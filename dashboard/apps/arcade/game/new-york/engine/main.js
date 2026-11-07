@@ -20,6 +20,7 @@ import { buildRoadPaint } from './road-paint.js';
 import { ThirdPersonControllerManager } from './controllers.js';
 import { TouchControls } from './touch-controls.js';
 import { GamepadControls } from './gamepad-controls.js';
+import { StartScreen } from './start-screen.js';
 import { CameraSystem, CAMERA_PRESETS } from './cameras.js';
 import { LightingSystem } from './lighting.js';
 import { NYCMapSystem } from './nyc-map.js';
@@ -198,7 +199,12 @@ async function initApp() {
   const touchControls = new TouchControls(controllerManager);
   const soundButton = document.getElementById('btn-sound');
   const audioSystem = new CityAudioSystem({ controllerManager, trafficSystem, highwayTraffic, streetDetails }, {
-    onStateChange: updateSoundButton
+    onStateChange: updateSoundButton,
+    // The player's own hits shake a gamepad that can (the listener sees every collision in the city)
+    onImpact: (impact) => {
+      const player = controllerManager.getActiveEntity();
+      if (player && (impact.a === player || impact.b === player)) gamepadControls?.impact(impact.speed);
+    }
   });
   function updateSoundButton() {
     if (!soundButton) return;
@@ -211,6 +217,7 @@ async function initApp() {
     gameMenu?.refresh();
   }
   let gameMenu = null;
+  let startScreen = null;
   soundButton?.addEventListener('click', () => audioSystem.setEnabled(!audioSystem.enabled));
   updateSoundButton();
   // pagehide also covers navigation away on mobile; preserve the context across back-forward cache restores.
@@ -321,8 +328,36 @@ async function initApp() {
     },
     onCycleCamera: cycleCamera,
     onToggleMap: () => mapSystem.toggleFullMap(!mapSystem.isFullMapOpen),
-    onCloseMap: () => mapSystem.toggleFullMap(false)
+    onCloseMap: () => mapSystem.toggleFullMap(false),
+    onHorn: () => audioSystem.honk(controllerManager.getActiveEntity()),
+    onPadChange: ({ connected, name }) => {
+      showPadNotice(t(connected ? 'controls.padConnected' : 'controls.padDisconnected', { name: name || t('controls.gamepad') }));
+      gameMenu?.refresh();
+      startScreen?.refresh();
+    }
   });
+  // A gamepad plugged in, paired or lost says so for a few seconds. It is a manual popover, shown afresh each time, so it
+  // lands in the top layer above the menu's modal dialog too.
+  const padNotice = document.getElementById('pad-notice');
+  let padNoticeTimer = 0;
+  function showPadNotice(text) {
+    if (!padNotice) return;
+    padNotice.textContent = text;
+    try {
+      if (padNotice.matches(':popover-open')) padNotice.hidePopover();
+      padNotice.showPopover();
+    } catch {
+      padNotice.hidden = false;
+    }
+    clearTimeout(padNoticeTimer);
+    padNoticeTimer = setTimeout(() => {
+      try {
+        padNotice.hidePopover();
+      } catch {
+        padNotice.hidden = true;
+      }
+    }, 4000);
+  }
 
   // Keyboard guide for each mode: [keys, action] (the action is a key of controls.<mode>; 'Drag' is the mouse)
   const controlHints = {
@@ -333,10 +368,11 @@ async function initApp() {
   };
   const keyName = (key) => (key === 'Drag' ? t('controls.drag') : key);
   const modeHints = (mode) => (controlHints[mode] || []).map(([keys, action]) => [keys.map(keyName), t(`controls.${mode}.${action}`)]);
-  // The menu's Controls page: this mode's keys, the ones that work everywhere, and the gamepad's
+  // The menu's Controls page: this mode's keys, the ones that work everywhere, and the gamepad's - first, under the pad's
+  // name, while one is connected
   function controlSections(mode) {
     const driving = mode === 'car' || mode === 'cyclist';
-    return [
+    const keyboard = [
       { title: t(`modes.${mode}`), rows: modeHints(mode) },
       {
         title: t('controls.general'),
@@ -349,25 +385,29 @@ async function initApp() {
           [['N'], t('controls.sound')],
           [['Esc'], t('controls.menu')]
         ]
-      },
-      {
-        title: t('controls.gamepad'),
-        rows: [
-          [[t('controls.leftStick')], t('controls.padMove')],
-          [[t('controls.rightStick')], t('controls.padLook')],
-          ...(driving ? [[['RT', 'LT'], t('controls.padThrottle')]] : []),
-          ...(mode === 'helicopter'
-            ? [[['RT', 'A'], t('controls.helicopter.up')], [['LT', 'B'], t('controls.helicopter.down')], [['L3'], t('controls.helicopter.turbo')]]
-            : []),
-          ...(mode === 'person' ? [[['A'], t('controls.padJump')]] : []),
-          [['Y'], t('controls.padCamera')],
-          [['LB', 'RB'], t('controls.padModes')],
-          [['↑', '↓'], t('controls.padZoom')],
-          [['Back'], t('controls.padMap')],
-          [['Start'], t('controls.padMenu')]
-        ]
       }
     ];
+    const pad = gamepadControls.connected;
+    const gamepad = {
+      title: pad && gamepadControls.padName ? t('controls.gamepadNamed', { name: gamepadControls.padName }) : t('controls.gamepad'),
+      rows: [
+        [[t('controls.leftStick')], t('controls.padMove')],
+        [[t('controls.rightStick')], t('controls.padLook')],
+        ...(driving ? [[['RT', 'LT'], t('controls.padThrottle')]] : []),
+        ...(mode === 'helicopter'
+          ? [[['RT', 'A'], t('controls.helicopter.up')], [['LT', 'B'], t('controls.helicopter.down')], [['L3'], t('controls.helicopter.turbo')]]
+          : []),
+        ...(mode === 'person' ? [[['A'], t('controls.padJump')]] : []),
+        ...(mode === 'car' ? [[['X'], t('controls.car.horn')]] : []),
+        [['Y'], t('controls.padCamera')],
+        [['LB', 'RB'], t('controls.padModes')],
+        [['↑', '↓'], t('controls.padZoom')],
+        [['Back'], t('controls.padMap')],
+        [['Start'], t('controls.padMenu')],
+        ...(pad && !gamepadControls.standard ? [[['?'], t('controls.padUnmapped')]] : [])
+      ]
+    };
+    return pad ? [gamepad, ...keyboard] : [...keyboard, gamepad];
   }
   // Top speeds in mph (controllers.js caps them at 8.2, 36, 19 & 52 m/s, the helicopter 83 with turbo): full scale of the
   // speed meter
@@ -653,19 +693,30 @@ async function initApp() {
     mode: () => controllerManager.activeMode,
     controls: controlSections,
     quality: () => (qualitySetting === 'auto' ? `${t('quality.auto')} · ${t(`quality.${quality}`)}` : t(`quality.${qualitySetting}`)),
-    blocked: () => !playing || mapSystem.isFullMapOpen || (supportsPopover && document.querySelector('.popover:popover-open') !== null),
-    onOpenChange: (open) => {
-      paused = open;
-      if (open) closePopovers();
-      controllerManager.resetInput();
-      touchControls.setEnabled(!open);
-      gamepadControls.reset();
-      audioSystem.setPaused(open);
-      // A frame that ran before the pause must not count the menu's time as one long step
-      lastTime = performance.now();
-    }
+    blocked: () => !playing || startScreen?.isOpen || mapSystem.isFullMapOpen || (supportsPopover && document.querySelector('.popover:popover-open') !== null),
+    onOpenChange: setPaused
   });
   gamepadControls.callbacks.menu = gameMenu;
+  // The menu and the start screen both hold the city still while they are open
+  function setPaused(open) {
+    paused = open;
+    if (open) closePopovers();
+    controllerManager.resetInput();
+    touchControls.setEnabled(!open);
+    gamepadControls.reset();
+    audioSystem.setPaused(open);
+    // A frame that ran before the pause must not count the menu's time as one long step
+    lastTime = performance.now();
+  }
+  // Before anything moves, the reader picks how they play (start-screen.js); it opens once the city is on screen
+  startScreen = new StartScreen({
+    gamepad: () => gamepadControls,
+    onOpenChange: setPaused,
+    onChoose: (choice) => {
+      document.body.dataset.input = choice;
+    }
+  });
+  gamepadControls.callbacks.startScreen = startScreen;
 
   // Text drawn by code follows the reader's language too (the page's own text is translated by i18n.js)
   function renderTexts() {
@@ -872,6 +923,7 @@ async function initApp() {
         initTimings = null;
         hideLoadingScreen();
         playing = true;
+        startScreen.open();
         pipelineGate.setBudget(PLAYING_BUILD_BUDGET);
         sunShadow.autoUpdate = true;
         audioSystem.ready = true;

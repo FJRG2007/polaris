@@ -149,6 +149,9 @@ async function buildNewYork() {
         write(bundledData[placeholder], bytes);
     }
 
+    // The library card's cover, under the fixed name the game's definition gives it
+    write("cover.svg", readFileSync(join(source, "cover.svg")));
+
     const template = readFileSync(join(source, "index.html"), "utf8");
     for (const placeholder of [
         "GAME_FILE",

@@ -1,4 +1,5 @@
 {
+    "name": "Skyline Roam",
     "loading": {
         "stage": {
             "data": "Downloading the map",
@@ -31,7 +32,7 @@
                 "text": "Turn on hardware acceleration in the browser, then reload."
             },
             "error": {
-                "title": "New York could not start",
+                "title": "Skyline Roam could not start",
                 "text": "Something stopped the city while it was loading. Reload to try again."
             },
             "lost": {
@@ -199,7 +200,11 @@
         "padModes": "Change mode",
         "padZoom": "Zoom",
         "padMap": "Street map",
-        "padMenu": "Menu"
+        "padMenu": "Menu",
+        "gamepadNamed": "Gamepad: {name}",
+        "padConnected": "{name} connected",
+        "padDisconnected": "{name} disconnected",
+        "padUnmapped": "This gamepad has no standard layout, so some buttons may differ"
     },
     "menu": {
         "title": "Paused",
@@ -214,6 +219,23 @@
         "off": "Off",
         "volume": "Volume",
         "soundOn": "Play sound",
-        "noAudio": "{surface, select, app {Sound is not available in this app.} other {Sound is not available in this browser.}}"
+        "noAudio": "{surface, select, app {Sound is not available in this app.} other {Sound is not available in this browser.}}",
+        "callMute": "Mute microphone",
+        "callUnmute": "Unmute microphone",
+        "callBack": "Back to the call",
+        "callLeave": "Leave the call"
+    },
+    "start": {
+        "title": "How do you want to play?",
+        "controllerTitle": "Use a controller",
+        "device": "Play on this device",
+        "deviceHint": "Keyboard and mouse, or touch",
+        "controller": "Use a controller",
+        "controllerHint": "A Bluetooth or USB gamepad",
+        "gamepad": "Gamepad",
+        "padWaiting": "Turn it on and press any button",
+        "padReady": "Ready",
+        "phone": "Phone",
+        "phoneSoon": "Pairing a phone comes later"
     }
 }

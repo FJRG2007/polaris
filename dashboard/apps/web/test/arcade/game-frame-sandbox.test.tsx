@@ -83,6 +83,65 @@ describe("the game's frame", () => {
         );
     });
 
+    it("lends the game the call's controls and does what its menu asks", async () => {
+        const controls = {
+            micOn: true,
+            toggleMic: vi.fn(),
+            leaveGame: vi.fn(),
+            leaveCall: vi.fn()
+        };
+        const view = render(<GameFrame game={game} call={{ ...call!, controls }} />);
+        const frame = document.querySelector("iframe")!;
+        const post = vi.spyOn(frame.contentWindow!, "postMessage");
+        const tell = (data: unknown) =>
+            act(async () => {
+                window.dispatchEvent(
+                    new MessageEvent("message", {
+                        data,
+                        origin: "null",
+                        source: frame.contentWindow
+                    })
+                );
+            });
+
+        await tell({ type: "polaris-game:ready" });
+        expect(post).toHaveBeenCalledWith(
+            { type: "polaris-game:call", controls: true, micOn: true },
+            "*"
+        );
+        view.rerender(
+            <GameFrame game={game} call={{ ...call!, controls: { ...controls, micOn: false } }} />
+        );
+        expect(post).toHaveBeenLastCalledWith(
+            { type: "polaris-game:call", controls: true, micOn: false },
+            "*"
+        );
+
+        await tell({ type: "polaris-game:call-action", action: "mic" });
+        await tell({ type: "polaris-game:call-action", action: "leave-game" });
+        await tell({ type: "polaris-game:call-action", action: "leave-call" });
+        await tell({ type: "polaris-game:call-action", action: "something-else" });
+        expect(controls.toggleMic).toHaveBeenCalledTimes(1);
+        expect(controls.leaveGame).toHaveBeenCalledTimes(1);
+        expect(controls.leaveCall).toHaveBeenCalledTimes(1);
+    });
+
+    it("offers no call controls where there is no call to control", async () => {
+        render(<GameFrame game={game} call={call} />);
+        const frame = document.querySelector("iframe")!;
+        const post = vi.spyOn(frame.contentWindow!, "postMessage");
+        await act(async () => {
+            window.dispatchEvent(
+                new MessageEvent("message", {
+                    data: { type: "polaris-game:ready" },
+                    origin: "null",
+                    source: frame.contentWindow
+                })
+            );
+        });
+        expect(post).toHaveBeenCalledWith({ type: "polaris-game:call", controls: false }, "*");
+    });
+
     it("tells its own messages apart from everybody else's", () => {
         const own = {} as Window;
         expect(fromFrame({ source: own, origin: "null" }, own)).toBe(true);

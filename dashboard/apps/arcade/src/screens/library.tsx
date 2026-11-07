@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { Play } from "lucide-react";
 import { useArcadeT } from "./i18n";
+import { GameCover } from "./game-cover";
 import { GAMES } from "../games/registry";
 import { Button, Card, CardBody } from "@polaris/ui";
 
@@ -23,7 +24,8 @@ export function GamesScreen() {
                         const Icon = game.icon;
                         return (
                             <li key={game.id} className="min-w-0">
-                                <Card>
+                                <Card className="overflow-hidden">
+                                    <GameCover game={game} />
                                     <CardBody className="flex min-w-0 flex-col gap-3">
                                         <div className="flex min-w-0 items-center gap-3">
                                             <Icon className="h-8 w-8 shrink-0" aria-hidden />

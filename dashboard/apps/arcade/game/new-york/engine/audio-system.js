@@ -76,7 +76,7 @@ class SpatialEmitter {
 }
 
 class CityAudioSystem {
-  constructor(simulation, { onStateChange = () => {} } = {}) {
+  constructor(simulation, { onStateChange = () => {}, onImpact = null } = {}) {
     this.sources = new CityAudioSources(simulation);
     this.acoustics = new CityAcoustics(simulation.controllerManager);
     this.onStateChange = onStateChange;
@@ -107,7 +107,11 @@ class CityAudioSystem {
     this.collisionPairs = new WeakMap();
     this.collisionSequence = 0;
     this.collisionSystems = [simulation.controllerManager, simulation.trafficSystem];
-    this.onCollision = (impact) => this.crash(impact);
+    // The collision listener is single, so whatever else wants impacts (the gamepad's rumble) is called from here
+    this.onCollision = (impact) => {
+      this.crash(impact);
+      onImpact?.(impact);
+    };
     for (const system of this.collisionSystems) system.setCollisionListener?.(this.onCollision);
     this.motorParams = { speed: 0, load: 0, verticalSpeed: 0, doppler: 1, seed: 0 };
     this.windParams = { speed: 0, altitude: 0, night: 0, traffic: 0, enclosure: 0 };

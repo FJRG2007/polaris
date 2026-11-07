@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>New York</title>
+  <title data-t="name">Skyline Roam</title>
   <link rel="icon" href="data:," />
   <meta name="geo" content="./GEO_FILE" />
   <meta name="buildings" content="./BUILDINGS_FILE" />
@@ -42,6 +42,8 @@
       <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4.5 7h15M4.5 12h15M4.5 17h15"/></symbol>
       <symbol id="i-check" viewBox="0 0 24 24"><path d="m5.5 12.5 4.2 4.2 8.8-9.4"/></symbol>
       <symbol id="i-exit" viewBox="0 0 24 24"><path d="M14 4.5H6.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2H14M10 12h10M16.5 8.5 20 12l-3.5 3.5"/></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3ZM18.5 11a6.5 6.5 0 0 1-13 0M12 17.5V21"/></symbol>
+      <symbol id="i-hang-up" viewBox="0 0 24 24"><path d="M3 14.5c5-4.5 13-4.5 18 0l-2.2 2.6-3.3-1.4v-2.6c-2.3-.8-4.7-.8-7 0v2.6l-3.3 1.4Z"/></symbol>
       <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/></symbol>
     </defs>
   </svg>
@@ -50,7 +52,7 @@
   <div id="loading-overlay" class="is-pending">
     <div class="loader">
       <span class="mta-bullet loader-bullet" aria-hidden="true">NY</span>
-      <div class="loader-title">New York</div>
+      <div class="loader-title" data-t="name"></div>
       <div id="loading-bar" class="loader-steps" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <div class="loader-step" data-stage="data"><span class="loader-track"><span class="loader-fill"></span></span><span class="loader-step-label" data-t="loading.step.data"></span></div>
         <div class="loader-step" data-stage="build"><span class="loader-track"><span class="loader-fill"></span></span><span class="loader-step-label" data-t="loading.step.build"></span></div>
@@ -70,7 +72,7 @@
       <span class="mta-bullet" aria-hidden="true">NY</span>
       <div class="brand-titles">
         <div class="brand-heading">
-          <h1>New York</h1>
+          <h1 data-t="name"></h1>
         </div>
       </div>
     </div>
@@ -288,6 +290,27 @@
     </div>
   </section>
 
+  <!-- A gamepad connected or lost (main.js shows it for a few seconds) -->
+  <div id="pad-notice" class="panel pad-notice" popover="manual" role="status" aria-live="polite"></div>
+
+  <!-- Start screen (start-screen.js): how to play, chosen before anything moves -->
+  <dialog id="start-screen" class="game-menu start-screen" aria-labelledby="start-title">
+    <div class="panel menu-panel">
+      <header class="menu-head">
+        <button class="icon-btn menu-back" type="button" data-start-back hidden data-t-aria="menu.back" data-t-title="menu.back"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg></button>
+        <h2 id="start-title"></h2>
+      </header>
+      <div class="menu-view" data-start-view="main">
+        <button class="menu-item" type="button" data-start-choose="device"><span class="menu-option-text"><span class="menu-name" data-t="start.device"></span><span class="menu-sub" data-t="start.deviceHint"></span></span></button>
+        <button class="menu-item" type="button" data-start-open="controller"><span class="menu-option-text"><span class="menu-name" data-t="start.controller"></span><span class="menu-sub" data-t="start.controllerHint"></span></span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+      </div>
+      <div class="menu-view" data-start-view="controller" hidden>
+        <button class="menu-item" type="button" data-start-choose="gamepad" disabled><span class="menu-option-text"><span class="menu-name" data-t="start.gamepad"></span><span id="start-pad-status" class="menu-sub" aria-live="polite"></span></span></button>
+        <button class="menu-item" type="button" disabled><span class="menu-option-text"><span class="menu-name" data-t="start.phone"></span><span class="menu-sub" data-t="start.phoneSoon"></span></span></button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- Game menu (Esc): the game pauses while it is open -->
   <dialog id="game-menu" class="game-menu" aria-labelledby="menu-title">
     <div class="panel menu-panel">
@@ -301,6 +324,9 @@
         <button class="menu-item" type="button" data-menu-open="controls"><span class="menu-name" data-t="menu.controls"></span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
         <button class="menu-item" type="button" data-menu-open="sound"><span class="menu-name" data-t="menu.sound"></span><span class="menu-value" data-menu-value="sound"></span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
         <button class="menu-item" type="button" data-menu-open="mode"><span class="menu-name" data-t="menu.mode"></span><span class="menu-value" data-menu-value="mode"></span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+        <button class="menu-item" type="button" data-call-action="mic" hidden><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span class="menu-name"></span></button>
+        <button class="menu-item" type="button" data-call-action="leave-game" hidden><svg class="icon" aria-hidden="true"><use href="#i-exit"/></svg><span class="menu-name" data-t="menu.callBack"></span></button>
+        <button class="menu-item menu-exit" type="button" data-call-action="leave-call" hidden><svg class="icon" aria-hidden="true"><use href="#i-hang-up"/></svg><span class="menu-name" data-t="menu.callLeave"></span></button>
         <button class="menu-item menu-exit" type="button" data-menu-action="exit" hidden><svg class="icon" aria-hidden="true"><use href="#i-exit"/></svg><span class="menu-name" data-t="menu.exit"></span></button>
       </div>
       <div class="menu-view" data-view="graphics" hidden>

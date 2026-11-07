@@ -1,9 +1,11 @@
 // The game menu (Esc, the menu button, or Start on a gamepad): resume, graphics, controls, sound, mode and, when the
-// framing page can take the reader back to its list of games, exit. The game pauses while it is open (main.js stops
+// framing page can take the reader back to its list of games, exit. In a call it also has the call's microphone, the
+// way back to the call and the hang-up: the call's own bar is out of reach of a gamepad, and of the keyboard while the
+// game has it. The game pauses while it is open (main.js stops
 // the simulation and the sound) and the keyboard drives only the menu. It is a modal <dialog>, so focus stays inside
 // it and it sits above every popover.
 import { t, formatNumber, onLocaleChange } from './i18n.js';
-import { exitAvailable, exitGame, onExitAvailability } from './embed.js';
+import { callAction, callControls, exitAvailable, exitGame, onCallControls, onExitAvailability } from './embed.js';
 
 const VIEWS = ['main', 'graphics', 'controls', 'sound', 'mode'];
 const FOCUSABLE = 'button:not([hidden]):not(:disabled), input:not(:disabled)';
@@ -29,6 +31,8 @@ class GameMenu {
     this.title = document.getElementById('menu-title');
     this.back = this.dialog.querySelector('[data-menu-back]');
     this.exitButton = this.dialog.querySelector('[data-menu-action="exit"]');
+    this.callButtons = [...this.dialog.querySelectorAll('[data-call-action]')];
+    this.micButton = this.dialog.querySelector('[data-call-action="mic"]');
     this.soundToggle = document.getElementById('menu-sound-toggle');
     this.volume = document.getElementById('menu-volume');
     this.volumeValue = document.getElementById('menu-volume-value');
@@ -44,6 +48,11 @@ class GameMenu {
       else if (target.hasAttribute('data-menu-back')) this.show('main');
       else if (target.dataset.menuAction === 'resume') this.close();
       else if (target.dataset.menuAction === 'exit') exitGame();
+      else if (target.dataset.callAction) {
+        callAction(target.dataset.callAction);
+        // Leaving takes the game away; the microphone keeps the menu open, to see it change
+        if (target.dataset.callAction !== 'mic') this.close();
+      }
       else if (target.hasAttribute('data-menu-close')) this.close();
     });
     // The browser's own Esc handling would close the dialog without the game knowing why
@@ -58,6 +67,7 @@ class GameMenu {
     // Capture, ahead of every other key handler in the page: while the menu is open no key reaches the game
     window.addEventListener('keydown', (e) => this.onKey(e), true);
     onExitAvailability(() => this.refresh());
+    onCallControls(() => this.refresh());
     onLocaleChange(() => this.refresh());
     this.refresh();
   }
@@ -159,6 +169,12 @@ class GameMenu {
   refresh() {
     this.title.textContent = t(this.view === 'main' ? 'menu.title' : `menu.${this.view}`);
     this.exitButton.hidden = !exitAvailable();
+    const call = callControls();
+    for (const button of this.callButtons) button.hidden = !call;
+    if (call) {
+      this.micButton.querySelector('.menu-name').textContent = t(call.micOn ? 'menu.callMute' : 'menu.callUnmute');
+      this.micButton.setAttribute('aria-pressed', String(!call.micOn));
+    }
     const audio = this.audio;
     const value = (name, text) => {
       const el = this.dialog.querySelector(`[data-menu-value="${name}"]`);

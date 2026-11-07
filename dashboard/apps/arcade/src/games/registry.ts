@@ -18,3 +18,8 @@ export function findGame(id: string): GameDefinition | null {
 export function gameFrameSrc(game: GameDefinition): string {
     return `/api/app-bundles/arcade/current/assets/${game.id}/index.html`;
 }
+
+/** Where a game's cover is served, from the same folder as its page; null for a game without one. */
+export function gameCoverSrc(game: GameDefinition): string | null {
+    return game.cover ? `/api/app-bundles/arcade/current/assets/${game.id}/${game.cover}` : null;
+}

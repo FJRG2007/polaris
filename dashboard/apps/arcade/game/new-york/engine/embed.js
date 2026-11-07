@@ -10,10 +10,12 @@
 //      polaris-game:state { x, y, z, heading, mode, speed, lamps? }   (10 a second, while joined)
 //                                                              lamps: { brake 0..1, reverse, signal -1|0|1 }, only while one is lit
 //      polaris-game:exit                                       (the reader chose Exit game in the menu)
+//      polaris-game:call-action { action: 'mic' | 'leave-game' | 'leave-call' }   (a call control in the menu)
 // In:  polaris-game:setup { locale, messages, exit }            (the reader's words; whether Exit game is offered)
 //      polaris-game:join { self: { id, name } }
 //      polaris-game:players { players: [{ id, name, x, y, z, heading, mode, lamps? }] }   (everyone else, replaces the last list)
 //      polaris-game:leave
+//      polaris-game:call { controls, micOn }                  (whether the menu offers the call's controls)
 
 import { applyCatalog, keepFallback, readCatalog } from './i18n.js';
 
@@ -31,6 +33,9 @@ let canExit = false;
 const listeners = new Set();
 const progressListeners = new Set();
 const exitListeners = new Set();
+let call = null;
+const callListeners = new Set();
+const CALL_ACTIONS = new Set(['mic', 'leave-game', 'leave-call']);
 
 /** Post one message to the framing page; nothing when the page is opened on its own. */
 export function tellHost(message) {
@@ -52,6 +57,21 @@ export function onProgress(listener) {
 /** Whether the host takes the reader back to its list of games (the menu's Exit game). */
 export function exitAvailable() {
   return canExit;
+}
+
+/** The call the game is played in, when it lends the menu its controls: `{ micOn }`, or null. */
+export function callControls() {
+  return call;
+}
+
+/** Called whenever the call's controls come, go or change (the microphone). */
+export function onCallControls(listener) {
+  callListeners.add(listener);
+}
+
+/** One of the call's controls, pressed in the menu. */
+export function callAction(action) {
+  if (call && CALL_ACTIONS.has(action)) tellHost({ type: 'polaris-game:call-action', action });
 }
 
 /** Called when the host says whether Exit game is offered. */
@@ -132,6 +152,9 @@ window.addEventListener('message', (event) => {
     else keepFallback();
     canExit = data.exit === true;
     for (const listener of exitListeners) listener(canExit);
+  } else if (data.type === 'polaris-game:call') {
+    call = data.controls === true ? { micOn: data.micOn === true } : null;
+    for (const listener of callListeners) listener(call);
   } else if (data.type === 'polaris-game:join') {
     const self = data.self;
     if (self && text(self.id, 128) && text(self.name, 64)) joined = { id: self.id, name: self.name };

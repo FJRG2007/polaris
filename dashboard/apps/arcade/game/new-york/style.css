@@ -1806,3 +1806,19 @@ body.touch-enabled .pop-item { min-height: 44px; }
 .loader-reload-btn:active {
   transform: scale(0.97);
 }
+
+/* A gamepad connected or lost: a short note at the top of the screen */
+.pad-notice {
+  inset: 16px auto auto 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 16px;
+  border: 0;
+  color: var(--text);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}

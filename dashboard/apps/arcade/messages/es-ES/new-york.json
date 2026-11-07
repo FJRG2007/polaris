@@ -1,4 +1,5 @@
 {
+    "name": "Skyline libre",
     "loading": {
         "stage": {
             "data": "Descargando el mapa",
@@ -31,7 +32,7 @@
                 "text": "Activa la aceleración por hardware en el navegador y recarga."
             },
             "error": {
-                "title": "Nueva York no pudo iniciarse",
+                "title": "Skyline libre no pudo iniciarse",
                 "text": "Algo detuvo la ciudad mientras cargaba. Recarga para volver a intentarlo."
             },
             "lost": {
@@ -199,7 +200,11 @@
         "padModes": "Cambiar modo",
         "padZoom": "Zoom",
         "padMap": "Callejero",
-        "padMenu": "Menú"
+        "padMenu": "Menú",
+        "gamepadNamed": "Mando: {name}",
+        "padConnected": "{name} conectado",
+        "padDisconnected": "{name} desconectado",
+        "padUnmapped": "Este mando no tiene el diseño estándar; algunos botones pueden variar"
     },
     "menu": {
         "title": "En pausa",
@@ -214,6 +219,23 @@
         "off": "No",
         "volume": "Volumen",
         "soundOn": "Con sonido",
-        "noAudio": "{surface, select, app {El sonido no está disponible en esta app.} other {El sonido no está disponible en este navegador.}}"
+        "noAudio": "{surface, select, app {El sonido no está disponible en esta app.} other {El sonido no está disponible en este navegador.}}",
+        "callMute": "Silenciar micrófono",
+        "callUnmute": "Activar micrófono",
+        "callBack": "Volver a la llamada",
+        "callLeave": "Colgar la llamada"
+    },
+    "start": {
+        "title": "¿Cómo quieres jugar?",
+        "controllerTitle": "Usar un mando",
+        "device": "Jugar en este equipo",
+        "deviceHint": "Teclado y ratón, o táctil",
+        "controller": "Usar un mando",
+        "controllerHint": "Un mando Bluetooth o USB",
+        "gamepad": "Mando",
+        "padWaiting": "Enciéndelo y pulsa cualquier botón",
+        "padReady": "Listo",
+        "phone": "Teléfono",
+        "phoneSoon": "Vincular un móvil llega después"
     }
 }
