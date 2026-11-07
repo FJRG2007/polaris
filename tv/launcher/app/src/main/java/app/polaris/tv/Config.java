@@ -44,6 +44,9 @@ final class Config {
     static final String WALLPAPER_CHOICE_KEY = "wallpaper_choice";
     static final String DOCK_OPACITY_KEY = "dock_opacity";
     static final String CLOCK_FORMAT_KEY = "clock_format";
+    /** Language picked in Launcher settings: a tag, or "" for the TV's. Unset, the theme's locale applies. A theme
+     *  change keeps it, since it belongs to whoever watches, not to the look. */
+    static final String LANGUAGE_KEY = "language_choice";
     /**
      * Counts the changes made in Launcher settings. Home remembers the count it was built with and rebuilds on
      * resume when it differs, however the settings were left (see MainActivity#onResume).
@@ -681,6 +684,7 @@ final class Config {
         int dockOpacity = json == null ? 100 : integer(json, "dock_opacity", 100, 30, 100);
         dockOpacity = chosenDockOpacity(choices.getInt(DOCK_OPACITY_KEY, -1), dockOpacity);
         clockFormat = choices.getString(CLOCK_FORMAT_KEY, clockFormat);
+        locale = choices.getString(LANGUAGE_KEY, locale);
         String wallpaperOrder = json == null ? WallpaperRotation.ORDER_SHUFFLE
                 : string(json, "wallpaper_order", WallpaperRotation.ORDER_SHUFFLE);
         // An unknown order must not silently change how an existing collection rotates.

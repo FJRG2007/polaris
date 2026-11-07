@@ -295,9 +295,10 @@
     <!-- Inputs, Wi-Fi and Settings folded into one round gear at the top right, like Google TV: OK drops a menu
          with the three, hold OK keeps the launcher menu. Off by default; a theme can set "top_menu": true. -->
     <bool name="top_menu">false</bool>
-    <!-- A direct Launcher settings action instead of TV Settings in the header (or top_menu).
-         Off by default; a theme can set "launcher_settings_button": true. -->
-    <bool name="launcher_settings_button">false</bool>
+    <!-- A direct Launcher settings action instead of TV Settings in the header (or top_menu). On by default
+         since 3.6, so language, layout and linking are one click from Home; TV settings is the page's second row.
+         A theme can set "launcher_settings_button": false for the TV's own settings there. -->
+    <bool name="launcher_settings_button">true</bool>
     <!-- The dock band as light frosted glass, like the Inputs, Wi-Fi and Settings pills, so a sky or wallpaper shows
          through it. false (the default) keeps the solid near-black band, or the cinematic shelf's dark glass. Can
          also be set with "dock_glass": true in a theme's config.json. -->

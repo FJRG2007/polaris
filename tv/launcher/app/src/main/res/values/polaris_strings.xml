@@ -78,4 +78,8 @@
         <item quantity="one">%d alert</item>
         <item quantity="other">%d alerts</item>
     </plurals>
+    <string name="polaris_link_pill">Link to Polaris</string>
+    <string name="language_row">Language: %1$s</string>
+    <string name="language_title">Language</string>
+    <string name="language_tv">Same as the TV</string>
 </resources>

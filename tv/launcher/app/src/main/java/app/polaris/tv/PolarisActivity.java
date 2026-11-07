@@ -41,6 +41,8 @@ public final class PolarisActivity extends Activity {
     private TextView instanceLine;
     private TextView countsLine;
     private TextView addressLine;
+    /** The address to link to, from the installer. */
+    static final String EXTRA_ORIGIN = "origin";
     private volatile boolean closed;
     private int attempt;
 
@@ -74,8 +76,17 @@ public final class PolarisActivity extends Activity {
             connect();
             return true;
         });
-        if (PolarisLink.connected(this)) showConnected();
-        else showForm(null);
+        if (PolarisLink.connected(this)) {
+            showConnected();
+            return;
+        }
+        showForm(null);
+        // Opened by the installer (the LinkFromInstall alias): its Polaris, so the code shows with nothing typed.
+        String from = getIntent().getStringExtra(EXTRA_ORIGIN);
+        if (from != null && PolarisFailover.readTyped(from) != null) {
+            address.setText(from);
+            connect();
+        }
     }
 
     @Override

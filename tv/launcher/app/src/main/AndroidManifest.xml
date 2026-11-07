@@ -143,6 +143,14 @@
             android:name=".PolarisActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+        <!-- The installer opens the link screen with its Polaris's address filled in (extra "origin"), over
+             adb right after the install. Only the shell holds WRITE_SECURE_SETTINGS, so no app on the TV can
+             open it, let alone point it at an address of its choosing. -->
+        <activity-alias
+            android:name=".LinkFromInstall"
+            android:targetActivity=".PolarisActivity"
+            android:exported="true"
+            android:permission="android.permission.WRITE_SECURE_SETTINGS" />
         <activity
             android:name=".QuickSettingsActivity"
             android:exported="false"

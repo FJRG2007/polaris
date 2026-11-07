@@ -35,6 +35,17 @@
             android:text="@string/polaris_settings_row" />
 
         <TextView
+            android:id="@+id/languageChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp" />
+
+        <TextView
+            android:id="@+id/tvSettingsChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp"
+            android:text="@string/tv_settings" />
+
+        <TextView
             android:id="@+id/dnsChoice"
             style="@style/SettingsRow"
             android:layout_marginTop="10dp" />
@@ -180,10 +191,5 @@
             android:textColor="#FFACB8C1"
             android:textSize="14sp" />
 
-        <TextView
-            android:id="@+id/tvSettingsChoice"
-            style="@style/SettingsRow"
-            android:layout_marginTop="18dp"
-            android:text="@string/tv_settings" />
     </LinearLayout>
 </ScrollView>

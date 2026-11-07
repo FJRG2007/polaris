@@ -1088,14 +1088,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         tileRefresh.onStart();
     }
 
-    /** Nothing at all happens on a TV with no Polaris: no thread, no socket. */
+    /**
+     * A TV with no Polaris shows the pill as "Link to Polaris", the one way in to linking it; nothing else
+     * happens then: no thread, no socket.
+     */
     private void refreshPolaris() {
+        btnPolaris.setVisibility(View.VISIBLE);
         if (!PolarisLink.connected(this)) {
-            if (btnPolaris.hasFocus()) findViewById(R.id.btnSettings).requestFocus();
-            btnPolaris.setVisibility(View.GONE);
+            btnPolaris.setText(R.string.polaris_link_pill);
             return;
         }
-        btnPolaris.setVisibility(View.VISIBLE);
+        // Just linked: drop the invitation at once instead of after the first answer.
+        if (getString(R.string.polaris_link_pill).contentEquals(btnPolaris.getText())) {
+            btnPolaris.setText(R.string.polaris_title);
+        }
         long now = SystemClock.elapsedRealtime();
         if (polarisAskedAt != 0 && now - polarisAskedAt < PolarisLink.STATE_MS) return;
         polarisAskedAt = now;
