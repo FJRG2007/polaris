@@ -116,7 +116,7 @@ export function toolInputSummary(input: unknown): string {
     if (typeof input === "string") return clip(input, MAX_TOOL_INPUT_CHARS);
     if (!input || typeof input !== "object") return "";
     const record = input as Record<string, unknown>;
-    for (const key of ["command", "file_path", "path", "pattern", "url", "query", "description", "prompt"]) {
+    for (const key of ["command", "file_path", "pattern", "path", "url", "query", "description", "prompt"]) {
         const value = record[key];
         if (typeof value === "string" && value.trim()) return clip(value.trim(), MAX_TOOL_INPUT_CHARS);
     }

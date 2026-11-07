@@ -139,7 +139,10 @@ export async function readTranscript(
     path: string,
     offset: number,
     run: (script: string) => Promise<string>,
-    { maxChunks = MAX_CHUNKS_PER_READ }: { maxChunks?: number } = {}
+    {
+        maxChunks = MAX_CHUNKS_PER_READ,
+        maxLineBytes = MAX_LINE_BYTES
+    }: { maxChunks?: number; maxLineBytes?: number } = {}
 ): Promise<TranscriptRead> {
     let restarted = false;
     let skipped = 0;
@@ -178,7 +181,7 @@ export async function readTranscript(
         held = held.subarray(from);
         heldAt += from;
 
-        if (held.length > MAX_LINE_BYTES) {
+        if (held.length > maxLineBytes) {
             const line = parseTranscriptAnswer(await run(transcriptLineScript(path, heldAt)));
             if (!line || line.kind !== "line" || line.length <= 0) break;
             // Not finished being written: wait for it rather than skip half.
