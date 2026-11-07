@@ -175,6 +175,10 @@
             "types": "./src/tv-compat/tv-checker.tsx",
             "import": "./src/tv-compat/tv-checker.tsx"
         },
+        "./tv-gallery": {
+            "types": "./src/tv-compat/tv-gallery.tsx",
+            "import": "./src/tv-compat/tv-gallery.tsx"
+        },
         "./i18n": {
             "types": "./src/i18n.tsx",
             "import": "./src/i18n.tsx"
