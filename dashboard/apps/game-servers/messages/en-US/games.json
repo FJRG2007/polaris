@@ -1040,7 +1040,7 @@
             "luckyblock": {
                 "name": "Lucky blocks",
                 "summary": "Break a block, take what it gives you, hope it was not the bad one.",
-                "setup": "The lucky blocks are in the map, so without one this is an empty world in adventure mode."
+                "setup": "Lucky blocks turn up across the world, and anyone can craft one from eight gold ingots around a quartz. No mod or resource pack needed to join."
             },
             "shrinking-world": {
                 "name": "Shrinking world",

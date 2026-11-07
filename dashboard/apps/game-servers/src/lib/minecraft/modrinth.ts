@@ -404,7 +404,8 @@ export async function readInstalledProjects(
             fitsVersion: isGameVersion(pinned) ? project.game_versions.includes(pinned) : null,
             // A project that lists no loader at all is a datapoint Modrinth is
             // missing, not a refusal - so it is not held against it.
-            fitsLoader: project.loaders.length === 0 || project.loaders.includes(loader)
+            fitsLoader:
+                project.loaders.length === 0 || project.loaders.includes(entryLoader(entry, loader))
         };
     });
 }
@@ -485,7 +486,11 @@ export async function readConflicts(
     const entryFor = entriesBySlug(slugs);
 
     const releases = await walk(listed.data, (entry) =>
-        projectVersions(entry.slug, loader, wanted)
+        projectVersions(
+            entry.slug,
+            entryLoader(entryFor.get(entry.slug.toLowerCase()) ?? "", loader),
+            wanted
+        )
     );
     const conflicts: ModrinthConflict[] = [];
     for (const [index, entry] of listed.data.entries()) {
@@ -673,7 +678,28 @@ function projectVersions(slug: string, loader: string, version = ""): Promise<un
     ).catch(() => null);
 }
 
-/** One entry of MODRINTH_PROJECTS, as the three things its syntax can carry. */
+/**
+ * The loaders an entry may be prefixed with, as the image's own parser lists them
+ * (mc-image-helper's `Loader`). A first part outside this set is the project.
+ */
+const ENTRY_LOADERS: ReadonlySet<string> = new Set([
+    "fabric",
+    "quilt",
+    "forge",
+    "neoforge",
+    "bukkit",
+    "spigot",
+    "paper",
+    "folia",
+    "pufferfish",
+    "leaf",
+    "purpur",
+    "bungeecord",
+    "velocity",
+    "datapack"
+]);
+
+/** One entry of MODRINTH_PROJECTS, as the things its syntax can carry. */
 export interface ProjectEntry {
     /** The project, with no "?" left on it. Empty for anything unaskable. */
     readonly slug: string;
@@ -682,6 +708,9 @@ export interface ProjectEntry {
     readonly optional: boolean;
     /** What followed the ":", which is a version, a release type, or both. */
     readonly parts: readonly string[];
+    /** The loader the entry names before the project - `datapack:terralith` -
+     *  which overrides the server's own for that one entry. Null for none. */
+    readonly loader: string | null;
 }
 
 /**
@@ -695,17 +724,30 @@ export interface ProjectEntry {
  *
  * Both spellings are taken, because the reader that was wrong about the first
  * was the one writing the second, and lists holding either are already deployed.
+ *
+ * A leading loader is read the way the image reads it: `datapack:ly-lucky-blocks`
+ * is the project `ly-lucky-blocks` installed as a datapack, not a project called
+ * "datapack" pinned to a version of that name.
  */
 export function splitEntry(entry: string): ProjectEntry {
-    const trimmed = entry.trim();
+    const all = entry.trim().split(":");
+    const first = all[0]?.trim().toLowerCase() ?? "";
+    const loader = all.length > 1 && ENTRY_LOADERS.has(first) ? first : null;
+    const trimmed = (loader ? all.slice(1) : all).join(":").trim();
     const head = trimmed.split(":")[0]?.trim() ?? "";
     const optional = /\?+$/.test(trimmed) || /\?+$/.test(head);
     const [slug = "", ...rest] = trimmed.replace(/\?+$/, "").split(":");
     return {
         slug: slug.trim().replace(/\?+$/, ""),
         optional,
-        parts: rest.map((part) => part.trim().replace(/\?+$/, "")).filter((part) => part.length > 0)
+        parts: rest.map((part) => part.trim().replace(/\?+$/, "")).filter((part) => part.length > 0),
+        loader
     };
+}
+
+/** The loader one entry is looked up with: its own prefix, else the server's. */
+export function entryLoader(entry: string, fallback: string): string {
+    return splitEntry(entry).loader ?? fallback;
 }
 
 /**
@@ -801,11 +843,13 @@ export function pinnedBuild(entry: string): string | null {
  * it off the end of a pinned version instead would be inventing a third form.
  */
 export function repinEntry(entry: string, build: string): string {
-    const { slug, optional, parts } = splitEntry(entry);
+    const { slug, optional, parts, loader } = splitEntry(entry);
     const kept = parts.filter((part) =>
         (RELEASE_TYPES as readonly string[]).includes(part.toLowerCase())
     );
-    return [`${slug}${optional ? "?" : ""}`, ...kept, build].join(":");
+    return [...(loader ? [loader] : []), `${slug}${optional ? "?" : ""}`, ...kept, build].join(
+        ":"
+    );
 }
 
 const buildSchema = someBuilds(
@@ -993,7 +1037,12 @@ export async function newestBuilds(
     const wanted = (version ?? "").trim();
     const pinned = entries.filter((entry) => projectSlug(entry) && pinnedBuild(entry));
     const builds = await walk(pinned, (entry) =>
-        admittedBuild(projectSlug(entry) as string, loader, wanted, entryReleaseType(entry))
+        admittedBuild(
+            projectSlug(entry) as string,
+            entryLoader(entry, loader),
+            wanted,
+            entryReleaseType(entry)
+        )
     );
     for (const [index, entry] of pinned.entries()) {
         const build = builds[index] ?? null;
@@ -1076,7 +1125,11 @@ export async function readRequirements(
 
     const needed: { by: string; id: string; release: ReleaseType }[] = [];
     const releases = await walk(listed.data, (project) =>
-        projectVersions(project.slug, loader, wanted)
+        projectVersions(
+            project.slug,
+            entryLoader(entryFor.get(project.slug.toLowerCase()) ?? "", loader),
+            wanted
+        )
     );
     for (const [index, project] of listed.data.entries()) {
         const entry =

@@ -19,6 +19,7 @@
 import { z } from "zod";
 import {
     admitsBuild,
+    entryLoader,
     entryReleaseType,
     modrinthApi,
     modrinthJson,
@@ -131,15 +132,23 @@ export async function commonVersions(
     loader = DEFAULT_LOADER
 ): Promise<string[]> {
     // Each entry carries its own answer to "how finished does a build have to be",
-    // so each is asked about the builds it would actually accept.
+    // so each is asked about the builds it would actually accept - and a datapack
+    // entry about its datapack builds, which no Paper lookup would ever find.
     const asked = projects
-        .map((entry) => ({ slug: projectSlug(entry), wanted: entryReleaseType(entry) }))
-        .filter((item): item is { slug: string; wanted: ReleaseType } => item.slug !== null);
+        .map((entry) => ({
+            slug: projectSlug(entry),
+            loader: entryLoader(entry, loader),
+            wanted: entryReleaseType(entry)
+        }))
+        .filter(
+            (item): item is { slug: string; loader: string; wanted: ReleaseType } =>
+                item.slug !== null
+        );
     if (asked.length === 0) return [];
 
     const [ordered, supported] = await Promise.all([
         releases(),
-        Promise.all(asked.map((item) => projectVersions(item.slug, loader, item.wanted)))
+        Promise.all(asked.map((item) => projectVersions(item.slug, item.loader, item.wanted)))
     ]);
     if (ordered.length === 0 || supported.some((versions) => versions.length === 0)) return [];
 
