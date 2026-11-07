@@ -20,7 +20,7 @@ import { REAL_TREES } from './tree-geodata.js';
 import { placeStreetTrees } from './tree-placements.js';
 import { createSubwayEntranceParts, createFoodCartParts } from './street-props.js';
 import { createSubwayEntrances } from './subway-entrances.js';
-import { pavedPlazaRects, centralParkClearings, parkTreeSites, parkLampSites } from './city-grid.js';
+import { pavedPlazaRects, centralParkClearings, parkTreeSites, parkLampSites, drawnGroundAt } from './city-grid.js';
 import { bryantParkLawn } from './landmarks.js';
 import { lightBudget } from './quality.js';
 
@@ -840,6 +840,7 @@ function buildStreetDetails(scene, colliders = []) {
 
   // B. Central Park (59th to 110th St, 5th Ave to Central Park West; city-config.js CENTRAL_PARK_BOUNDS), on the lawn
   const cp = CPB;
+  const firstParkTree = treePositions.length;
   // B1. Central Park South (59th St) dense woodland border
   for (let tx = cp.minX + 8; tx <= cp.maxX - 8; tx += 9.5) {
     treePositions.push({ x: tx, y: CP_LAWN_Y, z: cp.maxZ - 5, scale: 0.95, species: 0 });
@@ -926,6 +927,21 @@ function buildStreetDetails(scene, colliders = []) {
         treePositions.push({ x: tx, y: CP_LAWN_Y, z: tz, scale, species: mixSpecies(hashPos(tx, 4.4, tz), 0.4, 0.15) });
       }
     }
+  }
+
+  // The rows above are laid out on the park's rectangle (CPB), which runs past the real park line at its corners -
+  // Grand Army Plaza, Columbus Circle, the 110th St ends: each tree stands on the park ground drawn under it (wall, lawn,
+  // meadow) and one with no park under it, over the sidewalk or the street, is not planted
+  {
+    let kept = firstParkTree;
+    for (let i = firstParkTree; i < treePositions.length; i++) {
+      const t = treePositions[i];
+      const ground = drawnGroundAt(t.x, t.z);
+      if (ground === null) continue;
+      t.y = ground;
+      treePositions[kept++] = t;
+    }
+    treePositions.length = kept;
   }
 
   // B5. The squares, the other parks & the plazas (sites laid out by city-grid.js)

@@ -76,6 +76,16 @@ function addStreetGround(poly, height) {
   });
 }
 
+// The highest surface drawn under (x, z) that something can stand on, or null where none was registered
+function drawnGroundAt(x, z) {
+  let height = null;
+  for (const s of streetGroundSurfaces) {
+    if ((height === null || s.height > height) && x >= s.minX && x <= s.maxX && z >= s.minZ && z <= s.maxZ
+      && pointInPolygonXZ(s.poly, x, z)) height = s.height;
+  }
+  return height;
+}
+
 function getStreetGroundHeight(x, z) {
   let height = 0.22;
   for (const s of streetGroundSurfaces) {
@@ -3533,6 +3543,7 @@ function buildUnderpassPortal(frames, acc, quad, lights, colliders) {
 
 export {
   buildCityGrid,
+  drawnGroundAt,
   getStreetGroundHeight,
   batchStaticGroupMeshes,
   centralParkClearings,
