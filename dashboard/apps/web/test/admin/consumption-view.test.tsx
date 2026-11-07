@@ -113,14 +113,14 @@ describe("the split at the top", () => {
         expect(bar?.children).toHaveLength(3);
         expect(
             [...(bar?.children ?? [])].map((segment) => segment.getAttribute("title"))
-        ).toContain("Marketplace apps: 8 GB");
+        ).toContain("Apps: 8 GB");
     });
 
     it("gives every group a figure in the legend, including the empty one", () => {
         render(<ConsumptionSplit consumption={CONSUMPTION} />);
         for (const label of [
             "Polaris itself",
-            "Marketplace apps",
+            "Apps",
             "Deployed services",
             "Everything else"
         ]) {
