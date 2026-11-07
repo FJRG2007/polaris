@@ -83,15 +83,21 @@ function hudReadout(value, format = String) {
   return Number.isFinite(value) ? format(Math.round(value)) : '-';
 }
 
-// Brake lamp level the car and bus materials read (their red scales with it): full while slowing down, dimmer when
-// only held at a standstill, so a car braking stands out from the queue it joins. Two fixed steps, so the per-instance
-// state changes only when a car starts or stops braking, not every frame.
-const BRAKE_LAMP = { slowing: 1, holding: 0.6, slowingAt: -0.8, standingBelow: 0.3 };
+// Brake lamp level the car and bus materials read (their red scales with it), as in mrdoob/slop-newyork (MIT,
+// js/traffic.js and js/controllers.js): traffic lights them fully while slowing down or standing in a queue, the
+// player's car only while the throttle opposes its motion, so it rests with plain tail lamps. On or off, so the
+// per-instance state changes only when a car starts or stops braking, not every frame.
+const BRAKE_LAMP = { slowing: 1, holding: 1, slowingAt: -0.8, standingBelow: 0.3 };
 
-/** The brake lamp level for a vehicle's acceleration (m/s^2) and speed (m/s). */
+/** The brake lamp level for a traffic vehicle's acceleration (m/s^2) and speed (m/s). */
 function brakeLamp(acceleration, speed) {
   if (acceleration < BRAKE_LAMP.slowingAt) return BRAKE_LAMP.slowing;
   return Math.abs(speed) < BRAKE_LAMP.standingBelow ? BRAKE_LAMP.holding : 0;
+}
+
+/** The player car's brake lamp for its speed (m/s) and throttle (-1..1): lit only while braking against its motion. */
+function playerBrakeLamp(speed, throttle) {
+  return speed * throttle < 0 ? BRAKE_LAMP.slowing : 0;
 }
 
 // The player car signals from the steering held: a turn held at town speed starts the indicator on that side, and it
@@ -415,6 +421,6 @@ export {
   BODY_MOTION, KEY_BINDINGS, BRAKE_LAMP, HELI_CRUISE_SPEED, HELI_TURBO, LOOK_SENSITIVITY, PERSON_CAMERA, PERSON_MOVE, TURN_SIGNAL,
   approachVelocity, arrivalFor, bodyIsFinite, brakeLamp, cameraRelativeMove, clampSensitivity, clearLength,
   createJumpState, createTurnSignal, heliTopSpeed, hudReadout, lookCurve, lookDirection, personCameraPose,
-  rayEntersCollider, settleBody, slideVelocity, springArm, stepArm, stepJump, stepTurbo, stepTurnSignal, turnLamps, turnLook,
-  turnToward, wrapAngle
+  playerBrakeLamp, rayEntersCollider, settleBody, slideVelocity, springArm, stepArm, stepJump, stepTurbo, stepTurnSignal,
+  turnLamps, turnLook, turnToward, wrapAngle
 };
