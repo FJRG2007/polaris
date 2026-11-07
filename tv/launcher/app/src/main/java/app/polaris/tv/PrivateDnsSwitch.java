@@ -37,6 +37,8 @@ final class PrivateDnsSwitch {
     private static final String PROBE_NAME = "connectivitycheck.gstatic.com";
     /** One change at a time: the watch on Home never undoes a check still running in Settings. */
     private static final ReentrantLock LOCK = new ReentrantLock();
+    /** One watch at a time: Home resuming again while one waits does not start a second. */
+    private static final AtomicBoolean WATCHING = new AtomicBoolean(false);
 
     private PrivateDnsSwitch() {
     }
@@ -99,18 +101,45 @@ final class PrivateDnsSwitch {
     /**
      * Home came back: when our hostname is set and Android says it is not working, put the TV's own setting
      * back. Returns the hostname that was undone, or null. Skipped while a check holds the switch.
+     * Blocks up to {@link #CHECK_MS} while the network settles, without holding the switch.
      */
     static String watch(Context context) {
-        if (Build.VERSION.SDK_INT < PrivateDns.MIN_SDK || !LOCK.tryLock()) return null;
+        if (Build.VERSION.SDK_INT < PrivateDns.MIN_SDK || !WATCHING.compareAndSet(false, true)) return null;
         try {
-            PrivateDns dns = of(context);
-            String ours = dns.ours();
-            if (ours == null) return null;
+            if (of(context).ours() == null) return null;
             ConnectivityManager cm = context.getApplicationContext().getSystemService(ConnectivityManager.class);
-            return dns.watch(resolving(cm)) == PrivateDns.Result.REVERTED ? ours : null;
+            if (settles(cm)) return null;
+            if (!LOCK.tryLock()) return null;
+            try {
+                PrivateDns dns = of(context);
+                String ours = dns.ours();
+                if (ours == null) return null;
+                return dns.watch(resolving(cm)) == PrivateDns.Result.REVERTED ? ours : null;
+            } finally {
+                LOCK.unlock();
+            }
         } finally {
-            LOCK.unlock();
+            WATCHING.set(false);
         }
+    }
+
+    /**
+     * A TV that just woke or booted has a network Android has not validated yet, and strict Private DNS comes
+     * up seconds later: give it up to {@link #CHECK_MS} before calling the resolver dead. Interrupted is not dead.
+     */
+    @TargetApi(Build.VERSION_CODES.P)
+    private static boolean settles(ConnectivityManager cm) {
+        long end = System.currentTimeMillis() + CHECK_MS;
+        while (!resolving(cm)) {
+            if (System.currentTimeMillis() >= end) return false;
+            try {
+                Thread.sleep(STEP_MS);
+            } catch (InterruptedException stopped) {
+                Thread.currentThread().interrupt();
+                return true;
+            }
+        }
+        return true;
     }
 
     /**
