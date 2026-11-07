@@ -33,4 +33,24 @@
     <string name="profile_avatar_indigo">Índigo</string>
     <string name="profile_avatar_slate">Gris</string>
     <string name="profile_avatar_brown">Marrón</string>
+    <!-- PIN pad and profile PINs. -->
+    <string name="pin_enter">Introduce el PIN</string>
+    <string name="pin_new">Elige un PIN de 4 a 6 cifras y pulsa OK</string>
+    <string name="pin_confirm">Vuelve a introducir el mismo PIN</string>
+    <string name="pin_saving">Guardando el PIN</string>
+    <string name="pin_wrong">PIN incorrecto</string>
+    <string name="pin_too_short">Un PIN tiene de 4 a 6 cifras</string>
+    <string name="pin_mismatch">Los dos PIN no coincidían. Elige uno de nuevo.</string>
+    <string name="pin_locked_out">Demasiados intentos fallidos. Vuelve a intentarlo en %1$s</string>
+    <string name="pin_check_failed">No se ha podido comprobar el PIN. Inténtalo de nuevo.</string>
+    <string name="pin_save_failed">No se ha podido guardar el PIN. Inténtalo de nuevo.</string>
+    <string name="pin_delete">Borrar</string>
+    <string name="pin_forgot">¿Has olvidado el PIN?</string>
+    <string name="pin_forgot_explain">Para restablecerlo, abre los Ajustes del televisor, luego Aplicaciones, Polaris TV, y elige Borrar datos. Eso también elimina todos los perfiles y ajustes del launcher en este televisor.</string>
+    <string name="pin_locked_tile">PIN</string>
+    <string name="profile_pin_set">Poner un PIN</string>
+    <string name="profile_pin_change">Cambiar el PIN</string>
+    <string name="profile_pin_remove">Quitar el PIN</string>
+    <string name="profile_pin_saved">PIN guardado</string>
+    <string name="profile_pin_removed">PIN quitado</string>
 </resources>
