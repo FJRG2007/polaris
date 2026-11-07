@@ -325,7 +325,10 @@
                 "notFound": "Eso ya no está aquí.",
                 "unreadable": "No se han podido leer esos archivos. Usa los .conf que te da tu proveedor."
             }
-        }
+        },
+        "unreachable": "No accesible",
+        "unreachableHint": "Su servidor no acepta conexiones ahora mismo.",
+        "unreachableFix": "Ver qué abrir"
     },
     "nodes": {
         "title": "Servidores",
@@ -369,6 +372,35 @@
             "editAddress": "Cambiar dirección",
             "retry": "Reintentar",
             "retrying": "Probando..."
+        },
+        "reach": {
+            "label": "UDP {port} en {address}",
+            "states": {
+                "reachable": "Accesible",
+                "blocked": "No accesible",
+                "unknown": "No se pudo comprobar",
+                "unchecked": "Sin comprobar"
+            },
+            "checking": "Comprobando...",
+            "recheck": "Comprobar",
+            "show": "Ver la regla a añadir",
+            "hide": "Ocultar los pasos",
+            "blockedHint": "No llega nada a este puerto, así que ningún dispositivo puede conectarse. Añade esta regla delante del servidor.",
+            "viaRouter": "Comprobado a través de tu router. Si no reenvía su propia dirección, sale bloqueado aunque desde fuera funcione.",
+            "unknownHint": "Polaris no pudo llegar al servidor para contar lo que llega.",
+            "where": "Dónde añadirla",
+            "places": {
+                "cloud": "Firewall del proveedor",
+                "router": "Reenvío en tu router"
+            },
+            "rule": {
+                "protocol": "Protocolo",
+                "port": "Puerto",
+                "source": "Origen",
+                "any": "Cualquiera",
+                "destination": "Destino"
+            },
+            "after": "Al guardar la regla, vuelve a comprobar. Polaris también lo mira cada cinco minutos."
         }
     },
     "people": {

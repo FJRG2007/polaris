@@ -325,7 +325,10 @@
                 "notFound": "That is no longer here.",
                 "unreadable": "Those files could not be read. Use the .conf files your provider gives you."
             }
-        }
+        },
+        "unreachable": "Not reachable",
+        "unreachableHint": "Its server is not taking connections right now.",
+        "unreachableFix": "See what to open"
     },
     "nodes": {
         "title": "Servers",
@@ -369,6 +372,35 @@
             "editAddress": "Change address",
             "retry": "Try again",
             "retrying": "Trying..."
+        },
+        "reach": {
+            "label": "UDP {port} on {address}",
+            "states": {
+                "reachable": "Reachable",
+                "blocked": "Not reachable",
+                "unknown": "Could not be checked",
+                "unchecked": "Not checked yet"
+            },
+            "checking": "Checking...",
+            "recheck": "Check again",
+            "show": "Show the rule to add",
+            "hide": "Hide the steps",
+            "blockedHint": "Nothing sent to this port arrives, so no device can connect. Add this rule in front of the server.",
+            "viaRouter": "Checked through your router. One that does not loop back its own address reads as blocked even when devices outside get through.",
+            "unknownHint": "Polaris could not reach this server to count what arrives.",
+            "where": "Where to add it",
+            "places": {
+                "cloud": "Hosting provider's firewall",
+                "router": "Forward on your router"
+            },
+            "rule": {
+                "protocol": "Protocol",
+                "port": "Port",
+                "source": "Source",
+                "any": "Any address",
+                "destination": "Destination"
+            },
+            "after": "Once the rule is saved, check again. Polaris also checks every five minutes."
         }
     },
     "people": {

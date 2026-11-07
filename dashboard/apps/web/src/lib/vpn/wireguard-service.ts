@@ -12,11 +12,18 @@ import { dymoPlace } from "@/lib/dymo-service";
 import { deployBase } from "@/lib/domain-service";
 import { proxyNameFor } from "./proxy-name";
 import * as wg from "./wireguard";
-import { prisma } from "@polaris/db";
+import { notifyOperators } from "@/lib/notifications/operators";
+import { resolveCondition } from "@/lib/notification-service";
+import { translatorFor } from "@/lib/i18n/translate";
+import { wordsFor } from "@/lib/notifications/notice-words";
+import { DEFAULT_LOCALE } from "@polaris/core";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { prisma, VISIBLE_USER } from "@polaris/db";
 import { edgeHostnameTaken } from "@/lib/app-edge";
 import { edgeLauncher } from "@/lib/deploy/server-edge";
 import { isIP } from "node:net";
 import { createSocket } from "node:dgram";
+import * as reach from "./node-reach";
 import { loadEnv } from "@polaris/config";
 import * as proxy from "@/lib/vpn/browser-proxy";
 import { proxyLogin, type ProxyLogin } from "@/lib/vpn/browser-proxy-login";
@@ -332,6 +339,9 @@ export async function listNodes() {
             country: true,
             city: true,
             placedBy: true,
+            reachVerdict: true,
+            reachCheckedAt: true,
+            host: { select: { name: true, address: true } },
             _count: { select: { peers: true } }
         }
     });
@@ -393,6 +403,8 @@ export async function removeNode(id: string, anyway = false): Promise<void> {
         if (!anyway) throw new WireGuardRefusal("unreachable");
     }
     await prisma.vpnNode.delete({ where: { id } });
+    // A node that is gone is no longer anybody's to open.
+    await resolveCondition(reachCondition(id));
 }
 
 /** A machine leaving Polaris takes its node off first, while it can still be reached.
@@ -467,13 +479,21 @@ export async function nodesFor(user: { id: string; isAdmin: boolean }) {
             proxyHost: true,
             proxyIssue: true,
             country: true,
-            city: true
+            city: true,
+            reachVerdict: true,
+            reachCheckedAt: true,
+            host: { select: { address: true } }
         }
     });
     return nodes
         .filter(({ id }) => wg.mayUseNode(access, id))
-        .map(({ proxyHost, proxyIssue, ...node }) => ({
+        .map(({ proxyHost, proxyIssue, reachVerdict, reachCheckedAt, host, ...node }) => ({
             ...node,
+            // Only a verdict that cannot be the router's doing is passed on: it is
+            // what turns the place off for everybody. The machine's own address
+            // stays here.
+            reachVerdict: reach.blockedIsCertain(host.address) ? reachVerdict : null,
+            reachCheckedAt,
             browser: proxyHost !== null,
             // Why not, while `browser` is false; null where nobody recorded a reason.
             browserIssue: proxyHost === null ? proxyIssue : null
@@ -617,6 +637,9 @@ async function checkAnswer(node: NodeRow): Promise<NodeAnswerCheck> {
         // Packets arrive but no handshake came of them: the peer list is put right
         // so the next try finds this device on it.
         if (verdict === "open") await syncNode(node).catch(() => undefined);
+        if (verdict) await recordReach(node, verdict).catch((error: unknown) =>
+            console.error("polaris: a VPN node's reach could not be recorded:", error)
+        );
         return { ...place, verdict: verdict ?? "unknown" };
     } catch (error) {
         console.error("polaris: a VPN node's port could not be checked:", error);
@@ -636,13 +659,78 @@ export async function checkNodeAnswer(
 ): Promise<NodeAnswerCheck> {
     const access = await accessOf(user);
     if (!access || !wg.mayUseNode(access, nodeId)) throw new WireGuardRefusal("noAccess");
+    return checkNodeReach(nodeId);
+}
+
+/** The same check for the administrator's list, which may ask about any node; the
+ *  action in front of it is what makes sure only an administrator does. */
+export async function checkNodeReach(nodeId: string): Promise<NodeAnswerCheck> {
     const node = await nodeRow(nodeId);
     if (!node?.publicKey) throw new WireGuardRefusal("nodeNotReady");
-    const known = answerChecks.get(nodeId);
+    return reusedCheck(node);
+}
+
+function reusedCheck(node: NodeRow): Promise<NodeAnswerCheck> {
+    const known = answerChecks.get(node.id);
     if (known && Date.now() - known.at < ANSWER_CHECK_REUSE_MS) return known.check;
     const check = checkAnswer(node);
-    answerChecks.set(nodeId, { at: Date.now(), check });
+    answerChecks.set(node.id, { at: Date.now(), check });
     return check;
+}
+
+/** One open notice per node while its port is blocked; closed, rewritten as the
+ *  good news, once something gets through again. */
+const reachCondition = (nodeId: string) => `vpn.node-blocked:${nodeId}`;
+const VPN_SETTINGS_HREF = "/admin/apps/vpn/settings";
+
+async function adminIds(): Promise<string[]> {
+    const admins = await prisma.user.findMany({
+        where: { isAdmin: true, ...VISIBLE_USER },
+        select: { id: true }
+    });
+    return admins.map(({ id }) => id);
+}
+
+/** Keep what a check found, and tell the administrators when it changed. */
+async function recordReach(node: NodeRow, verdict: wg.ArrivalVerdict): Promise<void> {
+    await prisma.vpnNode.update({
+        where: { id: node.id },
+        data: { reachVerdict: verdict, reachCheckedAt: new Date() }
+    });
+    if (verdict === node.reachVerdict) return;
+    const values = { name: node.name, port: node.port, address: node.endpoint };
+    if (verdict === "blocked") {
+        const say = (t: NamespaceTranslator<"notices">) => ({
+            title: t("vpnNode.blockedTitle", values),
+            body: t("vpnNode.blockedBody", values)
+        });
+        await notifyOperators({
+            permission: "settings.manage",
+            recipients: await adminIds(),
+            event: "network.router",
+            ...say(translatorFor(DEFAULT_LOCALE, "notices")),
+            say,
+            href: VPN_SETTINGS_HREF,
+            actionRequired: true,
+            condition: reachCondition(node.id)
+        });
+        return;
+    }
+    // Back open: only a node somebody was told about has anything to close.
+    if (node.reachVerdict !== "blocked") return;
+    await Promise.allSettled(
+        (await adminIds()).map(async (userId) => {
+            const t = await wordsFor(userId, "notices");
+            await resolveCondition(reachCondition(node.id), {
+                userIds: [userId],
+                recovery: {
+                    title: t("vpnNode.backTitle", values),
+                    body: t("vpnNode.backBody", values),
+                    level: "success"
+                }
+            });
+        })
+    );
 }
 
 export async function removeDevice(
@@ -755,6 +843,8 @@ export async function runVpnPass(): Promise<void> {
         } catch (error) {
             console.error("polaris: a VPN node could not be read:", error);
         }
+        // Whether devices get through, so the screens know before anybody asks.
+        await reusedCheck(node).catch(() => undefined);
         await repairBrowserRoute(node, false).catch((error: unknown) =>
             console.error("polaris: a VPN node could not be set up for browsers:", error)
         );

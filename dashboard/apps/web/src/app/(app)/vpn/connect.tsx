@@ -18,6 +18,7 @@ import { countryName, WorldMap, type MapPlace } from "./world-map";
 import type { DesktopVpnStatus } from "@/lib/desktop-bridge";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { nodeReach } from "@/lib/vpn/node-reach";
 
 const GIB = 1024 ** 3;
 /** A device counts as connected while its last handshake is this recent. */
@@ -70,8 +71,16 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
             ),
         [nodes, profiles]
     );
+    // A place whose server nothing reaches is said so up front, not after a try.
+    const unreachable = (node: Node): boolean =>
+        nodeReach(node.reachVerdict, node.reachCheckedAt, new Date()) === "blocked";
     const active = tunnel?.nodeId ?? null;
-    const selected = picked ?? active ?? nodes[0]?.id ?? profiles[0]?.id ?? null;
+    const selected =
+        picked ??
+        active ??
+        (nodes.find((node) => !unreachable(node)) ?? nodes[0])?.id ??
+        profiles[0]?.id ??
+        null;
     const chosen = nodes.find(({ id }) => id === selected) ?? null;
     const chosenProfile = profiles.find(({ id }) => id === selected) ?? null;
 
@@ -234,6 +243,8 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                                     ) : null}
                                     {node.id === active ? (
                                         <ui.Badge variant="success">{t("connect.online")}</ui.Badge>
+                                    ) : unreachable(node) ? (
+                                        <ui.Badge variant="warning">{t("connect.unreachable")}</ui.Badge>
                                     ) : null}
                                 </button>
                             ))}
@@ -256,6 +267,19 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                             onChanged={read.reload}
                             onError={setError}
                         />
+                    ) : null}
+                    {chosen && chosen.id !== active && unreachable(chosen) ? (
+                        <p className="text-xs text-warning">
+                            {t("connect.unreachableHint")}{" "}
+                            {isAdmin ? (
+                                <Link
+                                    href="/admin/apps/vpn/settings"
+                                    className="text-primary hover:underline"
+                                >
+                                    {t("connect.unreachableFix")}
+                                </Link>
+                            ) : null}
+                        </p>
                     ) : null}
                     {chosen?.exit === "tor" ? (
                         <p className="text-xs text-muted-foreground">{t("connect.torHint")}</p>
@@ -283,7 +307,10 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                         </ui.Button>
                     ) : null}
                     {chosen && chosen.id !== active ? (
-                        <ui.Button disabled={pending || !!blocked} onClick={() => connect(chosen)}>
+                        <ui.Button
+                            disabled={pending || !!blocked || unreachable(chosen)}
+                            onClick={() => connect(chosen)}
+                        >
                             <Power />
                             {t(active ? "connect.switchTo" : "connect.connectTo", {
                                 name: chosen.name
