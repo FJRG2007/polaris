@@ -1621,6 +1621,13 @@ button.chip.choice {
     font-weight: 600;
 }
 
+/* Off, the line is a sentence rather than a name, so it wraps instead. */
+.vpn-hero[data-state="off"] .vpn-where {
+    font-size: 13px;
+    font-weight: 400;
+    white-space: normal;
+}
+
 .vpn-shield {
     display: inline-flex;
     align-items: center;

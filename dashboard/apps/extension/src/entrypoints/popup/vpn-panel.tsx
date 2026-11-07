@@ -287,11 +287,13 @@ export function VpnPanel(): React.JSX.Element {
                                         <div className="vpn-country">
                                             <button
                                                 className="vpn-pick"
-                                                aria-disabled={busy || !pick || undefined}
+                                                aria-disabled={busy || country.usable === 0 || undefined}
                                                 title={
                                                     pick
                                                         ? t("vpn.connectTo", { name: country.name })
-                                                        : t("vpn.noneUsable")
+                                                        : here
+                                                          ? t("vpn.inUse")
+                                                          : t("vpn.noneUsable")
                                                 }
                                                 onClick={() =>
                                                     !busy && pick && connect(pick, (failed) =>
@@ -378,7 +380,8 @@ function ServerRow({
     onConnect: () => void;
 }): React.JSX.Element {
     const t = useWords();
-    const blocked = busy || current || reason !== null;
+    // The server in use is not greyed out: it is the one that is working.
+    const blocked = busy || reason !== null;
     return (
         <li className="vpn-server-row">
             <button
@@ -386,7 +389,7 @@ function ServerRow({
                 aria-disabled={blocked || undefined}
                 aria-current={current || undefined}
                 title={reason ?? (current ? t("vpn.inUse") : t("vpn.connectTo", { name: title }))}
-                onClick={() => !blocked && onConnect()}
+                onClick={() => !blocked && !current && onConnect()}
             >
                 {flag ? <Flag code={node.country} /> : null}
                 <span className="vpn-text">
