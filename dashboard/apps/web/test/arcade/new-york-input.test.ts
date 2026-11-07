@@ -154,14 +154,23 @@ describe("switching mode never leaves NaN", () => {
         "with a NaN place": { position: { x: Number.NaN, y: 0, z: 1 }, heading: 1, speed: Number.NaN }
     };
 
-    /** The switch as controllers.js runs it: settle, arrive (arrivalFor -> placeArrival), settle the new body. */
+    // A fixture island: the map clamp controllers.js builds for findTeleportPosition, with made-up bounds and shore
+    const BOUNDS = { minX: -400, maxX: 400, minZ: -2000, maxZ: 600 };
+    const clampFor = (mode: string) => placement.mapClamp({
+        bounds: BOUNDS,
+        margin: mode === "helicopter" ? 6000 : 0,
+        minZOffset: mode === "helicopter" ? -6000 : 30,
+        shoreAt: mode === "helicopter" ? null : () => ({ westX: -300, eastX: 300 })
+    });
+
+    /** The switch as controllers.js runs it: settle, arrive (arrivalFor -> placeArrival with the map clamp), settle. */
     function switchTo(from: Record<string, any>, next: string) {
         rules.settleBody(from, from.last, START);
         const body: Record<string, any> = { position: { ...START }, heading: 0, speed: 0, verticalSpeed: 0 };
         const last = { ...START };
         const arrival = rules.arrivalFor({ ...from.position, heading: from.heading }, next);
         if (arrival) {
-            const spot = placement.placeArrival({ ...arrival, onRoad: next !== "person", edges: [], clear: () => true });
+            const spot = placement.placeArrival({ ...arrival, onRoad: next !== "person", edges: [], clear: () => true, clamp: clampFor(next) });
             if (spot) {
                 body.position.x = spot.x;
                 body.position.z = spot.z;
@@ -182,6 +191,9 @@ describe("switching mode never leaves NaN", () => {
                         to
                     );
                     expect([body.position.x, body.position.y, body.position.z, body.heading, body.speed].every(Number.isFinite)).toBe(true);
+                    if (rules.bodyIsFinite(state)) {
+                        expect(Math.hypot(body.position.x - state.position.x, body.position.z - state.position.z)).toBeLessThan(1e-9);
+                    }
                     expect(rules.hudReadout(Math.abs(body.speed) * 2.237)).not.toContain("NaN");
                     expect(rules.hudReadout(body.position.y * 3.281)).not.toContain("NaN");
                 });
@@ -194,6 +206,17 @@ describe("switching mode never leaves NaN", () => {
         const repaired = rules.settleBody(body, { x: 1, y: 0, z: 2, heading: 0.5 });
         expect(body).toEqual({ position: { x: 1, y: 0, z: 2 }, heading: 0.5, speed: 0, vx: 0 });
         expect(repaired).toEqual(["x", "heading"]);
+    });
+
+    it("never puts a body back at a place that is itself partly NaN", () => {
+        const spawn = { x: 3, y: 0, z: 9, heading: 1 };
+        const seed = { x: 5, y: 0, z: 8, heading: Number.NaN };
+        const body = { position: { x: 5, y: 0, z: 8 }, heading: Number.NaN, speed: 2 };
+        rules.settleBody(body, seed, spawn);
+        expect(body).toEqual({ position: { x: 3, y: 0, z: 9 }, heading: 1, speed: 0 });
+        const orphan = { position: { x: Number.NaN, y: 0, z: 0 }, heading: 0 };
+        rules.settleBody(orphan, {}, { x: Number.NaN, y: 0, z: 0, heading: 0 });
+        expect(rules.bodyIsFinite(orphan)).toBe(true);
     });
 
     it("zeroes a NaN speed without moving a body that is in place", () => {
@@ -290,6 +313,19 @@ describe("arrival placement", () => {
         expect(far && Math.hypot(far.x, far.z)).toBeGreaterThan(300);
         expect(placement.placeArrival({ x: 0, z: 0, clear: () => false })).toBeNull();
         expect(placement.placeArrival({ x: Number.NaN, z: 0, clear: () => true })).toBeNull();
+    });
+
+    it("clamps a { x, z } point onto the map, inside the shore", () => {
+        const bounds = { minX: -400, maxX: 400, minZ: -2000, maxZ: 600 };
+        const ground = placement.mapClamp({ bounds, minZOffset: 30, shoreAt: () => ({ westX: -100, eastX: 100 }) });
+        expect(ground({ x: 3.6, z: 410.6 })).toEqual({ x: 3.6, z: 410.6 });
+        expect(ground({ x: 500, z: 900 })).toEqual({ x: 92, z: 600 });
+        expect(ground({ x: 0, z: -5000 })).toEqual({ x: 0, z: -1970 });
+        expect(ground({ x: Number.NaN, z: 0 })).toBeNull();
+        expect(placement.mapClamp({ bounds, shoreAt: () => ({ westX: 0, eastX: 10 }) })({ x: 5, z: 0 })).toBeNull();
+        const air = placement.mapClamp({ bounds, margin: 6000, minZOffset: -6000 });
+        expect(air({ x: 5000, z: -7000 })).toEqual({ x: 5000, z: -7000 });
+        expect(placement.placeArrival({ x: 3.6, z: 410.6, heading: 0, clear: () => true, clamp: ground })).toEqual({ x: 3.6, z: 410.6, heading: 0 });
     });
 
     it("never arrives at a point the clamp could not place", () => {

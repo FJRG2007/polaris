@@ -44,12 +44,16 @@ function bodyIsFinite(body) {
   return !!p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z) && Number.isFinite(body.heading);
 }
 
+/** Whether a place { x, y, z, heading } is whole and finite. */
+const placeIsFinite = (place) => !!place && ['x', 'y', 'z', 'heading'].every((key) => Number.isFinite(place[key]));
+
 /**
  * Keeps a body out of NaN. A body whose position and heading are finite becomes `last` (the place it is put back to);
- * one that is not is put back at `last` (or `fallback` before it has one) at rest, and any non-finite motion field is
- * zeroed. Returns the names of the fields that were repaired (empty when there was nothing to do).
+ * one that is not is put back at `last` (or `fallback` while `last` is not a whole finite place, else the origin) at
+ * rest, and any non-finite motion field is zeroed. Returns the names of the fields that were repaired (empty when there
+ * was nothing to do).
  */
-function settleBody(body, last, fallback = { x: 0, y: 0, z: 0, heading: Math.PI }) {
+function settleBody(body, last, fallback) {
   const repaired = [];
   if (!body?.position) return repaired;
   const p = body.position;
@@ -58,7 +62,7 @@ function settleBody(body, last, fallback = { x: 0, y: 0, z: 0, heading: Math.PI 
   } else {
     for (const axis of ['x', 'y', 'z']) if (!Number.isFinite(p[axis])) repaired.push(axis);
     if (!Number.isFinite(body.heading)) repaired.push('heading');
-    const to = last && Number.isFinite(last.x) ? last : fallback;
+    const to = [last, fallback].find(placeIsFinite) ?? { x: 0, y: 0, z: 0, heading: Math.PI };
     p.x = to.x;
     p.y = to.y;
     p.z = to.z;

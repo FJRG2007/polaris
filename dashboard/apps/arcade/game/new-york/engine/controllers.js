@@ -30,7 +30,7 @@ import {
 } from './player-rules.js';
 import { bryantParkLawn } from './landmarks.js';
 import { polygonContact } from './building-collision.js';
-import { FAR_RING_MAX, overlapsBodies, overlapsFootprints, placeArrival } from './arrival-placement.js';
+import { FAR_RING_MAX, mapClamp, overlapsBodies, overlapsFootprints, placeArrival } from './arrival-placement.js';
 
 // Player models, animation and movement for walking, driving, cycling and flying.
 
@@ -365,7 +365,7 @@ class ThirdPersonControllerManager {
    */
   settleBodies() {
     for (const [mode, body] of Object.entries(this.entities)) {
-      body._lastGood ??= { x: body.position.x, y: body.position.y, z: body.position.z, heading: body.heading };
+      body._lastGood ??= {};
       const repaired = settleBody(body, body._lastGood, body._spawn);
       if (!repaired.length) continue;
       body._warned ??= new Set();
@@ -454,18 +454,9 @@ class ThirdPersonControllerManager {
     }));
     const cameraBack = Math.cos(0.09) * entity.chaseDistance;
     const cameraUp = entity.chaseHeight + Math.sin(0.09) * entity.chaseDistance * 0.85;
-    // placeArrival hands the point over as { x, z }
-    const clampPoint = ({ x: px, z: pz }) => {
-      pz = Math.max(ISLAND_BOUNDS.minZ + (heli ? -6000 : 30), Math.min(ISLAND_BOUNDS.maxZ + margin, pz));
-      px = Math.max(ISLAND_BOUNDS.minX - margin, Math.min(ISLAND_BOUNDS.maxX + margin, px));
-      if (!heli && getIslandBoundsAtZ) {
-        const shore = getIslandBoundsAtZ(pz);
-        const west = shore.westX + 8, east = shore.eastX - 8;
-        if (west > east) return null;
-        px = Math.max(west, Math.min(east, px));
-      }
-      return { x: px, z: pz };
-    };
+    const clampPoint = mapClamp({
+      bounds: ISLAND_BOUNDS, margin, minZOffset: heli ? -6000 : 30, shoreAt: !heli && getIslandBoundsAtZ ? getIslandBoundsAtZ : null
+    });
     const context = this._arrival;
     // Traffic as circles round each vehicle's centre (a bus's covers its length); only on the ground, and read once
     const traffic = heli && altitude > 8 ? [] : (context?.vehicles() || []).map((v) => ({ x: v.x, z: v.z, radius: v.bus ? 6.5 : 2.6 }));
