@@ -1763,8 +1763,10 @@
                 "unavailable": "No disponible para este TV."
             },
             "errors": {
-                "notInCatalog": "Eso no está en la versión más nueva del TV. Recarga la lista."
-            }
+                "notInCatalog": "Eso no está en la versión más nueva del TV. Recarga la lista.",
+                "unreachable": "No se pudo consultar la versión más nueva del TV. Inténtalo en un minuto."
+            },
+            "retry": "Reintentar"
         },
         "prefs": {
             "blocking": "Sin anuncios ni rastreo",
@@ -1793,7 +1795,8 @@
             },
             "errors": {
                 "tooMany": "Demasiados cambios. Espera un minuto.",
-                "badName": "Pon al TV un nombre de hasta 60 caracteres."
+                "badName": "Pon al TV un nombre de hasta 60 caracteres.",
+                "busy": "Este TV cambió en ese mismo momento. Inténtalo de nuevo."
             }
         }
     }

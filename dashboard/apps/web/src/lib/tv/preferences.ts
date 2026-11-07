@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { prisma } from "@polaris/db";
+import { prisma, Prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
 import { tvTakesBlocking } from "@/lib/tv/version-order";
 
@@ -164,6 +164,60 @@ export async function noteTvBlocking(
     }
 }
 
+/** The columns written beside `desired`. */
+interface TvPreferenceColumns {
+    readonly choice?: string | null;
+    readonly askedAt?: Date | null;
+    readonly applied?: string | null;
+    readonly appliedAt?: Date | null;
+}
+
+/** How many times a change to `desired` is tried again after another write moved it. */
+const DESIRED_ATTEMPTS = 5;
+
+/**
+ * Rewrite a TV's `desired` from what is stored now, never over a write that
+ * landed between the read and this one: the write only takes when `desired` is
+ * still what was read, and is worked out again from the new value otherwise.
+ * `change` answers null when there is nothing to write. `data` goes with every
+ * write, `created` only with the one that creates the row. False when the row
+ * kept moving under every attempt.
+ */
+export async function changeDesired(
+    keyId: string,
+    userId: string,
+    change: (current: TvDesired | null) => TvDesired | null,
+    data: TvPreferenceColumns = {},
+    created: TvPreferenceColumns = {}
+): Promise<boolean> {
+    for (let attempt = 0; attempt < DESIRED_ATTEMPTS; attempt += 1) {
+        const row = await prisma.tvPreference.findUnique({
+            where: { apiKeyId: keyId },
+            select: { desired: true }
+        });
+        const desired = change(readDesired(row?.desired));
+        if (!desired) return true;
+        if (!row) {
+            try {
+                await prisma.tvPreference.create({
+                    data: { apiKeyId: keyId, userId, ...data, ...created, desired }
+                });
+                return true;
+            } catch (caught) {
+                if (!isUniqueViolation(caught)) throw caught;
+                continue;
+            }
+        }
+        const read = row.desired === null ? Prisma.DbNull : (row.desired as Prisma.InputJsonValue);
+        const written = await prisma.tvPreference.updateMany({
+            where: { apiKeyId: keyId, desired: { equals: read } },
+            data: { ...data, desired }
+        });
+        if (written.count > 0) return true;
+    }
+    return false;
+}
+
 /** A key that is one of this account's connected TVs, now. */
 export function connectedTvWhere(userId: string, now: Date) {
     return {
@@ -187,22 +241,21 @@ export async function setTvBlocking(
     keyId: string,
     blocking: boolean,
     now = new Date()
-): Promise<"done" | "notATv" | "tooOld"> {
+): Promise<"done" | "notATv" | "tooOld" | "busy"> {
     const key = await prisma.apiKey.findFirst({
         where: { ...connectedTvWhere(userId, now), id: keyId },
-        select: { clientBuild: true, tvPreference: { select: { desired: true } } }
+        select: { clientBuild: true }
     });
     if (!key) return "notATv";
     if (!tvTakesBlocking(key.clientBuild)) return "tooOld";
     // The theme and add-ons asked before are kept as they are.
-    const desired: TvDesired = { ...readDesired(key.tvPreference?.desired), blocking };
-    const choice = { desired, choice: randomUUID(), askedAt: now, applied: null, appliedAt: null };
-    await prisma.tvPreference.upsert({
-        where: { apiKeyId: keyId },
-        create: { apiKeyId: keyId, userId, ...choice },
-        update: choice
+    const stored = await changeDesired(keyId, userId, (current) => ({ ...current, blocking }), {
+        choice: randomUUID(),
+        askedAt: now,
+        applied: null,
+        appliedAt: null
     });
-    return "done";
+    return stored ? "done" : "busy";
 }
 
 /** Rename one of the account's TVs. False when the key is not a TV of this account. */

@@ -6,6 +6,7 @@
  * the latest choice, and the Network filter question answers per address.
  */
 
+import { isDeepStrictEqual } from "node:util";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const OWNER = "user-1";
@@ -29,6 +30,7 @@ let build: number | null = 14;
 let meanwhile: (() => Promise<unknown> | void) | null = null;
 
 vi.mock("@polaris/db", () => ({
+    Prisma: { DbNull: null },
     prisma: {
         apiKey: {
             findFirst: async ({ where }: { where: { userId: string; id: string } }) =>
@@ -71,11 +73,19 @@ vi.mock("@polaris/db", () => ({
                 where,
                 data
             }: {
-                where: { apiKeyId: string; choice: string | null };
+                where: { apiKeyId: string; choice?: string | null; desired?: { equals: unknown } };
                 data: Partial<Row>;
             }) => {
                 const held = rows.get(where.apiKeyId);
-                if (!held || (held.choice ?? null) !== where.choice) return { count: 0 };
+                if (!held) return { count: 0 };
+                if ("choice" in where && (held.choice ?? null) !== where.choice)
+                    return { count: 0 };
+                if (
+                    where.desired &&
+                    !isDeepStrictEqual(held.desired ?? null, where.desired.equals)
+                ) {
+                    return { count: 0 };
+                }
                 writes += 1;
                 rows.set(where.apiKeyId, { ...held, ...data });
                 return { count: 1 };
@@ -198,6 +208,15 @@ describe("what the TV reports", () => {
         await preferences.noteTvBlocking(TV, OWNER, { report: "failed", choice: first });
         expect(rows.get(TV)?.desired).toEqual({ blocking: false });
         expect(rows.get(TV)?.applied).toBeNull();
+    });
+
+    it("keeps a theme picked while Block ads and trackers was being written", async () => {
+        const theme = { id: "aerial", choice: "0190a000-0000-7000-8000-0000000000aa" };
+        rows.set(TV, { apiKeyId: TV, userId: OWNER, desired: { blocking: false }, choice: null });
+        meanwhile = () =>
+            void rows.set(TV, { ...rows.get(TV)!, desired: { blocking: false, theme } });
+        expect(await preferences.setTvBlocking(OWNER, TV, true)).toBe("done");
+        expect(rows.get(TV)?.desired).toEqual({ blocking: true, theme });
     });
 
     it("survives the owner creating the row at the same moment", async () => {

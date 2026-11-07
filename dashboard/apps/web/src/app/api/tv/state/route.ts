@@ -53,7 +53,7 @@ export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
     const blocking = preferences.reportedBlocking(request);
     if (blocking) await preferences.noteTvBlocking(caller.keyId, caller.userId, blocking);
     const catalog = picks.reportedCatalog(request);
-    if (catalog) await picks.noteTvCatalog(caller.keyId, catalog);
+    if (catalog) await picks.noteTvCatalog(caller.keyId, caller.userId, catalog);
     const unreadWhere = { userId: caller.userId, readAt: null };
     const [user, unread, alerts, updateRequest, desired] = await Promise.all([
         prisma.user.findUnique({ where: { id: caller.userId }, select: { name: true } }),

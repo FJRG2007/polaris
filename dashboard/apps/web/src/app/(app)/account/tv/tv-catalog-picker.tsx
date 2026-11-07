@@ -69,27 +69,32 @@ export function TvCatalogPicker({
     row: TvRow;
     /** The TV runs the newest release there is (or none is published), so no update is on offer. */
     newestRelease?: boolean;
-    /** The catalog, asked once when the picker first opens. */
-    load: () => Promise<TvCatalogEntry[] | null>;
+    /** The catalog, asked once when the picker first opens (again after it could not be fetched). */
+    load: () => Promise<TvCatalogEntry[] | null | "unreachable">;
     onTheme: (id: string) => void;
     onAddons: (ids: string[]) => void;
 }) {
     const t = useTranslations("account");
     const [open, setOpen] = useState(false);
-    const [items, setItems] = useState<TvCatalogEntry[] | null | undefined>(undefined);
+    const [items, setItems] = useState<TvCatalogEntry[] | null | "unreachable" | undefined>(
+        undefined
+    );
     const status = catalogStatus(row, newestRelease);
     const statusId = `tv-catalog-${row.id}`;
     const problem = status === "failed" || status === "unavailable" || status === "asked";
     const addons = row.catalog.addons?.ids ?? [];
 
+    function fetchItems() {
+        setItems(undefined);
+        void load()
+            .then(setItems)
+            .catch(() => setItems("unreachable"));
+    }
+
     function toggle() {
         const next = !open;
         setOpen(next);
-        if (next && items === undefined) {
-            void load()
-                .then(setItems)
-                .catch(() => setItems(null));
-        }
+        if (next && (items === undefined || items === "unreachable")) fetchItems();
     }
 
     return (
@@ -130,11 +135,21 @@ export function TvCatalogPicker({
                         <Skeleton className="aspect-video w-full" />
                         <Skeleton className="aspect-video w-full" />
                     </div>
+                ) : items === "unreachable" ? (
+                    <div className="flex min-w-0 flex-wrap items-center gap-3">
+                        <p role="alert" className="min-w-0 text-sm text-warning-ink">
+                            {t("tv.catalog.errors.unreachable")}
+                        </p>
+                        <Button size="sm" variant="outline" onClick={fetchItems}>
+                            {t("tv.catalog.retry")}
+                        </Button>
+                    </div>
                 ) : !items || items.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t("tv.catalog.none")}</p>
                 ) : (
                     <TvGallery
                         items={items}
+                        heading={false}
                         screenshotSrc={shotSrc}
                         action={(item) =>
                             item.kind === "theme" ? (

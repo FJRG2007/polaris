@@ -79,6 +79,14 @@ describe("TvGallery", () => {
         expect(screen.getAllByRole("listitem")).toHaveLength(3);
     });
 
+    it("leaves its title and how-to-pick line to a page that has its own", () => {
+        render(wrap(<TvGallery items={ITEMS} screenshotSrc={src} heading={false} />));
+        expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
+        expect(screen.queryByText(en.gallery.intro)).toBeNull();
+        expect(screen.getByRole("region", { name: "Themes and add-ons" })).toBeTruthy();
+        expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    });
+
     it("says so when there is nothing to show", () => {
         render(wrap(<TvGallery items={[]} screenshotSrc={src} />));
         expect(screen.getByText("Nothing to show yet.")).toBeTruthy();

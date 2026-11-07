@@ -30,6 +30,11 @@ final class CatalogInstall {
 
     static final String EXTRA_ADDON = "app.polaris.tv.extra.CATALOG_ADDON";
     private static final int MAX_HOPS = 4;
+    /**
+     * Held for every download, apply and install: the screen and a remote pick share the cache file and the theme's
+     * staging folder, so one waits for the other instead of deleting what it is working on.
+     */
+    private static final Object WORK = new Object();
 
     /** Why a download or an apply did not finish, in the words the screen shows. */
     enum Failure { UNREACHABLE, CHECKSUM, REFUSED, NOT_STARTED }
@@ -131,6 +136,12 @@ final class CatalogInstall {
 
     /** Downloads and applies a theme; Home picks it up when it starts again. */
     static void applyTheme(Context context, Catalog.Item item) throws Failed {
+        synchronized (WORK) {
+            applyThemeHeld(context, item);
+        }
+    }
+
+    private static void applyThemeHeld(Context context, Catalog.Item item) throws Failed {
         File dir = Config.dir(context);
         if (dir == null) throw new Failed(Failure.NOT_STARTED);
         File zip = download(context, item);
@@ -148,6 +159,12 @@ final class CatalogInstall {
 
     /** Downloads an add-on and opens the system install; the result arrives at {@link UpdateStatusReceiver}. */
     static void installAddon(Context context, Catalog.Item item) throws Failed {
+        synchronized (WORK) {
+            installAddonHeld(context, item);
+        }
+    }
+
+    private static void installAddonHeld(Context context, Catalog.Item item) throws Failed {
         File apk = download(context, item);
         Intent status = new Intent(context, UpdateStatusReceiver.class).setAction(SelfUpdateRun.ACTION_STATUS)
                 .putExtra(EXTRA_ADDON, item.name);

@@ -1763,8 +1763,10 @@
                 "unavailable": "Not available for this TV."
             },
             "errors": {
-                "notInCatalog": "That is not in the newest TV release. Reload the list."
-            }
+                "notInCatalog": "That is not in the newest TV release. Reload the list.",
+                "unreachable": "Could not reach the newest TV release. Try again in a minute."
+            },
+            "retry": "Try again"
         },
         "prefs": {
             "blocking": "Block ads and trackers",
@@ -1793,7 +1795,8 @@
             },
             "errors": {
                 "tooMany": "Too many changes. Wait a minute.",
-                "badName": "Give the TV a name of up to 60 characters."
+                "badName": "Give the TV a name of up to 60 characters.",
+                "busy": "This TV changed at the same moment. Try again."
             }
         }
     }

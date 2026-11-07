@@ -49,12 +49,15 @@ const ANDROID_VERSION: Readonly<Record<number, string>> = {
 export function TvGallery({
     items,
     screenshotSrc,
-    action
+    action,
+    heading = true
 }: {
     items: readonly TvGalleryItem[];
     screenshotSrc: (item: TvGalleryItem) => string;
     /** What a card offers under its text, such as picking it for a TV. */
     action?: (item: TvGalleryItem) => ReactNode;
+    /** Its own title and how-to-pick line, for a page with no title of its own for it. */
+    heading?: boolean;
 }) {
     const t = useTranslations("tvCompat");
     const titleId = useId();
@@ -69,13 +72,19 @@ export function TvGallery({
     );
     const shown = filter === "all" ? items : items.filter((item) => item.kind === filter);
     return (
-        <section className="flex min-w-0 flex-col gap-4" aria-labelledby={titleId}>
-            <div className="flex min-w-0 flex-col gap-1">
-                <h2 id={titleId} className="text-xl font-semibold">
-                    {t("gallery.title")}
-                </h2>
-                <p className="text-sm text-muted-foreground">{t("gallery.intro")}</p>
-            </div>
+        <section
+            className="flex min-w-0 flex-col gap-4"
+            aria-labelledby={heading ? titleId : undefined}
+            aria-label={heading ? undefined : t("gallery.title")}
+        >
+            {heading ? (
+                <div className="flex min-w-0 flex-col gap-1">
+                    <h2 id={titleId} className="text-xl font-semibold">
+                        {t("gallery.title")}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">{t("gallery.intro")}</p>
+                </div>
+            ) : null}
             <div
                 role="group"
                 aria-label={t("gallery.filter.label")}

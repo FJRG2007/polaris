@@ -17,8 +17,8 @@ import { readFile } from "node:fs/promises";
 import { tvTakesCatalog } from "@/lib/tv/version-order";
 import { preparedTvCatalogFile, TV_CATALOG_NAME } from "@/lib/tv/release";
 import {
+    changeDesired,
     connectedTvWhere,
-    readDesired,
     tvCatalogIdSchema,
     TV_ADDONS_MAX,
     TV_ADDONS_REPORTS,
@@ -74,9 +74,13 @@ export function parseTvCatalog(body: string): TvCatalogEntry[] | null {
     return out;
 }
 
-/** The newest release's catalog, or null when there is none to read (no release, or one before the catalog). */
+/**
+ * The newest release's catalog, or null when there is none to read (no release,
+ * or one before the catalog). Throws when there is one this instance cannot
+ * fetch or verify right now.
+ */
 export async function readTvCatalog(): Promise<TvCatalogEntry[] | null> {
-    const file = await preparedTvCatalogFile(TV_CATALOG_NAME).catch(() => null);
+    const file = await preparedTvCatalogFile(TV_CATALOG_NAME);
     if (!file) return null;
     return parseTvCatalog(await readFile(file.path, "utf8"));
 }
@@ -105,14 +109,9 @@ export function reportedCatalog(request: Request): TvCatalogReported | null {
     return theme || addons ? { theme, addons } : null;
 }
 
-/** Keep what the TV said about its latest theme and add-ons choices, writing only when it changed. */
-export async function noteTvCatalog(keyId: string, reported: TvCatalogReported): Promise<void> {
-    const row = await prisma.tvPreference.findUnique({
-        where: { apiKeyId: keyId },
-        select: { desired: true }
-    });
-    const desired = readDesired(row?.desired);
-    if (!desired) return;
+/** What `desired` becomes with the TV's report, or null when the report changes nothing. */
+function withReport(desired: TvDesired | null, reported: TvCatalogReported): TvDesired | null {
+    if (!desired) return null;
     const next: TvDesired = { ...desired };
     let changed = false;
     if (reported.theme && desired.theme?.choice === reported.theme.choice) {
@@ -127,11 +126,20 @@ export async function noteTvCatalog(keyId: string, reported: TvCatalogReported):
             changed = true;
         }
     }
-    if (changed)
-        await prisma.tvPreference.updateMany({
-            where: { apiKeyId: keyId },
-            data: { desired: next }
-        });
+    return changed ? next : null;
+}
+
+/**
+ * Keep what the TV said about its latest theme and add-ons choices, writing only
+ * when it changed. A pick made while this is written is never written over: the
+ * report is worked out again against it, and dropped when it no longer answers it.
+ */
+export async function noteTvCatalog(
+    keyId: string,
+    userId: string,
+    reported: TvCatalogReported
+): Promise<void> {
+    await changeDesired(keyId, userId, (desired) => withReport(desired, reported));
 }
 
 export const tvThemePickSchema = z.object({ keyId: z.string().uuid(), theme: tvCatalogIdSchema });
@@ -143,12 +151,15 @@ export const tvAddonsPickSchema = z.object({
         .transform((ids) => [...new Set(ids)].sort())
 });
 
-export type TvPickOutcome = "done" | "notATv" | "tooOld" | "notInCatalog";
+export type TvPickOutcome =
+    "done" | "notATv" | "tooOld" | "notInCatalog" | "catalogUnreachable" | "busy";
 
 /**
  * Store a new theme or add-ons choice for one of the account's TVs. Every call
  * is a new choice the TV acts on once; what it said about the last one is
- * cleared. `notInCatalog` when an id is not in the newest release's catalog.
+ * cleared. `notInCatalog` when an id is not in the newest release's catalog,
+ * `catalogUnreachable` when that catalog cannot be read right now, `busy` when
+ * the TV's row kept changing under the write.
  */
 async function pick(
     userId: string,
@@ -159,26 +170,32 @@ async function pick(
 ): Promise<TvPickOutcome> {
     const key = await prisma.apiKey.findFirst({
         where: { ...connectedTvWhere(userId, now), id: keyId },
-        select: { clientBuild: true, tvPreference: { select: { desired: true } } }
+        select: { clientBuild: true }
     });
     if (!key) return "notATv";
     if (!tvTakesCatalog(key.clientBuild)) return "tooOld";
-    const catalog = await readTvCatalog();
+    let catalog: TvCatalogEntry[] | null;
+    try {
+        catalog = await readTvCatalog();
+    } catch (caught) {
+        console.error("[tv] reading the TV catalog for a pick failed", caught);
+        return "catalogUnreachable";
+    }
     const known = new Set(catalog?.filter((entry) => entry.kind === kind).map((entry) => entry.id));
     if (ids.some((id) => !known.has(id))) return "notInCatalog";
     const choice = randomUUID();
-    const desired: TvDesired = {
-        ...readDesired(key.tvPreference?.desired),
-        ...(kind === "theme"
+    const part: TvDesired =
+        kind === "theme"
             ? { theme: { id: ids[0]!, choice, applied: null } }
-            : { addons: { ids: [...ids], choice, applied: null } })
-    };
-    await prisma.tvPreference.upsert({
-        where: { apiKeyId: keyId },
-        create: { apiKeyId: keyId, userId, desired, askedAt: now },
-        update: { desired }
-    });
-    return "done";
+            : { addons: { ids: [...ids], choice, applied: null } };
+    const stored = await changeDesired(
+        keyId,
+        userId,
+        (current) => ({ ...current, ...part }),
+        {},
+        { askedAt: now }
+    );
+    return stored ? "done" : "busy";
 }
 
 export function setTvTheme(userId: string, keyId: string, theme: string, now = new Date()) {

@@ -4,12 +4,16 @@
  * kept only for the latest choice.
  */
 
+import { isDeepStrictEqual } from "node:util";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const CHOICE = "0190a000-0000-7000-8000-0000000000aa";
 let stored: { desired: unknown } | null = null;
+/** Runs between the read of `desired` and its write, as another request would. */
+let meanwhile: (() => void) | null = null;
 let clientBuild: number | null = 16;
 let catalogBody: string | null = null;
+let unreachable = false;
 const written: unknown[] = [];
 
 // The gallery renders in its own test (packages/ui); here only the picker around it is under test.
@@ -20,23 +24,41 @@ vi.mock("node:fs/promises", async (original) => ({
 }));
 vi.mock("@/lib/tv/release", () => ({
     TV_CATALOG_NAME: "catalog.json",
-    preparedTvCatalogFile: async () => (catalogBody === null ? null : { path: "catalog.json" })
+    preparedTvCatalogFile: async () => {
+        if (unreachable) throw new Error("unreachable");
+        return catalogBody === null ? null : { path: "catalog.json" };
+    }
 }));
 vi.mock("@polaris/db", () => ({
+    Prisma: { DbNull: null },
     prisma: {
         tvPreference: {
-            findUnique: async () => stored,
-            updateMany: async (args: { data: unknown }) => {
+            findUnique: async () => {
+                const found = stored ? { ...stored } : null;
+                const run = meanwhile;
+                meanwhile = null;
+                run?.();
+                return found;
+            },
+            updateMany: async (args: {
+                where: { desired: { equals: unknown } };
+                data: { desired: unknown };
+            }) => {
+                if (!stored || !isDeepStrictEqual(stored.desired, args.where.desired.equals)) {
+                    return { count: 0 };
+                }
                 written.push(args.data);
+                stored = { desired: args.data.desired };
                 return { count: 1 };
             },
-            upsert: async (args: { update: unknown }) => {
-                written.push(args.update);
+            create: async (args: { data: { desired: unknown } }) => {
+                written.push(args.data);
+                stored = { desired: args.data.desired };
                 return {};
             }
         },
         apiKey: {
-            findFirst: async () => ({ clientBuild, tvPreference: stored })
+            findFirst: async () => ({ clientBuild })
         }
     }
 }));
@@ -59,6 +81,8 @@ function entry(kind: string, id: string, extra: Record<string, unknown> = {}) {
 
 beforeEach(() => {
     stored = null;
+    meanwhile = null;
+    unreachable = false;
     clientBuild = 16;
     written.length = 0;
     catalogBody = JSON.stringify({
@@ -105,7 +129,7 @@ describe("a TV's report", () => {
 
     it("is kept for the latest choice, and blocking is left as it was", async () => {
         stored = { desired: { blocking: true, theme: { id: "aerial", choice: CHOICE } } };
-        await picks.noteTvCatalog("key-1", {
+        await picks.noteTvCatalog("key-1", "user-1", {
             theme: { report: "applied", choice: CHOICE },
             addons: null
         });
@@ -119,9 +143,25 @@ describe("a TV's report", () => {
         ]);
     });
 
+    it("never writes over a pick made while it was being written", async () => {
+        const next = "0190a000-0000-7000-8000-0000000000bb";
+        stored = { desired: { theme: { id: "aerial", choice: CHOICE } } };
+        meanwhile = () => {
+            stored = { desired: { theme: { id: "dusk", choice: next, applied: null } } };
+        };
+        await picks.noteTvCatalog("key-1", "user-1", {
+            theme: { report: "applied", choice: CHOICE },
+            addons: null
+        });
+        expect(stored).toEqual({
+            desired: { theme: { id: "dusk", choice: next, applied: null } }
+        });
+        expect(written).toEqual([]);
+    });
+
     it("is ignored for an earlier choice", async () => {
         stored = { desired: { theme: { id: "aerial", choice: CHOICE } } };
-        await picks.noteTvCatalog("key-1", {
+        await picks.noteTvCatalog("key-1", "user-1", {
             theme: { report: "failed", choice: "0190a000-0000-7000-8000-0000000000bb" },
             addons: null
         });
@@ -136,6 +176,26 @@ describe("picking for a TV", () => {
         const [update] = written as { desired: { blocking: boolean; theme: { id: string } } }[];
         expect(update!.desired.blocking).toBe(false);
         expect(update!.desired.theme).toMatchObject({ id: "aerial", applied: null });
+    });
+
+    it("keeps a report the TV made while the add-ons were being picked", async () => {
+        stored = { desired: { theme: { id: "aerial", choice: CHOICE } } };
+        meanwhile = () => {
+            stored = { desired: { theme: { id: "aerial", choice: CHOICE, applied: "applied" } } };
+        };
+        expect(await picks.setTvAddons("user-1", "key-1", ["weather"])).toBe("done");
+        const desired = (stored as { desired: { theme: unknown; addons: unknown } } | null)
+            ?.desired;
+        expect(desired?.theme).toEqual({ id: "aerial", choice: CHOICE, applied: "applied" });
+        expect(desired?.addons).toMatchObject({ ids: ["weather"], applied: null });
+    });
+
+    it("tells a catalog it cannot fetch apart from an id it does not list", async () => {
+        catalogBody = null;
+        expect(await picks.setTvTheme("user-1", "key-1", "aerial")).toBe("notInCatalog");
+        unreachable = true;
+        expect(await picks.setTvTheme("user-1", "key-1", "aerial")).toBe("catalogUnreachable");
+        expect(written).toEqual([]);
     });
 
     it("refuses an id the catalog does not list, and a launcher too old to act", async () => {

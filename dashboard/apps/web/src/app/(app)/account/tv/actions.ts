@@ -121,6 +121,7 @@ export async function setTvBlockingAction(
     const [tvs, latest] = await Promise.all([listTvs(user.id), latestVersion()]);
     if (refusal) return { tvs, latest, error: t(refusal) };
     if (outcome === "tooOld") return { tvs, latest, error: t("tv.prefs.status.updateFirst") };
+    if (outcome === "busy") return { tvs, latest, error: t("tv.prefs.errors.busy") };
     if (outcome !== "done") return { tvs, latest, error: t("tv.updates.errors.notATv") };
     return { tvs, latest };
 }
@@ -155,19 +156,25 @@ export async function renameTvAction(input: unknown): Promise<TvUpdatesView & { 
     return { tvs, latest };
 }
 
-/** The themes and add-ons of the newest TV release, for the picker. Null when there is no catalog to read. */
-export async function tvCatalogAction(): Promise<TvCatalogEntry[] | null> {
+/**
+ * The themes and add-ons of the newest TV release, for the picker. Null when
+ * there is no catalog to read, `unreachable` when there is one that cannot be
+ * fetched right now.
+ */
+export async function tvCatalogAction(): Promise<TvCatalogEntry[] | null | "unreachable"> {
     await requireUser();
     return readTvCatalog().catch((caught: unknown) => {
         console.error("[account/tv] reading the TV catalog failed", caught);
-        return null;
+        return "unreachable" as const;
     });
 }
 
 const PICK_REFUSALS = {
     notATv: "tv.updates.errors.notATv",
     tooOld: "tv.catalog.status.updateFirst",
-    notInCatalog: "tv.catalog.errors.notInCatalog"
+    notInCatalog: "tv.catalog.errors.notInCatalog",
+    catalogUnreachable: "tv.catalog.errors.unreachable",
+    busy: "tv.prefs.errors.busy"
 } as const satisfies Record<Exclude<TvPickOutcome, "done">, string>;
 
 async function pickAction(
