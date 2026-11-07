@@ -267,9 +267,10 @@ export function opened(output: string): boolean {
 
 /**
  * The runtime grants after the install. Location names the Wi-Fi in the launcher's network row;
- * WRITE_SECURE_SETTINGS, only when asked, lets "Block ads and trackers" set Private DNS and put the
- * TV's own back when it does not work. Neither is ever revoked here: the launcher's own scripts may
- * have granted the second for another switch.
+ * WRITE_SECURE_SETTINGS lets "Block ads and trackers" set Private DNS and put the TV's own back when it
+ * does not work; here it is granted only when that was asked for, though system mode grants it anyway
+ * as one of its control levels. Neither is ever revoked here: the launcher's own scripts may have
+ * granted the second for another switch.
  */
 export function grantCommands(blockAds: boolean): readonly string[] {
     const grants = [`pm grant ${PACKAGE} android.permission.ACCESS_FINE_LOCATION`];
@@ -359,13 +360,41 @@ export interface TvControlGrant {
 
 /**
  * The listener list with GuardRevival after whatever is there, never in place of it; nothing
- * when it is listed already, and null when the list is not a list of components.
+ * when it is listed already, and null when the list is not a list of components. Only for a TV
+ * older than Android 8, which has no `cmd notification` and binds listeners from this setting.
  */
 export function listenerCommands(read: string): string[] | null {
     const entries = accessibilityEntries(read);
     if (!entries) return null;
     if (entries.some(isGuardRevival)) return [];
     return [`settings put secure ${LISTENER_LIST} ${settingValue([...entries, GUARD_REVIVAL].join(":"))}`];
+}
+
+/** The first Android with `cmd notification`, where the service approves listeners rather than the setting. */
+const NOTIFICATION_CMD_SDK = 26;
+
+/** Whether `dumpsys notification` shows GuardRevival among the listeners the service enabled or bound. */
+export function listenerEnabled(check: string): boolean {
+    return check.includes(`ComponentInfo{${PACKAGE}/${PACKAGE}.GuardRevival}`) || check.includes(`ComponentInfo{${GUARD_REVIVAL}}`);
+}
+
+/** GuardRevival as a notification listener: through the service where it has a command, else through the setting. */
+function listenerGrant(sdk: number | null): TvControlGrant {
+    if (sdk !== null && sdk < NOTIFICATION_CMD_SDK) {
+        return {
+            rung: "notification-listener",
+            before: `settings get secure ${LISTENER_LIST}`,
+            commands: listenerCommands,
+            check: `settings get secure ${LISTENER_LIST}`,
+            got: (check) => (accessibilityEntries(check) ?? []).some(isGuardRevival)
+        };
+    }
+    return {
+        rung: "notification-listener",
+        commands: () => [`cmd notification allow_listener ${GUARD_REVIVAL}`],
+        check: "dumpsys notification | grep -F GuardRevival",
+        got: listenerEnabled
+    };
 }
 
 /** Whether `dumpsys package` lines show WRITE_SECURE_SETTINGS granted. */
@@ -388,39 +417,35 @@ export function batteryWhitelisted(check: string): boolean {
  * implements (tv/launcher/app/src/main/AndroidManifest.xml): it has no usage-stats or overlay
  * permission, so those app-ops are not asked for.
  */
-export const CONTROL_GRANTS: readonly TvControlGrant[] = [
-    {
-        rung: "secure-settings",
-        commands: () => [`pm grant ${PACKAGE} android.permission.WRITE_SECURE_SETTINGS`],
-        check: `dumpsys package ${PACKAGE} | grep -F WRITE_SECURE_SETTINGS`,
-        got: secureSettingsGranted
-    },
-    {
+export function controlGrants(sdk: number | null): readonly TvControlGrant[] {
+    return [
+        {
+            rung: "secure-settings",
+            commands: () => [`pm grant ${PACKAGE} android.permission.WRITE_SECURE_SETTINGS`],
+            check: `dumpsys package ${PACKAGE} | grep -F WRITE_SECURE_SETTINGS`,
+            got: secureSettingsGranted
+        },
         // GuardRevival brings the launcher back after the firmware force-stops it; it reads no notification.
-        rung: "notification-listener",
-        before: `settings get secure ${LISTENER_LIST}`,
-        commands: listenerCommands,
-        check: `settings get secure ${LISTENER_LIST}`,
-        got: (check) => (accessibilityEntries(check) ?? []).some(isGuardRevival)
-    },
-    {
-        rung: "install-packages",
-        commands: () => [`appops set ${PACKAGE} REQUEST_INSTALL_PACKAGES allow`],
-        check: `appops get ${PACKAGE} REQUEST_INSTALL_PACKAGES`,
-        got: installPackagesAllowed
-    },
-    {
-        rung: "battery",
-        commands: () => [`dumpsys deviceidle whitelist +${PACKAGE}`],
-        check: "dumpsys deviceidle whitelist",
-        got: batteryWhitelisted
-    }
-];
+        listenerGrant(sdk),
+        {
+            rung: "install-packages",
+            commands: () => [`appops set ${PACKAGE} REQUEST_INSTALL_PACKAGES allow`],
+            check: `appops get ${PACKAGE} REQUEST_INSTALL_PACKAGES`,
+            got: installPackagesAllowed
+        },
+        {
+            rung: "battery",
+            commands: () => [`dumpsys deviceidle whitelist +${PACKAGE}`],
+            check: "dumpsys deviceidle whitelist",
+            got: batteryWhitelisted
+        }
+    ];
+}
 
 /** Runs each grant and reads it back; one the TV refuses, or that fails, is recorded and the next is tried. */
-async function grantControl(adb: AdbConnection): Promise<TvControl[]> {
+export async function grantControl(adb: Pick<AdbConnection, "shell">, grants: readonly TvControlGrant[]): Promise<TvControl[]> {
     const control: TvControl[] = [];
-    for (const grant of CONTROL_GRANTS) {
+    for (const grant of grants) {
         let got = false;
         try {
             const commands = grant.commands(grant.before ? await adb.shell(grant.before) : "");
@@ -666,6 +691,7 @@ async function install(target: TvTarget, mode: TvInstallMode, blockAds: boolean,
     try {
         publish({ phase: "checking" });
         const sdk = await adb.shell("getprop ro.build.version.sdk");
+        const sdkLevel = Number.parseInt(sdk.trim(), 10) || null;
         const refusal = tvRefusal(sdk, await adb.shell("pm list features"));
         if (refusal) {
             await finish(adb, target, refusal);
@@ -674,7 +700,7 @@ async function install(target: TvTarget, mode: TvInstallMode, blockAds: boolean,
         const path = choosePath(sighting, {
             manufacturer: await adb.shell("getprop ro.product.manufacturer"),
             model: await adb.shell("getprop ro.product.model"),
-            sdk: Number.parseInt(sdk.trim(), 10) || null,
+            sdk: sdkLevel,
             homeGuard: listsPackage(await adb.shell(`pm list packages ${HOME_GUARD_PACKAGE}`), HOME_GUARD_PACKAGE)
         });
         publish({ home: path.home });
@@ -727,7 +753,7 @@ async function install(target: TvTarget, mode: TvInstallMode, blockAds: boolean,
         if (mode === "system") {
             // Each level past Home is tried and checked on its own; none of them can fail the install.
             publish({ phase: "control" });
-            publish({ control: [homeControl(path.home === "offered", outcome), ...(await grantControl(adb))] });
+            publish({ control: [homeControl(path.home === "offered", outcome), ...(await grantControl(adb, controlGrants(sdkLevel)))] });
         } else publish({ control: [] });
         const link = linkCommand(serverAddress());
         if (link && !alreadyLinked(await adb.shell(LINK_STATE_READ).catch(() => ""))) {

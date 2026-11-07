@@ -31,7 +31,7 @@ vi.mock("../../src/main/windows", () => ({
     kindOf: (sender: { kind: string; }) => sender.kind
 }));
 
-const { accessibilityEntries, alreadyLinked, apkNameOf, batteryWhitelisted, connectFailure, CONTROL_GRANTS, grantCommands, homeControl, homeIsOurs, homeKeyCommands, homeKeyOn, installMode, installPackagesAllowed, lateFailure, listenerCommands, latestApk, LINK_STATE_READ, linkCommand, opened, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, secureSettingsGranted, startSchema, tvRefusal, waitingFor } =
+const { accessibilityEntries, alreadyLinked, apkNameOf, batteryWhitelisted, connectFailure, controlGrants, grantCommands, grantControl, homeControl, homeIsOurs, homeKeyCommands, homeKeyOn, installMode, installPackagesAllowed, lateFailure, listenerCommands, listenerEnabled, latestApk, LINK_STATE_READ, linkCommand, opened, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, secureSettingsGranted, startSchema, tvRefusal, waitingFor } =
     await import(
     "../../src/main/tv-install"
 );
@@ -335,7 +335,7 @@ describe("the link screen after the install", () => {
 });
 
 describe("the grants after the install", () => {
-    it("grants location always, and secure settings only when ad blocking was asked for", () => {
+    it("grants location always and, in app mode, secure settings only when ad blocking was asked for", () => {
         expect(grantCommands(false)).toEqual(["pm grant app.polaris.tv android.permission.ACCESS_FINE_LOCATION"]);
         expect(grantCommands(true)).toEqual([
             "pm grant app.polaris.tv android.permission.ACCESS_FINE_LOCATION",
@@ -476,14 +476,14 @@ describe("the install mode", () => {
 
 describe("full control of the TV", () => {
     const listener = "app.polaris.tv/.GuardRevival";
-    const grant = (rung: string) => CONTROL_GRANTS.find((one) => one.rung === rung)!;
+    const grant = (rung: string, sdk: number | null = 30) => controlGrants(sdk).find((one) => one.rung === rung)!;
 
     it("tries the levels strongest first, and only what the launcher declares", () => {
-        expect(CONTROL_GRANTS.map((one) => one.rung)).toEqual(["secure-settings", "notification-listener", "install-packages", "battery"]);
+        expect(controlGrants(30).map((one) => one.rung)).toEqual(["secure-settings", "notification-listener", "install-packages", "battery"]);
         expect(grant("secure-settings").commands("")).toEqual(["pm grant app.polaris.tv android.permission.WRITE_SECURE_SETTINGS"]);
         expect(grant("install-packages").commands("")).toEqual(["appops set app.polaris.tv REQUEST_INSTALL_PACKAGES allow"]);
         expect(grant("battery").commands("")).toEqual(["dumpsys deviceidle whitelist +app.polaris.tv"]);
-        const all = CONTROL_GRANTS.flatMap((one) => one.commands("null") ?? []).join("\n");
+        const all = [...controlGrants(30), ...controlGrants(23)].flatMap((one) => one.commands("null") ?? []).join("\n");
         expect(all).not.toMatch(/GET_USAGE_STATS|SYSTEM_ALERT_WINDOW/);
     });
 
@@ -493,7 +493,21 @@ describe("full control of the TV", () => {
         expect(listenerCommands("com.a/com.a.Listen:com.b/.Other$X\n")).toEqual([
             `settings put secure enabled_notification_listeners 'com.a/com.a.Listen:com.b/.Other$X:${listener}'`
         ]);
-        expect(grant("notification-listener").before).toBe("settings get secure enabled_notification_listeners");
+        expect(grant("notification-listener", 23).before).toBe("settings get secure enabled_notification_listeners");
+        expect(grant("notification-listener", 23).commands("null")).toEqual([`settings put secure enabled_notification_listeners '${listener}'`]);
+    });
+
+    it("asks the notification service from Android 8 on, and believes only what it reports", () => {
+        for (const sdk of [26, 30, null]) {
+            const listen = grant("notification-listener", sdk);
+            expect(listen.before).toBeUndefined();
+            expect(listen.commands("")).toEqual([`cmd notification allow_listener ${listener}`]);
+            expect(listen.check).toBe("dumpsys notification | grep -F GuardRevival");
+        }
+        expect(listenerEnabled("      ComponentInfo{app.polaris.tv/app.polaris.tv.GuardRevival}\n")).toBe(true);
+        expect(listenerEnabled("    ManagedServiceInfo[component=ComponentInfo{app.polaris.tv/app.polaris.tv.GuardRevival},userid=0]\n")).toBe(true);
+        expect(listenerEnabled("      app.polaris.tv/app.polaris.tv.GuardRevival\n")).toBe(false);
+        expect(listenerEnabled("")).toBe(false);
     });
 
     it("writes nothing when it is listed already, in either spelling, or when the list is not a list", () => {
@@ -507,8 +521,8 @@ describe("full control of the TV", () => {
         expect(secureSettingsGranted("      android.permission.WRITE_SECURE_SETTINGS: granted=true\n")).toBe(true);
         expect(secureSettingsGranted("      android.permission.WRITE_SECURE_SETTINGS: granted=false\n")).toBe(false);
         expect(secureSettingsGranted("")).toBe(false);
-        expect(grant("notification-listener").got(`com.a/.One:${listener}\n`)).toBe(true);
-        expect(grant("notification-listener").got("null\n")).toBe(false);
+        expect(grant("notification-listener", 23).got(`com.a/.One:${listener}\n`)).toBe(true);
+        expect(grant("notification-listener", 23).got("null\n")).toBe(false);
         expect(installPackagesAllowed("REQUEST_INSTALL_PACKAGES: allow; time=+2m ago\n")).toBe(true);
         expect(installPackagesAllowed("REQUEST_INSTALL_PACKAGES: allow\n")).toBe(true);
         expect(installPackagesAllowed("REQUEST_INSTALL_PACKAGES: default\n")).toBe(false);
@@ -516,6 +530,39 @@ describe("full control of the TV", () => {
         expect(batteryWhitelisted("system-excidle,com.example.one,1000\r\nuser,app.polaris.tv,10123\r\n")).toBe(true);
         expect(batteryWhitelisted("user,app.polaris.tv.other,10124\n")).toBe(false);
         expect(batteryWhitelisted("")).toBe(false);
+    });
+
+    it("tries every level even when one throws or is refused, and reads before only where it is set", async () => {
+        const ran: string[] = [];
+        const answers: Record<string, string> = {
+            "dumpsys package app.polaris.tv | grep -F WRITE_SECURE_SETTINGS": "android.permission.WRITE_SECURE_SETTINGS: granted=true\n",
+            "dumpsys notification | grep -F GuardRevival": "",
+            "appops get app.polaris.tv REQUEST_INSTALL_PACKAGES": "REQUEST_INSTALL_PACKAGES: allow\n",
+            "dumpsys deviceidle whitelist": "user,app.polaris.tv,10123\n"
+        };
+        const adb = {
+            shell: async (command: string) => {
+                ran.push(command);
+                if (command.startsWith("appops set")) throw new Error("refused");
+                return answers[command] ?? "";
+            }
+        };
+        const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        expect(await grantControl(adb, controlGrants(30))).toEqual([
+            { rung: "secure-settings", state: "got" },
+            { rung: "notification-listener", state: "refused" },
+            { rung: "install-packages", state: "refused" },
+            { rung: "battery", state: "got" }
+        ]);
+        error.mockRestore();
+        expect(ran).not.toContain("settings get secure enabled_notification_listeners");
+        expect(ran).not.toContain("appops get app.polaris.tv REQUEST_INSTALL_PACKAGES");
+        expect(ran).toContain("dumpsys deviceidle whitelist +app.polaris.tv");
+
+        ran.length = 0;
+        answers["settings get secure enabled_notification_listeners"] = "cmd: Can't find service: settings";
+        expect(await grantControl(adb, [grant("notification-listener", 23)])).toEqual([{ rung: "notification-listener", state: "refused" }]);
+        expect(ran).toEqual(["settings get secure enabled_notification_listeners", "settings get secure enabled_notification_listeners"]);
     });
 
     it("reports Home as skipped where the TV keeps its own, and as got only when it was confirmed", () => {
