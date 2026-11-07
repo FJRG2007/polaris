@@ -2733,9 +2733,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         buttons.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> align.run());
     }
 
-    /** The first top-bar button after Inputs that is shown, in bar order (top_bar_apps, the network pill, ...); Settings is always there. */
+    /** The first top-bar button after Inputs that is shown, in bar order (top_bar_apps, the network pill, ...); Settings is always there.
+     *  With the bar hidden (a kids profile) it is the profile initial, the one thing left at the top. */
     private View firstTopButton() {
         ViewGroup bar = findViewById(R.id.topButtons);
+        if (bar.getVisibility() != View.VISIBLE && profileAvatar != null
+                && profileAvatar.getVisibility() == View.VISIBLE) return profileAvatar;
         // The Hebrew layout (layout-iw) lists the bar mirrored, Settings first and Inputs last, so bar order
         // runs from the end there. Walking it forwards returned Settings, and the pill key guard then treated
         // Settings as both ends of the bar: Right from Settings was swallowed and never reached Wi-Fi.
