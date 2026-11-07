@@ -304,13 +304,26 @@ export interface TvInstallBridge {
     /** Stops a search; an install already under way runs to its end. */
     cancel(): Promise<TvInstallState>;
     /** `host` for a TV on the network, `usb` for one from `TvInstallState.usb`. `blockAds` grants what
-     *  the launcher's "Block ads and trackers" needs; left out, it is not granted. */
+     *  the launcher's "Block ads and trackers" needs; left out, it is not granted. `mode` wins over `home`,
+     *  which pages older than it send alone: true is "system", false is "app". */
     start(
         input:
-            | { readonly host: string; readonly home: boolean; readonly blockAds?: boolean; readonly code?: string }
-            | { readonly usb: string; readonly home: boolean; readonly blockAds?: boolean }
+            | { readonly host: string; readonly mode?: TvInstallMode; readonly home?: boolean; readonly blockAds?: boolean; readonly code?: string }
+            | { readonly usb: string; readonly mode?: TvInstallMode; readonly home?: boolean; readonly blockAds?: boolean }
     ): Promise<boolean>;
     onState(listener: (state: TvInstallState) => void): () => void;
+}
+
+/** system: Polaris TV becomes the TV's system, with every level of control the TV allows. app: installed, nothing else changed. */
+export type TvInstallMode = "system" | "app";
+
+/** One level of control the system mode tries, strongest first. */
+export type TvControlRung = "home" | "secure-settings" | "notification-listener" | "install-packages" | "battery";
+
+/** got: the TV allowed it, checked afterwards. refused: this TV said no. skipped: not tried on this TV. */
+export interface TvControl {
+    readonly rung: TvControlRung;
+    readonly state: "got" | "refused" | "skipped";
 }
 
 /** Where installing on a TV has got to. */
@@ -324,6 +337,7 @@ export type TvPhase =
     | "download"
     | "install"
     | "home"
+    | "control"
     | "closing"
     | "done"
     | "failed";
@@ -382,6 +396,8 @@ export interface TvInstallState {
     readonly linking?: boolean | null;
     /** The name a found TV announced (its Cast name or model), by address. Absent on older apps. */
     readonly named?: Readonly<Record<string, string>>;
+    /** What the system mode got, level by level; empty for an app-only install, null before. Absent on older apps. */
+    readonly control?: readonly TvControl[] | null;
 }
 
 /** The instruction shown while waiting: turn on debugging (the menu path for this TV's platform), or accept the prompt. */

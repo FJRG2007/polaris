@@ -31,7 +31,7 @@ vi.mock("../../src/main/windows", () => ({
     kindOf: (sender: { kind: string; }) => sender.kind
 }));
 
-const { accessibilityEntries, alreadyLinked, apkNameOf, connectFailure, grantCommands, homeIsOurs, homeKeyCommands, homeKeyOn, lateFailure, latestApk, LINK_STATE_READ, linkCommand, opened, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, tvRefusal, waitingFor } =
+const { accessibilityEntries, alreadyLinked, apkNameOf, batteryWhitelisted, connectFailure, CONTROL_GRANTS, grantCommands, homeControl, homeIsOurs, homeKeyCommands, homeKeyOn, installMode, installPackagesAllowed, lateFailure, listenerCommands, latestApk, LINK_STATE_READ, linkCommand, opened, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, secureSettingsGranted, startSchema, tvRefusal, waitingFor } =
     await import(
     "../../src/main/tv-install"
 );
@@ -451,5 +451,78 @@ describe("the Home key service", () => {
         expect(homeKeyOn(`${service}\n0\n`)).toBe(false);
         expect(homeKeyOn("com.a/.One\n1\n")).toBe(false);
         expect(homeKeyOn("null\nnull\n")).toBe(false);
+    });
+});
+
+describe("the install mode", () => {
+    const host = "192.168.1.50";
+
+    it("takes the mode when the page sends it, and reads home alone the way pages before it meant it", () => {
+        expect(installMode({ mode: "app", home: true })).toBe("app");
+        expect(installMode({ mode: "system" })).toBe("system");
+        expect(installMode({ home: true })).toBe("system");
+        expect(installMode({ home: false })).toBe("app");
+    });
+
+    it("accepts a page that sends only home, only mode, or both, and refuses one that sends neither", () => {
+        expect(startSchema.safeParse({ host, home: false }).success).toBe(true);
+        expect(startSchema.safeParse({ host, mode: "app" }).success).toBe(true);
+        expect(startSchema.safeParse({ usb: "abc", mode: "system", home: true }).success).toBe(true);
+        expect(startSchema.safeParse({ host }).success).toBe(false);
+        expect(startSchema.safeParse({ usb: "abc" }).success).toBe(false);
+        expect(startSchema.safeParse({ host, mode: "root" }).success).toBe(false);
+    });
+});
+
+describe("full control of the TV", () => {
+    const listener = "app.polaris.tv/.GuardRevival";
+    const grant = (rung: string) => CONTROL_GRANTS.find((one) => one.rung === rung)!;
+
+    it("tries the levels strongest first, and only what the launcher declares", () => {
+        expect(CONTROL_GRANTS.map((one) => one.rung)).toEqual(["secure-settings", "notification-listener", "install-packages", "battery"]);
+        expect(grant("secure-settings").commands("")).toEqual(["pm grant app.polaris.tv android.permission.WRITE_SECURE_SETTINGS"]);
+        expect(grant("install-packages").commands("")).toEqual(["appops set app.polaris.tv REQUEST_INSTALL_PACKAGES allow"]);
+        expect(grant("battery").commands("")).toEqual(["dumpsys deviceidle whitelist +app.polaris.tv"]);
+        const all = CONTROL_GRANTS.flatMap((one) => one.commands("null") ?? []).join("\n");
+        expect(all).not.toMatch(/GET_USAGE_STATS|SYSTEM_ALERT_WINDOW/);
+    });
+
+    it("puts the listener after what is there, never in its place", () => {
+        expect(listenerCommands("null\n")).toEqual([`settings put secure enabled_notification_listeners '${listener}'`]);
+        expect(listenerCommands("")).toEqual([`settings put secure enabled_notification_listeners '${listener}'`]);
+        expect(listenerCommands("com.a/com.a.Listen:com.b/.Other$X\n")).toEqual([
+            `settings put secure enabled_notification_listeners 'com.a/com.a.Listen:com.b/.Other$X:${listener}'`
+        ]);
+        expect(grant("notification-listener").before).toBe("settings get secure enabled_notification_listeners");
+    });
+
+    it("writes nothing when it is listed already, in either spelling, or when the list is not a list", () => {
+        expect(listenerCommands(`com.a/.One:${listener}`)).toEqual([]);
+        expect(listenerCommands("app.polaris.tv/app.polaris.tv.GuardRevival")).toEqual([]);
+        expect(listenerCommands("cmd: Can't find service: settings")).toBeNull();
+        expect(listenerCommands("com.a/.One:not a component")).toBeNull();
+    });
+
+    it("counts each level only when the read-back shows it", () => {
+        expect(secureSettingsGranted("      android.permission.WRITE_SECURE_SETTINGS: granted=true\n")).toBe(true);
+        expect(secureSettingsGranted("      android.permission.WRITE_SECURE_SETTINGS: granted=false\n")).toBe(false);
+        expect(secureSettingsGranted("")).toBe(false);
+        expect(grant("notification-listener").got(`com.a/.One:${listener}\n`)).toBe(true);
+        expect(grant("notification-listener").got("null\n")).toBe(false);
+        expect(installPackagesAllowed("REQUEST_INSTALL_PACKAGES: allow; time=+2m ago\n")).toBe(true);
+        expect(installPackagesAllowed("REQUEST_INSTALL_PACKAGES: allow\n")).toBe(true);
+        expect(installPackagesAllowed("REQUEST_INSTALL_PACKAGES: default\n")).toBe(false);
+        expect(installPackagesAllowed("No operations.\n")).toBe(false);
+        expect(batteryWhitelisted("system-excidle,com.example.one,1000\r\nuser,app.polaris.tv,10123\r\n")).toBe(true);
+        expect(batteryWhitelisted("user,app.polaris.tv.other,10124\n")).toBe(false);
+        expect(batteryWhitelisted("")).toBe(false);
+    });
+
+    it("reports Home as skipped where the TV keeps its own, and as got only when it was confirmed", () => {
+        expect(homeControl(false, "installed")).toEqual({ rung: "home", state: "skipped" });
+        expect(homeControl(true, "installed-home")).toEqual({ rung: "home", state: "got" });
+        expect(homeControl(true, "installed-home-key")).toEqual({ rung: "home", state: "got" });
+        expect(homeControl(true, "installed-home-refused")).toEqual({ rung: "home", state: "refused" });
+        expect(homeControl(true, "installed-home-key-off")).toEqual({ rung: "home", state: "refused" });
     });
 });
