@@ -96,7 +96,11 @@ describe("the game's frame", () => {
         const tell = (data: unknown) =>
             act(async () => {
                 window.dispatchEvent(
-                    new MessageEvent("message", { data, origin: "null", source: frame.contentWindow })
+                    new MessageEvent("message", {
+                        data,
+                        origin: "null",
+                        source: frame.contentWindow
+                    })
                 );
             });
 
@@ -105,7 +109,9 @@ describe("the game's frame", () => {
             { type: "polaris-game:call", controls: true, micOn: true },
             "*"
         );
-        view.rerender(<GameFrame game={game} call={{ ...call!, controls: { ...controls, micOn: false } }} />);
+        view.rerender(
+            <GameFrame game={game} call={{ ...call!, controls: { ...controls, micOn: false } }} />
+        );
         expect(post).toHaveBeenLastCalledWith(
             { type: "polaris-game:call", controls: true, micOn: false },
             "*"

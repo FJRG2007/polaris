@@ -145,8 +145,7 @@ export function GameFrame({
                 if (data.action === "mic") controls?.toggleMic();
                 else if (data.action === "leave-game") controls?.leaveGame();
                 else controls?.leaveCall();
-            }
-            else if (data.type === "polaris-game:ready") {
+            } else if (data.type === "polaris-game:ready") {
                 setLoad({ phase: "ready" });
                 // Keys go to the frame that has the focus: without this they stayed with the page
                 // and the car ignored them until something in the game was clicked
