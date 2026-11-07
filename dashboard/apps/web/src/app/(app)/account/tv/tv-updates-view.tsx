@@ -89,8 +89,7 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
         .map((row) => `${row.id}:${row.blocking.askedAt ?? ""}`)
         .join(",");
     const [waitedOut, setWaitedOut] = useState<string | null>(null);
-    const anyPending =
-        view.tvs.some(pending) || (waitingOn !== "" && waitingOn !== waitedOut);
+    const anyPending = view.tvs.some(pending) || (waitingOn !== "" && waitingOn !== waitedOut);
 
     useEffect(() => {
         if (!waitingOn) return;
@@ -156,7 +155,11 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
                 r.id === row.id
                     ? {
                           ...r,
-                          blocking: { desired: next, applied: null, askedAt: new Date().toISOString() }
+                          blocking: {
+                              desired: next,
+                              applied: null,
+                              askedAt: new Date().toISOString()
+                          }
                       }
                     : r
             )

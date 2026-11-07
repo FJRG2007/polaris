@@ -19,12 +19,7 @@ import { tvTakesBlocking } from "@/lib/tv/version-order";
 
 /** Where Block ads and trackers stands on one TV, for the line under its switch. */
 export type TvBlockingStatus =
-    | "updateFirst"
-    | "notAsked"
-    | "waiting"
-    | "on"
-    | "off"
-    | Exclude<TvBlockingReport, "on" | "off">;
+    "updateFirst" | "notAsked" | "waiting" | "on" | "off" | Exclude<TvBlockingReport, "on" | "off">;
 
 /** What the switch shows: what was asked, or failing that what the TV said. */
 export function blockingSwitchOn(row: TvRow): boolean {
