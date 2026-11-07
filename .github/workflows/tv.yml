@@ -156,6 +156,6 @@ jobs:
           mkdir out
           cp tv/launcher/app/build/outputs/apk/release/app-release.apk out/polaris-tv.apk
           python3 -I tv/tools/catalog.py --apks "$RUNNER_TEMP/apks" --out out
-          (cd out && sha256sum polaris-tv.apk catalog.json theme-*.zip addon-*.apk > SHA256SUMS)
+          (cd out && sha256sum polaris-tv.apk catalog.json theme-*.zip theme-*.jpg addon-*.apk addon-*.jpg > SHA256SUMS)
           gh release create "${{ steps.decide.outputs.tag }}" out/* \
             --title "Polaris TV ${{ steps.decide.outputs.tag }}" --notes "Android TV and Google TV." --latest=false

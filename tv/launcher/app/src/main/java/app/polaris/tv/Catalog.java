@@ -15,9 +15,11 @@ import java.util.regex.Pattern;
  * The Themes & add-ons catalog (catalog.json) published with this launcher's own tv-v release by
  * tv/tools/catalog.py. Pure, so parsing is a unit test.
  *
- * The instance's /api/tv/update proxies only the launcher APK, so the catalog and its files come from the GitHub
- * release itself, over HTTPS, and every file is checked against the size and SHA-256 the catalog lists before it is
- * unpacked or installed. An entry that does not read cleanly is left out rather than shown half-filled.
+ * The catalog and its files are asked of the instance first ({@link #instancePath}, /api/tv/catalog over the TV's
+ * key, which serves the newest release's copy so a TV with no route to GitHub still has them), and of the GitHub
+ * release itself, over HTTPS, when the instance cannot answer. Either way every file is checked against the size and
+ * SHA-256 the catalog lists before it is unpacked or installed. An entry that does not read cleanly is left out
+ * rather than shown half-filled.
  */
 final class Catalog {
 
@@ -92,6 +94,15 @@ final class Catalog {
             return null;
         }
         return RELEASES + tag(versionName) + "/" + name;
+    }
+
+    /**
+     * The instance's address for a catalog file, relative to its origin: /api/tv/catalog for the catalog itself,
+     * with {@code ?name=} for one of its files. Null for a name that is not a plain file name.
+     */
+    static String instancePath(String name) {
+        if (name == null || !name.matches("[A-Za-z0-9_.-]{1,120}") || name.startsWith(".")) return null;
+        return FILE_NAME.equals(name) ? "/api/tv/catalog" : "/api/tv/catalog?name=" + name;
     }
 
     /** Only GitHub's own hosts over HTTPS, the same rule the instance's release fetch follows. */

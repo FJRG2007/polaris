@@ -50,7 +50,9 @@ vi.mock("@/lib/dns-blocker/service", () => ({
 }));
 vi.mock("@/lib/tv/release", async (original) => ({
     ...(await original<typeof import("@/lib/tv/release")>()),
-    preparedTvApk: async () => null
+    preparedTvApk: async () => null,
+    preparedTvCatalogFile: async () => null,
+    tvReleaseInfo: async () => null
 }));
 vi.mock("@/lib/tv/update-requests", async (original) => ({
     ...(await original<typeof import("@/lib/tv/update-requests")>()),
@@ -79,6 +81,7 @@ const stateRoute = await import("@/app/api/tv/state/route");
 const updateRoute = await import("@/app/api/tv/update/route");
 const apkRoute = await import("@/app/api/tv/update/apk/route");
 const reportRoute = await import("@/app/api/tv/update/report/route");
+const catalogRoute = await import("@/app/api/tv/catalog/route");
 
 /** Each state and update route, called the way a TV calls it. */
 const TV_ROUTES: [string, () => Promise<Response>][] = [
@@ -89,6 +92,11 @@ const TV_ROUTES: [string, () => Promise<Response>][] = [
     ],
     ["GET /api/tv/update", () => updateRoute.GET(onRoute("/api/tv/update"))],
     ["GET /api/tv/update/apk", () => apkRoute.GET(onRoute("/api/tv/update/apk"))],
+    ["GET /api/tv/catalog", () => catalogRoute.GET(onRoute("/api/tv/catalog"))],
+    [
+        "GET /api/tv/catalog for one file",
+        () => catalogRoute.GET(onRoute("/api/tv/catalog?name=theme-aerial.zip"))
+    ],
     [
         "POST /api/tv/update/report",
         () =>
@@ -143,6 +151,16 @@ describe("how far a TV's key reaches", () => {
     it("leaves every other kind as it was", async () => {
         kind = "cli";
         expect(await authenticateApiKey(asked())).toMatchObject({ kind: "cli" });
+    });
+});
+
+describe("the catalog route", () => {
+    it("answers no release with 204 and a name that is not a catalog file with 404", async () => {
+        expect((await catalogRoute.GET(onRoute("/api/tv/catalog"))).status).toBe(204);
+        const refused = await catalogRoute.GET(onRoute("/api/tv/catalog?name=polaris-tv.apk"));
+        expect(refused.status).toBe(404);
+        const climbing = await catalogRoute.GET(onRoute("/api/tv/catalog?name=..%2Fcatalog.json"));
+        expect(climbing.status).toBe(404);
     });
 });
 

@@ -20,7 +20,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 
 /**
- * The Android side of the Themes & add-ons screen: reads the catalog of this build's release, downloads a file
+ * The Android side of the Themes & add-ons screen: reads the catalog (from the instance this TV is connected to,
+ * else from this build's GitHub release), downloads a file
  * (checked against the size and SHA-256 the catalog lists), applies a theme into {@link Config#dir} through
  * {@link ThemeUnpack}, and hands an add-on to PackageInstaller through {@link SelfUpdateRun#commit}, never silently:
  * Android always asks first. Everything here blocks, so callers run it on their own thread.
@@ -44,38 +45,76 @@ final class CatalogInstall {
 
     private CatalogInstall() {}
 
-    /** The catalog of this launcher's own release. */
-    static String fetchCatalog() throws Failed {
-        String url = Catalog.url(BuildConfig.VERSION_NAME, Catalog.FILE_NAME);
-        if (url == null) throw new Failed(Failure.UNREACHABLE);
+    /** The catalog: the instance's copy of the newest release's, else the one of this launcher's own release. */
+    static String fetchCatalog(Context context) throws Failed {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
-        get(url, body, Catalog.MAX_CATALOG_BYTES);
+        fetch(context, Catalog.FILE_NAME, body, Catalog.MAX_CATALOG_BYTES);
         return new String(body.toByteArray(), StandardCharsets.UTF_8);
     }
 
     /** A screenshot's bytes, or null when it could not be read. */
-    static byte[] fetchScreenshot(Catalog.Item item) {
-        String url = Catalog.url(BuildConfig.VERSION_NAME, item.screenshot);
-        if (url == null) return null;
+    static byte[] fetchScreenshot(Context context, Catalog.Item item) {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         try {
-            get(url, body, Catalog.MAX_SCREENSHOT_BYTES);
+            fetch(context, item.screenshot, body, Catalog.MAX_SCREENSHOT_BYTES);
             return body.toByteArray();
         } catch (Failed failed) {
             return null;
         }
     }
 
+    /**
+     * One catalog file into {@code out}: from the instance when this TV is connected to one, from the GitHub release
+     * when it is not or cannot answer. A file the instance cut short is not mixed with GitHub's: the caller's buffer
+     * is reset first, and the size and checksum are checked by the caller either way.
+     */
+    private static void fetch(Context context, String name, OutputStream out, long max) throws Failed {
+        if (fromInstance(context, name, out, max)) return;
+        if (out instanceof ByteArrayOutputStream) ((ByteArrayOutputStream) out).reset();
+        else if (out instanceof FileOutputStream) {
+            try {
+                ((FileOutputStream) out).getChannel().truncate(0).position(0);
+            } catch (IOException unwritable) {
+                throw new Failed(Failure.UNREACHABLE);
+            }
+        }
+        String url = Catalog.url(BuildConfig.VERSION_NAME, name);
+        if (url == null) throw new Failed(Failure.UNREACHABLE);
+        get(url, out, max);
+    }
+
+    /** True when the instance served the whole file; false (nothing to rely on in {@code out}) otherwise. */
+    private static boolean fromInstance(Context context, String name, OutputStream out, long max) {
+        String path = Catalog.instancePath(name);
+        if (path == null || !PolarisLink.connected(context)) return false;
+        PolarisLink link = PolarisLink.load(context);
+        if (link == null) return false;
+        try {
+            SelfUpdate.Download reply = link.updateNet().download(path, 0, null);
+            try (InputStream in = reply.body) {
+                if (reply.status != 200 || in == null) return false;
+                byte[] chunk = new byte[64 * 1024];
+                long total = 0;
+                for (int read; (read = in.read(chunk)) != -1; ) {
+                    total += read;
+                    if (total > max) return false;
+                    out.write(chunk, 0, read);
+                }
+                return true;
+            }
+        } catch (IOException | RuntimeException unreachable) {
+            return false;
+        }
+    }
+
     /** Downloads the item's file into the app's cache and returns it once its size and checksum match. */
     static File download(Context context, Catalog.Item item) throws Failed {
-        String url = Catalog.url(BuildConfig.VERSION_NAME, item.file);
-        if (url == null) throw new Failed(Failure.UNREACHABLE);
         File dir = new File(context.getCacheDir(), "catalog");
         //noinspection ResultOfMethodCallIgnored
         dir.mkdirs();
         File target = new File(dir, item.file);
         try (OutputStream out = new FileOutputStream(target)) {
-            get(url, out, item.size);
+            fetch(context, item.file, out, item.size);
         } catch (IOException | Failed failed) {
             //noinspection ResultOfMethodCallIgnored
             target.delete();

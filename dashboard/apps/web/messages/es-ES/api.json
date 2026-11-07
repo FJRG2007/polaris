@@ -103,6 +103,7 @@
         "tvUpdateUnavailable": "No se pudo obtener la actualización del TV. Inténtalo más tarde.",
         "tvUpdateMismatch": "La actualización del TV no coincide con su suma publicada y no se sirvió.",
         "tvUpdateMoved": "Hay una actualización del TV más nueva. Vuelve a buscar actualizaciones.",
+        "tvCatalogMissing": "Este tema o complemento no está en la versión más nueva del TV.",
         "tvUpdateReport": "Eso no es un informe de actualización.",
         "tvUpdateStale": "Esa solicitud de actualización ya no está vigente."
     },

@@ -103,6 +103,7 @@
         "tvUpdateUnavailable": "The TV update could not be fetched. Try again later.",
         "tvUpdateMismatch": "The TV update did not match its published checksum, so it was not served.",
         "tvUpdateMoved": "A newer TV update is available. Check for updates again.",
+        "tvCatalogMissing": "This theme or add-on is not in the newest TV release.",
         "tvUpdateReport": "That is not an update report.",
         "tvUpdateStale": "That update request is no longer current."
     },

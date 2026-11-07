@@ -94,7 +94,7 @@ public class ThemesAddonsActivity extends Activity {
         new Thread(() -> {
             List<Catalog.Item> loaded;
             try {
-                loaded = Catalog.parse(CatalogInstall.fetchCatalog());
+                loaded = Catalog.parse(CatalogInstall.fetchCatalog(getApplicationContext()));
             } catch (CatalogInstall.Failed failed) {
                 loaded = null;
             }
@@ -157,7 +157,7 @@ public class ThemesAddonsActivity extends Activity {
         shot.setImageDrawable(null);
         int ticket = shown.incrementAndGet();
         new Thread(() -> {
-            byte[] bytes = CatalogInstall.fetchScreenshot(item);
+            byte[] bytes = CatalogInstall.fetchScreenshot(getApplicationContext(), item);
             Bitmap bitmap = bytes == null ? null : BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
             main.post(() -> {
                 if (ticket == shown.get() && !isFinishing()) shot.setImageBitmap(bitmap);

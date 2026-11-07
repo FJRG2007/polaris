@@ -104,6 +104,16 @@ public class CatalogTest {
         assertNull(Catalog.url("bad version!", "catalog.json"));
     }
 
+    @Test public void instancePathsAskTheCatalogRoute() {
+        assertEquals("/api/tv/catalog", Catalog.instancePath("catalog.json"));
+        assertEquals("/api/tv/catalog?name=theme-aerial.zip", Catalog.instancePath("theme-aerial.zip"));
+        assertEquals("/api/tv/catalog?name=addon-weather.jpg", Catalog.instancePath("addon-weather.jpg"));
+        assertNull(Catalog.instancePath("../catalog.json"));
+        assertNull(Catalog.instancePath("a&b=c"));
+        assertNull(Catalog.instancePath(".hidden"));
+        assertNull(Catalog.instancePath(null));
+    }
+
     @Test public void onlyGithubOverHttps() {
         assertTrue(Catalog.allowedHost("https://github.com/x"));
         assertTrue(Catalog.allowedHost("https://objects.githubusercontent.com/x"));
