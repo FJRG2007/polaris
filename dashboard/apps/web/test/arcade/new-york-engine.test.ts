@@ -67,7 +67,8 @@ describe("a player whose model cannot be built", () => {
         y: 0,
         z: 2,
         heading: 0,
-        mode
+        mode,
+        lamps: { brake: 0, reverse: false, signal: 0 }
     });
 
     it("is tried once per vehicle, and stays in the list for the map", async () => {
