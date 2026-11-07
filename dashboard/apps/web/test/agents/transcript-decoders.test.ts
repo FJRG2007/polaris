@@ -8,6 +8,7 @@ import {
     MAX_TEXT_CHARS,
     MAX_TOOL_RESULT_CHARS,
     decodeClaudeLine,
+    promptKey,
     toolInputSummary,
     transcriptDecoder
 } from "@/lib/agents/transcript-decoders";
@@ -23,6 +24,7 @@ const base = {
     timestamp: "2026-11-07T10:00:00.000Z"
 };
 const line = (record: Record<string, unknown>) => JSON.stringify({ ...base, ...record });
+const AT = Date.parse(base.timestamp);
 
 describe("decodeClaudeLine", () => {
     it("reads a prompt typed in the terminal", () => {
@@ -30,7 +32,7 @@ describe("decodeClaudeLine", () => {
             line({ type: "user", uuid: "u-1", message: { role: "user", content: "fix the login bug" } })
         );
         expect(rows).toEqual([
-            { vendorId: "u-1:0", role: "user", kind: "text", subject: "", ref: "", body: "fix the login bug" }
+            { vendorId: "u-1:0", role: "user", kind: "text", subject: "", ref: "", body: "fix the login bug", at: AT }
         ]);
     });
 
@@ -57,8 +59,8 @@ describe("decodeClaudeLine", () => {
             })
         );
         expect(rows).toEqual([
-            { vendorId: "a-1:1", role: "agent", kind: "text", subject: "", ref: "", body: "Let me look at the handler." },
-            { vendorId: "a-1:2", role: "agent", kind: "tool", subject: "Bash", ref: "toolu_01", body: "npm test -- auth" }
+            { vendorId: "a-1:1", role: "agent", kind: "text", subject: "", ref: "", body: "Let me look at the handler.", at: AT },
+            { vendorId: "a-1:2", role: "agent", kind: "tool", subject: "Bash", ref: "toolu_01", body: "npm test -- auth", at: AT }
         ]);
     });
 
@@ -121,7 +123,7 @@ describe("decodeClaudeLine", () => {
     it("marks a compaction and an interruption, and skips the summary and meta turns", () => {
         expect(
             decodeClaudeLine(line({ type: "system", subtype: "compact_boundary", uuid: "s-1", content: "Conversation compacted" }))
-        ).toEqual([{ vendorId: "s-1:0", role: "system", kind: "marker", subject: "compacted", ref: "", body: "" }]);
+        ).toEqual([{ vendorId: "s-1:0", role: "system", kind: "marker", subject: "compacted", ref: "", body: "", at: AT }]);
         expect(
             decodeClaudeLine(
                 line({ type: "user", uuid: "u-6", isCompactSummary: true, message: { role: "user", content: "This session is being continued..." } })
@@ -174,5 +176,34 @@ describe("tool inputs and decoders", () => {
         expect(transcriptDecoder("claude")).toBe(decodeClaudeLine);
         expect(transcriptDecoder("codex")).toBeNull();
         expect(transcriptDecoder("custom")).toBeNull();
+    });
+});
+
+describe("line time", () => {
+    it("is null when the line has none or an unreadable one", () => {
+        const [missing] = decodeClaudeLine(
+            JSON.stringify({ type: "user", uuid: "u-9", message: { content: "hi" } })
+        );
+        const [garbled] = decodeClaudeLine(line({ type: "user", uuid: "u-8", timestamp: "soon", message: { content: "hi" } }));
+        expect(missing?.at).toBeNull();
+        expect(garbled?.at).toBeNull();
+    });
+});
+
+describe("promptKey", () => {
+    it("matches a prompt to the transcript's copy of it", () => {
+        expect(promptKey("first line\r\nsecond  line ")).toBe(promptKey("first line\nsecond line"));
+        expect(promptKey("/review  main")).toBe(promptKey("/review main"));
+    });
+
+    it("matches a long prompt to its clipped copy", () => {
+        const typed = "word ".repeat(MAX_TEXT_CHARS / 2);
+        const [row] = decodeClaudeLine(line({ type: "user", uuid: "u-7", message: { content: typed } }));
+        expect(row!.body.length).toBeLessThan(typed.length);
+        expect(promptKey(row!.body)).toBe(promptKey(typed));
+    });
+
+    it("tells different prompts apart", () => {
+        expect(promptKey("fix the login bug")).not.toBe(promptKey("fix the logout bug"));
     });
 });

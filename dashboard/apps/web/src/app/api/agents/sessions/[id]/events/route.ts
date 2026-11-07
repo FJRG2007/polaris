@@ -24,9 +24,9 @@ import {
     sessionForToken
 } from "@/lib/agents/session-service";
 import { readerWords } from "@/lib/i18n/reader-words";
-import { parseHookSequence } from "@polaris/core";
+import { isSessionOver, parseHookSequence } from "@polaris/core";
 import { after } from "next/server";
-import { syncSessionHistory } from "@/lib/agents/session-history";
+import * as history from "@/lib/agents/session-history";
 
 /** The events after which the transcript is read. */
 const HISTORY_KINDS = new Set(["turn.end", "turn.failed", "tool.end", "tool.failed"]);
@@ -91,7 +91,7 @@ export async function POST(
     // outcome is in what the tool answered.
     const kind = event.kind === "tool.end" && hookEventFailed(payload) ? "tool.failed" : event.kind;
 
-    await recordSessionEvents(
+    const state = await recordSessionEvents(
         id,
         [{ kind, detail: event.detail, subject: event.subject }],
         parseHookSequence(request.headers.get("x-polaris-seq"))
@@ -99,6 +99,7 @@ export async function POST(
     // A finished turn or tool is when the transcript has something new. After
     // the answer, so the hook is never held on a read of the machine; the read
     // is claimed per session, so a burst of tools is one read.
-    if (HISTORY_KINDS.has(kind)) after(() => syncSessionHistory(id));
+    if (state && isSessionOver(state)) after(() => history.syncFinalSessionHistory(id));
+    else if (HISTORY_KINDS.has(kind)) after(() => history.syncSessionHistorySoon(id));
     return acknowledged();
 }

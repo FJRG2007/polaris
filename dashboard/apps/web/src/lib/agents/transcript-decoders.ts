@@ -28,6 +28,9 @@ export interface HistoryRow {
     /** The tool call a call or its result belongs to. */
     readonly ref: string;
     readonly body: string;
+    /** When the agent wrote the line, in epoch milliseconds, or null when it
+     *  did not say. */
+    readonly at: number | null;
 }
 
 /** The markers a transcript can carry. Each has a sentence on the page. */
@@ -60,6 +63,18 @@ function clip(text: string, max: number): string {
     return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+/** How much of a prompt two copies of it are compared on. */
+const PROMPT_KEY_CHARS = 2_000;
+
+/**
+ * A prompt as two copies of it are compared: the one typed in Polaris and the
+ * one the transcript gives back, which may be clipped, carry other line endings
+ * or space a slash command's arguments differently.
+ */
+export function promptKey(text: string): string {
+    return text.replace(/\s+/g, " ").trim().slice(0, PROMPT_KEY_CHARS).replace(/…$/, "").trimEnd();
+}
+
 const idSchema = z.string().min(1).max(MAX_ID_CHARS);
 
 const blockSchema = z.union([
@@ -82,6 +97,7 @@ const blockSchema = z.union([
 const claudeLineSchema = z.object({
     type: z.string(),
     uuid: idSchema.optional(),
+    timestamp: z.string().max(64).optional(),
     subtype: z.string().optional(),
     isMeta: z.boolean().optional(),
     isSidechain: z.boolean().optional(),
@@ -154,9 +170,11 @@ export function decodeClaudeLine(line: string): HistoryRow[] {
     const id = record.uuid;
     // No id is no way to store it once; a subagent's turns are its own.
     if (!id || record.isSidechain) return [];
+    const stamped = record.timestamp ? Date.parse(record.timestamp) : Number.NaN;
+    const at = Number.isFinite(stamped) ? stamped : null;
 
     const marker = (subject: HistoryMarker): HistoryRow[] => [
-        { vendorId: `${id}:0`, role: "system", kind: "marker", subject, ref: "", body: "" }
+        { vendorId: `${id}:0`, role: "system", kind: "marker", subject, ref: "", body: "", at }
     ];
 
     if (record.type === "system") return record.subtype === "compact_boundary" ? marker("compacted") : [];
@@ -177,15 +195,15 @@ export function decodeClaudeLine(line: string): HistoryRow[] {
             if (record.type === "user") {
                 if (record.isMeta) return;
                 if (INTERRUPTED.test(value.text.trim())) {
-                    rows.push({ vendorId, role: "system", kind: "marker", subject: "interrupted", ref: "", body: "" });
+                    rows.push({ vendorId, role: "system", kind: "marker", subject: "interrupted", ref: "", body: "", at });
                     return;
                 }
                 const text = userText(value.text);
-                if (text) rows.push({ vendorId, role: "user", kind: "text", subject: "", ref: "", body: clip(text, MAX_TEXT_CHARS) });
+                if (text) rows.push({ vendorId, role: "user", kind: "text", subject: "", ref: "", body: clip(text, MAX_TEXT_CHARS), at });
                 return;
             }
             const text = value.text.trim();
-            if (text) rows.push({ vendorId, role: "agent", kind: "text", subject: "", ref: "", body: clip(text, MAX_TEXT_CHARS) });
+            if (text) rows.push({ vendorId, role: "agent", kind: "text", subject: "", ref: "", body: clip(text, MAX_TEXT_CHARS), at });
             return;
         }
         if (value.type === "tool_use" && "name" in value && record.type === "assistant") {
@@ -195,7 +213,8 @@ export function decodeClaudeLine(line: string): HistoryRow[] {
                 kind: "tool",
                 subject: clip(value.name, 200),
                 ref: value.id ?? "",
-                body: toolInputSummary(value.input)
+                body: toolInputSummary(value.input),
+                at
             });
             return;
         }
@@ -206,7 +225,8 @@ export function decodeClaudeLine(line: string): HistoryRow[] {
                 kind: "result",
                 subject: value.is_error ? "error" : "",
                 ref: value.tool_use_id ?? "",
-                body: clip(resultText(value.content).trim(), MAX_TOOL_RESULT_CHARS)
+                body: clip(resultText(value.content).trim(), MAX_TOOL_RESULT_CHARS),
+                at
             });
         }
         // thinking, redacted_thinking, image and anything newer: not kept.

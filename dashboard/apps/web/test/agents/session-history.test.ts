@@ -71,12 +71,13 @@ vi.mock("@polaris/db", () => {
                     return rows.slice(0, take ?? rows.length);
                 }),
                 findFirst: vi.fn(async () => null),
-                updateMany: vi.fn(async ({ where, data }: { where: { id: string }; data: { vendorId: string } }) => {
+                updateMany: vi.fn(async ({ where, data }: { where: { id: string }; data: { vendorId: string; createdAt?: Date } }) => {
                     const row = db.messages.find((one) => one.id === where.id && one.vendorId === null);
                     if (!row) return { count: 0 };
                     if (db.messages.some((one) => one.sessionId === row.sessionId && one.vendorId === data.vendorId))
                         throw new Error("unique violation");
                     row.vendorId = data.vendorId;
+                    if (data.createdAt) row.createdAt = data.createdAt;
                     return { count: 1 };
                 }),
                 createMany: vi.fn(async ({ data }: { data: Omit<Message, "id" | "authorId">[] }) => {
@@ -126,7 +127,13 @@ vi.mock("@/lib/agents/session-service", () => ({
 }));
 
 import { sessionHistoryAction } from "@/app/(app)/apps/agents/sessions/actions";
-import { syncSessionHistory, SYNC_DEBOUNCE_MS } from "@/lib/agents/session-history";
+import {
+    MAX_ROWS_PER_SYNC,
+    SYNC_DEBOUNCE_MS,
+    historyPage,
+    syncSessionHistory,
+    syncSessionHistorySoon
+} from "@/lib/agents/session-history";
 
 const SESSION = "0196f0a0-0000-7000-8000-000000000001";
 
@@ -136,10 +143,10 @@ function transcript(): string {
     return join(dir, "6f1c.jsonl").replace(/\\/g, "/");
 }
 
-const user = (uuid: string, text: string) =>
-    JSON.stringify({ type: "user", uuid, isSidechain: false, message: { role: "user", content: text } });
-const reply = (uuid: string, text: string) =>
-    JSON.stringify({ type: "assistant", uuid, isSidechain: false, message: { role: "assistant", content: [{ type: "text", text }] } });
+const user = (uuid: string, text: string, timestamp?: string) =>
+    JSON.stringify({ type: "user", uuid, timestamp, isSidechain: false, message: { role: "user", content: text } });
+const reply = (uuid: string, text: string, timestamp?: string) =>
+    JSON.stringify({ type: "assistant", uuid, timestamp, isSidechain: false, message: { role: "assistant", content: [{ type: "text", text }] } });
 
 let path = "";
 beforeEach(() => {
@@ -230,6 +237,81 @@ describe("syncSessionHistory", () => {
         db.session!.transcriptPath = db.virtual;
         db.session!.cli = "codex";
         expect(await syncSessionHistory(SESSION, { now: later(SYNC_DEBOUNCE_MS * 5) })).toBe("skipped");
+    });
+});
+
+describe("the end of a session", () => {
+    it("reads the last turn of a session that has ended when asked for its final read", async () => {
+        writeFileSync(path, `${user("u-1", "ship it")}\n${reply("a-1", "Shipped.")}\n`);
+        db.session!.state = "stopped";
+        db.session!.transcriptSyncedAt = new Date();
+        expect(await syncSessionHistory(SESSION)).toBe("skipped");
+        expect(await syncSessionHistory(SESSION, { final: true })).toBe("synced");
+        expect(db.messages.map((one) => one.body)).toEqual(["ship it", "Shipped."]);
+    });
+
+    it("drains a backlog larger than one read in one sync", async () => {
+        const count = MAX_ROWS_PER_SYNC * 2 + 25;
+        const lines = Array.from({ length: count }, (_, index) => reply(`a-${index}`, `line ${index}`));
+        writeFileSync(path, `${lines.join("\n")}\n`);
+        expect(await syncSessionHistory(SESSION, { now: later(0) })).toBe("synced");
+        expect(db.messages).toHaveLength(count);
+        expect(db.session!.transcriptOffset).toBe(BigInt(Buffer.byteLength(`${lines.join("\n")}\n`)));
+    }, 120_000);
+
+    it("reads once more after the debounce when a read came too soon", async () => {
+        writeFileSync(path, `${reply("a-1", "Last answer.")}\n`);
+        db.session!.transcriptSyncedAt = new Date(Date.now() - SYNC_DEBOUNCE_MS + 50);
+        expect(await syncSessionHistorySoon(SESSION, { wait: 150 })).toBe("synced");
+        expect(db.messages.map((one) => one.body)).toEqual(["Last answer."]);
+    });
+});
+
+describe("order", () => {
+    it("sorts by when the agent wrote a line, not when it was read", async () => {
+        const sent = Date.now() - 1_000;
+        db.messages.push({
+            id: "typed-b",
+            sessionId: SESSION,
+            role: "user",
+            kind: "text",
+            subject: "",
+            ref: "",
+            body: "now the docs",
+            authorId: "owner",
+            vendorId: null,
+            createdAt: new Date(sent)
+        });
+        writeFileSync(
+            path,
+            [
+                reply("a-1", "Tests pass.", new Date(sent - 2_000).toISOString()),
+                user("u-b", "now the docs", new Date(sent + 20).toISOString()),
+                reply("a-2", "Docs updated.", new Date(sent + 5_000).toISOString())
+            ].join("\n") + "\n"
+        );
+        await syncSessionHistory(SESSION, { now: later(60_000) });
+        const page = await historyPage(SESSION);
+        expect(page.messages.map((one) => one.body)).toEqual(["Tests pass.", "now the docs", "Docs updated."]);
+        expect(db.messages.find((one) => one.id === "typed-b")!.vendorId).toBe("u-b:0");
+    });
+
+    it("links a typed prompt whose transcript copy differs only in spacing", async () => {
+        db.messages.push({
+            id: "typed-1",
+            sessionId: SESSION,
+            role: "user",
+            kind: "text",
+            subject: "",
+            ref: "",
+            body: "first line\r\nsecond line",
+            authorId: "owner",
+            vendorId: null,
+            createdAt: new Date(Date.now() - 1000)
+        });
+        writeFileSync(path, `${user("u-1", "first line\nsecond line")}\n`);
+        await syncSessionHistory(SESSION, { now: later(0) });
+        expect(db.messages.map((one) => [one.id, one.vendorId])).toEqual([["typed-1", "u-1:0"]]);
     });
 });
 

@@ -18,6 +18,7 @@ import { Button, Skeleton, pollWhileVisible } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChevronRight, TriangleAlert, Wrench } from "lucide-react";
 import type { HistoryMessage } from "@/lib/agents/session-history";
+import { promptKey } from "@/lib/agents/transcript-decoders";
 
 /** How often an open session re-reads its history. Each read may run a command
  *  on the session's machine, which the server claims once every few seconds. */
@@ -105,7 +106,7 @@ export function SessionHistory({ sessionId, initial, live, pending, onUserBodies
 
     useEffect(() => {
         onUserBodies?.(
-            new Set(messages.filter((one) => one.role === "user").map((one) => one.body.trim()))
+            new Set(messages.filter((one) => one.role === "user").map((one) => promptKey(one.body)))
         );
     }, [messages, onUserBodies]);
 

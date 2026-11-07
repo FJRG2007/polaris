@@ -32,6 +32,7 @@ import {
 import { useConfirm } from "@/components/confirm-dialog";
 import { SessionChanges, ShipPullRequest } from "./session-changes";
 import { SessionHistory, type HistoryPage } from "./session-history";
+import { promptKey } from "@/lib/agents/transcript-decoders";
 import {
     Badge,
     Button,
@@ -193,7 +194,7 @@ export function SessionDetail({
     // and the two were never the same message twice.
     const dropEchoed = useCallback((said: Set<string>) => {
         setPending((queue) => {
-            const left = queue.filter((one) => !said.has(one.body.trim()));
+            const left = queue.filter((one) => !said.has(promptKey(one.body)));
             return left.length === queue.length ? queue : left;
         });
     }, []);
