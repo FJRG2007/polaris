@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -74,11 +75,18 @@ final class PolarisFailover {
         final String id;
         final String publicKey;
         final List<String> addresses;
+        /** Lowercase hex SHA-256 of the instance's local CA certificate(s); empty on a Polaris that publishes none. */
+        final List<String> localCaSha256;
 
         Instance(String id, String publicKey, List<String> addresses) {
+            this(id, publicKey, addresses, Collections.emptyList());
+        }
+
+        Instance(String id, String publicKey, List<String> addresses, List<String> localCaSha256) {
             this.id = id;
             this.publicKey = publicKey;
             this.addresses = addresses;
+            this.localCaSha256 = Collections.unmodifiableList(new ArrayList<>(localCaSha256));
         }
     }
 
@@ -131,7 +139,10 @@ final class PolarisFailover {
         return origin.startsWith("http://");
     }
 
-    /** Reads what GET /api/instance answered, or null. Strict: nothing malformed is half-kept. */
+    /**
+     * Reads what GET /api/instance answered, or null. Strict: nothing malformed is half-kept, except the optional
+     * localCaSha256, of which only the well-formed fingerprints are kept (an older Polaris sends none).
+     */
     static Instance readInstance(String body) {
         try {
             JSONObject record = new JSONObject(body);
@@ -145,7 +156,8 @@ final class PolarisFailover {
                 if (origin == null) return null;
                 origins.add(origin);
             }
-            return new Instance(id, key, new ArrayList<>(origins));
+            return new Instance(id, key, new ArrayList<>(origins),
+                    PolarisLocalCa.readPins(record.optJSONArray("localCaSha256")));
         } catch (JSONException | RuntimeException notOne) {
             return null;
         }
@@ -184,7 +196,13 @@ final class PolarisFailover {
         this.instance = instance;
         this.current = primary;
         if (instance != null) {
-            for (String origin : instance.addresses) if (!origin.equals(primary)) alternates.add(origin);
+            // With the local CA pinned, the local https addresses are trusted, so the token never needs to cross the
+            // network in plain http: only those are kept. A record with no pin (a Polaris that predates it, or a
+            // usual address that is not https) keeps every alternate in its listed order, plain http included.
+            boolean pinned = PolarisLocalCa.scope(primary, instance) != null;
+            for (String origin : instance.addresses) {
+                if (!origin.equals(primary) && !(pinned && plain(origin))) alternates.add(origin);
+            }
         }
     }
 
