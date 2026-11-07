@@ -24,7 +24,12 @@ first" is a common reply.
 - **No prebuilt binaries.** No APKs (not even as workflow artifacts), `.so` files or zip uploads: everyone builds
   from source (#761, #398,
   #637, #1298).
-- **No self-updaters or release signing** (#143, #978).
+- **Updates come only from the Polaris the TV is connected to.** The launcher updates itself from that
+  instance (Launcher settings, Updates, or a request from Polaris), and only after the download matches the
+  SHA-256 the instance published, the package is `app.polaris.tv` with a higher version code, and Android
+  accepts its signature. Never a downgrade, never an install from anywhere else, never an install nobody asked
+  for: the daily check only shows a notice. The inherited rule against any self-updater (#143, #978) no longer
+  applies to that path.
 - **No personal details.** No LAN IPs, Wi-Fi names, your own city or your own dock in shared files
   (#25, #268,
   #1212, #312). Blur them in screenshots.

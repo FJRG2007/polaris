@@ -21,6 +21,7 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -41,15 +42,25 @@ final class PolarisLink {
     private static final int GCM_IV_BYTES = 12;
     private static final int GCM_TAG_BITS = 128;
     private static final int MAX_BODY = 64 * 1024;
+    private static final Pattern UUID = Pattern.compile(
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
     /** Home asks at most this often, so a TV left on the launcher is not polling. */
     static final long STATE_MS = 5 * 60_000;
 
     /** Sends over HttpURLConnection, which follows the system's certificate trust. */
-    static final PolarisFailover.Transport HTTP = (method, url, body, token) -> {
+    static final PolarisFailover.Transport HTTP = http(PolarisFailover.TIMEOUT_MS);
+
+    /** The same transport, waiting up to {@code readTimeoutMs} for an answer. */
+    static PolarisFailover.Transport http(int readTimeoutMs) {
+        return (method, url, body, token) -> send(method, url, body, token, readTimeoutMs);
+    }
+
+    private static PolarisFailover.Reply send(String method, String url, String body, String token, int readTimeoutMs)
+            throws IOException {
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         try {
             connection.setConnectTimeout(PolarisFailover.TIMEOUT_MS);
-            connection.setReadTimeout(PolarisFailover.TIMEOUT_MS);
+            connection.setReadTimeout(readTimeoutMs);
             connection.setRequestMethod(method);
             connection.setInstanceFollowRedirects(false);
             connection.setUseCaches(false);
@@ -65,11 +76,22 @@ final class PolarisLink {
             }
             int status = connection.getResponseCode();
             InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
-            return new PolarisFailover.Reply(status, stream == null ? "" : read(stream));
+            return new PolarisFailover.Reply(status, stream == null ? "" : read(stream), retryAfter(connection));
         } finally {
             connection.disconnect();
         }
-    };
+    }
+
+    /** Retry-After in seconds, or -1 when it is absent or a date. */
+    static long retryAfter(HttpURLConnection connection) {
+        String value = connection.getHeaderField("Retry-After");
+        if (value == null) return -1;
+        try {
+            return Math.max(0, Long.parseLong(value.trim()));
+        } catch (NumberFormatException httpDate) {
+            return -1;
+        }
+    }
 
     private static String read(InputStream stream) throws IOException {
         try (InputStream in = stream) {
@@ -108,24 +130,32 @@ final class PolarisLink {
         final String accountName;
         final int unread;
         final int alerts;
+        /** An update asked for from Polaris, or null. */
+        final String updateRequestId;
+        final String updateRequestVersion;
 
-        State(String instanceName, String accountName, int unread, int alerts) {
+        State(String instanceName, String accountName, int unread, int alerts, String updateRequestId,
+                String updateRequestVersion) {
             this.instanceName = instanceName;
             this.accountName = accountName;
             this.unread = unread;
             this.alerts = alerts;
+            this.updateRequestId = updateRequestId;
+            this.updateRequestVersion = updateRequestVersion;
         }
     }
 
     private final Context context;
     final String origin;
     private final String token;
+    private final PolarisFailover.Instance instance;
     private final PolarisFailover failover;
 
     private PolarisLink(Context context, String origin, String token, PolarisFailover.Instance instance) {
         this.context = context.getApplicationContext();
         this.origin = origin;
         this.token = token;
+        this.instance = instance;
         this.failover = new PolarisFailover(HTTP, origin, instance);
     }
 
@@ -202,17 +232,26 @@ final class PolarisLink {
         }
     }
 
-    /** What the instance says now. Null when the key is no longer accepted. */
+    /**
+     * What the instance says now. Null when the key is no longer accepted. Carries this build's version, which
+     * is how Polaris knows what the TV runs and when an update it asked for has landed.
+     */
     State state() throws IOException {
-        PolarisFailover.Reply reply = failover.request("GET", "/api/tv/state", null, token);
+        String path = "/api/tv/state" + SelfUpdate.versionQuery(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE);
+        PolarisFailover.Reply reply = failover.request("GET", path, null, token);
         if (reply.status == 401) return null;
         if (!reply.ok()) throw new IOException("Refused: " + reply.status);
         try {
             JSONObject answer = new JSONObject(reply.body);
             JSONObject instance = answer.getJSONObject("instance");
             JSONObject account = answer.getJSONObject("account");
+            // Older instances leave updateRequest out; a malformed one is ignored rather than refused.
+            JSONObject request = answer.optJSONObject("updateRequest");
+            String requestId = request == null ? null : request.optString("id", "");
+            if (requestId != null && !UUID.matcher(requestId).matches()) requestId = null;
             return new State(instance.optString("name"), account.optString("name"),
-                    Math.max(0, answer.optInt("unread")), Math.max(0, answer.optInt("alerts")));
+                    Math.max(0, answer.optInt("unread")), Math.max(0, answer.optInt("alerts")), requestId,
+                    requestId == null ? null : request.optString("versionName", null));
         } catch (JSONException notPolaris) {
             throw new IOException("Not a Polaris", notPolaris);
         }
@@ -233,6 +272,11 @@ final class PolarisLink {
         } catch (JSONException notPolaris) {
             throw new IOException("Not a Polaris", notPolaris);
         }
+    }
+
+    /** The update routes over this TV's key, reaching the same addresses as the state poll, alternates included. */
+    SelfUpdate.Net updateNet() {
+        return new SelfUpdateRun.Http(new PolarisFailover(http(SelfUpdateRun.TIMEOUT_MS), origin, instance), token);
     }
 
     boolean onLocalAddress() {

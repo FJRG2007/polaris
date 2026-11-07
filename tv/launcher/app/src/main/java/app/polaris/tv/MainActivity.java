@@ -1104,6 +1104,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (link == null) return;
             try {
                 PolarisLink.State state = link.state();
+                // An update asked for from Polaris starts the same flow as Update now, once per request.
+                if (state != null && state.updateRequestId != null) SelfUpdateRun.onRequest(this, state.updateRequestId);
                 int count = state == null ? 0 : state.unread + state.alerts;
                 runOnUiThread(() -> btnPolaris.setText(count > 0
                         ? getString(R.string.polaris_title) + " " + count : getString(R.string.polaris_title)));
@@ -1130,6 +1132,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         super.onResume();
         resumed = true;
         refreshPolaris();
+        SelfUpdateRun.dailyCheck(this);
         watchPrivateDns();
         // A festival that started or ended while Home was in the background: rebuild with or without it.
         if (festive != festival.active(LocalDate.now())) {

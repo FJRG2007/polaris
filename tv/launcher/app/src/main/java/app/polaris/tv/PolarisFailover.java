@@ -46,10 +46,17 @@ final class PolarisFailover {
     static final class Reply {
         final int status;
         final String body;
+        /** -1 when the answer had no Retry-After in seconds. */
+        final long retryAfterSeconds;
 
         Reply(int status, String body) {
+            this(status, body, -1);
+        }
+
+        Reply(int status, String body, long retryAfterSeconds) {
             this.status = status;
             this.body = body;
+            this.retryAfterSeconds = retryAfterSeconds;
         }
 
         boolean ok() {

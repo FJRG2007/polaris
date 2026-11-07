@@ -21,6 +21,10 @@
          undoes Private DNS for "Block ads and trackers" (PrivateDns), granted by the desktop installer when asked. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Updates Polaris TV from the Polaris it is connected to (SelfUpdateRun). The second lets Android 12+ skip
+         the system confirm when this app updates itself; see SelfUpdateRun for when it does. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <!-- YaOS (Yandex TV OS): HDMI, AV and the tuner all play in com.yandex.tv.live, whose activities require
          this permission (protection level normal, so it is granted at install). Ignored on other TVs. -->
     <uses-permission android:name="yandex.tv.permission.ACCESS_TV_SOURCE" />
@@ -247,6 +251,11 @@
                 <action android:name="app.polaris.tv.GUARD" />
             </intent-filter>
         </receiver>
+
+        <!-- PackageInstaller's status for a self-update (SelfUpdateRun.SystemInstaller). -->
+        <receiver
+            android:name=".UpdateStatusReceiver"
+            android:exported="false" />
 
         <service
             android:name=".InputKeyService"
