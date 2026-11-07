@@ -74,7 +74,7 @@ afterEach(() => {
 
 describe("the boot progress card", () => {
     it("reads the session's own terminal and turns it into a bar and a step list", async () => {
-        render(<SessionDetail session={workspaceSession()} events={[]} messages={[]} />, { wrapper: MessagesWrapper });
+        render(<SessionDetail session={workspaceSession()} events={[]} history={{ messages: [], older: false }} />, { wrapper: MessagesWrapper });
 
         await waitFor(() => expect(screen.getByText("Getting the machine ready.")).toBeTruthy());
 
@@ -94,7 +94,7 @@ describe("the boot progress card", () => {
             <SessionDetail
                 session={workspaceSession({ state: "working" })}
                 events={[]}
-                messages={[]}
+                history={{ messages: [], older: false }}
             />, { wrapper: MessagesWrapper });
 
         await waitFor(() => expect(sessionScreenAction).not.toHaveBeenCalled());

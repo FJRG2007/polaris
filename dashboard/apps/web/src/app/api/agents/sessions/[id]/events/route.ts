@@ -25,6 +25,11 @@ import {
 } from "@/lib/agents/session-service";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { parseHookSequence } from "@polaris/core";
+import { after } from "next/server";
+import { syncSessionHistory } from "@/lib/agents/session-history";
+
+/** The events after which the transcript is read. */
+const HISTORY_KINDS = new Set(["turn.end", "turn.failed", "tool.end", "tool.failed"]);
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -91,5 +96,9 @@ export async function POST(
         [{ kind, detail: event.detail, subject: event.subject }],
         parseHookSequence(request.headers.get("x-polaris-seq"))
     );
+    // A finished turn or tool is when the transcript has something new. After
+    // the answer, so the hook is never held on a read of the machine; the read
+    // is claimed per session, so a burst of tools is one read.
+    if (HISTORY_KINDS.has(kind)) after(() => syncSessionHistory(id));
     return acknowledged();
 }

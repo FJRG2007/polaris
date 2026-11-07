@@ -6,9 +6,9 @@ import { requirePermission, sessionCan } from "@/lib/session";
 import {
     getSession,
     sessionEvents,
-    sessionMessages,
     sharedSession
 } from "@/lib/agents/session-service";
+import { historyPage } from "@/lib/agents/session-history";
 import { getTranslations } from "@/lib/i18n/request";
 import { readSessionWaiting } from "@/lib/agents/agent-notices";
 
@@ -29,9 +29,9 @@ export default async function AgentSessionPage({
     const t = await getTranslations("agents");
 
     // Opening the session is reading what the bell said about it.
-    const [events, messages, , canControl] = await Promise.all([
+    const [events, history, , canControl] = await Promise.all([
         sessionEvents(sessionId),
-        sessionMessages(sessionId),
+        historyPage(sessionId),
         readSessionWaiting(sessionId, user.id),
         shared ? false : sessionCan(user, "agents.manage")
     ]);
@@ -62,7 +62,7 @@ export default async function AgentSessionPage({
             <SessionDetail
                 session={session}
                 events={events}
-                messages={messages}
+                history={history}
                 canControl={canControl}
                 shared={shared}
             />

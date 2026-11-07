@@ -8987,6 +8987,12 @@ model AgentSession {
     // a hook sends a value that passes the checks in the events route.
     vendorSessionId String?
     transcriptPath  String?
+    // How far into the transcript the history has been read: the file it was
+    // read from, the byte offset of the next unread line, and when a read last
+    // claimed it. A different file (a new conversation) starts again at 0.
+    transcriptFile     String?
+    transcriptOffset   BigInt?
+    transcriptSyncedAt DateTime?
     startedAt   DateTime?
     finishedAt  DateTime?
     // When the owner was told this session needs them, for the waiting episode
@@ -9074,10 +9080,21 @@ model AgentSessionMessage {
     // Who typed it, for a `user` message sent from the dashboard or the API. Null
     // for everything the machine produced.
     authorId  String?  @db.Uuid
+    // text | tool | result | marker. A tool call, its result and a marker
+    // (compaction, interruption) come from the agent's own transcript.
+    kind      String   @default("text")
+    // The tool's name for a tool call, the marker's name for a marker.
+    subject   String   @default("")
+    // The tool call a tool call or result belongs to, so the two pair up.
+    ref       String   @default("")
+    // The transcript line (and block in it) this came from. Null for what was
+    // typed in Polaris and not yet seen in the transcript.
+    vendorId  String?
     createdAt DateTime @default(now())
 
     session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
+    @@unique([sessionId, vendorId])
     @@index([sessionId, createdAt])
 }
 
