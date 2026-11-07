@@ -98,7 +98,6 @@ export function SessionHistory({ sessionId, initial, live, pending, onUserBodies
         };
     }, [sessionId, live]);
 
-
     const messages = useMemo(() => {
         const ids = new Set(latest.map((one) => one.id));
         return [...earlier.filter((one) => !ids.has(one.id)), ...latest];

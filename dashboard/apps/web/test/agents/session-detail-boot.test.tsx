@@ -29,7 +29,8 @@ vi.mock("../../src/app/(app)/apps/agents/sessions/actions", () => ({
     promptSessionAction: vi.fn(async () => ({})),
     interruptSessionAction: vi.fn(async () => ({})),
     stopSessionAction: vi.fn(async () => ({})),
-    sessionScreenAction: (...args: unknown[]) => sessionScreenAction(...args)
+    sessionScreenAction: (...args: unknown[]) => sessionScreenAction(...args),
+    sessionHistoryAction: vi.fn(async () => ({ messages: [], older: false }))
 }));
 vi.mock("../../src/app/(app)/apps/deploy/terminal-panel", () => ({ TerminalPanel: () => null }));
 

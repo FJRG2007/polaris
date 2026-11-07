@@ -271,6 +271,11 @@ vi.mock("@/app/(app)/apps/agents/sessions/sessions-polls", () => ({
         () => import("@/app/(app)/apps/agents/sessions/actions"),
         "sessionChangesAction",
         1
+    ),
+    sessionHistory: forward(
+        () => import("@/app/(app)/apps/agents/sessions/actions"),
+        "sessionHistoryAction",
+        1
     )
 }));
 
