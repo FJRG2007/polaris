@@ -311,6 +311,7 @@ export function MeetingChat({
                     inCall
                     channelId={meetingId}
                     rules={rules}
+                    fixedLimits
                     disabled={false}
                     mentionSource={mentions}
                     placeholder={t("meetingChat.saySomething")}

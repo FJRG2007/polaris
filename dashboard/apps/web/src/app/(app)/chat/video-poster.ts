@@ -25,6 +25,8 @@
  * for every video sent before this existed.
  */
 
+import { isWatchableVideo, typeOfFile } from "@/lib/mime";
+
 /** How wide a still is. Wider than a thumbnail is ever drawn, so it still looks
  *  right on a big screen, and far short of the picture itself. */
 const WIDTH = 640;
@@ -40,8 +42,7 @@ const PATIENCE_MS = 5000;
 
 /** Whether this is something to take a still from at all. */
 export function isVideoFile(type: string): boolean {
-    const base = (type.split(";")[0] ?? "").trim().toLowerCase();
-    return base === "video/mp4" || base === "video/webm" || base === "video/ogg";
+    return isWatchableVideo(type);
 }
 
 /**
@@ -52,7 +53,8 @@ export function isVideoFile(type: string): boolean {
  * is worth the compatibility at thumbnail size.
  */
 export async function posterFor(file: File): Promise<Blob | null> {
-    if (typeof document === "undefined" || !isVideoFile(file.type)) return null;
+    if (typeof document === "undefined" || !isVideoFile(typeOfFile(file.type, file.name)))
+        return null;
 
     const address = URL.createObjectURL(file);
     const video = document.createElement("video");
