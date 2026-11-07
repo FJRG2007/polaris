@@ -82,6 +82,11 @@ export function fromFrame(
 /** A page that has said nothing this long after loading did not start. */
 const SILENT_MS = 30_000;
 
+/** A load that has said nothing new for this long has stopped: every step of it
+ *  reports progress well within it, on a slow machine too. Not counted while the
+ *  tab is hidden, where the browser slows the game's timers down. */
+export const STALLED_MS = 120_000;
+
 type Load =
     // Nothing from the game yet: this draws the loading line
     | { phase: "starting" }
@@ -109,6 +114,7 @@ export function GameFrame({
     const [load, setLoad] = useState<Load>(STARTING);
     const heard = useRef(false);
     const silence = useRef<number | undefined>(undefined);
+    const stall = useRef<number | undefined>(undefined);
     const name = t(`games.${game.id}.name` as never);
     const host = useRef(call);
     host.current = call;
@@ -131,12 +137,28 @@ export function GameFrame({
 
     useEffect(() => {
         heard.current = false;
+        // Started again by every message until the city is up or the load failed
+        const watch = () => {
+            window.clearTimeout(stall.current);
+            stall.current = window.setTimeout(() => {
+                if (document.hidden) return watch();
+                setLoad((now) =>
+                    now.phase === "loading" || now.phase === "starting"
+                        ? { phase: "failed", reason: "error" }
+                        : now
+                );
+            }, STALLED_MS);
+        };
         const onMessage = (event: MessageEvent) => {
             if (!fromFrame(event, frame.current?.contentWindow)) return;
             const message = fromGame.safeParse(event.data);
             if (!message.success) return;
             heard.current = true;
             const data = message.data;
+            if (data.type === "polaris-game:ready" || data.type === "polaris-game:failed")
+                window.clearTimeout(stall.current);
+            else if (data.type === "polaris-game:progress" || data.type === "polaris-game:hello")
+                watch();
             if (data.type === "polaris-game:state") host.current?.onState(data);
             else if (data.type === "polaris-game:hello") setup.current();
             else if (data.type === "polaris-game:exit") exit.current?.();
@@ -158,6 +180,7 @@ export function GameFrame({
         return () => {
             window.removeEventListener("message", onMessage);
             window.clearTimeout(silence.current);
+            window.clearTimeout(stall.current);
         };
     }, [attempt]);
 
