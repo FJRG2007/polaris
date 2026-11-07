@@ -442,7 +442,7 @@
         "changeRandom": "Switch to a random server",
         "connectTo": "Connect to {name}",
         "noneUsable": "No server here can be used from a browser yet.",
-        "fellBack": "{failed} did not answer, so this browser leaves from {name}.",
+        "fellBack": "{failed} could not be used, so this browser leaves from {name}.",
         "failed": "Could not connect",
         "tryAgain": "Try again",
         "emptyTitle": "No servers yet",

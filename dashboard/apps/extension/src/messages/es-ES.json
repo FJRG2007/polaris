@@ -442,7 +442,7 @@
         "changeRandom": "Cambiar a un servidor al azar",
         "connectTo": "Conectar a {name}",
         "noneUsable": "Ningún servidor de aquí sirve aún para navegadores.",
-        "fellBack": "{failed} no respondió, así que el navegador sale por {name}.",
+        "fellBack": "No se pudo usar {failed}, así que el navegador sale por {name}.",
         "failed": "No se pudo conectar",
         "tryAgain": "Reintentar",
         "emptyTitle": "Aún no hay servidores",
