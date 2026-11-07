@@ -173,9 +173,13 @@ export function activitySession(
     return { game: first.claim.game, startedBy: first.seat, players };
 }
 
-/** What one player's browser tells the others. */
+/** What one player's browser tells the others. Lamps travel in a message of
+ *  their own, never inside the position: a browser from before them parses a
+ *  position strictly and would drop the whole of it, and that player would
+ *  stand still for it while braking. An unknown kind it simply ignores. */
 export const activityMessageSchema = z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("pose"), game: gameId, pose: poseSchema }).strict()
+    z.object({ kind: z.literal("pose"), game: gameId, pose: poseSchema }).strict(),
+    z.object({ kind: z.literal("lamps"), game: gameId, lamps: lampsSchema }).strict()
 ]);
 
 export type ActivityMessage = z.infer<typeof activityMessageSchema>;
@@ -184,6 +188,31 @@ export type ActivityMessage = z.infer<typeof activityMessageSchema>;
 export function readActivityMessage(payload: unknown): ActivityMessage | null {
     const parsed = activityMessageSchema.safeParse(payload);
     return parsed.success ? parsed.data : null;
+}
+
+const LAMPS_OFF: Lamps = { brake: 0, reverse: false, signal: 0 };
+
+/**
+ * What goes on the wire for one position from the frame: the position in the
+ * shape every browser reads, and a lamps message while one is lit plus once
+ * more when they go out, so the others turn them off. `wasLit` is whether the
+ * last lamps sent were lit; the result says what to remember for the next.
+ */
+export function wireMessages(
+    game: string,
+    pose: Pose,
+    wasLit: boolean
+): { messages: ActivityMessage[]; lit: boolean } {
+    const { lamps, ...position } = pose;
+    const messages: ActivityMessage[] = [{ kind: "pose", game, pose: position }];
+    if (lamps) messages.push({ kind: "lamps", game, lamps });
+    else if (wasLit) messages.push({ kind: "lamps", game, lamps: LAMPS_OFF });
+    return { messages, lit: lamps !== undefined };
+}
+
+/** Whether lamps are worth drawing: any of them lit. */
+export function anyLampLit(lamps: Lamps): boolean {
+    return lamps.brake > 0 || lamps.reverse || lamps.signal !== 0;
 }
 
 let poseFailureSeen = false;
@@ -214,9 +243,7 @@ export function readFramePose(payload: unknown): Pose | null {
     });
     if (!pose.success) return null;
     const { lamps: lit, ...rest } = pose.data;
-    return lit && (lit.brake > 0 || lit.reverse || lit.signal !== 0)
-        ? { ...rest, lamps: lit }
-        : rest;
+    return lit && anyLampLit(lit) ? { ...rest, lamps: lit } : rest;
 }
 
 /** What the call hands the frame: everybody else in the game, where they are. */

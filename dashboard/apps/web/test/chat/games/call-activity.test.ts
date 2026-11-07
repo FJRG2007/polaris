@@ -228,6 +228,43 @@ describe("car lamps in a position", () => {
         expect(off && "lamps" in off).toBe(false);
     });
 
+    it("travel apart from the position, so a browser from before them keeps reading it", () => {
+        const lit = activity.wireMessages("new-york", { ...pose, lamps }, false);
+        expect(lit.lit).toBe(true);
+        expect(lit.messages).toEqual([
+            { kind: "pose", game: "new-york", pose },
+            { kind: "lamps", game: "new-york", lamps }
+        ]);
+        // The position itself is the exact shape read before lamps existed.
+        expect(lit.messages[0]).toEqual({ kind: "pose", game: "new-york", pose });
+        for (const message of lit.messages) {
+            expect(activity.readActivityMessage(message)).toEqual(message);
+        }
+        // Once more when they go out, so the others turn them off; then nothing.
+        const out = activity.wireMessages("new-york", pose, true);
+        expect(out).toEqual({
+            lit: false,
+            messages: [
+                { kind: "pose", game: "new-york", pose },
+                { kind: "lamps", game: "new-york", lamps: { brake: 0, reverse: false, signal: 0 } }
+            ]
+        });
+        expect(activity.wireMessages("new-york", pose, false)).toEqual({
+            lit: false,
+            messages: [{ kind: "pose", game: "new-york", pose }]
+        });
+    });
+
+    it("drop a lamps message that does not fit", () => {
+        for (const bad of [
+            { kind: "lamps", game: "new-york" },
+            { kind: "lamps", game: "new-york", lamps: { ...lamps, brake: 3 } },
+            { kind: "lamps", game: "new-york", lamps, extra: 1 }
+        ]) {
+            expect(activity.readActivityMessage(bad)).toBeNull();
+        }
+    });
+
     it("drop a position whose lamps do not fit", () => {
         for (const bad of [
             { ...lamps, brake: 2 },

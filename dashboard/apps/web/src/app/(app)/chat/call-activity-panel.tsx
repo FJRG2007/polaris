@@ -402,6 +402,9 @@ function usePoseSync({
 }): CallActivityHost | null {
     const poses = useRef(new Map<string, callGame.Pose>());
     const heardAt = useRef(new Map<string, number>());
+    const lampsOf = useRef(new Map<string, callGame.Lamps>());
+    const lampsHeardAt = useRef(new Map<string, number>());
+    const lampsLit = useRef(false);
     const listeners = useRef(new Set<PlayersListener>());
     const live = useRef({ session, self, playing, nameOf });
     live.current = { session, self, playing, nameOf };
@@ -433,10 +436,22 @@ function usePoseSync({
                 if (!message) return;
                 const { session: now, self: me } = live.current;
                 const at = Date.now();
-                if (!callGame.acceptPose(now, me, from, message, heardAt.current.get(from), at))
+                const heard = message.kind === "pose" ? heardAt : lampsHeardAt;
+                if (!callGame.acceptPose(now, me, from, message, heard.current.get(from), at))
                     return;
-                heardAt.current.set(from, at);
-                poses.current.set(from, message.pose);
+                heard.current.set(from, at);
+                if (message.kind === "lamps") {
+                    if (callGame.anyLampLit(message.lamps))
+                        lampsOf.current.set(from, message.lamps);
+                    else lampsOf.current.delete(from);
+                }
+                // Lamps ride on the last position heard; a position takes the
+                // last lamps heard, and never lamps of its own from the wire.
+                const known = message.kind === "pose" ? message.pose : poses.current.get(from);
+                if (!known) return;
+                const { lamps: _carried, ...position } = known;
+                const lamps = lampsOf.current.get(from);
+                poses.current.set(from, lamps ? { ...position, lamps } : position);
                 pushPlayers();
             }),
         [listenActivity, pushPlayers]
@@ -449,6 +464,8 @@ function usePoseSync({
             if (!players.has(seat)) {
                 poses.current.delete(seat);
                 heardAt.current.delete(seat);
+                lampsOf.current.delete(seat);
+                lampsHeardAt.current.delete(seat);
             }
         }
         if (playing) pushPlayers();
@@ -471,10 +488,10 @@ function usePoseSync({
             const pose = callGame.readFramePose(state);
             const { session: now, self: me, playing: inGame } = live.current;
             if (!pose || !now || !inGame) return;
-            sendActivity(
-                now.players.filter((seat) => seat !== me),
-                { kind: "pose", game: now.game, pose }
-            );
+            const others = now.players.filter((seat) => seat !== me);
+            const wire = callGame.wireMessages(now.game, pose, lampsLit.current);
+            lampsLit.current = wire.lit;
+            for (const message of wire.messages) sendActivity(others, message);
         },
         [sendActivity]
     );
