@@ -223,12 +223,12 @@
         "callMute": "Silenciar micrófono",
         "callUnmute": "Activar micrófono",
         "callBack": "Volver a la llamada",
-        "callLeave": "Salir de la llamada"
+        "callLeave": "Colgar la llamada"
     },
     "start": {
         "title": "¿Cómo quieres jugar?",
         "controllerTitle": "Usar un mando",
-        "device": "Jugar en este dispositivo",
+        "device": "Jugar en este equipo",
         "deviceHint": "Teclado y ratón, o táctil",
         "controller": "Usar un mando",
         "controllerHint": "Un mando Bluetooth o USB",
