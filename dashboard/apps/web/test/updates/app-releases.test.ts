@@ -537,9 +537,7 @@ describe("a release every member is offered", () => {
             const repo = "example/partial-walk";
             const found = await appLookup(repo, DESKTOP_TAG_PREFIX);
             expect(found.reached).toBe(true);
-            expect(pickFile(found.download?.files ?? [], [".exe"])?.name).toBe(
-                "Polaris-Setup.exe"
-            );
+            expect(pickFile(found.download?.files ?? [], [".exe"])?.name).toBe("Polaris-Setup.exe");
             // Not on the page that was read, and the rest was never answered.
             expect(await appLookup(repo, TV_TAG_PREFIX)).toEqual({
                 download: null,
