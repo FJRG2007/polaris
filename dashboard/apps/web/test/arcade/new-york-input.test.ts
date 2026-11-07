@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import * as rules from "../../../arcade/game/new-york/engine/player-rules.js";
 import * as guards from "../../../arcade/game/new-york/engine/browser-defaults.js";
 import * as gamepad from "../../../arcade/game/new-york/engine/gamepad-controls.js";
+import * as placement from "../../../arcade/game/new-york/engine/arrival-placement.js";
 
 // The gamepad module reads only the field check from the city config, which otherwise needs the city data
 vi.mock("../../../arcade/game/new-york/engine/city-config.js", () => ({
@@ -134,5 +135,94 @@ describe("switching mode", () => {
         expect(rules.arrivalFor(null, "car")).toBeNull();
         expect(rules.arrivalFor({ x: Number.NaN, z: 0 }, "car")).toBeNull();
         expect(rules.arrivalFor({ x: 1, z: 2 }, "person")?.heading).toBe(Math.PI);
+    });
+});
+
+describe("arrival placement", () => {
+    // A northbound avenue (north = -z) along x = 0, lanes 2 m and 5 m right of its centre line, 200 m long
+    const avenue = { sx: 0, sz: 100, dx: 0, dz: -1, rx: 1, rz: 0, len: 200, lanes: [2, 5] };
+    // A building block east of the avenue, x 10..60, z -40..40
+    const block = { minX: 10, maxX: 60, minZ: -40, maxZ: 40 };
+    const inBlock = (p: { x: number; z: number }, r = 1) =>
+        placement.overlapsFootprints([block], p.x, p.z, r);
+
+    it("puts a car switched to above a road on the nearest lane, facing along it", () => {
+        const at = placement.placeArrival({
+            x: 3,
+            z: 0,
+            heading: 0.4,
+            onRoad: true,
+            edges: [avenue],
+            clear: (p) => !inBlock(p)
+        });
+        expect(at).toEqual({ x: 2, z: 0, heading: placement.headingOf(0, -1) });
+    });
+
+    it("moves a body dropped onto a roof to the street beside it", () => {
+        const onFoot = placement.placeArrival({
+            x: 30,
+            z: 0,
+            heading: 1,
+            clear: (p) => !inBlock(p)
+        });
+        expect(onFoot).not.toBeNull();
+        expect(inBlock(onFoot!)).toBe(false);
+        expect(Math.hypot(onFoot!.x - 30, onFoot!.z)).toBeLessThanOrEqual(24);
+        const car = placement.placeArrival({
+            x: 30,
+            z: 0,
+            onRoad: true,
+            edges: [avenue],
+            clear: (p) => !inBlock(p)
+        });
+        expect(car).toMatchObject({ x: 5, z: 0 });
+    });
+
+    it("stays on open ground in a park with no lane in reach", () => {
+        const at = placement.placeArrival({
+            x: 400,
+            z: 0,
+            heading: 2,
+            onRoad: true,
+            edges: [avenue],
+            clear: () => true
+        });
+        expect(at).toEqual({ x: 400, z: 0, heading: 2 });
+    });
+
+    it("finds the gap between parked or queued cars", () => {
+        const cars = [-6, -3, 0, 3, 6].flatMap((z) => [
+            { x: 2, z, radius: 2.6 },
+            { x: 5, z, radius: 2.6 }
+        ]);
+        const at = placement.placeArrival({
+            x: 2,
+            z: 0,
+            onRoad: true,
+            edges: [avenue],
+            clear: (p) => !placement.overlapsBodies(cars, p.x, p.z, 1)
+        });
+        expect(at).not.toBeNull();
+        expect(placement.overlapsBodies(cars, at!.x, at!.z, 1)).toBe(false);
+        expect([2, 5]).toContain(at!.x);
+        expect(Math.abs(at!.z)).toBeLessThan(15);
+    });
+
+    it("widens past the old 256 m search, and gives up with nothing clear", () => {
+        const far = placement.placeArrival({
+            x: 0,
+            z: 0,
+            clear: (p) => Math.hypot(p.x, p.z) > 300
+        });
+        expect(far && Math.hypot(far.x, far.z)).toBeGreaterThan(300);
+        expect(placement.placeArrival({ x: 0, z: 0, clear: () => false })).toBeNull();
+        expect(placement.placeArrival({ x: Number.NaN, z: 0, clear: () => true })).toBeNull();
+    });
+
+    it("lists lane points nearest first and skips edges out of reach", () => {
+        const points = placement.laneCandidates([avenue], 3, 0);
+        expect(points[0]).toMatchObject({ x: 2, z: 0 });
+        expect(points.every((p, i) => i === 0 || p.distance >= points[i - 1].distance)).toBe(true);
+        expect(placement.laneCandidates([avenue], 500, 0)).toEqual([]);
     });
 });

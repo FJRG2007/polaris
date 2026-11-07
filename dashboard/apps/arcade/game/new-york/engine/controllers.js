@@ -28,6 +28,7 @@ import { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './veh
 import { HELI_CRUISE_SPEED, arrivalFor, heliTopSpeed, stepTurbo } from './player-rules.js';
 import { bryantParkLawn } from './landmarks.js';
 import { polygonContact } from './building-collision.js';
+import { FAR_RING_MAX, overlapsBodies, overlapsFootprints, placeArrival } from './arrival-placement.js';
 
 // Player models, animation and movement for walking, driving, cycling and flying.
 
@@ -336,7 +337,7 @@ class ThirdPersonControllerManager {
     this.activeMode = mode;
     // The new body arrives where the player is, not where it was last left; where nothing is clear it stays put
     const arrival = switching ? arrivalFor(previous?.position && { ...previous.position, heading: previous.heading }, mode) : null;
-    if (arrival) this.teleportActiveTo(arrival.x, arrival.z, arrival.heading, arrival.altitude);
+    if (arrival) this.teleportActiveTo(arrival.x, arrival.z, arrival.heading, arrival.altitude, { preferLane: true });
     const active = this.entities[mode];
     if (active.mesh) active.mesh.visible = true;
     if (active.helmet) active.helmet.visible = true;
@@ -353,17 +354,27 @@ class ThirdPersonControllerManager {
     return this.entities[this.activeMode];
   }
 
-  teleportActiveTo(x, z, heading = Math.PI, savedAltitude = null) {
+  /**
+   * What arrivals keep clear of beyond the static colliders, set once the city is built: the road network's directed
+   * edges (lanes to arrive on), the traffic's vehicles (`vehicles()` returns the live list) and street furniture
+   * footprints (tree pits, kiosks, hydrants...).
+   */
+  setArrivalContext({ edges = [], vehicles = () => [], footprints = [] } = {}) {
+    this._arrival = { edges, vehicles, footprints: footprints.filter((f) => !f.pedestrianOnly) };
+  }
+
+  /** `preferLane`: a car or bicycle arrives on the nearest clear lane, facing along it (a mode switch). */
+  teleportActiveTo(x, z, heading = Math.PI, savedAltitude = null, { preferLane = false } = {}) {
     const ent = this.getActiveEntity();
     this.resetInput();
     if (!Number.isFinite(heading)) heading = ent.heading;
     const heli = this.activeMode === 'helicopter';
     const altitude = heli ? Math.max(0.25, Math.min(380, savedAltitude ?? Math.max(92, ent.position.y))) : 0;
-    const destination = this.findTeleportPosition(x, z, heading, altitude);
+    const destination = this.findTeleportPosition(x, z, heading, altitude, preferLane);
     if (destination) {
       ent.position.x = destination.x;
       ent.position.z = destination.z;
-      ent.heading = heading;
+      ent.heading = heading = destination.heading ?? heading;
       ent.position.y = heli ? altitude : this.getGroundHeight(destination.x, destination.z, this.activeMode);
     }
     ent.speed = 0;
@@ -402,13 +413,10 @@ class ThirdPersonControllerManager {
 
   // Find a fully clear arrival before moving the player. Sequential collision pushes can leave a player trapped
   // between overlapping buildings, so test whole candidate footprints instead; retain the old position if none fits.
-  findTeleportPosition(x, z, heading, altitude) {
+  findTeleportPosition(x, z, heading, altitude, preferLane = false) {
     if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
     const heli = this.activeMode === 'helicopter';
     const radius = heli ? 4.5 : this.activeMode === 'person' ? 0.48 : 0.65;
-    const sinH = Math.sin(heading), cosH = Math.cos(heading);
-    const shape = collisionBody(this.activeMode, radius, heading, 0.1);
-    const reach = Math.max(shape.extX, shape.extZ);
     const margin = heli ? 6000 : 0;
     const entity = this.getActiveEntity();
     // Conservative body cylinders, including the taxi's corners, bicycle wheels and helicopter tail/rotor.
@@ -430,8 +438,20 @@ class ThirdPersonControllerManager {
       }
       return { x: px, z: pz };
     };
-    const clear = (p) => {
+    const context = this._arrival;
+    // Traffic as circles round each vehicle's centre (a bus's covers its length); only on the ground, and read once
+    const traffic = heli && altitude > 8 ? [] : (context?.vehicles() || []).map((v) => ({ x: v.x, z: v.z, radius: v.bus ? 6.5 : 2.6 }));
+    // Furniture within the search's reach only, so a long search stays a few milliseconds
+    const span = FAR_RING_MAX + 64;
+    const furniture = heli ? [] : (context?.footprints || []).filter((f) => f.maxX > x - span && f.minX < x + span && f.maxZ > z - span && f.minZ < z + span);
+    const clear = (p, h) => {
       if (!p) return false;
+      const sinH = Math.sin(h), cosH = Math.cos(h);
+      const shape = collisionBody(this.activeMode, radius, h, 0.1);
+      const reach = Math.max(shape.extX, shape.extZ);
+      const footprint = Math.max(body[entity.type][0], 0.5);
+      if (overlapsBodies(traffic, p.x, p.z, footprint)) return false;
+      if (overlapsFootprints(furniture, p.x, p.z, footprint)) return false;
       const baseY = heli ? altitude : this.getGroundHeight(p.x, p.z, this.activeMode);
       // Keep other player models out of both the arrival and its default chase view. A corridor also prevents a
       // parked car between camera and character from hiding the character even when the camera itself is outside it.
@@ -447,19 +467,8 @@ class ThirdPersonControllerManager {
       }
       return true;
     };
-    const origin = clampPoint(x, z);
-    if (clear(origin)) return origin;
-    // Four-metre rings cover nearby streets and courtyards, with bounded work even for a click inside a large block.
-    const cx = origin ? origin.x : Math.max(ISLAND_BOUNDS.minX, Math.min(ISLAND_BOUNDS.maxX, x));
-    const cz = origin ? origin.z : Math.max(ISLAND_BOUNDS.minZ + 30, Math.min(ISLAND_BOUNDS.maxZ, z));
-    for (let distance = 4; distance <= 256; distance += 4) {
-      for (let i = 0; i < 32; i++) {
-        const angle = i * Math.PI / 16;
-        const p = clampPoint(cx + Math.cos(angle) * distance, cz + Math.sin(angle) * distance);
-        if (clear(p)) return p;
-      }
-    }
-    return null;
+    // Lanes first for a road vehicle, then the spot itself, then widening rings (placeArrival); null keeps it in place
+    return placeArrival({ x, z, heading, onRoad: preferLane && !heli && this.activeMode !== 'person', edges: context?.edges, clear, clamp: clampPoint });
   }
 
   // =========================================================================

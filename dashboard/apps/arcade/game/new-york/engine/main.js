@@ -154,6 +154,12 @@ async function initApp() {
 
   // 4. Initialize Third-Person Controllers (Person, Car, Cyclist, Helicopter) & Multi-Camera System
   const controllerManager = new ThirdPersonControllerManager(scene, allColliders);
+  // A mode switch lands a car or bicycle on the nearest clear lane, and nothing lands on traffic or street furniture
+  controllerManager.setArrivalContext({
+    edges: trafficSystem.network.edges,
+    vehicles: () => [...trafficSystem.cars, ...trafficSystem.buses],
+    footprints: streetDetails.footprints
+  });
   // Reuse teleport placement so saved players return at rest, close to their last positions.
   // A restart carries the player in its address (`?resume=`): framed in a call the page is sandboxed, has an opaque
   // origin and so no storage, and the restart would otherwise put everybody back at the start
