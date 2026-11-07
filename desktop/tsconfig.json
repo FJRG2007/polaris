@@ -16,7 +16,9 @@
         "noEmit": true,
         "baseUrl": ".",
         "paths": {
-            "@/*": ["./src/*"]
+            "@/*": ["./src/*"],
+            "@tv-compat/*": ["../dashboard/packages/core/src/tv-compat/*"],
+            "zod": ["./node_modules/zod"]
         }
     },
     "include": ["src/**/*.ts", "test/**/*.ts"]

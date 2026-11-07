@@ -348,7 +348,8 @@ export type TvOutcome =
     | "install-failed"
     | "install-interrupted"
     | "usb-busy"
-    | "usb-gone";
+    | "usb-gone"
+    | "needs-pairing";
 
 /** A TV plugged in by USB that offers ADB. */
 export interface TvUsbDevice {
@@ -369,6 +370,20 @@ export interface TvInstallState {
     readonly backup: string | null;
     /** Whether the port refused afterwards; null until that was checked. */
     readonly closed: boolean | null;
+    /** While the install waits on the TV: the one thing to do there. Absent on older apps. */
+    readonly waiting?: TvWaiting | null;
+    /** Whether this TV lets Polaris TV be Home, once it is known. Absent on older apps. */
+    readonly home?: "offered" | "app-only" | "refused-by-maker" | null;
+}
+
+/** The instruction shown while waiting: turn on debugging (the menu path for this TV's platform), or accept the prompt. */
+export interface TvWaiting {
+    readonly step: "debugging" | "prompt";
+    readonly about: string;
+    readonly press: string;
+    readonly presses: number;
+    readonly developer: string;
+    readonly switches: readonly string[];
 }
 
 /** What the main process asks of the hidden page that holds a TV's USB connection. */

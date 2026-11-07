@@ -1470,7 +1470,8 @@
                     "install-failed": "La TV no pudo instalarla. No cambió nada más en ella.",
                     "install-interrupted": "La conexión se cortó durante la instalación. Busca Polaris TV entre las apps de la TV o reinténtalo.",
                     "usb-busy": "Otro programa usa la depuración USB de la TV. Cierra adb o scrcpy y reintenta. En Windows, la TV puede necesitar el Google USB Driver.",
-                    "usb-gone": "La TV ya no está conectada por USB. Revisa el cable y vuelve a intentarlo."
+                    "usb-gone": "La TV ya no está conectada por USB. Revisa el cable y vuelve a intentarlo.",
+                    "needs-pairing": "Esta TV solo activa la depuración con un código de emparejamiento de depuración inalámbrica, que la app de escritorio aún no usa. Nada cambió en la TV. Conéctala por USB si tiene puerto de datos."
                 },
                 "usb": "Cable USB",
                 "usbHint": "Conecta la TV a este ordenador. Cierra adb o scrcpy si están abiertos.",

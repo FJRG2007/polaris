@@ -26,10 +26,12 @@ import { repository } from "../../package.json";
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
 import { usbDevices, usbLink } from "./usb-link";
 import { AdbConnection, newAdbKey } from "./adb-client";
+import { waitForTv, type TvWaitResult, type TvWaitStep } from "./tv-wait";
+import { choosePath, type TvPath, type TvSighting } from "./tv-path";
 import { CHECKSUMS, parseChecksums, releaseSource } from "./releases";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { readTvAddress } from "@/shared/tv-address";
-import { CHANNELS, type TvInstallState, type TvOutcome } from "@/shared/bridge";
+import { CHANNELS, type TvInstallState, type TvOutcome, type TvWaiting } from "@/shared/bridge";
 
 const PACKAGE = "app.polaris.tv";
 const HOME_ACTIVITY = `${PACKAGE}/.MainActivity`;
@@ -46,6 +48,9 @@ const PAGE_SIZE = 100;
 const MAX_PAGES = 5;
 const LOOKUP_MS = 15_000;
 const DOWNLOAD_MS = 300_000;
+/** How often the port is tried while the person turns debugging on, and for how long in all. */
+const WAIT_EVERY_MS = 2_000;
+const WAIT_FOR_MS = 600_000;
 
 /** What a failed connection means, in terms the person can act on. */
 export function connectFailure(error: { code?: string; message?: string; }): TvOutcome {
@@ -97,6 +102,20 @@ function answersOn(host: string, port: number, timeoutMs: number): Promise<"open
 
 /** Bumped by a cancel, so a search started before it stops taking addresses. */
 let search = 0;
+/** Bumped by a cancel and when a wait ends, so a wait for the TV stops polling. */
+let waitRun = 0;
+
+/** The one instruction for this TV while the install waits on it. */
+export function waitingFor(step: TvWaitStep, path: TvPath): TvWaiting {
+    const { about, press, presses, developer, switches } = path.instruction;
+    return { step, about, press, presses, developer, switches };
+}
+
+/** What a wait that ended without a connection tells the person. */
+export function waitOutcome(waited: Exclude<TvWaitResult<unknown>, { kind: "connected" | "cancelled" }>): TvOutcome {
+    if (waited.kind === "failed") return waited.outcome as TvOutcome;
+    return waited.step === "prompt" ? "not-allowed" : "adb-off";
+}
 
 async function findTvs(run: number): Promise<string[]> {
     const queue = neighbours();
@@ -212,7 +231,17 @@ let window: BrowserWindow | null = null;
 const pages = new Set<WebContents>();
 let busy = false;
 let searcher: WebContents | null = null;
-let state: TvInstallState = { phase: "ready", found: [], usb: null, usbListing: false, outcome: null, backup: null, closed: null };
+let state: TvInstallState = {
+    phase: "ready",
+    found: [],
+    usb: null,
+    usbListing: false,
+    outcome: null,
+    backup: null,
+    closed: null,
+    waiting: null,
+    home: null
+};
 
 function publish(next: Partial<TvInstallState>): void {
     state = { ...state, ...next };
@@ -244,7 +273,7 @@ export function lateFailure(stage: TvStage): TvOutcome {
 }
 
 async function install(target: TvTarget, makeHome: boolean, blockAds: boolean): Promise<void> {
-    publish({ phase: "download", outcome: null, backup: null, closed: null });
+    publish({ phase: "download", outcome: null, backup: null, closed: null, waiting: null, home: null });
     const release = await latestApk().catch((caught: unknown) => {
         console.error("[tv]", caught);
         return undefined;
@@ -263,30 +292,71 @@ async function install(target: TvTarget, makeHome: boolean, blockAds: boolean): 
     }
 
     publish({ phase: "connecting" });
-    const adb = new AdbConnection({
-        ...(target.kind === "usb" ? { link: usbLink(target.id) } : { host: target.host, port: ADB_PORT }),
-        key,
-        connectMs: 8_000,
-        approveMs: 60_000,
-        commandMs: 60_000,
-        onPrompt: () => publish({ phase: "allow" })
-    });
-    try {
-        await adb.open();
-    } catch (caught) {
-        adb.close();
-        publish({ phase: "failed", outcome: connectFailure(caught as NodeJS.ErrnoException) });
+    const sighting: TvSighting = {
+        services: [],
+        adbOpen: target.kind === "network" && (await answersOn(target.host, ADB_PORT, SCAN_MS)) === "open"
+    };
+    const before = choosePath(sighting);
+    if (target.kind === "network" && before.route === "pairing") {
+        publish({ phase: "failed", outcome: "needs-pairing" });
         return;
     }
+    waitRun += 1;
+    const run = waitRun;
+    const waited = await waitForTv<AdbConnection>({
+        probe: () => (target.kind === "usb" ? Promise.resolve("open") : answersOn(target.host, ADB_PORT, SCAN_MS)),
+        connect: async () => {
+            const adb = new AdbConnection({
+                ...(target.kind === "usb" ? { link: usbLink(target.id) } : { host: target.host, port: ADB_PORT }),
+                key,
+                connectMs: 8_000,
+                approveMs: 60_000,
+                commandMs: 60_000,
+                onPrompt: () => publish({ phase: "allow", waiting: waitingFor("prompt", before) })
+            });
+            try {
+                await adb.open();
+                return adb;
+            } catch (caught) {
+                adb.close();
+                throw caught;
+            }
+        },
+        classify: (caught) => connectFailure(caught as NodeJS.ErrnoException),
+        onStep: (step) => publish({ phase: step === "prompt" ? "allow" : "connecting", waiting: waitingFor(step, before) }),
+        cancelled: () => run !== waitRun,
+        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        now: () => Date.now(),
+        intervalMs: WAIT_EVERY_MS,
+        timeoutMs: WAIT_FOR_MS
+    });
+    waitRun += 1;
+    if (waited.kind === "cancelled") {
+        publish({ phase: "ready", waiting: null });
+        return;
+    }
+    if (waited.kind !== "connected") {
+        publish({ phase: "failed", outcome: waitOutcome(waited), waiting: null });
+        return;
+    }
+    const adb = waited.connection;
+    publish({ waiting: null });
 
     let stage: TvStage = "check";
     try {
         publish({ phase: "checking" });
-        const refusal = tvRefusal(await adb.shell("getprop ro.build.version.sdk"), await adb.shell("pm list features"));
+        const sdk = await adb.shell("getprop ro.build.version.sdk");
+        const refusal = tvRefusal(sdk, await adb.shell("pm list features"));
         if (refusal) {
             await finish(adb, target, refusal);
             return;
         }
+        const path = choosePath(sighting, {
+            manufacturer: await adb.shell("getprop ro.product.manufacturer"),
+            model: await adb.shell("getprop ro.product.model"),
+            sdk: Number.parseInt(sdk.trim(), 10) || null
+        });
+        publish({ home: path.home });
         stage = "backup";
         publish({ phase: "backup" });
         publish({ backup: await backUp(adb, target) });
@@ -303,9 +373,11 @@ async function install(target: TvTarget, makeHome: boolean, blockAds: boolean): 
         }
         stage = "home";
         for (const grant of grantCommands(blockAds)) await adb.shell(grant).catch(() => "");
+        // TCL's app-ops: a TV without that firmware answers an error, which changes nothing.
+        for (const line of path.afterInstall) await adb.shell(`${line} 2>/dev/null; true`).catch(() => "");
 
         let outcome: TvOutcome = "installed";
-        if (makeHome) {
+        if (makeHome && path.home === "offered") {
             publish({ phase: "home" });
             await adb.shell(`cmd package set-home-activity --user 0 ${HOME_ACTIVITY}`);
             const resolved = await adb.shell(
@@ -326,8 +398,9 @@ async function finish(adb: AdbConnection, target: TvTarget, outcome: TvOutcome):
     publish({ phase: outcome.startsWith("installed") ? "done" : "failed", outcome, closed });
 }
 
-/** Stops a search under way; an install is never stopped part way. */
+/** Stops a search, or a wait for the TV, under way; an install is never stopped once the TV let this in. */
 function stopSearch(by?: WebContents): void {
+    if (state.waiting) waitRun += 1;
     if (state.phase !== "searching" || (by && searcher !== by)) return;
     searcher = null;
     search += 1;

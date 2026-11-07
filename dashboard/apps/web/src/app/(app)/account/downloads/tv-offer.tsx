@@ -82,7 +82,8 @@ const OUTCOMES = new Set([
     "install-failed",
     "install-interrupted",
     "usb-busy",
-    "usb-gone"
+    "usb-gone",
+    "needs-pairing"
 ]);
 
 function validAddress(value: string): boolean {

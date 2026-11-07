@@ -10,6 +10,7 @@ import { execFileSync } from "node:child_process";
 import models from "../../src/tv-compat/models.json" with { type: "json" };
 import quirks from "../../src/tv-compat/quirks.json" with { type: "json" };
 import privacy from "../../src/tv-compat/privacy.json" with { type: "json" };
+import debugging from "../../src/tv-compat/debugging.json" with { type: "json" };
 import enWords from "../../../../apps/web/messages/en-US/tvCompat.json" with { type: "json" };
 import esWords from "../../../../apps/web/messages/es-ES/tvCompat.json" with { type: "json" };
 import * as tv from "../../src/tv-compat/index";
@@ -50,6 +51,16 @@ describe("tv-compat data", () => {
         expect(tcl.map((entry) => entry.id)).toEqual(["tcl", "google-tv"]);
         const fire = tv.privacyFor({ brand: "Amazon Fire TV", platform: "fire-os" });
         expect(fire.map((entry) => entry.id)).toEqual(["fire-tv"]);
+    });
+
+    it("says how to turn on debugging on every platform the installer reaches", () => {
+        expect(tv.tvDebuggingSchema.safeParse(debugging).success).toBe(true);
+        const platforms = tv.TV_DEBUGGING.platforms.flatMap((entry) => entry.platforms);
+        expect(new Set(platforms).size).toBe(platforms.length);
+        for (const model of tv.TV_MODELS.filter((one) => one.install !== "none"))
+            expect(tv.debuggingFor(model.platform)?.id, model.id).toBeDefined();
+        expect(tv.debuggingFor("fire-os")?.switches).toEqual(["ADB debugging"]);
+        expect(tv.debuggingFor("webos")).toBeUndefined();
     });
 
     it("words every privacy step in both languages", () => {

@@ -1470,7 +1470,8 @@
                     "install-failed": "The TV could not install it. Nothing else changed on it.",
                     "install-interrupted": "The connection dropped during the install. Look for Polaris TV among the TV's apps, or try again.",
                     "usb-busy": "Another program is using the TV's USB debugging. Close adb or scrcpy and retry. On Windows, the TV may need the Google USB Driver.",
-                    "usb-gone": "The TV is no longer connected by USB. Check the cable and try again."
+                    "usb-gone": "The TV is no longer connected by USB. Check the cable and try again.",
+                    "needs-pairing": "This TV turns on debugging only with a Wireless debugging pairing code, which the desktop app cannot use yet. Nothing changed on the TV. Plug it in by USB if it has a data port."
                 },
                 "usb": "USB cable",
                 "usbHint": "Plug the TV into this computer. Close adb or scrcpy if open.",

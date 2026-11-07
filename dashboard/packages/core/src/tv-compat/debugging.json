@@ -1,0 +1,34 @@
+{
+    "platforms": [
+        {
+            "id": "android-tv",
+            "platforms": ["android-tv", "android"],
+            "about": "Settings > Device Preferences > About",
+            "press": "Build",
+            "presses": 7,
+            "developer": "Settings > Device Preferences > Developer options",
+            "switches": ["USB debugging", "Network debugging"],
+            "source": "https://github.com/simbasjungles/free-my-tv#install"
+        },
+        {
+            "id": "google-tv",
+            "platforms": ["google-tv"],
+            "about": "Settings > System > About",
+            "press": "Build",
+            "presses": 7,
+            "developer": "Settings > System > Developer options",
+            "switches": ["USB debugging", "Wireless debugging"],
+            "source": "https://github.com/simbasjungles/free-my-tv#install"
+        },
+        {
+            "id": "fire-os",
+            "platforms": ["fire-os"],
+            "about": "Settings > My Fire TV > About",
+            "press": "the device name",
+            "presses": 7,
+            "developer": "Settings > My Fire TV > Developer options",
+            "switches": ["ADB debugging"],
+            "source": "https://github.com/FJRG2007/polaris/blob/main/tv/README.md"
+        }
+    ]
+}

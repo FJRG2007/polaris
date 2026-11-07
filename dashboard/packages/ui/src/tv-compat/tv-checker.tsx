@@ -20,10 +20,10 @@ import { AppWindow, Check, ExternalLink, House, Router, Search } from "lucide-re
 /** The guides a result can point at. */
 export type TvGuide = "setup" | "fire" | "network" | "privacy";
 
-/** Each guide's page on the docs site. */
+/** Each guide's page on the docs site; one install page covers the Home and the app tier alike. */
 export const TV_GUIDE_SLUGS: Readonly<Record<TvGuide, string>> = {
-    setup: "polaris-tv-setup",
-    fire: "polaris-tv-fire",
+    setup: "polaris-tv-install",
+    fire: "polaris-tv-install",
     network: "polaris-tv-network",
     privacy: "polaris-tv-privacy"
 };

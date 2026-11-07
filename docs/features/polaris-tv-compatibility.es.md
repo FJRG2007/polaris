@@ -11,9 +11,9 @@ Polaris TV puede ser su pantalla de inicio.
 - **Pantalla de inicio**: Android TV 8 o posterior y Google TV, incluidos Chromecast con Google TV, Google
   TV Streamer, cajas y proyectores. Polaris TV sustituye la pantalla de inicio, puede bloquear anuncios y
   rastreadores en la propia tele (Android 9 o posterior) y se instala desde la app de escritorio de
-  Polaris. [Configúrala en tres pasos](polaris-tv-setup.md).
+  Polaris. [Instálala en tres pasos](polaris-tv-install.md).
 - **App**: Fire TV con Fire OS 6 o posterior. Polaris TV se abre como una app y Amazon conserva el botón de
-  inicio. [Guía de Fire TV](polaris-tv-fire.md). Las apps para LG webOS y Samsung Tizen están en camino;
+  inicio. [Instálala](polaris-tv-install.md). Las apps para LG webOS y Samsung Tizen están en camino;
   hasta entonces, esas teles van en el grupo siguiente.
 - **Solo red**: Roku, Vizio, Hisense VIDAA, de momento LG y Samsung, y cualquier otra. Sin app, pero el
   Filtro de red bloquea anuncios y rastreadores en todas las teles de casa cuando el router lo usa como DNS.
