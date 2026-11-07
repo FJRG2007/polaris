@@ -554,6 +554,7 @@ public final class LauncherSettingsActivity extends Activity {
         List<String> names = new ArrayList<>();
         for (Profiles.Profile p : roster) {
             String name = ProfilePicker.displayName(this, p);
+            if (p.kids) name = name + " - " + getString(R.string.kids_badge);
             names.add(p.id.equals(linked) ? name + " - " + getString(R.string.profile_linked_note) : name);
         }
         boolean room = Profiles.canAdd(roster);
@@ -576,9 +577,24 @@ public final class LauncherSettingsActivity extends Activity {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         labels.add(getString(R.string.profile_rename));
-        actions.add(() -> PinPad.check(this, profile, () -> askProfileName(profile)));
+        actions.add(() -> unlock(profile, () -> askProfileName(profile)));
         labels.add(getString(R.string.profile_change_avatar));
-        actions.add(() -> PinPad.check(this, profile, () -> pickAvatar(profile, null)));
+        actions.add(() -> unlock(profile, () -> pickAvatar(profile, null)));
+        // A kids profile: its apps, and back to a standard profile, each behind a parent PIN.
+        if (profile.kids) {
+            labels.add(getString(R.string.kids_apps_row, profile.apps.size()));
+            actions.add(() -> PinPad.checkParent(this, () -> pickKidsApps(profile.id)));
+            labels.add(getString(R.string.kids_make_standard));
+            actions.add(() -> PinPad.checkParent(this, () -> {
+                Profiles.Profile now = Profiles.active(Profiles.load(this), profile.id);
+                if (now != null && now.id.equals(profile.id)) {
+                    saveProfiles(Profiles.replace(Profiles.load(this), now.asKids(false)));
+                }
+            }));
+        } else {
+            labels.add(getString(R.string.kids_make_kids));
+            actions.add(() -> makeKids(profile.id));
+        }
         if (at > 0) {
             labels.add(getString(R.string.profile_move_up));
             actions.add(() -> saveProfiles(Profiles.move(Profiles.load(this), profile.id, -1)));
@@ -587,23 +603,34 @@ public final class LauncherSettingsActivity extends Activity {
             labels.add(getString(R.string.profile_move_down));
             actions.add(() -> saveProfiles(Profiles.move(Profiles.load(this), profile.id, 1)));
         }
-        // A PIN is set freely, but changing or removing one asks for it first, as do a new name or colour.
-        if (Profiles.hasPin(this, profile.id)) {
+        // A PIN is set freely, but changing or removing one asks for it first, as do a new name or colour. A kids
+        // profile has none: a parent PIN stands in for it.
+        boolean ownPin = Profiles.hasPin(this, profile.id);
+        if (!profile.kids && ownPin) {
             labels.add(getString(R.string.profile_pin_change));
             actions.add(() -> PinPad.check(this, profile, () -> PinPad.create(this, profile,
                     () -> openProfile(profile))));
             labels.add(getString(R.string.profile_pin_remove));
             actions.add(() -> PinPad.check(this, profile, () -> {
+                // The last parent PIN stays while a kids profile needs it to be left.
+                List<Profiles.Profile> now = Profiles.load(this);
+                java.util.Set<String> pinned = Profiles.pinnedIds(this, now);
+                pinned.remove(profile.id);
+                if (!Profiles.kidsSafe(now, pinned)) {
+                    say(getString(R.string.kids_last_parent_pin));
+                    return;
+                }
                 Profiles.savePin(this, profile.id, null);
                 openProfile(profile);
             }));
-        } else {
+        } else if (!profile.kids) {
             labels.add(getString(R.string.profile_pin_set));
             actions.add(() -> PinPad.create(this, profile, () -> openProfile(profile)));
         }
         labels.add(getString(R.string.profile_delete));
-        // Deleting a profile with a PIN asks for it too (PinPad.check goes straight on without one).
-        actions.add(() -> PinPad.check(this, profile, () -> deleteProfile(profile)));
+        // Deleting a profile with a PIN asks for it too (PinPad.check goes straight on without one), and a kids
+        // profile asks for a parent PIN.
+        actions.add(() -> unlock(profile, () -> deleteProfile(profile)));
         new AlertDialog.Builder(this)
                 .setTitle(ProfilePicker.displayName(this, profile))
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> actions.get(which).run())
@@ -662,10 +689,16 @@ public final class LauncherSettingsActivity extends Activity {
                     String key = Profiles.AVATARS[which];
                     List<Profiles.Profile> roster = Profiles.load(this);
                     if (profile == null) {
-                        List<Profiles.Profile> added = Profiles.add(roster, java.util.UUID.randomUUID().toString(),
-                                newName, key);
-                        if (added == null) say(getString(R.string.profile_full));
-                        else saveProfiles(added);
+                        String id = java.util.UUID.randomUUID().toString();
+                        List<Profiles.Profile> added = Profiles.add(roster, id, newName, key);
+                        if (added == null) {
+                            say(getString(R.string.profile_full));
+                            return;
+                        }
+                        Profiles.save(this, added);
+                        ProfileSession.reload();
+                        refreshProfilesRow();
+                        askKind(id);
                         return;
                     }
                     Profiles.Profile now = Profiles.active(roster, profile.id);
@@ -690,12 +723,151 @@ public final class LauncherSettingsActivity extends Activity {
                         say(getString(R.string.profile_delete_last));
                         return;
                     }
+                    // Not the last profile with a parent PIN while a kids profile still needs one to be left.
+                    if (!Profiles.kidsSafe(left, Profiles.pinnedIds(this, left))) {
+                        say(getString(R.string.kids_last_parent_delete));
+                        return;
+                    }
                     if (profile.id.equals(Profiles.linkedId(this))) Profiles.setLinked(this, null);
                     deleteSharedPreferences(Profiles.recentsFile(profile.id));
                     Profiles.savePin(this, profile.id, null);
                     saveProfiles(left);
                 })
                 .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /** Runs {@code then} once the profile is unlocked: its own PIN, or a parent PIN for a kids profile. */
+    private void unlock(Profiles.Profile profile, Runnable then) {
+        if (profile.kids) PinPad.checkParent(this, then);
+        else PinPad.check(this, profile, then);
+    }
+
+    /** A new profile: a standard one, or a kids one (which then asks for a parent PIN and its apps). */
+    private void askKind(String id) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.kids_kind_title)
+                .setItems(new String[]{getString(R.string.kids_kind_standard), getString(R.string.kids_kind_kids)},
+                        (dialog, which) -> {
+                            if (which == 1) makeKids(id);
+                            else openProfiles();
+                        })
+                .setOnCancelListener(dialog -> openProfiles())
+                .show();
+    }
+
+    /**
+     * Turns a profile into a kids profile. There has to be a parent PIN (a profile that is not a kids profile, with
+     * a PIN) to leave it by, so without one this shows how to set one first; with one, that PIN is asked for.
+     * The profile's own PIN goes: a kids profile never asks for it.
+     */
+    private void makeKids(String id) {
+        List<Profiles.Profile> roster = Profiles.load(this);
+        Profiles.Profile profile = Profiles.active(roster, id);
+        if (profile == null || !profile.id.equals(id)) return;
+        java.util.Set<String> pinned = Profiles.pinnedIds(this, roster);
+        pinned.remove(id);
+        List<Profiles.Profile> after = Profiles.replace(roster, profile.asKids(true));
+        if (!Profiles.kidsSafe(after, pinned)) {
+            askParentPinFirst(profile, after);
+            return;
+        }
+        PinPad.checkParent(this, () -> {
+            List<Profiles.Profile> now = Profiles.load(this);
+            Profiles.Profile current = Profiles.active(now, id);
+            if (current == null || !current.id.equals(id)) return;
+            Profiles.savePin(this, id, null);
+            Profiles.save(this, Profiles.replace(now, current.asKids(true)));
+            ProfileSession.reload();
+            refreshProfilesRow();
+            pickKidsApps(id);
+        });
+    }
+
+    /** No parent PIN yet: offers to set one on a profile that is not a kids profile, then goes on to make it. */
+    private void askParentPinFirst(Profiles.Profile kid, List<Profiles.Profile> after) {
+        List<Profiles.Profile> adults = new ArrayList<>();
+        for (Profiles.Profile p : after) if (!p.kids) adults.add(p);
+        if (adults.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setMessage(R.string.kids_needs_adult)
+                    .setPositiveButton(R.string.profile_add, (d, w) -> askProfileName(null))
+                    .setNegativeButton(android.R.string.cancel, (d, w) -> openProfiles())
+                    .show();
+            return;
+        }
+        Runnable pick = () -> {
+            if (adults.size() == 1) {
+                PinPad.create(this, adults.get(0), () -> makeKids(kid.id));
+                return;
+            }
+            String[] names = new String[adults.size()];
+            for (int i = 0; i < names.length; i++) names[i] = ProfilePicker.displayName(this, adults.get(i));
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.kids_parent_pick_set)
+                    .setItems(names, (d, which) -> PinPad.create(this, adults.get(which), () -> makeKids(kid.id)))
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+        };
+        new AlertDialog.Builder(this)
+                .setMessage(getString(R.string.kids_needs_parent_pin, ProfilePicker.displayName(this, kid)))
+                .setPositiveButton(R.string.profile_pin_set, (d, w) -> pick.run())
+                .setNegativeButton(android.R.string.cancel, (d, w) -> openProfiles())
+                .show();
+    }
+
+    /**
+     * The apps a kids profile may open from Home, ticked from what is installed (TV apps and phone apps alike).
+     * Packages on the list that are no longer installed are kept, so an app put back later is on it again.
+     */
+    private void pickKidsApps(String id) {
+        Profiles.Profile profile = Profiles.active(Profiles.load(this), id);
+        if (profile == null || !profile.id.equals(id) || !profile.kids) return;
+        PackageManager pm = getPackageManager();
+        java.util.Map<String, String> labels = new java.util.HashMap<>();
+        for (String category : new String[]{Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER}) {
+            for (ResolveInfo ri : pm.queryIntentActivities(new Intent(Intent.ACTION_MAIN).addCategory(category), 0)) {
+                if (ri.activityInfo == null || !ri.activityInfo.exported) continue;
+                String pkg = ri.activityInfo.packageName;
+                if (pkg.equals(getPackageName()) || labels.containsKey(pkg)) continue;
+                labels.put(pkg, Cards.cleanLabel(String.valueOf(ri.loadLabel(pm)), pkg));
+            }
+        }
+        List<String> packages = new ArrayList<>(labels.keySet());
+        Collections.sort(packages, (a, b) -> labels.get(a).compareToIgnoreCase(labels.get(b)));
+        String[] names = new String[packages.size()];
+        boolean[] checked = new boolean[packages.size()];
+        for (int i = 0; i < names.length; i++) {
+            names[i] = labels.get(packages.get(i));
+            checked[i] = profile.apps.contains(packages.get(i));
+        }
+        if (names.length == 0) {
+            say(getString(R.string.kids_apps_none_installed));
+            return;
+        }
+        String name = ProfilePicker.displayName(this, profile);
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.kids_apps_title, name))
+                .setMultiChoiceItems(names, checked, (dialog, which, on) -> checked[which] = on)
+                .setPositiveButton(R.string.kids_apps_save, (dialog, which) -> {
+                    java.util.Set<String> kept = new java.util.TreeSet<>();
+                    for (String pkg : profile.apps) if (!labels.containsKey(pkg)) kept.add(pkg);
+                    for (int i = 0; i < checked.length; i++) if (checked[i]) kept.add(packages.get(i));
+                    List<Profiles.Profile> now = Profiles.load(this);
+                    Profiles.Profile current = Profiles.active(now, id);
+                    if (current == null || !current.id.equals(id) || !current.kids) return;
+                    Profiles.save(this, Profiles.replace(now, current.withApps(kept)));
+                    ProfileSession.reload();
+                    refreshProfilesRow();
+                    int shown = 0;
+                    for (boolean on : checked) if (on) shown++;
+                    new AlertDialog.Builder(this)
+                            .setMessage(getString(R.string.kids_apps_saved, shown, name))
+                            .setPositiveButton(android.R.string.ok, (d, w) -> openProfiles())
+                            .setOnCancelListener(d -> openProfiles())
+                            .show();
+                })
+                .setNegativeButton(android.R.string.cancel, (dialog, which) -> openProfiles())
                 .show();
     }
 

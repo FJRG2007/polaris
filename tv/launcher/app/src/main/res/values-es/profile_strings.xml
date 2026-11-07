@@ -51,4 +51,24 @@
     <string name="profile_pin_set">Poner un PIN</string>
     <string name="profile_pin_change">Cambiar el PIN</string>
     <string name="profile_pin_remove">Quitar el PIN</string>
+    <!-- Perfiles infantiles. -->
+    <string name="kids_badge">Infantil</string>
+    <string name="kids_parent_pin">Hace falta el PIN de un adulto</string>
+    <string name="kids_parent_pick">¿De quién es el PIN que vas a escribir?</string>
+    <string name="kids_parent_pick_set">¿Qué perfil tendrá el PIN?</string>
+    <string name="kids_make_kids">Convertir en perfil infantil</string>
+    <string name="kids_make_standard">Convertir en perfil normal</string>
+    <string name="kids_apps_row">Aplicaciones en Inicio: %1$d</string>
+    <string name="kids_apps_title">Aplicaciones de %1$s</string>
+    <string name="kids_apps_save">Guardar</string>
+    <string name="kids_apps_saved">%2$s ve %1$d aplicaciones en Inicio. Lo que muestra cada aplicación por dentro se ajusta en esa aplicación.</string>
+    <string name="kids_apps_none_installed">No hay aplicaciones instaladas que se puedan poner en Inicio.</string>
+    <string name="kids_kind_title">¿Para quién es este perfil?</string>
+    <string name="kids_kind_standard">Perfil normal</string>
+    <string name="kids_kind_kids">Perfil infantil</string>
+    <string name="kids_needs_parent_pin">Para salir de %1$s hará falta el PIN de un adulto. Pon antes un PIN a un perfil que no sea infantil.</string>
+    <string name="kids_needs_adult">Un perfil infantil necesita el perfil de un adulto con PIN para poder salir de él. Añade uno antes.</string>
+    <string name="kids_last_parent_pin">Es el único PIN de un adulto y un perfil infantil lo necesita para salir. Convierte antes el perfil infantil en uno normal o pon un PIN a otro perfil.</string>
+    <string name="kids_last_parent_delete">Este perfil tiene el único PIN de un adulto y un perfil infantil lo necesita para salir. Pon antes un PIN a otro perfil.</string>
+    <string name="kids_home_empty">Aún no hay aplicaciones en el Inicio de %1$s. Un adulto puede añadirlas en Gestionar perfiles.</string>
 </resources>

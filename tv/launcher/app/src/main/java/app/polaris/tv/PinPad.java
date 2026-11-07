@@ -2,6 +2,7 @@ package app.polaris.tv;
 
 import android.animation.ObjectAnimator;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
 import android.graphics.Color;
@@ -22,6 +23,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.security.GeneralSecurityException;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -152,11 +154,47 @@ final class PinPad {
     /** Asks for the profile's PIN; {@code onUnlocked} runs once it is right. Back closes the pad. */
     static void check(Activity activity, Profiles.Profile profile, Runnable onUnlocked) {
         if (padShowing()) return;
-        if (Profiles.pin(activity, profile.id) == null) {
+        // A kids profile never asks for its own PIN: leaving it asks for a parent's (checkParent) instead.
+        if (profile.kids || Profiles.pin(activity, profile.id) == null) {
             onUnlocked.run();
             return;
         }
         new PinPad(activity, profile, Step.CHECK, onUnlocked);
+    }
+
+    /**
+     * Asks for a parent PIN (D8): the PIN of any profile on this TV that is not a kids profile. With one such
+     * profile its pad opens straight away; with several, the viewer first picks whose PIN they will type, so each
+     * PIN keeps its own lockout. {@code onUnlocked} runs once one is right. With no parent PIN on the TV at all,
+     * which Manage profiles never lets happen while a kids profile exists, it goes on rather than shut everybody
+     * out of a TV only a factory reset could open again.
+     */
+    static void checkParent(Activity activity, Runnable onUnlocked) {
+        if (padShowing()) return;
+        List<Profiles.Profile> roster = Profiles.load(activity);
+        List<Profiles.Profile> parents = Profiles.parents(roster, Profiles.pinnedIds(activity, roster));
+        if (parents.isEmpty()) {
+            onUnlocked.run();
+            return;
+        }
+        if (parents.size() == 1) {
+            new PinPad(activity, parents.get(0), Step.CHECK, onUnlocked).parentPrompt();
+            return;
+        }
+        String[] names = new String[parents.size()];
+        for (int i = 0; i < names.length; i++) names[i] = ProfilePicker.displayName(activity, parents.get(i));
+        new AlertDialog.Builder(activity)
+                .setTitle(R.string.kids_parent_pick)
+                .setItems(names, (d, which) -> {
+                    if (!padShowing()) new PinPad(activity, parents.get(which), Step.CHECK, onUnlocked).parentPrompt();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /** The pad asks for this profile's PIN as a parent PIN. */
+    private void parentPrompt() {
+        prompt.setText(R.string.kids_parent_pin);
     }
 
     /** Asks for a new PIN twice and keeps it; {@code onSaved} runs after. */

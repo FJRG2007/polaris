@@ -15,6 +15,9 @@ public class AppLaunchActivity extends Activity {
         try {
             Uri data = getIntent().getData();
             String pkg = data == null ? null : data.getQueryParameter("id");
+            // A kids profile opens only what is on its list (T-K2 adds the guard for every other way in).
+            if (pkg != null && !Profiles.onKidsList(Profiles.kidsApps(ProfileSession.active(this)), pkg,
+                    getPackageName())) pkg = null;
             if (pkg != null) {
                 Intent launch = getPackageManager().getLeanbackLaunchIntentForPackage(pkg);
                 if (launch == null) launch = getPackageManager().getLaunchIntentForPackage(pkg);

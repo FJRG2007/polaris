@@ -27,7 +27,8 @@ public final class QuickSettingsActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        ProfileSession.guardResumed(this);   // a profile's PIN is owed: back to "Who's watching?"
+        // A profile's PIN is owed: back to "Who's watching?". A kids profile may stay, for Switch profile only.
+        ProfileSession.guardResumed(this, true);
     }
 
     @Override
@@ -46,6 +47,13 @@ public final class QuickSettingsActivity extends Activity {
         }
         findViewById(R.id.scrim).setOnClickListener(v -> finish());
         LinearLayout rows = findViewById(R.id.rows);
+        if (ProfileSession.kidsActive(this)) {
+            // A kids profile gets no settings here; leaving it asks for a parent PIN on "Who's watching?".
+            addRow(rows, R.drawable.ic_settings, R.string.profile_switch, 0,
+                    new Intent(this, MainActivity.class).setAction(MainActivity.ACTION_SWITCH_PROFILE));
+            rows.getChildAt(0).requestFocus();
+            return;
+        }
         addRow(rows, R.drawable.ic_settings, R.string.tv_settings, 0, SystemSettings.intent(this, Settings.ACTION_SETTINGS));
         addRow(rows, R.drawable.ic_picture, R.string.quick_picture, 0, SystemSettings.displayIntent(this));
         addRow(rows, R.drawable.ic_wifi, R.string.quick_network, 0, SystemSettings.intent(this, Settings.ACTION_WIFI_SETTINGS));
