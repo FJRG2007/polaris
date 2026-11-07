@@ -20,10 +20,10 @@ import { AppWindow, Check, ExternalLink, House, Router, Search } from "lucide-re
 /** The guides a result can point at. */
 export type TvGuide = "setup" | "fire" | "network" | "privacy";
 
-/** Each guide's page on the docs site. */
+/** Each guide's page on the docs site; one install page covers the Home and the app tier alike. */
 export const TV_GUIDE_SLUGS: Readonly<Record<TvGuide, string>> = {
-    setup: "polaris-tv-setup",
-    fire: "polaris-tv-fire",
+    setup: "polaris-tv-install",
+    fire: "polaris-tv-install",
     network: "polaris-tv-network",
     privacy: "polaris-tv-privacy"
 };
@@ -58,7 +58,7 @@ function useDate() {
 
 interface Links {
     readonly guideHref: (guide: TvGuide) => string;
-    readonly action?: (tier: tv.TvTier) => ReactNode;
+    readonly action?: (tier: tv.TvTier, platform: tv.TvPlatform) => ReactNode;
 }
 
 function GuideLink({ href, children }: { href: string; children: ReactNode }) {
@@ -167,7 +167,7 @@ function ModelRow({ model, links }: { model: tv.TvModel; links: Links }) {
                         {t("model.privacy")}
                     </GuideLink>
                 ) : null}
-                {links.action?.(model.tier)}
+                {links.action?.(model.tier, model.platform)}
             </div>
         </li>
     );
@@ -221,7 +221,7 @@ export function TvMissing({ links }: { links: Links }) {
                 <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
                     <GuideLink href={links.guideHref(guide)}>{t(`guides.${guide}`)}</GuideLink>
                     <GuideLink href={links.guideHref("privacy")}>{t("guides.privacy")}</GuideLink>
-                    {links.action?.(ruling.tier)}
+                    {links.action?.(ruling.tier, platform)}
                 </div>
             </div>
         </section>
@@ -236,8 +236,9 @@ export function TvChecker({
 }: {
     /** Where a guide opens; the public docs when left out. */
     guideHref?: (guide: TvGuide) => string;
-    /** Drawn beside a result or an answer, such as an install button for a tier that has one. */
-    action?: (tier: tv.TvTier) => ReactNode;
+    /** Drawn beside a result or an answer, such as an install button for a tier that has one;
+     *  `platform` is the TV's, so the install can name its own menus. */
+    action?: (tier: tv.TvTier, platform: tv.TvPlatform) => ReactNode;
     initialQuery?: string;
     /** Whether the title and the tier cards are drawn above the search. */
     heading?: boolean;

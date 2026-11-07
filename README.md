@@ -41,8 +41,8 @@ the full feature list. Mobile versions are in
 [docs/assets/media](docs/assets/media).
 
 Polaris TV: [does it work on my TV?](docs/features/polaris-tv-compatibility.md),
-[setup](docs/features/polaris-tv-setup.md), [privacy switches by brand](docs/features/polaris-tv-privacy.md),
-[Fire TV](docs/features/polaris-tv-fire.md) and [ad blocking for any TV](docs/features/polaris-tv-network.md).
+[install](docs/features/polaris-tv-install.md), [privacy switches by brand](docs/features/polaris-tv-privacy.md)
+and [ad blocking for any TV](docs/features/polaris-tv-network.md).
 
 ### Everywhere
 

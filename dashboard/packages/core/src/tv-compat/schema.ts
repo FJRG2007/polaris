@@ -119,3 +119,43 @@ export const tvPrivacySchema = z
     .strict();
 export type TvPrivacy = z.infer<typeof tvPrivacySchema>;
 export type TvPrivacyBrand = TvPrivacy["brands"][number];
+
+/** Where each platform hides "turn on debugging": the one thing left for the
+ *  person to do on the TV, shown as a single instruction while the installer waits. */
+export const tvDebuggingSchema = z
+    .object({
+        platforms: z.array(
+            z
+                .object({
+                    id: z.string().regex(/^[a-z0-9-]+$/),
+                    platforms: z.array(z.enum(TV_PLATFORMS)).min(1),
+                    /** The screen that holds the item pressed to become a developer. */
+                    about: z.string().min(1),
+                    press: z.string().min(1),
+                    presses: z.number().int().min(1).max(10),
+                    developer: z.string().min(1),
+                    /** The switches to turn on there, by the name the TV shows. */
+                    switches: z.array(z.string().min(1)).min(1),
+                    source: z.string().url(),
+                    /** The same menus as the TV shows them in another language, by locale; English is the default above. */
+                    localized: z
+                        .object({
+                            "es-ES": z
+                                .object({
+                                    about: z.string().min(1),
+                                    press: z.string().min(1),
+                                    developer: z.string().min(1),
+                                    switches: z.array(z.string().min(1)).min(1)
+                                })
+                                .strict()
+                        })
+                        .partial()
+                        .strict()
+                        .optional()
+                })
+                .strict()
+        )
+    })
+    .strict();
+export type TvDebugging = z.infer<typeof tvDebuggingSchema>;
+export type TvDebuggingSteps = TvDebugging["platforms"][number];

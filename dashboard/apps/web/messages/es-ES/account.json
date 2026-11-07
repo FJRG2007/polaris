@@ -1429,6 +1429,8 @@
                 "backupNote": "Primero se guarda en este equipo una copia de los ajustes de la TV. No se desinstala nada y la depuración de red se apaga al final.",
                 "notStarted": "No se pudo iniciar la instalación. Revisa la dirección y vuelve a intentarlo.",
                 "start": "Instalar",
+                "pairStart": "Emparejar e instalar",
+                "code": "Código de la TV",
                 "cancel": "Cancelar",
                 "close": "Cerrar",
                 "keepsGoing": "Si cierras esto, la instalación sigue en la app de escritorio.",
@@ -1451,6 +1453,16 @@
                     "home": "Haciéndola la pantalla de inicio...",
                     "closing": "Apagando la depuración en la TV..."
                 },
+                "waiting": {
+                    "loader": "Esperando a la TV...",
+                    "debugging": "En la TV, abre {about} y pulsa OK sobre {press} {presses} veces. Luego en {developer}, activa {switches}.",
+                    "before": "Antes de empezar, en la TV: abre {about} y pulsa OK sobre {press} {presses} veces; luego en {developer} activa {switches}.",
+                    "carriesOn": "La instalación sigue sola en cuanto esté activado.",
+                    "pairing": "Si la TV solo ofrece Depuración inalámbrica, actívala y pulsa Instalar: aquí se te pedirá su código.",
+                    "prompt": "En la TV, elige Permitir. Marca Permitir siempre desde este ordenador para que no vuelva a preguntar.",
+                    "list": "{items} y {last}",
+                    "stop": "Parar"
+                },
                 "outcomes": {
                     "installed": "Polaris TV está instalada. Búscala entre las apps de la TV.",
                     "installed-home": "Polaris TV está instalada y ya es la pantalla de inicio.",
@@ -1470,7 +1482,9 @@
                     "install-failed": "La TV no pudo instalarla. No cambió nada más en ella.",
                     "install-interrupted": "La conexión se cortó durante la instalación. Busca Polaris TV entre las apps de la TV o reinténtalo.",
                     "usb-busy": "Otro programa usa la depuración USB de la TV. Cierra adb o scrcpy y reintenta. En Windows, la TV puede necesitar el Google USB Driver.",
-                    "usb-gone": "La TV ya no está conectada por USB. Revisa el cable y vuelve a intentarlo."
+                    "usb-gone": "La TV ya no está conectada por USB. Revisa el cable y vuelve a intentarlo.",
+                    "needs-pairing": "Esta TV se empareja con un código. En la TV, abre Emparejar dispositivo con código de sincronización y escribe abajo los seis dígitos que muestra.",
+                    "pairing-refused": "La TV no aceptó ese código. Abre otra vez Emparejar dispositivo con código de sincronización en la TV y escribe abajo el código nuevo."
                 },
                 "usb": "Cable USB",
                 "usbHint": "Conecta la TV a este ordenador. Cierra adb o scrcpy si están abiertos.",

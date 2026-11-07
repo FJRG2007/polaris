@@ -10,6 +10,7 @@ import { execFileSync } from "node:child_process";
 import models from "../../src/tv-compat/models.json" with { type: "json" };
 import quirks from "../../src/tv-compat/quirks.json" with { type: "json" };
 import privacy from "../../src/tv-compat/privacy.json" with { type: "json" };
+import debugging from "../../src/tv-compat/debugging.json" with { type: "json" };
 import enWords from "../../../../apps/web/messages/en-US/tvCompat.json" with { type: "json" };
 import esWords from "../../../../apps/web/messages/es-ES/tvCompat.json" with { type: "json" };
 import * as tv from "../../src/tv-compat/index";
@@ -50,6 +51,47 @@ describe("tv-compat data", () => {
         expect(tcl.map((entry) => entry.id)).toEqual(["tcl", "google-tv"]);
         const fire = tv.privacyFor({ brand: "Amazon Fire TV", platform: "fire-os" });
         expect(fire.map((entry) => entry.id)).toEqual(["fire-tv"]);
+    });
+
+    it("says how to turn on debugging on every platform the installer reaches", () => {
+        expect(tv.tvDebuggingSchema.safeParse(debugging).success).toBe(true);
+        const platforms = tv.TV_DEBUGGING.platforms.flatMap((entry) => entry.platforms);
+        expect(new Set(platforms).size).toBe(platforms.length);
+        for (const model of tv.TV_MODELS.filter((one) => one.install !== "none"))
+            expect(tv.debuggingFor(model.platform)?.id, model.id).toBeDefined();
+        expect(tv.debuggingFor("fire-os")?.switches).toEqual(["ADB debugging"]);
+        expect(tv.debuggingFor("webos")).toBeUndefined();
+    });
+
+    it("names the menus in Spanish for any Spanish locale, and in English otherwise", () => {
+        const english = tv.debuggingFor("fire-os");
+        expect(tv.debuggingFor("fire-os", "es-ES")?.switches).toEqual(["Depuración ADB"]);
+        expect(tv.debuggingFor("fire-os", "es-MX")?.developer).toBe(
+            tv.debuggingFor("fire-os", "es-ES")?.developer
+        );
+        expect(tv.debuggingFor("fire-os", "es-ES")).toMatchObject({
+            id: english?.id,
+            presses: english?.presses,
+            source: english?.source
+        });
+        expect(tv.debuggingFor("fire-os", "en-US")).toEqual(english);
+        expect(tv.debuggingFor("fire-os", "fr-FR")).toEqual(english);
+        expect(tv.debuggingFor("webos", "es-ES")).toBeUndefined();
+    });
+
+    it("finds the same steps by the id the desktop app sends, in the reader's language", () => {
+        for (const steps of tv.TV_DEBUGGING.platforms) {
+            expect(tv.debuggingById(steps.id)).toEqual(steps);
+            const platform = steps.platforms[0];
+            if (platform)
+                expect(tv.debuggingById(steps.id, "es-ES")).toEqual(
+                    tv.debuggingFor(platform, "es-ES")
+                );
+        }
+        expect(tv.debuggingById("google-tv", "es-ES")?.switches).toContain(
+            "Depuración inalámbrica"
+        );
+        expect(tv.debuggingById("nothing-like-it")).toBeUndefined();
     });
 
     it("words every privacy step in both languages", () => {

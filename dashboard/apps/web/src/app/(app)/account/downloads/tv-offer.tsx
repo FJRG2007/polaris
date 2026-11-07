@@ -35,9 +35,11 @@ import {
     cn
 } from "@polaris/ui";
 import { TvChecker } from "@polaris/ui/tv-checker";
+import { debuggingById, debuggingFor, type TvPlatform } from "@polaris/core/tv-compat";
 import { DownloadCard } from "@polaris/ui/download-card";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { desktopBridge, type DesktopTv, type DesktopTvState } from "@/lib/desktop-bridge";
+import { TvWaitingNote } from "./tv-waiting";
 
 type Reach = "browser" | "old-app" | "app";
 /** The dialog's two steps: whether the TV can take Polaris TV, then the install. */
@@ -82,7 +84,9 @@ const OUTCOMES = new Set([
     "install-failed",
     "install-interrupted",
     "usb-busy",
-    "usb-gone"
+    "usb-gone",
+    "needs-pairing",
+    "pairing-refused"
 ]);
 
 function validAddress(value: string): boolean {
@@ -109,8 +113,18 @@ function TvLoader({ label }: { label: string }) {
 }
 
 /** The install, driven through the desktop app this page is open in. */
-function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
+function InstallSteps({
+    tv,
+    platform,
+    onClose
+}: {
+    tv: DesktopTv;
+    /** The TV's platform as the checker answered it, so its menus show before Install; null when skipped. */
+    platform: TvPlatform | null;
+    onClose: () => void;
+}) {
     const t = useTranslations("account");
+    const locale = useLocale();
     const [state, setState] = useState<DesktopTvState | null>(null);
     const [address, setAddress] = useState("");
     const [home, setHome] = useState(true);
@@ -118,6 +132,21 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
     const [usbId, setUsbId] = useState<string | null>(null);
     const [notStarted, setNotStarted] = useState(false);
     const [refused, setRefused] = useState(false);
+    /** The address whose TV asked for a Wireless debugging pairing code. */
+    const [codeFor, setCodeFor] = useState<string | null>(null);
+    const [code, setCode] = useState("");
+    const typed = useRef(address);
+    const arrived = state?.outcome ?? null;
+
+    useEffect(() => {
+        typed.current = address;
+    }, [address]);
+    // Once per outcome as it arrives, so typing a new code afterwards is never undone.
+    useEffect(() => {
+        if (arrived === "needs-pairing" || arrived === "pairing-refused")
+            setCodeFor(typed.current.trim());
+        if (arrived === "pairing-refused") setCode("");
+    }, [arrived]);
 
     useEffect(() => {
         const stop = tv.onState(setState);
@@ -154,11 +183,17 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
     // Only an app that installs over USB sends the field and answers findUsb.
     const findUsb = Array.isArray(state.usb) || state.usb === null ? tv.findUsb : undefined;
     const usbListed = state.usb ?? [];
+    // The app names the TV it found; before that, the platform the checker answered.
+    const waiting = state.waiting ?? null;
+    const menus = platform ? debuggingFor(platform, locale) : undefined;
+    const showBefore = !waiting && idle && menus && (!outcome || outcome === "adb-off");
     const usbPicked = usbListed.some((one) => one.id === usbId)
         ? usbId
         : usbListed.length === 1 && !address.trim()
           ? (usbListed[0]?.id ?? null)
           : null;
+    const asksCode = !usbPicked && codeFor !== null && codeFor === address.trim();
+    const codeReady = !asksCode || /^\d{6}$/.test(code);
 
     return (
         <>
@@ -212,6 +247,8 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
                                 <Button
                                     key={host}
                                     size="sm"
+                                    title={host}
+                                    className="min-w-0 max-w-full"
                                     variant={host === address.trim() ? "primary" : "outline"}
                                     disabled={!idle}
                                     onClick={() => {
@@ -219,7 +256,12 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
                                         setUsbId(null);
                                     }}
                                 >
-                                    <Tv className="size-3.5 shrink-0" /> {host}
+                                    <Tv className="size-3.5 shrink-0" />
+                                    <span className="truncate">
+                                        {state.named?.[host]
+                                            ? `${state.named[host]} - ${host}`
+                                            : host}
+                                    </span>
                                 </Button>
                             ))}
                         </div>
@@ -287,6 +329,19 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
 
                 {usbListing ? (
                     <TvLoader label={t("downloads.tv.dialog.steps.usbListing")} />
+                ) : waiting ? (
+                    <>
+                        <TvLoader label={t("downloads.tv.dialog.waiting.loader")} />
+                        <TvWaitingNote
+                            menus={
+                                (waiting.steps
+                                    ? debuggingById(waiting.steps, locale)
+                                    : undefined) ?? waiting
+                            }
+                            step={waiting.step}
+                            waiting
+                        />
+                    </>
                 ) : STEPS.has(state.phase) ? (
                     <TvLoader label={t(`downloads.tv.dialog.steps.${state.phase}` as never)} />
                 ) : null}
@@ -301,6 +356,30 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
                         {t(`downloads.tv.dialog.outcomes.${outcome}` as never)}
                     </p>
                 ) : null}
+                {asksCode ? (
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                        <label htmlFor="tv-code" className="text-sm font-medium">
+                            {t("downloads.tv.dialog.code")}
+                        </label>
+                        <Input
+                            id="tv-code"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            spellCheck={false}
+                            maxLength={6}
+                            placeholder="123456"
+                            value={code}
+                            disabled={!idle}
+                            onChange={(event) =>
+                                setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                            }
+                            className="w-32 tabular-nums"
+                        />
+                    </div>
+                ) : null}
+                {showBefore ? (
+                    <TvWaitingNote menus={menus} step="debugging" waiting={false} />
+                ) : null}
                 {state.closed !== null ? (
                     <p className="text-xs text-muted-foreground">
                         {state.closed
@@ -313,7 +392,7 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
                         {t("downloads.tv.dialog.backupKept", { path: state.backup })}
                     </p>
                 ) : null}
-                {!idle && !searching ? (
+                {!idle && !searching && !waiting ? (
                     <p className="text-xs text-muted-foreground">
                         {t("downloads.tv.dialog.keepsGoing")}
                     </p>
@@ -325,19 +404,24 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
                         ? t("downloads.tv.dialog.cancel")
                         : t("downloads.tv.dialog.close")}
                 </Button>
+                {waiting ? (
+                    <Button variant="outline" onClick={() => void tv.cancel()}>
+                        {t("downloads.tv.dialog.waiting.stop")}
+                    </Button>
+                ) : null}
                 <Button
-                    disabled={!idle || (!valid && !usbPicked)}
+                    disabled={!idle || (!valid && !usbPicked) || !codeReady}
                     onClick={() => {
                         void tv
                             .start(
                                 usbPicked
                                     ? { usb: usbPicked, home }
-                                    : { host: address.trim(), home }
+                                    : { host: address.trim(), home, ...(asksCode ? { code } : {}) }
                             )
                             .then((started) => setNotStarted(!started));
                     }}
                 >
-                    {t("downloads.tv.dialog.start")}
+                    {asksCode ? t("downloads.tv.dialog.pairStart") : t("downloads.tv.dialog.start")}
                 </Button>
             </DialogFooter>
         </>
@@ -454,6 +538,7 @@ export function TvOffer({
     const [tv, setTv] = useState<DesktopTv | null>(null);
     const [open, setOpen] = useState(false);
     const [step, setStep] = useState<Step>("check");
+    const [platform, setPlatform] = useState<TvPlatform | null>(null);
 
     useEffect(() => {
         const bridge = desktopBridge();
@@ -538,9 +623,15 @@ export function TvOffer({
                         <>
                             <TvChecker
                                 heading={false}
-                                action={(tier) =>
+                                action={(tier, answered) =>
                                     tier === "network" ? null : (
-                                        <Button size="sm" onClick={() => setStep("install")}>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => {
+                                                setPlatform(answered);
+                                                setStep("install");
+                                            }}
+                                        >
                                             {compat("install")}
                                         </Button>
                                     )
@@ -550,7 +641,13 @@ export function TvOffer({
                                 <Button variant="ghost" onClick={close}>
                                     {t("downloads.tv.dialog.cancel")}
                                 </Button>
-                                <Button variant="outline" onClick={() => setStep("install")}>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setPlatform(null);
+                                        setStep("install");
+                                    }}
+                                >
                                     {compat("skip")}
                                 </Button>
                             </DialogFooter>
@@ -562,7 +659,7 @@ export function TvOffer({
                             </Button>
                         </DialogFooter>
                     ) : tv ? (
-                        <InstallSteps tv={tv} onClose={close} />
+                        <InstallSteps tv={tv} platform={platform} onClose={close} />
                     ) : (
                         <OpenInApp download={download} onClose={() => setOpen(false)} />
                     )}

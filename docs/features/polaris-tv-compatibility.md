@@ -11,9 +11,9 @@ Polaris TV can be its Home screen.
 - **Home screen**: Android TV 8 or newer and Google TV, including Chromecast with Google TV, the Google TV
   Streamer, TV boxes and projectors. Polaris TV replaces the Home screen, can block ads and trackers on
   the TV itself (Android 9 or newer), and installs from the Polaris desktop app.
-  [Set it up in three steps](polaris-tv-setup.md).
+  [Install it in three steps](polaris-tv-install.md).
 - **App**: Fire TV on Fire OS 6 or newer. Polaris TV opens as an app and Amazon keeps the Home button.
-  [Fire TV guide](polaris-tv-fire.md). Apps for LG webOS and Samsung Tizen are coming; until they ship,
+  [Install it](polaris-tv-install.md). Apps for LG webOS and Samsung Tizen are coming; until they ship,
   those TVs are in the next group.
 - **Network only**: Roku, Vizio, Hisense VIDAA, LG and Samsung for now, and anything else. No app, but the
   Network filter blocks ads and trackers for every TV at home once your router uses it for DNS.
