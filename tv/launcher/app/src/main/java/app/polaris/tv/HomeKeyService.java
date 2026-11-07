@@ -200,9 +200,10 @@ public class HomeKeyService extends AccessibilityService {
         frontAppScancodes = RemoteKeys.parseFrontAppScancodes(config.appKeys);
         boolean watchFront = !frontAppKeys.isEmpty() || !frontAppScancodes.isEmpty();
         stockHome.clear();
-        stockHomePackage = config.stockHomeRedirect;
-        if (!config.stockHomeRedirect.isEmpty()) {
-            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(config.stockHomeRedirect);
+        stockHomePackage = config.stockHomeRedirect.isEmpty() && !BuildConfig.HOME_CATEGORY
+                ? currentHomePackage() : config.stockHomeRedirect;
+        if (!stockHomePackage.isEmpty()) {
+            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(stockHomePackage);
             for (ResolveInfo ri : getPackageManager().queryIntentActivities(home, PackageManager.MATCH_DISABLED_COMPONENTS)) {
                 stockHome.add(ri.activityInfo.name);
             }
@@ -414,8 +415,20 @@ public class HomeKeyService extends AccessibilityService {
         return upTime - downTime < longPressTimeout;
     }
 
+    /** The Home key edition (build.gradle homeCategory=false) is never Home itself, so whatever Android resolves as
+     *  Home is the stock home to send back here, as if stock_home_redirect named it. Empty when Android would show its
+     *  chooser instead, or nothing answers. */
+    private String currentHomePackage() {
+        ResolveInfo home = getPackageManager().resolveActivity(
+                new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY);
+        if (home == null || home.activityInfo == null) return "";
+        String pkg = home.activityInfo.packageName;
+        return pkg == null || "android".equals(pkg) || pkg.equals(getPackageName()) ? "" : pkg;
+    }
+
     private void openHome() {
-        Intent open = stockHomeStays() ? new Intent(this, MainActivity.class)
+        // The Home key edition declares no HOME filter, so only an explicit start can reach MainActivity.
+        Intent open = !BuildConfig.HOME_CATEGORY || stockHomeStays() ? new Intent(this, MainActivity.class)
                 : new Intent(Intent.ACTION_MAIN).setPackage(getPackageName());
         startActivity(open.addCategory(Intent.CATEGORY_HOME)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));

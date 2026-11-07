@@ -97,10 +97,12 @@
             android:screenOrientation="landscape">
             <!-- CVTE firmware (ro.CVT_EN_COMMON_HOME_INTENT=1) sends the Home key and boot as MAIN + HOME +
                  COMMON_HOME, which only matches a filter that lists both (#1201). In this one filter, not a second
-                 one: a plain HOME intent still matches it, and a second filter could list this activity twice. -->
+                 one: a plain HOME intent still matches it, and a second filter could list this activity twice.
+                 The homeCategory placeholder is HOME, except in the Home key edition (build.gradle homeCategory=false), where it is
+                 an inert category so the activity declares no HOME at all. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.HOME" />
+                <category android:name="${homeCategory}" />
                 <category android:name="android.intent.category.COMMON_HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <!-- ColorOS TV: boot only promotes a HOME that declares this category.

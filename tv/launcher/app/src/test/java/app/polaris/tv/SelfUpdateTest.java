@@ -374,4 +374,20 @@ public class SelfUpdateTest {
         assertEquals(Arrays.asList("waiting-confirmation", "failed", "done"), net.states());
         assertEquals("The update was cancelled on the TV.", new JSONObject(net.reports.get(1)).getString("reason"));
     }
+
+    @Test
+    public void theHomeKeyEditionAsksForItsOwnApk() {
+        assertEquals("/api/tv/update", SelfUpdate.releasePath(""));
+        assertEquals("/api/tv/update?edition=home-key", SelfUpdate.releasePath("home-key"));
+    }
+
+    @Test
+    public void aReleaseCarriesTheEditionTheInstanceNamed() {
+        String sha = "a".repeat(64);
+        String body = "{\"versionName\":\"3.6\",\"size\":10,\"sha256\":\"" + sha
+                + "\",\"url\":\"/api/tv/update/apk?version=3.6&edition=home-key\",\"edition\":\"home-key\"}";
+        assertEquals("home-key", SelfUpdate.readRelease(body).edition);
+        // An instance from before editions names none, which is the ordinary build.
+        assertEquals("", SelfUpdate.readRelease(body.replace(",\"edition\":\"home-key\"", "")).edition);
+    }
 }
