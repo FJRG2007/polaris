@@ -101,7 +101,9 @@ describe("TvWaitingNote", () => {
         render(<TvWaitingNote menus={FIRE_TV} step="debugging" waiting={false} />, {
             wrapper: MessagesWrapper
         });
-        expect(screen.getByText(/^Before you start, on the TV: open Settings > My Fire TV > About/)).toBeTruthy();
+        expect(
+            screen.getByText(/^Before you start, on the TV: open Settings > My Fire TV > About/)
+        ).toBeTruthy();
         expect(screen.getByText(/turn on ADB debugging\.$/)).toBeTruthy();
         expect(screen.queryByText(/carries on by itself/)).toBeNull();
         expect(screen.queryByText(/asks for its code/)).toBeNull();
@@ -113,8 +115,12 @@ describe("TvWaitingNote", () => {
     });
 
     it("joins the switches in Spanish", () => {
-        render(withMessages(<TvWaitingNote menus={GOOGLE_TV_ES} step="debugging" waiting />, "es-ES"));
-        expect(screen.getByText(/activa Depuración por USB y Depuración inalámbrica\.$/)).toBeTruthy();
+        render(
+            withMessages(<TvWaitingNote menus={GOOGLE_TV_ES} step="debugging" waiting />, "es-ES")
+        );
+        expect(
+            screen.getByText(/activa Depuración por USB y Depuración inalámbrica\.$/)
+        ).toBeTruthy();
     });
 });
 
@@ -131,7 +137,11 @@ describe("the install dialog", () => {
     it("shows the instruction the app sent while it waits, and Stop cancels the wait", async () => {
         await openDialog();
         act(() =>
-            listener?.({ ...BASE, phase: "connecting", waiting: { step: "debugging", ...GOOGLE_TV } })
+            listener?.({
+                ...BASE,
+                phase: "connecting",
+                waiting: { step: "debugging", ...GOOGLE_TV }
+            })
         );
         expect(await screen.findByText("Waiting for the TV...")).toBeTruthy();
         expect(screen.getByText(/press OK on Build 7 times/)).toBeTruthy();
@@ -151,23 +161,33 @@ describe("the install dialog", () => {
                 waiting: { step: "debugging", steps: "google-tv", ...GOOGLE_TV }
             })
         );
-        expect(await screen.findByText(/activa Depuración por USB y Depuración inalámbrica\.$/)).toBeTruthy();
+        expect(
+            await screen.findByText(/activa Depuración por USB y Depuración inalámbrica\.$/)
+        ).toBeTruthy();
         expect(screen.queryByText(/USB debugging/)).toBeNull();
     });
 
     it("keeps the menus the app sent when their steps are not known here", async () => {
         await openDialog();
         act(() =>
-            listener?.({ ...BASE, phase: "connecting", waiting: { step: "debugging", steps: "unknown", ...GOOGLE_TV } })
+            listener?.({
+                ...BASE,
+                phase: "connecting",
+                waiting: { step: "debugging", steps: "unknown", ...GOOGLE_TV }
+            })
         );
         expect(await screen.findByText(/press OK on Build 7 times/)).toBeTruthy();
     });
 
     it("shows the prompt step instead of the phase text once the TV asks", async () => {
         await openDialog();
-        act(() => listener?.({ ...BASE, phase: "allow", waiting: { step: "prompt", ...GOOGLE_TV } }));
+        act(() =>
+            listener?.({ ...BASE, phase: "allow", waiting: { step: "prompt", ...GOOGLE_TV } })
+        );
         expect(await screen.findByText(/Tick Always allow from this computer/)).toBeTruthy();
-        expect(screen.queryByText("On the TV, choose Allow when it asks to allow USB debugging.")).toBeNull();
+        expect(
+            screen.queryByText("On the TV, choose Allow when it asks to allow USB debugging.")
+        ).toBeNull();
     });
 
     it("asks for the TV's pairing code here, sends it, and takes a new one after a wrong code", async () => {
@@ -180,7 +200,11 @@ describe("the install dialog", () => {
         await userEvent.type(field, "12a3456");
         expect((field as HTMLInputElement).value).toBe("123456");
         await userEvent.click(pair);
-        expect(start).toHaveBeenLastCalledWith({ host: "192.168.1.40", home: true, code: "123456" });
+        expect(start).toHaveBeenLastCalledWith({
+            host: "192.168.1.40",
+            home: true,
+            code: "123456"
+        });
 
         act(() => listener?.({ ...BASE, phase: "connecting", outcome: null }));
         act(() => listener?.({ ...BASE, phase: "failed", outcome: "pairing-refused" }));
@@ -188,7 +212,11 @@ describe("the install dialog", () => {
         await userEvent.type(screen.getByLabelText("Pairing code"), "654321");
         expect((screen.getByLabelText("Pairing code") as HTMLInputElement).value).toBe("654321");
         await userEvent.click(screen.getByRole("button", { name: "Pair and install" }));
-        expect(start).toHaveBeenLastCalledWith({ host: "192.168.1.40", home: true, code: "654321" });
+        expect(start).toHaveBeenLastCalledWith({
+            host: "192.168.1.40",
+            home: true,
+            code: "654321"
+        });
     });
 
     it("drops the code field for another address", async () => {
@@ -211,7 +239,9 @@ describe("the install dialog", () => {
                 named: { "192.168.1.40": "Living Room TV" }
             })
         );
-        expect(await screen.findByRole("button", { name: /Living Room TV - 192\.168\.1\.40/ })).toBeTruthy();
+        expect(
+            await screen.findByRole("button", { name: /Living Room TV - 192\.168\.1\.40/ })
+        ).toBeTruthy();
         expect(screen.getByRole("button", { name: "192.168.1.51" })).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
     });

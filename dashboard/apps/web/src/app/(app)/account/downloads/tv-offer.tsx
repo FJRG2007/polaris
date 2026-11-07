@@ -143,7 +143,8 @@ function InstallSteps({
     }, [address]);
     // Once per outcome as it arrives, so typing a new code afterwards is never undone.
     useEffect(() => {
-        if (arrived === "needs-pairing" || arrived === "pairing-refused") setCodeFor(typed.current.trim());
+        if (arrived === "needs-pairing" || arrived === "pairing-refused")
+            setCodeFor(typed.current.trim());
         if (arrived === "pairing-refused") setCode("");
     }, [arrived]);
 
@@ -332,7 +333,11 @@ function InstallSteps({
                     <>
                         <TvLoader label={t("downloads.tv.dialog.waiting.loader")} />
                         <TvWaitingNote
-                            menus={(waiting.steps ? debuggingById(waiting.steps, locale) : undefined) ?? waiting}
+                            menus={
+                                (waiting.steps
+                                    ? debuggingById(waiting.steps, locale)
+                                    : undefined) ?? waiting
+                            }
                             step={waiting.step}
                             waiting
                         />
@@ -365,7 +370,9 @@ function InstallSteps({
                             placeholder="123456"
                             value={code}
                             disabled={!idle}
-                            onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                            onChange={(event) =>
+                                setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                            }
                             className="w-32 tabular-nums"
                         />
                     </div>

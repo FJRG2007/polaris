@@ -49,16 +49,26 @@ export function quirkSource(id: TvQuirkId): string | undefined {
 
 /** How a platform's debugging is turned on, or undefined where no install runs. */
 export function debuggingFor(platform: TvPlatform, locale?: string): TvDebuggingSteps | undefined {
-    return inLocale(TV_DEBUGGING.platforms.find((entry) => entry.platforms.includes(platform)), locale);
+    return inLocale(
+        TV_DEBUGGING.platforms.find((entry) => entry.platforms.includes(platform)),
+        locale
+    );
 }
 
 /** The same steps by their `id`, as the desktop app names them while it waits; undefined for an id this data does not have. */
 export function debuggingById(id: string, locale?: string): TvDebuggingSteps | undefined {
-    return inLocale(TV_DEBUGGING.platforms.find((entry) => entry.id === id), locale);
+    return inLocale(
+        TV_DEBUGGING.platforms.find((entry) => entry.id === id),
+        locale
+    );
 }
 
-function inLocale(steps: TvDebuggingSteps | undefined, locale?: string): TvDebuggingSteps | undefined {
+function inLocale(
+    steps: TvDebuggingSteps | undefined,
+    locale?: string
+): TvDebuggingSteps | undefined {
     // Spanish of any region reads the es-ES menus; anything else, or a menu not translated, stays English.
-    const labels = steps && locale?.toLowerCase().startsWith("es") ? steps.localized?.["es-ES"] : undefined;
+    const labels =
+        steps && locale?.toLowerCase().startsWith("es") ? steps.localized?.["es-ES"] : undefined;
     return steps && labels ? { ...steps, ...labels } : steps;
 }

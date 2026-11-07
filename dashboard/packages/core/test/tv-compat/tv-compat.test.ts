@@ -66,8 +66,14 @@ describe("tv-compat data", () => {
     it("names the menus in Spanish for any Spanish locale, and in English otherwise", () => {
         const english = tv.debuggingFor("fire-os");
         expect(tv.debuggingFor("fire-os", "es-ES")?.switches).toEqual(["Depuración ADB"]);
-        expect(tv.debuggingFor("fire-os", "es-MX")?.developer).toBe(tv.debuggingFor("fire-os", "es-ES")?.developer);
-        expect(tv.debuggingFor("fire-os", "es-ES")).toMatchObject({ id: english?.id, presses: english?.presses, source: english?.source });
+        expect(tv.debuggingFor("fire-os", "es-MX")?.developer).toBe(
+            tv.debuggingFor("fire-os", "es-ES")?.developer
+        );
+        expect(tv.debuggingFor("fire-os", "es-ES")).toMatchObject({
+            id: english?.id,
+            presses: english?.presses,
+            source: english?.source
+        });
         expect(tv.debuggingFor("fire-os", "en-US")).toEqual(english);
         expect(tv.debuggingFor("fire-os", "fr-FR")).toEqual(english);
         expect(tv.debuggingFor("webos", "es-ES")).toBeUndefined();
@@ -77,9 +83,14 @@ describe("tv-compat data", () => {
         for (const steps of tv.TV_DEBUGGING.platforms) {
             expect(tv.debuggingById(steps.id)).toEqual(steps);
             const platform = steps.platforms[0];
-            if (platform) expect(tv.debuggingById(steps.id, "es-ES")).toEqual(tv.debuggingFor(platform, "es-ES"));
+            if (platform)
+                expect(tv.debuggingById(steps.id, "es-ES")).toEqual(
+                    tv.debuggingFor(platform, "es-ES")
+                );
         }
-        expect(tv.debuggingById("google-tv", "es-ES")?.switches).toContain("Depuración inalámbrica");
+        expect(tv.debuggingById("google-tv", "es-ES")?.switches).toContain(
+            "Depuración inalámbrica"
+        );
         expect(tv.debuggingById("nothing-like-it")).toBeUndefined();
     });
 
