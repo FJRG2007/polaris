@@ -35,4 +35,24 @@
     <string name="profile_avatar_indigo">Indigo</string>
     <string name="profile_avatar_slate">Gray</string>
     <string name="profile_avatar_brown">Brown</string>
+    <!-- PIN pad and profile PINs. -->
+    <string name="pin_enter">Enter the PIN</string>
+    <string name="pin_new">Choose a PIN of 4 to 6 digits, then OK</string>
+    <string name="pin_confirm">Enter the same PIN again</string>
+    <string name="pin_saving">Saving the PIN</string>
+    <string name="pin_wrong">Wrong PIN</string>
+    <string name="pin_too_short">A PIN has 4 to 6 digits</string>
+    <string name="pin_mismatch">The two PINs were different. Choose one again.</string>
+    <string name="pin_locked_out">Too many wrong tries. Try again in %1$s</string>
+    <string name="pin_check_failed">The PIN couldn\'t be checked. Try again.</string>
+    <string name="pin_save_failed">The PIN couldn\'t be saved. Try again.</string>
+    <string name="pin_delete">Delete</string>
+    <string name="pin_forgot">Forgot PIN?</string>
+    <string name="pin_forgot_explain">To reset it, open the TV\'s Settings, then Apps, Polaris TV, and choose Clear data. That also removes every profile and launcher setting on this TV.</string>
+    <string name="pin_locked_tile">PIN</string>
+    <string name="profile_pin_set">Set a PIN</string>
+    <string name="profile_pin_change">Change PIN</string>
+    <string name="profile_pin_remove">Remove PIN</string>
+    <string name="profile_pin_saved">PIN saved</string>
+    <string name="profile_pin_removed">PIN removed</string>
 </resources>
