@@ -9,7 +9,7 @@ import java.util.Locale;
 /**
  * When an app was last opened from Home, for the cinematic shelf's "Last opened" line: the launcher notes the
  * time whenever it opens an app. No permission and nothing read from other apps, so an app started some other
- * way (a remote's own Netflix button) shows the last time Home opened it.
+ * way (a remote's own Netflix button) shows the last time Home opened it. Each profile keeps its own times.
  */
 final class LastOpened {
     private static final String PREFS = "last_opened";
@@ -47,6 +47,8 @@ final class LastOpened {
     }
 
     private static SharedPreferences prefs(Context ctx) {
-        return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        // The shared file only before Profiles.migrate gave the TV a profile (it then moves into profile #1's).
+        String profile = ProfileSession.activeId(ctx);
+        return ctx.getSharedPreferences(profile == null ? PREFS : Profiles.recentsFile(profile), Context.MODE_PRIVATE);
     }
 }
