@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_picker_title">¿Quién está viendo?</string>
+    <string name="profile_default_name">Yo</string>
+    <string name="profile_add">Añadir perfil</string>
+    <string name="profile_manage">Gestionar perfiles</string>
+    <string name="profile_switch">Cambiar de perfil</string>
+    <string name="profile_switch_hint">Ahora: %1$s</string>
+    <string name="profiles_row">Perfiles</string>
+    <string name="profiles_row_count">Perfiles: %1$d</string>
+    <string name="profile_name_title">Nombre del perfil</string>
+    <string name="profile_name_hint">Hasta 20 caracteres</string>
+    <string name="profile_avatar_title">Elige un color</string>
+    <string name="profile_rename">Cambiar nombre</string>
+    <string name="profile_change_avatar">Cambiar color</string>
+    <string name="profile_move_up">Mover antes</string>
+    <string name="profile_move_down">Mover después</string>
+    <string name="profile_delete">Eliminar perfil</string>
+    <string name="profile_delete_confirm">¿Eliminar %1$s? Se borran sus apps recientes en esta TV. Las apps y los ajustes se quedan.</string>
+    <string name="profile_delete_last">Una TV siempre conserva un perfil, así que este no se puede eliminar.</string>
+    <string name="profile_full">Esta TV ya tiene el máximo de perfiles (6). Elimina uno para añadir otro.</string>
+    <string name="profile_name_empty">Escribe un nombre para el perfil.</string>
+    <string name="profile_linked_note">Conectado a Polaris</string>
+    <string name="profile_avatar_blue">Azul</string>
+    <string name="profile_avatar_teal">Turquesa</string>
+    <string name="profile_avatar_green">Verde</string>
+    <string name="profile_avatar_lime">Lima</string>
+    <string name="profile_avatar_amber">Ámbar</string>
+    <string name="profile_avatar_orange">Naranja</string>
+    <string name="profile_avatar_red">Rojo</string>
+    <string name="profile_avatar_pink">Rosa</string>
+    <string name="profile_avatar_purple">Morado</string>
+    <string name="profile_avatar_indigo">Índigo</string>
+    <string name="profile_avatar_slate">Gris</string>
+    <string name="profile_avatar_brown">Marrón</string>
+</resources>
