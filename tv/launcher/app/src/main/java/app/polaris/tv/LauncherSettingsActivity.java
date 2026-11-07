@@ -419,7 +419,8 @@ public final class LauncherSettingsActivity extends Activity {
                         : getString(R.string.wallpaper_theme_default)));
         openOnStartChoice.setText(getString(R.string.open_on_start_state, openOnStartLabel()));
         followThemeChoice.setSelected(!hasOnTvChoices());
-        languageChoice.setText(getString(R.string.language_row, languageLabel(Config.load(this).locale)));
+        languageChoice.setText(getString(R.string.language_row, followsAccount()
+                ? accountLanguageLabel() : languageLabel(Config.load(this).locale)));
         String dnsHost = PrivateDnsSwitch.of(this).ours();
         dnsChoice.setText(getString(R.string.dns_row,
                 dnsHost == null ? getString(R.string.off) : getString(R.string.dns_state_on, dnsHost)));
@@ -501,12 +502,24 @@ public final class LauncherSettingsActivity extends Activity {
         return name.isEmpty() ? tag : name.substring(0, 1).toUpperCase(locale) + name.substring(1);
     }
 
+    /** Linked, with no language picked here: the launcher speaks the account's (LauncherLocale#resolve). */
+    private boolean followsAccount() {
+        return LauncherLocale.parse(choices.getString(Config.LANGUAGE_KEY, null)) == null
+                && LauncherLocale.parse(PolarisLink.accountLocale(this)) != null;
+    }
+
+    private String accountLanguageLabel() {
+        return getString(R.string.language_account, languageLabel(PolarisLink.accountLocale(this)));
+    }
+
     private void openLanguages() {
-        String current = Config.load(this).locale;
+        // Following the account is the first entry's doing, so that is the one marked.
+        String current = followsAccount() ? "" : Config.load(this).locale;
         String[] names = new String[LANGUAGES.length];
         int checked = 0;
         for (int i = 0; i < LANGUAGES.length; i++) {
-            names[i] = languageLabel(LANGUAGES[i]);
+            names[i] = i == 0 && LauncherLocale.parse(PolarisLink.accountLocale(this)) != null
+                    ? accountLanguageLabel() : languageLabel(LANGUAGES[i]);
             if (LANGUAGES[i].equalsIgnoreCase(current == null ? "" : current.trim())) checked = i;
         }
         final int was = checked;

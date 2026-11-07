@@ -216,6 +216,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean shamsi;
     /** greeting_name: said after the greeting, which is shown in capitals. */
     private String greetingName = "";
+    /** The theme's greeting_name, which wins over the linked account's first name. */
+    private String themeGreetingName = "";
+    /** The linked account's language this screen was built in; home rebuilds when the account's changes. */
+    private String accountLocaleShown = "";
     /** Optional time-of-day backdrop (config.xml, sky_intensity); 0 keeps it hidden. */
     private SkyView sky;
     private String vpnApp;
@@ -596,7 +600,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         lunar = cfg.lunarDate;
         lunarOffset = Lunar.offsetFor(cfg.lunarUtcOffset, Locale.getDefault());
         if (lunar) lunarDate.setVisibility(View.VISIBLE);
-        greetingName = cfg.greetingName;
+        themeGreetingName = cfg.greetingName;
+        greetingName = greetingNameNow();
+        accountLocaleShown = PolarisLink.accountLocale(this);
         if (cfg.dateBelowClock) moveDateBelowClock();
         if (cfg.dateBelowClock && cfg.iconOnlyButtons && !cfg.topMenu
                 && !getResources().getBoolean(R.bool.rtl_menu_bar)) {
@@ -1112,6 +1118,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (link == null) return;
             try {
                 PolarisLink.State state = link.state();
+                if (state != null) runOnUiThread(() -> {
+                    // The account's language changed: rebuild in it (an explicit choice on the TV still wins).
+                    if (state.localeChanged && resumed && !isFinishing()) recreate();
+                    else greetWith(greetingNameNow());
+                });
                 // An update asked for from Polaris starts the same flow as Update now, once per request.
                 if (state != null && state.updateRequestId != null) SelfUpdateRun.onRequest(this, state.updateRequestId);
                 int count = state == null ? 0 : state.unread + state.alerts;
@@ -1178,6 +1189,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             recreate();
             return;
         }
+        // Linked, unlinked, or the account's language changed elsewhere: rebuild in the language that now applies.
+        if (!accountLocaleShown.equals(PolarisLink.accountLocale(this))) {
+            recreate();
+            return;
+        }
+        // Just linked: greet by the name the approval handed over, before the first answer from Polaris.
+        greetWith(greetingNameNow());
         restartIdleClock();
         promptsPaused = false;
         if (grid.getAdapter() == null) grid.setAdapter(adapter);   // dropped by onTrimMemory
@@ -2794,6 +2812,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         } else {
             handler.postDelayed(clockCheck, 1_000L);
         }
+    }
+
+    /** The name the greeting adds: the theme's greeting_name, else the linked account's first name, else none. */
+    private String greetingNameNow() {
+        return themeGreetingName.isEmpty() ? PolarisLink.accountFirstName(this) : themeGreetingName;
+    }
+
+    private void greetWith(String name) {
+        if (name.equals(greetingName)) return;
+        greetingName = name;
+        updateGreeting();
     }
 
     private void updateGreeting() {

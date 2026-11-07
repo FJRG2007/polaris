@@ -107,4 +107,5 @@
     <string name="catalog_why_checksum">la descarga no coincide con el catálogo.</string>
     <string name="catalog_why_refused">el tema tiene archivos que Polaris TV no lee.</string>
     <string name="catalog_why_unreachable">la descarga se detuvo. Vuelve a intentarlo.</string>
+    <string name="language_account">El de tu cuenta (%1$s)</string>
 </resources>
