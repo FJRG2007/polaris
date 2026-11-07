@@ -7,24 +7,26 @@
  * `section-nav`), so this page reads only the identity and the role list.
  */
 
+import { Suspense } from "react";
 import { requireAdmin } from "@/lib/session";
-import { loadUserRecord } from "./user-record";
 import { IdentityCard } from "./identity-card";
-import { listRoleOptions } from "@/lib/role-service";
-import { OverviewControls } from "./overview-controls";
+import { UserOverviewRegion } from "./loaders";
+import { CardSkeleton } from "@/app/(app)/admin/region-skeletons";
 
 export const dynamic = "force-dynamic";
 
 export default async function UserOverviewPage({ params }: { params: Promise<{ id: string }> }) {
-    const admin = await requireAdmin();
+    await requireAdmin();
     const { id } = await params;
-    const [account, roles] = await Promise.all([loadUserRecord(id), listRoleOptions()]);
 
     return (
         <div className="flex flex-col gap-4">
-            {/* Who they are, before anything about what they may do. */}
-            <IdentityCard userId={account.id} />
-            <OverviewControls user={account} roles={roles} isSelf={account.id === admin.id} />
+            {/* Who they are, before anything about what they may do. Streamed, so
+                the record paints before its sign-in methods are read. */}
+            <Suspense fallback={<CardSkeleton lines={3} />}>
+                <IdentityCard userId={id} />
+            </Suspense>
+            <UserOverviewRegion userId={id} revision={Date.now()} />
         </div>
     );
 }

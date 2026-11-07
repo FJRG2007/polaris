@@ -9,47 +9,21 @@
  * name.
  */
 
-import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { GroupsAdminLoader } from "./loader";
 import { getTranslations } from "@/lib/i18n/request";
-import { firstMembers, GROUP_PREVIEW } from "@/lib/group-members";
-import { GroupsAdmin, type GroupRow } from "./groups-admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function GroupsAdminPage() {
     await requireAdmin();
     const t = await getTranslations("admin");
-    const groups = await prisma.group.findMany({
-        orderBy: { name: "asc" },
-        select: {
-            id: true,
-            name: true,
-            description: true,
-            isSystem: true,
-            _count: { select: { members: true } },
-            members: {
-                orderBy: { userId: "asc" },
-                take: GROUP_PREVIEW + 1,
-                select: { user: { select: { id: true, name: true, email: true } } }
-            }
-        }
-    });
-
-    const rows: GroupRow[] = groups.map((group) => ({
-        id: group.id,
-        name: group.name,
-        description: group.description,
-        isSystem: group.isSystem,
-        memberCount: group._count.members,
-        members: firstMembers(group.members)
-    }));
 
     return (
         <>
             <PageHeader title={t("groups.page.title")} description={t("groups.page.description")} />
-            <GroupsAdmin groups={rows} />
+            <GroupsAdminLoader revision={Date.now()} />
         </>
     );
 }

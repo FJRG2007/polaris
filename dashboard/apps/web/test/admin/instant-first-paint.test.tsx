@@ -9,6 +9,8 @@
  * it kept, asks again in the background, and swaps only what moved.
  */
 
+import { join, relative } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
@@ -48,6 +50,7 @@ vi.mock("@/app/(app)/admin/retention/actions", () => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 import { writeSnapshot } from "@/lib/snapshot-cache";
+import { AfterPaint } from "@/components/after-paint";
 import RetentionPage from "@/app/(app)/admin/retention/page";
 import DisplayAdminPage from "@/app/(app)/admin/display/page";
 import { RetentionView } from "@/app/(app)/admin/retention/retention-view";
@@ -183,5 +186,226 @@ describe("the retention counts", () => {
 
         expect((await screen.findByRole("alert")).textContent).toMatch(/stale/i);
         expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
+    });
+});
+describe("a region read after the paint", () => {
+    it("shows its skeleton, then the answer, and keeps it for the next visit", async () => {
+        let answer: (value: { name: string }) => void = () => undefined;
+        const load = vi.fn(() => new Promise<{ name: string }>((resolve) => (answer = resolve)));
+        render(
+            <AfterPaint cacheKey="test.region" load={load} skeleton={<p>waiting</p>}>
+                {(data) => <p>{data.name}</p>}
+            </AfterPaint>
+        );
+        expect(screen.getByText("waiting")).toBeTruthy();
+        await act(async () => answer({ name: "Ada" }));
+        expect(screen.getByText("Ada")).toBeTruthy();
+        expect(keptValue("test.region")).toEqual({ value: { name: "Ada" } });
+    });
+
+    it("paints the kept answer before asking again", () => {
+        keep("test.kept", { value: { name: "Kept" } });
+        render(
+            <AfterPaint<{ name: string }>
+                cacheKey="test.kept"
+                load={() => new Promise(() => undefined)}
+                skeleton={<p>waiting</p>}
+            >
+                {(data) => <p>{data.name}</p>}
+            </AfterPaint>
+        );
+        expect(screen.getByText("Kept")).toBeTruthy();
+    });
+
+    it("keeps nothing in the tab when told not to", async () => {
+        render(
+            <AfterPaint cacheKey="test.secret" load={async () => ({ name: "Grace" })} persist={false} skeleton={null}>
+                {(data) => <p>{data.name}</p>}
+            </AfterPaint>
+        );
+        expect(await screen.findByText("Grace")).toBeTruthy();
+        expect(keptValue("test.secret")).toBeUndefined();
+    });
+
+    it("says it failed and asks again on retry, instead of a skeleton forever", async () => {
+        const load = vi.fn(async (): Promise<{ name: string }> => {
+            throw new Error("down");
+        });
+        render(
+            <AfterPaint cacheKey="test.failed" load={load} skeleton={<p>waiting</p>}>
+                {() => <p>never</p>}
+            </AfterPaint>
+        );
+        expect(await screen.findByRole("alert")).toBeTruthy();
+        expect(screen.queryByText("waiting")).toBeNull();
+        const calls = load.mock.calls.length;
+        await act(async () => fireEvent.click(screen.getByRole("button", { name: /retry/i })));
+        await waitFor(() => expect(load.mock.calls.length).toBe(calls + 1));
+    });
+
+    it("says the record is gone when the answer is empty", async () => {
+        render(
+            <AfterPaint cacheKey="test.gone" load={async () => null} skeleton={null}>
+                {() => <p>never</p>}
+            </AfterPaint>
+        );
+        expect(await screen.findByText(/notFound/)).toBeTruthy();
+    });
+
+    it("asks again when the server page renders anew", async () => {
+        const load = vi.fn(async () => ({ name: "Ada" }));
+        const view = (revision: number) => (
+            <AfterPaint cacheKey="test.revision" load={load} revision={revision} skeleton={null}>
+                {(data) => <p>{data.name}</p>}
+            </AfterPaint>
+        );
+        const { rerender } = render(view(1));
+        await screen.findByText("Ada");
+        const calls = load.mock.calls.length;
+        rerender(view(2));
+        await waitFor(() => expect(load.mock.calls.length).toBe(calls + 1));
+    });
+});
+
+/**
+ * The rule, over every Management page and layout: the exported component may
+ * check who is asking and read its translations, and that is all it awaits.
+ * Anything else - a prisma query, a service read - holds the HTML of the whole
+ * navigation until it answers, and belongs in a region read after the paint
+ * (`AfterPaint`) or streamed behind a `<Suspense>` of its own.
+ *
+ * Only the body of the default export is read, so an async component a page
+ * renders inside `<Suspense>` (the SSO providers) is not counted against it.
+ */
+describe("no Management page awaits its data before it paints", () => {
+    // Run from apps/web, like every suite here; jsdom gives `import.meta.url` no file scheme.
+    const ADMIN = join(process.cwd(), "src", "app", "(app)", "admin");
+
+    /** What a page may await: the session check, the request, its strings. */
+    const FAST = /^(require[A-Z]\w*|getTranslations|getLocale|params|searchParams|headers|cookies)$/;
+
+    /**
+     * Pages that still await their data, each with the reason. An entry here is
+     * debt, not a pass: convert the page and delete its line.
+     */
+    const ALLOWED: Record<string, string> = {
+        // not converted yet
+        "agents/page.tsx": "pending",
+        // adopts installs before listing them; a write, not only a read
+        "apps/page.tsx": "pending",
+        // decides notFound from whether the app has services
+        "apps/[appId]/settings/page.tsx": "pending",
+        // not converted yet
+        "billing/page.tsx": "pending",
+        // not converted yet
+        "diagnostics/page.tsx": "pending",
+        // not converted yet
+        "email/page.tsx": "pending",
+        // picks which screen to show from the bridge state
+        "inbox/channels/connect/page.tsx": "pending",
+        // not converted yet
+        "inbox/channels/page.tsx": "pending",
+        // not converted yet
+        "inbox/contacts/page.tsx": "pending",
+        // not converted yet
+        "inbox/logs/page.tsx": "pending",
+        // not converted yet
+        "inbox/page.tsx": "pending",
+        // not converted yet
+        "integrations/models/page.tsx": "pending",
+        // not converted yet
+        "integrations/page.tsx": "pending",
+        // reads one install flag for the overview cards
+        "page.tsx": "pending",
+        // the policy form only; the slow counts already load after the paint
+        "retention/page.tsx": "pending",
+        // not converted yet
+        "safety/page.tsx": "pending",
+        // not converted yet
+        "settings/page.tsx": "pending",
+        // not converted yet
+        "uploads/page.tsx": "pending"
+    };
+
+    function files(dir: string): string[] {
+        return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+            const full = join(dir, entry.name);
+            if (entry.isDirectory()) return files(full);
+            return /^(page|layout)\.tsx$/.test(entry.name) ? [full] : [];
+        });
+    }
+
+    /** The index just past the bracket that closes the one at `open`. */
+    function closing(code: string, open: number): number {
+        const pair = code[open] === "(" ? ")" : "}";
+        for (let depth = 0, index = open; index < code.length; index += 1) {
+            if (code[index] === code[open]) depth += 1;
+            if (code[index] === pair && --depth === 0) return index + 1;
+        }
+        return code.length;
+    }
+
+    /** The body of `export default async function`, comments removed. */
+    function defaultBody(source: string): string {
+        const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+        const start = code.search(/export default async function/);
+        if (start < 0) return "";
+        // The parameters can hold braces of their own (a destructured prop and its
+        // type), so the body is the first brace after the signature closes.
+        const signatureEnd = closing(code, code.indexOf("(", start));
+        const open = code.indexOf("{", signatureEnd);
+        return code.slice(open, closing(code, open));
+    }
+
+    /** The name of every call the body awaits, `Promise.all([...])` opened up. */
+    function awaited(body: string): string[] {
+        const calls: string[] = [];
+        for (const match of body.matchAll(/\bawait\s+([\w.]+)/g)) {
+            const callee = match[1].split(".")[0];
+            if (match[1] !== "Promise.all") {
+                calls.push(callee);
+                continue;
+            }
+            const open = body.indexOf("(", match.index);
+            const inner = body.slice(open + 1, closing(body, open) - 1);
+            for (const call of inner.matchAll(/(?:^|[[,(\s])([A-Za-z_][\w.]*)\s*\(/g)) {
+                calls.push(call[1].split(".")[0]);
+            }
+        }
+        return calls;
+    }
+
+    function slowReads(file: string): string[] {
+        const body = defaultBody(readFileSync(file, "utf8"));
+        const slow = awaited(body).filter((call) => !FAST.test(call));
+        if (/\bprisma\./.test(body)) slow.push("prisma");
+        return [...new Set(slow)];
+    }
+
+    it("awaits only the session, the request and its strings", () => {
+        const offenders: string[] = [];
+        for (const file of files(ADMIN)) {
+            const name = relative(ADMIN, file).replace(/\\/g, "/");
+            if (name in ALLOWED) continue;
+            const slow = slowReads(file);
+            if (slow.length) offenders.push(`${name}: ${slow.join(", ")}`);
+        }
+        expect(offenders).toEqual([]);
+    });
+
+    it("lists no exception that has since been converted", () => {
+        for (const name of Object.keys(ALLOWED)) {
+            expect(slowReads(join(ADMIN, name)).length, name).toBeGreaterThan(0);
+        }
+    });
+
+    it("recognizes a page that awaits its data", () => {
+        const sample = `export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+            await requireAdmin();
+            const [t, rows] = await Promise.all([getTranslations("admin"), listRows()]);
+            const more = await prisma.row.findMany();
+        }`;
+        const body = defaultBody(sample);
+        expect(awaited(body).filter((call) => !FAST.test(call))).toEqual(["listRows", "prisma"]);
     });
 });

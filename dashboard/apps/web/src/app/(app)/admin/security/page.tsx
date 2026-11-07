@@ -14,32 +14,20 @@
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
-import { SecurityAdmin } from "./security-admin";
+import { SecurityAdminLoader } from "./loader";
 import { getTranslations } from "@/lib/i18n/request";
-import { getAuthMailStatus } from "@/lib/auth-mail";
-import { getInstanceSecurity } from "@/lib/instance-security";
-import { PlayerAddressesCard } from "./player-addresses-card";
-import { playerAddressesShared } from "@/lib/player-address-policy";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminSecurityPage() {
     await requireAdmin();
-    const [policy, mail, addressesShared, t] = await Promise.all([
-        getInstanceSecurity(),
-        getAuthMailStatus(),
-        playerAddressesShared(),
-        getTranslations("admin")
-    ]);
+    const t = await getTranslations("admin");
 
     return (
         <>
             <PageHeader title={t("security.title")} description={t("security.description")} />
             <div className="flex flex-col gap-4">
-                <SecurityAdmin policy={policy} mailReady={mail.channelId !== null} />
-                <div className="max-w-2xl">
-                    <PlayerAddressesCard shared={addressesShared} />
-                </div>
+                <SecurityAdminLoader revision={Date.now()} />
             </div>
         </>
     );

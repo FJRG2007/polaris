@@ -178,5 +178,10 @@
         "orgHint": "Los miembros de esta organización llevan su etiqueta.",
         "instanceHint": "La etiqueta de este mismo Polaris.",
         "view": "Ver organización"
+    },
+    "afterPaint": {
+        "loadFailed": "No se ha podido cargar.",
+        "retry": "Reintentar",
+        "notFound": "Ya no está aquí."
     }
 }

@@ -7,13 +7,12 @@ import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { BadgesAdmin } from "./badges-admin";
 import { getTranslations } from "@/lib/i18n/request";
-import { instanceTag } from "@/lib/name-tags/name-tag-service";
-import { InstanceNameTag } from "./instance-name-tag";
+import { InstanceNameTagLoader } from "./loader";
 
 export const dynamic = "force-dynamic";
 
 export default async function BadgesAdminPage() {
-    const [, t, tag] = await Promise.all([requireAdmin(), getTranslations("admin"), instanceTag()]);
+    const [, t] = await Promise.all([requireAdmin(), getTranslations("admin")]);
     return (
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
@@ -21,7 +20,7 @@ export default async function BadgesAdminPage() {
                 description={t("overview.sections.badges.description")}
             />
             <div className="mb-4">
-                <InstanceNameTag initial={tag} />
+                <InstanceNameTagLoader revision={Date.now()} />
             </div>
             <BadgesAdmin />
         </div>
