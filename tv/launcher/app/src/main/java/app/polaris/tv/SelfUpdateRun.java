@@ -195,38 +195,36 @@ final class SelfUpdateRun {
         File dir = new File(context.getFilesDir(), "updates");
         //noinspection ResultOfMethodCallIgnored
         dir.mkdirs();
+        return partial(new File(dir, "polaris-tv.apk"));
+    }
+
+    /** A file on disk as the downloader and the installer see it; also used for add-on and theme downloads. */
+    static SelfUpdate.Partial partial(File file) {
         return new SelfUpdate.Partial() {
-            private File file;
-
-            private File file() {
-                if (file == null) file = new File(dir, "polaris-tv.apk");
-                return file;
-            }
-
             @Override
             public long length() {
-                return file().length();
+                return file.length();
             }
 
             @Override
             public OutputStream open(boolean append) throws IOException {
-                return new FileOutputStream(file(), append);
+                return new FileOutputStream(file, append);
             }
 
             @Override
             public InputStream read() throws IOException {
-                return new FileInputStream(file());
+                return new FileInputStream(file);
             }
 
             @Override
             public void delete() {
                 //noinspection ResultOfMethodCallIgnored
-                file().delete();
+                file.delete();
             }
 
             @Override
             public String toString() {
-                return file().getAbsolutePath();
+                return file.getAbsolutePath();
             }
         };
     }
@@ -249,33 +247,45 @@ final class SelfUpdateRun {
 
         @Override
         public void install(SelfUpdate.Partial file, long size, String requestId) throws IOException {
-            PackageInstaller installer = context.getPackageManager().getPackageInstaller();
-            PackageInstaller.SessionParams params =
-                    new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
-            params.setAppPackageName(SelfUpdate.PACKAGE);
-            params.setSize(size);
-            if (Build.VERSION.SDK_INT >= 31) {
-                // See the class comment for when Android honours this; when it does not, the status is
-                // STATUS_PENDING_USER_ACTION and UpdateStatusReceiver shows the system confirm.
-                params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+            Intent status = new Intent(context, UpdateStatusReceiver.class).setAction(ACTION_STATUS)
+                    .putExtra(EXTRA_REQUEST, requestId);
+            commit(context, file, size, SelfUpdate.PACKAGE, true, status);
+        }
+    }
+
+    /**
+     * Writes {@code file} into a PackageInstaller session for {@code packageName} and commits it, the status going
+     * to {@code status}. {@code silent} asks Android to skip the confirm where it allows that (see the class
+     * comment); an add-on passes false, so Android always asks first.
+     */
+    static void commit(Context context, SelfUpdate.Partial file, long size, String packageName, boolean silent,
+                       Intent status) throws IOException {
+        Context app = context.getApplicationContext();
+        PackageInstaller installer = app.getPackageManager().getPackageInstaller();
+        PackageInstaller.SessionParams params =
+                new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+        params.setAppPackageName(packageName);
+        params.setSize(size);
+        if (Build.VERSION.SDK_INT >= 31) {
+            // When Android does not honour this, the status is STATUS_PENDING_USER_ACTION and UpdateStatusReceiver
+            // shows the system confirm.
+            params.setRequireUserAction(silent ? PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED
+                    : PackageInstaller.SessionParams.USER_ACTION_REQUIRED);
+        }
+        int id = installer.createSession(params);
+        try (PackageInstaller.Session session = installer.openSession(id)) {
+            try (InputStream in = file.read(); OutputStream out = session.openWrite("package.apk", 0, size)) {
+                byte[] chunk = new byte[64 * 1024];
+                for (int read; (read = in.read(chunk)) != -1; ) out.write(chunk, 0, read);
+                session.fsync(out);
             }
-            int id = installer.createSession(params);
-            try (PackageInstaller.Session session = installer.openSession(id)) {
-                try (InputStream in = file.read(); OutputStream out = session.openWrite("polaris-tv.apk", 0, size)) {
-                    byte[] chunk = new byte[64 * 1024];
-                    for (int read; (read = in.read(chunk)) != -1; ) out.write(chunk, 0, read);
-                    session.fsync(out);
-                }
-                Intent status = new Intent(context, UpdateStatusReceiver.class).setAction(ACTION_STATUS)
-                        .putExtra(EXTRA_REQUEST, requestId);
-                // Mutable: the installer adds the status extras to this intent (required from Android 12).
-                int flags = PendingIntent.FLAG_UPDATE_CURRENT
-                        | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
-                session.commit(PendingIntent.getBroadcast(context, id, status, flags).getIntentSender());
-            } catch (IOException | RuntimeException refused) {
-                installer.abandonSession(id);
-                throw refused instanceof IOException ? (IOException) refused : new IOException(refused);
-            }
+            // Mutable: the installer adds the status extras to this intent (required from Android 12).
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT
+                    | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
+            session.commit(PendingIntent.getBroadcast(app, id, status, flags).getIntentSender());
+        } catch (IOException | RuntimeException refused) {
+            installer.abandonSession(id);
+            throw refused instanceof IOException ? (IOException) refused : new IOException(refused);
         }
     }
 

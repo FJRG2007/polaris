@@ -75,6 +75,9 @@ public final class LauncherSettingsActivity extends Activity {
         dnsChoice.setOnClickListener(v -> openDns());
         updatesChoice = findViewById(R.id.updatesChoice);
         updatesChoice.setOnClickListener(v -> openUpdates());
+        TextView catalogChoice = findViewById(R.id.catalogChoice);
+        catalogChoice.setText(getString(R.string.catalog_row));
+        catalogChoice.setOnClickListener(v -> startActivity(new Intent(this, ThemesAddonsActivity.class)));
         columns = config.columns;
         rowsBelowDock = config.rowsBelowDock;
         dockOpacity = config.dockOpacity;
