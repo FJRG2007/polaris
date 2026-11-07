@@ -70,6 +70,8 @@ final class ProfilePicker {
         float density = activity.getResources().getDisplayMetrics().density;
         List<Profiles.Profile> roster = Profiles.load(activity);
         String activeId = ProfileSession.activeId(activity);
+        // While a PIN is owed nobody may reach settings from here; picking a profile comes first.
+        boolean locked = ProfileSession.locked(activity);
 
         LinearLayout root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -106,15 +108,22 @@ final class ProfilePicker {
         int avatarPx = (int) (96 * density);
         View focus = null;
         for (Profiles.Profile profile : roster) {
-            View tile = tile(activity, density, avatar(activity, profile, avatarPx), displayName(activity, profile));
+            boolean pinned = Profiles.hasPin(activity, profile.id);
+            View tile = tile(activity, density, avatar(activity, profile, avatarPx), displayName(activity, profile),
+                    pinned);
             tile.setOnClickListener(v -> {
-                dialog.dismiss();
-                listener.onPicked(profile);
+                Runnable pick = () -> {
+                    dialog.dismiss();
+                    listener.onPicked(profile);
+                };
+                // Back to the profile already in use needs no PIN; any other with one asks for it.
+                if (profile.id.equals(activeId) && !ProfileSession.locked(activity)) pick.run();
+                else PinPad.check(activity, profile, pick);
             });
             row.addView(tile);
             if (focus == null || profile.id.equals(activeId)) focus = tile;   // the last active, else the first
         }
-        if (Profiles.canAdd(roster)) {
+        if (!locked && Profiles.canAdd(roster)) {
             TextView plus = new TextView(activity);
             plus.setText("+");
             plus.setTextColor(Color.WHITE);
@@ -123,13 +132,22 @@ final class ProfilePicker {
             plus.setIncludeFontPadding(false);
             plus.setBackground(circle(0xFF374151));
             plus.setLayoutParams(new LinearLayout.LayoutParams(avatarPx, avatarPx));
-            View add = tile(activity, density, plus, activity.getString(R.string.profile_add));
+            View add = tile(activity, density, plus, activity.getString(R.string.profile_add), false);
             add.setOnClickListener(v -> {
                 dialog.dismiss();
                 listener.onAdd();
             });
             row.addView(add);
         }
+        if (!locked) addManage(activity, density, avatarPx, row, dialog, listener);
+
+        dialog.show();
+        if (focus != null) focus.requestFocus();
+        return dialog;
+    }
+
+    private static void addManage(Activity activity, float density, int avatarPx, LinearLayout row,
+            Dialog dialog, Listener listener) {
         ImageView gear = new ImageView(activity);
         gear.setImageResource(R.drawable.ic_settings);
         gear.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
@@ -137,20 +155,16 @@ final class ProfilePicker {
         gear.setPadding(inset, inset, inset, inset);
         gear.setBackground(circle(0xFF374151));
         gear.setLayoutParams(new LinearLayout.LayoutParams(avatarPx, avatarPx));
-        View manage = tile(activity, density, gear, activity.getString(R.string.profile_manage));
+        View manage = tile(activity, density, gear, activity.getString(R.string.profile_manage), false);
         manage.setOnClickListener(v -> {
             dialog.dismiss();
             listener.onManage();
         });
         row.addView(manage);
-
-        dialog.show();
-        if (focus != null) focus.requestFocus();
-        return dialog;
     }
 
-    /** One focusable tile: the circle over the name, lit and a little larger while focused. */
-    private static View tile(Context ctx, float density, View circle, String label) {
+    /** One focusable tile: the circle over the name (and a lock under it for a PIN), lit while focused. */
+    private static View tile(Context ctx, float density, View circle, String label, boolean pinned) {
         LinearLayout tile = new LinearLayout(ctx);
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -181,6 +195,16 @@ final class ProfilePicker {
                 ViewGroup.LayoutParams.WRAP_CONTENT);
         nameLp.topMargin = (int) (12 * density);
         tile.addView(name, nameLp);
+        if (pinned) {
+            ImageView lock = new ImageView(ctx);
+            lock.setImageResource(R.drawable.ic_lock);
+            lock.setColorFilter(0xCCFFFFFF);
+            lock.setContentDescription(ctx.getString(R.string.pin_locked_tile));
+            int size = (int) (18 * density);
+            LinearLayout.LayoutParams lockLp = new LinearLayout.LayoutParams(size, size);
+            lockLp.topMargin = (int) (6 * density);
+            tile.addView(lock, lockLp);
+        }
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
         int gap = (int) (10 * density);

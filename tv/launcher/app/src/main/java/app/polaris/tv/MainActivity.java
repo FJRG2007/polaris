@@ -2892,7 +2892,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** "Who's watching?" when it is owed: a cold start or a long screen-off, and only with two or more profiles. */
     private void showProfilePickerIfDue() {
         if (profilePicker != null && profilePicker.isShowing()) return;
-        if (!ProfileSession.pickerDue(Profiles.load(this).size())) return;
+        String activeId = ProfileSession.activeId(this);
+        boolean pinned = activeId != null && Profiles.hasPin(this, activeId);
+        if (!ProfileSession.pickerDue(Profiles.load(this).size(), pinned)) return;
         showProfilePicker(false);
     }
 
@@ -2900,7 +2902,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private void showProfilePicker(boolean backReturns) {
         if (isFinishing() || isDestroyed()) return;
         if (profilePicker != null && profilePicker.isShowing()) return;
-        profilePicker = ProfilePicker.show(this, backReturns, new ProfilePicker.Listener() {
+        // While a PIN is owed, Back cannot leave the picker for the profile that is locked.
+        boolean back = backReturns && !ProfileSession.locked(this);
+        profilePicker = ProfilePicker.show(this, back, new ProfilePicker.Listener() {
             @Override
             public void onPicked(Profiles.Profile profile) {
                 profilePicker = null;
