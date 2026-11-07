@@ -65,13 +65,28 @@ export function wrapHeading(heading: number): number {
     return Math.atan2(Math.sin(heading), Math.cos(heading));
 }
 
+/** The lamps a car shows: brake (0 off to 1 full), reverse, and the
+ *  indicator side (1 left, -1 right, 0 none; the receiver makes it blink). */
+export const lampsSchema = z
+    .object({
+        brake: z.number().finite().min(0).max(1),
+        reverse: z.boolean(),
+        signal: z.union([z.literal(-1), z.literal(0), z.literal(1)])
+    })
+    .strict();
+
+export type Lamps = z.infer<typeof lampsSchema>;
+
 export const poseSchema = z
     .object({
         x: coordinate,
         y: coordinate,
         z: coordinate,
         heading: z.number().finite().min(-Math.PI).max(Math.PI),
-        mode: z.enum(VEHICLES)
+        mode: z.enum(VEHICLES),
+        // Missing is every lamp off. Only sent while one is lit, so a pose
+        // with nothing lit stays the shape a browser from before reads.
+        lamps: lampsSchema.optional()
     })
     .strict();
 
@@ -158,9 +173,13 @@ export function activitySession(
     return { game: first.claim.game, startedBy: first.seat, players };
 }
 
-/** What one player's browser tells the others. */
+/** What one player's browser tells the others. Lamps travel in a message of
+ *  their own, never inside the position: a browser from before them parses a
+ *  position strictly and would drop the whole of it, and that player would
+ *  stand still for it while braking. An unknown kind it simply ignores. */
 export const activityMessageSchema = z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("pose"), game: gameId, pose: poseSchema }).strict()
+    z.object({ kind: z.literal("pose"), game: gameId, pose: poseSchema }).strict(),
+    z.object({ kind: z.literal("lamps"), game: gameId, lamps: lampsSchema }).strict()
 ]);
 
 export type ActivityMessage = z.infer<typeof activityMessageSchema>;
@@ -169,6 +188,40 @@ export type ActivityMessage = z.infer<typeof activityMessageSchema>;
 export function readActivityMessage(payload: unknown): ActivityMessage | null {
     const parsed = activityMessageSchema.safeParse(payload);
     return parsed.success ? parsed.data : null;
+}
+
+const LAMPS_OFF: Lamps = { brake: 0, reverse: false, signal: 0 };
+
+/**
+ * What goes on the wire for one position from the frame: the position in the
+ * shape every browser reads, and a lamps message while one is lit plus once
+ * more when they go out, so the others turn them off. `wasLit` is whether the
+ * last lamps sent were lit; the result says what to remember for the next.
+ */
+export function wireMessages(
+    game: string,
+    pose: Pose,
+    wasLit: boolean
+): { messages: ActivityMessage[]; lit: boolean } {
+    const { lamps, ...position } = pose;
+    const messages: ActivityMessage[] = [{ kind: "pose", game, pose: position }];
+    if (lamps) messages.push({ kind: "lamps", game, lamps });
+    else if (wasLit) messages.push({ kind: "lamps", game, lamps: LAMPS_OFF });
+    return { messages, lit: lamps !== undefined };
+}
+
+/** How long lit lamps last with nothing heard about them. Lit lamps go out
+ *  with every position, so a lost "off" only holds them this long. */
+export const LAMPS_HOLD_MS = POSE_EVERY_MS * 4;
+
+/** Whether lamps last heard at `heardAt` still stand at `now`. */
+export function lampsCurrent(heardAt: number | undefined, now: number): boolean {
+    return heardAt !== undefined && now - heardAt <= LAMPS_HOLD_MS;
+}
+
+/** Whether lamps are worth drawing: any of them lit. */
+export function anyLampLit(lamps: Lamps): boolean {
+    return lamps.brake > 0 || lamps.reverse || lamps.signal !== 0;
 }
 
 let poseFailureSeen = false;
@@ -184,18 +237,22 @@ export function reportPoseFailure(cause: unknown): void {
 
 /** The reader's own position as the game's frame reports it
  *  (`polaris-game:state`, see `apps/arcade/game/<game>/engine/embed.js`), or
- *  null for anything that does not fit. The heading is wrapped first. */
+ *  null for anything that does not fit. The heading is wrapped first, and
+ *  lamps that are all off are left out. */
 export function readFramePose(payload: unknown): Pose | null {
     if (!payload || typeof payload !== "object") return null;
-    const { x, y, z, heading, mode } = payload as Record<string, unknown>;
+    const { x, y, z, heading, mode, lamps } = payload as Record<string, unknown>;
     const pose = poseSchema.safeParse({
         x,
         y,
         z,
         heading: typeof heading === "number" ? wrapHeading(heading) : heading,
-        mode
+        mode,
+        ...(lamps === undefined ? {} : { lamps })
     });
-    return pose.success ? pose.data : null;
+    if (!pose.success) return null;
+    const { lamps: lit, ...rest } = pose.data;
+    return lit && anyLampLit(lit) ? { ...rest, lamps: lit } : rest;
 }
 
 /** What the call hands the frame: everybody else in the game, where they are. */

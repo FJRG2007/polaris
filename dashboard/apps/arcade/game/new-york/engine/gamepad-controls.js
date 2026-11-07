@@ -28,6 +28,17 @@ function buttons(pad) {
   return Array.from({ length: BUTTON_COUNT }, (_, i) => Boolean(pad.buttons?.[i]?.pressed) || buttonValue(pad, i) > 0.5);
 }
 
+/**
+ * The helicopter on a gamepad: the triggers climb (RT) and descend (LT) by how far they are pulled, A and B do the same
+ * at full rate for a pad whose triggers read badly, and clicking the left stick holds turbo. `held(i)` is whether button
+ * i is down (and not left over from before a reset). Returns `vertical` (-1 descend to 1 climb) and `turbo` (0 or 1).
+ */
+function helicopterPadInput(pad, held) {
+  const climb = Math.max(buttonValue(pad, 7), held(0) ? 1 : 0);
+  const descend = Math.max(buttonValue(pad, 6), held(1) ? 1 : 0);
+  return { vertical: climb - descend, turbo: held(10) ? 1 : 0 };
+}
+
 class GamepadControls {
   constructor(controllerManager, cameraSystem, callbacks = {}) {
     this.controller = controllerManager;
@@ -177,10 +188,11 @@ class GamepadControls {
     const look = stick(pad, 2);
     let drive = -movement.y;
     let vertical = 0;
+    let turbo = 0;
     if (driving) {
       drive = buttonValue(pad, 7) - buttonValue(pad, 6);
     } else if (mode === 'helicopter') {
-      vertical = buttonValue(pad, 7) - buttonValue(pad, 6);
+      ({ vertical, turbo } = helicopterPadInput(pad, held));
     }
     this.controller.setGamepadInput('forward', Math.max(0, drive));
     this.controller.setGamepadInput('backward', Math.max(0, -drive));
@@ -188,9 +200,10 @@ class GamepadControls {
     this.controller.setGamepadInput('right', Math.max(0, movement.x));
     this.controller.setGamepadInput('up', mode === 'person' ? Number(Boolean(held(0))) : Math.max(0, vertical));
     this.controller.setGamepadInput('down', Math.max(0, -vertical));
+    this.controller.setGamepadInput('turbo', turbo);
     const zoom = Number(Boolean(held(13))) - Number(Boolean(held(12)));
     this.camera.applyGamepadInput(look.x, look.y, zoom, Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0);
   }
 }
 
-export { GamepadControls };
+export { GamepadControls, helicopterPadInput };

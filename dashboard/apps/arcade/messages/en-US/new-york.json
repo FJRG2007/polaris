@@ -176,7 +176,8 @@
             "move": "Pitch",
             "turn": "Yaw",
             "up": "Ascend",
-            "down": "Descend"
+            "down": "Descend",
+            "turbo": "Turbo"
         },
         "drag": "Drag",
         "general": "Everywhere",
@@ -193,7 +194,6 @@
         "padMove": "Move and steer",
         "padLook": "Look around",
         "padThrottle": "Throttle and brake",
-        "padLift": "Up and down",
         "padJump": "Jump",
         "padCamera": "Switch camera",
         "padModes": "Change mode",

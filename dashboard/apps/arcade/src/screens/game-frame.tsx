@@ -203,7 +203,14 @@ export function GameFrame({
     };
 
     return (
-        <div className="relative h-full w-full overflow-hidden bg-black">
+        <div
+            className="relative h-full w-full overflow-hidden bg-black"
+            // The browser's menu over the game's frame or its loading and failure screens; text stays copyable
+            onContextMenu={(event) => {
+                if (!(event.target as Element).closest("p, a, input, textarea"))
+                    event.preventDefault();
+            }}
+        >
             <iframe
                 key={attempt}
                 ref={frame}

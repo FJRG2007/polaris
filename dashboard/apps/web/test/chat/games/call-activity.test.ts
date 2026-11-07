@@ -199,6 +199,104 @@ describe("a position from the game's frame", () => {
     });
 });
 
+describe("car lamps in a position", () => {
+    const lamps = { brake: 0.6, reverse: false, signal: 1 as const };
+
+    it("are optional, so a position from before them still reads with every lamp off", () => {
+        const old = activity.readActivityMessage({ kind: "pose", game: "new-york", pose });
+        expect(old?.pose).toEqual(pose);
+        expect(old?.pose.lamps).toBeUndefined();
+        expect(activity.readFramePose({ type: "polaris-game:state", ...pose, speed: 3 })).toEqual(
+            pose
+        );
+    });
+
+    it("are carried when one is lit, and left out when none is", () => {
+        expect(activity.readFramePose({ ...pose, lamps })).toEqual({ ...pose, lamps });
+        expect(
+            activity.readActivityMessage({
+                kind: "pose",
+                game: "new-york",
+                pose: { ...pose, lamps }
+            })?.pose.lamps
+        ).toEqual(lamps);
+        const off = activity.readFramePose({
+            ...pose,
+            lamps: { brake: 0, reverse: false, signal: 0 }
+        });
+        expect(off).toEqual(pose);
+        expect(off && "lamps" in off).toBe(false);
+    });
+
+    it("travel apart from the position, so a browser from before them keeps reading it", () => {
+        const lit = activity.wireMessages("new-york", { ...pose, lamps }, false);
+        expect(lit.lit).toBe(true);
+        expect(lit.messages).toEqual([
+            { kind: "pose", game: "new-york", pose },
+            { kind: "lamps", game: "new-york", lamps }
+        ]);
+        // The position itself is the exact shape read before lamps existed.
+        expect(lit.messages[0]).toEqual({ kind: "pose", game: "new-york", pose });
+        for (const message of lit.messages) {
+            expect(activity.readActivityMessage(message)).toEqual(message);
+        }
+        // Once more when they go out, so the others turn them off; then nothing.
+        const out = activity.wireMessages("new-york", pose, true);
+        expect(out).toEqual({
+            lit: false,
+            messages: [
+                { kind: "pose", game: "new-york", pose },
+                { kind: "lamps", game: "new-york", lamps: { brake: 0, reverse: false, signal: 0 } }
+            ]
+        });
+        expect(activity.wireMessages("new-york", pose, false)).toEqual({
+            lit: false,
+            messages: [{ kind: "pose", game: "new-york", pose }]
+        });
+    });
+
+    it("go out on their own when nothing keeps them lit, so a lost off message never sticks", () => {
+        expect(activity.lampsCurrent(undefined, 1000)).toBe(false);
+        expect(activity.lampsCurrent(1000, 1000 + activity.POSE_EVERY_MS)).toBe(true);
+        expect(activity.lampsCurrent(1000, 1000 + activity.LAMPS_HOLD_MS)).toBe(true);
+        expect(activity.lampsCurrent(1000, 1001 + activity.LAMPS_HOLD_MS)).toBe(false);
+    });
+
+    it("drop a lamps message that does not fit", () => {
+        for (const bad of [
+            { kind: "lamps", game: "new-york" },
+            { kind: "lamps", game: "new-york", lamps: { ...lamps, brake: 3 } },
+            { kind: "lamps", game: "new-york", lamps, extra: 1 }
+        ]) {
+            expect(activity.readActivityMessage(bad)).toBeNull();
+        }
+    });
+
+    it("drop a position whose lamps do not fit", () => {
+        for (const bad of [
+            { ...lamps, brake: 2 },
+            { ...lamps, brake: -0.1 },
+            { ...lamps, brake: Number.NaN },
+            { ...lamps, reverse: 1 },
+            { ...lamps, signal: 0.5 },
+            { ...lamps, signal: 2 },
+            { ...lamps, extra: 1 },
+            { brake: 1 },
+            "on",
+            null
+        ]) {
+            expect(activity.readFramePose({ ...pose, lamps: bad })).toBeNull();
+            expect(
+                activity.readActivityMessage({
+                    kind: "pose",
+                    game: "new-york",
+                    pose: { ...pose, lamps: bad }
+                })
+            ).toBeNull();
+        }
+    });
+});
+
 describe("a heading", () => {
     it("is wrapped between -pi and pi", () => {
         for (const heading of [0, 3, -3, 7, -7, 1e6]) {

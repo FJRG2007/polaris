@@ -4,7 +4,8 @@ import { createPedestrianSystem } from './pedestrian-system.js';
 import { vehicleContact, resolveVehicleContact, sweptVehicleContact } from './vehicle-physics.js';
 import { signalPhase, walkSignal } from './city-config.js';
 import { cityUniforms, createContactShadowMaterial, createCarFlareMaterial } from './tsl-materials.js';
-import { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
+import { HEADLIGHTS, brakeLamp, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
+import { lightBudget } from './quality.js';
 import {
   BODY_SPECS,
   buildCarGeometry,
@@ -1620,7 +1621,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
   // v is heading for (left = +x)
   function writeLampState(v, array, o) {
     const blinkOn = v.blink !== 0 && (clock + v.blinkPhase) % 0.8 <= 0.4;
-    array[o] = v.acc < -0.8 || v.speed < 0.3 ? 1 : 0;
+    array[o] = brakeLamp(v.acc, v.speed);
     array[o + 1] = blinkOn && v.blink < 0 ? 1 : 0;
     array[o + 2] = blinkOn && v.blink > 0 ? 1 : 0;
   }
@@ -1661,7 +1662,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     const state = attrs.carState.array;
     const o4 = slot * 4;
     const blinkOn = c.blink !== 0 && (clock + c.blinkPhase) % 0.8 <= 0.4;
-    const b0 = c.acc < -0.8 || c.speed < 0.3 ? 1 : 0;
+    const b0 = brakeLamp(c.acc, c.speed);
     const b1 = blinkOn && c.blink < 0 ? 1 : 0;
     const b2 = blinkOn && c.blink > 0 ? 1 : 0;
     const b3 = c.style;
@@ -1748,7 +1749,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
         b._effDist = effDist;
         b._sinY = sinY;
         b._cosY = cosY;
-        b._braking = b.acc < -0.8 || b.speed < 0.3 ? 1 : 0;
+        b._braking = brakeLamp(b.acc, b.speed);
         litVehicles[litVehicleCount++] = b;
       }
     }
@@ -1772,13 +1773,14 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     const beamScale = clamp((glow - 0.60) * 1.45, 0.0, 1.28);
     const tailScale = clamp(0.18 + glow * 0.66, 0.24, 1.22);
 
-    const maxDualVehicles = HEADLIGHT_POOL_SIZE >> 1;
+    const headlightBudget = lightBudget(HEADLIGHT_POOL_SIZE); // quality.js: fewer lit on lower levels, same pool
+    const maxDualVehicles = headlightBudget >> 1;
     const vehCutoff = litVehicleCount > maxDualVehicles
       ? Math.min(MAX_LIGHT_DIST, litVehicles[maxDualVehicles]._effDist)
       : MAX_LIGHT_DIST;
     let spotUsed = 0;
     if (beamScale > 0.001) {
-      for (let i = 0; i < litVehicleCount && spotUsed + 2 <= HEADLIGHT_POOL_SIZE; i++) {
+      for (let i = 0; i < litVehicleCount && spotUsed + 2 <= headlightBudget; i++) {
         const v = litVehicles[i];
         const fade = smoothDistFade(v._effDist, vehCutoff * 0.62, vehCutoff);
         if (fade <= 0.001) continue;
@@ -1813,7 +1815,8 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
 
     // 1. NYPD emergency roof lightbar flashes (smoothly pulsing red/blue 360° PointLights on nearby patrol cruisers)
     let policeLightsUsed = 0;
-    for (let i = 0; i < litVehicleCount && policeLightsUsed < POLICE_LIGHT_POOL_SIZE; i++) {
+    const policeBudget = lightBudget(POLICE_LIGHT_POOL_SIZE);
+    for (let i = 0; i < litVehicleCount && policeLightsUsed < policeBudget; i++) {
       const v = litVehicles[i];
       if (!v.isPolice || v._effDist >= 88) continue;
       const fade = smoothDistFade(v._effDist, 52, 88);
@@ -2433,13 +2436,14 @@ function createHighwayTraffic(scene, lanes) {
     }
     const glow = cityUniforms && cityUniforms.uInteriorGlow ? cityUniforms.uInteriorGlow.value : 0.48;
     const beamScale = clamp((glow - 0.60) * 1.45, 0.0, 1.28);
-    const maxHwyVeh = HWY_SPOT_POOL >> 1;
+    const hwyBudget = lightBudget(HWY_SPOT_POOL);
+    const maxHwyVeh = hwyBudget >> 1;
     const hwyCutoff = hwyLitCount > maxHwyVeh
       ? Math.min(HWY_LIGHT_DIST, hwyLitCars[maxHwyVeh]._effDist)
       : HWY_LIGHT_DIST;
     let spotUsed = 0;
     if (beamScale > 0.001) {
-      for (let i = 0; i < hwyLitCount && spotUsed + 2 <= HWY_SPOT_POOL; i++) {
+      for (let i = 0; i < hwyLitCount && spotUsed + 2 <= hwyBudget; i++) {
         const c = hwyLitCars[i];
         const t = clamp((hwyCutoff - c._effDist) / Math.max(1, hwyCutoff * 0.38), 0, 1);
         const fade = (t * t * (3 - 2 * t)) * ease(Math.min(c.u, c.lane.len - c.u));
