@@ -82,7 +82,10 @@ describe("dirty upload runs", () => {
 describe("blocks entering and leaving the radius", () => {
     it("diffs a resident map against the blocks now in range, keeping range order", () => {
         const [a, b, c, d] = [{ n: "a" }, { n: "b" }, { n: "c" }, { n: "d" }];
-        const resident = new Map<object, unknown[]>([[a, []], [b, []]]);
+        const resident = new Map<object, unknown[]>([
+            [a, []],
+            [b, []]
+        ]);
         const { entering, leaving } = slots.diffResident(resident, [d, b, c]);
         expect(entering).toEqual([d, c]);
         expect(leaving).toEqual([a]);
@@ -97,7 +100,11 @@ describe("blocks entering and leaving the radius", () => {
 
     it("refills blocks a full pool cut short once a leaving block frees slots, closest first", () => {
         const [a, b, c, d] = [{ n: "a" }, { n: "b" }, { n: "c" }, { n: "d" }];
-        const resident = new Map<object, unknown[]>([[a, []], [b, []], [c, []]]);
+        const resident = new Map<object, unknown[]>([
+            [a, []],
+            [b, []],
+            [c, []]
+        ]);
         const { entering, leaving } = slots.diffResident(resident, [b, d, c], new Set([b]));
         expect(leaving).toEqual([a, b]);
         expect(entering).toEqual([b, d]);
