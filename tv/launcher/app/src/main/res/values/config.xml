@@ -286,8 +286,9 @@
          settings. Hidden while no VPN is up and vpn_app is empty or not installed, and with top_menu. It keeps its
          label with icon_only_buttons, since the red state has no icon. A VPN app's kill switch keeps a VPN up while
          the app says disconnected (it holds the tunnel to block traffic), so the pill stays green then. Can also be
-         set with "vpn_pill" in a theme. -->
-    <bool name="vpn_pill">false</bool>
+         set with "vpn_pill" in a theme. On by default since 3.9, with icon_only_vpn: an icon-only network pill has
+         no label left to carry the VPN badge. -->
+    <bool name="vpn_pill">true</bool>
     <!-- The dock as its own row: a lighter band, no names under the tiles, parked low on the screen with the top
          shelf above it. false makes the dock apps simply the first tiles of one plain grid (still in dock_apps
          order, no empty slots), with names under every tile and the glow behind every focused tile. -->
@@ -320,14 +321,15 @@
          button's long-press menu, so it needs no extra button on screen. -->
     <bool name="reorder_button">false</bool>
     <!-- Wi-Fi and Settings as round icon-only buttons (the network name moves to the talkback description);
-         Inputs keeps its label. -->
-    <bool name="icon_only_buttons">false</bool>
+         Inputs keeps its label unless icon_only_inputs. On by default since 3.9: the Wi-Fi icon shows the signal
+         in bars, so the name adds nothing a glance needs. A theme can set "icon_only_buttons": false. -->
+    <bool name="icon_only_buttons">true</bool>
     <!-- The Inputs pill as a round icon button too (the label moves to the talkback description). -->
-    <bool name="icon_only_inputs">false</bool>
+    <bool name="icon_only_inputs">true</bool>
     <!-- With vpn_pill, the VPN pill as a round icon button too: an open lock on the plain glass button while no VPN is
          up, the closed lock in a green outline while one is (solid green only while focused, like the pill). "VPN" /
-         "VPN off" become its talkback description. A theme can set "icon_only_vpn": true. -->
-    <bool name="icon_only_vpn">false</bool>
+         "VPN off" become its talkback description. A theme can set "icon_only_vpn": false. -->
+    <bool name="icon_only_vpn">true</bool>
     <!-- The launcher's clocks (Home, the clock screensaver and the Clock screen) in 12- or 24-hour time whatever the TV
          is set to: "12", "24", or "system", the default, which follows the TV. Launcher settings' Clock row overrides
          it, and a theme can set "clock_format": "24". -->

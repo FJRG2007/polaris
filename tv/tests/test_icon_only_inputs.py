@@ -48,10 +48,10 @@ class TestIconOnlyInputsWiring(unittest.TestCase):
                       "MainActivity must make the Inputs pill icon-only with makeIconOnly, as #556 does for "
                       "Wi-Fi and Settings")
 
-    def test_theme_table_lists_it_off_by_default(self):
+    def test_theme_table_lists_it_on_by_default(self):
         row = next((line for line in THEMES_README.splitlines() if line.startswith("| `icon_only_inputs`")), "")
         self.assertTrue(row, "themes/README.md's config.json table must list icon_only_inputs")
-        self.assertIn("`false` by default", row, "the table must say it is off by default")
+        self.assertIn("`true` by default since 3.9", row, "the table must say it is on by default")
 
 
 if __name__ == "__main__":

@@ -840,7 +840,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         launcherSettingsButton = cfg.launcherSettingsButton;
         if (launcherSettingsButton) {
             ((TextView) btnSettings).setText(R.string.launcher_settings);
-            ((TextView) btnSettings).setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_home_settings_pill, 0, 0, 0);
+            // The gear, like every Settings button: the house-and-gear read as a second, different action.
+            ((TextView) btnSettings).setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_settings, 0, 0, 0);
         }
         btnSettings.setOnClickListener(v -> {
             if (launcherSettingsButton) startActivityForResult(
@@ -3026,6 +3027,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         root.invalidate();   // a resume that changes nothing on screen still draws once, so the refresh runs
     }
 
+    /** The Wi-Fi icon by signal, as a phone's status bar draws it: index 0 is offline, 1 to 4 the bars lit. */
+    private static final int[] WIFI_BARS = {R.drawable.ic_wifi_0, R.drawable.ic_wifi_1, R.drawable.ic_wifi_2,
+            R.drawable.ic_wifi_3, R.drawable.ic_wifi_4};
+
     /** Shows the Wi-Fi network name on the button when we can read it, otherwise the connection type. */
     @SuppressWarnings("deprecation")
     private void updateWifiLabel() {
@@ -3056,6 +3061,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
             if (!online) {
                 text = getString(R.string.offline);
+                icon = WIFI_BARS[0];
                 vpn = false;
             } else if (ethernet) {
                 text = getString(R.string.ethernet);
@@ -3067,6 +3073,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 WifiInfo info = wm != null ? wm.getConnectionInfo() : null;
                 String ssid = info != null ? info.getSSID() : null;
                 flame = info != null ? Math.max(1, Math.min(4, WifiManager.calculateSignalLevel(info.getRssi(), 5))) : 3;
+                icon = WIFI_BARS[flame];
                 if (ssid != null) {
                     ssid = ssid.replace("\"", "").trim();
                     if (!ssid.isEmpty() && !ssid.contains("unknown") && !ssid.equals("0x")) text = ssid;
