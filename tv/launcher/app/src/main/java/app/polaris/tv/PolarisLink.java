@@ -133,15 +133,21 @@ final class PolarisLink {
         /** An update asked for from Polaris, or null. */
         final String updateRequestId;
         final String updateRequestVersion;
+        /** Block ads and trackers as asked from Polaris, or null when the TV keeps its own setting. */
+        final Boolean desiredBlocking;
+        /** The id of that choice, or null. */
+        final String desiredChoice;
 
         State(String instanceName, String accountName, int unread, int alerts, String updateRequestId,
-                String updateRequestVersion) {
+                String updateRequestVersion, Boolean desiredBlocking, String desiredChoice) {
             this.instanceName = instanceName;
             this.accountName = accountName;
             this.unread = unread;
             this.alerts = alerts;
             this.updateRequestId = updateRequestId;
             this.updateRequestVersion = updateRequestVersion;
+            this.desiredBlocking = desiredBlocking;
+            this.desiredChoice = desiredChoice;
         }
     }
 
@@ -234,10 +240,12 @@ final class PolarisLink {
 
     /**
      * What the instance says now. Null when the key is no longer accepted. Carries this build's version, which
-     * is how Polaris knows what the TV runs and when an update it asked for has landed.
+     * is how Polaris knows what the TV runs and when an update it asked for has landed, and what came of Block ads
+     * and trackers ({@link RemoteBlocking}).
      */
     State state() throws IOException {
-        String path = "/api/tv/state" + SelfUpdate.versionQuery(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE);
+        String path = RemoteBlockingRun.withReport(context,
+                "/api/tv/state" + SelfUpdate.versionQuery(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
         PolarisFailover.Reply reply = failover.request("GET", path, null, token);
         if (reply.status == 401) return null;
         if (!reply.ok()) throw new IOException("Refused: " + reply.status);
@@ -251,7 +259,8 @@ final class PolarisLink {
             if (requestId != null && !UUID.matcher(requestId).matches()) requestId = null;
             return new State(instance.optString("name"), account.optString("name"),
                     Math.max(0, answer.optInt("unread")), Math.max(0, answer.optInt("alerts")), requestId,
-                    requestId == null ? null : request.optString("versionName", null));
+                    requestId == null ? null : request.optString("versionName", null),
+                    RemoteBlocking.desiredBlocking(answer), RemoteBlocking.desiredChoice(answer));
         } catch (JSONException notPolaris) {
             throw new IOException("Not a Polaris", notPolaris);
         }

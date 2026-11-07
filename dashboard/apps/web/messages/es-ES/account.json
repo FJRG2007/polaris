@@ -1739,6 +1739,36 @@
                 "notATv": "Ese TV no está conectado a tu cuenta.",
                 "tooMany": "Demasiadas solicitudes. Espera un minuto."
             }
+        },
+        "prefs": {
+            "blocking": "Sin anuncios ni rastreo",
+            "rename": "Renombrar",
+            "nameLabel": "Nombre",
+            "save": "Guardar",
+            "cancel": "Cancelar",
+            "status": {
+                "updateFirst": "Actualiza el TV para cambiarlo desde aquí",
+                "notAsked": "Se ajusta en el propio TV",
+                "waiting": "Esperando a que el TV lo aplique",
+                "on": "Activado en el TV",
+                "off": "Apagado en el TV",
+                "failed": "Aquí no funciona; el TV volvió a su propio DNS",
+                "unavailable": "El Android de este TV es demasiado antiguo",
+                "noPermission": "Instala el TV de nuevo desde Polaris Desktop para permitirlo",
+                "noFilter": "No hay Filtro de red con DNS cifrado que usar",
+                "leftAsSet": "Sin activar: se cambió el DNS propio del TV"
+            },
+            "reach": {
+                "reaching": "Llega al Filtro de red",
+                "notReaching": "No llega al Filtro de red",
+                "notReachingHint": "Ninguna consulta de {address} en el último día",
+                "filterOff": "Filtro de red apagado",
+                "unknown": "Filtro de red: no se sabe"
+            },
+            "errors": {
+                "tooMany": "Demasiados cambios. Espera un minuto.",
+                "badName": "Pon al TV un nombre de hasta 60 caracteres."
+            }
         }
     }
 }

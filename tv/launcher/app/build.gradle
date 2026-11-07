@@ -13,8 +13,8 @@ android {
         applicationId providers.gradleProperty('launcherApplicationId').getOrElse('app.polaris.tv')
         minSdk 26
         targetSdk 34
-        versionCode 13
-        versionName '3.4'
+        versionCode 14
+        versionName '3.5'
     }
 
     signingConfigs {

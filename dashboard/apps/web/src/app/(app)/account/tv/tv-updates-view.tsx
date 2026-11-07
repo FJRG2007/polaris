@@ -3,7 +3,9 @@
 /**
  * The account's connected TVs, the version each one runs, and the button that
  * asks it to update. The TV collects the request on its next check-in and
- * reports back, so a pending row refreshes itself until it settles.
+ * reports back, so a pending row refreshes itself until it settles. Each row
+ * also carries its name, Block ads and trackers, and whether it reaches the
+ * Network filter (`tv-preferences.tsx`).
  */
 
 import { Tv } from "lucide-react";
@@ -13,11 +15,25 @@ import { RelativeTime } from "@/components/relative-time";
 import { compareTvVersions, tvTakesUpdates } from "@/lib/tv/version-order";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { TvFilterReach } from "@/lib/tv/filter-reach";
 import type { TvRow, TvUpdateState } from "@/lib/tv/update-requests";
-import { requestTvUpdateAction, tvUpdatesAction, type TvUpdatesView } from "./actions";
+import { blockingWaiting, TvName, TvPreferences } from "./tv-preferences";
+import {
+    renameTvAction,
+    requestTvUpdateAction,
+    setTvBlockingAction,
+    tvFilterReachAction,
+    tvUpdatesAction,
+    type TvUpdatesView
+} from "./actions";
 
 /** How often a pending row asks how it is going. */
 const REFRESH_MS = 5000;
+
+/** How long the list keeps asking after Block ads and trackers is waiting on a
+ *  TV. A TV that is on answers within seconds; one that is off answers when it
+ *  is turned on, and the page shows that once it is opened again. */
+const BLOCKING_WAIT_MS = 2 * 60_000;
 
 const PENDING: readonly TvUpdateState[] = [
     "queued",
@@ -67,7 +83,29 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
     const [view, setView] = useState(initial);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
-    const anyPending = view.tvs.some(pending);
+    const [reach, setReach] = useState<Record<string, TvFilterReach> | null>(null);
+    const waitingOn = view.tvs
+        .filter(blockingWaiting)
+        .map((row) => `${row.id}:${row.blocking.askedAt ?? ""}`)
+        .join(",");
+    const [waitedOut, setWaitedOut] = useState<string | null>(null);
+    const anyPending = view.tvs.some(pending) || (waitingOn !== "" && waitingOn !== waitedOut);
+
+    useEffect(() => {
+        if (!waitingOn) return;
+        const timer = window.setTimeout(() => setWaitedOut(waitingOn), BLOCKING_WAIT_MS);
+        return () => window.clearTimeout(timer);
+    }, [waitingOn]);
+
+    useEffect(() => {
+        let live = true;
+        void runAction(tvFilterReachAction, () => undefined).then((found) => {
+            if (live) setReach(found ?? {});
+        });
+        return () => {
+            live = false;
+        };
+    }, []);
 
     useEffect(() => {
         if (!anyPending) return;
@@ -105,6 +143,47 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
             return;
         }
         setView({ tvs: answer.tvs, latest: answer.latest });
+    }
+
+    /** Shown at once; that row's switch goes back if the change is refused. */
+    async function changeBlocking(row: TvRow, next: boolean) {
+        const restore = (tvs: TvRow[]) =>
+            tvs.map((r) => (r.id === row.id ? { ...r, blocking: row.blocking } : r));
+        setView((current) => ({
+            ...current,
+            tvs: current.tvs.map((r) =>
+                r.id === row.id
+                    ? {
+                          ...r,
+                          blocking: {
+                              desired: next,
+                              applied: null,
+                              askedAt: new Date().toISOString()
+                          }
+                      }
+                    : r
+            )
+        }));
+        setError(null);
+        const answer = await runAction(
+            () => setTvBlockingAction({ keyId: row.id, blocking: next }),
+            setError
+        );
+        if (!answer || answer.error) {
+            setView((current) => ({ ...current, tvs: restore(current.tvs) }));
+            if (answer?.error) setError(answer.error);
+            return;
+        }
+        setView({ tvs: answer.tvs, latest: answer.latest });
+    }
+
+    async function rename(row: TvRow, name: string): Promise<boolean> {
+        setError(null);
+        const answer = await runAction(() => renameTvAction({ keyId: row.id, name }), setError);
+        if (!answer) return false;
+        setView({ tvs: answer.tvs, latest: answer.latest });
+        if (answer.error) setError(answer.error);
+        return !answer.error;
     }
 
     const updatable = view.tvs.filter((row) => canUpdate(row, view.latest)).length;
@@ -150,7 +229,10 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
                                 row={row}
                                 latest={view.latest}
                                 busy={busy}
+                                reach={reach ? (reach[row.id] ?? "unknown") : undefined}
                                 onUpdate={() => void update({ keyId: row.id })}
+                                onBlocking={(next) => void changeBlocking(row, next)}
+                                onRename={(name) => rename(row, name)}
                             />
                         ))}
                     </CardBody>
@@ -164,12 +246,18 @@ function TvUpdateRow({
     row,
     latest,
     busy,
-    onUpdate
+    reach,
+    onUpdate,
+    onBlocking,
+    onRename
 }: {
     row: TvRow;
     latest: string | null;
     busy: boolean;
+    reach: TvFilterReach | undefined;
     onUpdate: () => void;
+    onBlocking: (next: boolean) => void;
+    onRename: (name: string) => Promise<boolean>;
 }) {
     const t = useTranslations("account");
     const current = upToDate(row, latest);
@@ -184,68 +272,73 @@ function TvUpdateRow({
                 ? "warning"
                 : "neutral";
     return (
-        <div className="flex min-w-0 items-center gap-3 px-3 py-2.5">
-            <Tv className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-sm font-medium" title={row.name}>
-                    {row.name}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                    {row.versionName
-                        ? t("tv.updates.runs", { version: row.versionName })
-                        : t("tv.updates.versionUnknown")}
-                    {row.lastSeenAt ? (
-                        <>
-                            {" - "}
-                            {t("tv.updates.seen")} <RelativeTime iso={row.lastSeenAt} />
-                        </>
-                    ) : null}
-                </span>
-                {showStatus && status ? (
-                    <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                        <Badge variant={tone}>
-                            {t(STATE_WORDS[status.state], { version: status.versionName })}
-                        </Badge>
-                        {status.state === "failed" && status.reason ? (
-                            <span
-                                className="min-w-0 truncate text-xs text-muted-foreground"
-                                title={status.reason}
-                            >
-                                {status.reason}
-                            </span>
+        <div className="flex min-w-0 flex-col gap-2.5 px-3 py-2.5">
+            <div className="flex min-w-0 items-center gap-3">
+                <Tv className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <TvName row={row} onRename={onRename} />
+                    <span className="truncate text-xs text-muted-foreground">
+                        {row.versionName
+                            ? t("tv.updates.runs", { version: row.versionName })
+                            : t("tv.updates.versionUnknown")}
+                        {row.lastSeenAt ? (
+                            <>
+                                {" - "}
+                                {t("tv.updates.seen")} <RelativeTime iso={row.lastSeenAt} />
+                            </>
                         ) : null}
                     </span>
-                ) : null}
+                    {showStatus && status ? (
+                        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            <Badge variant={tone}>
+                                {t(STATE_WORDS[status.state], { version: status.versionName })}
+                            </Badge>
+                            {status.state === "failed" && status.reason ? (
+                                <span
+                                    className="min-w-0 truncate text-xs text-muted-foreground"
+                                    title={status.reason}
+                                >
+                                    {status.reason}
+                                </span>
+                            ) : null}
+                        </span>
+                    ) : null}
+                </div>
+                {current ? (
+                    <Badge variant="success" className="shrink-0">
+                        {t("tv.updates.current")}
+                    </Badge>
+                ) : !tvTakesUpdates(row.versionCode) ? (
+                    <span
+                        className="min-w-0 max-w-[45%] shrink truncate text-right text-xs text-muted-foreground"
+                        title={t("tv.updates.updateOnTv")}
+                    >
+                        {t("tv.updates.updateOnTv")}
+                    </span>
+                ) : (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        disabled={!canUpdate(row, latest) || busy}
+                        title={
+                            !latest
+                                ? t("tv.updates.noRelease")
+                                : pending(row)
+                                  ? t("tv.updates.alreadyAsked")
+                                  : undefined
+                        }
+                        onClick={onUpdate}
+                    >
+                        {status?.state === "failed"
+                            ? t("tv.updates.retry")
+                            : t("tv.updates.update")}
+                    </Button>
+                )}
             </div>
-            {current ? (
-                <Badge variant="success" className="shrink-0">
-                    {t("tv.updates.current")}
-                </Badge>
-            ) : !tvTakesUpdates(row.versionCode) ? (
-                <span
-                    className="min-w-0 max-w-[45%] shrink truncate text-right text-xs text-muted-foreground"
-                    title={t("tv.updates.updateOnTv")}
-                >
-                    {t("tv.updates.updateOnTv")}
-                </span>
-            ) : (
-                <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    disabled={!canUpdate(row, latest) || busy}
-                    title={
-                        !latest
-                            ? t("tv.updates.noRelease")
-                            : pending(row)
-                              ? t("tv.updates.alreadyAsked")
-                              : undefined
-                    }
-                    onClick={onUpdate}
-                >
-                    {status?.state === "failed" ? t("tv.updates.retry") : t("tv.updates.update")}
-                </Button>
-            )}
+            <div className="pl-7">
+                <TvPreferences row={row} reach={reach} onBlocking={onBlocking} />
+            </div>
         </div>
     );
 }

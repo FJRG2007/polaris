@@ -25,3 +25,12 @@ export function compareTvVersions(left: string, right: string): number {
 export function tvTakesUpdates(versionCode: number | null): boolean {
     return versionCode !== null;
 }
+
+/** The first launcher build that carries out Block ads and trackers asked from
+ *  Polaris and says how it went. */
+export const TV_BLOCKING_MIN_CODE = 14;
+
+/** Whether a TV acts on Block ads and trackers asked from /account/tv. */
+export function tvTakesBlocking(versionCode: number | null): boolean {
+    return versionCode !== null && versionCode >= TV_BLOCKING_MIN_CODE;
+}

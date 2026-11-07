@@ -11,9 +11,17 @@ import { tvReleaseInfo } from "@/lib/tv/release";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { getTranslations } from "@/lib/i18n/request";
+import { seenDevices } from "@/lib/dns-blocker/insights";
+import { DnsBlockerRefusal, type DnsRefusalCode } from "@/lib/dns-blocker/service";
+import { reachOf, type TvFilterReach } from "@/lib/tv/filter-reach";
 import { listTvs, requestTvUpdates, type TvRow } from "@/lib/tv/update-requests";
+import { tvNameSchema } from "@/lib/tv/tv-name";
+import { renameTv, setTvBlocking } from "@/lib/tv/preferences";
 
 const LIMIT = 30;
+
+/** The refusals that mean no filter runs here; any other is one that runs and cannot be read now. */
+const FILTER_OFF: readonly DnsRefusalCode[] = ["notInstalled", "notRunning"];
 const WINDOW_MS = 60_000;
 
 const targetSchema = z.union([
@@ -70,4 +78,91 @@ export async function requestTvUpdateAction(
         });
     }
     return { tvs: await listTvs(user.id), latest };
+}
+
+const blockingSchema = z.object({ keyId: z.string().uuid(), blocking: z.boolean() });
+const renameSchema = z.object({ keyId: z.string().uuid(), name: tvNameSchema });
+
+/** Turn Block ads and trackers on or off for one TV. The TV applies it on its next check-in. */
+export async function setTvBlockingAction(
+    input: unknown
+): Promise<TvUpdatesView & { error?: string }> {
+    const user = await requireUser();
+    const t = await getTranslations("account");
+    const parsed = blockingSchema.safeParse(input);
+    const throttle = await rateLimit(`tv-prefs:${user.id}`, LIMIT, WINDOW_MS);
+    const refusal = !parsed.success
+        ? "tv.updates.errors.notATv"
+        : !throttle.ok
+          ? "tv.prefs.errors.tooMany"
+          : null;
+    const outcome =
+        !refusal && parsed.success
+            ? await setTvBlocking(user.id, parsed.data.keyId, parsed.data.blocking)
+            : "notATv";
+    if (outcome === "done" && parsed.success) {
+        await recordAudit({
+            actorId: user.id,
+            action: "account.tv.blocking.changed",
+            targetType: "apiKey",
+            targetId: parsed.data.keyId,
+            metadata: { blocking: parsed.data.blocking }
+        });
+    }
+    const [tvs, latest] = await Promise.all([listTvs(user.id), latestVersion()]);
+    if (refusal) return { tvs, latest, error: t(refusal) };
+    if (outcome === "tooOld") return { tvs, latest, error: t("tv.prefs.status.updateFirst") };
+    if (outcome !== "done") return { tvs, latest, error: t("tv.updates.errors.notATv") };
+    return { tvs, latest };
+}
+
+/** Give one TV a name of its owner's choosing. */
+export async function renameTvAction(input: unknown): Promise<TvUpdatesView & { error?: string }> {
+    const user = await requireUser();
+    const t = await getTranslations("account");
+    const parsed = renameSchema.safeParse(input);
+    const throttle = await rateLimit(`tv-prefs:${user.id}`, LIMIT, WINDOW_MS);
+    const refusal = !parsed.success
+        ? "tv.prefs.errors.badName"
+        : !throttle.ok
+          ? "tv.prefs.errors.tooMany"
+          : null;
+    const renamed =
+        !refusal && parsed.success
+            ? await renameTv(user.id, parsed.data.keyId, parsed.data.name)
+            : false;
+    if (renamed && parsed.success) {
+        await recordAudit({
+            actorId: user.id,
+            action: "account.tv.renamed",
+            targetType: "apiKey",
+            targetId: parsed.data.keyId,
+            metadata: { name: parsed.data.name }
+        });
+    }
+    const [tvs, latest] = await Promise.all([listTvs(user.id), latestVersion()]);
+    if (refusal || !renamed)
+        return { tvs, latest, error: t(refusal ?? "tv.updates.errors.notATv") };
+    return { tvs, latest };
+}
+
+/**
+ * For each of the account's TVs, whether its lookups reach the Network filter.
+ * Only the account's own TVs, and only yes or no: never what they looked up.
+ */
+export async function tvFilterReachAction(): Promise<Record<string, TvFilterReach>> {
+    const user = await requireUser();
+    const tvs = await listTvs(user.id);
+    let seen: Awaited<ReturnType<typeof seenDevices>> | null = null;
+    try {
+        seen = await seenDevices("24h");
+    } catch (caught) {
+        const off = caught instanceof DnsBlockerRefusal && FILTER_OFF.includes(caught.code);
+        if (!off) {
+            if (!(caught instanceof DnsBlockerRefusal))
+                console.error("[account/tv] reading the network filter's devices failed", caught);
+            return Object.fromEntries(tvs.map((tv) => [tv.id, "unknown" as const]));
+        }
+    }
+    return Object.fromEntries(tvs.map((tv) => [tv.id, reachOf(tv.address, seen)]));
 }

@@ -7,6 +7,12 @@
  * user agent (`polaris-tv/<version>`). A malformed version is ignored, never refused.
  * Reporting `versionCode` is how a TV says it carries out `updateRequest`; one that
  * names only its version is never offered an update from /account/tv.
+ *
+ * `desired` is what the TV's owner asked of it from /account/tv
+ * (`{ blocking, choice }`), or null when they never chose, so the TV keeps its
+ * own setting. The TV acts once per `choice` and says what it did with
+ * `?blocking=&blockingChoice=<choice>` (lib/tv/preferences); a malformed report
+ * is ignored, never refused.
  */
 
 import { prisma } from "@polaris/db";
@@ -14,6 +20,7 @@ import { tvCaller } from "@/lib/tv/auth";
 import { requestOrigin } from "@/lib/domain-service";
 import { withKeyUsage } from "@/lib/api-usage/recorder";
 import * as updates from "@/lib/tv/update-requests";
+import * as preferences from "@/lib/tv/preferences";
 
 /** What this TV says it runs, from the query or its user agent; null when neither reads. */
 function reportedVersion(request: Request): updates.TvVersion | null {
@@ -42,14 +49,17 @@ export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
     if (caller instanceof Response) return caller;
     const version = reportedVersion(request);
     if (version) await updates.noteTvVersion(caller.keyId, version);
+    const blocking = preferences.reportedBlocking(request);
+    if (blocking) await preferences.noteTvBlocking(caller.keyId, caller.userId, blocking);
     const unreadWhere = { userId: caller.userId, readAt: null };
-    const [user, unread, alerts, updateRequest] = await Promise.all([
+    const [user, unread, alerts, updateRequest, desired] = await Promise.all([
         prisma.user.findUnique({ where: { id: caller.userId }, select: { name: true } }),
         prisma.notification.count({ where: unreadWhere }),
         prisma.notification.count({
             where: { ...unreadWhere, OR: [{ actionRequired: true }, { level: "danger" }] }
         }),
-        updates.pendingTvUpdate(caller.keyId)
+        updates.pendingTvUpdate(caller.keyId),
+        preferences.desiredFor(caller.keyId)
     ]);
     if (!user) return new Response(null, { status: 401 });
     return Response.json(
@@ -58,7 +68,8 @@ export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
             account: { name: user.name },
             unread,
             alerts,
-            updateRequest
+            updateRequest,
+            desired
         },
         { headers: { "cache-control": "no-store" } }
     );

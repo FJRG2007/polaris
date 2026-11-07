@@ -11,6 +11,12 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
 import { compareTvVersions, tvTakesUpdates } from "@/lib/tv/version-order";
+import {
+    connectedTvWhere,
+    readDesired,
+    readReport,
+    type TvBlockingReport
+} from "@/lib/tv/preferences";
 
 export const TV_UPDATE_STATES = [
     "queued",
@@ -85,16 +91,15 @@ export interface TvRow {
         readonly reason: string | null;
         readonly at: string;
     } | null;
-}
-
-function connectedWhere(userId: string, now: Date) {
-    return {
-        userId,
-        kind: "tv",
-        revokedAt: null,
-        enabled: true,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+    /** Block ads and trackers: what the owner asked (null: never asked), when, and
+     *  what the TV said about it (null: nothing yet). */
+    readonly blocking: {
+        readonly desired: boolean | null;
+        readonly applied: TvBlockingReport | null;
+        readonly askedAt: string | null;
     };
+    /** The address the TV last called from, as this instance saw it. */
+    readonly address: string | null;
 }
 
 /** Bounded: a person has a few TVs, not thousands. */
@@ -102,7 +107,7 @@ const MAX_TVS = 100;
 
 export async function listTvs(userId: string, now = new Date()): Promise<TvRow[]> {
     const keys = await prisma.apiKey.findMany({
-        where: connectedWhere(userId, now),
+        where: connectedTvWhere(userId, now),
         select: {
             id: true,
             clientName: true,
@@ -110,9 +115,11 @@ export async function listTvs(userId: string, now = new Date()): Promise<TvRow[]
             clientVersion: true,
             clientBuild: true,
             lastUsedAt: true,
+            lastUsedIp: true,
             tvUpdate: {
                 select: { versionName: true, state: true, reason: true, updatedAt: true }
-            }
+            },
+            tvPreference: { select: { desired: true, applied: true, askedAt: true } }
         },
         orderBy: { createdAt: "asc" },
         take: MAX_TVS
@@ -132,7 +139,13 @@ export async function listTvs(userId: string, now = new Date()): Promise<TvRow[]
                   reason: key.tvUpdate.reason,
                   at: key.tvUpdate.updatedAt.toISOString()
               }
-            : null
+            : null,
+        blocking: {
+            desired: readDesired(key.tvPreference?.desired)?.blocking ?? null,
+            applied: readReport(key.tvPreference?.applied),
+            askedAt: key.tvPreference?.askedAt?.toISOString() ?? null
+        },
+        address: key.lastUsedIp ?? null
     }));
 }
 
@@ -152,7 +165,7 @@ export async function requestTvUpdates(
     now = new Date()
 ): Promise<string[]> {
     const keys = await prisma.apiKey.findMany({
-        where: { ...connectedWhere(userId, now), ...(only ? { id: { in: [...only] } } : {}) },
+        where: { ...connectedTvWhere(userId, now), ...(only ? { id: { in: [...only] } } : {}) },
         select: {
             id: true,
             clientVersion: true,

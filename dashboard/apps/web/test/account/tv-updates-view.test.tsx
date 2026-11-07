@@ -1,7 +1,8 @@
 /**
  * The connected TVs on /account/tv: each row says what the TV runs and where its
  * update stands, and the Update button is offered only when there is something
- * for it to do.
+ * for it to do. Block ads and trackers says whether the TV has done what was
+ * asked, and the switch shows what was asked.
  */
 
 import { withMessages } from "../setup/i18n";
@@ -11,11 +12,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("@/app/(app)/account/tv/actions", () => ({
     tvUpdatesAction: async () => ({ tvs: [], latest: null }),
-    requestTvUpdateAction: async () => ({ tvs: [], latest: null })
+    requestTvUpdateAction: async () => ({ tvs: [], latest: null }),
+    setTvBlockingAction: async () => ({ tvs: [], latest: null }),
+    renameTvAction: async () => ({ tvs: [], latest: null }),
+    tvFilterReachAction: async () => ({})
 }));
 
 const { TvUpdatesView, canUpdate, upToDate } =
     await import("@/app/(app)/account/tv/tv-updates-view");
+const { blockingStatus, blockingSwitchOn, blockingWaiting } =
+    await import("@/app/(app)/account/tv/tv-preferences");
 
 function tv(overrides: Partial<TvRow> = {}): TvRow {
     return {
@@ -25,6 +31,8 @@ function tv(overrides: Partial<TvRow> = {}): TvRow {
         versionCode: 13,
         lastSeenAt: null,
         update: null,
+        blocking: { desired: null, applied: null, askedAt: null },
+        address: "192.168.1.20",
         ...overrides
     };
 }
@@ -103,6 +111,77 @@ describe("the rows", () => {
     it("speaks the reader's language", () => {
         expect(draw([tv({ update: update("waiting-confirmation") })], "3.5", "es-ES")).toContain(
             "Confirma en el TV"
+        );
+    });
+});
+
+describe("Block ads and trackers", () => {
+    const at = (desired: boolean | null, applied: TvRow["blocking"]["applied"]) =>
+        tv({
+            versionName: "3.5",
+            versionCode: 14,
+            blocking: {
+                desired,
+                applied,
+                askedAt: desired === null ? null : "2026-11-07T10:00:00.000Z"
+            }
+        });
+
+    it("shows what the TV says when nobody asked from here", () => {
+        expect(blockingStatus(at(null, null))).toBe("notAsked");
+        expect(blockingStatus(at(null, "on"))).toBe("on");
+        expect(blockingSwitchOn(at(null, "on"))).toBe(true);
+        expect(blockingSwitchOn(at(null, "off"))).toBe(false);
+    });
+
+    it("waits on the TV until it answers what was asked", () => {
+        expect(blockingStatus(at(true, null))).toBe("waiting");
+        expect(blockingStatus(at(false, null))).toBe("waiting");
+        expect(blockingWaiting(at(true, null))).toBe(true);
+        // The switch shows what was asked, not what the TV last said.
+        expect(blockingSwitchOn(at(true, null))).toBe(true);
+        expect(blockingSwitchOn(at(false, null))).toBe(false);
+    });
+
+    it("settles once the TV did it", () => {
+        expect(blockingStatus(at(true, "on"))).toBe("on");
+        expect(blockingStatus(at(false, "off"))).toBe("off");
+        expect(blockingStatus(at(false, "left-as-set"))).toBe("off");
+        expect(blockingStatus(at(true, "left-as-set"))).toBe("left-as-set");
+        expect(blockingWaiting(at(true, "on"))).toBe(false);
+    });
+
+    it("passes on why the TV could not do it", () => {
+        for (const reason of ["failed", "unavailable", "no-permission", "no-filter"] as const) {
+            expect(blockingStatus(at(true, reason))).toBe(reason);
+            expect(blockingWaiting(at(true, reason))).toBe(false);
+        }
+        expect(blockingStatus(at(false, "no-permission"))).toBe("no-permission");
+    });
+
+    it("asks a launcher too old to act on it to be updated first, and never waits on it", () => {
+        for (const versionCode of [null, 13]) {
+            const old = { ...at(true, null), versionCode };
+            expect(blockingStatus(old)).toBe("updateFirst");
+            expect(blockingWaiting(old)).toBe(false);
+        }
+        const markup = draw([{ ...at(null, null), versionName: "3.4", versionCode: 13 }], "3.5");
+        expect(markup).toContain("Update the TV to change it from here");
+        expect(markup).toMatch(/role="switch"[^>]*disabled/);
+    });
+
+    it("draws the switch, its state, and holds a skeleton while the filter is asked", () => {
+        const markup = draw([at(true, "no-filter")], "3.5");
+        expect(markup).toContain("Block ads and trackers");
+        expect(markup).toContain('role="switch" aria-checked="true"');
+        expect(markup).toContain("No Network filter with encrypted DNS to use");
+        expect(markup).toContain("animate-pulse");
+        expect(markup).toContain('aria-label="Rename"');
+    });
+
+    it("speaks the reader's language", () => {
+        expect(draw([at(true, null)], "3.5", "es-ES")).toContain(
+            "Esperando a que el TV lo aplique"
         );
     });
 });
