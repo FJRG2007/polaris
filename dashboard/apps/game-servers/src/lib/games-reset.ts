@@ -32,6 +32,7 @@ import { formatMemory, hasCrossplay } from "./minecraft/blueprints";
 import { parseMemoryMb } from "./games-service";
 import { DEFAULT_LEVEL_TYPE } from "./minecraft/world";
 import { SKYBLOCK_ISLANDS_KEY, SKYBLOCK_ISLANDS_TRIES_KEY } from "./minecraft/skyblock-islands";
+import { ONEBLOCK_READY_KEY, ONEBLOCK_TRIES_KEY } from "./minecraft/oneblock";
 import type { ResetMinecraftServerInput } from "./games-schema";
 import { parseProjectList, projectSlug } from "./minecraft/modrinth";
 import {
@@ -199,7 +200,10 @@ export async function resetMinecraftServer(
         [RELEASE_KEY]: env.get("VERSION") ?? "",
         // Whether the Skyblock map's extra islands are in this new world's sky.
         [SKYBLOCK_ISLANDS_KEY]: false,
-        [SKYBLOCK_ISLANDS_TRIES_KEY]: 0
+        [SKYBLOCK_ISLANDS_TRIES_KEY]: 0,
+        // And whether OneBlock has been told where this new world's first block goes.
+        [ONEBLOCK_READY_KEY]: null,
+        [ONEBLOCK_TRIES_KEY]: null
     });
 
     // And the worlds this server will not be able to open.

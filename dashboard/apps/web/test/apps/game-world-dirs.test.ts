@@ -184,7 +184,10 @@ describe("a new world on a OneBlock server", () => {
         expect(written.find((entry) => entry.key === "GENERATOR_SETTINGS")?.value).toBe(
             VOID_GENERATOR_SETTINGS
         );
-        expect(patchInstallConfig).toHaveBeenCalledWith("install-1", { oneblockReady: null });
+        expect(patchInstallConfig).toHaveBeenCalledWith("install-1", {
+            oneblockReady: null,
+            oneblockTries: null
+        });
     });
 
     it("grows what was asked for once the shape is no longer the blueprint's", async () => {

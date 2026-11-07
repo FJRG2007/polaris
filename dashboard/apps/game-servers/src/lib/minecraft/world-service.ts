@@ -35,7 +35,7 @@ import { EVENT_STATE_KEY } from "./events/catalog";
 import { formatBytes, gameOfServer } from "@polaris/core";
 import { BLUEPRINT_KEY, OWNED_PROJECTS } from "../games-create";
 import { findBlueprint } from "./blueprints";
-import { ONEBLOCK_READY_KEY } from "./oneblock";
+import { ONEBLOCK_READY_KEY, ONEBLOCK_TRIES_KEY } from "./oneblock";
 import {
     containerFailure,
     onlinePlayers,
@@ -840,8 +840,11 @@ export async function newWorld(
 
     // OneBlock is told where its islands go once per world, and this is a new one:
     // the next walk looks at the plugin's file again (see `oneblock-service.ts`).
-    if (stored[ONEBLOCK_READY_KEY] !== undefined)
-        await patchInstallConfig(installedAppId, { [ONEBLOCK_READY_KEY]: null });
+    if (stored[ONEBLOCK_READY_KEY] !== undefined || stored[ONEBLOCK_TRIES_KEY] !== undefined)
+        await patchInstallConfig(installedAppId, {
+            [ONEBLOCK_READY_KEY]: null,
+            [ONEBLOCK_TRIES_KEY]: null
+        });
 
     await deployApplication(await applicationOf(ownerId, installedAppId), ownerId, actorId);
     return { level: planned.target, carried: planned.keep };

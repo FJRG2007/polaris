@@ -109,11 +109,16 @@ describe("reading the plugin's file", () => {
         expect(oneblock.isSetUp("world: world\n", "world")).toBe(false);
     });
 
-    it("takes islands left in another world as not set", () => {
+    it("takes islands left in the level Polaris set it up on as not set", () => {
         // A new world is a new level folder; the file still names the old one.
         expect(oneblock.islandWorld(CONFIGURED)).toBe("world");
         expect(oneblock.islandWorld('world: "world-20261107"\n')).toBe("world-20261107");
-        expect(oneblock.isSetUp(CONFIGURED, "world-20261107")).toBe(false);
+        expect(oneblock.isSetUp(CONFIGURED, "world-20261107", "world")).toBe(false);
+    });
+
+    it("takes islands an operator put in another world as set", () => {
+        expect(oneblock.isSetUp(CONFIGURED, "world-20261107")).toBe(true);
+        expect(oneblock.isSetUp(CONFIGURED, "world-20261107", "world-old")).toBe(true);
     });
 
     it("sends the console form of the command, on the server's own world", () => {
@@ -141,6 +146,7 @@ describe("setting it up from the walk", () => {
         await applyOneBlockSetup("owner", "app", install.config);
         expect(sent).toHaveLength(1);
         expect(JSON.parse(install.config).oneblockReady).toBe(true);
+        expect(JSON.parse(install.config).oneblockWorld).toBe("world");
 
         // Marked: the next walk does not open the server at all.
         file = BUNDLED;
@@ -155,10 +161,28 @@ describe("setting it up from the walk", () => {
     });
 
     it("sets the plugin up again on a new world", async () => {
+        install = { config: JSON.stringify({ blueprintId: "oneblock", oneblockWorld: "world-old" }) };
         file = CONFIGURED.replace("world: world", "world: world-old");
         await applyOneBlockSetup("owner", "app", install.config);
         expect(sent).toEqual([oneblock.setupLines("world")]);
         expect(JSON.parse(install.config).oneblockReady).toBeUndefined();
+    });
+
+    it("leaves islands an operator put in another world alone", async () => {
+        file = CONFIGURED.replace("world: world", "world: skylands");
+        await applyOneBlockSetup("owner", "app", install.config);
+        expect(sent).toEqual([]);
+        expect(JSON.parse(install.config).oneblockReady).toBe(true);
+    });
+
+    it("stops telling a plugin that never takes it", async () => {
+        file = BUNDLED;
+        for (let pass = 0; pass < oneblock.MAX_TRIES; pass += 1)
+            await applyOneBlockSetup("owner", "app", install.config);
+        expect(sent).toHaveLength(oneblock.MAX_TRIES);
+        expect(JSON.parse(install.config).oneblockReady).toBe(true);
+        await applyOneBlockSetup("owner", "app", install.config);
+        expect(sent).toHaveLength(oneblock.MAX_TRIES);
     });
 
     it("does nothing on a server built on another blueprint", async () => {

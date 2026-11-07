@@ -94,7 +94,7 @@ export interface Island {
     /** The middle of its top layer. */
     readonly center: Point;
     readonly cells: readonly Cell[];
-    /** The block whose presence says the island is there. */
+    /** The block whose presence says the island is there: the last one placed. */
     readonly anchor: Point;
     /** Lines run once, right after the island is first seen standing. */
     readonly extras: readonly string[];
@@ -237,12 +237,37 @@ class Builder {
         }
     }
 
+    /**
+     * The block that goes in after every other one, so finding it means the whole
+     * island was sent: the lowest solid one nearest the middle, with nothing that
+     * falls resting on it.
+     */
+    private anchor(): Point {
+        const cell = [...this.cells.values()]
+            .filter((one) => {
+                if (one.attached) return false;
+                const above = this.cells.get(
+                    this.key(one.x - this.center.x, one.y - this.center.y + 1, one.z - this.center.z)
+                );
+                return !above || (!FALLING.has(above.block) && !above.attached);
+            })
+            .sort(
+                (a, b) =>
+                    a.y - b.y ||
+                    Math.abs(a.x - this.center.x) + Math.abs(a.z - this.center.z) -
+                        (Math.abs(b.x - this.center.x) + Math.abs(b.z - this.center.z)) ||
+                    a.x - b.x ||
+                    a.z - b.z
+            )[0];
+        return cell ? { x: cell.x, y: cell.y, z: cell.z } : this.at(0, -1, 0);
+    }
+
     build(): Island {
         return {
             id: this.id,
             center: this.center,
             cells: [...this.cells.values()],
-            anchor: this.at(0, -1, 0),
+            anchor: this.anchor(),
             extras: this.extras
         };
     }
@@ -478,15 +503,19 @@ export function overlaps(a: Area, b: Area): boolean {
 
 /**
  * The lines that put an island up: the solid blocks bottom layer first, then
- * whatever rests on them, each layer as few rectangles of one block as it takes.
+ * whatever rests on them, each layer as few rectangles of one block as it takes,
+ * and the anchor on its own at the very end.
  */
 export function placeLines(island: Island): string[] {
+    const { anchor } = island;
+    const isAnchor = (cell: Cell) => cell.x === anchor.x && cell.y === anchor.y && cell.z === anchor.z;
     const lines: string[] = [];
     for (const attached of [false, true]) {
-        const cells = island.cells.filter((cell) => cell.attached === attached);
+        const cells = island.cells.filter((cell) => cell.attached === attached && !isAnchor(cell));
         const layers = [...new Set(cells.map((cell) => cell.y))].sort((a, b) => a - b);
         for (const y of layers) lines.push(...layerLines(cells.filter((cell) => cell.y === y)));
     }
+    lines.push(...layerLines(island.cells.filter(isAnchor)));
     return lines;
 }
 

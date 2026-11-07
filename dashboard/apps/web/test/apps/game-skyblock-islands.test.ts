@@ -60,7 +60,7 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
                 for (const line of lines) {
                     answer(line);
                     for (const island of islands.ISLANDS) {
-                        if (!unloaded.has(island.id) && islands.placeLines(island).includes(line))
+                        if (!unloaded.has(island.id) && islands.placeLines(island).at(-1) === line)
                             standing.add(island.id);
                     }
                 }
@@ -181,11 +181,14 @@ describe("the islands", () => {
                 island.cells.some((cell) => cell.attached && line.includes(` ${cell.block} keep`))
             );
             const lastSolidY = Math.max(...[...solid.values()].map((cell) => cell.y));
-            const ys = lines.slice(0, firstAttached === -1 ? lines.length : firstAttached).map((line) =>
+            const ys = lines.slice(0, firstAttached === -1 ? -1 : firstAttached).map((line) =>
                 Number(/ (?:fill|setblock) -?\d+ (-?\d+) /.exec(line)![1])
             );
             expect(ys).toEqual([...ys].sort((a, b) => a - b));
             expect(Math.max(...ys)).toBe(lastSolidY);
+            const { x, y, z } = island.anchor;
+            expect(lines.at(-1)).toMatch(new RegExp(` setblock ${x} ${y} ${z} `));
+            expect(lines.filter((line) => line.includes(` ${x} ${y} ${z} `))).toHaveLength(1);
         }
     });
 
@@ -254,6 +257,19 @@ describe("the walk", () => {
         unloaded = new Set();
         sent = [];
         await walk();
+        expect(standing.has("ruins")).toBe(true);
+        expect(sent.filter((line) => line.includes(" loot insert "))).toHaveLength(2);
+        expect(stored()[islands.SKYBLOCK_ISLANDS_KEY]).toBe(true);
+    });
+
+    it("finishes an island whose pass stopped halfway, and fills its chests then", async () => {
+        const ruins = islands.ISLANDS.find((one) => one.id === "ruins")!;
+        const lines = islands.placeLines(ruins);
+        // Everything but the anchor went in before the pass stopped, so it still
+        // answers that it is not there.
+        standing = new Set(islands.ISLANDS.filter((one) => one.id !== "ruins").map((one) => one.id));
+        await walk();
+        expect(placed()).toEqual(lines);
         expect(standing.has("ruins")).toBe(true);
         expect(sent.filter((line) => line.includes(" loot insert "))).toHaveLength(2);
         expect(stored()[islands.SKYBLOCK_ISLANDS_KEY]).toBe(true);
