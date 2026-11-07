@@ -244,7 +244,9 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                                     {node.id === active ? (
                                         <ui.Badge variant="success">{t("connect.online")}</ui.Badge>
                                     ) : unreachable(node) ? (
-                                        <ui.Badge variant="warning">{t("connect.unreachable")}</ui.Badge>
+                                        <ui.Badge variant="warning">
+                                            {t("connect.unreachable")}
+                                        </ui.Badge>
                                     ) : null}
                                 </button>
                             ))}

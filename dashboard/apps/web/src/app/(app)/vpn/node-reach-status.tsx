@@ -126,7 +126,9 @@ export function NodeReachStatus({ node }: { node: NodeRow }) {
                             lanIp={
                                 reach.blockedIsCertain(node.host.address) ? null : node.host.address
                             }
-                            rules={[{ name: "polaris-vpn", protocol: rule.protocol, port: rule.port }]}
+                            rules={[
+                                { name: "polaris-vpn", protocol: rule.protocol, port: rule.port }
+                            ]}
                         />
                     ) : (
                         <>
@@ -135,15 +137,21 @@ export function NodeReachStatus({ node }: { node: NodeRow }) {
                                 address={rule.destination}
                             />
                             <dl className="grid min-w-0 grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-md border border-border px-3 py-2">
-                                <dt className="text-muted-foreground">{t("nodes.reach.rule.protocol")}</dt>
+                                <dt className="text-muted-foreground">
+                                    {t("nodes.reach.rule.protocol")}
+                                </dt>
                                 <dd>
                                     <code className="text-foreground">{rule.protocol}</code>
                                 </dd>
-                                <dt className="text-muted-foreground">{t("nodes.reach.rule.port")}</dt>
+                                <dt className="text-muted-foreground">
+                                    {t("nodes.reach.rule.port")}
+                                </dt>
                                 <dd>
                                     <Value text={String(rule.port)} />
                                 </dd>
-                                <dt className="text-muted-foreground">{t("nodes.reach.rule.source")}</dt>
+                                <dt className="text-muted-foreground">
+                                    {t("nodes.reach.rule.source")}
+                                </dt>
                                 <dd className="text-foreground">{t("nodes.reach.rule.any")}</dd>
                                 <dt className="text-muted-foreground">
                                     {t("nodes.reach.rule.destination")}

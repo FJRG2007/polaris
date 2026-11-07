@@ -11,7 +11,11 @@ import { ExternalLink } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useRef, useState } from "react";
 import { bold } from "./guide-parts";
-import { CLOUD_FIREWALLS, detectCloud, type CloudFirewall } from "@/lib/backup-access/firewall-guide";
+import {
+    CLOUD_FIREWALLS,
+    detectCloud,
+    type CloudFirewall
+} from "@/lib/backup-access/firewall-guide";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
 export function CloudFirewallSteps({

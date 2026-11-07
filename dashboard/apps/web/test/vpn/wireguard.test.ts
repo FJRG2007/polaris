@@ -158,7 +158,9 @@ describe("a node that does not answer", () => {
         expect(script).toContain(
             'nft add rule inet polaris_vpn reach_51820 iifname "$wan" udp dport 51820 counter name outside_51820'
         );
-        expect(wg.renderArrivalCount(40000)).toContain("udp dport 40000 counter name outside_40000");
+        expect(wg.renderArrivalCount(40000)).toContain(
+            "udp dport 40000 counter name outside_40000"
+        );
     });
 
     it("counts from outside on the lowest-metric default route's interface", () => {
@@ -177,12 +179,17 @@ describe("a node that does not answer", () => {
     });
 
     it("reads nft's own counter output", () => {
-        const listed = "table inet polaris_vpn {\n\tcounter outside_51820 {\n\t\tpackets 7 bytes 91\n\t}\n}\n";
+        const listed =
+            "table inet polaris_vpn {\n\tcounter outside_51820 {\n\t\tpackets 7 bytes 91\n\t}\n}\n";
         const count = script.split("\n").find((line) => line.startsWith("count()")) ?? "";
-        const said = execFileSync("sh", ["-c", `nft() { printf '%s' "$LISTED"; }\n${count}\ncount outside_51820`], {
-            env: { ...process.env, LISTED: listed },
-            stdio: "pipe"
-        });
+        const said = execFileSync(
+            "sh",
+            ["-c", `nft() { printf '%s' "$LISTED"; }\n${count}\ncount outside_51820`],
+            {
+                env: { ...process.env, LISTED: listed },
+                stdio: "pipe"
+            }
+        );
         expect(said.toString().trim()).toBe("7");
     });
 

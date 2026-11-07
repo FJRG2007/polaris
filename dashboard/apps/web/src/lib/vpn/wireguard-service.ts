@@ -650,9 +650,10 @@ async function checkAnswer(node: NodeRow): Promise<NodeAnswerCheck> {
         // Packets arrive but no handshake came of them: the peer list is put right
         // so the next try finds this device on it.
         if (verdict === "open") await syncNode(node).catch(() => undefined);
-        if (verdict) await recordReach(node, verdict).catch((error: unknown) =>
-            console.error("polaris: a VPN node's reach could not be recorded:", error)
-        );
+        if (verdict)
+            await recordReach(node, verdict).catch((error: unknown) =>
+                console.error("polaris: a VPN node's reach could not be recorded:", error)
+            );
         return { ...place, verdict: verdict ?? "unknown" };
     } catch (error) {
         console.error("polaris: a VPN node's port could not be checked:", error);
