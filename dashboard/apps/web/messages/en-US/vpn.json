@@ -303,6 +303,8 @@
             "denied": "The VPN needs your permission once to install. Press Connect and accept the prompt.",
             "failed": "This computer could not start the VPN. Try again.",
             "noAnswer": "That server did not answer. Try another location.",
+            "portBlocked": "Nothing reaches UDP port {port} on {address}. Allow incoming UDP {port} in its hosting provider's firewall and its own, or forward it on its router.",
+            "portOpen": "{address} is reachable, but this network may block outgoing UDP port {port}. Try again or use another network.",
             "unreachable": "That server's address could not be found. Try another location."
         },
         "remoteAccess": "Tailscale and other ways into this server",
@@ -323,7 +325,10 @@
                 "notFound": "That is no longer here.",
                 "unreadable": "Those files could not be read. Use the .conf files your provider gives you."
             }
-        }
+        },
+        "unreachable": "Not reachable",
+        "unreachableHint": "Its server is not taking connections right now.",
+        "unreachableFix": "See what to open"
     },
     "nodes": {
         "title": "Servers",
@@ -367,6 +372,35 @@
             "editAddress": "Change address",
             "retry": "Try again",
             "retrying": "Trying..."
+        },
+        "reach": {
+            "label": "UDP {port} on {address}",
+            "states": {
+                "reachable": "Reachable",
+                "blocked": "Not reachable",
+                "unknown": "Could not be checked",
+                "unchecked": "Not checked yet"
+            },
+            "checking": "Checking...",
+            "recheck": "Check again",
+            "show": "Show the rule to add",
+            "hide": "Hide the steps",
+            "blockedHint": "Nothing sent to this port arrives, so no device can connect. Add this rule in front of the server, and allow it in the server's own firewall if it runs one.",
+            "viaRouter": "Checked through your router. One that does not loop back its own address reads as blocked even when devices outside get through.",
+            "unknownHint": "Polaris could not tell from here. It may not reach this server, or it runs on it, so its own check never crosses the firewalls.",
+            "where": "Where to add it",
+            "places": {
+                "cloud": "Hosting provider's firewall",
+                "router": "Forward on your router"
+            },
+            "rule": {
+                "protocol": "Protocol",
+                "port": "Port",
+                "source": "Source",
+                "any": "Any address",
+                "destination": "Destination"
+            },
+            "after": "Once the rule is saved, check again. Polaris also checks every five minutes."
         }
     },
     "people": {

@@ -18,6 +18,7 @@ import { countryName, WorldMap, type MapPlace } from "./world-map";
 import type { DesktopVpnStatus } from "@/lib/desktop-bridge";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { nodeReach } from "@/lib/vpn/node-reach";
 
 const GIB = 1024 ** 3;
 /** A device counts as connected while its last handshake is this recent. */
@@ -70,8 +71,16 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
             ),
         [nodes, profiles]
     );
+    // A place whose server nothing reaches is said so up front, not after a try.
+    const unreachable = (node: Node): boolean =>
+        nodeReach(node.reachVerdict, node.reachCheckedAt, new Date()) === "blocked";
     const active = tunnel?.nodeId ?? null;
-    const selected = picked ?? active ?? nodes[0]?.id ?? profiles[0]?.id ?? null;
+    const selected =
+        picked ??
+        active ??
+        (nodes.find((node) => !unreachable(node)) ?? nodes[0])?.id ??
+        profiles[0]?.id ??
+        null;
     const chosen = nodes.find(({ id }) => id === selected) ?? null;
     const chosenProfile = profiles.find(({ id }) => id === selected) ?? null;
 
@@ -102,8 +111,22 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
             if (result.error !== undefined) return setError(result.error);
             const up = await desktop.up({ ...result.connection, nodeId: node.id });
             if (!up.ok) setError(tunnelError(up.error));
+            if (!up.ok && up.error === "noAnswer") setError(await whyNoAnswer(node.id));
             setTunnel(await desktop.status());
             read.reload();
+        });
+    }
+
+    /** Polaris knocks on the server's port itself, to say what is in the way. */
+    async function whyNoAnswer(nodeId: string): Promise<string> {
+        const answer = await actions.checkVpnNodeAnswerAction(nodeId).catch(() => null);
+        if (!answer || answer.error !== undefined || answer.check.verdict === "unknown") {
+            return t("connect.tunnel.noAnswer");
+        }
+        const { verdict, endpoint, port } = answer.check;
+        return t(`connect.tunnel.${verdict === "blocked" ? "portBlocked" : "portOpen"}`, {
+            address: endpoint,
+            port: String(port)
         });
     }
 
@@ -220,6 +243,10 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                                     ) : null}
                                     {node.id === active ? (
                                         <ui.Badge variant="success">{t("connect.online")}</ui.Badge>
+                                    ) : unreachable(node) ? (
+                                        <ui.Badge variant="warning">
+                                            {t("connect.unreachable")}
+                                        </ui.Badge>
                                     ) : null}
                                 </button>
                             ))}
@@ -242,6 +269,19 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                             onChanged={read.reload}
                             onError={setError}
                         />
+                    ) : null}
+                    {chosen && chosen.id !== active && unreachable(chosen) ? (
+                        <p className="text-xs text-warning">
+                            {t("connect.unreachableHint")}{" "}
+                            {isAdmin ? (
+                                <Link
+                                    href="/admin/apps/vpn/settings"
+                                    className="text-primary hover:underline"
+                                >
+                                    {t("connect.unreachableFix")}
+                                </Link>
+                            ) : null}
+                        </p>
                     ) : null}
                     {chosen?.exit === "tor" ? (
                         <p className="text-xs text-muted-foreground">{t("connect.torHint")}</p>
@@ -269,7 +309,10 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                         </ui.Button>
                     ) : null}
                     {chosen && chosen.id !== active ? (
-                        <ui.Button disabled={pending || !!blocked} onClick={() => connect(chosen)}>
+                        <ui.Button
+                            disabled={pending || !!blocked || unreachable(chosen)}
+                            onClick={() => connect(chosen)}
+                        >
                             <Power />
                             {t(active ? "connect.switchTo" : "connect.connectTo", {
                                 name: chosen.name

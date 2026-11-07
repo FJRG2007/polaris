@@ -16335,6 +16335,10 @@ model VpnNode {
     longitude   Float?
     /// "ip", "dymo" or "manual". A manual place is never replaced by a lookup.
     placedBy    String?
+    /// Whether devices' packets reached its port the last time it was checked:
+    /// "open" or "blocked". Null until a check could tell.
+    reachVerdict   String?
+    reachCheckedAt DateTime?
     /// Which address block this node has; see nodeSubnet.
     subnetIndex Int       @unique
     createdAt   DateTime  @default(now())

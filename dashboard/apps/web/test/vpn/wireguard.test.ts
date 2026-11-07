@@ -139,3 +139,70 @@ describe("the browser proxy", () => {
         ]);
     });
 });
+
+describe("a node that does not answer", () => {
+    const script = wg.renderArrivalCount(51820);
+
+    it("parses as shell", () => {
+        expect(() => execFileSync("sh", ["-n"], { input: script, stdio: "pipe" })).not.toThrow();
+    });
+
+    it("counts only its own port, after the machine's firewall, adding it on a node set up before it", () => {
+        expect(script).toContain(
+            "nft add chain inet polaris_vpn reach_51820 '{ type filter hook input priority filter + 10; policy accept; }'"
+        );
+        expect(script).toContain("nft flush chain inet polaris_vpn reach_51820");
+        expect(script).toContain(
+            "nft add rule inet polaris_vpn reach_51820 udp dport 51820 counter name reached_51820"
+        );
+        expect(script).toContain(
+            'nft add rule inet polaris_vpn reach_51820 iifname "$wan" udp dport 51820 counter name outside_51820'
+        );
+        expect(wg.renderArrivalCount(40000)).toContain(
+            "udp dport 40000 counter name outside_40000"
+        );
+    });
+
+    it("counts from outside on the lowest-metric default route's interface", () => {
+        const wan = script.split("\n[ -n")[0]?.split("\n").slice(1).join("\n") ?? "";
+        const routes = [
+            "default via 192.168.1.1 dev wlan0 proto dhcp metric 600",
+            "default via 192.168.1.1 dev eth0 proto dhcp metric 100",
+            ""
+        ].join("\n");
+        const said = execFileSync(
+            "sh",
+            ["-c", `ip() { [ "$2" = "-6" ] || printf '%s' "$ROUTES"; }\n${wan}\necho "$wan"`],
+            { env: { ...process.env, ROUTES: routes }, stdio: "pipe" }
+        );
+        expect(said.toString().trim()).toBe("eth0");
+    });
+
+    it("reads nft's own counter output", () => {
+        const listed =
+            "table inet polaris_vpn {\n\tcounter outside_51820 {\n\t\tpackets 7 bytes 91\n\t}\n}\n";
+        const count = script.split("\n").find((line) => line.startsWith("count()")) ?? "";
+        const said = execFileSync(
+            "sh",
+            ["-c", `nft() { printf '%s' "$LISTED"; }\n${count}\ncount outside_51820`],
+            {
+                env: { ...process.env, LISTED: listed },
+                stdio: "pipe"
+            }
+        );
+        expect(said.toString().trim()).toBe("7");
+    });
+
+    it("tells a port nothing reaches from one that is reached", () => {
+        const read = (outside: [number, number], any: [number, number]) =>
+            `before=${outside[0]}\nany_before=${any[0]}\nafter=${outside[1]}\nany_after=${any[1]}\n`;
+        expect(wg.arrivalVerdict(read([12, 12], [12, 12]))).toBe("blocked");
+        expect(wg.arrivalVerdict(read([12, 19], [12, 19]))).toBe("open");
+        expect(wg.arrivalVerdict("")).toBeNull();
+        expect(wg.arrivalVerdict("before=3\n")).toBeNull();
+    });
+
+    it("cannot tell when the knock only arrived from inside the machine", () => {
+        expect(wg.arrivalVerdict("before=4\nany_before=4\nafter=4\nany_after=12\n")).toBeNull();
+    });
+});

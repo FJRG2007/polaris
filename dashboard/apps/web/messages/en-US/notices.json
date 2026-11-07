@@ -531,5 +531,11 @@
             "title": "Your sign-in email changed",
             "body": "An administrator changed your sign-in email from {from} to {to}."
         }
+    },
+    "vpnNode": {
+        "blockedTitle": "VPN server {name} is not reachable",
+        "blockedBody": "Nothing reaches UDP {port} on {address}, so no device can connect. Open it in the firewall in front of the server and in its own.",
+        "backTitle": "VPN server {name} is reachable again",
+        "backBody": "UDP {port} on {address} gets through again."
     }
 }

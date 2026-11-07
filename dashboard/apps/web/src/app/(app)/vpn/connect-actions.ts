@@ -78,6 +78,31 @@ export async function connectThisDeviceAction(
     }
 }
 
+/** After the app's tunnel got no answer: whether anything reaches that server's port. */
+export async function checkVpnNodeAnswerAction(
+    input: unknown
+): Promise<Result<{ check: service.NodeAnswerCheck }>> {
+    const user = await requireUser();
+    try {
+        return { check: await service.checkNodeAnswer(user, z.string().uuid().parse(input)) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** The administrator's list: whether devices' packets reach a node's port now. */
+export async function checkVpnNodeReachAction(
+    input: unknown
+): Promise<Result<{ check: service.NodeAnswerCheck; checkedAt: string }>> {
+    await requireAdmin();
+    try {
+        const check = await service.checkNodeReach(z.string().uuid().parse(input));
+        return { check, checkedAt: new Date().toISOString() };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
 export async function removeVpnDeviceAction(input: unknown): Promise<Result> {
     const user = await requireUser();
     try {
