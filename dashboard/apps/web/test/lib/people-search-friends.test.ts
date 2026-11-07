@@ -51,6 +51,12 @@ function clauseMatches(person: Account, clause: Record<string, unknown>): boolea
 vi.mock("@/lib/rich-text/mention-service", () => ({
     like: (term: string) => ({ contains: term })
 }));
+// The instance's discovery policy, as the operator left it; null is the default.
+let storedPolicy: string | null = null;
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async () => storedPolicy,
+    setSetting: async () => {}
+}));
 vi.mock("@/lib/privacy-service", () => ({
     discoverableBy: async (_viewer: { id: string }, userIds: readonly string[]) => new Set(userIds)
 }));
@@ -76,6 +82,7 @@ async function search(term: string): Promise<string[]> {
 describe("finding somebody who is not a friend", () => {
     beforeEach(() => {
         friends = new Set(["friend"]);
+        storedPolicy = null;
     });
 
     it("lists nobody from a few letters", async () => {
@@ -97,5 +104,51 @@ describe("finding somebody who is not a friend", () => {
     it("lists nobody at all for somebody with no friends", async () => {
         friends = new Set();
         expect(await search("fixture")).toEqual([]);
+    });
+});
+
+describe("the instance's discovery policy", () => {
+    beforeEach(() => {
+        friends = new Set(["friend"]);
+    });
+
+    function policy(rules: Record<string, boolean>) {
+        storedPolicy = JSON.stringify({
+            usernameExact: true,
+            usernamePartial: false,
+            namePartial: false,
+            emailExact: false,
+            ...rules
+        });
+    }
+
+    it("finds a stranger by part of their username only when that is on", async () => {
+        policy({ usernamePartial: true });
+        expect(await search("fixture_str")).toEqual(["stranger"]);
+        expect(await search("Fixture Stranger")).toEqual([]);
+    });
+
+    it("finds a stranger by part of their name only when that is on", async () => {
+        policy({ namePartial: true });
+        expect(await search("Stranger")).toEqual(["stranger"]);
+        expect(await search("fixture_str")).toEqual([]);
+    });
+
+    it("finds a stranger by their whole address only when that is on, never part of it", async () => {
+        policy({ emailExact: true });
+        expect(await search("stranger@example.test")).toEqual(["stranger"]);
+        expect(await search("example.test")).toEqual([]);
+    });
+
+    it("stops finding strangers by username when that is off, and keeps friends", async () => {
+        policy({ usernameExact: false });
+        expect(await search("fixture_stranger")).toEqual([]);
+        expect(await search("Friend")).toEqual(["friend"]);
+    });
+
+    it("reads an unreadable value as the defaults", async () => {
+        storedPolicy = "not json";
+        expect(await search("fixture_stranger")).toEqual(["stranger"]);
+        expect(await search("Stranger")).toEqual([]);
     });
 });

@@ -85,6 +85,11 @@ vi.mock("@/lib/friends-service", () => ({
     endPendingRequests
 }));
 
+// No discovery policy stored: the defaults, whole username only.
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async () => null,
+    setSetting: async () => {}
+}));
 vi.mock("@/lib/privacy-service", () => ({
     discoverableBy: async (_viewer: { id: string }, userIds: readonly string[]) => new Set(userIds)
 }));

@@ -11,17 +11,19 @@
  * had to look its own name up would be a query per chip on every render.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, VISIBLE_USER } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
 import type { Prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import * as access from "@/lib/tasks/access";
 import { allowedBy } from "@/lib/privacy-service";
+import { friendIds } from "@/lib/friends-service";
 import { nicknamesFor } from "@/lib/contact-names";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { conversationAudience } from "@/lib/chat/access";
 import type { ReferenceKind } from "@/components/rich-text/references";
+import { findsStrangers, type DiscoveryPolicy } from "@/lib/discovery-policy";
 
 /** One row of the picker. */
 export interface MentionCandidate {
@@ -223,9 +225,13 @@ function handle(username: string | null): string {
  *
  * A drop point's allowlist, a successor, somebody being given a server: all of
  * them are matched later by username or email, so the picker has to hand back
- * the identity and not the id. The reach is deliberately the one above - naming
- * an account in a field does not make it visible, and a picker that offered the
- * whole instance would be a user directory nobody agreed to publish.
+ * the identity and not the id. The reach is the one above plus the two ways the
+ * friend search finds somebody: a friend, by part of their name or handle, and
+ * anybody else by what the operator's discovery policy allows - by default their
+ * whole username. Both of those pass the person's own "who can find me" and
+ * every block, exactly as they do there (`people-search.ts`). Naming an account
+ * in a field does not make it visible, and a picker that offered the whole
+ * instance would be a user directory nobody agreed to publish.
  *
  * @param actor - The caller, already past the permission check.
  * @param query - What has been typed. Empty offers the first names in reach.
@@ -238,9 +244,21 @@ export async function searchAccounts(
 ): Promise<AccountCandidate[]> {
     const term = query.trim();
     const contains = term ? like(term) : undefined;
+    const search = await import("@/lib/people-search");
     return accountsInReach(
         actor,
-        contains ? { OR: [{ name: contains }, { email: contains }, { username: contains }] } : {},
+        {
+            colleagues: contains
+                ? { OR: [{ name: contains }, { email: contains }, { username: contains }] }
+                : {},
+            // An empty box offers friends: they are the people this account
+            // already chose, and the reason somebody opens a field like this.
+            others: (friends, policy) => {
+                if (!term) return friends.length > 0 ? { id: { in: friends } } : null;
+                const matches = search.matchingPeople(term, friends, policy);
+                return matches.OR.length > 0 ? matches : null;
+            }
+        },
         limit
     );
 }
@@ -260,22 +278,83 @@ export async function accountsByIdInReach(
 ): Promise<AccountCandidate[]> {
     const wanted = [...new Set(ids)];
     if (wanted.length === 0) return [];
-    return accountsInReach(actor, { id: { in: wanted } }, wanted.length);
+    return accountsInReach(
+        actor,
+        {
+            colleagues: { id: { in: wanted } },
+            // Anybody the search could have offered: a friend always, and a
+            // stranger whenever the policy lets strangers be found at all - by
+            // id there is no typed text to hold the policy against, and the id
+            // came from a search that already did.
+            others: (friends, policy) => {
+                const ids = findsStrangers(policy)
+                    ? wanted
+                    : wanted.filter((id) => friends.includes(id));
+                return ids.length > 0 ? { id: { in: ids } } : null;
+            }
+        },
+        wanted.length
+    );
+}
+
+/** What one question for accounts matches: among the people this account
+ *  works with, and - built from its friends and the instance's discovery
+ *  policy - among everybody else, or nobody else when null. */
+interface AccountMatch {
+    readonly colleagues: Prisma.UserWhereInput;
+    readonly others: (friends: string[], policy: DiscoveryPolicy) => Prisma.UserWhereInput | null;
 }
 
 /** The accounts matching `match` that `actor` reaches, as identities. */
 async function accountsInReach(
     actor: access.TaskActor,
-    match: Prisma.UserWhereInput,
+    match: AccountMatch,
     limit: number
 ): Promise<AccountCandidate[]> {
-    const scope = actor.isAdmin ? null : await reachablePeople(actor);
-    const users = await prisma.user.findMany({
-        where: { AND: [scope ? { id: { in: scope } } : {}, match] },
-        select: { id: true, name: true, username: true, email: true },
-        orderBy: { name: "asc" },
-        take: limit
-    });
+    const select = { id: true, name: true, username: true, email: true } as const;
+    let users: { id: string; name: string; username: string | null; email: string }[];
+    if (actor.isAdmin) {
+        users = await prisma.user.findMany({
+            where: match.colleagues,
+            select,
+            orderBy: { name: "asc" },
+            take: limit
+        });
+    } else {
+        const search = await import("@/lib/people-search");
+        const [scope, friends, policy] = await Promise.all([
+            reachablePeople(actor),
+            friendIds(actor.id),
+            search.discoveryPolicy()
+        ]);
+        const colleagues = new Set(scope);
+        const others = match.others(
+            [...friends].filter((id) => !colleagues.has(id)),
+            policy
+        );
+        const found = await prisma.user.findMany({
+            where: {
+                OR: [
+                    { AND: [{ id: { in: scope } }, match.colleagues] },
+                    ...(others ? [{ AND: [{ id: { notIn: scope } }, VISIBLE_USER, others] }] : [])
+                ]
+            },
+            select,
+            orderBy: { name: "asc" },
+            // Room for the ones the filter below leaves out, the way the friend
+            // search leaves room.
+            take: others ? Math.max(limit, Math.min(limit * 4, 40)) : limit
+        });
+        // Somebody outside the people this account works with is offered only
+        // if they let this account find them and neither has blocked the other.
+        const findable = await search.findableBy(
+            actor.id,
+            found.filter((user) => !colleagues.has(user.id)).map((user) => user.id)
+        );
+        users = found
+            .filter((user) => colleagues.has(user.id) || findable.has(user.id))
+            .slice(0, limit);
+    }
 
     // The address comes back only from somebody who shows it to this account.
     // These fields store "a username or an address" and the handle is the one

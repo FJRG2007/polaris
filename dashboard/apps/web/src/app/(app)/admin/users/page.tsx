@@ -10,6 +10,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { SharingPolicyForm } from "./sharing-policy-form";
 import { UsernameCooldownForm } from "./username-cooldown-form";
 import { PublicProfilesForm } from "./public-profiles-form";
+import { PeopleDiscoveryForm } from "./people-discovery-form";
+import { discoveryPolicy } from "@/lib/people-search";
 import { profilesArePublic } from "@/lib/profile-service";
 import { defaultFollowerAudience } from "@/lib/privacy-service";
 import { usernameCooldownDays, USERNAME_COOLDOWN_KEY } from "@polaris/core";
@@ -39,7 +41,8 @@ export default async function UsersAdminPage({
         sharing,
         cooldown,
         publicProfiles,
-        followerDefault
+        followerDefault,
+        discovery
     ] = await Promise.all([
         listUserDirectoryPage(),
         listInvites(),
@@ -52,7 +55,8 @@ export default async function UsersAdminPage({
         sharingPolicy(),
         getSetting(USERNAME_COOLDOWN_KEY),
         profilesArePublic(),
-        defaultFollowerAudience()
+        defaultFollowerAudience(),
+        discoveryPolicy()
     ]);
 
     return (
@@ -75,6 +79,7 @@ export default async function UsersAdminPage({
                 />
                 <UsernameCooldownForm days={usernameCooldownDays(cooldown)} />
                 <PublicProfilesForm enabled={publicProfiles} followerDefault={followerDefault} />
+                <PeopleDiscoveryForm policy={discovery} />
             </div>
         </>
     );

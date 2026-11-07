@@ -3367,6 +3367,29 @@
                 "nobody": "Nadie"
             }
         },
+        "discovery": {
+            "title": "Encontrar personas",
+            "hint": "Qué permite encontrar una cuenta a quien no es amigo ni compañero. A amigos y compañeros siempre se les encuentra por parte de su nombre o usuario. El ajuste de privacidad de cada persona y los bloqueos siguen valiendo.",
+            "saved": "Guardado.",
+            "rules": {
+                "usernameExact": {
+                    "label": "Usuario completo",
+                    "hint": "Escribir @ada encuentra a Ada."
+                },
+                "usernamePartial": {
+                    "label": "Parte del usuario",
+                    "hint": "Unas letras listan cada coincidencia de la instancia."
+                },
+                "namePartial": {
+                    "label": "Parte del nombre",
+                    "hint": "Unas letras listan cada coincidencia de la instancia."
+                },
+                "emailExact": {
+                    "label": "Correo completo",
+                    "hint": "Encuentra la cuenta. El correo solo se muestra si su dueño lo permite."
+                }
+            }
+        },
         "errors": {
             "invalidInput": "Datos no válidos",
             "unknownAccount": "Cuenta desconocida.",
