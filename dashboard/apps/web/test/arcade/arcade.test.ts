@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { DEFAULT_ROLES, GAMES_CAPABILITIES, PERMISSIONS, PERMISSION_META } from "@polaris/core";
 // @ts-expect-error - plain browser module without types
 import { decodeGeo, encodeGeo } from "../../../arcade/game/new-york/engine/geo-codec.js";
-import { GAMES, findGame, gameFrameSrc } from "../../../arcade/src/games/registry";
+import { GAMES, findGame, gameCoverSrc, gameFrameSrc } from "../../../arcade/src/games/registry";
 import enUS from "../../../arcade/messages/en-US/games.json";
 import esES from "../../../arcade/messages/es-ES/games.json";
 
@@ -25,6 +25,25 @@ describe("games registry", () => {
         expect(gameFrameSrc(game!)).toBe(
             "/api/app-bundles/arcade/current/assets/new-york/index.html"
         );
+    });
+
+    it("ships every cover a game names, from the game's own folder", () => {
+        const build = readFileSync(
+            fileURLToPath(new URL("../../../arcade/scripts/build-games.mjs", import.meta.url)),
+            "utf8"
+        );
+        for (const game of GAMES.filter((each) => each.cover)) {
+            const file = new URL(`../../../arcade/game/${game.id}/${game.cover}`, import.meta.url);
+            const svg = readFileSync(fileURLToPath(file), "utf8");
+            // Offline: a cover pulls in nothing from outside the bundle
+            expect(svg).not.toMatch(/(href|src)=["']https?:/);
+            expect(svg).not.toMatch(/<script/i);
+            expect(build).toContain(`write("${game.cover}"`);
+            expect(gameCoverSrc(game)).toBe(
+                `/api/app-bundles/arcade/current/assets/${game.id}/${game.cover}`
+            );
+        }
+        expect(findGame("new-york")?.cover).toBeTruthy();
     });
 });
 
