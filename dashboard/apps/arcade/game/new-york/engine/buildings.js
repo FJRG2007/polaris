@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createFireEscapes } from './fire-escapes.js';
 import { addBuildingDetails } from './building-details.js';
+import { createSlotPool, dirtyRuns, diffResident, takeBudget } from './instance-slots.js';
 import {
   Fn,
   vec2,
@@ -687,152 +688,220 @@ function buildCityBlocks(scene, landmarkColliders = []) {
   // ============================================================================
   let lastStreamX = Infinity;
   let lastStreamZ = Infinity;
+  let lastEscapeX = Infinity;
+  let lastEscapeZ = Infinity;
   const STREAM_RADIUS = 560; // High-detail architectural radius around player in meters
+  const STREAM_STEP_SQ = 18 * 18; // re-query the quadtree once the focus has moved 18 m
+  // Fire escapes are bucketed around the focus (near shadow casters, far culling cells), so they are re-bucketed
+  // as a whole; every 54 m keeps that to a third of the stream updates while the near bucket still covers the player.
+  const ESCAPE_STEP_SQ = 54 * 54;
+  // Instance writes one frame may spend filling blocks that came into range (about 0.4 ms of matrix work): an 18 m step
+  // fits in one frame, a teleport fills closest blocks first over a few frames instead of stalling one.
+  const FILL_BUDGET = 1500;
 
-  // Streaming rewrites only the active prefix; unused pool capacity need not cross the GPU queue.
-  function flagRange(attribute, count) {
-    if (count === 0) return;
-    attribute.clearUpdateRanges();
-    attribute.addUpdateRange(0, count * attribute.itemSize);
+  const streamKind = (capacity, meshes, color = false) => ({ pool: createSlotPool(capacity), meshes, color });
+  const corniceKind = streamKind(MAX_CORNICES, [corniceInst]);
+  const towerKind = streamKind(MAX_WATER_TOWERS, [legsInst, barrelInst, coneInst]);
+  const hvacKind = streamKind(MAX_HVAC, [hvacInst]);
+  const awningKind = streamKind(MAX_AWNINGS, [awningInst], true);
+  const signKinds = signInsts.map((sInst) => streamKind(MAX_SIGNS_PER_THEME, [sInst]));
+  const shedKind = streamKind(MAX_SHEDS, [shedInst]);
+  const streamKinds = [corniceKind, towerKind, hvacKind, awningKind, ...signKinds, shedKind];
+
+  // Block -> flat [kind, owner, kind, owner, ...] of the slots it holds; owner.slot follows the instance when the pool
+  // compacts. A block is resident from the frame it is filled until it leaves the radius.
+  const resident = new Map();
+  let pending = [];
+  let nearbyBlocks = [];
+  const blockCost = (blk) => blk.cornices.length + blk.waterTowers.length * 3 + blk.hvacUnits.length
+    + blk.awnings.length * 2 + blk.scaffoldSheds.length;
+
+  function hold(held, kind) {
+    const owner = { slot: -1 };
+    owner.slot = kind.pool.add(owner);
+    if (owner.slot < 0) return -1;
+    held.push(kind, owner);
+    return owner.slot;
+  }
+
+  function release(held) {
+    for (let i = 0; i < held.length; i += 2) {
+      const kind = held[i];
+      const slot = held[i + 1].slot;
+      const from = kind.pool.remove(slot);
+      if (from < 0) continue;
+      kind.pool.owners[slot].slot = slot;
+      for (const mesh of kind.meshes) mesh.instanceMatrix.array.copyWithin(slot * 16, from * 16, from * 16 + 16);
+      if (kind.color && awningInst.instanceColor) {
+        awningInst.instanceColor.array.copyWithin(slot * 3, from * 3, from * 3 + 3);
+      }
+    }
+  }
+
+  function fill(blk) {
+    const held = [];
+    resident.set(blk, held);
+
+    // 1. Stone cornices & setback ledges, hung just below their roof line (top 0.1h under it, so no two ledges or
+    //    roofs share a plane) so roofs & terraces keep their own roofing instead of a stone lid
+    for (const c of blk.cornices) {
+      const slot = hold(held, corniceKind);
+      if (slot < 0) break;
+      dummy.rotation.set(0, c.ry || 0, 0);
+      dummy.position.set(c.x, c.y - c.h * 0.6, c.z);
+      dummy.scale.set(c.w, c.h, c.d);
+      dummy.updateMatrix();
+      corniceInst.setMatrixAt(slot, dummy.matrix);
+    }
+
+    // 2. Rooftop cedar water towers
+    for (const wt of blk.waterTowers) {
+      const slot = hold(held, towerKind);
+      if (slot < 0) break;
+      dummy.rotation.set(0, wt.ry || 0, 0);
+      dummy.scale.set(1, 1, 1);
+
+      dummy.position.set(wt.x, wt.y + 1.3, wt.z);
+      dummy.updateMatrix();
+      legsInst.setMatrixAt(slot, dummy.matrix);
+
+      dummy.position.set(wt.x, wt.y + 4.2, wt.z);
+      dummy.updateMatrix();
+      barrelInst.setMatrixAt(slot, dummy.matrix);
+
+      dummy.position.set(wt.x, wt.y + 6.7, wt.z);
+      dummy.updateMatrix();
+      coneInst.setMatrixAt(slot, dummy.matrix);
+    }
+
+    // 3. Rooftop HVAC & mechanical bulkheads
+    for (const u of blk.hvacUnits) {
+      const slot = hold(held, hvacKind);
+      if (slot < 0) break;
+      dummy.rotation.set(0, u.ry || 0, 0);
+      dummy.position.set(u.x, u.y + u.h * 0.5, u.z);
+      dummy.scale.set(u.w, u.h, u.d);
+      dummy.updateMatrix();
+      hvacInst.setMatrixAt(slot, dummy.matrix);
+    }
+
+    // 4. Retail awnings & illuminated storefront fascia signs
+    for (const a of blk.awnings) {
+      const slot = hold(held, awningKind);
+      if (slot < 0) break;
+      dummy.rotation.set(0, a.ry || 0, 0);
+      dummy.position.set(a.x, a.y, a.z);
+      dummy.scale.set(a.w, 0.75, a.d);
+      dummy.updateMatrix();
+      awningInst.setMatrixAt(slot, dummy.matrix);
+      awningInst.setColorAt(slot, awningPalette[a.colorIdx % awningPalette.length]);
+
+      const themeIdx = a.colorIdx % signInsts.length;
+      const signSlot = hold(held, signKinds[themeIdx]);
+      if (signSlot >= 0) {
+        dummy.position.set(a.x, a.y + 0.88, a.z);
+        dummy.scale.set(0.28, 0.86, a.d * 0.92);
+        dummy.updateMatrix();
+        signInsts[themeIdx].setMatrixAt(signSlot, dummy.matrix);
+      }
+    }
+
+    // 5. Sidewalk construction sheds
+    for (const s of blk.scaffoldSheds) {
+      const slot = hold(held, shedKind);
+      if (slot < 0) break;
+      dummy.rotation.set(0, s.ry || 0, 0);
+      dummy.position.set(s.x, s.y + 3.6, s.z);
+      dummy.scale.set(s.w, 0.85, s.d);
+      dummy.updateMatrix();
+      shedInst.setMatrixAt(slot, dummy.matrix);
+    }
+    dummy.rotation.set(0, 0, 0);
+  }
+
+  // Ranges stay queued until the renderer uploads them (it clears them after), so a frame that is not drawn loses
+  // nothing; past a handful of queued ranges they collapse into the one span that covers them.
+  function flagRuns(attribute, runs) {
+    const size = attribute.itemSize;
+    for (const r of runs) attribute.addUpdateRange(r.start * size, r.count * size);
+    const ranges = attribute.updateRanges;
+    if (ranges.length > 32) {
+      let lo = Infinity;
+      let hi = 0;
+      for (const r of ranges) {
+        lo = Math.min(lo, r.start);
+        hi = Math.max(hi, r.start + r.count);
+      }
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(lo, hi - lo);
+    }
     attribute.needsUpdate = true;
   }
 
+  function publish() {
+    for (const kind of streamKinds) {
+      const { pool } = kind;
+      if (pool.dirty.size === 0 && kind.meshes[0].count === pool.count) continue;
+      const runs = dirtyRuns(pool.dirty, pool.count);
+      pool.dirty.clear();
+      for (const mesh of kind.meshes) {
+        mesh.count = pool.count;
+        if (runs.length > 0) flagRuns(mesh.instanceMatrix, runs);
+      }
+      if (kind.color && runs.length > 0 && awningInst.instanceColor) flagRuns(awningInst.instanceColor, runs);
+    }
+  }
+
+  function rebucketEscapes(focusX, focusZ) {
+    lastEscapeX = focusX;
+    lastEscapeZ = focusZ;
+    fireEscapeSystem.begin(focusX, focusZ);
+    for (const blk of nearbyBlocks) for (const fe of blk.fireEscapes) fireEscapeSystem.add(fe);
+    fireEscapeSystem.end();
+  }
+
+  // Called every frame: re-diffs the blocks in range once the focus has moved 18 m, then fills queued blocks within the
+  // frame's budget. Only instances of blocks entering or leaving the radius are written and uploaded.
   function update(focusX, focusZ, force = false) {
     const dx = focusX - lastStreamX;
     const dz = focusZ - lastStreamZ;
-    if (!force && (dx * dx + dz * dz) < 324) {
-      // Player moved less than 18m since last Quadtree stream update
-      return;
+    if (force || (dx * dx + dz * dz) >= STREAM_STEP_SQ) {
+      lastStreamX = focusX;
+      lastStreamZ = focusZ;
+
+      nearbyBlocks = quadtree.queryRange(focusX, focusZ, STREAM_RADIUS);
+      // Closest blocks first: they are filled first, and if any pool hits capacity the closest blocks win
+      nearbyBlocks.sort((a, b) => {
+        const da = (a.cx - focusX) * (a.cx - focusX) + (a.cz - focusZ) * (a.cz - focusZ);
+        const db = (b.cx - focusX) * (b.cx - focusX) + (b.cz - focusZ) * (b.cz - focusZ);
+        return da - db;
+      });
+
+      const { entering, leaving } = diffResident(resident, nearbyBlocks);
+      for (const blk of leaving) {
+        release(resident.get(blk));
+        resident.delete(blk);
+      }
+      pending = entering;
+
+      activeAwnings.length = 0;
+      let awningBlocks = 0;
+      for (const blk of nearbyBlocks) {
+        if (blk.awnings.length === 0) continue;
+        if (awningBlocks++ >= 20) break;
+        for (const a of blk.awnings) activeAwnings.push({ a, themeIdx: a.colorIdx % signInsts.length, ry: a.ry || 0 });
+      }
+
+      const ex = focusX - lastEscapeX;
+      const ez = focusZ - lastEscapeZ;
+      if (force || (ex * ex + ez * ez) >= ESCAPE_STEP_SQ) rebucketEscapes(focusX, focusZ);
     }
-    lastStreamX = focusX;
-    lastStreamZ = focusZ;
 
-    const nearbyBlocks = quadtree.queryRange(focusX, focusZ, STREAM_RADIUS);
-    // Sort closest blocks first so if any pool hits capacity, closest blocks around the player always win
-    nearbyBlocks.sort((a, b) => {
-      const da = (a.cx - focusX) * (a.cx - focusX) + (a.cz - focusZ) * (a.cz - focusZ);
-      const db = (b.cx - focusX) * (b.cx - focusX) + (b.cz - focusZ) * (b.cz - focusZ);
-      return da - db;
-    });
-    activeAwnings.length = 0;
-
-    let corniceCount = 0;
-    let wtCount = 0;
-    let hvacCount = 0;
-    fireEscapeSystem.begin(focusX, focusZ);
-    let awningCount = 0;
-    let awningBlocks = 0;
-    let shedCount = 0;
-    const signCounts = signInsts.map(() => 0);
-
-    for (const blk of nearbyBlocks) {
-      const collectNearLights = blk.awnings.length > 0 && awningBlocks++ < 20;
-
-      // 1. Stone cornices & setback ledges, hung just below their roof line (top 0.1h under it, so no two ledges or
-      //    roofs share a plane) so roofs & terraces keep their own roofing instead of a stone lid
-      for (let i = 0; i < blk.cornices.length && corniceCount < MAX_CORNICES; i++) {
-        const c = blk.cornices[i];
-        dummy.rotation.set(0, c.ry || 0, 0);
-        dummy.position.set(c.x, c.y - c.h * 0.6, c.z);
-        dummy.scale.set(c.w, c.h, c.d);
-        dummy.updateMatrix();
-        corniceInst.setMatrixAt(corniceCount++, dummy.matrix);
-      }
-
-      // 2. Rooftop cedar water towers
-      for (let i = 0; i < blk.waterTowers.length && wtCount < MAX_WATER_TOWERS; i++) {
-        const wt = blk.waterTowers[i];
-        dummy.rotation.set(0, wt.ry || 0, 0);
-        dummy.scale.set(1, 1, 1);
-
-        dummy.position.set(wt.x, wt.y + 1.3, wt.z);
-        dummy.updateMatrix();
-        legsInst.setMatrixAt(wtCount, dummy.matrix);
-
-        dummy.position.set(wt.x, wt.y + 4.2, wt.z);
-        dummy.updateMatrix();
-        barrelInst.setMatrixAt(wtCount, dummy.matrix);
-
-        dummy.position.set(wt.x, wt.y + 6.7, wt.z);
-        dummy.updateMatrix();
-        coneInst.setMatrixAt(wtCount, dummy.matrix);
-        wtCount++;
-      }
-
-      // 3. Rooftop HVAC & mechanical bulkheads
-      for (let i = 0; i < blk.hvacUnits.length && hvacCount < MAX_HVAC; i++) {
-        const u = blk.hvacUnits[i];
-        dummy.rotation.set(0, u.ry || 0, 0);
-        dummy.position.set(u.x, u.y + u.h * 0.5, u.z);
-        dummy.scale.set(u.w, u.h, u.d);
-        dummy.updateMatrix();
-        hvacInst.setMatrixAt(hvacCount++, dummy.matrix);
-      }
-
-      // 4. Wrought-iron fire escapes
-      for (const fe of blk.fireEscapes) fireEscapeSystem.add(fe);
-
-      // 5. Retail awnings & illuminated storefront fascia signs
-      for (let i = 0; i < blk.awnings.length && awningCount < MAX_AWNINGS; i++) {
-        const a = blk.awnings[i];
-        dummy.rotation.set(0, a.ry || 0, 0);
-        dummy.position.set(a.x, a.y, a.z);
-        dummy.scale.set(a.w, 0.75, a.d);
-        dummy.updateMatrix();
-        awningInst.setMatrixAt(awningCount, dummy.matrix);
-        awningInst.setColorAt(awningCount, awningPalette[a.colorIdx % awningPalette.length]);
-
-        const themeIdx = a.colorIdx % signInsts.length;
-        if (signCounts[themeIdx] < MAX_SIGNS_PER_THEME) {
-          dummy.position.set(a.x, a.y + 0.88, a.z);
-          dummy.scale.set(0.28, 0.86, a.d * 0.92);
-          dummy.updateMatrix();
-          signInsts[themeIdx].setMatrixAt(signCounts[themeIdx]++, dummy.matrix);
-        }
-        if (collectNearLights) {
-          activeAwnings.push({ a, themeIdx, ry: a.ry || 0 });
-        }
-        awningCount++;
-      }
-
-      // 6. Sidewalk construction sheds
-      for (let i = 0; i < blk.scaffoldSheds.length && shedCount < MAX_SHEDS; i++) {
-        const s = blk.scaffoldSheds[i];
-        dummy.rotation.set(0, s.ry || 0, 0);
-        dummy.position.set(s.x, s.y + 3.6, s.z);
-        dummy.scale.set(s.w, 0.85, s.d);
-        dummy.updateMatrix();
-        shedInst.setMatrixAt(shedCount++, dummy.matrix);
-      }
+    if (pending.length > 0) {
+      const batch = force ? pending.splice(0) : takeBudget(pending, blockCost, FILL_BUDGET);
+      for (const blk of batch) fill(blk);
     }
-    dummy.rotation.set(0, 0, 0);
-
-    corniceInst.count = corniceCount;
-    flagRange(corniceInst.instanceMatrix, corniceCount);
-
-    legsInst.count = wtCount;
-    barrelInst.count = wtCount;
-    coneInst.count = wtCount;
-    flagRange(legsInst.instanceMatrix, wtCount);
-    flagRange(barrelInst.instanceMatrix, wtCount);
-    flagRange(coneInst.instanceMatrix, wtCount);
-
-    hvacInst.count = hvacCount;
-    flagRange(hvacInst.instanceMatrix, hvacCount);
-
-    fireEscapeSystem.end();
-
-    awningInst.count = awningCount;
-    flagRange(awningInst.instanceMatrix, awningCount);
-    if (awningInst.instanceColor) flagRange(awningInst.instanceColor, awningCount);
-
-    signInsts.forEach((sInst, idx) => {
-      sInst.count = signCounts[idx];
-      flagRange(sInst.instanceMatrix, signCounts[idx]);
-    });
-
-    shedInst.count = shedCount;
-    flagRange(shedInst.instanceMatrix, shedCount);
+    publish();
   }
 
   function smoothFade(d, start, end) {
