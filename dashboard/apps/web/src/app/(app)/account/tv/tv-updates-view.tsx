@@ -47,7 +47,10 @@ export function upToDate(row: TvRow, latest: string | null): boolean {
 /** Whether the Update button has anything to do for this TV. */
 export function canUpdate(row: TvRow, latest: string | null): boolean {
     return (
-        Boolean(latest) && tvTakesUpdates(row.versionCode) && !upToDate(row, latest) && !pending(row)
+        Boolean(latest) &&
+        tvTakesUpdates(row.versionCode) &&
+        !upToDate(row, latest) &&
+        !pending(row)
     );
 }
 
