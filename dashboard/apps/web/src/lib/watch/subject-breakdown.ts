@@ -41,7 +41,12 @@ import { localDisk } from "@/lib/deploy/local-disk";
 import { hostSpace } from "@/lib/deploy/host-space";
 import { cachedSamples } from "@/lib/container-stats-cache";
 import { containerParts, type DeployedApp } from "./container-rows";
-import { accessCan, accessInEnvironment, projectAccess } from "@/lib/deploy-project-access";
+import {
+    accessCan,
+    accessInEnvironment,
+    projectAccess,
+    type ProjectAccess
+} from "@/lib/deploy-project-access";
 import { getLocalHostId } from "@/lib/local-server";
 import { machineProcesses } from "./machine-processes";
 import { hostVolumes } from "@/lib/deploy/host-volumes";
@@ -397,6 +402,8 @@ async function sampleContainers(
     return { samples, at: oldest };
 }
 
+const ACCESS_LOOKUPS_AT_ONCE = 8;
+
 /**
  * The services Polaris deployed to one machine, keyed by the compose project each
  * one runs under.
@@ -429,14 +436,14 @@ async function deployedOn(
     // Whether a row links to its service is Deploy's own question, asked once per
     // project: a service the reader cannot open there is named, never linked.
     const projectIds = [...new Set(apps.map((app) => app.environment.projectId))];
-    const access = new Map(
-        await Promise.all(
-            projectIds.map(
-                async (projectId) =>
-                    [projectId, await projectAccess(projectId, viewerId).catch(() => null)] as const
-            )
-        )
-    );
+    const access = new Map<string, ProjectAccess | null>();
+    for (let start = 0; start < projectIds.length; start += ACCESS_LOOKUPS_AT_ONCE) {
+        const batch = projectIds.slice(start, start + ACCESS_LOOKUPS_AT_ONCE);
+        const granted = await Promise.all(
+            batch.map((projectId) => projectAccess(projectId, viewerId).catch(() => null))
+        );
+        batch.forEach((projectId, index) => access.set(projectId, granted[index] ?? null));
+    }
     return new Map(
         apps.map((app) => {
             const granted = access.get(app.environment.projectId) ?? null;

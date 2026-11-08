@@ -342,6 +342,7 @@ function Row({ row, format }: { row: BreakdownRow; format: (value: number) => st
     const second = [row.detail, row.image ? t("breakdown.image", { image: row.image }) : null]
         .filter(Boolean)
         .join(" - ");
+    const locked = row.service && !row.href ? t("breakdown.noAccess") : null;
     const body = (
         <>
             <RowIcon row={row} />
@@ -382,6 +383,11 @@ function Row({ row, format }: { row: BreakdownRow; format: (value: number) => st
                         ) : null}
                     </div>
                 ) : null}
+                {locked ? (
+                    <p className="truncate text-xs text-foreground-subtle" title={locked}>
+                        {locked}
+                    </p>
+                ) : null}
                 {row.share === null ? null : (
                     <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-border" aria-hidden>
                         <div
@@ -406,17 +412,12 @@ function Row({ row, format }: { row: BreakdownRow; format: (value: number) => st
             {row.href ? (
                 <Link
                     href={row.href}
-                    className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-1 py-2 hover:bg-muted/60"
+                    className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-1 py-2 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     {body}
                 </Link>
             ) : (
-                <div
-                    className="flex min-w-0 flex-1 items-start gap-2 px-1 py-2"
-                    title={row.service ? t("breakdown.noAccess") : undefined}
-                >
-                    {body}
-                </div>
+                <div className="flex min-w-0 flex-1 items-start gap-2 px-1 py-2">{body}</div>
             )}
             {row.service?.canRestart ? (
                 <RestartService id={row.service.id} name={row.label} />
@@ -435,17 +436,32 @@ function RestartService({ id, name }: { id: string; name: string }) {
     const [state, setState] = useState<"idle" | "asking" | "working" | "done" | "failed">(
         "idle"
     );
+    const [error, setError] = useState<string | null>(null);
     useEffect(() => {
-        if (state !== "asking") return;
+        if (state !== "asking" && state !== "done") return;
         // A question left on screen is one somebody answers by accident later.
-        const timer = window.setTimeout(() => setState("idle"), 6000);
+        const timer = window.setTimeout(() => setState("idle"), state === "asking" ? 6000 : 4000);
         return () => window.clearTimeout(timer);
     }, [state]);
     const run = async () => {
         setState("working");
-        const result = await restartApplicationAction(id).catch(() => ({ error: "failed" }));
-        setState(result.error ? "failed" : "done");
+        setError(null);
+        const result = await restartApplicationAction(id).catch(() => null);
+        setError(result?.error ?? null);
+        setState(!result || result.error ? "failed" : "done");
     };
+    const ask = (
+        <Button
+            size="icon-xs"
+            variant="ghost"
+            className="mt-1.5 shrink-0"
+            aria-label={t("breakdown.restart", { name })}
+            title={t("breakdown.restart", { name })}
+            onClick={() => setState("asking")}
+        >
+            <RotateCw aria-hidden />
+        </Button>
+    );
     if (state === "asking") {
         return (
             <div className="flex shrink-0 items-center gap-1 py-1.5">
@@ -464,27 +480,19 @@ function RestartService({ id, name }: { id: string; name: string }) {
                 ? t("breakdown.restarting")
                 : state === "done"
                   ? t("breakdown.restarted")
-                  : t("breakdown.restartFailed");
+                  : (error ?? t("breakdown.restartFailed"));
         return (
-            <span
-                role="status"
-                className={`max-w-[40%] shrink-0 truncate py-2 text-xs ${state === "failed" ? "text-danger" : "text-muted-foreground"}`}
-                title={text}
-            >
-                {text}
-            </span>
+            <div className="flex min-w-0 max-w-[40%] shrink-0 items-start gap-1">
+                <span
+                    role="status"
+                    className={`min-w-0 truncate py-2 text-xs ${state === "failed" ? "text-danger" : "text-muted-foreground"}`}
+                    title={text}
+                >
+                    {text}
+                </span>
+                {state === "failed" ? ask : null}
+            </div>
         );
     }
-    return (
-        <Button
-            size="icon-xs"
-            variant="ghost"
-            className="mt-1.5 shrink-0"
-            aria-label={t("breakdown.restart", { name })}
-            title={t("breakdown.restart", { name })}
-            onClick={() => setState("asking")}
-        >
-            <RotateCw aria-hidden />
-        </Button>
-    );
+    return ask;
 }
