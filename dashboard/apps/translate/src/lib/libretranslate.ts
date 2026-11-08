@@ -123,6 +123,34 @@ const configured: ConfiguredRequest = (address, init, options) =>
 
 const errorShape = z.object({ error: z.string() }).partial();
 
+/**
+ * The answer's text, or null when it runs past `ANSWER_MAX_BYTES` - counted as
+ * it arrives, since a chunked answer declares no length.
+ */
+async function readAnswer(response: Response): Promise<string | null> {
+    const declared = Number(response.headers.get("content-length") ?? 0);
+    const reader = response.body?.getReader();
+    if (declared > ANSWER_MAX_BYTES) {
+        await reader?.cancel().catch(() => undefined);
+        return null;
+    }
+    if (!reader) return "";
+    const decoder = new TextDecoder();
+    let size = 0;
+    let text = "";
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > ANSWER_MAX_BYTES) {
+            await reader.cancel().catch(() => undefined);
+            return null;
+        }
+        text += decoder.decode(value, { stream: true });
+    }
+    return text + decoder.decode();
+}
+
 async function call(
     path: string,
     body: Record<string, unknown> | null,
@@ -150,15 +178,11 @@ async function call(
         const detail = caught instanceof Error ? caught.message : undefined;
         throw new LibreTranslateRefusal("failed", detail);
     }
-    const declared = Number(response.headers.get("content-length") ?? 0);
-    if (declared > ANSWER_MAX_BYTES) {
-        await response.body?.cancel().catch(() => undefined);
-        throw new LibreTranslateRefusal("failed", "too large");
-    }
-    const text = await response.text().catch(() => "");
+    const text = await readAnswer(response).catch(() => "");
+    if (text === null) throw new LibreTranslateRefusal("failed", "too large");
     let json: unknown = null;
     try {
-        json = text.length <= ANSWER_MAX_BYTES ? JSON.parse(text) : null;
+        json = JSON.parse(text);
     } catch {
         json = null;
     }
@@ -243,6 +267,25 @@ export async function libreLanguages(
 }
 
 /**
+ * Whether the server takes this key: `/languages` asks for none, so one word
+ * is detected with it. A server that wants no key ignores one it is given.
+ */
+async function checkKey(target: Target, request: ConfiguredRequest): Promise<void> {
+    const parsed = detectAnswer.safeParse(await call("/detect", { q: "hello" }, request, target));
+    if (!parsed.success) throw new LibreTranslateRefusal("failed", "answer");
+}
+
+/** Whether two addresses are the same server: a kept key only ever goes back to its own. */
+function sameServer(a: string | null, b: string): boolean {
+    if (!a) return false;
+    try {
+        return new URL(a).origin === new URL(b).origin;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Keeps a new address and key once the server answered `/languages` with
  * them. An empty address switches the engine off and forgets the key.
  */
@@ -257,8 +300,11 @@ export async function saveLibreTranslate(
     const stored = await readStored();
     let key: string | null;
     if (input.key !== undefined) key = input.key || null;
+    // A kept key is not sent to a server it was not given for.
+    else if (!sameServer(stored.url, input.url)) key = null;
     else key = stored.key ? await host.translateEngines.openEngineKey(stored.key) : null;
     await libreLanguages({ url: input.url, key }, request);
+    if (key) await checkKey({ url: input.url, key }, request);
     const sealed = key ? await host.translateEngines.sealEngineKey(key) : null;
     await host.settingStore.setSetting(KEY, JSON.stringify({ url: input.url, key: sealed }));
     return { url: input.url, hasKey: sealed !== null };

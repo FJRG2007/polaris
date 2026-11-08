@@ -131,4 +131,45 @@ describe("selection translation on the device first", () => {
         );
         expect(await queue.translate("hello", "es")).toMatchObject({ text: "srv:hello" });
     });
+
+    it("asks the server where its first usable engine sits, not an unusable one", async () => {
+        // LibreTranslate first but never set up: the device engines still come before DeepL.
+        const fetcher = server({
+            browser: false,
+            local: true,
+            order: ["libretranslate", "local", "deepl"],
+            engines: ["deepl"]
+        });
+        const local = engine("local");
+        const queue = new TranslationQueue(
+            offer,
+            fetcher,
+            async () => null,
+            0,
+            async () => ({ browser: null, local })
+        );
+        expect(await queue.translate("hello", "es")).toMatchObject({ text: "local:hello" });
+        expect(posts(fetcher)).toBe(0);
+    });
+
+    it("still asks the server last when no engine there can answer", async () => {
+        const fetcher = server(
+            { browser: false, local: true, order: ["deepl", "local"], engines: [] },
+            () => json({ error: "noEngine", message: "No engine" }, 503)
+        );
+        const local = failing();
+        const queue = new TranslationQueue(
+            offer,
+            fetcher,
+            async () => null,
+            0,
+            async () => ({ browser: null, local })
+        );
+        expect(await queue.translate("hello", "es")).toEqual({
+            kind: "failed",
+            message: "No engine"
+        });
+        expect(local.translate).toHaveBeenCalled();
+        expect(posts(fetcher)).toBe(1);
+    });
 });

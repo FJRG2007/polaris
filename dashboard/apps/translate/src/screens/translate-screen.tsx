@@ -90,6 +90,7 @@ import {
     readOrder,
     HISTORY_MAX,
     HISTORY_TEXT_MAX,
+    SERVER_ENGINE_IDS,
     type EngineId,
     type ServerEngineId
 } from "../model/schemas";
@@ -132,9 +133,10 @@ const ENGINE_KEY = {
     browser: "engine.browser",
     local: "engine.local",
     polar: "engine.polar",
+    libretranslate: "engine.libretranslate",
     deepl: "engine.deepl",
     google: "engine.google"
-} as const;
+} as const satisfies Record<EngineId, string>;
 
 /** A translation put on screen whole, from the history or a swap: no engine is asked for it again. */
 interface Loaded {
@@ -283,7 +285,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         if (browser)
             made.set("browser", createBrowserEngine(self as unknown as BrowserScope, setDownload));
         if (local) made.set("local", deviceEngine(t("local.downloadFailed"), t("errors.failed"), setDownload));
-        for (const id of ["deepl", "google", "polar"] as const) {
+        for (const id of SERVER_ENGINE_IDS) {
             made.set(id, createServerEngine(id, t("errors.failed")));
         }
         return made;

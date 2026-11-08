@@ -36,12 +36,20 @@ interface Status {
     readonly charLimit: number | null;
     /** Engine ids in the administrator's order; empty when the app did not say. */
     readonly order: readonly string[];
+    /** The server engines that can answer the reader; null when the app did not say. */
+    readonly engines: readonly string[] | null;
     /** Whether the administrator allows each device engine. */
     readonly browser: boolean;
     readonly local: boolean;
 }
 
-const NO_STATUS: Status = { charLimit: null, order: [], browser: false, local: false };
+const NO_STATUS: Status = {
+    charLimit: null,
+    order: [],
+    engines: null,
+    browser: false,
+    local: false
+};
 
 /** An engine that runs on the reader's device; `from` null means "detect it". */
 export interface DeviceEngine {
@@ -63,6 +71,9 @@ export type LoadDevices = () => Promise<DeviceEngines | null>;
 const DEVICE_IDS = ["browser", "local"] as const;
 
 type DeviceId = (typeof DEVICE_IDS)[number];
+
+/** Where the server stands in the order the queue walks. */
+const SERVER = "server";
 
 function isDevice(id: string): id is DeviceId {
     return (DEVICE_IDS as readonly string[]).includes(id);
@@ -152,6 +163,9 @@ export class TranslationQueue {
                     order: Array.isArray(body.order)
                         ? body.order.filter((id): id is string => typeof id === "string")
                         : [],
+                    engines: Array.isArray(body.engines)
+                        ? body.engines.filter((id): id is string => typeof id === "string")
+                        : null,
                     browser: body.browser === true,
                     local: body.local === true
                 };
@@ -204,22 +218,27 @@ export class TranslationQueue {
     /**
      * One batch through the engines in order. A device engine that fails, or
      * that this browser does not run, hands the batch on; the server is asked
-     * once, where its first engine sits in the order (last when the order names
-     * none), and its failure is the one shown when nothing after it answers.
+     * once, where the first engine that can answer on it sits in the order (an
+     * engine switched off or without a key does not count; last when the order
+     * names none), and its failure is the one shown when nothing after it answers.
      */
     private async send(status: Status, to: string, batch: readonly Waiting[]): Promise<void> {
         const texts = batch.map((item) => item.text);
-        const order = status.order.some((id) => !isDevice(id))
-            ? status.order
-            : [...status.order, "server"];
-        let asked = false;
+        const usable = status.engines;
+        const serverAt = status.order.findIndex((id) =>
+            usable === null ? !isDevice(id) : usable.includes(id)
+        );
+        const order: readonly string[] = [
+            ...status.order.filter((id, at) => isDevice(id) && (serverAt < 0 || at < serverAt)),
+            SERVER,
+            ...(serverAt < 0 ? [] : status.order.slice(serverAt + 1).filter(isDevice))
+        ];
         let message: string | null = null;
         for (const id of order) {
             let answer: Answer | null = null;
             if (isDevice(id)) {
                 if (status[id]) answer = await this.askDevice(id, texts, to);
-            } else if (!asked) {
-                asked = true;
+            } else {
                 answer = await this.askServer(texts, to);
                 if (!answer.ok) message = answer.message;
             }

@@ -17,6 +17,14 @@ interface Server {
     readonly hasKey: boolean;
 }
 
+function sameOrigin(a: string, b: string | null): boolean {
+    try {
+        return b !== null && new URL(a).origin === new URL(b).origin;
+    } catch {
+        return false;
+    }
+}
+
 export function LibreTranslateServer() {
     const t = useTranslateT();
     const toast = useToast();
@@ -48,20 +56,27 @@ export function LibreTranslateServer() {
 
     const save = async () => {
         setSaving(true);
-        const answer = await saveLibreTranslateAction({
-            url,
-            ...(key.trim() ? { key } : dropKey ? { key: null } : {})
-        });
-        setSaving(false);
-        if (!answer.ok) {
-            toast.error(answer.error);
-            return;
+        try {
+            const answer = await saveLibreTranslateAction({
+                url,
+                ...(key.trim() ? { key } : dropKey ? { key: null } : {})
+            });
+            if (!answer.ok) {
+                toast.show({ title: answer.error });
+                return;
+            }
+            setLoaded(answer.server);
+            setUrl(answer.server.url ?? "");
+            setKey("");
+            setDropKey(false);
+            toast.show({
+                title: t(answer.server.url ? "libretranslate.saved" : "libretranslate.off")
+            });
+        } catch {
+            toast.show({ title: t("errors.generic") });
+        } finally {
+            setSaving(false);
         }
-        setLoaded(answer.server);
-        setUrl(answer.server.url ?? "");
-        setKey("");
-        setDropKey(false);
-        toast.success(t(answer.server.url ? "libretranslate.saved" : "libretranslate.off"));
     };
 
     return (
@@ -98,7 +113,8 @@ export function LibreTranslateServer() {
                         value={key}
                         onChange={(event) => setKey(event.target.value)}
                     />
-                    {loaded.hasKey && !dropKey ? (
+                    {/* A kept key stays with its own server; a new address starts without one. */}
+                    {loaded.hasKey && !dropKey && sameOrigin(wanted, loaded.url) ? (
                         <span className="flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground">
                             <span className="min-w-0">{t("libretranslate.keyKept")}</span>
                             <Button variant="ghost" size="sm" onClick={() => setDropKey(true)}>

@@ -86,7 +86,7 @@ describe("modelFileParams", () => {
 });
 
 describe("the local engine in the order", () => {
-    const available = { deepl: true, google: false, polar: true };
+    const available = { libretranslate: false, deepl: true, google: false, polar: true };
     const settings = DEFAULT_SETTINGS;
 
     it("is offered after the browser's translator where the browser can run it", () => {

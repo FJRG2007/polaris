@@ -34,6 +34,10 @@ const json = (body: unknown, status = 200) =>
 
 const LANGUAGES = [{ code: "en", name: "English", targets: ["es"] }];
 
+/** A LibreTranslate that lists its languages and detects with any key. */
+const answering = (path: string) =>
+    path === "/detect" ? json([{ language: "en", confidence: 90 }]) : json(LANGUAGES);
+
 function server(answer: (path: string, body: Record<string, unknown> | null) => Response) {
     return vi.fn<ConfiguredRequest>(async (address, init, options) => {
         expect(options).toEqual({ allowPrivate: true });
@@ -46,7 +50,7 @@ function server(answer: (path: string, body: Record<string, unknown> | null) => 
 }
 
 async function configure(key?: string) {
-    const ok = server(() => json(LANGUAGES));
+    const ok = server(answering);
     await saveLibreTranslate(
         libreTranslateInput.parse({ url: "http://192.168.1.20:5000/", key }),
         ok
@@ -72,7 +76,7 @@ describe("LibreTranslate settings", () => {
     });
 
     it("keeps an address only once the server answered /languages, the key sealed", async () => {
-        const request = server(() => json(LANGUAGES));
+        const request = server(answering);
         const saved = await saveLibreTranslate(
             libreTranslateInput.parse({ url: " http://192.168.1.20:5000/ ", key: "abc" }),
             request
@@ -105,6 +109,55 @@ describe("LibreTranslate settings", () => {
             hasKey: false
         });
         expect(await libreTranslateReady()).toBe(false);
+    });
+});
+
+describe("LibreTranslate key handling", () => {
+    it("checks a new key against the server before keeping it", async () => {
+        const refusing = server((path) =>
+            path === "/detect" ? json({ error: "Invalid API key" }, 403) : json(LANGUAGES)
+        );
+        await expect(
+            saveLibreTranslate(
+                libreTranslateInput.parse({ url: "http://192.168.1.20:5000", key: "wrong" }),
+                refusing
+            )
+        ).rejects.toMatchObject({ name: "EngineRefusal" });
+        expect(store.size).toBe(0);
+    });
+
+    it("never sends a kept key to a different server", async () => {
+        await configure("abc");
+        const other = server(answering);
+        const saved = await saveLibreTranslate(
+            libreTranslateInput.parse({ url: "https://elsewhere.test" }),
+            other
+        );
+        expect(saved).toEqual({ url: "https://elsewhere.test", hasKey: false });
+        expect(JSON.stringify(other.mock.calls)).not.toContain("abc");
+        expect(store.get("translate.libretranslate")).not.toContain("abc");
+    });
+
+    it("keeps the key when the same server is saved again", async () => {
+        await configure("abc");
+        const same = server(answering);
+        const saved = await saveLibreTranslate(
+            libreTranslateInput.parse({ url: "http://192.168.1.20:5000/" }),
+            same
+        );
+        expect(saved).toEqual({ url: "http://192.168.1.20:5000", hasKey: true });
+    });
+
+    it("refuses an answer past the size cap even when it declares no length", async () => {
+        await configure();
+        const huge = new ReadableStream<Uint8Array>({
+            pull(controller) {
+                controller.enqueue(new Uint8Array(1024 * 1024).fill(32));
+            }
+        });
+        await expect(
+            libreTranslate(["hello"], "en", "es", server(() => new Response(huge)))
+        ).rejects.toMatchObject({ name: "EngineRefusal", code: "failed" });
     });
 });
 

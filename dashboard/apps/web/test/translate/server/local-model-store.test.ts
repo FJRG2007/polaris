@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     ensureModelFile,
@@ -45,6 +45,15 @@ afterEach(async () => {
 });
 
 describe("server model store", () => {
+    it("clears what a download stopped mid-way left behind", async () => {
+        const left = path.join(dir, `.${file.sha256}.stopped.part`);
+        const other = path.join(dir, ".another-file.part");
+        await writeFile(left, "half");
+        await writeFile(other, "half");
+        await ensureModelFile("en-es", file, vi.fn(async () => served(bytes)));
+        expect((await readdir(dir)).sort()).toEqual([".another-file.part", file.sha256].sort());
+    });
+
     it("keeps a file that matches its size and sha256 under its hash", async () => {
         const fetcher = vi.fn(async () => served(bytes));
         const at = await ensureModelFile("en-es", file, fetcher);

@@ -13,8 +13,9 @@ import {
 } from "@polaris-app/translate/src/model/engines";
 import { DEFAULT_SETTINGS, type TranslateSettings } from "@polaris-app/translate/src/model/schemas";
 
-const ALL = { deepl: true, google: true, polar: true };
-const NONE = { deepl: false, google: false, polar: false };
+// LibreTranslate stays off: it answers only once an address is set.
+const ALL = { libretranslate: false, deepl: true, google: true, polar: true };
+const NONE = { libretranslate: false, deepl: false, google: false, polar: false };
 
 function only(engines: Partial<TranslateSettings["engines"]>): TranslateSettings {
     return { ...DEFAULT_SETTINGS, engines: { ...DEFAULT_SETTINGS.engines, ...engines } };
@@ -48,13 +49,28 @@ describe("server engines", () => {
 describe("the screen's engines", () => {
     it("put the browser first when it has a translator and the owner allows it", () => {
         expect(
-            usableEngines({ browser: true, available: ALL, settings: DEFAULT_SETTINGS })
+            usableEngines({
+                browser: true,
+                local: false,
+                available: ALL,
+                settings: DEFAULT_SETTINGS
+            })
         ).toEqual(["browser", "deepl", "google", "polar"]);
         expect(
-            usableEngines({ browser: true, available: NONE, settings: only({ browser: false }) })
+            usableEngines({
+                browser: true,
+                local: false,
+                available: NONE,
+                settings: only({ browser: false })
+            })
         ).toEqual([]);
         expect(
-            usableEngines({ browser: false, available: NONE, settings: DEFAULT_SETTINGS })
+            usableEngines({
+                browser: false,
+                local: false,
+                available: NONE,
+                settings: DEFAULT_SETTINGS
+            })
         ).toEqual([]);
     });
 
@@ -63,7 +79,9 @@ describe("the screen's engines", () => {
             ...DEFAULT_SETTINGS,
             order: ["polar", "google", "browser", "deepl"] as TranslateSettings["order"]
         };
-        expect(usableEngines({ browser: true, available: ALL, settings: order })).toEqual([
+        expect(
+            usableEngines({ browser: true, local: false, available: ALL, settings: order })
+        ).toEqual([
             "polar",
             "google",
             "browser",

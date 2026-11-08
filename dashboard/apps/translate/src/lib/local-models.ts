@@ -16,7 +16,7 @@ import path from "node:path";
 import { loadEnv } from "@polaris/config";
 import { createWriteStream } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, rename, rm, stat } from "node:fs/promises";
+import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { upstreamUrl, LOCAL_MODEL_ORIGIN, type LocalModelFile } from "../model/local-models";
 
 /** Long enough for the largest model (about 44 MB) on a slow line. */
@@ -51,6 +51,21 @@ async function present(file: LocalModelFile): Promise<boolean> {
     }
 }
 
+/**
+ * Removes what an earlier download of this file left behind when the process
+ * stopped mid-way: nothing else in this process downloads it at the same time
+ * (`pending`), so every part file of it is a dead one.
+ */
+async function dropLeftovers(file: LocalModelFile): Promise<void> {
+    const prefix = `.${file.sha256}.`;
+    const names = await readdir(modelDir()).catch(() => [] as string[]);
+    await Promise.all(
+        names
+            .filter((name) => name.startsWith(prefix) && name.endsWith(".part"))
+            .map((name) => rm(path.join(modelDir(), name), { force: true }).catch(() => undefined))
+    );
+}
+
 type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
 
 async function download(pair: string, file: LocalModelFile, fetcher: Fetcher): Promise<void> {
@@ -67,6 +82,7 @@ async function download(pair: string, file: LocalModelFile, fetcher: Fetcher): P
         throw new ModelDownloadError(`status ${response.status}`);
     }
     await mkdir(modelDir(), { recursive: true });
+    await dropLeftovers(file);
     const part = path.join(modelDir(), `.${file.sha256}.${randomUUID()}.part`);
     const hash = createHash("sha256");
     const out = createWriteStream(part);
