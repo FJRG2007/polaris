@@ -207,6 +207,9 @@ export interface ActivityView {
     /** Where "Join game" takes this reader - a game played together here that
      *  has room and that they may join - or absent when they cannot. */
     readonly joinUrl?: string | null;
+    /** Still in the game but away from it - its tab hidden or the window in
+     *  the background for a while - so the card says "Idle", not a clock. */
+    readonly idle?: boolean;
 }
 
 /** The one line a crowded row has room for: "Playing Hollow Knight", "Listening

@@ -17,6 +17,7 @@
  * is one), or the room being public lets somebody in.
  */
 
+import { noteGameAway } from "@/lib/chat/game-away";
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as card from "@/lib/chat/activity-card";
@@ -169,7 +170,8 @@ const RENEW_GRACE_MS = 60 * 1000;
 /** Renew the pass while playing, asking everything again. */
 export async function renewLobbyGame(
     sessionId: unknown,
-    claim: unknown
+    claim: unknown,
+    away: unknown = false
 ): Promise<{ readonly claim: ActivityClaim } | { readonly reason: CallGamesRefusal }> {
     const id = sessionIdSchema.safeParse(sessionId);
     const held = activityClaimSchema.safeParse(claim);
@@ -182,6 +184,7 @@ export async function renewLobbyGame(
     const facts = { meetingId: card.lobbyPassScope(id.data), seat: user.id, game, at };
     if (!readActivityPass(pass, facts, Date.now() - RENEW_GRACE_MS)) return { reason: "seat" };
     await sessions.touchLobbyPlay(id.data, user.id);
+    noteGameAway(user.id, away === true);
     return { claim: { game, at, pass: activityPass(facts) } };
 }
 

@@ -283,7 +283,11 @@ export function ActivityCard({
                                 : activity.state}
                         </span>
                     ) : null}
-                    {activity.endsAt ? null : <Elapsed startedAt={activity.startedAt} />}
+                    {activity.endsAt ? null : activity.idle ? (
+                        <span className="text-muted-foreground">{t("activity.idle")}</span>
+                    ) : (
+                        <Elapsed startedAt={activity.startedAt} />
+                    )}
                 </span>
             </div>
             {activity.endsAt ? <TrackBar activity={activity} /> : null}

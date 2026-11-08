@@ -15,6 +15,7 @@
  * only for whoever may use it.
  */
 
+import { useGameAway } from "./use-game-away";
 import type { CallState } from "./call-state";
 import {
     Expand,
@@ -218,14 +219,21 @@ export function useCallActivity(
 
     // Renew the pass while playing. The server asks everything again, so a
     // player whose permission was taken away is refused here and leaves.
+    // Stepping away is said on the next renewal, and a change in it brings that
+    // renewal forward, so the card reads "Idle" within a minute of leaving.
+    const away = useGameAway();
+    const sentAway = useRef(false);
     useEffect(() => {
         if (!mine) return;
         const due =
-            callGame.passExpiresAt(mine.pass) - callGame.RENEW_BEFORE_MS - (Date.now() + skew);
+            away !== sentAway.current
+                ? 0
+                : callGame.passExpiresAt(mine.pass) - callGame.RENEW_BEFORE_MS - (Date.now() + skew);
         const timer = window.setTimeout(
             () => {
+                sentAway.current = away;
                 void api
-                    .renewCallGame(meetingId, mine)
+                    .renewCallGame(meetingId, mine, away)
                     .then((result) => {
                         if ("claim" in result) {
                             setSkew(skewFrom(result.claim));
@@ -244,7 +252,7 @@ export function useCallActivity(
             Math.max(0, due)
         );
         return () => window.clearTimeout(timer);
-    }, [mine, meetingId, clock, skew, setActivity, api]);
+    }, [mine, meetingId, clock, skew, setActivity, api, away]);
 
     // Asked afresh every time, so a permission given back or a seat admitted
     // since shows the next time anybody looks.

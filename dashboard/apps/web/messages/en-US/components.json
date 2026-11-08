@@ -17,6 +17,7 @@
         "by": "by {artist}",
         "on": "on {album}",
         "elapsed": "{time} elapsed",
+        "idle": "Idle",
         "trackPosition": "Track position",
         "short": {
             "listening": "Listening to {name}",

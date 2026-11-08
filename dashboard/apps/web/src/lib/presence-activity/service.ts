@@ -28,6 +28,7 @@ import { getUserLocale } from "@/lib/i18n/locale-service";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import { sessionHref } from "@/lib/chat/activity-card";
 import { MAX_PLAYERS, PASS_TTL_MS } from "@/lib/chat/call-activity";
+import { isGameAway } from "@/lib/chat/game-away";
 import { activitySettingsFor, activitySettingsOf, rememberSeenGame } from "./settings";
 
 /** The sources that are stored here rather than looked up. */
@@ -413,7 +414,8 @@ async function playingTogetherFor(
             linkUrl: null,
             startedAt: row.joinedAt.toISOString(),
             endsAt: null,
-            joinUrl: joinable ? sessionHref(row.session) : null
+            joinUrl: joinable ? sessionHref(row.session) : null,
+            idle: isGameAway(row.userId, now.getTime())
         });
     }
     return found;

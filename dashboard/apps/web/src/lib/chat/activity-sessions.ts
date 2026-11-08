@@ -27,6 +27,7 @@
  * Server-only.
  */
 
+import { noteGameAway } from "./game-away";
 import { publishChatChange } from "./live";
 import { prisma, type Prisma } from "@polaris/db";
 import { PASS_TTL_MS } from "./call-activity";
@@ -230,6 +231,7 @@ export async function leaveLobbyPlay(sessionId: string, userId: string): Promise
 }
 
 async function leaveWhere(where: Prisma.ArcadeSessionWhereInput, userId: string): Promise<void> {
+    noteGameAway(userId, false);
     try {
         const sessions = await prisma.arcadeSession.findMany({
             where: { ...where, endedAt: null, players: { some: { userId, leftAt: null } } },

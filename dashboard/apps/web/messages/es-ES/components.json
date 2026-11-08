@@ -17,6 +17,7 @@
         "by": "de {artist}",
         "on": "en {album}",
         "elapsed": "{time} transcurrido",
+        "idle": "Ausente",
         "trackPosition": "Posición",
         "short": {
             "listening": "Escuchando {name}",

@@ -12,6 +12,7 @@
  * claim's pass is real before it counts the player - see `lib/chat/call-activity`.
  */
 
+import { noteGameAway } from "@/lib/chat/game-away";
 import { z } from "zod";
 import { seatForUser } from "@/lib/chat/meetings";
 import { resolveSeat } from "@/lib/chat/meeting-seat";
@@ -114,7 +115,8 @@ const RENEW_GRACE_MS = 60 * 1000;
  */
 export async function renewCallGame(
     meetingId: unknown,
-    claim: unknown
+    claim: unknown,
+    away: unknown = false
 ): Promise<{ readonly claim: ActivityClaim } | { readonly reason: CallGamesRefusal }> {
     const id = meetingIdSchema.safeParse(meetingId);
     const held = activityClaimSchema.safeParse(claim);
@@ -126,6 +128,7 @@ export async function renewCallGame(
     const facts = { meetingId: id.data, seat: answer.seat, game, at };
     if (!readActivityPass(pass, facts, Date.now() - RENEW_GRACE_MS)) return { reason: "seat" };
     await touchPlay(id.data, userId, game);
+    noteGameAway(userId, away === true);
     return { claim: { game, at, pass: activityPass(facts) } };
 }
 
