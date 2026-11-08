@@ -3981,6 +3981,15 @@ model Notification {
     // Last time an open condition rewrote the text in place. Null for a row that
     // was never edited after it was written.
     updatedAt      DateTime?
+    // What makes two alerts the same alert, so a repeat folds into this row
+    // instead of writing another (see notifications/dispatch). Null on rows
+    // written before it existed and on anything that cannot repeat.
+    dedupKey       String?
+    // How many times this alert was raised while it was folded into one row.
+    repeatCount    Int       @default(1)
+    // When the first of those was raised. The repeat window counts from here;
+    // `createdAt` moves to the latest repeat so the row sorts by it.
+    firstSeenAt    DateTime?
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -3997,6 +4006,10 @@ model Notification {
     // resolved and one-off rows are unaffected. Also what makes two checkers
     // raising the same condition at once end in one row.
     @@unique([userId, conditionKey])
+    // One row per alert identity per reader: what makes a repeat raced from
+    // two processes end in one row. NULLs never collide, so rows without a key
+    // are unaffected.
+    @@unique([userId, dedupKey])
     // An announcement's history counts its notices by key, across readers.
     @@index([conditionKey])
 }
@@ -11617,6 +11630,11 @@ model Camera {
     /// whole of the outage state: the alert is raised once the gap since this
     /// passes the grace window, and the event is closed when it clears.
     offlineSince DateTime?
+    /// The outage (by its `offlineSince`) this camera was last reported for.
+    /// Kept on the camera rather than read off the log, because the log is the
+    /// operator's to clear: deriving "already said" from an event row made every
+    /// clear of the outage line a fresh alert on the next pass.
+    offlineReportedAt DateTime?
 
     /// Privacy: nothing Polaris runs reads a frame from it while this is on -
     /// relay, recording, watcher, detection and stills all leave it alone. On a

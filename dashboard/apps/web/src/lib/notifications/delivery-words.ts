@@ -44,7 +44,9 @@ const EXACT: Readonly<Record<string, Key>> = {
     "Held back: you muted it.": "delivery.muted",
     "Held back: outside the hours you set for it.": "delivery.outsideSchedule",
     "Recorded without a sound or badge: it is muted or outside its hours.":
-        "delivery.recordedQuietly"
+        "delivery.recordedQuietly",
+    "Folded into the same alert already on the bell; sent nowhere else.": "delivery.folded",
+    "Held back: too many of these at once, so they are counted on one alert.": "delivery.heldBurst"
 };
 
 const SHAPED: readonly (readonly [RegExp, Key])[] = [

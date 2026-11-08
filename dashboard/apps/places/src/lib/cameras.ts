@@ -383,7 +383,7 @@ export async function updateCamera(
     const row = await prisma.camera.update({
         where: { id },
         data: {
-            ...(battery ? { offlineSince: null } : {}),
+            ...(battery ? { offlineSince: null, offlineReportedAt: null } : {}),
             ...(moved ? { controlPin: null, hardwareAddress: null } : {}),
             placeId: input.placeId || null,
             name: input.name,

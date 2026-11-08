@@ -21,6 +21,7 @@
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 import Link from "next/link";
 import { RelativeTime } from "@/components/relative-time";
+import { NotificationRepeats } from "@/components/notifications/notification-repeats";
 import { eventLabel } from "./event-names";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { loadNotificationHistoryAction } from "./actions";
@@ -370,6 +371,7 @@ function NotificationRow({
                 ) : null}
                 <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-muted-foreground/70">
                     <RelativeTime iso={row.createdAt} />
+                    <NotificationRepeats row={row} />
                     <span aria-hidden="true">-</span>
                     <span title={audience.hint}>{audience.text}</span>
                     {label ? (

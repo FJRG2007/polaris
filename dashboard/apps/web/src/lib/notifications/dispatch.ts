@@ -13,6 +13,7 @@
  * write - see `notify`, which resolves once the record exists.
  */
 
+import { createHash } from "node:crypto";
 import { prisma } from "@polaris/db";
 import { isViewing } from "./presence";
 import { sendSms } from "./sms-service";
@@ -25,6 +26,7 @@ import { getNotificationHolds, getNotificationPreferences, getQuietHours } from 
 import {
     createNotification,
     raiseCondition,
+    type RepeatPolicy,
     type NotificationAudience
 } from "@/lib/notification-service";
 import { destinationSummary, recordDestinationResult, resolveDestination } from "./destinations";
@@ -83,6 +85,71 @@ export interface NotifyInput {
     condition?: string;
     /** With `condition`: put a rewritten notice back to unread (it got worse). */
     resurface?: boolean;
+    /**
+     * What makes this alert the same incident as an earlier one, for a producer
+     * that knows (an outage's place and start, a job's id). Left out, it is
+     * derived from the event, title, body and link, so an exact repeat is
+     * always caught. A repeat inside `REPEAT_WINDOW_MS` folds into the row
+     * already on the bell and is sent nowhere else.
+     *
+     * `null` for an alert that carries what a person wrote (a comment, a
+     * mention, a reminder, an automation's own message): two identical ones are
+     * still two messages, so it is never folded and never held by the burst
+     * ceiling.
+     */
+    dedupKey?: string | null;
+}
+
+/**
+ * Anti-spam, after Alertmanager's notification pipeline: one alert per identity
+ * per `repeat_interval` (a repeat folds into the open row, "x12", and is not
+ * mailed, texted or posted again), and a per-reader, per-event ceiling on new
+ * rows in a short span, past which the rest are held on one summary row - its
+ * group_interval. A critical event is folded on exact repeats like any other
+ * but never held by the ceiling: a break-in is not throttled.
+ */
+export const REPEAT_WINDOW_MS = 60 * 60 * 1000;
+export const BURST_LIMIT = 10;
+export const BURST_WINDOW_MS = 10 * 60 * 1000;
+
+/** The delivery log's lines for a repeat that was folded rather than sent.
+ *  Matched back to the reader's words by delivery-words. */
+export const FOLDED = "Folded into the same alert already on the bell; sent nowhere else.";
+export const HELD_BURST = "Held back: too many of these at once, so they are counted on one alert.";
+
+/** The identity of an alert nobody named: the same words to the same place,
+ *  on the same shelf - the same sentence about two organizations' work is two
+ *  alerts, each on the shelf it belongs to. */
+export function derivedDedupKey(
+    input: Pick<NotifyInput, "event" | "title" | "body" | "href" | "shelf">
+): string {
+    const words = [input.event, input.title, input.body ?? null, input.href ?? null];
+    const digest = createHash("sha256")
+        .update(JSON.stringify(input.shelf ? [...words, input.shelf.orgId] : words))
+        .digest("hex")
+        .slice(0, 32);
+    return `auto:${digest}`;
+}
+
+/** How a repeat of this alert is folded. No burst ceiling for a critical
+ *  event: a break-in is folded on exact repeats, never held back. */
+function repeatPolicy(input: NotifyInput, critical: boolean): RepeatPolicy {
+    if (critical) return { windowMs: REPEAT_WINDOW_MS };
+    return {
+        windowMs: REPEAT_WINDOW_MS,
+        burst: {
+            limit: BURST_LIMIT,
+            windowMs: BURST_WINDOW_MS,
+            summary: async () => {
+                const t = await wordsFor(input.userId, "notices");
+                return {
+                    title: t("repeats.burstTitle"),
+                    body: input.title,
+                    href: "/account/notifications"
+                };
+            }
+        }
+    };
 }
 
 /** What one attempt came to, as the delivery log recorded it. */
@@ -95,10 +162,12 @@ export interface DeliveryOutcome {
  * What became of the bell row. `read`: written, but already marked read because
  * the page it points at was open; `off`: the account turned this event off;
  * `refused`: the event is not in the catalogue, so nothing was written;
- * `updated`: a condition already open, whose notice was rewritten in place.
+ * `updated`: a condition already open, whose notice was rewritten in place;
+ * `collapsed`: a repeat folded into the alert already on the bell, or held on
+ * the burst summary - sent nowhere else.
  */
 export interface NotifyReport {
-    inapp: "sent" | "read" | "off" | "refused" | "updated";
+    inapp: "sent" | "read" | "off" | "refused" | "updated" | "collapsed";
     /**
      * The channels of the account's rule the alert was handed to in the
      * background (never with `bellOnly`). Left out when there were none.
@@ -452,7 +521,28 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
             });
             if (outcome === "updated") return { inapp: "updated" };
         } else {
-            await createNotification(row);
+            const outcome = await createNotification(
+                input.dedupKey === null
+                    ? row
+                    : {
+                          ...row,
+                          dedupKey: input.dedupKey ?? derivedDedupKey(input),
+                          repeat: repeatPolicy(input, event.critical === true)
+                      }
+            );
+            // A repeat: the bell already says it, now with one more on its
+            // count. Mail, texts and webhooks were told the first time, and
+            // telling them every minute is the spam this exists to stop.
+            if (outcome === "collapsed" || outcome === "held") {
+                await record({
+                    userId: input.userId,
+                    event: input.event,
+                    kind: "inapp",
+                    status: "skipped",
+                    detail: outcome === "held" ? HELD_BURST : FOLDED
+                });
+                return { inapp: "collapsed" };
+            }
         }
         await record({
             userId: input.userId,

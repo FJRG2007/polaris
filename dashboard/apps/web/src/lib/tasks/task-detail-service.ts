@@ -69,7 +69,9 @@ export async function addComment(actorId: string, input: core.CommentInput): Pro
             title: task?.name ?? translate(await getUserLocale(userId), "tasks.notify.aTask"),
             body: input.body.slice(0, 200),
             href: `/tasks/t/${input.taskId}`,
-            shelf
+            shelf,
+            // What a person wrote: two identical ones are two messages.
+            dedupKey: null
         });
     }
     // Being named in a comment reaches somebody who follows none of this. The
