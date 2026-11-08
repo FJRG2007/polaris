@@ -26,13 +26,7 @@ import { callActivityGames } from "@/lib/app-extensions/registry";
 
 /** Why a room action was refused, in a word the screen turns into a sentence. */
 export type RoomRefusal =
-    | "invalid"
-    | "denied"
-    | "missing"
-    | "limited"
-    | "unknown"
-    | "full"
-    | "failed";
+    "invalid" | "denied" | "missing" | "limited" | "unknown" | "full" | "failed";
 
 type User = Awaited<ReturnType<typeof requireUser>>;
 

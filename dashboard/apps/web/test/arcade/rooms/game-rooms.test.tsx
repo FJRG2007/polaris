@@ -34,7 +34,10 @@ vi.mock("@/components/i18n/i18n-provider", () => ({
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: (href: string) => api.pushed.push(href) })
 }));
-vi.mock("@/lib/snapshot-cache", () => ({ readSnapshot: () => null, writeSnapshot: () => undefined }));
+vi.mock("@/lib/snapshot-cache", () => ({
+    readSnapshot: () => null,
+    writeSnapshot: () => undefined
+}));
 
 import { GameRooms } from "@/components/arcade/game-rooms";
 

@@ -24,12 +24,7 @@ export const ROOM_CREATE_WINDOW_MS = 10 * 60 * 1000;
 /** A typed code in its one stored form: upper case, no spaces or dashes, and
  *  the letters people mistype for digits read as the digits. */
 export function normalizeRoomCode(raw: string): string {
-    return raw
-        .trim()
-        .toUpperCase()
-        .replace(/[\s-]/g, "")
-        .replace(/[IL]/g, "1")
-        .replace(/O/g, "0");
+    return raw.trim().toUpperCase().replace(/[\s-]/g, "").replace(/[IL]/g, "1").replace(/O/g, "0");
 }
 
 export const roomCodeSchema = z
