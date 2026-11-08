@@ -31,7 +31,7 @@ import { Button } from "@polaris/ui";
 import { packOn, seasonOn, type Season, type SeasonCalendar } from "@polaris/core";
 import { createContext, useContext, useEffect, useState, useTransition } from "react";
 import { Eye, Ghost, PartyPopper, Snowflake, Sparkles, type LucideIcon } from "lucide-react";
-import { stopSeasonPreviewAction } from "@/app/(app)/admin/settings/seasonal-actions";
+import { stopSeasonPreviewAction } from "@/app/(app)/account/preferences/seasonal-actions";
 
 /** How often the date is looked at again, for a tab left open across midnight. */
 const RECHECK_MS = 30 * 60_000;

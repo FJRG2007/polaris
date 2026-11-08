@@ -19,9 +19,9 @@ import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Select, Switch } 
 import {
     previewSeasonAction,
     saveSeasonRuleAction,
-    setSeasonsAllowedAction,
-    stopSeasonPreviewAction
+    setSeasonsAllowedAction
 } from "./seasonal-actions";
+import { stopSeasonPreviewAction } from "@/app/(app)/account/preferences/seasonal-actions";
 
 export function SeasonalAdminCard({
     initial,

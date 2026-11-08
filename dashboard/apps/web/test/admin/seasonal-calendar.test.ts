@@ -49,6 +49,7 @@ vi.mock("react", async (original) => ({
 const actions = await import("@/app/(app)/admin/settings/seasonal-actions");
 const service = await import("@/lib/seasonal-service");
 const preview = await import("@/lib/seasonal-preview");
+const own = await import("@/app/(app)/account/preferences/seasonal-actions");
 
 const md = (month: number, day: number) => ({ month, day });
 
@@ -73,9 +74,19 @@ describe("saving a season", () => {
     });
 
     it("forgets a season put back to its defaults, so nothing is stored", async () => {
-        await actions.saveSeasonRuleAction("winter", { enabled: false, from: md(12, 1), to: md(1, 9) });
-        expect(JSON.parse(settings.get("seasonal.calendar")!)).toEqual({ winter: { enabled: false } });
-        await actions.saveSeasonRuleAction("winter", { enabled: true, from: md(12, 1), to: md(1, 9) });
+        await actions.saveSeasonRuleAction("winter", {
+            enabled: false,
+            from: md(12, 1),
+            to: md(1, 9)
+        });
+        expect(JSON.parse(settings.get("seasonal.calendar")!)).toEqual({
+            winter: { enabled: false }
+        });
+        await actions.saveSeasonRuleAction("winter", {
+            enabled: true,
+            from: md(12, 1),
+            to: md(1, 9)
+        });
         expect(settings.has("seasonal.calendar")).toBe(false);
         expect(await service.seasonCalendar()).toEqual(core.DEFAULT_SEASON_CALENDAR);
     });
@@ -113,7 +124,11 @@ describe("saving a season", () => {
     it("refuses somebody who is not an administrator", async () => {
         admin = false;
         await expect(
-            actions.saveSeasonRuleAction("halloween", { enabled: false, from: md(10, 7), to: md(11, 2) })
+            actions.saveSeasonRuleAction("halloween", {
+                enabled: false,
+                from: md(10, 7),
+                to: md(11, 2)
+            })
         ).rejects.toThrow();
         expect(settings.size).toBe(0);
     });
@@ -129,7 +144,7 @@ describe("previewing a season", () => {
 
     it("stops", async () => {
         await actions.previewSeasonAction("halloween");
-        expect(await actions.stopSeasonPreviewAction()).toEqual({});
+        expect(await own.stopSeasonPreviewAction()).toEqual({});
         expect(await preview.seasonPreviewFor("session-a")).toBeNull();
     });
 

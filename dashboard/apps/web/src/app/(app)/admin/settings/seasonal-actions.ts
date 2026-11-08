@@ -11,7 +11,7 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "@/lib/i18n/request";
 import { setSeasonPreview } from "@/lib/seasonal-preview";
-import { requireAdmin, requireUser } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
 import { saveSeasonRule, seasonCalendar, setSeasonsAllowed } from "@/lib/seasonal-service";
 
 export async function setSeasonsAllowedAction(allowed: unknown): Promise<{ error?: string }> {
@@ -90,15 +90,6 @@ export async function previewSeasonAction(season: unknown): Promise<{ error?: st
         return { error: t("settings.seasonal.previewFailed") };
     }
     await setSeasonPreview(user.sessionId, parsed.data);
-    revalidatePath("/", "layout");
-    return {};
-}
-
-/** Stop a preview. Asked only by a session that is previewing, so a signed-in
- *  account is enough: one that lost admin since still gets out of it. */
-export async function stopSeasonPreviewAction(): Promise<{ error?: string }> {
-    const user = await requireUser();
-    await setSeasonPreview(user.sessionId, null);
     revalidatePath("/", "layout");
     return {};
 }
