@@ -11,6 +11,7 @@
  * once it is back. A server's own switch tells it at once.
  */
 
+import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
 import * as seasonal from "./seasonal";
 import * as winter from "./seasonal-winter";
@@ -29,6 +30,13 @@ const { readInstallConfig, patchInstallConfig } = host.appsInstallConfig;
 /** The deployment's switch, read from the host when asked rather than as this
  *  loads: the events loop loads this too, for an arena's season. */
 const seasonsAllowed = () => host.seasonalService.seasonsAllowed();
+/** The deployment's calendar - the windows an admin set, and which seasons run.
+ *  The shipped one when it cannot be read: a server is never left undressed
+ *  over a settings read. */
+const seasonCalendar = (): Promise<core.SeasonCalendar> =>
+    Promise.resolve()
+        .then(() => host.seasonalService.seasonCalendar())
+        .catch(() => core.DEFAULT_SEASON_CALENDAR);
 
 /** How long a server with no Polaris jar at all is left before it is asked again:
  *  it answers the same until somebody adds one. */
@@ -90,10 +98,12 @@ function zoneOf(config: Record<string, unknown>): string {
 export function decorationOf(
     config: Record<string, unknown>,
     allowed: boolean,
-    now: Date
+    now: Date,
+    calendar: core.SeasonCalendar = core.DEFAULT_SEASON_CALENDAR
 ): seasonal.Decoration | null {
     return seasonal.decorationNow({
         now,
+        calendar,
         timeZone: zoneOf(config),
         allowed,
         serverOn: seasonal.seasonalOn(config),
@@ -117,17 +127,19 @@ export async function eventDecoration(
     now: Date = new Date()
 ): Promise<seasonal.Decoration | null> {
     try {
-        const [row, allowed] = await Promise.all([
+        const [row, allowed, calendar] = await Promise.all([
             prisma.installedApp.findUnique({
                 where: { id: installedAppId },
                 select: { config: true }
             }),
-            seasonsAllowed().catch(() => true)
+            seasonsAllowed().catch(() => true),
+            seasonCalendar()
         ]);
         if (!row) return null;
         const config = readInstallConfig(row.config);
         return seasonal.decorationNow({
             now,
+            calendar,
             timeZone: zoneOf(config),
             allowed,
             serverOn: seasonal.seasonalOn(config),
@@ -149,7 +161,8 @@ async function halloweenCommandFor(
     ownerId: string,
     config: Record<string, unknown>,
     now: Date,
-    switchedOff = false
+    switchedOff = false,
+    calendar: core.SeasonCalendar = core.DEFAULT_SEASON_CALENDAR
 ): Promise<string> {
     const language = await serverLanguage(ownerId, config);
     const settings = halloween.halloweenSettings(config);
@@ -158,7 +171,7 @@ async function halloweenCommandFor(
         settings,
         halloween.bloodNightKey(now, zoneOf(config)),
         language,
-        halloween.halloweenSecondsLeft(now, zoneOf(config))
+        halloween.halloweenSecondsLeft(now, zoneOf(config), calendar)
     );
 }
 
@@ -166,21 +179,29 @@ async function halloweenCommandFor(
 function halloweenSwitchedOff(
     config: Record<string, unknown>,
     allowed: boolean,
-    now: Date
+    now: Date,
+    calendar: core.SeasonCalendar
 ): boolean {
     if (allowed && seasonal.seasonalOn(config)) return false;
-    return seasonal.decorationFor(seasonal.seasonInZone(now, zoneOf(config))) === "halloween";
+    return (
+        seasonal.decorationFor(seasonal.seasonInZone(now, zoneOf(config), calendar)) === "halloween"
+    );
 }
 
 /** Tell one server. A line it already took out of season is not sent again. */
-async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolean> {
+async function tell(
+    row: ServerRow,
+    allowed: boolean,
+    now: Date,
+    calendar: core.SeasonCalendar
+): Promise<boolean> {
     const config = readInstallConfig(row.config);
-    const decoration = decorationOf(config, allowed, now);
+    const decoration = decorationOf(config, allowed, now, calendar);
     const clearLine = seasonal.seasonCommand(null);
     const last = told.get(row.id);
     const again = askAgainAt(last);
     if (again !== null && now.getTime() < again) return false;
-    const switchedOff = !decoration && halloweenSwitchedOff(config, allowed, now);
+    const switchedOff = !decoration && halloweenSwitchedOff(config, allowed, now, calendar);
     if (
         !decoration &&
         last &&
@@ -233,12 +254,12 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
         const hasHalloween = reading.caps.has(halloween.HALLOWEEN_CAP);
         const halloweenLine =
             decoration === "halloween" && hasHalloween
-                ? await halloweenCommandFor(row.ownerId, config, now)
+                ? await halloweenCommandFor(row.ownerId, config, now, false, calendar)
                 : null;
         if (halloweenLine) lines.push(halloweenLine);
         // Switched off is not paused: the graveyards come down with the rest.
         if (switchedOff && hasHalloween)
-            lines.unshift(await halloweenCommandFor(row.ownerId, config, now, true));
+            lines.unshift(await halloweenCommandFor(row.ownerId, config, now, true, calendar));
         // Christmas and New Year ride on the winter, for a jar that takes them.
         const winterJar = reading.caps.has(winter.WINTER_CAP);
         if (decoration === "winter" && winterJar) {
@@ -271,7 +292,7 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
 
 /** Every Minecraft server, told what to show. */
 export async function sweepSeasons(now: Date = new Date()): Promise<{ told: number }> {
-    const [rows, allowed] = await Promise.all([
+    const [rows, allowed, calendar] = await Promise.all([
         prisma.installedApp.findMany({
             where: {
                 status: { not: "removed" },
@@ -280,14 +301,15 @@ export async function sweepSeasons(now: Date = new Date()): Promise<{ told: numb
             },
             select: { id: true, ownerId: true, config: true }
         }),
-        seasonsAllowed().catch(() => true)
+        seasonsAllowed().catch(() => true),
+        seasonCalendar()
     ]);
     let count = 0;
     let next = 0;
     const worker = async () => {
         while (next < rows.length) {
             const row = rows[next++]!;
-            if (await tell(row, allowed, now)) count += 1;
+            if (await tell(row, allowed, now, calendar)) count += 1;
         }
     };
     await Promise.all(Array.from({ length: Math.min(SWEEP_CONCURRENCY, rows.length) }, worker));
@@ -329,17 +351,18 @@ export interface SeasonalView {
 }
 
 export async function seasonalView(installedAppId: string): Promise<SeasonalView> {
-    const [row, allowed] = await Promise.all([
+    const [row, allowed, calendar] = await Promise.all([
         prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { config: true } }),
-        seasonsAllowed().catch(() => true)
+        seasonsAllowed().catch(() => true),
+        seasonCalendar()
     ]);
     const config = readInstallConfig(row?.config);
     const now = new Date();
     const last = told.get(installedAppId);
     return {
         on: seasonal.seasonalOn(config),
-        showing: decorationOf(config, allowed, now),
-        season: seasonal.decorationFor(seasonal.seasonInZone(now, zoneOf(config))),
+        showing: decorationOf(config, allowed, now, calendar),
+        season: seasonal.decorationFor(seasonal.seasonInZone(now, zoneOf(config), calendar)),
         blocked: !allowed,
         paused: readEventState(config).run !== null,
         needsRestart: last !== undefined && "oldJarAt" in last,
@@ -391,13 +414,14 @@ export async function setSeasonal(
     // Asked again now rather than when the last answer runs out, so a server
     // restarted onto a newer jar is reached on the switch.
     told.delete(installedAppId);
-    const [row, allowed] = await Promise.all([
+    const [row, allowed, calendar] = await Promise.all([
         prisma.installedApp.findUnique({
             where: { id: installedAppId },
             select: { id: true, ownerId: true, config: true }
         }),
-        seasonsAllowed().catch(() => true)
+        seasonsAllowed().catch(() => true),
+        seasonCalendar()
     ]);
-    if (row) await tell({ ...row, ownerId }, allowed, new Date());
+    if (row) await tell({ ...row, ownerId }, allowed, new Date(), calendar);
     return seasonalView(installedAppId);
 }

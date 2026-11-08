@@ -51,11 +51,15 @@ export function decorationFor(season: core.Season | null): Decoration | null {
  * zone's wall clock. A zone the runtime does not know, or "automatic" (which
  * would be the dashboard machine's own clock), is UTC.
  */
-export function seasonInZone(now: Date, timeZone: string): core.Season | null {
+export function seasonInZone(
+    now: Date,
+    timeZone: string,
+    calendar: core.SeasonCalendar = core.DEFAULT_SEASON_CALENDAR
+): core.Season | null {
     const zone =
         timeZone !== core.AUTOMATIC_TIME_ZONE && core.isTimeZone(timeZone) ? timeZone : "UTC";
     const wall = core.wallClock(now, zone);
-    return core.seasonOn(new Date(wall.year, wall.month - 1, wall.day, 12));
+    return core.seasonOn(new Date(wall.year, wall.month - 1, wall.day, 12), calendar);
 }
 
 export interface SeasonInputs {
@@ -67,12 +71,14 @@ export interface SeasonInputs {
     readonly serverOn: boolean;
     /** An event is running: its arena stays as it was built. */
     readonly eventRunning: boolean;
+    /** The deployment's calendar (`seasonCalendar`); the shipped one when absent. */
+    readonly calendar?: core.SeasonCalendar;
 }
 
 /** What the server should be showing now, or null for nothing. */
 export function decorationNow(inputs: SeasonInputs): Decoration | null {
     if (!inputs.allowed || !inputs.serverOn || inputs.eventRunning) return null;
-    return decorationFor(seasonInZone(inputs.now, inputs.timeZone));
+    return decorationFor(seasonInZone(inputs.now, inputs.timeZone, inputs.calendar));
 }
 
 /** Where a server keeps how many more monsters come out on a Halloween night. */

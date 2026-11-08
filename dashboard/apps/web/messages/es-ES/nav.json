@@ -435,5 +435,10 @@
         "winter": "Fiestas de invierno",
         "newYear": "Año Nuevo",
         "lunarNewYear": "Año Nuevo Lunar"
+    },
+    "seasonPreview": {
+        "bar": "Vista previa de {season}: solo la ves tú",
+        "stop": "Parar",
+        "notStopped": "La vista previa no pudo parar. Inténtalo de nuevo en un momento."
     }
 }

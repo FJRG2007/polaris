@@ -91,8 +91,9 @@ import { SoundVolumeSeed } from "@/components/sound-volume-seed";
 import { getSoundVolume } from "@/lib/notifications/sound-volume-service";
 import { DEFAULT_SOUND_VOLUME } from "@/lib/notifications/sound-volume";
 import { buildStamp } from "@/lib/build-stamp";
-import { SEASONAL_DEFAULTS } from "@polaris/core";
-import { getSeasonalChoice, seasonsAllowed } from "@/lib/seasonal-service";
+import { DEFAULT_SEASON_CALENDAR, SEASONAL_DEFAULTS } from "@polaris/core";
+import { seasonPreviewFor } from "@/lib/seasonal-preview";
+import { getSeasonalChoice, seasonCalendar, seasonsAllowed } from "@/lib/seasonal-service";
 import { SeasonalBadge, SeasonalFrame } from "@/components/seasonal/seasonal-frame";
 import { NewBuildBanner } from "@/components/new-build-banner";
 import { SnapshotBuild } from "@/components/snapshot-build";
@@ -182,6 +183,8 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         adminWaiting,
         seasonsOn,
         seasonal,
+        calendar,
+        seasonPreview,
         polarAccess
     ] = await Promise.all([
         // The open shelf's, as the bell shows them - see `lib/shelf`.
@@ -211,6 +214,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         // A decoration is never worth a failed page: off, rather than an error.
         seasonsAllowed().catch(() => false),
         getSeasonalChoice(user.id).catch(() => SEASONAL_DEFAULTS),
+        seasonCalendar().catch(() => DEFAULT_SEASON_CALENDAR),
+        // An admin trying a season on, on this session only (see the Settings list).
+        user.isAdmin ? seasonPreviewFor(user.sessionId).catch(() => null) : null,
         // The same check every Polar route makes, so the header follows it.
         polarAccessFor(user.id)
     ]);
@@ -392,6 +398,12 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                     }
                                                                                     mutedPack={
                                                                                         seasonal.mutedPack
+                                                                                    }
+                                                                                    calendar={
+                                                                                        calendar
+                                                                                    }
+                                                                                    preview={
+                                                                                        seasonPreview
                                                                                     }
                                                                                 >
                                                                                     <AppShell

@@ -60,7 +60,11 @@ export function SettingsCardsLoader({ max, revision }: { max: number; revision: 
         >
             {(data) => (
                 <>
-                    <SeasonalAdminCard initial={data.seasons} />
+                    <SeasonalAdminCard
+                        initial={data.seasons}
+                        calendar={data.calendar}
+                        preview={data.preview}
+                    />
                     <TerminalSessionsCard cap={data.terminalCap} max={max} />
                 </>
             )}
