@@ -2,7 +2,9 @@
 
 /**
  * The browser extension's card on the downloads screen: which browser, then how
- * - from the store, or by hand with a download or a command.
+ * - from the store, or by hand with a download or a command. Every way has the
+ * same Install button, which installs it the most automatic way that browser
+ * allows (`extension-install.ts`); the ways only change what is shown under it.
  *
  * The browser starts on the one the page is open in and stays a picker, because
  * the reader may be setting it up for another. The way starts on the store once
@@ -11,8 +13,10 @@
  * Firefox has no command: the line cannot keep a temporary add-on current.
  */
 
-import { useState } from "react";
-import { DesktopInstall } from "./desktop-install";
+import { useEffect, useState } from "react";
+import { useDesktopInstallable } from "./desktop-install";
+import { ExtensionInstallButton } from "./extension-install-button";
+import { EXTENSION_LISTINGS, installMethod, isSafari } from "./extension-install";
 import { AppLink } from "./app-link";
 import { Puzzle } from "lucide-react";
 import type { ReactNode } from "react";
@@ -38,19 +42,43 @@ function defaultWay(browser: BrowserId, store: boolean): Way {
 export function ExtensionCard({
     repo,
     files,
-    storeUrl = null
+    signedFirefox
 }: {
     /** The GitHub repository this deployment updates from. */
     repo: string;
     /** The release's files, which wait on GitHub in a boundary of their own. */
     files: ReactNode;
-    /** The store listing, once there is one. */
-    storeUrl?: string | null;
+    /** Where this deployment serves the signed Firefox package, once GitHub has
+     *  said whether the release carries one. */
+    signedFirefox?: Promise<string | null>;
 }) {
     const t = useTranslations("account");
     const [browser, setBrowser] = useBrowserChoice();
     const [chosen, setChosen] = useState<Way | null>(null);
+    const [firefoxPackage, setFirefoxPackage] = useState<string | null>(null);
+    const [safari, setSafari] = useState(false);
+    const desktop = useDesktopInstallable();
     const firefox = browser === "firefox";
+
+    useEffect(() => {
+        setSafari(typeof navigator !== "undefined" && isSafari(navigator.userAgent));
+        let alive = true;
+        signedFirefox?.then(
+            (url) => alive && setFirefoxPackage(url),
+            () => undefined
+        );
+        return () => {
+            alive = false;
+        };
+    }, [signedFirefox]);
+
+    const method = installMethod({
+        browser,
+        listings: EXTENSION_LISTINGS,
+        signedFirefox: firefoxPackage,
+        desktop
+    });
+    const storeUrl = method.kind === "store" ? method.url : null;
     // A choice that this browser cannot take falls back to its default.
     const way =
         chosen && !(chosen === "command" && firefox) && !(chosen === "store" && !storeUrl)
@@ -101,21 +129,10 @@ export function ExtensionCard({
                     />
                 </div>
 
-                {/* Whichever way is showing: inside the app it is all one button.
-                    Firefox cannot load what the app's installer puts on disk. */}
-                {firefox ? null : (
-                    <DesktopInstall
-                        tool="extension"
-                        browser={browser}
-                        done={t("downloads.install.extensionDone")}
-                    />
-                )}
+                {/* Whichever way is showing, the same button. */}
+                <ExtensionInstallButton method={method} browser={browser} safari={safari} />
 
-                {way === "store" && storeUrl ? (
-                    <a className="underline" href={storeUrl} target="_blank" rel="noreferrer">
-                        {t("downloads.extension.store")}
-                    </a>
-                ) : way === "command" ? (
+                {way === "store" ? null : way === "command" ? (
                     <ExtensionCommand repo={repo} browser={browser} />
                 ) : (
                     <>

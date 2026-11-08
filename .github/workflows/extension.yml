@@ -72,6 +72,33 @@ jobs:
       - run: npm run zip --workspace @polaris/extension
       - run: npm run zip:firefox --workspace @polaris/extension
 
+      # A signed Firefox package, so Firefox offers to install it with one press:
+      # release Firefox installs nothing unsigned. Mozilla signs it as unlisted
+      # (self-distributed) with the account's AMO API credentials; without the
+      # secrets this step is skipped and Firefox keeps the temporary steps.
+      # `secrets` cannot be read in an `if`, and handing them to the whole job
+      # would hand them to every install script npm runs; so one step says
+      # whether they exist and only the signing step sees them.
+      - name: Whether there are signing credentials
+        id: amo
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: echo "ready=$([ -n "$AMO_JWT_ISSUER" ] && [ -n "$AMO_JWT_SECRET" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      # Only a release tag signs: AMO takes each version once, so a manual run
+      # would spend the version the tag needs. A refusal or an AMO outage leaves
+      # Firefox on the manual steps instead of holding the whole release back.
+      - name: Sign the Firefox package
+        if: steps.amo.outputs.ready == 'true' && startsWith(github.ref, 'refs/tags/extension-v')
+        continue-on-error: true
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          npx --yes web-ext@8.3.0 sign --channel=unlisted --source-dir apps/extension/.output/firefox-mv2 --artifacts-dir apps/extension/.output/signed --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
+          cp apps/extension/.output/signed/*.xpi apps/extension/.output/polaris-extension-firefox.xpi
+
       # The installers ride along with the packages, so the release carries the
       # easy way in as well as the files it installs. They are ordinary files in
       # the repository; the release job has no checkout of its own, so they are
@@ -89,6 +116,7 @@ jobs:
           # both is the same extension twice.
           path: |
             dashboard/apps/extension/.output/*.zip
+            dashboard/apps/extension/.output/*.xpi
             dashboard/apps/extension/.output/install.sh
             dashboard/apps/extension/.output/install.ps1
           # WXT writes into `.output`, and this action counts "files within
@@ -122,5 +150,6 @@ jobs:
           make_latest: "false"
           files: |
             packages/*.zip
+            packages/*.xpi
             packages/install.sh
             packages/install.ps1

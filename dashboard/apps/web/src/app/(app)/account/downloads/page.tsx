@@ -32,10 +32,13 @@ import { requireUser } from "@/lib/session";
 import { publicAppUrl } from "@/lib/domain-service";
 import { InstallAppOffer, NativeAppOffer } from "@/components/installed-app";
 import { DesktopFiles, ExtensionFiles } from "@/components/app-download";
+import { FIREFOX_PACKAGE_ROUTE } from "@/lib/extension-package";
+import { signedFirefoxFile } from "@polaris/ui/account-downloads/extension-install";
 import {
     companionDownload,
     streamDeckDownload,
     tvDownload,
+    extensionDownload,
     tvInstallable
 } from "@/lib/app-releases";
 import { DeckFile, StreamDeckSection, type ConnectedDeck } from "./streamdeck-section";
@@ -108,6 +111,13 @@ export default async function DownloadsPage() {
                     }
                 />
             }
+            // Not awaited either: the button learns whether Firefox has a signed
+            // package when GitHub answers, and offers the steps until then.
+            signedFirefox={extensionDownload(repo)
+                .then((found) =>
+                    found && signedFirefoxFile(found.files) ? FIREFOX_PACKAGE_ROUTE : null
+                )
+                .catch(() => null)}
             extensionFiles={
                 <Suspense fallback={<FilesSkeleton />}>
                     <ExtensionFiles repo={repo} />

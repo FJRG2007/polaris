@@ -1259,7 +1259,19 @@
             "wayDownload": "Descarga",
             "wayCommand": "Comando",
             "alreadyHave": "¿Ya la tienes? <link>Conéctala a esta cuenta</link>. Tu bóveda es el segundo paso, desde la propia extensión.",
-            "rowFirefox": "Hasta cerrar Firefox"
+            "rowFirefox": "Hasta cerrar Firefox",
+            "auto": {
+                "storeChrome": "Añadir desde Chrome Web Store",
+                "storeEdge": "Añadir desde Edge Add-ons",
+                "storeOpera": "Añadir desde Opera add-ons",
+                "storeHint": "La tienda abre su página. Pulsa Añadir y confirma en {browser}.",
+                "packageAction": "Instalar en Firefox",
+                "packageHint": "Firefox pregunta antes: pulsa Continuar con la instalación y luego Añadir.",
+                "desktopStoreDone": "Listo. Cierra {browser}, ábrelo de nuevo y pulsa Habilitar extensión cuando lo pida.",
+                "manualChromium": "{browser} solo añade una extensión por sí mismo desde su tienda, y Polaris aún no está allí. Abre esta página en la app de escritorio de Polaris para instalarla con un clic, o sigue los pasos de abajo.",
+                "manualFirefox": "Firefox solo conserva extensiones firmadas por Mozilla, y esta versión aún no lo está. Los pasos de abajo la cargan hasta que cierres Firefox.",
+                "safari": "Safari solo acepta extensiones dentro de una app de Mac firmada por Apple, y Polaris aún no tiene una. Chrome, Edge, Brave, Opera y Firefox funcionan hoy."
+            }
         },
         "later": {
             "title": "Aún no está",
