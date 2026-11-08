@@ -11,7 +11,10 @@ export const dynamic = "force-dynamic";
 const ROUTES = new Map(
     Object.entries(PAINT_READS).map(([name, entry]) => [
         name as PaintReadName,
-        { inbox: entry.inbox, answer: pollRoute(entry.query, entry.run as (input: unknown) => Promise<unknown>) }
+        {
+            inbox: entry.inbox,
+            answer: pollRoute(entry.query, entry.run as (input: unknown) => Promise<unknown>, { sameOrigin: true })
+        }
     ])
 );
 

@@ -21,7 +21,13 @@ type Shell = { skeleton: ReactNode; revision: number };
 
 export function InboxLoader({ skeleton, revision }: Shell) {
     return (
-        <AfterPaint cacheKey="admin.inbox" load={() => paintRead("inbox")} revision={revision} skeleton={skeleton}>
+        <AfterPaint
+            cacheKey="admin.inbox"
+            load={() => paintRead("inbox")}
+            persist={false}
+            revision={revision}
+            skeleton={skeleton}
+        >
             {(data) => (
                 <InboxView
                     initialChannels={data.channels}
@@ -51,6 +57,7 @@ export function ContactsLoader({ skeleton, revision }: Shell) {
         <AfterPaint
             cacheKey="admin.inbox.contacts"
             load={() => paintRead("inbox.contacts")}
+            persist={false}
             revision={revision}
             skeleton={skeleton}
         >
@@ -64,6 +71,7 @@ export function LogsLoader({ skeleton, revision }: Shell) {
         <AfterPaint
             cacheKey="admin.inbox.logs"
             load={() => paintRead("inbox.logs")}
+            persist={false}
             revision={revision}
             skeleton={skeleton}
         >
@@ -78,6 +86,7 @@ export function ConnectChannelLoader({ skeleton, revision }: Shell) {
         <AfterPaint
             cacheKey="admin.inbox.connect"
             load={() => paintRead("inbox.connect")}
+            persist={false}
             revision={revision}
             skeleton={skeleton}
         >

@@ -9,7 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const gate = vi.hoisted(() => ({
     admin: vi.fn(async (): Promise<unknown> => ({ id: "admin-1" })),
-    permission: vi.fn(async (_permission: string): Promise<unknown> => ({ id: "agent-1" }))
+    permission: vi.fn(async (_permission: string): Promise<unknown> => ({ id: "agent-1" })),
+    options: [] as unknown[]
 }));
 
 vi.mock("@/lib/api-session", () => ({
@@ -17,8 +18,10 @@ vi.mock("@/lib/api-session", () => ({
     apiPermission: gate.permission
 }));
 vi.mock("@/lib/poll-route", () => ({
-    pollRoute: (_query: unknown, run: (input: unknown) => Promise<unknown>) => async () =>
-        Response.json({ value: await run({}) })
+    pollRoute: (_query: unknown, run: (input: unknown) => Promise<unknown>, options: unknown) => {
+        gate.options.push(options);
+        return async () => Response.json({ value: await run({}) });
+    }
 }));
 vi.mock("@/app/(app)/admin/paint-reads", () => ({
     PAINT_READS: {
@@ -58,6 +61,11 @@ describe("the after-paint read route", () => {
     it("returns the refusal instead of running the read", async () => {
         gate.admin.mockResolvedValueOnce(new Response(null, { status: 403 }));
         expect((await ask("settings")).status).toBe(403);
+    });
+
+    it("refuses another site's request on every read", () => {
+        expect(gate.options).toHaveLength(2);
+        for (const options of gate.options) expect(options).toMatchObject({ sameOrigin: true });
     });
 
     it("knows no read it was not given, including inherited names", async () => {

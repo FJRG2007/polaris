@@ -29,6 +29,7 @@ export function AppSettingsLoader({
         <AfterPaint
             cacheKey={`admin.app-settings:${appId}`}
             load={() => paintRead("apps.settings", { appId })}
+            persist={false}
             revision={revision}
             skeleton={<AppServicesSkeleton />}
         >
