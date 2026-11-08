@@ -20,7 +20,10 @@ export default async function ChannelsPage() {
         <ChannelsLoader
             revision={Date.now()}
             skeleton={
-                <ViewHeadingSkeleton title={t("inboxChannels.title")} intro={t("inboxChannels.intro")}>
+                <ViewHeadingSkeleton
+                    title={t("inboxChannels.title")}
+                    intro={t("inboxChannels.intro")}
+                >
                     {cardsSkeleton}
                 </ViewHeadingSkeleton>
             }

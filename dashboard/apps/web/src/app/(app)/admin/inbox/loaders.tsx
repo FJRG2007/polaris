@@ -96,7 +96,10 @@ export function ConnectChannelLoader({ skeleton, revision }: Shell) {
                 ) : data.screen === "ready" ? (
                     <ConnectChannelView bridgeReady />
                 ) : (
-                    <ConnectChannelView bridgeReady={false} bridgeHref={data.bridgeHref ?? undefined} />
+                    <ConnectChannelView
+                        bridgeReady={false}
+                        bridgeHref={data.bridgeHref ?? undefined}
+                    />
                 )
             }
         </AfterPaint>

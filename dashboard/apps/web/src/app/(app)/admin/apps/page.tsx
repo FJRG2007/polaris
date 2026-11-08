@@ -37,7 +37,9 @@ export default async function PolarisAppsPage({
 
     return (
         <PolarisAppsLoader
-            heading={<PageHeader title={t("polaris.title")} description={t("polaris.description")} />}
+            heading={
+                <PageHeader title={t("polaris.title")} description={t("polaris.description")} />
+            }
             initialQuery={focus?.name ?? ""}
             revision={Date.now()}
         />

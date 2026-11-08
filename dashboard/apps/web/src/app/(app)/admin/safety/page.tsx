@@ -29,14 +29,12 @@ export default async function SafetyPage({
     await requireAdmin();
     const status = (await searchParams).status;
     const t = await getTranslations("admin");
-    const known = (SAFETY_CASE_STATUSES as readonly string[]).includes(status ?? "") || status === "all";
+    const known =
+        (SAFETY_CASE_STATUSES as readonly string[]).includes(status ?? "") || status === "all";
 
     return (
         <>
-            <PageHeader
-                title={t("safety.page.title")}
-                description={t("safety.page.description")}
-            />
+            <PageHeader title={t("safety.page.title")} description={t("safety.page.description")} />
             {/* The reports and cases this page lists are ones the reader has seen. */}
             <SeenOnVisit screen="/admin/safety" />
             <SafetyLoader

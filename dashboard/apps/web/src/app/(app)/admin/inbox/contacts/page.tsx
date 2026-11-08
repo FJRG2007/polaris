@@ -19,7 +19,10 @@ export default async function ContactsPage() {
         <ContactsLoader
             revision={Date.now()}
             skeleton={
-                <ViewHeadingSkeleton title={t("inboxContacts.title")} intro={t("inboxContacts.intro")}>
+                <ViewHeadingSkeleton
+                    title={t("inboxContacts.title")}
+                    intro={t("inboxContacts.intro")}
+                >
                     {tableSkeleton}
                 </ViewHeadingSkeleton>
             }

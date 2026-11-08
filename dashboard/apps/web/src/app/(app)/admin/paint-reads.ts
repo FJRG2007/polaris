@@ -31,7 +31,11 @@ const none = z.object({});
 const person = z.object({ id: z.string().trim().min(1).max(200) });
 
 /** `inbox` marks a read held by whoever answers the shared inbox, not the operator alone. */
-function read<Q extends z.ZodTypeAny, A>(query: Q, run: (input: z.infer<Q>) => Promise<A>, inbox = false) {
+function read<Q extends z.ZodTypeAny, A>(
+    query: Q,
+    run: (input: z.infer<Q>) => Promise<A>,
+    inbox = false
+) {
     return { query, run, inbox };
 }
 
@@ -69,4 +73,6 @@ export const PAINT_READS = {
 
 export type PaintReadName = keyof typeof PAINT_READS;
 export type PaintQuery<K extends PaintReadName> = z.input<(typeof PAINT_READS)[K]["query"]>;
-export type PaintAnswer<K extends PaintReadName> = Awaited<ReturnType<(typeof PAINT_READS)[K]["run"]>>;
+export type PaintAnswer<K extends PaintReadName> = Awaited<
+    ReturnType<(typeof PAINT_READS)[K]["run"]>
+>;

@@ -45,10 +45,7 @@ function IntegrationsRegion({
     // Asked once per connection state; only the note in the GitHub dialog waits
     // for it, and a failed check leaves the note out.
     const runners = useMemo(
-        () =>
-            githubConnected
-                ? paintRead("integrations.runners").catch(() => null)
-                : undefined,
+        () => (githubConnected ? paintRead("integrations.runners").catch(() => null) : undefined),
         [githubConnected]
     );
     return <IntegrationsView cards={cards} runnerAccess={runners} configure={configure} />;

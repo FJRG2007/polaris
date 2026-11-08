@@ -25,7 +25,9 @@ export function SafetyLoader({
             revision={revision}
             skeleton={<TableSkeleton rows={6} />}
         >
-            {(data) => <SafetyView cases={data.cases} reports={data.reports} status={shownStatus} />}
+            {(data) => (
+                <SafetyView cases={data.cases} reports={data.reports} status={shownStatus} />
+            )}
         </AfterPaint>
     );
 }

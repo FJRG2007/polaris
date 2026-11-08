@@ -13,15 +13,24 @@ const ROUTES = new Map(
         name as PaintReadName,
         {
             inbox: entry.inbox,
-            answer: pollRoute(entry.query, entry.run as (input: unknown) => Promise<unknown>, { sameOrigin: true })
+            answer: pollRoute(entry.query, entry.run as (input: unknown) => Promise<unknown>, {
+                sameOrigin: true
+            })
         }
     ])
 );
 
-export async function GET(request: Request, { params }: { params: Promise<{ read: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ read: string }> }
+): Promise<Response> {
     const route = ROUTES.get((await params).read as PaintReadName);
     // i18n-ignore: status body no screen shows; the region offers to ask again
-    if (!route) return NextResponse.json({ error: "Not found" }, { status: 404, headers: { "cache-control": "no-store" } });
+    if (!route)
+        return NextResponse.json(
+            { error: "Not found" },
+            { status: 404, headers: { "cache-control": "no-store" } }
+        );
     // Operator only, or whoever answers the inbox for its reads, said here as
     // every admin route says it; the action checks again.
     const refused = route.inbox ? await apiPermission("inbox.read") : await apiAdmin();
