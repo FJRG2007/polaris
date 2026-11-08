@@ -169,7 +169,7 @@
             "turn": "Girar",
             "horn": "Claxon",
             "signal": "Intermitente",
-            "hazard": "Luces de emergencia",
+            "hazard": "Emergencia",
             "orbit": "Mirar"
         },
         "cyclist": {
