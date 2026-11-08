@@ -76,7 +76,18 @@ async function ceiling(key: string, fallback: number): Promise<number> {
 
 /** The states that still hold a machine. Anything else has been torn down, so it
  *  costs nothing and is not counted. */
-const ALIVE = ["starting", "working", "waiting", "idle"];
+export const ALIVE_STATES = ["starting", "working", "waiting", "idle"] as const;
+const ALIVE = [...ALIVE_STATES];
+
+/** The per-account ceiling, as an administrator left it. */
+export function perAccountCeiling(): Promise<number> {
+    return ceiling(PER_ACCOUNT_KEY, DEFAULT_PER_ACCOUNT);
+}
+
+/** The deployment-wide ceiling, as an administrator left it. */
+export function totalCeiling(): Promise<number> {
+    return ceiling(INSTANCE_KEY, DEFAULT_TOTAL);
+}
 
 export interface Capacity {
     readonly mine: number;
@@ -105,10 +116,10 @@ export async function sessionCapacity(userId: string): Promise<Capacity> {
  * deployment-wide one deliberately does not say who is holding the other
  * sessions: it is a number, not a list of what other people are working on.
  *
- * Nothing is queued. A session is a conversation somebody is about to have, and
- * starting one twenty minutes later against a prompt written for a repository
- * that has moved on is worse than being told now - so this refuses, and the
- * person decides whether to stop one of their own.
+ * A full ceiling no longer refuses a start: `session-queue` uses this sentence
+ * to decide that a session waits, and shows the person where it stands in the
+ * queue with a Cancel next to it - so the choice of waiting or stopping one of
+ * their own is still theirs, made with the session already written down.
  */
 export function capacityRefusal(capacity: Capacity): string | null {
     if (capacity.mine >= capacity.perAccount) {

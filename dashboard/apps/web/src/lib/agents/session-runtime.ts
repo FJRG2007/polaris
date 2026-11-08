@@ -894,7 +894,8 @@ export async function sweepSilentSessions(
     ];
     const quiet = await prisma.agentSession.findMany({
         where: {
-            state: { notIn: ["stopped", "failed"] },
+            // A queued session has no machine to probe. It is the queue's.
+            state: { notIn: ["stopped", "failed", "queued"] },
             OR: [
                 {
                     place: { not: "host" },

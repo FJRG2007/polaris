@@ -68,6 +68,7 @@
             "full": "Adds the gate's review, test and document passes. Minutes rather than seconds, and the steps are reported on the run."
         },
         "sessionState": {
+            "queued": "Queued",
             "starting": "Starting",
             "working": "Working",
             "waiting": "Needs you",
@@ -149,6 +150,8 @@
         "installationMissesRepository": "The GitHub App installed on {owner} does not reach {repo}. The administrators have to add it to the installation.",
         "cloneTokenFailed": "GitHub did not hand Polaris a token for {repo}. Try again in a moment.",
         "noInstallationSession": "Polaris has no GitHub App installation for {owner}, so it cannot check the repository out. Connect it again under Agents settings.",
+        "queueFull": "You already have {count} sessions waiting to start, which is as many as one account may queue. Cancel one, or wait for one to start.",
+        "queueCancelled": "Cancelled before it started.",
         "accountFull": "You already have {count} sessions running, which is the most one account may have at once. Stop one and this will start.",
         "unknownAgent": "Polaris no longer knows an agent called {cli}.",
         "noTerminal": "its agent never opened a terminal to type into",
@@ -195,6 +198,7 @@
             "saySomething": "Say something",
             "gone": "That session no longer exists.",
             "ended": "That session has ended.",
+            "queued": "This session is still waiting for a free slot. It gets its first prompt when it starts; send more once it has.",
             "noAnswer": "The machine running this session did not answer.",
             "notResumable": "There is no conversation to reopen for this session yet.",
             "stillRunning": "The agent is still running, so there is nothing to resume.",

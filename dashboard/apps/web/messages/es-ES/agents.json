@@ -68,6 +68,7 @@
             "full": "Añade las pasadas de revisión, pruebas y documentación del gate. Minutos en vez de segundos, y los pasos se muestran en la ejecución."
         },
         "sessionState": {
+            "queued": "En cola",
             "starting": "Iniciando",
             "working": "Trabajando",
             "waiting": "Te necesita",
@@ -149,6 +150,8 @@
         "installationMissesRepository": "La GitHub App instalada en {owner} no llega a {repo}. Los administradores tienen que añadirlo a la instalación.",
         "cloneTokenFailed": "GitHub no le dio a Polaris un token para {repo}. Vuelve a intentarlo en un momento.",
         "noInstallationSession": "Polaris no tiene ninguna instalación de la GitHub App para {owner}, así que no puede descargar el repositorio. Vuelve a conectarla en los ajustes de Agentes.",
+        "queueFull": "Ya tienes {count} sesiones esperando para iniciarse, que es lo máximo que una cuenta puede poner en cola. Cancela una o espera a que alguna se inicie.",
+        "queueCancelled": "Cancelada antes de iniciarse.",
         "accountFull": "Ya tienes {count} sesiones en marcha, que es el máximo que puede tener una cuenta a la vez. Detén una y esta se iniciará.",
         "unknownAgent": "Polaris ya no conoce ningún agente llamado {cli}.",
         "noTerminal": "su agente nunca abrió un terminal donde escribir",
@@ -195,6 +198,7 @@
             "saySomething": "Escribe algo",
             "gone": "Esa sesión ya no existe.",
             "ended": "Esa sesión ha terminado.",
+            "queued": "Esta sesión aún espera un hueco libre. Recibe su primer mensaje al iniciarse; envía más cuando ya haya arrancado.",
             "noAnswer": "La máquina que ejecuta esta sesión no respondió.",
             "notResumable": "Esta sesión aún no tiene una conversación que reabrir.",
             "stillRunning": "El agente sigue en marcha, así que no hay nada que reanudar.",

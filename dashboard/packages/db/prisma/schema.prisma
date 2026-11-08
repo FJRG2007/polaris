@@ -16629,3 +16629,109 @@ model AgentPermissionRequest {
 
     @@index([sessionId, status])
 }
+
+// A piece of work split across several agent sessions: a coordinator that plans
+// it and the workers that each take one task of it.
+//
+// The run is a namespace and an inbox, never a scheduler of its own - what
+// starts a worker is a task whose dependencies have completed. Bounded on the
+// row rather than by a setting, so a coordinator that loops can never ask for
+// more than the run was created with.
+model AgentOrchestrationRun {
+    id                   String    @id @default(uuid(7)) @db.Uuid
+    // Who started it, and whose capacity and credentials every session of it
+    // spends. Not a relation, the same way a session's is not.
+    ownerId              String    @db.Uuid
+    objective            String
+    // The repository every worker clones, the branch they start from, and the
+    // tool a task runs on when it does not name one.
+    repoId               String    @db.Uuid
+    baseRef              String    @default("")
+    cli                  String    @default("claude")
+    // The session that plans the run. Null for a run driven from the screen.
+    coordinatorSessionId String?   @db.Uuid
+    // active | completed | cancelled
+    status               String    @default("active")
+    maxTasks             Int       @default(20)
+    maxDepth             Int       @default(4)
+    maxConcurrent        Int       @default(3)
+    createdAt            DateTime  @default(now())
+    updatedAt            DateTime  @updatedAt
+    finishedAt           DateTime?
+
+    tasks    AgentOrchestrationTask[]
+    messages AgentOrchestrationMessage[]
+
+    @@index([ownerId, createdAt])
+    @@index([coordinatorSessionId])
+    @@index([status])
+}
+
+// One item of a run, with what it waits on.
+model AgentOrchestrationTask {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    runId          String    @db.Uuid
+    title          String
+    spec           String
+    // Ids of tasks in the same run that must complete first. Only tasks that
+    // already exist can be named, so the graph can never hold a cycle.
+    dependsOn      String[]  @default([])
+    // How far down the chain of dependencies it sits: 0 for a task that waits
+    // on nothing. Bounded by the run's maxDepth.
+    depth          Int       @default(0)
+    // pending | ready | dispatched | completed | failed | blocked
+    status         String    @default("pending")
+    // Why it is blocked: `gate` (waiting on a person) or `dependency` (one it
+    // waits on failed). Null otherwise.
+    blockedBy      String?
+    // The tool it runs on, or null for the run's.
+    cli            String?
+    // The session working on it now. Changes when it is dispatched again.
+    sessionId      String?   @db.Uuid
+    attempts       Int       @default(0)
+    // succeeded | failed, and what the worker said, in its own words.
+    outcome        String?
+    result         String?
+    // Fan-out: the same work on several agents shares a group, and the one a
+    // person keeps is marked chosen.
+    groupId        String?   @db.Uuid
+    chosen         Boolean   @default(false)
+    // A question a person must answer before it may start. Null for none.
+    gateQuestion   String?
+    gateOptions    String[]  @default([])
+    gateResolution String?
+    gateResolvedBy String?   @db.Uuid
+    gateResolvedAt DateTime?
+    createdAt      DateTime  @default(now())
+    updatedAt      DateTime  @updatedAt
+    finishedAt     DateTime?
+
+    run AgentOrchestrationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+    @@index([runId, createdAt])
+    @@index([sessionId])
+    @@index([status])
+}
+
+// Mail in a run's inbox: what a worker reported, or what the coordinator said.
+model AgentOrchestrationMessage {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    runId       String    @db.Uuid
+    taskId      String?   @db.Uuid
+    fromSession String?   @db.Uuid
+    // worker_done | question | escalation
+    kind        String
+    body        String
+    // The answer to a question or an escalation, from a person or the
+    // coordinator.
+    answer      String?
+    answeredAt  DateTime?
+    // When the coordinator read it through its inbox tool.
+    readAt      DateTime?
+    createdAt   DateTime  @default(now())
+
+    run AgentOrchestrationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+    @@index([runId, createdAt])
+    @@index([kind, answeredAt])
+}

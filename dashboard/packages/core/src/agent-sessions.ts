@@ -36,6 +36,7 @@
  * is a session you may come back to whenever you like.
  */
 export const AGENT_SESSION_STATES = [
+    "queued",
     "starting",
     "working",
     "waiting",
@@ -46,6 +47,7 @@ export const AGENT_SESSION_STATES = [
 export type AgentSessionState = (typeof AGENT_SESSION_STATES)[number];
 
 export const AGENT_SESSION_STATE_LABELS: Record<AgentSessionState, string> = {
+    queued: "Queued",
     starting: "Starting",
     working: "Working",
     waiting: "Needs you",
@@ -57,6 +59,12 @@ export const AGENT_SESSION_STATE_LABELS: Record<AgentSessionState, string> = {
 /** A session nobody can send anything to any more. */
 export function isSessionOver(state: AgentSessionState): boolean {
     return state === "stopped" || state === "failed";
+}
+
+/** A session waiting for a free slot. It has no machine yet, so nothing can be
+ *  sent to it and nothing has to be torn down to cancel it. */
+export function isSessionQueued(state: AgentSessionState): boolean {
+    return state === "queued";
 }
 
 /** A session that is not computing but is still alive, so a prompt would land. */

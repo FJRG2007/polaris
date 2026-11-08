@@ -68,6 +68,7 @@ export function agentWord(
  * printed - passes through.
  */
 const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
+    "Cancelled before it started.": "text.queueCancelled",
     "Pick a repository": "text.pickRepository",
     "Not a repository name": "text.notRepository",
     "Pick a model": "text.pickModel",
@@ -180,6 +181,11 @@ const SHAPED: readonly (readonly [RegExp, NamespaceKey<"agents">, readonly strin
     [
         /^You already have (\d+) sessions running, which is the most one account may have at once\. Stop one and this will start\.$/,
         "text.accountFull",
+        ["count"]
+    ],
+    [
+        /^You already have (\d+) sessions waiting to start, which is as many as one account may queue\. Cancel one, or wait for one to start\.$/,
+        "text.queueFull",
         ["count"]
     ],
     [/^Polaris no longer knows an agent called (.+)\.$/, "text.unknownAgent", ["cli"]],
