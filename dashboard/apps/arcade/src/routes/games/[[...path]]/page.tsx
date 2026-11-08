@@ -25,13 +25,11 @@ export default async function GamesPage({
     const [id] = path;
     // A phone used as a controller for a game open elsewhere (phone-pad-screen.tsx)
     if (id === "pad") return <PhonePadScreen />;
-    if (id !== undefined) {
-        if (!findGame(id)) notFound();
-        return <GamePlayer gameId={id} />;
-    }
+    if (id !== undefined && !findGame(id)) notFound();
     // Rooms are offered only to whoever may play with others, the same check
     // every room action asks again.
     const user = await host.session.requireUser();
     const together = await host.session.sessionCan(user, "arcade.calls");
+    if (id !== undefined) return <GamePlayer gameId={id} together={together} />;
     return <GamesScreen together={together} />;
 }

@@ -1,5 +1,5 @@
 /**
- * The Games library's rooms screen: the forms are there before the list
+ * A game's rooms, on its own page: scoped to that game's id, the forms are there before the list
  * answers, only the list waits behind a skeleton, an empty list says what to
  * do, a code is only called wrong once it is whole, and a refusal is a
  * sentence rather than a dead button.
@@ -12,7 +12,9 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 
 const api = vi.hoisted(() => ({
     list: null as null | ((value: unknown) => void),
+    asked: [] as unknown[],
     joined: [] as unknown[],
+    created: [] as unknown[],
     pushed: [] as string[],
     join: async (input: unknown): Promise<unknown> => {
         api.joined.push(input);
@@ -21,11 +23,15 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock("@/app/(app)/chat/room-actions", () => ({
-    publicGameRooms: () =>
+    publicGameRooms: (input: unknown) =>
         new Promise((resolve) => {
+            api.asked.push(input);
             api.list = resolve;
         }),
-    createGameRoom: async () => ({ ok: true, href: "/chat/play/room" }),
+    createGameRoom: async (input: unknown) => {
+        api.created.push(input);
+        return { ok: true, href: "/chat/play/room", game: "new-york" };
+    },
     joinGameRoom: (input: unknown) => api.join(input)
 }));
 vi.mock("@/components/i18n/i18n-provider", () => ({
@@ -41,31 +47,42 @@ vi.mock("@/lib/snapshot-cache", () => ({
 
 import { GameRooms } from "@/components/arcade/game-rooms";
 
-const GAMES = [{ id: "new-york", name: "Skyline Roam" }];
+const GAME = { id: "new-york", name: "Skyline Roam" };
 
 beforeEach(() => {
     api.list = null;
     api.joined = [];
+    api.created = [];
+    api.asked = [];
     api.pushed = [];
 });
 afterEach(cleanup);
 
 describe("GameRooms", () => {
     it("draws the forms at once and a skeleton only where the list goes", () => {
-        render(<GameRooms games={GAMES} />);
+        render(<GameRooms game={GAME} />);
         expect(screen.getByText("gameRooms.create")).toBeTruthy();
         expect(screen.getByLabelText("gameRooms.code")).toBeTruthy();
         expect(screen.getByText("gameRooms.publicRooms")).toBeTruthy();
         expect(document.querySelector("[aria-busy]")).not.toBeNull();
     });
 
+    it("asks only for this game's public rooms, and opens a room of this game", async () => {
+        render(<GameRooms game={GAME} />);
+        expect(api.asked).toEqual([{ game: "new-york" }]);
+        await act(async () => {
+            fireEvent.click(screen.getByText("gameRooms.create"));
+        });
+        expect(api.created).toEqual([{ game: "new-york", isPublic: false }]);
+    });
+
     it("says there are no public rooms, and lists the ones there are", async () => {
-        const { unmount } = render(<GameRooms games={GAMES} />);
+        const { unmount } = render(<GameRooms game={GAME} />);
         await act(async () => api.list!({ ok: true, rooms: [] }));
         expect(screen.getByText("gameRooms.empty")).toBeTruthy();
         unmount();
 
-        render(<GameRooms games={GAMES} />);
+        render(<GameRooms game={GAME} />);
         await act(async () =>
             api.list!({
                 ok: true,
@@ -82,20 +99,20 @@ describe("GameRooms", () => {
                 ]
             })
         );
-        expect(screen.getByText("Skyline Roam")).toBeTruthy();
+        expect(screen.getByText("Fixture Host")).toBeTruthy();
         expect(screen.getByText("gameRooms.joinRoom").closest("a")?.getAttribute("href")).toBe(
             "/chat/play/room"
         );
     });
 
     it("turns a refused list into its sentence", async () => {
-        render(<GameRooms games={GAMES} />);
+        render(<GameRooms game={GAME} />);
         await act(async () => api.list!({ ok: false, reason: "denied" }));
         expect(screen.getByText("gameRooms.refused.denied")).toBeTruthy();
     });
 
     it("calls a code wrong only once it is whole, and shows why a join was refused", async () => {
-        render(<GameRooms games={GAMES} />);
+        render(<GameRooms game={GAME} />);
         const input = screen.getByLabelText("gameRooms.code");
         fireEvent.change(input, { target: { value: "abc" } });
         expect(screen.queryByText("gameRooms.codeInvalid")).toBeNull();
@@ -114,7 +131,7 @@ describe("GameRooms", () => {
     });
 
     it("creates a room and goes to it", async () => {
-        render(<GameRooms games={GAMES} />);
+        render(<GameRooms game={GAME} />);
         await act(async () => {
             fireEvent.click(screen.getByText("gameRooms.create"));
         });

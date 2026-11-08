@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
 
 /**
- * New York's start screen: play on this device or with a controller, the
- * gamepad only once one is connected, the phone opening its pairing page, and
- * the last choice remembered where storage allows it.
+ * The start screen games share, in New York's markup: every way to play on its
+ * first page - this device, a gamepad (only once one is connected), the phone
+ * (opening its pairing page) and, where the host offers rooms, play with
+ * others - and the last choice remembered where storage allows it.
  */
 
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import * as start from "../../../arcade/game/new-york/engine/start-screen.js";
+import * as start from "../../../arcade/game/shared/start-screen.js";
+import { t } from "../../../arcade/game/new-york/engine/i18n.js";
 
 const page = readFileSync(resolve(__dirname, "../../../arcade/game/new-york/index.html"), "utf8");
 const markup = page.match(/<dialog id="start-screen"[\s\S]*?<\/dialog>/)![0];
@@ -40,10 +42,22 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-function screen(pad = { connected: false, padName: "" }) {
+const KEY = "nyc-input";
+
+function screen(
+    pad = { connected: false, padName: "" },
+    rooms: { state: () => "on" | "denied" | "off"; open: () => void } | null = null
+) {
     const onChoose = vi.fn();
     const onOpenChange = vi.fn();
-    const view = new start.StartScreen({ gamepad: () => pad, onChoose, onOpenChange });
+    const view = new start.StartScreen({
+        t,
+        storageKey: KEY,
+        gamepad: () => pad,
+        rooms,
+        onChoose,
+        onOpenChange
+    });
     return { view, onChoose, onOpenChange, pad };
 }
 
@@ -59,21 +73,29 @@ describe("the start screen", () => {
         expect(onChoose).toHaveBeenCalledWith("device");
         expect(onOpenChange).toHaveBeenLastCalledWith(false);
         expect(view.isOpen).toBe(false);
-        expect(start.rememberedChoice()).toBe("device");
+        expect(start.rememberedChoice(KEY)).toBe("device");
     });
 
-    it("waits for a gamepad before it can be chosen, and lists the phone", () => {
+    it("lists every way to play on its first page, with no page in between", () => {
+        screen().view.open();
+        const main = document.querySelector('[data-start-view="main"]')!;
+        expect(main.querySelector('[data-start-choose="device"]')).not.toBeNull();
+        expect(main.querySelector('[data-start-choose="gamepad"]')).not.toBeNull();
+        expect(main.querySelector('[data-start-open="phone"]')).not.toBeNull();
+        expect(main.querySelector("[data-start-together]")).not.toBeNull();
+        expect(document.querySelector('[data-start-view="controller"]')).toBeNull();
+        expect(button('[data-start-open="phone"]').querySelector('[data-t="start.phone"]')).not.toBeNull();
+        expect(t("start.phone")).toBe("Phone as controller");
+    });
+
+    it("waits for a gamepad before it can be chosen", () => {
         const { view, onChoose, pad } = screen();
         view.open();
-        button('[data-start-open="controller"]').click();
         const gamepad = button('[data-start-choose="gamepad"]');
         expect(gamepad.disabled).toBe(true);
         expect(document.getElementById("start-pad-status")!.textContent).toBe(
             "Turn it on and press any button"
         );
-        const phone = button('[data-start-open="phone"]');
-        expect(phone.disabled).toBe(false);
-        expect(phone.querySelector('[data-t="start.phoneHint"]')).not.toBeNull();
         gamepad.click();
         view.close();
         expect(onChoose).not.toHaveBeenCalled();
@@ -88,17 +110,13 @@ describe("the start screen", () => {
         );
         view.activate();
         expect(onChoose).toHaveBeenCalledWith("gamepad");
-        expect(start.rememberedChoice()).toBe("gamepad");
+        expect(start.rememberedChoice(KEY)).toBe("gamepad");
     });
 
     it("takes Start on a connected gamepad as choosing it, and B back a page", () => {
         const { view, onChoose } = screen({ connected: true, padName: "Pad" });
         view.open();
-        view.move(1);
-        view.activate();
-        expect(document.querySelector<HTMLElement>('[data-start-view="controller"]')!.hidden).toBe(
-            false
-        );
+        view.show("phone");
         view.goBack();
         expect(document.querySelector<HTMLElement>('[data-start-view="main"]')!.hidden).toBe(false);
         view.goBack();
@@ -117,10 +135,10 @@ describe("the start screen", () => {
         expect(game).not.toHaveBeenCalled();
     });
 
-    it("focuses the controller first after it was last chosen, and works with storage blocked", () => {
-        localStorage.setItem("nyc-input", "gamepad");
+    it("focuses the last choice first, and works with storage blocked", () => {
+        localStorage.setItem(KEY, "phone");
         screen().view.open();
-        expect(document.activeElement).toBe(button('[data-start-open="controller"]'));
+        expect(document.activeElement).toBe(button('[data-start-open="phone"]'));
 
         document.body.innerHTML = markup;
         const blocked = () => {
@@ -129,8 +147,44 @@ describe("the start screen", () => {
         vi.stubGlobal("localStorage", { getItem: blocked, setItem: blocked });
         const { view, onChoose } = screen();
         view.open();
-        expect(start.rememberedChoice()).toBe("");
+        expect(start.rememberedChoice(KEY)).toBe("");
         view.activate();
         expect(onChoose).toHaveBeenCalledWith("device");
+    });
+});
+
+describe("play with others", () => {
+    it("is not there where the host offers no rooms", () => {
+        screen().view.open();
+        expect(button("[data-start-together]").hidden).toBe(true);
+    });
+
+    it("asks the host for its rooms and keeps the screen open behind them", () => {
+        const open = vi.fn();
+        const { view, onChoose } = screen(undefined, { state: () => "on", open });
+        view.open();
+        const together = button("[data-start-together]");
+        expect(together.hidden).toBe(false);
+        expect(together.disabled).toBe(false);
+        expect(document.getElementById("start-together-status")!.textContent).toBe(
+            "Open a room or join one with a code"
+        );
+        together.click();
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(view.isOpen).toBe(true);
+        expect(onChoose).not.toHaveBeenCalled();
+    });
+
+    it("is shown off with the reason for somebody an admin turned it off for", () => {
+        const open = vi.fn();
+        screen(undefined, { state: () => "denied", open }).view.open();
+        const together = button("[data-start-together]");
+        expect(together.hidden).toBe(false);
+        expect(together.disabled).toBe(true);
+        expect(document.getElementById("start-together-status")!.textContent).toBe(
+            "An admin turned this off for your account"
+        );
+        together.click();
+        expect(open).not.toHaveBeenCalled();
     });
 });

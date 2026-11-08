@@ -42,12 +42,13 @@ From the game to the host:
 | `polaris-game:state`       | `x`, `y`, `z`, `heading` (radians, -pi to pi), `mode`, `speed` (m/s), `lamps`? | Up to ten times a second, while joined              |
 | `polaris-game:exit`        |                                                                                | The reader chose Exit game in the menu              |
 | `polaris-game:call-action` | `action`: `"mic"`, `"leave-game"` or `"leave-call"`                            | The reader used a call control from the game's menu |
+| `polaris-game:rooms`       |                                                                                | The reader chose Play with others on the start screen |
 
 From the host to the game:
 
 | `type`                 | Fields                                                      | Effect                                                                                                                                                                           |
 | ---------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `polaris-game:setup`   | `locale`, `messages` (the game's catalog), `exit`           | The game's words in the reader's language; `exit` offers Exit game in its menu. Sent on `hello` and on every change of language                                                  |
+| `polaris-game:setup`   | `locale`, `messages` (the game's catalog), `exit`, `rooms`  | The game's words in the reader's language; `exit` offers Exit game in its menu; `rooms` (`"on"`, `"denied"` or `"off"`) offers Play with others. Sent on `hello` and on every change of language |
 | `polaris-game:join`    | `self`: `{ id, name }`                                      | Starts sending `state`                                                                                                                                                           |
 | `polaris-game:players` | `players`: `[{ id, name, x, y, z, heading, mode, lamps? }]` | Everyone else in the session. Replaces the previous list, so a missing player is removed                                                                                         |
 | `polaris-game:leave`   |                                                             | Stops sending `state` and removes every marker                                                                                                                                   |

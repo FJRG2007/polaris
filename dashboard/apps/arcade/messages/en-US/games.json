@@ -56,5 +56,9 @@
     "loadingInCall": "Loading...",
     "together": "Play with others",
     "togetherIntro": "Open a room, share its code, or join one already running.",
-    "togetherDenied": "An admin has turned off playing with others for your account."
+    "togetherDenied": "An admin has turned off playing with others for your account.",
+    "openRooms": "Open rooms: {count}",
+    "phonePad": "Phone controller",
+    "phonePadIntro": "Control a game open on another screen",
+    "multiplayerBadge": "Multiplayer"
 }

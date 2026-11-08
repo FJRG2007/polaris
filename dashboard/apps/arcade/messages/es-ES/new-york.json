@@ -231,16 +231,13 @@
     },
     "start": {
         "title": "¿Cómo quieres jugar?",
-        "controllerTitle": "Usar un mando",
         "device": "Jugar en este equipo",
         "deviceHint": "Teclado y ratón, o táctil",
-        "controller": "Usar un mando",
-        "controllerHint": "Un mando Bluetooth o USB",
-        "gamepad": "Mando",
+        "gamepad": "Mando Bluetooth o USB",
         "padWaiting": "Enciéndelo y pulsa cualquier botón",
         "padReady": "Listo",
-        "phone": "Teléfono",
-        "phoneHint": "Emparéjalo con un código o un QR",
+        "phone": "Teléfono como mando",
+        "phoneHint": "Vincúlalo con un QR o un código",
         "phoneTitle": "Usa tu móvil",
         "phoneSteps": "Escanéalo con el móvil, o abre Juegos en él, elige Mando en el móvil e introduce el código.",
         "phoneQr": "Código QR que abre el mando en el móvil",
@@ -249,6 +246,10 @@
         "phoneOpening": "Creando un código",
         "phoneWaiting": "Esperando a tu móvil",
         "phoneFailed": "No se pudo crear un código. Reinténtalo.",
-        "phoneUnavailable": "Abre el juego desde Polaris para emparejar un móvil."
+        "phoneUnavailable": "Abre el juego desde Polaris para emparejar un móvil.",
+        "together": "Jugar con otros",
+        "togetherHint": "Abre una sala o entra con un código",
+        "togetherDenied": "Un admin lo ha desactivado en tu cuenta",
+        "phoneName": "Teléfono"
     }
 }

@@ -127,6 +127,10 @@ export interface CallActivityGame {
     readonly name: string;
     /** The game's page, same origin, framed inside the call. */
     readonly src: string;
+    /** Rooms people open from the game's own page to play it together, and
+     *  how many may sit in one. Absent for a game played together only in a
+     *  call. */
+    readonly rooms?: { readonly maxPlayers: number };
 }
 
 /** A call game as a call offers it: with the slot that draws it. */

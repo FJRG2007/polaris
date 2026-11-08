@@ -428,13 +428,14 @@ export const PUBLIC_ROOMS_MAX = 30;
 
 /** The public rooms still running, newest first, each with what it needs to be
  *  judged over or full. The caller drops the ones that are. */
-export async function publicRooms(now = Date.now()) {
+export async function publicRooms(now = Date.now(), game?: string) {
     // Live in the database already: somebody still renewing a pass, or opened
     // too recently for anybody to have sat down - so rooms left without a
     // goodbye never crowd the running ones out of the page.
     return prisma.arcadeSession.findMany({
         where: {
             isPublic: true,
+            ...(game === undefined ? {} : { game }),
             meetingId: null,
             endedAt: null,
             OR: [

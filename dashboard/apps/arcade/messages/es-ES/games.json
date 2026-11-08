@@ -56,5 +56,9 @@
     "loadingInCall": "Cargando...",
     "together": "Jugar con otros",
     "togetherIntro": "Abre una sala, comparte su código o únete a una en marcha.",
-    "togetherDenied": "Un administrador ha desactivado jugar con otros en tu cuenta."
+    "togetherDenied": "Un administrador ha desactivado jugar con otros en tu cuenta.",
+    "openRooms": "Salas abiertas: {count}",
+    "phonePad": "Mando con el móvil",
+    "phonePadIntro": "Controla un juego abierto en otra pantalla",
+    "multiplayerBadge": "Multijugador"
 }

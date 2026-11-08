@@ -22,7 +22,8 @@ export const arcadeExtension: AppExtension = {
         return GAMES.filter((game) => game.multiplayer).map((game) => ({
             id: game.id,
             name: t(`games.${game.id}.name` as never),
-            src: gameFrameSrc(game)
+            src: gameFrameSrc(game),
+            ...(game.rooms ? { rooms: game.rooms } : {})
         }));
     }
 };

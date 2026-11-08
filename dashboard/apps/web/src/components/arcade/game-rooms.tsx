@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Play with others, from the Games library: open a room for a game, join one
- * by its code, or pick one from the public rooms. A room is played on the
+ * Play with others, from a game's own page: open a room for that game, join
+ * one by its code, or pick one of its public rooms. Only a game whose
+ * definition declares rooms is offered this. A room is played on the
  * lobby's page, where its code is shown and more people are invited with the
  * same dialog a lobby uses. Lent to the Games app through the host's client
  * pieces, like the invite dialog, because the Games page cannot reach the
@@ -18,7 +19,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Plus, RefreshCw, Users } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
-import { Button, Input, Select, Skeleton, Switch } from "@polaris/ui";
+import { Button, Input, Skeleton, Switch } from "@polaris/ui";
 import { normalizeRoomCode, roomCodeSchema, ROOM_CODE_LENGTH } from "@/lib/arcade/room-code";
 import {
     createGameRoom,
@@ -28,7 +29,7 @@ import {
     type RoomRefusal
 } from "@/app/(app)/chat/room-actions";
 
-const LIST_KEY = "arcade.public-rooms";
+const LIST_KEY = "arcade.public-rooms.";
 const LIST_MAX_AGE_MS = 30 * 1000;
 
 export interface RoomGame {
@@ -36,10 +37,10 @@ export interface RoomGame {
     readonly name: string;
 }
 
-export function GameRooms({ games }: { games: readonly RoomGame[] }) {
+export function GameRooms({ game: { id: game } }: { game: RoomGame }) {
     const t = useTranslations("components");
     const router = useRouter();
-    const [game, setGame] = useState(games[0]?.id ?? "");
+    const listKey = `${LIST_KEY}${game}`;
     const [isPublic, setPublic] = useState(false);
     const [code, setCode] = useState("");
     const [busy, setBusy] = useState<"create" | "join" | null>(null);
@@ -47,7 +48,7 @@ export function GameRooms({ games }: { games: readonly RoomGame[] }) {
         null
     );
     const [rooms, setRooms] = useState<readonly PublicRoom[] | null>(
-        () => readSnapshot<readonly PublicRoom[]>(LIST_KEY, LIST_MAX_AGE_MS)?.value ?? null
+        () => readSnapshot<readonly PublicRoom[]>(listKey, LIST_MAX_AGE_MS)?.value ?? null
     );
     const [listFailed, setListFailed] = useState<RoomRefusal | "network" | null>(null);
     const [loading, setLoading] = useState(false);
@@ -55,15 +56,15 @@ export function GameRooms({ games }: { games: readonly RoomGame[] }) {
     const load = useCallback(() => {
         setLoading(true);
         setListFailed(null);
-        void publicGameRooms()
+        void publicGameRooms({ game })
             .then((answer) => {
                 if (!answer.ok) return setListFailed(answer.reason);
                 setRooms(answer.rooms);
-                writeSnapshot(LIST_KEY, answer.rooms);
+                writeSnapshot(listKey, answer.rooms);
             })
             .catch(() => setListFailed("network"))
             .finally(() => setLoading(false));
-    }, []);
+    }, [game, listKey]);
     useEffect(load, [load]);
 
     const go = (form: "create" | "join", answer: Awaited<ReturnType<typeof createGameRoom>>) => {
@@ -113,14 +114,6 @@ export function GameRooms({ games }: { games: readonly RoomGame[] }) {
                     }}
                 >
                     <h3 className="text-sm font-medium">{t("gameRooms.createTitle")}</h3>
-                    {games.length > 1 && (
-                        <Select
-                            value={game}
-                            onValueChange={setGame}
-                            options={games.map((entry) => ({ value: entry.id, label: entry.name }))}
-                            aria-label={t("gameRooms.game")}
-                        />
-                    )}
                     <label className="flex min-w-0 items-start gap-3 text-sm">
                         <Switch
                             checked={isPublic}
@@ -239,16 +232,12 @@ export function GameRooms({ games }: { games: readonly RoomGame[] }) {
                                 <div className="min-w-0 flex-1">
                                     <p
                                         className="truncate text-sm font-medium"
-                                        title={room.gameName}
-                                    >
-                                        {room.gameName}
-                                    </p>
-                                    <p
-                                        className="truncate text-xs text-muted-foreground"
                                         title={room.host.name}
                                     >
-                                        {t("gameRooms.roomLine", {
-                                            name: room.host.name,
+                                        {room.host.name}
+                                    </p>
+                                    <p className="truncate text-xs text-muted-foreground">
+                                        {t("gameRooms.players", {
                                             count: room.players,
                                             max: room.max
                                         })}

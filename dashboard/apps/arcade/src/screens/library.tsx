@@ -1,33 +1,59 @@
 "use client";
 
-/** The Games library: every game, the way into each, and - for whoever may
- *  play with others - rooms to play the multiplayer ones together. */
+/** The Games library: every game and the way into each, and the way to use
+ *  this phone as the controller of a game open on another screen. Rooms are
+ *  not here: each game with rooms offers them on its own page; its card says
+ *  only that it has them and how many public ones are open. */
 
 import Link from "next/link";
-import { Play } from "lucide-react";
 import { useArcadeT } from "./i18n";
 import { GameCover } from "./game-cover";
+import { useEffect, useState } from "react";
 import { GAMES } from "../games/registry";
-import { Button, Card, CardBody } from "@polaris/ui";
+import { Gamepad2, Play } from "lucide-react";
 import { hostUi } from "@polaris/app-host/client";
+import { Badge, Button, Card, CardBody } from "@polaris/ui";
+
+type Counts = { ok: true; counts: Readonly<Record<string, number>> } | { ok: false };
 
 export function GamesScreen({ together }: { together: boolean }) {
     const t = useArcadeT();
     const shown = GAMES;
-    const multiplayer = shown
-        .filter((game) => game.multiplayer)
-        .map((game) => ({ id: game.id, name: t(`games.${game.id}.name` as never) }));
-    const Rooms = hostUi.arcadeRooms.GameRooms;
+    const withRooms = together && shown.some((game) => game.rooms);
+    const [counts, setCounts] = useState<Readonly<Record<string, number>>>({});
+
+    useEffect(() => {
+        if (!withRooms) return;
+        let live = true;
+        void (hostUi.arcadeRooms.publicRoomCounts() as Promise<Counts>)
+            .then((answer) => live && answer.ok && setCounts(answer.counts))
+            .catch(() => undefined);
+        return () => {
+            live = false;
+        };
+    }, [withRooms]);
+
     return (
         <div className="mx-auto w-full max-w-5xl px-4 py-6">
-            <h1 className="text-xl font-semibold">{t("title")}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{t("intro")}</p>
+            <div className="flex min-w-0 flex-wrap items-start gap-3">
+                <div className="min-w-0 flex-1">
+                    <h1 className="text-xl font-semibold">{t("title")}</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("intro")}</p>
+                </div>
+                <Button asChild variant="outline" className="max-sm:w-full">
+                    <Link href="/games/pad" title={t("phonePadIntro")}>
+                        <Gamepad2 className="h-4 w-4" aria-hidden />
+                        {t("phonePad")}
+                    </Link>
+                </Button>
+            </div>
             {shown.length === 0 ? (
                 <p className="mt-6 text-sm text-muted-foreground">{t("empty")}</p>
             ) : (
                 <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {shown.map((game) => {
                         const Icon = game.icon;
+                        const open = counts[game.id] ?? 0;
                         return (
                             <li key={game.id} className="min-w-0">
                                 <Card className="overflow-hidden">
@@ -46,6 +72,16 @@ export function GamesScreen({ together }: { together: boolean }) {
                                                 </p>
                                             </div>
                                         </div>
+                                        {game.rooms && (
+                                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                                <Badge>{t("multiplayerBadge")}</Badge>
+                                                {together && open > 0 && (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {t("openRooms", { count: open })}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                         <p className="text-sm text-muted-foreground">
                                             {t(`games.${game.id}.summary` as never)}
                                         </p>
@@ -61,25 +97,6 @@ export function GamesScreen({ together }: { together: boolean }) {
                         );
                     })}
                 </ul>
-            )}
-            {multiplayer.length > 0 && (
-                <section className="mt-10 min-w-0" aria-labelledby="games-together">
-                    <h2 id="games-together" className="text-lg font-semibold">
-                        {t("together")}
-                    </h2>
-                    {together ? (
-                        <>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                {t("togetherIntro")}
-                            </p>
-                            <div className="mt-4">
-                                <Rooms games={multiplayer} />
-                            </div>
-                        </>
-                    ) : (
-                        <p className="mt-1 text-sm text-muted-foreground">{t("togetherDenied")}</p>
-                    )}
-                </section>
             )}
         </div>
     );

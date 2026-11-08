@@ -1762,7 +1762,6 @@
     },
     "gameRooms": {
         "createTitle": "New room",
-        "game": "Game",
         "public": "Public room",
         "publicHint": "Anyone signed in can see it and join.",
         "create": "Create room",
@@ -1775,7 +1774,6 @@
         "empty": "No public rooms right now. Create one and others can join.",
         "loadFailed": "Could not load the rooms.",
         "retry": "Try again",
-        "roomLine": "Hosted by {name} - {count} of {max} playing",
         "joinRoom": "Join",
         "refused": {
             "invalid": "Check the code and try again.",
@@ -1785,7 +1783,8 @@
             "unknown": "No running room has that code.",
             "full": "That room is full.",
             "failed": "Something went wrong. Try again."
-        }
+        },
+        "players": "{count} of {max} playing"
     },
     "gameInvite": {
         "title": "Invite to {game}",

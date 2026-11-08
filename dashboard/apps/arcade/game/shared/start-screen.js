@@ -1,27 +1,30 @@
-// The start screen: once the city is on screen, before anything moves, the reader picks how they play - on this
-// device (keyboard, mouse or touch) or with a controller (a Bluetooth or USB gamepad, or a phone paired by a code or a QR
-// - phone-pad.js). It is a modal <dialog> drawn like the game menu, the game stays paused while it is open, and
-// the keyboard, the mouse and a gamepad (gamepad-controls.js drives it through move/activate/goBack/close) all work it.
-// The last choice is remembered and focused first next time.
-import { t, onLocaleChange } from './i18n.js';
+// The start screen every game shares: once the game is on screen, before anything moves, the reader picks how they
+// play, every way listed on its first page - on this device (keyboard, mouse or touch), with a gamepad (Bluetooth or
+// USB), with a phone as the controller (paired by a code or a QR, phone-pad.js), or with others (the host's rooms for
+// this game, offered only where the host says the game has rooms). It is a modal <dialog> the game draws like its
+// menu, the game stays paused while it is open, and the keyboard, the mouse and a gamepad (move/activate/goBack/close)
+// all work it. The last choice is remembered and focused first next time.
+//
+// A game brings the markup (ids and data attributes below, see new-york/index.html), its words under `start.*`, and
+// its own `t` and `onLocaleChange`; nothing in here is about any one game.
 
-const STORAGE_KEY = 'nyc-input';
 const CHOICES = ['device', 'gamepad', 'phone'];
 const FOCUSABLE = 'button:not([hidden]):not(:disabled)';
+const DEFAULT_KEY = 'polaris-game-input';
 
 /** The remembered choice, or '' where there is none (or storage is blocked). */
-function rememberedChoice() {
+function rememberedChoice(storageKey = DEFAULT_KEY) {
   try {
-    const value = localStorage.getItem(STORAGE_KEY);
+    const value = localStorage.getItem(storageKey);
     return CHOICES.includes(value) ? value : '';
   } catch {
     return '';
   }
 }
 
-function rememberChoice(choice) {
+function rememberChoice(storageKey, choice) {
   try {
-    localStorage.setItem(STORAGE_KEY, choice);
+    localStorage.setItem(storageKey, choice);
   } catch {
     // Storage is optional: the screen just has no preference next time
   }
@@ -30,28 +33,40 @@ function rememberChoice(choice) {
 class StartScreen {
   /**
    * @param {object} options
-   * @param {() => {connected: boolean, padName: string}} options.gamepad  the gamepad's state (GamepadControls)
+   * @param {(key: string, values?: object) => string} options.t  the game's words
+   * @param {(listener: () => void) => void} [options.onLocaleChange]
+   * @param {string} [options.storageKey]  where the last choice is kept
+   * @param {() => {connected: boolean, padName: string}} options.gamepad  the gamepad's state
    * @param {(open: boolean) => void} options.onOpenChange
-   * @param {import('./phone-pad.js').PhonePad} [options.phone]  the phone pad, paired from the phone page
+   * @param {{connected: boolean, failed: boolean, offer: {qr?: string, code: string} | null, request: () => void, onChange: (l: () => void) => void}} [options.phone]
+   * @param {{state: () => 'on' | 'denied' | 'off', open: () => void, onChange?: (l: () => void) => void}} [options.rooms]
    * @param {(choice: string) => void} options.onChoose  'device', 'gamepad' or 'phone'
    */
-  constructor({ gamepad, phone = null, onOpenChange, onChoose }) {
+  constructor({ t, onLocaleChange = null, storageKey = DEFAULT_KEY, gamepad, phone = null, rooms = null, onOpenChange, onChoose }) {
+    this.t = t;
+    this.storageKey = storageKey;
     this.gamepad = gamepad;
     this.phone = phone;
+    this.rooms = rooms;
     this.onOpenChange = onOpenChange;
     this.onChoose = onChoose;
     this.dialog = document.getElementById('start-screen');
     this.title = document.getElementById('start-title');
     this.back = this.dialog?.querySelector('[data-start-back]');
+    this.deviceButton = this.dialog?.querySelector('[data-start-choose="device"]');
     this.padButton = this.dialog?.querySelector('[data-start-choose="gamepad"]');
     this.padStatus = document.getElementById('start-pad-status');
+    this.phoneOpen = this.dialog?.querySelector('[data-start-open="phone"]');
     this.phoneButton = this.dialog?.querySelector('[data-start-choose="phone"]');
     this.phoneRetry = this.dialog?.querySelector('[data-start-retry]');
     this.phoneQr = document.getElementById('start-phone-qr');
     this.phoneCode = document.getElementById('start-phone-code');
     this.phoneStatus = document.getElementById('start-phone-status');
+    this.togetherButton = this.dialog?.querySelector('[data-start-together]');
+    this.togetherStatus = document.getElementById('start-together-status');
     this.view = 'main';
     this.isOpen = false;
+    this.padWas = false;
     if (!this.dialog) return;
 
     this.dialog.addEventListener('click', (e) => {
@@ -60,6 +75,7 @@ class StartScreen {
       if (target.dataset.startOpen) this.show(target.dataset.startOpen);
       else if (target.hasAttribute('data-start-back')) this.goBack();
       else if (target.hasAttribute('data-start-retry')) this.phone?.request();
+      else if (target.hasAttribute('data-start-together')) this.openRooms();
       else if (target.dataset.startChoose) this.choose(target.dataset.startChoose);
     });
     // Esc goes back a page; on the first it does nothing, since there is nothing behind this screen to return to
@@ -68,7 +84,8 @@ class StartScreen {
       this.goBack();
     });
     window.addEventListener('keydown', (e) => this.onKey(e), true);
-    onLocaleChange(() => this.refresh());
+    onLocaleChange?.(() => this.refresh());
+    rooms?.onChange?.(() => this.refresh());
     // The phone that takes the pad while its page is open is the one to play with: no second step
     this.phone?.onChange(() => {
       if (this.isOpen && this.view === 'phone' && this.phone.connected) this.choose('phone');
@@ -104,15 +121,20 @@ class StartScreen {
     if (!CHOICES.includes(choice) || !this.isOpen) return;
     if (choice === 'gamepad' && !this.gamepad().connected) return;
     if (choice === 'phone' && !this.phone?.connected) return;
-    rememberChoice(choice);
+    rememberChoice(this.storageKey, choice);
     this.isOpen = false;
     this.dialog.close();
     this.onChoose(choice);
     this.onOpenChange(false);
   }
 
+  /** Play with others: the host draws its rooms for this game over the page; this screen stays behind them. */
+  openRooms() {
+    if (this.rooms?.state() === 'on') this.rooms.open();
+  }
+
   show(view) {
-    if (view !== 'main' && view !== 'controller' && view !== 'phone') return;
+    if (view !== 'main' && view !== 'phone') return;
     if (view === 'phone') this.phone?.request();
     const from = this.view;
     this.view = view;
@@ -120,8 +142,7 @@ class StartScreen {
     this.back.hidden = view === 'main';
     this.refresh();
     if (!this.isOpen) return;
-    if (view === 'main' && from !== 'main') this.dialog.querySelector('[data-start-open="controller"]')?.focus();
-    else if (view === 'controller' && from === 'phone') this.dialog.querySelector('[data-start-open="phone"]')?.focus();
+    if (view === 'main' && from === 'phone') this.phoneOpen?.focus();
     else this.focusFirst();
   }
 
@@ -132,12 +153,11 @@ class StartScreen {
 
   focusFirst() {
     const items = this.items().filter((el) => el !== this.back);
-    const remembered = rememberedChoice();
-    const preferred = this.view === 'main'
-      ? this.dialog.querySelector(remembered === 'gamepad' || remembered === 'phone' ? '[data-start-open="controller"]' : '[data-start-choose="device"]')
-      : this.view === 'phone' ? null
-      : remembered === 'phone' ? this.dialog.querySelector('[data-start-open="phone"]')
-      : this.padButton?.disabled ? null : this.padButton;
+    const remembered = rememberedChoice(this.storageKey);
+    const preferred = this.view !== 'main' ? null
+      : remembered === 'gamepad' ? this.padButton
+      : remembered === 'phone' ? this.phoneOpen
+      : this.deviceButton;
     (items.includes(preferred) ? preferred : items[0] || this.back)?.focus();
   }
 
@@ -158,8 +178,7 @@ class StartScreen {
 
   /** Gamepad B, Esc: one page back. */
   goBack() {
-    if (this.view === 'phone') this.show('controller');
-    else if (this.view !== 'main') this.show('main');
+    if (this.view !== 'main') this.show('main');
   }
 
   /** Gamepad Start: the pad that pressed it is the controller. */
@@ -168,22 +187,36 @@ class StartScreen {
     else if (this.gamepad().connected) this.choose('gamepad');
   }
 
-  /** Redraws what depends on the gamepad or the language. */
+  /** Redraws what depends on the gamepad, the phone, the rooms or the language. */
   refresh() {
     if (!this.dialog) return;
-    this.title.textContent = t(this.view === 'main' ? 'start.title' : this.view === 'phone' ? 'start.phoneTitle' : 'start.controllerTitle');
+    const t = this.t;
+    this.title.textContent = t(this.view === 'phone' ? 'start.phoneTitle' : 'start.title');
     this.refreshPhone();
+    this.refreshTogether();
     const { connected, padName } = this.gamepad();
     this.padButton.disabled = !connected;
     this.padStatus.textContent = connected ? padName || t('start.padReady') : t('start.padWaiting');
-    // A pad that turns up while its page is open takes the focus from the way back (or from a button that just went off)
+    // A pad that turns up takes the focus from this device's choice: pressing its button says which one to play with
     const focus = document.activeElement;
-    if (this.isOpen && this.view === 'controller' && connected && (focus === this.back || focus?.dataset?.startOpen === 'phone' || !this.dialog.contains(focus))) this.padButton.focus();
+    const arrived = connected && !this.padWas;
+    this.padWas = connected;
+    if (this.isOpen && this.view === 'main' && arrived && (focus === this.deviceButton || !this.dialog.contains(focus))) this.padButton.focus();
+  }
+
+  /** Play with others: hidden where the host has no rooms for this game, off with the reason where it refuses. */
+  refreshTogether() {
+    if (!this.togetherButton) return;
+    const state = this.rooms?.state() ?? 'off';
+    this.togetherButton.hidden = state === 'off';
+    this.togetherButton.disabled = state !== 'on';
+    if (this.togetherStatus) this.togetherStatus.textContent = this.t(state === 'denied' ? 'start.togetherDenied' : 'start.togetherHint');
   }
 
   /** The phone page: the QR and the code to pair with, and how the pairing stands. */
   refreshPhone() {
     if (!this.phoneButton) return;
+    const t = this.t;
     const phone = this.phone;
     const offer = phone?.offer;
     const connected = Boolean(phone?.connected);

@@ -111,7 +111,7 @@ class PhonePad {
       } else if (typeof data.connected === 'boolean') {
         this.pad.connected = data.connected;
         // The pad's name on screen, in the reader's language (gamepad-controls.js reads it as the pad's id)
-        if (data.connected) this.pad.id = t('start.phone');
+        if (data.connected) this.pad.id = t('start.phoneName');
         if (!data.connected) {
           this.pad.axes = new Array(AXES).fill(0);
           this.pad.buttons = this.pad.buttons.map(() => ({ value: 0, pressed: false, touched: false }));

@@ -231,16 +231,13 @@
     },
     "start": {
         "title": "How do you want to play?",
-        "controllerTitle": "Use a controller",
         "device": "Play on this device",
         "deviceHint": "Keyboard and mouse, or touch",
-        "controller": "Use a controller",
-        "controllerHint": "A Bluetooth or USB gamepad",
-        "gamepad": "Gamepad",
+        "gamepad": "Gamepad, Bluetooth or USB",
         "padWaiting": "Turn it on and press any button",
         "padReady": "Ready",
-        "phone": "Phone",
-        "phoneHint": "Pair it with a code or a QR",
+        "phone": "Phone as controller",
+        "phoneHint": "Pair it with a QR or a code",
         "phoneTitle": "Use your phone",
         "phoneSteps": "Scan this with your phone, or open Games on it, choose Phone controller and enter the code.",
         "phoneQr": "QR code that opens the phone controller",
@@ -249,6 +246,10 @@
         "phoneOpening": "Getting a code",
         "phoneWaiting": "Waiting for your phone",
         "phoneFailed": "No code could be made. Try again.",
-        "phoneUnavailable": "Open the game from Polaris to pair a phone."
+        "phoneUnavailable": "Open the game from Polaris to pair a phone.",
+        "together": "Play with others",
+        "togetherHint": "Open a room or join one with a code",
+        "togetherDenied": "An admin turned this off for your account",
+        "phoneName": "Phone"
     }
 }

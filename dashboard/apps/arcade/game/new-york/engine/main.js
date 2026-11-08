@@ -42,7 +42,7 @@ import { buildRoadPaint } from "./road-paint.js";
 import { ThirdPersonControllerManager } from "./controllers.js";
 import { TouchControls } from "./touch-controls.js";
 import { GamepadControls } from "./gamepad-controls.js";
-import { StartScreen } from "./start-screen.js";
+import { StartScreen } from "../../shared/start-screen.js";
 import { PhonePad } from "./phone-pad.js";
 import { CameraSystem, CAMERA_PRESETS } from "./cameras.js";
 import { LightingSystem } from "./lighting.js";
@@ -51,7 +51,7 @@ import { setupSceneCulling, updateSceneCulling } from "./scene-culling.js";
 import { setBuildBudget, yieldToHost } from "./build-slice.js";
 import { CityAudioSystem } from "./audio-system.js";
 import { createRemotePlayers } from "./remote-players.js";
-import { reportFailure, reportProgress, reportReady, shareState } from "./embed.js";
+import { onRoomsChange, openRooms, reportFailure, reportProgress, reportReady, roomsState, shareState } from "./embed.js";
 import { formatNumber, onLocaleChange, t } from "./i18n.js";
 import { hudReadout } from "./player-rules.js";
 import { GameMenu } from "./game-menu.js";
@@ -876,8 +876,12 @@ async function initApp() {
     const phonePad = new PhonePad();
     gamepadControls.phone = () => phonePad.pad;
     startScreen = new StartScreen({
+        t,
+        onLocaleChange,
+        storageKey: "nyc-input",
         gamepad: () => gamepadControls,
         phone: phonePad,
+        rooms: { state: roomsState, open: openRooms, onChange: onRoomsChange },
         onOpenChange: setPaused,
         onChoose: (choice) => {
             // A phone plays as a gamepad does: the page's touch controls step aside for it
