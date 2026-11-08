@@ -90,7 +90,9 @@ async function download(pair: string, file: LocalModelFile, fetcher: Fetcher): P
         }
         await rename(part, modelPath(file));
     } catch (caught) {
-        out.destroy();
+        // Closed before it is removed: a stream still opening would otherwise
+        // create the file again after it was deleted.
+        if (!out.closed) await new Promise((resolve) => out.destroy().once("close", resolve));
         await rm(part, { force: true }).catch(() => undefined);
         throw caught;
     }
