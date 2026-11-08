@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { SharedInstances } from './shared-instances.js';
+import { buildSlice } from './build-slice.js';
 
 // Spatial culling for the island-wide static geometry. Most of Manhattan's street furniture and building massing is
 // built as a handful of instanced meshes spanning the whole island (bounding spheres ~7 km across), which three.js can
@@ -146,7 +147,7 @@ function replaceWithChunks(mesh, cell) {
  * Sets up the culling of the static city under `roots` (Object3Ds). `shadow` is the SunLightShadow whose cascade
  * cameras render the shadow stand-ins (none are made without it). Per-frame culling runs in updateSceneCulling().
  */
-function setupSceneCulling(scene, roots, shadow = null) {
+async function setupSceneCulling(scene, roots, shadow = null) {
   scene.updateMatrixWorld(true);
   const culled = [];
 
@@ -184,6 +185,7 @@ function setupSceneCulling(scene, roots, shadow = null) {
     });
   }
   for (const mesh of chunkable) {
+    await buildSlice();
     // unlit (glowing) props, like signal lenses & lamp bulbs, read from much further away at night; a mesh may also
     // set its own (userData.cullDistance)
     const glow = mesh.material.isMeshBasicNodeMaterial || mesh.material.type === 'MeshBasicNodeMaterial' ? 3 : 1;
@@ -258,6 +260,7 @@ function setupSceneCulling(scene, roots, shadow = null) {
     }
 
     for (const o of sources) {
+      await buildSlice();
       const side = sideOf(o.material);
       const geo = o.userData.shadowStandIn?.isBufferGeometry ? o.userData.shadowStandIn : o.geometry;
       if (o.isInstancedMesh) {
@@ -275,6 +278,7 @@ function setupSceneCulling(scene, roots, shadow = null) {
         }
         const e = o.instanceMatrix.array;
         for (let i = 0; i < o.count; i++) {
+          if ((i & 4095) === 4095) await buildSlice();
           _wm.multiplyMatrices(o.matrixWorld, _m.fromArray(e, i * 16));
           const key = cellKey(_wm.elements[12], _wm.elements[14]);
           let list = entry.cells.get(key);
@@ -289,6 +293,7 @@ function setupSceneCulling(scene, roots, shadow = null) {
         const start = geo.drawRange.start;
         const end = Math.min(idx ? idx.count : pos.count, start + geo.drawRange.count);
         for (let t = start; t + 2 < end; t += 3) {
+          if ((((t - start) / 3) & 4095) === 4095) await buildSlice();
           const i0 = idx ? idx.getX(t) : t;
           const i1 = idx ? idx.getX(t + 1) : t + 1;
           const i2 = idx ? idx.getX(t + 2) : t + 2;
@@ -314,12 +319,14 @@ function setupSceneCulling(scene, roots, shadow = null) {
       scene.add(mesh);
     };
     for (const entry of instancedBySig.values()) {
+      await buildSlice();
       for (const list of entry.cells.values()) {
         addProxy(new SharedInstances(entry.geometry, entry.material, new Float32Array(list)));
       }
     }
     for (const [side, bySide] of triCells) {
       for (const list of bySide.values()) {
+        await buildSlice();
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.Float32BufferAttribute(list, 3));
         g.computeBoundingSphere();
@@ -332,6 +339,7 @@ function setupSceneCulling(scene, roots, shadow = null) {
   // Preserve the shadow stand-ins above before splitting their visible geometry.
   // These large objects stay visible at any distance and need no per-frame distance checks.
   for (const mesh of largeMeshes) {
+    await buildSlice();
     if (!mesh.castShadow) replaceWithChunks(mesh, STATIC_CELL);
   }
 

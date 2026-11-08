@@ -1,4 +1,5 @@
 import { blockAt } from './city-config.js';
+import { buildSlice } from './build-slice.js';
 
 function hashPos(x, y, z) {
   const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
@@ -6,7 +7,7 @@ function hashPos(x, y, z) {
 }
 
 // Fit surveyed street trees to the modeled curbs, preserving nearby park and plaza trees.
-function placeStreetTrees(points, existingSites, isClear) {
+async function placeStreetTrees(points, existingSites, isClear) {
   const cells = new Map();
   const insert = (site) => {
     const key = Math.floor(site.x / 4) + ',' + Math.floor(site.z / 4);
@@ -28,6 +29,7 @@ function placeStreetTrees(points, existingSites, isClear) {
 
   const sites = [];
   for (let i = 0; i < points.length; i += 2) {
+    await buildSlice();
     const sourceX = points[i], sourceZ = points[i + 1];
     const originalBlock = blockAt(sourceX, sourceZ);
     if (originalBlock && (originalBlock.park > 0.6 || originalBlock.median)) continue;

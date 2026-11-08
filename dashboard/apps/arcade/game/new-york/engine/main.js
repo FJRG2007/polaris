@@ -47,6 +47,7 @@ import { CameraSystem, CAMERA_PRESETS } from "./cameras.js";
 import { LightingSystem } from "./lighting.js";
 import { NYCMapSystem } from "./nyc-map.js";
 import { setupSceneCulling, updateSceneCulling } from "./scene-culling.js";
+import { setBuildBudget, yieldToHost } from "./build-slice.js";
 import { CityAudioSystem } from "./audio-system.js";
 import { createRemotePlayers } from "./remote-players.js";
 import { reportFailure, reportProgress, reportReady, shareState } from "./embed.js";
@@ -123,8 +124,10 @@ async function initApp() {
     // scheduler.yield(), whose continuation would run ahead of the host's progress messages)
     const stepDone = (label) => {
         markInit(label);
-        return new Promise((resolve) => setTimeout(resolve, 0));
+        return yieldToHost();
     };
+    // The builders hand the thread back the same way within a phase, once a slice has run for the build budget
+    setBuildBudget(LOADING_BUILD_BUDGET);
 
     let renderer;
     try {
@@ -176,13 +179,13 @@ async function initApp() {
     await stepDone("lighting");
 
     // 3. Build Manhattan Geography, Iconic Landmarks, Blocks, Street Details & Traffic
-    const cityGrid = buildCityGrid(scene);
+    const cityGrid = await buildCityGrid(scene);
     await stepDone("cityGrid");
     const boroughs = buildBoroughs(scene, { sidewalks: cityGrid.sidewalks });
     await stepDone("boroughs");
     const { colliders: landmarkColliders } = buildLandmarks(scene);
     await stepDone("landmarks");
-    const cityBlocks = buildCityBlocks(scene, landmarkColliders);
+    const cityBlocks = await buildCityBlocks(scene, landmarkColliders);
     await stepDone("blocks");
     const allColliders = [
         ...landmarkColliders,
@@ -191,12 +194,12 @@ async function initApp() {
         ...(cityGrid.colliders || [])
     ];
 
-    const streetDetails = buildStreetDetails(scene, allColliders);
+    const streetDetails = await buildStreetDetails(scene, allColliders);
     await stepDone("streetDetails");
     // Buildings turned along non-grid streets have oriented colliders whose world bounds reach past their lots: they stay
     // inside the property line anyway, so the road network (lanes & sidewalks) doesn't need them.
     // Elevated building sections that clear even a bus don't obstruct ground traffic.
-    const trafficSystem = createTrafficSystem(scene, cityGrid.sidewalks, [
+    const trafficSystem = await createTrafficSystem(scene, cityGrid.sidewalks, [
         ...cityGrid.footprints,
         ...streetDetails.footprints,
         ...allColliders.filter((c) => !c.obb && (c.minY ?? 0) < 3.5)
@@ -314,7 +317,7 @@ async function initApp() {
     ]
         .map((name) => scene.getObjectByName(name))
         .filter(Boolean);
-    setupSceneCulling(scene, cullingRoots, lightingSystem.sunLight.shadow);
+    await setupSceneCulling(scene, cullingRoots, lightingSystem.sunLight.shadow);
     await stepDone("culling");
 
     // Initialize static world matrices once, including the chunks and shadow proxies created above.

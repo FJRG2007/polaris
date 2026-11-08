@@ -39,6 +39,7 @@ import { createBuildingFootprints } from './building-footprints.js';
 import { polygonContains, polygonBoxOverlaps } from './building-collision.js';
 import { pavedPlazaRects, parkTreeSites, sidewalkBlocks } from './city-grid.js';
 import { lightBudget } from './quality.js';
+import { buildSlice } from './build-slice.js';
 
 // Surveyed footprints define buildings and collisions; architectural details stream around the player.
 
@@ -147,7 +148,7 @@ class Quadtree {
   }
 }
 
-function buildCityBlocks(scene, landmarkColliders = []) {
+async function buildCityBlocks(scene, landmarkColliders = []) {
   const group = new THREE.Group();
   group.name = 'ManhattanCityBlocks';
   const colliders = [];
@@ -345,6 +346,7 @@ function buildCityBlocks(scene, landmarkColliders = []) {
   const surveyedBuckets = materials.map(() => []);
   const detailsToPlace = [];
   for (const b of surveyedBuildings) {
+    await buildSlice();
     const seed = Math.round(b.cx * 31 + b.cz * 17);
     const rand = mulberry32(seed);
     const tone = rand();
@@ -373,15 +375,18 @@ function buildCityBlocks(scene, landmarkColliders = []) {
   }
   // Reserve every fire escape before placing storefronts on neighbouring buildings.
   for (const { b, detail, masonry, rand } of detailsToPlace) {
+    await buildSlice();
     const neighbours = nearbyReserves(b, 6);
     for (const reserve of addBuildingDetails(b, detail, { masonry, rand, neighbours })) addReserve(reserve);
     quadtree.insert(detail);
   }
-  surveyedBuckets.forEach((items, i) => {
-    if (!items.length) return;
-    group.add(createBuildingFootprints(materials[i], items, i < 2 ? b => nearbyReserves(b, 2) : undefined));
-  });
+  for (const [i, items] of surveyedBuckets.entries()) {
+    if (!items.length) continue;
+    await buildSlice();
+    group.add(await createBuildingFootprints(materials[i], items, i < 2 ? b => nearbyReserves(b, 2) : undefined));
+  }
 
+  await buildSlice();
   // Narrow empty lots become sitting areas with trees.
   {
     const plazas = pavedPlazaRects || [];
@@ -413,6 +418,7 @@ function buildCityBlocks(scene, landmarkColliders = []) {
       }
     }
   }
+await buildSlice();
 
   // Times Square: tiers of billboards up every street wall that looks onto the bowtie (podiums and the tower
   //     shafts set back above them alike), from above the storefront marquees to ~62 m, split into screens up to
@@ -463,6 +469,7 @@ function buildCityBlocks(scene, landmarkColliders = []) {
       }
     }
   }
+await buildSlice();
 
   // ============================================================================
   // STATIC BILLBOARDS
@@ -489,6 +496,7 @@ function buildCityBlocks(scene, landmarkColliders = []) {
       for (const g of geos) g.dispose();
     }
   }
+await buildSlice();
 
   // ============================================================================
   // STREAMED ARCHITECTURAL DETAILS
@@ -977,6 +985,7 @@ function buildCityBlocks(scene, landmarkColliders = []) {
     }
   }
 
+  await buildSlice();
   // Initial Quadtree stream centered at Midtown 5th Ave & 42nd St
   update(0, 62, true);
 

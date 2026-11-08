@@ -58,6 +58,7 @@ import {
 } from './tsl-materials.js';
 import { createRoadPaintChunkBuilder } from './road-paint.js';
 import { GEO } from './nyc-geodata.js';
+import { buildSlice } from './build-slice.js';
 
 // Live construction data consumed by the building and street-detail builders after buildCityGrid().
 let centralParkClearings;
@@ -1517,7 +1518,7 @@ function buildWaterfrontPiers(group) {
   B.build(group, new Set([BL, PA]));
 }
 
-function buildCityGrid(scene) {
+async function buildCityGrid(scene) {
   streetGroundSurfaces = [];
   const group = new THREE.Group();
   group.name = 'ManhattanCityGrid';
@@ -1584,6 +1585,7 @@ function buildCityGrid(scene) {
   const hedgeGeos = [];
   const SW_TOP = 0.22;
   for (const b of BLOCKS) {
+    await buildSlice();
     if (b.park > 0.6 && !b.median && b.parkName !== 'Bryant Park') continue; // parks build their own perimeter sidewalk (sections 7, 7B)
     if (b.rect) {
       const slab = { cx: (b.minX + b.maxX) * 0.5, cz: (b.minZ + b.maxZ) * 0.5, w: b.maxX - b.minX, d: b.maxZ - b.minZ, block: b };
@@ -1621,6 +1623,7 @@ function buildCityGrid(scene) {
       group.add(m);
     }
   };
+  await buildSlice();
   mergeInto(curbGeos, curbMat, false);
   mergeInto(slabGeos, sidewalkMat);
   mergeInto(hedgeGeos, medianHedgeMat, true);
@@ -1648,6 +1651,7 @@ function buildCityGrid(scene) {
   curbInstanced.instanceMatrix.needsUpdate = true;
   group.add(swInstanced, curbInstanced);
 
+  await buildSlice();
   // 6. Times Square Pedestrian Plazas, Duffy Square TKTS Red Steps, Herald Square & Flatiron Plaza
   //    Curb-height light-grey granite paver plazas in Broadway's roadbed with granite benches & planters, plus the
   //    shared street-furniture instancing of the plazas & small parks (instanced at the end of section 7B)
@@ -1742,6 +1746,7 @@ function buildCityGrid(scene) {
     addFootprint((Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2, Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));
   };
   for (const pc of [...tsPieces, ...hsPieces]) {
+    await buildSlice();
     addPavedPlaza(pc.pts, 1);
     footprintOf(pc.pts);
   }
@@ -1756,6 +1761,7 @@ function buildCityGrid(scene) {
     return inner && pointInPolygonXZ(inner, x, z);
   };
   for (const pc of tsPieces) {
+    await buildSlice();
     const bx = pieceBox(pc);
     if (bx.maxX - bx.minX < 6) continue;
     for (let z = pc.zN + 6; z <= pc.zS - 6; z += 12) {
@@ -1820,6 +1826,7 @@ function buildCityGrid(scene) {
   // Herald Square (34th-35th St) & Greeley Square: planted honey locusts in granite planters, benches & lampposts on the
   // larger pieces
   for (const pc of hsPieces) {
+    await buildSlice();
     const bx = pieceBox(pc);
     if (bx.maxX - bx.minX < 7 || pc.zS - pc.zN < 20) continue;
     for (let z = pc.zN + 8; z <= pc.zS - 8; z += 16) {
@@ -1832,6 +1839,7 @@ function buildCityGrid(scene) {
     addLamp(bx.cx + 5.5, PLAZA_Y, pc.zS - 3);
   }
 
+  await buildSlice();
   // =========================================================================
   // 7. CENTRAL PARK (59th to 110th St, 5th Ave to Central Park West) from its real features (city-config.js GEO:
   //    the NYC Parks outline, OpenStreetMap's meadows, water bodies, loop drives & landmarks, the transverses from the
@@ -1886,6 +1894,7 @@ function buildCityGrid(scene) {
   // Sunlit open meadows & lawns: Sheep Meadow, the Great Lawn, North Meadow, the Great Hill, Cedar & Pilgrim Hills...
   const cpLawnPolys = CPG.lawns.map((l) => flatPts(l.ring));
   for (const pts of cpLawnPolys) {
+    await buildSlice();
     group.add(createFlatPolygonMesh(pts, 1.21, cpMeadowMat, true));
     addStreetGround(pts, 1.21);
   }
@@ -1894,6 +1903,7 @@ function buildCityGrid(scene) {
   // track), Harlem Meer, the Pond, Turtle Pond, the Pool & Conservatory Water
   const cpWaterPolys = [];
   for (const w of CPG.water) {
+    await buildSlice();
     const pts = flatPts(w.ring);
     cpWaterPolys.push(pts);
     if (w.name === 'Jacqueline Kennedy Onassis Reservoir') {
@@ -1924,6 +1934,7 @@ function buildCityGrid(scene) {
     }
   }
   for (const d of CPG.drives) {
+    await buildSlice();
     const wp = [];
     for (let i = 0; i < d.pts.length; i += 2) wp.push([d.pts[i], d.pts[i + 1]]);
     if (wp.length < 2) continue;
@@ -1979,6 +1990,7 @@ function buildCityGrid(scene) {
     { x: -690, z: -2700, sx: 1.8, sy: 0.72, sz: 1.50 }
   ];
   for (const rc of rockCoords) {
+    await buildSlice();
     const rock = new THREE.Mesh(rockGeo, schistRockMat);
     rock.position.set(rc.x, 1.05, rc.z);
     rock.scale.set(rc.sx, rc.sy, rc.sz);
@@ -2021,6 +2033,7 @@ function buildCityGrid(scene) {
     mall: { x: mallX, z0: mallZ0, z1: mallZ0 + MALL_LEN }
   };
 
+  await buildSlice();
   // 6. Grand Army Plaza (5th Ave & 59th St: the Pulitzer Fountain, Sherman's gilded statue) & Columbus Circle
   const gapPlaza = new THREE.Mesh(new THREE.CylinderGeometry(16, 17, 0.45, 24), marbleArchMat);
   gapPlaza.position.set(gap.x, 0.25, gap.z);
@@ -2042,6 +2055,7 @@ function buildCityGrid(scene) {
   columbusColumn.position.set(colC.x, 9.5, colC.z);
   group.add(columbusColumn);
 
+  await buildSlice();
   // 7B. Madison Square Park, Union Square Park, Washington Square Park, Tompkins Square Park & Battery Park
   //     Flush with the sidewalks: hex-paver walks, granite-coped lawn beds with low hoop fences between radial &
   //     diagonal paths, a cast-iron perimeter fence on a granite coping, benches, lampposts & a dense plane canopy
@@ -2257,7 +2271,10 @@ function buildCityGrid(scene) {
     tompkins: parkRect('Tompkins Square Park', { speciesMix: [0.45, 0.1], cells: [{ extraRays: [-QUARTER, QUARTER, 0, Math.PI], hubR: 4.5 }] })
   })) if (def) smallParks[key] = def;
   const parkFrames = {};
-  for (const key of Object.keys(smallParks)) parkFrames[key] = buildSmallPark(smallParks[key]);
+  for (const key of Object.keys(smallParks)) {
+    await buildSlice();
+    parkFrames[key] = buildSmallPark(smallParks[key]);
+  }
 
   // Washington Square Arch (white marble, 1892) at the foot of 5th Ave, over the park's north-east entrance
   const wsArchX = avenueX('5');
@@ -2298,9 +2315,11 @@ function buildCityGrid(scene) {
   }
   const nearArch = (x, z) => Math.abs(x - wsArchX) < 11 && z > wsArchZ - 6 && z < wsArchZ + 4.5;
   for (let i = treeSites.length - 1; i >= 0; i--) {
+    await buildSlice();
     if (nearArch(treeSites[i].x, treeSites[i].z)) treeSites.splice(i, 1);
   }
   for (let i = lampMatrices.length - 1; i >= 0; i--) {
+    await buildSlice();
     if (nearArch(lampMatrices[i].elements[12], lampMatrices[i].elements[14])) lampMatrices.splice(i, 1);
   }
 
@@ -2332,6 +2351,7 @@ function buildCityGrid(scene) {
   const SPECIAL_PARKS = new Set(['Central Park', 'Madison Square Park', 'Union Square Park', 'Washington Square Park', 'Tompkins Square Park', 'Bryant Park']);
   const genericParks = BLOCKS.filter((b) => b.park > 0.6 && !b.median && !SPECIAL_PARKS.has(b.parkName) && b.area > 250);
   for (const b of genericParks) {
+    await buildSlice();
     const slab = offsetPolygonInward(b.poly, 0.1) || b.poly;
     group.add(createExtrudedPolygonMesh(b.poly, 0.0, PARK_Y - 0.04, curbMat, true, false));
     const top = createExtrudedPolygonMesh(slab, 0.0, PARK_Y, pavingMat, true, false);
@@ -2557,6 +2577,7 @@ function buildCityGrid(scene) {
   pavedPlazaRects = pavedRects;
   sidewalkBlocks = blockSidewalks; // { cx, cz, w, d } raised sidewalk slabs (cross-street tree rows)
 
+  await buildSlice();
   // =========================================================================
   // 8. AUTHENTIC HUDSON RIVER & EAST RIVER WATERFRONT PIERS (29 Piers)
   // =========================================================================
@@ -2567,13 +2588,16 @@ function buildCityGrid(scene) {
 
   // 9 & 10. The East River bridges, harbor islands and the surrounding boroughs are built by boroughs.js
 
+  await buildSlice();
   // 11. Manhattan's waterfront edge: esplanades, shore highways & riverside park belts (see buildManhattanWaterfrontEdge)
   const roadPaint = createRoadPaintChunkBuilder('RoadMarkings');
-  const highwayLanes = buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMat: cpLawnMat, curbMat, roadMat, roadPaint });
+  const highwayLanes = await buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMat: cpLawnMat, curbMat, roadMat, roadPaint });
 
+  await buildSlice();
   // Batch static sub-meshes by material to reduce per-frame WebGPU draw calls
   batchStaticGroupMeshes(group, new Set([waterMat, roadMat, cpLawnMat, cpMeadowMat]));
 
+  await buildSlice();
   scene.add(group);
 
   // Raised sidewalk blocks bound the roads (the planted malls down Park Ave, Broadway & co. are obstacles in the
@@ -2604,7 +2628,7 @@ function buildCityGrid(scene) {
  * South of the Williamsburg Bridge the FDR leaves the strip for the South Street Viaduct (buildSouthStreetViaduct).
  * Everything is merged into a handful of meshes and keeps clear of the bridge towers standing near the shore.
  */
-function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMat, curbMat, roadMat, roadPaint }) {
+async function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMat, curbMat, roadMat, roadPaint }) {
   const STEP = 3; // shore sampling (m of z)
   const HWY_W = 15.2; // 0.4 shoulder, 2 x 3.3 m lanes, 1.2 m median, 2 x 3.3 m lanes, 0.4 shoulder
   const COPING_Y = -0.04; // seawall coping top (section 2)
@@ -2619,6 +2643,7 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
   // block elements closer to the water than dMax)
   const towers = []; // oriented boxes { cx, cz, ux, uz, hl, hw } (u = along the bridge)
   for (const br of EAST_RIVER_BRIDGES) {
+    await buildSlice();
     const dx = br.b.x - br.a.x;
     const dz = br.b.z - br.a.z;
     const L = Math.hypot(dx, dz);
@@ -2898,13 +2923,16 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
   const [er0, er1] = parkZRange('John V. Lindsay East River Park', [streetZ(12), 4150]);
   const [cs0, cs1] = [streetZ(90), streetZ(84)]; // Carl Schurz Park
   const WEST_END_Z = 6000; // Route 9A dives into the Battery Park Underpass at Battery Place
+  await buildSlice();
   const westRows = sampleShore(true, CUT_Z + 40, WEST_END_Z, (z) => smooth(streetZ(66), streetZ(59) + 60, z));
+  await buildSlice();
   const eastRows = sampleShore(false, CUT_Z + 40, 6150, (z) =>
     Math.max(smooth(er0 - 60, er0, z) * (1 - smooth(er1 - 50, er1, z)), smooth(cs0 - 40, cs0, z) * (1 - smooth(cs1, cs1 + 40, z))));
   // South of VIA_Z the FDR leaves the strip for the South Street Viaduct: no at-grade carriageway or park belts there,
   // the esplanade carries on
   const VIA_Z = 4250;
   for (const r of eastRows) {
+    await buildSlice();
     if (r.z <= VIA_Z) continue;
     r.via = true;
     r.river = r.land = null;
@@ -2912,23 +2940,41 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
   const hwy = (r, o) => (r.via ? null : H(r, o));
   for (const rows of [westRows, eastRows]) {
     const isWest = rows[0].west;
+    await buildSlice();
     railing(rows, -5.8);
+    await buildSlice();
     paintLine(rows, () => -0.45, 0.1, WHITE);
+    await buildSlice();
     paintLine(rows, () => -3.2, 0.1, WHITE);
+    await buildSlice();
     paintLine(rows, () => -1.82, 0.1, YELLOW, 6, 0.5);
+    await buildSlice();
     esplanade(rows);
+    await buildSlice();
     paintLine(rows, (r) => hwy(r, 0.3), 0.15, WHITE);
+    await buildSlice();
     paintLine(rows, (r) => hwy(r, 3.7), 0.13, WHITE, 12, 0.25);
+    await buildSlice();
     paintLine(rows, (r) => hwy(r, 7.05), 0.12, YELLOW);
+    await buildSlice();
     paintLine(rows, (r) => hwy(r, 8.15), 0.12, YELLOW);
+    await buildSlice();
     paintLine(rows, (r) => hwy(r, 11.5), 0.13, WHITE, 12, 0.25);
+    await buildSlice();
     paintLine(rows, (r) => hwy(r, HWY_W - 0.3), 0.15, WHITE);
+    await buildSlice();
     barrier(rows, (r) => hwy(r, 7.6));
+    await buildSlice();
     barrier(rows, (r) => (r.river || r.via ? null : r.d0 - 0.3));
+    await buildSlice();
     highwayLights(rows, isWest ? 10 : 25);
+    await buildSlice();
     belt(rows, 'river', false);
+    await buildSlice();
     belt(rows, 'land', isWest);
+    await buildSlice();
     plantBelt(rows, 'river', 9, 4.5, MIX_PARK, 1, 0.9, 1.2);
+    await buildSlice();
     plantBelt(rows, 'land', isWest ? 8.5 : 9, isWest ? 3.8 : 4.5, isWest ? MIX_RIVERSIDE : MIX_PARK, isWest ? 0 : 1, 1.0, 1.3);
   }
 
@@ -2956,6 +3002,7 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
   };
   const groundOK = (x, z) => inStrip(x, z) ||
     blockSidewalks.some((b) => Math.abs(x - b.cx) < b.w / 2 - 1 && Math.abs(z - b.cz) < b.d / 2 - 1);
+  await buildSlice();
   const viaduct = buildSouthStreetViaduct(group, {
     start: { x: join.x, z: join.z }, shoreX: (z) => shoreX(z, false), obstacles: towers.concat(pierBoxes), zEnd: 6330,
     quad, makeAcc, roadMat, lawnMat, paint, WHITE, YELLOW, lightSpots: highwaySpots, underSpots, groundOK
@@ -2972,11 +3019,13 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
   // Over the last 42 m of Route 9A's carriageway, whose lanes go underground behind its dark screen and come up on the
   // South Street Viaduct (and vice versa); the park trees, lamps and highway lights in its way are dropped
   const zW = westRows[westRows.length - 1].z;
+  await buildSlice();
   const wFrames = westRows.filter((r) => r.z >= zW - 42 - 1e-6).map((r) => {
     const c = P(r, H(r, 7.6));
     return { x: c.x, z: c.z, nx: r.sgn, nz: 0, y: 0, half: 7.6 * r.k + 0.5 };
   });
   const wPortal = { conc: makeAcc(), roof: lawn, dark: makeAcc(), shade: makeAcc() };
+  await buildSlice();
   buildUnderpassPortal(wFrames, wPortal, quad, underSpots, viaduct.colliders);
   const inWestPortal = (x, z, m) => {
     let f = wFrames[0];
@@ -2987,6 +3036,7 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
     if (inWestPortal(treeSites[i].x, treeSites[i].z, 3)) treeSites.splice(i, 1);
   }
   for (const spots of [lampSpots, highwaySpots]) {
+    await buildSlice();
     for (let i = spots.length - 1; i >= 0; i--) if (inWestPortal(spots[i][0], spots[i][2], 0.5)) spots.splice(i, 1);
   }
 
@@ -3003,9 +3053,11 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
     group.add(m);
     return m;
   };
+  await buildSlice();
   addMesh(lawn, lawnMat);
   addMesh(curbs, curbMat);
   addMesh(wall, createParkWallMaterial(), true);
+  await buildSlice();
   addMesh(concrete, new THREE.MeshStandardNodeMaterial({ color: 0x7f7c76, roughness: 0.92, metalness: 0.0 }));
   addMesh(fence, createIronFenceMaterial());
   // West St's underpass portal in the South Street Viaduct portal's materials (its lawn roof went in with the lawns)
@@ -3034,6 +3086,7 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
     inst.computeBoundingSphere();
     group.add(inst);
   };
+  await buildSlice();
   const glowMat = createParkLampGlobeMaterial(); // milky by day, warm glow at dusk & night
   instanced(mergeGeometries([
     new THREE.CylinderGeometry(0.15, 0.2, 0.7, 8).translate(0, 0.35, 0),
@@ -3071,6 +3124,7 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
   const highwayLanes = [];
   const tunnelLanes = {}; // offset -> { west, east }: the lanes in and out of the Battery Park Underpass
   for (const rows of [westRows, eastRows]) {
+    await buildSlice();
     const side = rows[0].west ? 'west' : 'east';
     for (const [o, dirWest, speed] of [[2.05, 1, 15.5], [5.35, 1, 17.5], [9.85, -1, 17.5], [13.15, -1, 15.5]]) {
       const dir = rows[0].west ? dirWest : -dirWest;
@@ -3097,6 +3151,7 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
   // The underground link: a straight run (points every ~30 m) from the end of the lane going in to the start of the
   // one coming out (the river pair: West St south -> FDR north; the land pair: FDR south -> West St north)
   for (const { west, east } of Object.values(tunnelLanes)) {
+    await buildSlice();
     if (!west || !east) continue;
     const [a, b] = west.pts[west.pts.length - 1].z > west.pts[0].z ? [west, east] : [east, west];
     const p0 = a.pts[a.pts.length - 1];
