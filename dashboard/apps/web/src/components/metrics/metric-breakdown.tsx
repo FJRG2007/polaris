@@ -348,10 +348,7 @@ function Row({ row, format }: { row: BreakdownRow; format: (value: number) => st
             <RowIcon row={row} />
             <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-baseline gap-2">
-                    <span
-                        className="min-w-0 flex-1 truncate text-sm font-medium"
-                        title={row.label}
-                    >
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium" title={row.label}>
                         {row.label}
                     </span>
                     <span className="shrink-0 tabular-nums text-sm">{format(row.value)}</span>
@@ -433,9 +430,7 @@ function Row({ row, format }: { row: BreakdownRow; format: (value: number) => st
  */
 function RestartService({ id, name }: { id: string; name: string }) {
     const t = useTranslations("watch");
-    const [state, setState] = useState<"idle" | "asking" | "working" | "done" | "failed">(
-        "idle"
-    );
+    const [state, setState] = useState<"idle" | "asking" | "working" | "done" | "failed">("idle");
     const [error, setError] = useState<string | null>(null);
     useEffect(() => {
         if (state !== "asking" && state !== "done") return;

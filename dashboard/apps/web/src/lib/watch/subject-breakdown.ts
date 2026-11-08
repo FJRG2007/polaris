@@ -415,10 +415,7 @@ const ACCESS_LOOKUPS_AT_ONCE = 8;
  * else's service. Only the name and where it lives are taken, and the caller has
  * already been gated on reading this machine.
  */
-async function deployedOn(
-    serverId: string,
-    viewerId: string
-): Promise<Map<string, DeployedApp>> {
+async function deployedOn(serverId: string, viewerId: string): Promise<Map<string, DeployedApp>> {
     const apps = await prisma.application
         .findMany({
             where: { target: targetOn(serverId) },
