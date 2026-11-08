@@ -160,6 +160,7 @@ export function GameRooms({ games }: { games: readonly RoomGame[] }) {
                     <Input
                         value={code}
                         onChange={(event) => setCode(event.target.value)}
+                        // i18n-ignore: the shape of a room code
                         placeholder="ABCD-2345"
                         aria-label={t("gameRooms.code")}
                         aria-invalid={codeWrong || undefined}
@@ -236,16 +237,18 @@ export function GameRooms({ games }: { games: readonly RoomGame[] }) {
                                     aria-hidden
                                 />
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium" title={room.gameName}>
+                                    <p
+                                        className="truncate text-sm font-medium"
+                                        title={room.gameName}
+                                    >
                                         {room.gameName}
                                     </p>
                                     <p
                                         className="truncate text-xs text-muted-foreground"
                                         title={room.host.name}
                                     >
-                                        {t("gameRooms.hostedBy", { name: room.host.name })}
-                                        {" - "}
-                                        {t("gameRooms.players", {
+                                        {t("gameRooms.roomLine", {
+                                            name: room.host.name,
                                             count: room.players,
                                             max: room.max
                                         })}

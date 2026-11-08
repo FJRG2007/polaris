@@ -405,15 +405,6 @@ export async function roomByCode(code: string) {
     });
 }
 
-/** What the room's own screen shows about it: its code and whether it is
- *  listed. Null for a session that is not a room. */
-export async function roomFacts(sessionId: string) {
-    return prisma.arcadeSession.findFirst({
-        where: { id: sessionId, code: { not: null } },
-        select: { code: true, isPublic: true }
-    });
-}
-
 /**
  * Let somebody who typed a room's code in: the same invitation an invitee
  * holds, issued by themselves - which keeps it out of their toast and bell
@@ -447,7 +438,9 @@ export async function publicRooms(now = Date.now()) {
             meetingId: null,
             endedAt: null,
             OR: [
-                { players: { some: { leftAt: null, seenAt: { gt: new Date(now - PASS_TTL_MS) } } } },
+                {
+                    players: { some: { leftAt: null, seenAt: { gt: new Date(now - PASS_TTL_MS) } } }
+                },
                 { createdAt: { gt: new Date(now - INVITE_WAIT_MS) }, players: { none: {} } }
             ]
         },

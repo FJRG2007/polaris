@@ -1775,8 +1775,7 @@
         "empty": "No public rooms right now. Create one and others can join.",
         "loadFailed": "Could not load the rooms.",
         "retry": "Try again",
-        "hostedBy": "Hosted by {name}",
-        "players": "{count} of {max} playing",
+        "roomLine": "Hosted by {name} - {count} of {max} playing",
         "joinRoom": "Join",
         "refused": {
             "invalid": "Check the code and try again.",

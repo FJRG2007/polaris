@@ -1775,8 +1775,7 @@
         "empty": "Ahora no hay salas públicas. Crea una y otros podrán unirse.",
         "loadFailed": "No se pudieron cargar las salas.",
         "retry": "Reintentar",
-        "hostedBy": "Creada por {name}",
-        "players": "{count} de {max} jugando",
+        "roomLine": "Creada por {name} - {count} de {max} jugando",
         "joinRoom": "Unirse",
         "refused": {
             "invalid": "Revisa el código e inténtalo de nuevo.",
