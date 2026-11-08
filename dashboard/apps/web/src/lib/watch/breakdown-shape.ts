@@ -57,6 +57,25 @@ export interface BreakdownRow {
     /** Where this thing lives, when it has a page of its own. */
     readonly href: string | null;
     readonly group?: BreakdownGroup;
+    /** The engine's own name for the container behind the row, so two rows of
+     *  one project can be told apart. Shown when it is not the label. */
+    readonly container?: string | null;
+    /** What a container nobody deployed runs from. */
+    readonly image?: string | null;
+    /** The part of Polaris this is, by its catalog key, so the screen names it in
+     *  the reader's words. Null for a part the catalog does not know. */
+    readonly part?: string | null;
+    /** A service Polaris deployed: how Deploy draws it and what the reader may do. */
+    readonly service?: BreakdownService | null;
+    /** The memory cap set on it, in bytes. Null when it may use the whole machine. */
+    readonly limit?: number | null;
+}
+
+/** The deployed service behind a row. */
+export interface BreakdownService {
+    readonly id: string;
+    readonly source: "github" | "image";
+    readonly canRestart: boolean;
 }
 
 /** A row before it knows how big a part of the whole it is. */
