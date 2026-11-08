@@ -15,12 +15,9 @@
  * "5TH AVE · 42 ST", which an operator saw at Fifth Avenue and 59th Street.
  */
 
-import { gzipSync } from "node:zlib";
-import { readFileSync, writeFileSync } from "node:fs";
-import { URL as FileUrl, fileURLToPath } from "node:url";
+import { writeFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-
-const data = fileURLToPath(new FileUrl("../../../arcade/game/new-york/data/", import.meta.url));
+import { serveData } from "./new-york-data";
 
 type Site = { x: number; y: number; z: number };
 const captured = vi.hoisted(() => ({ sites: [] as Site[] }));
@@ -38,40 +35,6 @@ vi.mock("../../../arcade/game/new-york/engine/trees.js", async () => {
         }
     };
 });
-
-/** The files the page names in its `<meta>` tags, served from the source data. */
-function serveData() {
-    const files: Record<string, () => Uint8Array> = {
-        geo: () => gzipSync(readFileSync(`${data}geo.bin`)),
-        buildings: () => readFileSync(`${data}buildings.bin.gz`),
-        trees: () => readFileSync(`${data}trees.bin.gz`)
-    };
-    for (const name of Object.keys(files)) {
-        const meta = document.createElement("meta");
-        meta.name = name;
-        meta.content = name;
-        document.head.append(meta);
-    }
-    // Textures are painted on 2D canvases jsdom does not draw: a context that takes every call is all the build needs
-    const pixels = (w: number, h: number) => ({
-        width: w,
-        height: h,
-        data: new Uint8ClampedArray(w * h * 4)
-    });
-    const context: object = new Proxy(() => context, {
-        get: (_target, key) => {
-            if (key === "getImageData")
-                return (_x: number, _y: number, w: number, h: number) => pixels(w, h);
-            if (key === "createImageData") return (w: number, h: number) => pixels(w, h);
-            if (key === "measureText") return () => ({ width: 10 });
-            return context;
-        },
-        apply: () => context,
-        set: () => true
-    });
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
-    vi.stubGlobal("fetch", async (name: string) => new Response(files[name]()));
-}
 
 const CELL = 8;
 const LARGE = 64;
@@ -134,11 +97,11 @@ async function buildCityOnce() {
     const { buildStreetDetails } =
         await import("../../../arcade/game/new-york/engine/street-details.js");
     const scene = new THREE.Scene();
-    const grid = buildCityGrid(scene);
+    const grid = await buildCityGrid(scene);
     const boroughs = buildBoroughs(scene, { sidewalks: grid.sidewalks });
     const { colliders } = buildLandmarks(scene);
-    const blocks = buildCityBlocks(scene, colliders);
-    buildStreetDetails(scene, [
+    const blocks = await buildCityBlocks(scene, colliders);
+    await buildStreetDetails(scene, [
         ...colliders,
         ...blocks.colliders,
         ...boroughs.colliders,

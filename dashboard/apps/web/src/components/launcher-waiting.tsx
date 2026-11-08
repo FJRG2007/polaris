@@ -9,11 +9,12 @@
  * its corner. The foot of the menu has "mark everything read". What "read"
  * means is the app's own - see `lib/launcher-waiting`.
  *
- * Which tiles may be marked, and by how much a mark moves each badge, comes from
- * the waiting route, asked when the menu opens: Management's badge counts a
- * fault that no mark dismisses, so the badge alone cannot say. The last answer
- * is kept for the page's life and used at once on the next open, then replaced
- * if it changed.
+ * Which tiles may be marked is the badges' answer, from the first paint: every
+ * app whose badge is up offers the mark, and a mark takes the whole badge down.
+ * The waiting route, asked when the menu opens, only refines that - an app
+ * whose entries are all faults no mark dismisses loses the mark, and the part
+ * of a badge such a fault holds stays up. The last answer is kept for the
+ * page's life and used at once on the next open, then replaced if it changed.
  *
  * A mark moves the badge at once and is put back if the server refuses it, with
  * a toast saying so.
@@ -24,15 +25,15 @@ import { useAdminRecount } from "@/components/admin-waiting";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useToast, type AppTileAction, type PolarisApp } from "@polaris/ui";
-import { useNudgeAppUnread, useServerUnread } from "@/components/app-unread";
+import { useAppUnread, useNudgeAppUnread, useServerUnread } from "@/components/app-unread";
 import { beginUnreadChange } from "@/lib/mailbox/unread-overlay";
 import { useHoldConversationNotices } from "@/components/notifications/notifications-provider";
 import { markLauncherReadAction } from "@/app/(app)/launcher-waiting-actions";
 import {
-    badgeDelta,
     launcherWaitingSchema,
     LAUNCHER_WAITING_APPS,
     markableApps,
+    undismissable,
     withoutAll,
     withoutApp,
     type LauncherWaiting,
@@ -69,6 +70,9 @@ export function useLauncherMarks(
     const t = useTranslations("nav");
     const toast = useToast();
     const server = useServerUnread();
+    // What the badges show now, this browser's marks included: what a mark is
+    // offered on, and how far it takes each badge down.
+    const shown = useAppUnread();
     const nudge = useNudgeAppUnread();
     const holdNotices = useHoldConversationNotices();
     const recountAdmin = useAdminRecount();
@@ -116,10 +120,15 @@ export function useLauncherMarks(
     const mark = useCallback(
         async (app: LauncherWaitingApp | null) => {
             const before = latest.current;
-            if (!before) return;
-            const after = app ? withoutApp(before, app) : withoutAll(before);
-            const touched = app ? [app] : [...markableApps(before)];
-            apply(after);
+            const touched = app ? [app] : [...markableApps(shown, before)];
+            if (touched.length === 0) return;
+            // By the badge, not by the route: the route may not have answered,
+            // and a badge is what the reader is marking. Only what the route
+            // says no mark dismisses stays on it.
+            const by = (one: LauncherWaitingApp) =>
+                -Math.max(0, (shown[one] ?? 0) - undismissable(before, one));
+            const after = before ? (app ? withoutApp(before, app) : withoutAll(before)) : null;
+            if (after) apply(after);
             // Mail's badge moves on Mail's own ledger, which every count of
             // unread mail reads - the tile, the tab, the rail inside Mail - and
             // which keeps the change over a recount asked for before it landed.
@@ -127,24 +136,19 @@ export function useLauncherMarks(
             // the server reads in the same action.
             const notices = touched.includes("mail")
                 ? holdNotices(
-                      before.groups
+                      before?.groups
                           .find((group) => group.app === "mail")
                           ?.items.map((item) => item.id) ?? []
                   )
                 : null;
             const mail = touched.includes("mail")
                 ? beginUnreadChange([
-                      {
-                          folderId: null,
-                          accountId: null,
-                          inbox: true,
-                          by: badgeDelta(before, after, "mail")
-                      }
+                      { folderId: null, accountId: null, inbox: true, by: by("mail") }
                   ])
                 : null;
-            const undo = touched
-                .filter((one) => one !== "mail")
-                .map((one) => nudge(one, badgeDelta(before, after, one)));
+            const undo = new Map(
+                touched.filter((one) => one !== "mail").map((one) => [one, nudge(one, by(one))])
+            );
             marking.current += 1;
             const result = await markLauncherReadAction(
                 app ? { scope: "app", app } : { scope: "all" }
@@ -154,26 +158,31 @@ export function useLauncherMarks(
                     marking.current -= 1;
                 });
             if (result.error) {
-                for (const one of undo) one();
+                for (const one of undo.values()) one();
                 mail?.abandon();
                 notices?.abandon();
-                if (latest.current === after) apply(before);
+                if (before && latest.current === after) apply(before);
                 toast.show({ title: result.error });
                 void refresh();
                 return;
             }
             mail?.settle();
             notices?.settle();
-            if (touched.includes("admin")) recountAdmin();
+            const admin = undo.get("admin");
+            if (admin) {
+                void recountAdmin().then((counted) => {
+                    if (counted) admin();
+                });
+            }
             if (marking.current === 0 && missed.current) {
                 missed.current = false;
                 void refresh();
             }
         },
-        [apply, holdNotices, nudge, recountAdmin, refresh, t, toast]
+        [apply, holdNotices, nudge, recountAdmin, refresh, shown, t, toast]
     );
 
-    const markable = markableApps(waiting);
+    const markable = markableApps(shown, waiting);
     const markAction = (appId: string, appLabel: string, short = false): AppTileAction | null => {
         if (!isWaitingApp(appId) || !markable.has(appId)) return null;
         const seen = appId === "admin";

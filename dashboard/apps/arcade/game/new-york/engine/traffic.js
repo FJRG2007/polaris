@@ -24,6 +24,7 @@ import {
   createBusWheelMaterial,
   createLoftedBusMaterial
 } from './bus.js';
+import { buildSlice } from './build-slice.js';
 
 // Cars and buses follow the road graph, obey signals, yield at crossings and react to collisions.
 // Vehicles replenish around the player; pedestrian-system.js manages the nearby walking population.
@@ -104,7 +105,7 @@ function createBusDestinationTexture() {
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
-function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
+async function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
   const group = new THREE.Group();
   group.name = 'ManhattanTrafficAndPedestrians';
   let collisionListener = null;
@@ -132,7 +133,8 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
   // =========================================================================
   // 0. ROAD NETWORK
   // =========================================================================
-  const network = buildRoadNetwork(sidewalks, obstacles, signalIntersections);
+  await buildSlice();
+  const network = await buildRoadNetwork(sidewalks, obstacles, signalIntersections);
   const { nodes, edges, connector, curvePoint } = network;
 
   // Sides of an intersection (road-network.js step 9): a grid intersection's are 0 east, 1 west, 2 south, 3 north;
@@ -141,12 +143,14 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
   const laneCoord = (e, i) => (e.sx + e.rx * e.lanes[i]) * e.clx + (e.sz + e.rz * e.lanes[i]) * e.clz;
 
   for (const n of nodes) {
+    await buildSlice();
     n.box = new Array(n.groupCount).fill(0); // vehicles crossing it from each road (group: on the grid avenue 0, street 1)
     n.crossing = new Array(n.sideCount).fill(0); // vehicles crossing (or about to cross) the crosswalk on each side
     n.approach = new Array(n.sideCount).fill(null); // the edge arriving over each side's crosswalk
     n.road = new Array(n.sideCount).fill(null); // an edge arriving or leaving over each side's crosswalk: the road it spans
   }
   for (const e of edges) {
+    await buildSlice();
     e.occ = e.lanes.map(() => []); // vehicles in each lane, sorted by position
     // e.inSide / e.outSide: the crosswalks crossed on the way into e.to / out of e.from; e.axisIndex: its group at e.to;
     // e.opposite: the oncoming edge of its road there (road-network.js)
@@ -179,6 +183,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
   }
 
   // Every body kind shares one 3D wheel model, instanced separately and scaled to the kind's wheel radius
+  await buildSlice();
   const carWheelLeftGeo = buildSteerableWheelGeo(BODY_SPECS.sedan, -1);
   const carWheelRightGeo = buildSteerableWheelGeo(BODY_SPECS.sedan, 1);
   const carWheelStyles = new THREE.InstancedBufferAttribute(new Float32Array(NUM_CARS * 2), 1);
@@ -264,10 +269,12 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     'taxi', 'sedan', 'suv', 'van', 'suv', 'taxi', 'minivan', 'sedan', 'suv', 'sedan'];
 
   const cars = [];
+  await buildSlice();
   const counts = Object.fromEntries(Object.keys(CAR_KINDS).map((kind) => [kind, 0]));
   const policeCounts = { sedan: 0, suv: 0 };
 
   for (let i = 0; i < NUM_CARS; i++) {
+    await buildSlice();
     const isPolice = (i % 50) === 6 || (i % 100) === 56;
     const isBoroTaxi = !isPolice && (i % 25) === 3;
     let bodyType = FLEET_MIX[i % FLEET_MIX.length];
@@ -307,6 +314,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
   // turn signals, livery (1 = NYPD).
   const bodies = {};
   for (const kind of Object.keys(CAR_KINDS)) {
+    await buildSlice();
     const spec = BODY_SPECS[kind];
     const n = Math.max(1, counts[kind]);
     const mat = createLoftedCarMaterial(spec);
@@ -385,6 +393,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
   // =========================================================================
   // 2. CITY BUSES
   // =========================================================================
+  await buildSlice();
   const busBodyGeo = buildLoftedBusBodyGeometry();
   // Per-instance lamp & variant state the bus material and sign atlas read: brake, left (+x) & right (-x) turn, variant+1
   const busStates = new THREE.InstancedBufferAttribute(new Float32Array(NUM_BUSES * 4), 4);
@@ -432,12 +441,14 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     halfW: 0.86, halfL: 2.18 };
   const nearEdges = [];
   const nearSignals = [];
+  await buildSlice();
   const pedestrianSystem = createPedestrianSystem(network, {
     player, nearEdges, nearSignals, mayCross, walkOn, visible, nearView
   });
   group.add(...pedestrianSystem.meshes);
 
   // Add vehicle contact shadows last + pre-allocated Clustered SpotLight / PointLight pools
+  await buildSlice();
   group.add(carShadowInst, busShadowInst);
 
   const HEADLIGHT_POOL_SIZE = 96;

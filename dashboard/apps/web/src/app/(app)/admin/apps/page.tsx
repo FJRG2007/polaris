@@ -9,34 +9,39 @@
  */
 
 import { redirect } from "next/navigation";
+import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
-import { adoptAppInstalls } from "@/lib/app-extensions/registry";
-import { adoptMailServerApp } from "@/lib/mail-server/app-install";
-import { storeInstalls } from "@/app/(app)/apps/marketplace/store-installs";
-import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
+import { PolarisAppsLoader } from "./loader";
+import { getTranslations } from "@/lib/i18n/request";
 import { DEPLOYABLE_APPS_PATH, storeScope, findStoreApp } from "@/lib/apps/marketplace-store";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * The installs, and the adoption of older install rows that has to run before
+ * they are listed, are read after the paint (`data.ts`); only the redirect for a
+ * deployable app is decided here, from the address and the static catalogue.
+ */
 export default async function PolarisAppsPage({
     searchParams
 }: {
     searchParams: Promise<{ app?: string | string[] }>;
 }) {
-    const user = await requireAdmin();
-    await Promise.all([adoptAppInstalls(user.id), adoptMailServerApp()]);
+    await requireAdmin();
     const { app } = await searchParams;
     const focus = typeof app === "string" ? findStoreApp(app) : undefined;
+    // A deployable app belongs on the other screen: send it there with its focus.
     if (focus && storeScope(focus) === "deployable")
         redirect(`${DEPLOYABLE_APPS_PATH}?app=${encodeURIComponent(focus.id)}`);
-    const { installed, canInstall } = await storeInstalls(user, "polaris");
+    const t = await getTranslations("marketplace");
+
     return (
-        <MarketplaceView
-            scope="polaris"
-            installed={installed}
+        <PolarisAppsLoader
+            heading={
+                <PageHeader title={t("polaris.title")} description={t("polaris.description")} />
+            }
             initialQuery={focus?.name ?? ""}
-            canInstall={canInstall}
-            canUpdateApps={user.isAdmin}
+            revision={Date.now()}
         />
     );
 }

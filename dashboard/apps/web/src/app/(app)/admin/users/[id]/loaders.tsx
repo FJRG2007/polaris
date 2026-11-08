@@ -13,8 +13,9 @@
  * section hands the header what its own answer carried (`UserRecordFrame`).
  */
 
-import * as data from "./data";
 import { createContext, useContext, useState, type ReactNode } from "react";
+import type * as data from "./data";
+import { paintRead } from "@/app/(app)/admin/paint-read";
 import { UserAccessView } from "./access-view";
 import { Badge, PageHeader } from "@polaris/ui";
 import { DangerSection } from "./danger-section";
@@ -104,7 +105,7 @@ export function UserOverviewRegion({ userId, revision }: RegionProps) {
         <AfterPaint
             onAnswer={publishHeading}
             cacheKey={`admin-user-overview:${userId}`}
-            load={() => data.loadUserOverviewAction(userId)}
+            load={() => paintRead("users.overview", { id: userId })}
             revision={revision}
             skeleton={<CardSkeleton lines={4} />}
         >
@@ -125,7 +126,7 @@ export function UserAccessRegion({ userId, revision }: RegionProps) {
         <AfterPaint
             onAnswer={publishHeading}
             cacheKey={`admin-user-access:${userId}`}
-            load={() => data.loadUserAccessAction(userId)}
+            load={() => paintRead("users.access", { id: userId })}
             revision={revision}
             skeleton={
                 <div className="flex flex-col gap-4">
@@ -156,7 +157,7 @@ export function UserSecurityRegion({ userId, revision }: RegionProps) {
         <AfterPaint
             onAnswer={publishHeading}
             cacheKey={`admin-user-security:${userId}`}
-            load={() => data.loadUserSecurityAction(userId)}
+            load={() => paintRead("users.security", { id: userId })}
             persist={false}
             revision={revision}
             skeleton={
@@ -182,7 +183,7 @@ export function UserSessionsRegion({ userId, revision }: RegionProps) {
         <AfterPaint
             onAnswer={publishHeading}
             cacheKey={`admin-user-sessions:${userId}`}
-            load={() => data.loadUserSessionsAction(userId)}
+            load={() => paintRead("users.sessions", { id: userId })}
             persist={false}
             revision={revision}
             skeleton={<CardSkeleton lines={4} />}
@@ -198,7 +199,7 @@ export function UserDangerRegion({ userId, revision }: RegionProps) {
         <AfterPaint
             onAnswer={publishHeading}
             cacheKey={`admin-user-danger:${userId}`}
-            load={() => data.loadUserDangerAction(userId)}
+            load={() => paintRead("users.danger", { id: userId })}
             persist={false}
             revision={revision}
             skeleton={<CardSkeleton lines={2} />}

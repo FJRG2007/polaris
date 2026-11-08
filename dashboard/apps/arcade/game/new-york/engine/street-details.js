@@ -23,6 +23,7 @@ import { createSubwayEntrances } from './subway-entrances.js';
 import { pavedPlazaRects, centralParkClearings, parkTreeSites, parkLampSites, drawnGroundAt } from './city-grid.js';
 import { bryantParkLawn } from './landmarks.js';
 import { lightBudget } from './quality.js';
+import { buildSlice } from './build-slice.js';
 
 // Instanced street furniture, traffic signals, trees and nearby light pools.
 
@@ -153,7 +154,7 @@ function createWalkSignalMaterial(clock) {
   return mat;
 }
 
-function buildStreetDetails(scene, colliders = []) {
+async function buildStreetDetails(scene, colliders = []) {
   const group = new THREE.Group();
   group.name = 'ManhattanStreetDetails';
 
@@ -288,6 +289,7 @@ function buildStreetDetails(scene, colliders = []) {
 
   // Use each avenue's local width and the street's real runs, including gaps at Central Park and road ends.
   for (const ave of ALL_AVENUES) {
+    await buildSlice();
     if (ave.isHighway) continue;
     for (const st of ALL_STREETS) {
       const avenueRun = ave.segs?.find((s) => st.z >= s.z0 && st.z <= s.z1);
@@ -392,6 +394,7 @@ function buildStreetDetails(scene, colliders = []) {
   const allBlocks = BLOCKS || [];
 
   for (const b of allBlocks) {
+    await buildSlice();
     if (!b || !b.poly || b.poly.length < 3 || b.median || b.park > 0.6) continue;
 
     const poly = b.poly;
@@ -553,6 +556,7 @@ function buildStreetDetails(scene, colliders = []) {
     return inst;
   }
 
+  await buildSlice();
   addMatrixArrayInstanced(unitCyl, poleMetalMat, poleMatrices);
   addMatrixArrayInstanced(unitBox, poleMetalMat, armMatrices);
   addMatrixArrayInstanced(signalHousingGeo, signalHousingMat, yellowBoxMatrices);
@@ -593,6 +597,7 @@ function buildStreetDetails(scene, colliders = []) {
     { x: -55,  y: 48, z: -360, rotY: 0.28,  rotZ: -0.46 }  // 59th St / Central Park South Canyon
   ];
   for (const cs of canyonShafts) {
+    await buildSlice();
     const shaft = new THREE.Mesh(godRayGeo, godRayMat);
     const at = fromOldFrame(cs.x, cs.z); // (authored on the former compressed grid)
     shaft.position.set(at.x, cs.y, at.z);
@@ -622,6 +627,7 @@ function buildStreetDetails(scene, colliders = []) {
   ];
   // (authored on the former compressed grid: carried onto the real streets; the Financial District one by One WTC)
   for (const st of steamLocations) {
+    await buildSlice();
     const wtc = LANDMARK_SITES['One World Trade Center'];
     const at = st.z > 1000 && wtc ? { x: wtc.x + 48, z: wtc.z - 40 } : fromOldFrame(st.x, st.z);
     st.x = at.x;
@@ -650,6 +656,7 @@ function buildStreetDetails(scene, colliders = []) {
   const barricadeWhiteMatrices = [];
 
   for (let sIdx = 0; sIdx < steamLocations.length; sIdx++) {
+    await buildSlice();
     const { x: sx, z: sz, windX, windZ } = steamLocations[sIdx];
     addFootprint(sx, sz, 2, 2); // stack + sawhorse barricades
 
@@ -733,6 +740,7 @@ function buildStreetDetails(scene, colliders = []) {
     }
   }
 
+  await buildSlice();
   addMatrixArrayInstanced(unitCyl, steamOrangeMat, orangeMatrices);
   addMatrixArrayInstanced(unitCyl, steamWhiteMat, whiteMatrices);
   addMatrixArrayInstanced(unitBox, steamOrangeMat, barricadeOrangeMatrices);
@@ -755,6 +763,7 @@ function buildStreetDetails(scene, colliders = []) {
   const subwayMatrices = [];
   const subwayColliders = [];
   for (const { x, y, z, yaw } of subwaySites) {
+    await buildSlice();
     const cs = Math.cos(yaw), sn = Math.sin(yaw);
     subwayMatrices.push(new THREE.Matrix4().makeRotationY(yaw).setPosition(x, y, z));
     const hw = 1.21, hd = 3.16;
@@ -835,6 +844,7 @@ function buildStreetDetails(scene, colliders = []) {
   const hydrantPositions = [];
   const mailboxPositions = [];
   for (const ave of AVENUES) {
+    await buildSlice();
     for (let row = 0; row < STREETS.length - 1; row++) {
       const zMid = (STREETS[row].z + STREETS[row + 1].z) * 0.5;
       const h1 = [ave.x - ave.width * 0.5 - 0.8, zMid - 16];
@@ -1001,12 +1011,15 @@ function buildStreetDetails(scene, colliders = []) {
   }
 
   // B5. The squares, the other parks & the plazas (sites laid out by city-grid.js)
+  await buildSlice();
   for (const s of parkTreeSites || []) treePositions.push(s);
 
+  await buildSlice();
   // Surveyed street trees; parks keep their authored terrain, clearings and tree layouts.
-  let sidewalkTreePositions = placeStreetTrees(REAL_TREES, treePositions,
+  let sidewalkTreePositions = await placeStreetTrees(REAL_TREES, treePositions,
     (x, z) => !inPlaza(x, z, 1.5) && isClearOfPoles(x, z, 2.2));
   for (const tree of sidewalkTreePositions) treePositions.push(tree);
+  await buildSlice();
   const treeField = createTreeField(scene, treePositions, [...colliders, ...subwayColliders]);
   group.add(treeField.group);
   sidewalkTreePositions = sidewalkTreePositions.filter((t) => treeField.sites.has(t));
@@ -1031,6 +1044,7 @@ function buildStreetDetails(scene, colliders = []) {
   pitGrateInst.receiveShadow = true;
   pitGrateInst.count = gratedTrees.length;
 
+  await buildSlice();
   sidewalkTreePositions.forEach((t, i) => {
     dummy.rotation.set(0, t.pitRot || 0, 0);
     dummy.scale.set(t.pitS || 1, 1, 1);
@@ -1081,6 +1095,7 @@ function buildStreetDetails(scene, colliders = []) {
   scene.add(streetLightsGroup);
 
   const streetlightSpotPool = [];
+  await buildSlice();
   for (let i = 0; i < STREETLIGHT_SPOT_POOL; i++) {
     // Cobra-head LED luminaire: wide downward spread (0.96 rad half-angle) illuminating both road and sidewalk
     const spot = new THREE.SpotLight(0xffe8c2, 0, 25, 0.96, 0.82, 1.25);

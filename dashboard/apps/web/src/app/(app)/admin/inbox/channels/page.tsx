@@ -6,12 +6,27 @@
  */
 
 import { requirePermission } from "@/lib/session";
-import { ChannelsView } from "./channels-view";
-import { listChannels } from "@/lib/messaging-service";
+import { getTranslations } from "@/lib/i18n/request";
+import { ChannelsLoader, cardsSkeleton } from "../loaders";
+import { ViewHeadingSkeleton } from "@/app/(app)/admin/region-skeletons";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChannelsPage() {
-    const user = await requirePermission("inbox.read");
-    return <ChannelsView initialChannels={await listChannels(user.id)} />;
+    await requirePermission("inbox.read");
+    const t = await getTranslations("admin");
+
+    return (
+        <ChannelsLoader
+            revision={Date.now()}
+            skeleton={
+                <ViewHeadingSkeleton
+                    title={t("inboxChannels.title")}
+                    intro={t("inboxChannels.intro")}
+                >
+                    {cardsSkeleton}
+                </ViewHeadingSkeleton>
+            }
+        />
+    );
 }

@@ -52,5 +52,9 @@
         "camera": "Cámara",
         "previous": "Anterior",
         "next": "Otro"
-    }
+    },
+    "loadingInCall": "Cargando...",
+    "together": "Jugar con otros",
+    "togetherIntro": "Abre una sala, comparte su código o únete a una en marcha.",
+    "togetherDenied": "Un administrador ha desactivado jugar con otros en tu cuenta."
 }

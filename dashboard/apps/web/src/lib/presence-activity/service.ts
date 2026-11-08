@@ -26,7 +26,7 @@ import { can } from "@polaris/auth";
 import { callActivityGames, playingNowFor } from "@/lib/app-extensions/registry";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import { isAppInstalled } from "@/lib/apps/install-presence";
-import { joinHref, lobbyHref } from "@/lib/chat/activity-card";
+import { sessionHref } from "@/lib/chat/activity-card";
 import { MAX_PLAYERS, PASS_TTL_MS } from "@/lib/chat/call-activity";
 import { activitySettingsFor, activitySettingsOf, rememberSeenGame } from "./settings";
 
@@ -360,6 +360,7 @@ async function playingTogetherFor(
                     id: true,
                     meetingId: true,
                     channelId: true,
+                    isPublic: true,
                     game: true,
                     _count: {
                         select: { players: { where: { leftAt: null, seenAt: { gt: since } } } }
@@ -381,7 +382,9 @@ async function playingTogetherFor(
         prisma.chatChannelMember.findMany({
             where: {
                 userId: viewer.id,
-                channelId: { in: [...new Set(rows.map((row) => row.session.channelId))] }
+                channelId: {
+                    in: [...new Set(rows.flatMap((row) => row.session.channelId ?? []))]
+                }
             },
             select: { channelId: true }
         })
@@ -391,8 +394,10 @@ async function playingTogetherFor(
         const game = games.find((entry) => entry.id === row.session.game);
         if (!game || found.has(row.userId)) continue;
         const lobby = row.session.meetingId === null;
+        const channelId = row.session.channelId;
         const reachable =
-            member.has(row.session.channelId) || (lobby && row.session.invites.length > 0);
+            (channelId !== null && member.has(channelId)) ||
+            (lobby && (row.session.isPublic || row.session.invites.length > 0));
         const joinable =
             row.userId !== viewer.id &&
             mayPlay &&
@@ -408,11 +413,7 @@ async function playingTogetherFor(
             linkUrl: null,
             startedAt: row.joinedAt.toISOString(),
             endsAt: null,
-            joinUrl: joinable
-                ? lobby
-                    ? lobbyHref(row.session.id)
-                    : joinHref(row.session.channelId, row.session.id)
-                : null
+            joinUrl: joinable ? sessionHref(row.session) : null
         });
     }
     return found;

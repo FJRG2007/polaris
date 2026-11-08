@@ -31,6 +31,7 @@ import {
 import { useChatUnread } from "@/components/chat-unread";
 import { useMailUnread } from "@/components/mail-unread";
 import { useAdminWaiting } from "@/components/admin-waiting";
+import type { LauncherWaitingApp } from "@/lib/launcher-waiting";
 
 /** How much is waiting in each app, by the id the app catalogue uses. Apps with
  *  nothing to count are simply absent rather than zero, so a caller can ask
@@ -46,8 +47,16 @@ export function useServerUnread(): AppUnread {
     // this answers for the other two: is anybody waiting for me. See
     // `admin-waiting`.
     const admin = useAdminWaiting();
+    // Typed by the launcher's list, so an app that starts counting here is one
+    // the app menu, the rail and a right click can mark read - see
+    // `launcher-waiting`. A badge with no "mark read" is a type error.
     return useMemo(
-        () => ({ chat: chat.messages, mail: mail.messages, admin: admin.total }),
+        () =>
+            ({
+                chat: chat.messages,
+                mail: mail.messages,
+                admin: admin.total
+            }) satisfies Record<LauncherWaitingApp, number>,
         [chat.messages, mail.messages, admin.total]
     );
 }

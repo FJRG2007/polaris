@@ -279,7 +279,8 @@ export function GameFrame({
                             role="status"
                             className="w-full max-w-xs truncate text-center text-sm font-medium"
                         >
-                            {t("loading", { game: name })}
+                            {/* In a call the bar above the frame already names the game */}
+                            {call ? t("loadingInCall") : t("loading", { game: name })}
                         </p>
                     ) : (
                         <div

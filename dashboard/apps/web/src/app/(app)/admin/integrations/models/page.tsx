@@ -18,13 +18,7 @@ import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { modelProviderRows } from "@/lib/agents/model-key-providers";
 import { signinProviderRows } from "@/lib/agents/agent-signins";
-import { ModelKeysView } from "@/components/model-keys/model-keys-view";
-import {
-    instanceKeysAreShared,
-    INSTANCE,
-    listAgentSignins,
-    listProviderKeys
-} from "@/lib/agents/model-keys";
+import { ModelProvidersLoader } from "./loader";
 import {
     addInstanceModelKeyAction,
     deleteInstanceModelKeyAction,
@@ -41,11 +35,21 @@ export default async function ModelProvidersPage() {
     // Two listings rather than one filtered afterwards: agent sign-ins share this
     // table and would otherwise appear in the provider list as a credential for a
     // provider that does not exist.
-    const [keys, signins, shared] = await Promise.all([
-        listProviderKeys(INSTANCE),
-        listAgentSignins(INSTANCE),
-        instanceKeysAreShared()
-    ]);
+    const actions = {
+        add: addInstanceModelKeyAction,
+        update: updateInstanceModelKeyAction,
+        remove: deleteInstanceModelKeyAction,
+        reorder: reorderInstanceModelKeysAction,
+        toggle: toggleInstanceModelKeyAction
+    };
+    // Both readings of the sharing note, so the region can show the one that is
+    // true once it knows, without a translation of its own.
+    const agentsLink = (chunks: ReactNode) => (
+        <Link key="link" href="/admin/agents" className="text-primary hover:underline">
+            {chunks}
+        </Link>
+    );
+    const sharingTitle = t("integrationsModels.sharing.title");
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -55,45 +59,6 @@ export default async function ModelProvidersPage() {
                 </h1>
                 <p className="text-muted-foreground text-sm">{t("integrationsModels.intro")}</p>
             </div>
-            <ModelKeysView
-                providers={modelProviderRows()}
-                keys={keys}
-                actions={{
-                    add: addInstanceModelKeyAction,
-                    update: updateInstanceModelKeyAction,
-                    remove: deleteInstanceModelKeyAction,
-                    reorder: reorderInstanceModelKeysAction,
-                    toggle: toggleInstanceModelKeyAction
-                }}
-                copy={{
-                    title: t("integrationsModels.keys.title"),
-                    hint: t("integrationsModels.keys.hint"),
-                    empty: t("integrationsModels.keys.empty"),
-                    adding: t("integrationsModels.keys.adding")
-                }}
-                footer={
-                    <SharingCard
-                        title={t("integrationsModels.sharing.title")}
-                        body={t.rich(
-                            shared
-                                ? "integrationsModels.sharing.shared"
-                                : "integrationsModels.sharing.private",
-                            {
-                                link: (chunks) => (
-                                    <Link
-                                        key="link"
-                                        href="/admin/agents"
-                                        className="text-primary hover:underline"
-                                    >
-                                        {chunks}
-                                    </Link>
-                                )
-                            }
-                        )}
-                    />
-                }
-            />
-
             {/* The deployment's own agent accounts, in the same table and for the
                 same reason the provider keys are in one: everything about them is
                 a key - named, reordered, renamed, given an end date, shown with
@@ -101,23 +66,36 @@ export default async function ModelProvidersPage() {
                 one of those separately and still look like a different feature.
                 No assisted sign-in here: an administrator would be asked to
                 authorise a subscription that is not theirs, in their own browser. */}
-            <ModelKeysView
-                providers={signinProviderRows()}
-                keys={signins}
-                actions={{
-                    add: addInstanceModelKeyAction,
-                    update: updateInstanceModelKeyAction,
-                    remove: deleteInstanceModelKeyAction,
-                    reorder: reorderInstanceModelKeysAction,
-                    toggle: toggleInstanceModelKeyAction
+            <ModelProvidersLoader
+                keyProviders={modelProviderRows()}
+                signinProviders={signinProviderRows()}
+                actions={actions}
+                keysCopy={{
+                    title: t("integrationsModels.keys.title"),
+                    hint: t("integrationsModels.keys.hint"),
+                    empty: t("integrationsModels.keys.empty"),
+                    adding: t("integrationsModels.keys.adding")
                 }}
-                copy={{
+                accountsCopy={{
                     title: t("integrationsModels.accounts.title"),
                     action: t("integrationsModels.accounts.action"),
                     hint: t("integrationsModels.accounts.hint"),
                     empty: t("integrationsModels.accounts.empty"),
                     adding: t("integrationsModels.accounts.adding")
                 }}
+                sharedFooter={
+                    <SharingCard
+                        title={sharingTitle}
+                        body={t.rich("integrationsModels.sharing.shared", { link: agentsLink })}
+                    />
+                }
+                privateFooter={
+                    <SharingCard
+                        title={sharingTitle}
+                        body={t.rich("integrationsModels.sharing.private", { link: agentsLink })}
+                    />
+                }
+                revision={Date.now()}
             />
             <p className="text-muted-foreground text-sm">
                 {t.rich("integrationsModels.elsewhere", {

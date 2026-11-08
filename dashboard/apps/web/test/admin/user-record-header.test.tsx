@@ -3,8 +3,8 @@
 /**
  * The name over one person's record comes from the read the open section makes.
  *
- * Server actions leave the browser one at a time, so a header with an action of
- * its own held every section behind it and read the same record twice.
+ * A header with a read of its own held every section behind it and read the
+ * same record twice.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,7 +18,17 @@ const actions = vi.hoisted(() => ({
     loadUserDangerAction: vi.fn()
 }));
 
-vi.mock("@/app/(app)/admin/users/[id]/data", () => actions);
+// Each region asks through the paint route; its name says which read answers.
+const reads: Record<string, (id: string) => unknown> = {
+    "users.sessions": (id) => actions.loadUserSessionsAction(id),
+    "users.overview": (id) => actions.loadUserOverviewAction(id),
+    "users.access": (id) => actions.loadUserAccessAction(id),
+    "users.security": (id) => actions.loadUserSecurityAction(id),
+    "users.danger": (id) => actions.loadUserDangerAction(id)
+};
+vi.mock("@/app/(app)/admin/paint-read", () => ({
+    paintRead: (name: string, query: { id: string }) => reads[name]!(query.id)
+}));
 vi.mock("@/app/(app)/admin/users/[id]/sessions-section", () => ({
     SessionsSection: ({ user }: { user: { id: string } }) => <p>sessions of {user.id}</p>
 }));

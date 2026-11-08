@@ -13,11 +13,15 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import { RefreshCw } from "lucide-react";
 import { RatesCard } from "./rates-card";
+import { paintRead } from "../paint-read";
+import { CardSkeleton } from "../region-skeletons";
+import { AfterPaint } from "@/components/after-paint";
 import { Button, PageHeader, Skeleton } from "@polaris/ui";
 import * as parts from "@/components/billing/statement-parts";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
-export function BillingView({ rates }: { rates: core.BillingRates | null }) {
+/** `revision` is the page's render time: a saved rate asks for the rates again. */
+export function BillingView({ revision }: { revision: number }) {
     const t = useTranslations("admin");
     const { data, error, stale, refreshing, refresh, month, months } = parts.useStatement(
         "/api/admin/billing",
@@ -47,7 +51,15 @@ export function BillingView({ rates }: { rates: core.BillingRates | null }) {
             />
 
             <div className="flex flex-col gap-4">
-                <RatesCard rates={rates} onChange={refresh} />
+                <AfterPaint
+                    cacheKey="admin.billing.rates"
+                    load={() => paintRead("billing.rates")}
+                    persist={false}
+                    revision={revision}
+                    skeleton={<CardSkeleton lines={3} />}
+                >
+                    {(data) => <RatesCard rates={data.rates} onChange={refresh} />}
+                </AfterPaint>
 
                 <section className="flex flex-col gap-4">
                     <parts.StatementToolbar

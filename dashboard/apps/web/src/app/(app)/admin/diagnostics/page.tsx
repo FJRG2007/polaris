@@ -10,22 +10,22 @@
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { DiagnosticsLoader } from "./loader";
 import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
 import { CHECK_IDS } from "@/lib/diagnostics/checks";
-import { lastSpeedResult } from "@/lib/diagnostics/speed-test";
-import { DiagnosticsView } from "./diagnostics-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function DiagnosticsPage() {
     await requireAdmin();
-    const [t, speed] = await Promise.all([getTranslations("diagnostics"), lastSpeedResult()]);
+    const t = await getTranslations("diagnostics");
+
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col">
             <PageHeader title={t("page.title")} description={t("page.description")} />
             <Messages namespaces={["diagnostics"]}>
-                <DiagnosticsView checks={[...CHECK_IDS]} initialSpeed={speed} />
+                <DiagnosticsLoader checks={[...CHECK_IDS]} />
             </Messages>
         </div>
     );

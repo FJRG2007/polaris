@@ -16184,11 +16184,18 @@ model ArcadeSession {
     // The call it is played in, or null for a lobby: a game somebody was
     // invited to, played in its own room with no call around it.
     meetingId   String?   @db.Uuid
-    channelId   String    @db.Uuid
+    // The conversation its card is posted in, or null for a room opened from
+    // the Games library, which has no conversation and no card.
+    channelId   String?   @db.Uuid
     game        String
     startedById String    @db.Uuid
     // The card's message, once posted.
     messageId   String?   @db.Uuid
+    // A room's short code, typed by whoever joins with it. Null for a lobby
+    // opened by an invitation and for a call's game.
+    code        String?   @unique
+    // A room anybody signed in may see in the list and join.
+    isPublic    Boolean   @default(false)
     createdAt   DateTime  @default(now())
     endedAt     DateTime?
 
@@ -16196,6 +16203,7 @@ model ArcadeSession {
     invites ArcadeInvite[]
 
     @@index([meetingId, endedAt])
+    @@index([isPublic, endedAt, createdAt])
 }
 
 // Somebody invited to a session: what their toast and bell offer until it

@@ -5,25 +5,25 @@
  * client over the messaging service.
  */
 
+import { InboxLoader, tableSkeleton } from "./loaders";
 import { requirePermission } from "@/lib/session";
-import { bridgeConfigured } from "@/lib/messaging/bridge-client";
-import { listChannels, listConversations } from "@/lib/messaging-service";
-import { InboxView } from "./inbox-view";
+import { getTranslations } from "@/lib/i18n/request";
+import { ViewHeadingSkeleton } from "../region-skeletons";
 
 export const dynamic = "force-dynamic";
 
 export default async function InboxPage() {
-    const user = await requirePermission("inbox.read");
-    const [ready, channels, conversations] = await Promise.all([
-        bridgeConfigured(),
-        listChannels(user.id),
-        listConversations(user.id)
-    ]);
+    await requirePermission("inbox.read");
+    const t = await getTranslations("admin");
+
     return (
-        <InboxView
-            initialChannels={channels}
-            initialConversations={conversations}
-            bridgeReady={ready}
+        <InboxLoader
+            revision={Date.now()}
+            skeleton={
+                <ViewHeadingSkeleton title={t("inbox.view.title")} className="flex flex-col gap-3">
+                    {tableSkeleton}
+                </ViewHeadingSkeleton>
+            }
         />
     );
 }

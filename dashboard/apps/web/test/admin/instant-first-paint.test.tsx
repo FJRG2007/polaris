@@ -330,44 +330,7 @@ describe("no Management page awaits its data before it paints", () => {
      * Pages that still await their data, each with the reason. An entry here is
      * debt, not a pass: convert the page and delete its line.
      */
-    const ALLOWED: Record<string, string> = {
-        // not converted yet
-        "agents/page.tsx": "pending",
-        // adopts installs before listing them; a write, not only a read
-        "apps/page.tsx": "pending",
-        // decides notFound from whether the app has services
-        "apps/[appId]/settings/page.tsx": "pending",
-        // not converted yet
-        "billing/page.tsx": "pending",
-        // not converted yet
-        "diagnostics/page.tsx": "pending",
-        // not converted yet
-        "email/page.tsx": "pending",
-        // picks which screen to show from the bridge state
-        "inbox/channels/connect/page.tsx": "pending",
-        // not converted yet
-        "inbox/channels/page.tsx": "pending",
-        // not converted yet
-        "inbox/contacts/page.tsx": "pending",
-        // not converted yet
-        "inbox/logs/page.tsx": "pending",
-        // not converted yet
-        "inbox/page.tsx": "pending",
-        // not converted yet
-        "integrations/models/page.tsx": "pending",
-        // not converted yet
-        "integrations/page.tsx": "pending",
-        // reads one install flag for the overview cards
-        "page.tsx": "pending",
-        // the policy form only; the slow counts already load after the paint
-        "retention/page.tsx": "pending",
-        // not converted yet
-        "safety/page.tsx": "pending",
-        // not converted yet
-        "settings/page.tsx": "pending",
-        // not converted yet
-        "uploads/page.tsx": "pending"
-    };
+    const ALLOWED: Record<string, string> = {};
 
     function files(dir: string): string[] {
         return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

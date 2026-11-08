@@ -12,7 +12,9 @@
  *
  * Who may be in a lobby: an account holding `arcade.calls`, with the Games app
  * installed, who is in the conversation its card was posted in or holds an
- * invitation to it that is still offered - while it runs and has room.
+ * invitation to it that is still offered - while it runs and has room. A room
+ * (`room-actions`) has no conversation: an invitation, the code typed (which
+ * is one), or the room being public lets somebody in.
  */
 
 import { z } from "zod";
@@ -56,8 +58,9 @@ async function admit(
         return { ok: false, reason: "ended" };
     const playing = session.players.filter((row) => card.stillPlaying(row, now));
     const inGame = playing.some((row) => row.userId === user.id);
-    if (!inGame && !(await mayReach(user.id, session.channelId, session.id, now)))
-        return { ok: false, reason: "access" };
+    const reachable =
+        inGame || session.isPublic || (await mayReach(user.id, session.channelId, session.id, now));
+    if (!reachable) return { ok: false, reason: "access" };
     if (!inGame && playing.length >= MAX_PLAYERS) return { ok: false, reason: "full" };
     const games = (await callActivityGames(await getUserLocale(user.id))).filter(
         (game) => game.id === session.game
@@ -69,10 +72,11 @@ async function admit(
 /** In the card's conversation, or invited. */
 async function mayReach(
     userId: string,
-    channelId: string,
+    channelId: string | null,
     sessionId: string,
     now: number
 ): Promise<boolean> {
+    if (!channelId) return sessions.holdsInvite(sessionId, userId, now);
     try {
         await requireChannel({ id: userId }, channelId);
         return true;
@@ -92,8 +96,10 @@ export type LobbyEntry =
           readonly token: string;
           readonly seat: string;
           readonly game: string;
-          readonly channelId: string;
+          readonly channelId: string | null;
           readonly member: boolean;
+          /** A room's code and whether it is listed; null for a lobby. */
+          readonly room: { readonly code: string; readonly isPublic: boolean } | null;
       }
     | { readonly ok: false; readonly reason: LobbyRefusal };
 
@@ -106,21 +112,26 @@ export async function enterLobby(sessionId: unknown): Promise<LobbyEntry> {
     if (!admitted.ok) return admitted;
     const endpoint = await callServer();
     if (!endpoint) return { ok: false, reason: "server" };
+    const channelId = admitted.session.channelId;
     const [token, member] = await Promise.all([
         lobbyToken(endpoint, card.lobbyRoom(id.data), user.id, user.name),
-        requireChannel({ id: user.id }, admitted.session.channelId).then(
-            () => true,
-            () => false
-        )
+        channelId
+            ? requireChannel({ id: user.id }, channelId).then(
+                  () => true,
+                  () => false
+              )
+            : false
     ]);
+    const { code, isPublic } = admitted.session;
     return {
         ok: true,
         url: endpoint.url,
         token,
         seat: user.id,
         game: admitted.session.game,
-        channelId: admitted.session.channelId,
-        member
+        channelId,
+        member,
+        room: code ? { code, isPublic } : null
     };
 }
 
@@ -201,11 +212,16 @@ export async function vouchLobbyGames(
         where: { id: id.data, meetingId: null },
         select: {
             channelId: true,
+            isPublic: true,
             players: { where: { userId: user.id }, select: { userId: true } }
         }
     });
     if (!session) return { seats: [], now };
-    if (session.players.length === 0 && !(await mayReach(user.id, session.channelId, id.data, now)))
+    if (
+        session.players.length === 0 &&
+        !session.isPublic &&
+        !(await mayReach(user.id, session.channelId, id.data, now))
+    )
         return { seats: [], now };
     const scope = card.lobbyPassScope(id.data);
     const seats = parsed.data

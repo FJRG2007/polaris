@@ -37,9 +37,15 @@ vi.mock("@/components/app-unread", () => ({
     useAppUnread: () => unread,
     useServerUnread: () => unread,
     anythingWaiting: () => true,
+    // The badge moves with the nudge, as the drift overlay moves it: the mark
+    // belongs to the badge, so it goes when the badge does.
     useNudgeAppUnread: () => (app: string, by: number) => {
         nudges.push([app, by]);
-        return () => nudges.push([app, -by]);
+        unread[app] = (unread[app] ?? 0) + by;
+        return () => {
+            nudges.push([app, -by]);
+            unread[app] = (unread[app] ?? 0) - by;
+        };
     }
 }));
 
@@ -79,6 +85,8 @@ beforeEach(() => {
     marked.length = 0;
     nudges.length = 0;
     refuse = false;
+    unread.chat = 7;
+    unread.mail = 0;
     vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) =>

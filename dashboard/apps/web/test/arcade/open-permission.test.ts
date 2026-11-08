@@ -14,7 +14,10 @@ vi.mock("@polaris/app-host", () => ({
         session: {
             requirePermission: async (permission: string) => {
                 if (!held.permissions.has(permission)) throw new Refused(permission);
-            }
+            },
+            requireUser: async () => ({ id: "user-1" }),
+            sessionCan: async (_user: unknown, permission: string) =>
+                held.permissions.has(permission)
         }
     }
 }));

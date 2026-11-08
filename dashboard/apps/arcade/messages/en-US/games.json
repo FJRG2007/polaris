@@ -52,5 +52,9 @@
         "camera": "Camera",
         "previous": "Previous",
         "next": "Next one"
-    }
+    },
+    "loadingInCall": "Loading...",
+    "together": "Play with others",
+    "togetherIntro": "Open a room, share its code, or join one already running.",
+    "togetherDenied": "An admin has turned off playing with others for your account."
 }
