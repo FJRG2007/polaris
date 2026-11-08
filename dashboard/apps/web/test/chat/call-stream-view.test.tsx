@@ -258,15 +258,33 @@ describe("a stream in a direct message", () => {
         expect(watchedStreams()).toEqual(["screen:seat-bo"]);
     });
 
-    it("takes the call alone when asked, and gives the people back", () => {
-        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
-            wrapper: MessagesWrapper
-        });
-        fireEvent.click(screen.getByRole("button", { name: "Make this bigger" }));
-        expect(screen.queryByText("You")).toBeNull();
-        fireEvent.click(screen.getByRole("button", { name: "Back to the people" }));
-        expect(screen.getByText("You")).toBeTruthy();
-        expect(watchedStreams()).toEqual(["screen:seat-bo"]);
+    it("takes the call alone with a press on the picture, and gives the people back", () => {
+        vi.useFakeTimers();
+        try {
+            render(
+                <CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />,
+                { wrapper: MessagesWrapper }
+            );
+            const press = () => {
+                const video = document.querySelector("video")!;
+                fireEvent.pointerDown(video, { button: 0, pointerId: 1, clientX: 5, clientY: 5 });
+                fireEvent.click(video, { detail: 1, clientX: 5, clientY: 5 });
+                act(() => vi.advanceTimersByTime(300));
+            };
+            press();
+            expect(screen.queryByText("You")).toBeNull();
+            press();
+            expect(screen.getByText("You")).toBeTruthy();
+            expect(watchedStreams()).toEqual(["screen:seat-bo"]);
+            // A press that dragged the picture is a pan, not a press
+            const video = document.querySelector("video")!;
+            fireEvent.pointerDown(video, { button: 0, pointerId: 1, clientX: 5, clientY: 5 });
+            fireEvent.click(video, { detail: 1, clientX: 60, clientY: 5 });
+            act(() => vi.advanceTimersByTime(300));
+            expect(screen.getByText("You")).toBeTruthy();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("leaves the speaking ring room in the strip of faces under a stream", () => {
@@ -404,7 +422,7 @@ describe("the buttons over a stream", () => {
         expect(box.className).toContain("opacity-100");
     });
 
-    it("carry the stream's volume, its window, zoom and full screen", () => {
+    it("carry the stream's volume, its window and full screen, and nothing else", () => {
         Object.defineProperty(document, "pictureInPictureEnabled", {
             configurable: true,
             value: true
@@ -424,8 +442,11 @@ describe("the buttons over a stream", () => {
         expect(streamMuted("bo")).toBe(true);
         expect(tile.getByRole("button", { name: "Unmute stream" })).toBeTruthy();
         expect(tile.getByRole("button", { name: "Pop out" })).toBeTruthy();
-        expect(tile.getByRole("button", { name: "Zoom in" })).toBeTruthy();
         expect(tile.getByRole("button", { name: "Full screen" })).toBeTruthy();
+        // The sizes in between are a press on the picture and the call's own header
+        expect(tile.queryByRole("button", { name: "Make this bigger" })).toBeNull();
+        expect(tile.queryByRole("button", { name: "Fill the column" })).toBeNull();
+        expect(tile.queryByRole("button", { name: "Zoom in" })).toBeNull();
     });
 
     it("are pressed, not dragged, on a zoomed picture", () => {
@@ -438,7 +459,8 @@ describe("the buttons over a stream", () => {
             wrapper: MessagesWrapper
         });
         const tile = within(streamTile());
-        fireEvent.click(tile.getByRole("button", { name: "Zoom in" }));
+        fireEvent.wheel(document.querySelector("video")!, { deltaY: -100 });
+        expect(tile.getByRole("button", { name: "Zoom in" })).toBeTruthy();
         fireEvent.pointerDown(tile.getByRole("button", { name: "Full screen" }), {
             button: 0,
             pointerId: 1
@@ -464,18 +486,16 @@ describe("the buttons over a stream", () => {
         fireEvent.doubleClick(document.querySelector("video")!);
         expect(requestFullscreen).toHaveBeenCalledTimes(1);
         // Not from a button, which is a button being pressed twice.
-        fireEvent.doubleClick(within(streamTile()).getByRole("button", { name: "Zoom in" }));
+        fireEvent.doubleClick(within(streamTile()).getByRole("button", { name: "Pop out" }));
         expect(requestFullscreen).toHaveBeenCalledTimes(1);
     });
 });
 
-describe("the three sizes a watched stream has", () => {
-    it("offers the column between the call and the whole display", () => {
-        // The defect this pins down: from the picture itself there were two sizes,
-        // the room the call gave it and the whole display. Somebody trying to read
-        // a shared screen had nothing in between - the step that puts the
-        // conversation away and gives the call the column lived in a chevron at the
-        // top of the panel, which is not where they were looking.
+describe("the sizes a watched stream has", () => {
+    it("keeps the column in the call's header, not in the picture's corner", () => {
+        // The picture's corner holds what a voice client puts there - its sound,
+        // its own window, full screen. Bigger and back is a press on it; the column
+        // between the call and the conversation is the call's own header button.
         const onExpand = vi.fn();
         const { rerender } = render(
             <CallRoom
@@ -487,9 +507,8 @@ describe("the three sizes a watched stream has", () => {
             />,
             { wrapper: MessagesWrapper }
         );
-        expect(screen.getByRole("button", { name: "Full screen" })).toBeTruthy();
-
-        fireEvent.click(screen.getByRole("button", { name: "Fill the column" }));
+        expect(within(streamTile()).queryByRole("button", { name: "Fill the column" })).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Expand the call" }));
         expect(onExpand).toHaveBeenLastCalledWith(true);
 
         rerender(
@@ -502,7 +521,7 @@ describe("the three sizes a watched stream has", () => {
                 onLeave={() => undefined}
             />
         );
-        const back = screen.getByRole("button", { name: "Bring the conversation back" });
+        const back = screen.getByRole("button", { name: "Shrink the call" });
         expect(back.getAttribute("aria-pressed")).toBe("true");
         fireEvent.click(back);
         expect(onExpand).toHaveBeenLastCalledWith(false);

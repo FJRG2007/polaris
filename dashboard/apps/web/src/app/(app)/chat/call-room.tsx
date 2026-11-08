@@ -2823,9 +2823,26 @@ function Tile({
     const onPicture = (event: React.SyntheticEvent) =>
         !(event.target as Element | null)?.closest?.(`[${TILE_CONTROLS}]`);
     const zoomProps = zoomable ? look.frameProps : null;
+    // A stream is made bigger and put back by a press on the picture, the way
+    // every voice client does it, so its corner keeps only its sound, its own
+    // window and full screen. A press that dragged (a pan of the zoom) is not
+    // one, and the first press of a double one waits to see it is not.
+    const pressedAt = useRef<{ x: number; y: number } | null>(null);
+    const pressTimer = useRef<number | undefined>(undefined);
+    useEffect(() => () => window.clearTimeout(pressTimer.current), []);
+    const pressFocuses = screen && !blank && !!onFocus;
     const frameProps = {
         onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
+            pressedAt.current = onPicture(event) ? { x: event.clientX, y: event.clientY } : null;
             if (onPicture(event)) zoomProps?.onPointerDown(event);
+        },
+        onClick: (event: React.MouseEvent<HTMLElement>) => {
+            const from = pressedAt.current;
+            pressedAt.current = null;
+            if (!pressFocuses || !from || !onPicture(event) || event.detail > 1) return;
+            if (Math.hypot(event.clientX - from.x, event.clientY - from.y) > 6) return;
+            window.clearTimeout(pressTimer.current);
+            pressTimer.current = window.setTimeout(() => onFocus?.(), 250);
         },
         onPointerMove: (event: React.PointerEvent<HTMLElement>) => {
             zoomProps?.onPointerMove(event);
@@ -2839,6 +2856,7 @@ function Tile({
         onPointerLeave: controls.frameProps.onPointerLeave,
         onDoubleClick: (event: React.MouseEvent<HTMLElement>) => {
             if (!onPicture(event)) return;
+            window.clearTimeout(pressTimer.current);
             if (screen && !blank) toggleFull();
             else zoomProps?.onDoubleClick(event);
         }
@@ -3085,15 +3103,17 @@ function Tile({
                             {look.zoom.scale.toFixed(1)}x
                         </button>
                     )}
-                    <button
-                        type="button"
-                        onClick={look.zoomIn}
-                        aria-label={t("callRoom.zoomIn")}
-                        title={t("callRoom.zoomIn")}
-                        className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                        <ZoomIn className="size-3.5" />
-                    </button>
+                    {look.zoomed && (
+                        <button
+                            type="button"
+                            onClick={look.zoomIn}
+                            aria-label={t("callRoom.zoomIn")}
+                            title={t("callRoom.zoomIn")}
+                            className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                            <ZoomIn className="size-3.5" />
+                        </button>
+                    )}
                 </span>
             )}
             {/* The rest come and go with the pointer - see `call-tile-controls`.
@@ -3118,7 +3138,7 @@ function Tile({
                             onWatch={streamMenu.onWatch}
                         />
                     )}
-                    {onFocus && (
+                    {onFocus && !pressFocuses && (
                         <button
                             type="button"
                             onClick={onFocus}
@@ -3141,7 +3161,7 @@ function Tile({
                             )}
                         </button>
                     )}
-                    {onGrow && (
+                    {onGrow && !screen && (
                         <button
                             type="button"
                             onClick={onGrow}
