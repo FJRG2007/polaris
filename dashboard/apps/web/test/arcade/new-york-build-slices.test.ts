@@ -80,7 +80,7 @@ describe("New York start-up builders", () => {
 
         const scene = new THREE.Scene();
         const grid = await run("cityGrid", () => buildCityGrid(scene));
-        const boroughs = buildBoroughs(scene, { sidewalks: grid.sidewalks });
+        const boroughs = await run("boroughs", () => buildBoroughs(scene, { sidewalks: grid.sidewalks }));
         const { colliders } = buildLandmarks(scene);
         const blocks = await run("blocks", () => buildCityBlocks(scene, colliders));
         const all = [

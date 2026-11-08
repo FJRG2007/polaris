@@ -759,7 +759,7 @@ async function buildStreetDetails(scene, colliders = []) {
   // =========================================================================
   // 4. MTA SUBWAY ENTRANCES WITH GLOWING GREEN GLOBE LAMPS
   // =========================================================================
-  const subwaySites = createSubwayEntrances(colliders, footprints);
+  const subwaySites = await createSubwayEntrances(colliders, footprints);
   const subwayMatrices = [];
   const subwayColliders = [];
   for (const { x, y, z, yaw } of subwaySites) {
@@ -1020,7 +1020,7 @@ async function buildStreetDetails(scene, colliders = []) {
     (x, z) => !inPlaza(x, z, 1.5) && isClearOfPoles(x, z, 2.2));
   for (const tree of sidewalkTreePositions) treePositions.push(tree);
   await buildSlice();
-  const treeField = createTreeField(scene, treePositions, [...colliders, ...subwayColliders]);
+  const treeField = await createTreeField(scene, treePositions, [...colliders, ...subwayColliders]);
   group.add(treeField.group);
   sidewalkTreePositions = sidewalkTreePositions.filter((t) => treeField.sites.has(t));
   console.info(`[streetDetails] ${treeField.stats.trees} trees (${sidewalkTreePositions.length} street trees)`);

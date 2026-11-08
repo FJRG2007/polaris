@@ -190,6 +190,11 @@ function buildManhattanSchistGeometry() {
  * batched BufferGeometry per material to minimize WebGPU render & shadow pass draw calls.
  */
 function batchStaticGroupMeshes(rootGroup, excludeMaterials = null) {
+  for (const merge of staticGroupBatches(rootGroup, excludeMaterials)) merge();
+}
+
+// The merges batchStaticGroupMeshes makes, one per material, for a builder to run between slices
+function staticGroupBatches(rootGroup, excludeMaterials = null) {
   rootGroup.updateMatrixWorld(true);
   const invRoot = new THREE.Matrix4().copy(rootGroup.matrixWorld).invert();
   const buckets = new Map();
@@ -205,8 +210,8 @@ function batchStaticGroupMeshes(rootGroup, excludeMaterials = null) {
     buckets.get(obj.material).push(obj);
   });
 
-  for (const [mat, meshes] of buckets.entries()) {
-    if (meshes.length < 2) continue;
+  return Array.from(buckets.entries(), ([mat, meshes]) => () => {
+    if (meshes.length < 2) return;
     const geos = [];
     let anyCast = false;
     let anyReceive = false;
@@ -233,7 +238,7 @@ function batchStaticGroupMeshes(rootGroup, excludeMaterials = null) {
       batchedMesh.receiveShadow = anyReceive;
       rootGroup.add(batchedMesh);
     }
-  }
+  });
 }
 
 /**
@@ -2595,7 +2600,10 @@ async function buildCityGrid(scene) {
 
   await buildSlice();
   // Batch static sub-meshes by material to reduce per-frame WebGPU draw calls
-  batchStaticGroupMeshes(group, new Set([waterMat, roadMat, cpLawnMat, cpMeadowMat]));
+  for (const merge of staticGroupBatches(group, new Set([waterMat, roadMat, cpLawnMat, cpMeadowMat]))) {
+    await buildSlice();
+    merge();
+  }
 
   await buildSlice();
   scene.add(group);
@@ -3003,7 +3011,7 @@ async function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, 
   const groundOK = (x, z) => inStrip(x, z) ||
     blockSidewalks.some((b) => Math.abs(x - b.cx) < b.w / 2 - 1 && Math.abs(z - b.cz) < b.d / 2 - 1);
   await buildSlice();
-  const viaduct = buildSouthStreetViaduct(group, {
+  const viaduct = await buildSouthStreetViaduct(group, {
     start: { x: join.x, z: join.z }, shoreX: (z) => shoreX(z, false), obstacles: towers.concat(pierBoxes), zEnd: 6330,
     quad, makeAcc, roadMat, lawnMat, paint, WHITE, YELLOW, lightSpots: highwaySpots, underSpots, groundOK
   });
@@ -3186,7 +3194,7 @@ async function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, 
  *   along the structure, keepOut(x, z, margin), colliders: player AABBs {minX, maxX, minZ, maxZ, maxY} of the columns,
  *   the ramps on fill and the portal, portalMats: the portal's { conc, dark, shade } materials }
  */
-function buildSouthStreetViaduct(group, opts) {
+async function buildSouthStreetViaduct(group, opts) {
   const { start, shoreX, obstacles, zEnd, quad, makeAcc, roadMat, lawnMat, paint, WHITE, YELLOW, lightSpots, underSpots } = opts;
   const groundOK = opts.groundOK || (() => true);
   const HALF = 7.9; // deck half-width: 2 + 2 lanes, median, shoulders and parapets
@@ -3241,8 +3249,10 @@ function buildSouthStreetViaduct(group, opts) {
 
   // The shore every 2 m of arc, smoothed over ~±35 m
   let coast = [];
+  await buildSlice();
   for (let z = start.z; z <= zEnd; z += 1) coast.push(new THREE.Vector2(shoreX(z), z));
   coast = resample(coast, 2);
+  await buildSlice();
   for (let k = 0; k < 3; k++) coast = smoothPts(coast, 6);
   const nC = coast.length;
   const cn = normals(coast);
@@ -3286,6 +3296,7 @@ function buildSouthStreetViaduct(group, opts) {
   const nP = path.length;
   const pn = normals(path);
   const S = [0];
+  await buildSlice();
   for (let i = 1; i < nP; i++) S.push(S[i - 1] + path[i].distanceTo(path[i - 1]));
   const L = S[nP - 1];
   const iAt = (s) => { let i = 0; while (i < nP - 2 && S[i + 1] <= s) i++; return i; };
@@ -3340,6 +3351,7 @@ function buildSouthStreetViaduct(group, opts) {
   const MEDIAN = [[0.3, 0], [0.3, 0.08], [0.19, 0.33], [0.08, 0.82]];
   const elevated = (i) => Y[i] >= FILL_Y && Y[i + 1] >= FILL_Y;
   for (let i = 0; i < iMouth; i++) {
+    await buildSlice();
     seg(deck, i, [-7.38, 0], [7.38, 0], UP);
     for (const sd of [-1, 1]) {
       for (let k = 0; k + 1 < PARAPET.length; k++) {
@@ -3382,6 +3394,7 @@ function buildSouthStreetViaduct(group, opts) {
   let iA = -1;
   let iB = -1;
   for (let i = 0; i < iMouth; i++) {
+    await buildSlice();
     if (!elevated(i)) continue;
     if (iA < 0) iA = i;
     iB = i + 1;
@@ -3433,6 +3446,7 @@ function buildSouthStreetViaduct(group, opts) {
       u += len;
     }
   }
+  await buildSlice();
   line(-7.05, 0.15, WHITE);
   line(-3.9, 0.13, WHITE, 12, 0.25);
   line(-0.55, 0.12, YELLOW);
@@ -3442,6 +3456,7 @@ function buildSouthStreetViaduct(group, opts) {
 
   // Twin-arm highway lights on the median, as at grade
   for (let s = 20; s < sMouth - 12; s += 39) {
+    await buildSlice();
     const i = iAt(s);
     const a = path[Math.max(0, i - 1)];
     const b = path[Math.min(nP - 1, i + 1)];
@@ -3450,12 +3465,14 @@ function buildSouthStreetViaduct(group, opts) {
 
   // ---- Battery Park Underpass portal (buildUnderpassPortal) -------------------------------------------------------
   const portalFrames = [];
+  await buildSlice();
   for (let i = iMouth; i < nP; i++) portalFrames.push({ x: path[i].x, z: path[i].y, nx: pn[i].x, nz: pn[i].y, y: Y[i], half: HALF });
   buildUnderpassPortal(portalFrames, { deck, conc, roof, dark, shade }, quad, underSpots, colliders);
 
   // Player colliders: the ramps on fill once the road is ~0.35 m up (four boxes across every segment; the columns are
   // added with the bents, the portal's by buildUnderpassPortal)
   for (let i = 0; i < iMouth; i++) {
+    await buildSlice();
     if (elevated(i) || Math.max(Y[i], Y[i + 1]) < 0.35) continue;
     const hw = 7.9;
     const top = Math.max(Y[i], Y[i + 1]) + 0.85;
@@ -3489,6 +3506,7 @@ function buildSouthStreetViaduct(group, opts) {
     dark: new THREE.MeshBasicNodeMaterial({ color: 0x020203 }),
     shade: createTunnelShadeMaterial()
   };
+  await buildSlice();
   addMesh(deck, roadMat, false, 'SouthStreetViaductDeck');
   addMesh(conc, portalMats.conc, true, 'SouthStreetViaductConcrete');
   addMesh(steel, new THREE.MeshStandardNodeMaterial({ color: 0x55625b, roughness: 0.6, metalness: 0.3 }), true, 'SouthStreetViaductSteel');
@@ -3500,6 +3518,7 @@ function buildSouthStreetViaduct(group, opts) {
   // Buildings and trees keep 2.5 m clear of the deck edges (oriented boxes every ~12 m)
   const boxes = [];
   for (let i = 0; i < nP - 1; i += 4) {
+    await buildSlice();
     const j = Math.min(nP - 1, i + 4);
     const dx = path[j].x - path[i].x;
     const dz = path[j].y - path[i].y;

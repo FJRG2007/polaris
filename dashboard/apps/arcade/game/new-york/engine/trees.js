@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { createTreeMaterial } from './tsl-materials.js';
 import { SharedInstances } from './shared-instances.js';
 import { polygonBoxOverlaps } from './building-collision.js';
+import { buildSlice } from './build-slice.js';
 
 // Seeded street and park trees with three geometry levels, regrouped by spatial cell as the camera moves.
 // Bark tubes and leaf cards share a material; atlas mipmaps preserve leaf coverage at a distance.
@@ -863,15 +864,26 @@ function createTreeClearance(colliders) {
  * `update(cameraPosition)` from the frame loop to keep each tree's level of detail up to date. Returns
  * { group, material, atlas, sites (accepted placements), update(cameraPosition) }.
  */
-function createTreeField(_scene, sites, colliders = []) {
+async function createTreeField(_scene, sites, colliders = []) {
   const group = new THREE.Group();
   group.name = 'Trees';
   const atlas = createLeafAtlas();
+  await buildSlice();
   const material = createTreeMaterial(atlas.texture);
 
   // Geometries: [species][variant][lod]
-  const geos = SPECIES.map((_, s) => [0, 1].map((v) => buildTreeGeometries(s, v, atlas.tileMeters)));
+  const geos = [];
+  for (let s = 0; s < SPECIES.length; s++) {
+    const variants = [];
+    for (const v of [0, 1]) {
+      await buildSlice();
+      variants.push(buildTreeGeometries(s, v, atlas.tileMeters));
+    }
+    geos.push(variants);
+  }
+  await buildSlice();
   const clearOfBuildings = createTreeClearance(colliders);
+  await buildSlice();
   const treeBounds = geos.map((variants) => variants.map((levels) => {
     const bounds = new THREE.Box3();
     for (const g of levels) bounds.union(g.boundingBox);
@@ -916,7 +928,8 @@ function createTreeField(_scene, sites, colliders = []) {
 
   const dummy = new THREE.Object3D();
   const tint = new THREE.Color();
-  sites.forEach((t) => {
+  for (const t of sites) {
+    await buildSlice();
     const sp = Math.min(SPECIES.length - 1, Math.max(0, t.species || 0));
     const r1 = hashPos(t.x, 1.3, t.z);
     const r2 = hashPos(t.z, 7.1, t.x);
@@ -929,7 +942,7 @@ function createTreeField(_scene, sites, colliders = []) {
     dummy.updateMatrix();
     const tree = treeBounds[sp][variant];
     worldBounds.copy(tree.bounds).applyMatrix4(dummy.matrix).expandByScalar(tree.margin);
-    if (!clearOfBuildings(worldBounds)) return;
+    if (!clearOfBuildings(worldBounds)) continue;
     const i = N++;
     plantedSites.add(t);
     dummy.matrix.toArray(mats, i * 16);
@@ -966,9 +979,10 @@ function createTreeField(_scene, sites, colliders = []) {
       meshOf[i * 3 + l] = index;
       meshes[index].capacity++;
     }
-  });
+  }
 
   // Finalize per-cell 3D bounding spheres, tier cutoffs, and typed index arrays for cell-hierarchical LOD checks.
+  await buildSlice();
   const cellList = Array.from(cells.values(), (cell) => {
     const trees = Int32Array.from(cell.trees);
     let minX = Infinity, minY = Infinity, minZ = Infinity;
@@ -1012,7 +1026,9 @@ function createTreeField(_scene, sites, colliders = []) {
     return cell;
   });
 
-  const instanced = meshes.map((m) => {
+  const instanced = [];
+  for (const m of meshes) {
+    await buildSlice();
     const geo = new THREE.BufferGeometry();
     for (const name of Object.keys(m.type.geo.attributes)) geo.setAttribute(name, m.type.geo.attributes[name]);
     geo.setIndex(m.type.geo.index);
@@ -1032,8 +1048,8 @@ function createTreeField(_scene, sites, colliders = []) {
     m.cell.group.add(mesh);
     m.type.meshes.push(mesh);
     counts.push(0);
-    return mesh;
-  });
+    instanced.push(mesh);
+  }
 
   // Repack only cells whose trees changed level; the meshes and their buffer capacities stay fixed.
   const dirtyCells = new Set();

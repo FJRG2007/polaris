@@ -181,7 +181,7 @@ async function initApp() {
     // 3. Build Manhattan Geography, Iconic Landmarks, Blocks, Street Details & Traffic
     const cityGrid = await buildCityGrid(scene);
     await stepDone("cityGrid");
-    const boroughs = buildBoroughs(scene, { sidewalks: cityGrid.sidewalks });
+    const boroughs = await buildBoroughs(scene, { sidewalks: cityGrid.sidewalks });
     await stepDone("boroughs");
     const { colliders: landmarkColliders } = buildLandmarks(scene);
     await stepDone("landmarks");
@@ -206,6 +206,7 @@ async function initApp() {
     ]);
     await stepDone("traffic");
     const highwayTraffic = createHighwayTraffic(scene, cityGrid.highwayLanes);
+    await yieldToHost();
     buildRoadPaint(scene, trafficSystem.network, cityGrid.roadPaint);
     await stepDone("roadPaint");
 
