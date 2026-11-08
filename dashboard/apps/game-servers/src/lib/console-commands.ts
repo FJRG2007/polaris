@@ -74,6 +74,37 @@ export const MAX_SAVED_SEQUENCE = 4000;
 /** A blank to be filled in before sending: `Broadcast <message>`. */
 const PLACEHOLDER = /<[^<>\n]*>/;
 
+/** Every `<...>` blank, for turning the ones that name something into variables. */
+const BLANKS = /<([^<>\n]*)>/g;
+
+/** What a blank's text reads as a variable's name: `<Your block>` is `your_block`. */
+const BLANK_NAME = /^[a-z][a-z0-9_]{0,23}$/;
+
+/**
+ * A blank that names what goes in it - `<player>`, `<block>` - written as the
+ * variable it means, so pressing the command asks for it instead of dropping the
+ * line into the box to be edited by hand: `fill ... securitycraft:<block>_mine`
+ * asked for nothing and sent nothing. A blank that is not a name (`< @s b run`,
+ * an inequality in an `execute if score`) stays exactly as it was typed.
+ *
+ * Minecraft only (`blanksAsVariablesIn`): variables are filled in on a Minecraft
+ * server, and elsewhere - ARK's `Kick <player>` - a brace would be sent as it is.
+ */
+export function blanksAsVariables(command: string): string {
+    return command.replace(BLANKS, (raw, inner: string) => {
+        const name = inner.trim().toLowerCase().replace(/[\s-]+/g, "_");
+        return BLANK_NAME.test(name) ? `{${name}}` : raw;
+    });
+}
+
+/** A kept list with every command's named blanks turned into variables. */
+export function blanksAsVariablesIn(list: readonly SavedCommand[]): SavedCommand[] {
+    return list.map((entry) => {
+        const command = blanksAsVariables(entry.command);
+        return command === entry.command ? entry : { ...entry, command };
+    });
+}
+
 /** A command as it is typed: every line trimmed and the empty ones dropped. The
  *  one normalizer, on the screen and on the server. */
 export function normalizeCommandText(text: string): string {

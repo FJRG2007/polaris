@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
     MAX_SAVED_COMMANDS,
+    blanksAsVariables,
+    blanksAsVariablesIn,
+    keptPress,
     normalizeSavedCommand,
     placeholderRange,
     readSavedCommands,
@@ -168,5 +171,43 @@ describe("a kept command's variables", () => {
             ]
         });
         expect(read).toEqual([{ id: "a", label: "Give", command: "give {player} {x}" }]);
+    });
+});
+
+describe("blanksAsVariables", () => {
+    it("turns a blank that names something into the variable that asks for it", () => {
+        expect(
+            blanksAsVariables(
+                "execute at <player> run fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 securitycraft:<block>_mine"
+            )
+        ).toBe("execute at {player} run fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 securitycraft:{block}_mine");
+        expect(blanksAsVariables("say <Your message>")).toBe("say {your_message}");
+    });
+
+    it("leaves what is not a name exactly as typed", () => {
+        const score = "execute if score @s a < @s b run say >";
+        expect(blanksAsVariables(score)).toBe(score);
+        expect(blanksAsVariables("say <>")).toBe("say <>");
+        expect(blanksAsVariables("say <1st>")).toBe("say <1st>");
+        expect(blanksAsVariables("SaveWorld")).toBe("SaveWorld");
+    });
+
+    it("asks for the values when a kept command with blanks is pressed", () => {
+        const kept = normalizeSavedCommand({
+            id: "mine",
+            command: "execute at <player> run fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 securitycraft:<block>_mine"
+        })!;
+        // Stored exactly as typed; read as variables on a Minecraft server.
+        expect(keptPress(kept, "java")).toEqual({ kind: "load" });
+        const [read] = blanksAsVariablesIn([kept]);
+        expect(read?.command).toBe(
+            "execute at {player} run fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 securitycraft:{block}_mine"
+        );
+        expect(read && keptPress(read, "java")).toEqual({ kind: "ask" });
+    });
+
+    it("hands back the same entry when there is nothing to turn", () => {
+        const kept = normalizeSavedCommand({ id: "s", command: "save-all" })!;
+        expect(blanksAsVariablesIn([kept])[0]).toBe(kept);
     });
 });

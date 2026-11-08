@@ -12,12 +12,14 @@
 import { prisma } from "@polaris/db";
 import {
     SAVED_COMMANDS_KEY,
+    blanksAsVariablesIn,
     readSavedCommands,
     withSavedCommand,
     withoutSavedCommand,
     type SavedCommand
 } from "./console-commands";
 import { host } from "@polaris/app-host";
+import { gameOfServer } from "@polaris/core";
 import { gameMessage } from "./game-message";
 import {
     CONSOLE_SCHEDULES_KEY,
@@ -29,13 +31,22 @@ import {
 
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 
-/** The list one server carries. Empty for a server nobody has kept one on. */
+/** The list one server carries. Empty for a server nobody has kept one on.
+ *  On a Minecraft server a `<player>` blank is the variable that asks for it. */
 export async function readConsoleCommands(installedAppId: string): Promise<SavedCommand[]> {
+    return (await readKept(installedAppId)).list;
+}
+
+async function readKept(
+    installedAppId: string
+): Promise<{ list: SavedCommand[]; minecraft: boolean }> {
     const row = await prisma.installedApp.findUnique({
         where: { id: installedAppId },
-        select: { config: true }
+        select: { config: true, catalogId: true }
     });
-    return readSavedCommands(readInstallConfig(row?.config));
+    const list = readSavedCommands(readInstallConfig(row?.config));
+    const minecraft = Boolean(row) && gameOfServer(row!.catalogId)?.id === "minecraft";
+    return { list: minecraft ? blanksAsVariablesIn(list) : list, minecraft };
 }
 
 /** Add one or rewrite the one of that id, and hand back the list as it now is. */
@@ -43,7 +54,13 @@ export async function saveConsoleCommand(
     installedAppId: string,
     entry: SavedCommand
 ): Promise<SavedCommand[]> {
-    const list = withSavedCommand(await readConsoleCommands(installedAppId), entry);
+    const kept = await readKept(installedAppId);
+    // Read the way the rest of the list is, so the button it comes back as asks
+    // for its blanks without waiting for the next reload.
+    const list = withSavedCommand(
+        kept.list,
+        kept.minecraft ? blanksAsVariablesIn([entry])[0]! : entry
+    );
     await patchInstallConfig(installedAppId, { [SAVED_COMMANDS_KEY]: list });
     return list;
 }
