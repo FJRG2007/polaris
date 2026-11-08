@@ -18,6 +18,7 @@
 import { describe, expect, it } from "vitest";
 import {
     readRefusals,
+    withRefusal,
     REFUSALS_KEY
 } from "@polaris-app/game-servers/src/lib/minecraft/player-access";
 
@@ -30,7 +31,7 @@ const REFUSAL = {
 
 describe("what the owner is told about a refusal", () => {
     it("reads back what was written", () => {
-        expect(readRefusals({ [REFUSALS_KEY]: [REFUSAL] })).toEqual([REFUSAL]);
+        expect(readRefusals({ [REFUSALS_KEY]: [REFUSAL] })).toEqual([{ ...REFUSAL, count: 1 }]);
     });
 
     it("says nothing about a server that has turned nobody away", () => {
@@ -41,7 +42,7 @@ describe("what the owner is told about a refusal", () => {
         // It is a settings blob, and a bad entry must not take down the screen
         // somebody would fix it from.
         expect(readRefusals({ [REFUSALS_KEY]: "nobody" })).toEqual([]);
-        expect(readRefusals({ [REFUSALS_KEY]: [{ player: "Grumm" }, REFUSAL] })).toEqual([REFUSAL]);
+        expect(readRefusals({ [REFUSALS_KEY]: [{ player: "Grumm" }, REFUSAL] })).toEqual([{ ...REFUSAL, count: 1 }]);
         expect(readRefusals({ [REFUSALS_KEY]: [null, 7] })).toEqual([]);
     });
 
@@ -50,5 +51,42 @@ describe("what the owner is told about a refusal", () => {
         // refusal still happened - it is the part the owner has to see.
         const unknown = { ...REFUSAL, address: null };
         expect(readRefusals({ [REFUSALS_KEY]: [unknown] })[0]?.address).toBeNull();
+    });
+
+    it("folds the same refusal repeated into one counted row, also in lists written before", () => {
+        const again = { ...REFUSAL, at: "2026-09-21T20:44:57.000Z" };
+        expect(readRefusals({ [REFUSALS_KEY]: [again, REFUSAL] })).toEqual([
+            { ...again, count: 2 }
+        ]);
+    });
+
+    it("drops a refusal stored under a rank's symbol instead of a name", () => {
+        const phantom = { ...REFUSAL, player: "✦", address: null };
+        expect(readRefusals({ [REFUSALS_KEY]: [phantom, phantom, REFUSAL] })).toEqual([
+            { ...REFUSAL, count: 1 }
+        ]);
+    });
+});
+
+describe("withRefusal", () => {
+    const held = readRefusals({ [REFUSALS_KEY]: [REFUSAL] });
+    const { at: _at, ...refusal } = REFUSAL;
+
+    it("treats a retry inside the window as the same arrival", () => {
+        expect(withRefusal(held, refusal, new Date("2026-09-21T20:35:00.000Z"))).toBe(held);
+    });
+
+    it("counts the same refusal later on its one row, moved to the top", () => {
+        const other = { ...refusal, player: "Ana" };
+        const list = withRefusal(
+            withRefusal(held, other, new Date("2026-09-21T20:40:00.000Z")),
+            refusal,
+            new Date("2026-09-21T21:00:00.000Z")
+        );
+        expect(list.map((one) => [one.player, one.count])).toEqual([
+            ["Grumm", 2],
+            ["Ana", 1]
+        ]);
+        expect(list[0]?.at).toBe("2026-09-21T21:00:00.000Z");
     });
 });

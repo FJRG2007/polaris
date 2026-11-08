@@ -707,6 +707,9 @@ export function MinecraftPlayers({
                                             : t("playersTab.arrivedFromAnAddressThe")}
                                         {" - "}
                                         {format.dateTime(refusal.at)}
+                                        {refusal.count > 1
+                                            ? ` (${t("playersTab.refusedTimes", { count: refusal.count })})`
+                                            : null}
                                     </span>
                                     {canManage && from && (
                                         <Button

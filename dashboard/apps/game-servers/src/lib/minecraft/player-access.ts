@@ -32,7 +32,12 @@
 import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { noteReachedFrom } from "./reach";
-import { parseJoinAddresses, parseProperties, parseWhitelistRefusal } from "./parse";
+import {
+    playerOfEntry,
+    parseJoinAddresses,
+    parseProperties,
+    parseWhitelistRefusal
+} from "./parse";
 import { readContainerFile, readContainerFileState, writeContainerFile } from "../container-files";
 import {
     isReadableRoster,
@@ -156,7 +161,11 @@ export interface PlayerRefusal {
     readonly address: string | null;
     /** What they were told. */
     readonly why: string;
+    /** The latest time. */
     readonly at: string;
+    /** How many times it happened: the same player refused from the same place
+     *  for the same reason is one row, counted, rather than one row a pass. */
+    readonly count: number;
 }
 
 /** Where the last few live on the install, beside the rest of its settings. */
@@ -171,43 +180,90 @@ const REFUSALS_KEPT = 12;
  *  noise where the point is to be read. */
 const REFUSAL_WINDOW_MS = 10 * 60 * 1000;
 
+/** Whether two refusals are the same thing happening again. */
+type RefusalKey = Omit<PlayerRefusal, "at" | "count">;
+
+function sameRefusal(one: RefusalKey, other: RefusalKey): boolean {
+    return (
+        one.player.toLowerCase() === other.player.toLowerCase() &&
+        one.address === other.address &&
+        one.why === other.why
+    );
+}
+
+/**
+ * The refusals kept, newest first, one row per repeated refusal. Read the same
+ * way from lists written before rows were counted: their repeats fold into the
+ * newest, and a "player" that is no name at all - the rank symbol `✦` a team
+ * prefix put where the name was before `list` was read through it - is dropped.
+ */
 export function readRefusals(config: Record<string, unknown>): PlayerRefusal[] {
     const raw = config[REFUSALS_KEY];
     if (!Array.isArray(raw)) return [];
-    return raw.flatMap((entry) => {
-        if (typeof entry !== "object" || entry === null) return [];
+    const folded: PlayerRefusal[] = [];
+    for (const entry of raw) {
+        if (typeof entry !== "object" || entry === null) continue;
         const row = entry as Record<string, unknown>;
-        if (typeof row.player !== "string" || typeof row.at !== "string") return [];
-        return [
-            {
-                player: row.player,
-                address: typeof row.address === "string" ? row.address : null,
-                why: typeof row.why === "string" ? row.why : "",
-                at: row.at
-            }
-        ];
-    });
+        if (typeof row.player !== "string" || typeof row.at !== "string") continue;
+        if (playerOfEntry(row.player) === null) continue;
+        const one: PlayerRefusal = {
+            player: row.player,
+            address: typeof row.address === "string" ? row.address : null,
+            why: typeof row.why === "string" ? row.why : "",
+            at: row.at,
+            count:
+                typeof row.count === "number" && Number.isInteger(row.count) && row.count > 0
+                    ? row.count
+                    : 1
+        };
+        const index = folded.findIndex((held) => sameRefusal(held, one));
+        const held = folded[index];
+        if (!held) {
+            folded.push(one);
+            continue;
+        }
+        folded[index] = {
+            ...held,
+            at: Date.parse(one.at) > Date.parse(held.at) ? one.at : held.at,
+            count: held.count + one.count
+        };
+    }
+    return folded;
 }
 
 /** Write one down, newest first, without repeating the retry of one arrival. */
 export async function noteRefusal(
     installedAppId: string,
-    refusal: Omit<PlayerRefusal, "at">,
+    refusal: Omit<PlayerRefusal, "at" | "count">,
     now: Date = new Date()
 ): Promise<void> {
     const row = await prisma.installedApp
         .findUnique({ where: { id: installedAppId }, select: { config: true } })
         .catch(() => null);
     const held = readRefusals(readInstallConfig(row?.config));
-    const same = held.find(
-        (one) =>
-            one.player.toLowerCase() === refusal.player.toLowerCase() &&
-            one.address === refusal.address &&
-            now.getTime() - Date.parse(one.at) < REFUSAL_WINDOW_MS
-    );
-    if (same) return;
-    const kept = [{ ...refusal, at: now.toISOString() }, ...held].slice(0, REFUSALS_KEPT);
+    const kept = withRefusal(held, refusal, now);
+    if (kept === held) return;
     await patchInstallConfig(installedAppId, { [REFUSALS_KEY]: kept }).catch(() => undefined);
+}
+
+/**
+ * The list with one more refusal: a retry inside the window is the same arrival
+ * and changes nothing (the same list back); the same refusal later moves its row
+ * to the top and counts it; anything else is a new row. Pure, for the tests.
+ */
+export function withRefusal(
+    held: readonly PlayerRefusal[],
+    refusal: Omit<PlayerRefusal, "at" | "count">,
+    now: Date
+): readonly PlayerRefusal[] {
+    const same = held.find((one) => sameRefusal(one, refusal));
+    if (same && now.getTime() - Date.parse(same.at) < REFUSAL_WINDOW_MS) return held;
+    const next: PlayerRefusal = {
+        ...refusal,
+        at: now.toISOString(),
+        count: (same?.count ?? 0) + 1
+    };
+    return [next, ...held.filter((one) => one !== same)].slice(0, REFUSALS_KEPT);
 }
 
 /** Take off the list every refusal `drop` picks. Nothing is written when none is. */

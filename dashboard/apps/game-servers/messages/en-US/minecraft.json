@@ -465,6 +465,7 @@
         "closedHintJava": "The server is closed until somebody is registered. Add yourself first: your Minecraft username, and the address you play from - the locate button fills in the one you are on now.",
         "closedHintBedrock": "The server is closed until somebody is registered. Add yourself first: your gamertag, and the address you play from - the locate button fills in the one you are on now.",
         "arrivedFrom": "arrived from {address}",
+        "refusedTimes": "{count} times",
         "whoCanJoinHint": "A player is let in when the username is on this list and they arrive from the address registered to it.",
         "lapses": "{reason} - lapses {date}",
         "cancelFor": "Cancel {what} for {name}",
