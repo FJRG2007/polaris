@@ -38,6 +38,7 @@ import { isDrivingKey, mayTakeFocus } from "./frame-focus";
 import { Button } from "@polaris/ui";
 import { gameFrameSrc } from "../games/registry";
 import { useEffect, useRef, useState } from "react";
+import { PhonePadBridge } from "./phone-pad-bridge";
 import type { GameDefinition } from "../games/types";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -270,6 +271,7 @@ export function GameFrame({
                 onLoad={onFrameLoad}
                 className="absolute inset-0 h-full w-full border-0"
             />
+            <PhonePadBridge frame={frame} />
             {(load.phase === "starting" || load.phase === "failed") && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black px-4 text-white">
                     {load.phase === "starting" ? (

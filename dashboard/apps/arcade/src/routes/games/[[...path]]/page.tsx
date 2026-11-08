@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import { findGame } from "../../../games/registry";
 import { GamesScreen } from "../../../screens/library";
 import { GamePlayer } from "../../../screens/game-player";
+import { PhonePadScreen } from "../../../screens/phone-pad-screen";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,8 @@ export default async function GamesPage({
     const path = Array.isArray(raw) ? raw : raw ? [raw] : [];
     if (path.length > 1) notFound();
     const [id] = path;
+    // A phone used as a controller for a game open elsewhere (phone-pad-screen.tsx)
+    if (id === "pad") return <PhonePadScreen />;
     if (id !== undefined) {
         if (!findGame(id)) notFound();
         return <GamePlayer gameId={id} />;

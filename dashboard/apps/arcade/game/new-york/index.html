@@ -306,7 +306,17 @@
       </div>
       <div class="menu-view" data-start-view="controller" hidden>
         <button class="menu-item" type="button" data-start-choose="gamepad" disabled><span class="menu-option-text"><span class="menu-name" data-t="start.gamepad"></span><span id="start-pad-status" class="menu-sub" aria-live="polite"></span></span></button>
-        <button class="menu-item" type="button" disabled><span class="menu-option-text"><span class="menu-name" data-t="start.phone"></span><span class="menu-sub" data-t="start.phoneSoon"></span></span></button>
+        <button class="menu-item" type="button" data-start-open="phone"><span class="menu-option-text"><span class="menu-name" data-t="start.phone"></span><span class="menu-sub" data-t="start.phoneHint"></span></span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+      </div>
+      <div class="menu-view" data-start-view="phone" hidden>
+        <div class="start-phone">
+          <img id="start-phone-qr" class="start-phone-qr" alt="" width="176" height="176" hidden>
+          <p class="start-phone-steps" data-t="start.phoneSteps"></p>
+          <p id="start-phone-code" class="start-phone-code"></p>
+          <p id="start-phone-status" class="menu-sub" aria-live="polite"></p>
+        </div>
+        <button class="menu-item" type="button" data-start-retry hidden><span class="menu-option-text"><span class="menu-name" data-t="start.phoneRetry"></span></span></button>
+        <button class="menu-item" type="button" data-start-choose="phone" disabled><span class="menu-option-text"><span class="menu-name" data-t="start.phonePlay"></span></span></button>
       </div>
     </div>
   </dialog>
