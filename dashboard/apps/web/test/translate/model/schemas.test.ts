@@ -11,6 +11,7 @@ import {
     TEXTS_MAX,
     TOTAL_MAX,
     detectInput,
+    readOrder,
     readSettings,
     settingsInput,
     translateInput
@@ -54,8 +55,8 @@ describe("readSettings", () => {
         expect(
             readSettings({ engines: { deepl: false, polar: "no" }, defaultTarget: "xx" })
         ).toEqual({
-            engines: { browser: true, polar: true, deepl: false, google: true },
-            order: ["browser", "deepl", "google", "polar"],
+            engines: { browser: true, local: true, polar: true, deepl: false, google: true },
+            order: ["browser", "local", "deepl", "google", "polar"],
             defaultTarget: "en",
             charLimit: null
         });
@@ -80,19 +81,48 @@ describe("readSettings", () => {
         expect(settingsInput.safeParse({ ...base, charLimit: 5000 }).success).toBe(true);
     });
 
-    it("keeps a stored order, drops what it does not know, and appends what it lacks", () => {
+    it("keeps a stored order, drops what it does not know, and fills in what it lacks", () => {
+        // Nothing before them is kept: the missing ones go first, in the default order.
         expect(readSettings({ order: ["polar", "google"] }).order).toEqual([
-            "polar",
-            "google",
             "browser",
-            "deepl"
+            "local",
+            "deepl",
+            "polar",
+            "google"
         ]);
         expect(readSettings({ order: ["polar", "polar", "bing", 3] }).order).toEqual([
+            "browser",
+            "local",
+            "deepl",
+            "google",
+            "polar"
+        ]);
+    });
+
+    it("puts the local engine right after the browser's in an order saved before it", () => {
+        expect(readOrder(["polar", "browser", "google", "deepl"])).toEqual([
+            "polar",
+            "browser",
+            "local",
+            "google",
+            "deepl"
+        ]);
+        expect(readOrder(["deepl", "google", "polar", "browser"])).toEqual([
+            "deepl",
+            "google",
+            "polar",
+            "browser",
+            "local"
+        ]);
+        // An order that already places it keeps it where it is.
+        expect(readOrder(["local", "polar", "browser", "deepl", "google"])).toEqual([
+            "local",
             "polar",
             "browser",
             "deepl",
             "google"
         ]);
+        expect(readSettings(null).order).toEqual(["browser", "local", "deepl", "google", "polar"]);
     });
 
     it("refuses an order that repeats or leaves out an engine", () => {
@@ -105,9 +135,20 @@ describe("readSettings", () => {
             settingsInput.safeParse({ ...base, order: ["polar", "polar", "deepl", "browser"] })
                 .success
         ).toBe(false);
-        expect(
-            settingsInput.safeParse({ ...base, order: ["polar", "deepl", "browser"] }).success
-        ).toBe(false);
+        // An order from a client older than an engine is completed, not refused.
+        const older = settingsInput.safeParse({
+            ...base,
+            engines: { browser: true, polar: true, deepl: true, google: true },
+            order: ["polar", "google", "deepl", "browser"]
+        });
+        expect(older.success && older.data.order).toEqual([
+            "polar",
+            "google",
+            "deepl",
+            "browser",
+            "local"
+        ]);
+        expect(older.success && older.data.engines.local).toBe(true);
     });
 });
 

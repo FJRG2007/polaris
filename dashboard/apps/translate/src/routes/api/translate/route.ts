@@ -22,6 +22,7 @@ export async function GET(): Promise<Response> {
     return Response.json({
         engines: status.engines,
         browser: status.settings.engines.browser,
+        local: status.settings.engines.local,
         defaultTarget: status.settings.defaultTarget,
         order: status.settings.order,
         charLimit: status.settings.charLimit,

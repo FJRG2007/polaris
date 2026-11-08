@@ -12,6 +12,8 @@ export const TRANSLATE_API = "/api/translate";
 export interface ServerStatusView {
     engines: ServerEngineId[];
     browser: boolean;
+    /** Whether the local engine may answer; missing from a status cached before it existed. */
+    local?: boolean;
     defaultTarget: string;
     /** The administrator's order; missing from a status cached before it existed. */
     order?: EngineId[];
@@ -98,6 +100,21 @@ export function createServerEngine(id: ServerEngineId, fallback: string): Transl
             return answer.language;
         }
     };
+}
+
+/** The language of `text` as Polaris reads it, whichever server engine answers. */
+export async function detectOnServer(
+    text: string,
+    fallback: string,
+    signal?: AbortSignal
+): Promise<string | null> {
+    const answer = await post<{ language: string | null }>(
+        `${TRANSLATE_API}/detect`,
+        { text },
+        fallback,
+        signal
+    );
+    return answer.language;
 }
 
 /** A file posted as it is to one of the reading routes; the answer, or the sentence refusing it. */

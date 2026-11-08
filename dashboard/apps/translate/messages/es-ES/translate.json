@@ -29,6 +29,7 @@
         "label": "Motor",
         "automatic": "Automático",
         "browser": "En tu navegador",
+        "local": "En este equipo",
         "polar": "Modelo de Polar",
         "deepl": "DeepL",
         "google": "Google Cloud",
@@ -68,6 +69,7 @@
         "moveUp": "Subir {engine}",
         "moveDown": "Bajar {engine}",
         "browserHint": "Gratis, en el dispositivo de quien lee. Solo Chrome de escritorio.",
+        "localHint": "Gratis, sin conexión, sin límites, en cualquier navegador. Cada idioma se descarga una vez desde Polaris.",
         "polarHint": "Usa el modelo de Polar y cuenta para sus límites.",
         "deeplHint": "Necesita una clave de DeepL en Integraciones.",
         "googleHint": "Necesita una clave de Google Cloud en Integraciones.",
@@ -285,5 +287,9 @@
             "kana": "Kana japonés",
             "hangul": "Coreano"
         }
+    },
+    "local": {
+        "unknownModel": "Ese modelo de idioma no es uno de los que ofrece Polaris.",
+        "downloadFailed": "Polaris no pudo descargar el modelo del idioma. Revisa su conexión a internet y vuelve a intentarlo."
     }
 }

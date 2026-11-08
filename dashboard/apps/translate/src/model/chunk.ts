@@ -32,6 +32,8 @@ export const PIECE_MAX = 4500;
  */
 export const ENGINE_LIMITS: Readonly<Record<EngineId, EngineLimit>> = {
     browser: { maxTexts: 50, maxChars: 20_000 },
+    // One worker message; the runtime splits it into sentences itself.
+    local: { maxTexts: 50, maxChars: 10_000 },
     deepl: { maxTexts: 50, maxChars: 30_000 },
     google: { maxTexts: 128, maxChars: 5000 },
     polar: { maxTexts: 50, maxChars: 6000 }

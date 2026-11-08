@@ -2,9 +2,9 @@
  * One interface for every engine, and which one answers a request.
  *
  * Engines are tried in the order the administrator set (`settings.order`,
- * by default the browser, DeepL, Google, then Polar's model), skipping any
- * that is switched off, has no key, or - for the browser's own translator -
- * is missing from the reader's browser.
+ * by default the browser's translator, the local one, DeepL, Google, then
+ * Polar's model), skipping any that is switched off, has no key, or - for the
+ * two that run on the device - that the reader's browser cannot run.
  */
 
 import {
@@ -66,12 +66,17 @@ export function pickServerEngine(
 /** What the screen can choose from, in the administrator's order. */
 export function usableEngines(input: {
     browser: boolean;
+    /** Whether this browser can run the local engine (WebAssembly in a worker). */
+    local: boolean;
     available: ServerAvailability;
     settings: TranslateSettings;
 }): EngineId[] {
     const server = usableServerEngines(input.available, input.settings);
-    const browser = input.browser && input.settings.engines.browser;
-    return input.settings.order.filter((id) => (id === "browser" ? browser : server.includes(id)));
+    const device: Partial<Record<EngineId, boolean>> = {
+        browser: input.browser && input.settings.engines.browser,
+        local: input.local && input.settings.engines.local
+    };
+    return input.settings.order.filter((id) => device[id] ?? server.includes(id as ServerEngineId));
 }
 
 /**

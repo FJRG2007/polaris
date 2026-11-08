@@ -51,6 +51,7 @@ export function limitOf(text: string | null): number | null {
 
 const NAME = {
     browser: "engine.browser",
+    local: "engine.local",
     polar: "engine.polar",
     deepl: "engine.deepl",
     google: "engine.google"
@@ -58,6 +59,7 @@ const NAME = {
 
 const HINT = {
     browser: "settings.browserHint",
+    local: "settings.localHint",
     polar: "settings.polarHint",
     deepl: "settings.deeplHint",
     google: "settings.googleHint"

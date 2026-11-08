@@ -158,8 +158,9 @@ describe("GET /api/translate", () => {
         expect(await response.json()).toEqual({
             engines: ["deepl", "polar"],
             browser: true,
+            local: true,
             defaultTarget: "en",
-            order: ["browser", "deepl", "google", "polar"],
+            order: ["browser", "local", "deepl", "google", "polar"],
             charLimit: null,
             reads: { images: false, audio: false }
         });
