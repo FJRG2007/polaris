@@ -72,7 +72,17 @@ export const CLASSIC_PHASE_LIST: readonly OneBlockPhase[] = [
         name: "Underground",
         color: "WHITE",
         length: 150,
-        blocks: ["STONE", "COBBLESTONE", "COAL_ORE", "IRON_ORE", "COPPER_ORE", "GRAVEL", "ANDESITE", "DIORITE", "GRANITE"],
+        blocks: [
+            "STONE",
+            "COBBLESTONE",
+            "COAL_ORE",
+            "IRON_ORE",
+            "COPPER_ORE",
+            "GRAVEL",
+            "ANDESITE",
+            "DIORITE",
+            "GRANITE"
+        ],
         mobs: ["ZOMBIE", "SKELETON", "SPIDER"],
         chest: "small_chest"
     },
@@ -128,14 +138,28 @@ export const CLASSIC_PHASE_LIST: readonly OneBlockPhase[] = [
         name: "Idyll",
         color: "PINK",
         length: 450,
-        blocks: ["GRASS_BLOCK", "CHERRY_LOG", "CHERRY_LEAVES", "FLOWERING_AZALEA_LEAVES", "MOSS_BLOCK"],
+        blocks: [
+            "GRASS_BLOCK",
+            "CHERRY_LOG",
+            "CHERRY_LEAVES",
+            "FLOWERING_AZALEA_LEAVES",
+            "MOSS_BLOCK"
+        ],
         mobs: ["BEE", "FOX", "RABBIT", "HORSE"]
     },
     {
         name: "Desolate Land",
         color: "YELLOW",
         length: 500,
-        blocks: ["COARSE_DIRT", "PODZOL", "MYCELIUM", "DEEPSLATE", "OBSIDIAN", "DIAMOND_ORE", "EMERALD_ORE"],
+        blocks: [
+            "COARSE_DIRT",
+            "PODZOL",
+            "MYCELIUM",
+            "DEEPSLATE",
+            "OBSIDIAN",
+            "DIAMOND_ORE",
+            "EMERALD_ORE"
+        ],
         mobs: ["WITCH", "CREEPER", "PILLAGER"],
         chest: "high_chest"
     },
@@ -202,8 +226,14 @@ export function phasesFile(phases: readonly OneBlockPhase[] = CLASSIC_PHASE_LIST
         const mobWeight = ownWeight(mobPool, phase.mobs.length);
         // A chest is a draw from the block pool, kept rare against the phase's own blocks.
         const chestWeight = Math.max(1, Math.round(blockWeight / 4));
-        lines.push(`'${index}':`, `- 'Level: ${index} - ${phase.name}'`, `- ${phase.color}`, `- ${phase.length}`);
-        for (const block of phase.blocks) lines.push(`- block: ${block}`, `  weight: ${blockWeight}`);
+        lines.push(
+            `'${index}':`,
+            `- 'Level: ${index} - ${phase.name}'`,
+            `- ${phase.color}`,
+            `- ${phase.length}`
+        );
+        for (const block of phase.blocks)
+            lines.push(`- block: ${block}`, `  weight: ${blockWeight}`);
         if (phase.chest) lines.push(`- chest: ${phase.chest}`, `  weight: ${chestWeight}`);
         for (const mob of phase.mobs) lines.push(`- mob: ${mob}`, `  weight: ${mobWeight}`);
         blockPool += blockWeight * phase.blocks.length + (phase.chest ? chestWeight : 0);

@@ -415,7 +415,8 @@ export function gameJobTable(): readonly AppJob[] {
             // Leased: two passes at once could each give the same newcomer theirs
             // before either tagged them.
             leaseMs: 5 * MINUTE,
-            run: async () => (await import("./minecraft/lucky-starter-service")).sweepLuckyStarters()
+            run: async () =>
+                (await import("./minecraft/lucky-starter-service")).sweepLuckyStarters()
         },
         {
             key: "game-challenges",

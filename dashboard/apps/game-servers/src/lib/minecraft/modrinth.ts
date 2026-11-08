@@ -740,7 +740,9 @@ export function splitEntry(entry: string): ProjectEntry {
     return {
         slug: slug.trim().replace(/\?+$/, ""),
         optional,
-        parts: rest.map((part) => part.trim().replace(/\?+$/, "")).filter((part) => part.length > 0),
+        parts: rest
+            .map((part) => part.trim().replace(/\?+$/, ""))
+            .filter((part) => part.length > 0),
         loader
     };
 }
@@ -847,9 +849,7 @@ export function repinEntry(entry: string, build: string): string {
     const kept = parts.filter((part) =>
         (RELEASE_TYPES as readonly string[]).includes(part.toLowerCase())
     );
-    return [...(loader ? [loader] : []), `${slug}${optional ? "?" : ""}`, ...kept, build].join(
-        ":"
-    );
+    return [...(loader ? [loader] : []), `${slug}${optional ? "?" : ""}`, ...kept, build].join(":");
 }
 
 const buildSchema = someBuilds(

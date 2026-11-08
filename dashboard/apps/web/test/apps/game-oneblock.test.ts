@@ -221,7 +221,8 @@ describe("the classic phases", () => {
             const head = /^'(\d+)':$/.exec(line);
             if (head?.[1]) out.set(head[1], (current = []));
             else if (line.startsWith("- ") && current) current.push(line.slice(2));
-            else if (line.startsWith("  weight: ") && current) current[current.length - 1] += ` x${line.slice(10)}`;
+            else if (line.startsWith("  weight: ") && current)
+                current[current.length - 1] += ` x${line.slice(10)}`;
         }
         return out;
     }
@@ -246,7 +247,8 @@ describe("the classic phases", () => {
         // Legacy is a scalar MaxLevel or a bare-string pool entry.
         expect(text).toMatch(/\nMaxLevel:\n$/);
         for (const entries of levels(text).values())
-            for (const entry of entries.slice(3)) expect(entry).toMatch(/^(block|mob|chest): [A-Z_a-z]+ x\d+$/);
+            for (const entry of entries.slice(3))
+                expect(entry).toMatch(/^(block|mob|chest): [A-Z_a-z]+ x\d+$/);
     });
 
     it("names only the chests the plugin ships", () => {
@@ -272,7 +274,9 @@ describe("the classic phases", () => {
 
         file = BUNDLED;
         await applyOneBlockSetup("owner", "app", install.config);
-        expect(written.get(phases.ONEBLOCK_BLOCKS_PATH)).toBe(phases.phasesFile(phases.phasesFor("26.3")));
+        expect(written.get(phases.ONEBLOCK_BLOCKS_PATH)).toBe(
+            phases.phasesFile(phases.phasesFor("26.3"))
+        );
         expect(sent).toEqual([["ob reload"], oneblock.setupLines("world")]);
         expect(JSON.parse(install.config).oneblockPhases).toBe("classic");
 
@@ -286,7 +290,14 @@ describe("the classic phases", () => {
     it("holds only what the server's release has", () => {
         const on = (release: string) => phases.phasesFile(phases.phasesFor(release));
         // 1.16.5: no copper, moss, deepslate or cherry; the Nether's own blocks are there.
-        for (const name of ["COPPER_ORE", "MOSS_BLOCK", "DEEPSLATE", "FLOWERING_AZALEA_LEAVES", "CHERRY_LOG", "BAMBOO_BLOCK"])
+        for (const name of [
+            "COPPER_ORE",
+            "MOSS_BLOCK",
+            "DEEPSLATE",
+            "FLOWERING_AZALEA_LEAVES",
+            "CHERRY_LOG",
+            "BAMBOO_BLOCK"
+        ])
             expect(on("1.16.5")).not.toContain(`: ${name}\n`);
         expect(on("1.16.5")).toContain("block: BLACKSTONE\n");
         expect(on("1.16.5")).toContain("mob: PIGLIN\n");
@@ -297,7 +308,8 @@ describe("the classic phases", () => {
         expect(on("26.3")).toContain("block: CHERRY_LOG\n");
         // And no phase is left with nothing to draw.
         for (const release of ["1.13", "1.16.5", "1.19.4"])
-            for (const phase of phases.phasesFor(release)) expect(phase.blocks.length).toBeGreaterThan(0);
+            for (const phase of phases.phasesFor(release))
+                expect(phase.blocks.length).toBeGreaterThan(0);
     });
 
     it("waits for the log to say which release the server runs", async () => {

@@ -31,10 +31,14 @@ export async function applyOneBlockSetup(
 ): Promise<void> {
     const stored = readInstallConfig(config);
     const blueprintId = stored[BLUEPRINT_KEY];
-    if (typeof blueprintId !== "string" || !oneblock.ONEBLOCK_BLUEPRINT_IDS.includes(blueprintId)) return;
+    if (typeof blueprintId !== "string" || !oneblock.ONEBLOCK_BLUEPRINT_IDS.includes(blueprintId))
+        return;
     // Isolated: a phases write that fails must not keep the first block from
     // being placed, and is tried again on the next pass.
-    if (blueprintId === oneblock.ONEBLOCK_CLASSIC_BLUEPRINT_ID && stored[phases.ONEBLOCK_PHASES_KEY] !== phases.CLASSIC_PHASES)
+    if (
+        blueprintId === oneblock.ONEBLOCK_CLASSIC_BLUEPRINT_ID &&
+        stored[phases.ONEBLOCK_PHASES_KEY] !== phases.CLASSIC_PHASES
+    )
         await applyClassicPhases(ownerId, installedAppId).catch((error) =>
             console.warn("polaris: OneBlock classic phases failed", installedAppId, String(error))
         );
@@ -89,10 +93,16 @@ async function applyClassicPhases(ownerId: string, installedAppId: string): Prom
         // that does not say yet is read again on the next pass.
         const version = await serverVersion(server);
         if (!version) return false;
-        await writeContainerFile(server, phases.ONEBLOCK_BLOCKS_PATH, phases.phasesFile(phases.phasesFor(version)));
+        await writeContainerFile(
+            server,
+            phases.ONEBLOCK_BLOCKS_PATH,
+            phases.phasesFile(phases.phasesFor(version))
+        );
         await server.sayAll(["ob reload"]);
         return true;
     });
     if (written)
-        await patchInstallConfig(installedAppId, { [phases.ONEBLOCK_PHASES_KEY]: phases.CLASSIC_PHASES });
+        await patchInstallConfig(installedAppId, {
+            [phases.ONEBLOCK_PHASES_KEY]: phases.CLASSIC_PHASES
+        });
 }
