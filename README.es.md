@@ -26,17 +26,6 @@ La guía completa (qué incluye cada app, requisitos, uso y desarrollo) está en
 
 ## Un vistazo
 
-Capturas de la interfaz real con datos de ejemplo. Casi todas enlazan a una
-página con todas sus funciones. Las versiones para móvil están en
-[docs/assets/media](docs/assets/media).
-
-[Agentes](docs/features/agents.es.md) y [CRM](docs/features/crm.es.md) tienen
-también su propia página.
-
-Polaris TV: [¿funciona en mi tele?](docs/features/polaris-tv-compatibility.es.md),
-[instalación](docs/features/polaris-tv-install.es.md), [privacidad por marca](docs/features/polaris-tv-privacy.es.md)
-y [bloqueo de anuncios en cualquier tele](docs/features/polaris-tv-network.es.md).
-
 ### En todas partes
 
 <p align="center">
