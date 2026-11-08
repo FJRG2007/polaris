@@ -291,14 +291,6 @@ function toolDetail(tool: string, input: Record<string, unknown>): string {
     }
 }
 
-/**
- * Turn what a machine posted into an event, or null.
- *
- * Null for anything unrecognised, and that is the whole contract: this is fed by
- * a program running against somebody's repository, so the safe reading of an
- * unfamiliar payload is that it says nothing. An event that cannot be placed in
- * the vocabulary must not move the session.
- */
 /** A tool call's arguments, as an object or as the JSON string Copilot CLI sends. */
 function toolInput(value: unknown): Record<string, unknown> {
     if (typeof value === "string") {
@@ -320,6 +312,14 @@ function errorText(value: unknown): unknown {
     return value;
 }
 
+/**
+ * Turn what a machine posted into an event, or null.
+ *
+ * Null for anything unrecognised, and that is the whole contract: this is fed by
+ * a program running against somebody's repository, so the safe reading of an
+ * unfamiliar payload is that it says nothing. An event that cannot be placed in
+ * the vocabulary must not move the session.
+ */
 export function normalizeHookEvent(payload: unknown): NormalizedHookEvent | null {
     if (!payload || typeof payload !== "object") return null;
     const record = payload as Record<string, unknown>;
