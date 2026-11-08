@@ -1189,6 +1189,7 @@
         "download": "Descargar",
         "system": "Para qué sistema es",
         "notInRelease": "No está en esta versión",
+        "unreachable": "GitHub no ha respondido ahora mismo, así que no se pueden mostrar los archivos. Prueba en un minuto, o <link>abre la página de versiones</link>.",
         "whatChanged": "Qué ha cambiado",
         "noDesktopVersion": "Aún no está disponible. Para usar Polaris en su propia ventana hoy mismo, instálalo como app más abajo.",
         "noExtensionVersion": "Aún no se ha publicado ninguna versión. Los archivos aparecerán aquí, uno por navegador, en cuanto se publique."

@@ -196,7 +196,7 @@ export function InstallAppOffer() {
     if (prompt)
         return (
             <div>
-                <Button onClick={() => void install()}>
+                <Button variant="secondary" size="sm" onClick={() => void install()}>
                     <Download className="size-4" /> {t("installApp.install")}
                 </Button>
             </div>

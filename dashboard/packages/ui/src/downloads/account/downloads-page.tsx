@@ -16,7 +16,7 @@ import { ExtensionCard } from "./extension-card";
 import { AssistantsCard } from "./assistants-card";
 import { Globe, Monitor, Smartphone, Tv } from "lucide-react";
 import { DownloadCard, DownloadRow, DownloadRows } from "../download-card";
-import { DesktopPreview, PhonePreview } from "./download-previews";
+import { DesktopPreview, PhonePreview, TvPreview } from "./download-previews";
 
 /** The phone systems the mobile card names; product names, the same in every language. */
 // i18n-ignore systems' names
@@ -73,17 +73,30 @@ export function DownloadsPage({
                     description={t("downloads.desktop.description")}
                     side={<DesktopPreview />}
                 >
-                    {desktopFiles}
+                    <div className="flex min-w-0 flex-col gap-2">
+                        <p className="flex min-w-0 items-center gap-2 text-xs font-medium text-muted-foreground">
+                            <span className="min-w-0 truncate">{t("downloads.desktop.app")}</span>
+                            <Badge variant="neutral">{t("downloads.desktop.recommended")}</Badge>
+                        </p>
+                        {desktopFiles}
+                    </div>
                     {/* The other way to have it in a window of its own: the
-                        browser's install offer, which needs no download - a row
-                        of this card rather than a card of its own. */}
-                    <div id="app" className="min-w-0 scroll-mt-4">
+                        browser's install offer, which needs no download. Drawn
+                        under the installers and quieter than them, because it is
+                        the lesser of the two and says what it lacks. */}
+                    <div
+                        id="app"
+                        className="min-w-0 scroll-mt-4 rounded-lg bg-muted/40 px-3 py-2 text-muted-foreground"
+                    >
                         <DownloadRows label={t("downloads.web.title")}>
                             <DownloadRow
                                 mark={<Globe className="size-4 shrink-0" />}
                                 name={t("downloads.web.name")}
                                 detail={tc("installApp.intro")}
                             >
+                                <p className="text-xs text-muted-foreground">
+                                    {t("downloads.web.lacks")}
+                                </p>
                                 {webApp ?? (
                                     <p className="text-sm text-muted-foreground">
                                         {tc("installApp.fromMenu")}
@@ -104,6 +117,7 @@ export function DownloadsPage({
                         icon={<Tv className="size-4 shrink-0" />}
                         title={t("downloads.tv.title")}
                         description={t("downloads.tv.description")}
+                        preview={<TvPreview />}
                     >
                         <p className="text-sm text-muted-foreground">
                             {t("downloads.tv.needsApp")}

@@ -5,6 +5,7 @@ import {
     EXTENSION_TAG_PREFIX,
     STREAMDECK_TAG_PREFIX,
     TV_TAG_PREFIX,
+    appLookup,
     desktopDownload,
     extensionDownload,
     pickFile,
@@ -420,6 +421,147 @@ describe("appDownload", () => {
                 vi.useRealTimers();
             }
         });
+    });
+});
+
+/**
+ * The downloads page as every member sees it.
+ *
+ * The admin was offered Polaris Desktop 0.1.19 for Windows while members opening
+ * the same page were told it was "not available yet". Nothing looked at roles: the
+ * lookup asked GitHub once per app (five calls a view, against sixty an hour
+ * unauthenticated), and cached a refusal for two minutes as "no release" - so
+ * whoever came after the quota ran out lost the installers. The list is now read
+ * once for every app, and a refusal keeps the last list that worked.
+ */
+describe("a release every member is offered", () => {
+    const desktop = release({
+        tag_name: "desktop-v0.1.19",
+        html_url: "https://github.com/example/polaris/releases/tag/desktop-v0.1.19",
+        assets: [
+            {
+                name: "Polaris-Setup.exe",
+                browser_download_url: "https://github.com/example/dl/Polaris-Setup.exe"
+            },
+            {
+                name: "Polaris-0.1.19-arm64.dmg",
+                browser_download_url: "https://github.com/example/dl/Polaris-0.1.19-arm64.dmg"
+            },
+            {
+                name: "polaris-desktop_0.1.19_amd64.deb",
+                browser_download_url:
+                    "https://github.com/example/dl/polaris-desktop_0.1.19_amd64.deb"
+            }
+        ]
+    });
+    const listed = (body: readonly ReleaseListing[], etag: string) => ({
+        ok: true,
+        status: 200,
+        headers: new Headers({ etag }),
+        json: async () => body
+    });
+    const refused = { ok: false, status: 403, headers: new Headers(), json: async () => ({}) };
+
+    it("keeps the Windows installer for the next reader when GitHub refuses a later look", async () => {
+        vi.useFakeTimers({ now: new Date("2026-11-07T18:00:00Z") });
+        const fetching = vi
+            .fn()
+            .mockResolvedValueOnce(listed([desktop], '"a"'))
+            .mockResolvedValue(refused);
+        vi.stubGlobal("fetch", fetching);
+        try {
+            // The admin, first.
+            const first = await desktopDownload("example/members");
+            expect(pickFile(first?.files ?? [], [".exe"])?.name).toBe("Polaris-Setup.exe");
+            // A member, after the hourly limit ran out.
+            vi.advanceTimersByTime(121_000);
+            const later = await appLookup("example/members", DESKTOP_TAG_PREFIX);
+            expect(later.reached).toBe(true);
+            expect(later.download?.version).toBe("0.1.19");
+            expect(pickFile(later.download?.files ?? [], [".exe"])?.name).toBe("Polaris-Setup.exe");
+            // Tried again soon, not two minutes later.
+            vi.advanceTimersByTime(31_000);
+            await desktopDownload("example/members");
+            expect(fetching).toHaveBeenCalledTimes(3);
+        } finally {
+            vi.unstubAllGlobals();
+            vi.useRealTimers();
+        }
+    });
+
+    it("answers every app on the page from one call", async () => {
+        const fetching = vi.fn(async () =>
+            listed(
+                [
+                    desktop,
+                    release({ tag_name: "extension-v0.1.40" }),
+                    release({ tag_name: "streamdeck-v0.1.2" }),
+                    release({ tag_name: "companion-v0.1.1" }),
+                    release({ tag_name: "tv-v0.1.0" })
+                ],
+                '"a"'
+            )
+        );
+        vi.stubGlobal("fetch", fetching);
+        try {
+            const repo = "example/one-call";
+            const versions = await Promise.all(
+                [
+                    DESKTOP_TAG_PREFIX,
+                    EXTENSION_TAG_PREFIX,
+                    STREAMDECK_TAG_PREFIX,
+                    COMPANION_TAG_PREFIX,
+                    TV_TAG_PREFIX
+                ].map(async (prefix) => (await appLookup(repo, prefix)).download?.version)
+            );
+            expect(versions).toEqual(["0.1.19", "0.1.40", "0.1.2", "0.1.1", "0.1.0"]);
+            expect(fetching).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it("keeps the pages it read when GitHub refuses a later one", async () => {
+        const full = [
+            desktop,
+            ...Array.from({ length: 99 }, (_, index) =>
+                release({ tag_name: `dashboard-v0.${index}.0` })
+            )
+        ];
+        const fetching = vi
+            .fn()
+            .mockResolvedValueOnce(listed(full, '"a"'))
+            .mockResolvedValue(refused);
+        vi.stubGlobal("fetch", fetching);
+        try {
+            const repo = "example/partial-walk";
+            const found = await appLookup(repo, DESKTOP_TAG_PREFIX);
+            expect(found.reached).toBe(true);
+            expect(pickFile(found.download?.files ?? [], [".exe"])?.name).toBe("Polaris-Setup.exe");
+            // Not on the page that was read, and the rest was never answered.
+            expect(await appLookup(repo, TV_TAG_PREFIX)).toEqual({
+                download: null,
+                reached: false
+            });
+            expect(fetching).toHaveBeenCalledTimes(2);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it("says GitHub was not reached, rather than that nothing is released, with no list yet", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => refused)
+        );
+        try {
+            expect(await appLookup("example/never", DESKTOP_TAG_PREFIX)).toEqual({
+                download: null,
+                reached: false
+            });
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 });
 

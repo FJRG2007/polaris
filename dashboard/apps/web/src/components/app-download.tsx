@@ -14,7 +14,13 @@
  * the half above it does nothing but await.
  */
 
-import { desktopDownload, extensionDownload } from "@/lib/app-releases";
+import {
+    DESKTOP_TAG_PREFIX,
+    EXTENSION_TAG_PREFIX,
+    appLookup,
+    desktopDownload,
+    extensionDownload
+} from "@/lib/app-releases";
 import {
     DesktopDownloadOffer,
     DesktopFilesOffer,
@@ -36,10 +42,12 @@ export async function ExtensionDownload({ repo }: { repo: string }) {
 
 /** The same, once GitHub has answered. Render inside a Suspense boundary. */
 export async function DesktopFiles({ repo }: { repo: string }) {
-    return <DesktopFilesOffer download={await desktopDownload(repo)} />;
+    const { download, reached } = await appLookup(repo, DESKTOP_TAG_PREFIX);
+    return <DesktopFilesOffer download={download} unreachable={reached ? undefined : repo} />;
 }
 
 /** The same, once GitHub has answered. Render inside a Suspense boundary. */
 export async function ExtensionFiles({ repo }: { repo: string }) {
-    return <ExtensionFilesOffer download={await extensionDownload(repo)} />;
+    const { download, reached } = await appLookup(repo, EXTENSION_TAG_PREFIX);
+    return <ExtensionFilesOffer download={download} unreachable={reached ? undefined : repo} />;
 }

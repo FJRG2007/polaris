@@ -1343,9 +1343,12 @@
         },
         "web": {
             "title": "O como app, desde el navegador",
-            "name": "Sin nada que descargar"
+            "name": "Sin nada que descargar",
+            "lacks": "Más ligera, pero sin lo que añade la app de escritorio: avisos del sistema, la VPN, desplegar desde este equipo e instalar en una TV."
         },
         "desktop": {
+            "app": "Escritorio",
+            "recommended": "Recomendada",
             "description": "Polaris en tu ordenador, para Windows, macOS y Linux. Despliega desde tu propia máquina y vigila tus servicios en su propia ventana."
         },
         "cards": {
