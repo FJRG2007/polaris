@@ -120,3 +120,15 @@ describe("filling inside web pages", () => {
         expect(BLOCKED_HOSTS_KEY).toBe("local:blocked.hosts");
     });
 });
+
+describe("shortcuts without a vault", () => {
+    it("leaves the fill shortcut out for an account that cannot use a vault", () => {
+        const groups = shortcutGroups(
+            [{ name: "fill-login", shortcut: "Ctrl+Shift+L" }],
+            ENGLISH,
+            true,
+            false
+        );
+        expect(groups.map((group) => group.id)).toEqual(["polar"]);
+    });
+});

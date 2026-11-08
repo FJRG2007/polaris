@@ -243,6 +243,13 @@ export interface OfferedCapture {
 
 export type Request =
     | { readonly kind: "status" }
+    /**
+     * The status again once the server has been asked what this account may do,
+     * whenever it was last asked. The popup draws `status` first and this after
+     * it, so access taken away on Polaris is gone from the popup that was opened
+     * to look, rather than from the one after it.
+     */
+    | { readonly kind: "statusChecked" }
     | { readonly kind: "connect"; readonly typed: string }
     /**
      * Ask Polaris to connect this browser, and open the page that decides.

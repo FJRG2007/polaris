@@ -7,6 +7,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VaultStatus } from "../src/lib/messages";
+import { ENGLISH } from "../src/lib/words";
 import { initialsInk, tintFor } from "@polaris/core/faces";
 import { Face, Home, SectionBar, TopBar, vaultState } from "../src/entrypoints/popup/shell";
 
@@ -155,5 +156,15 @@ describe("a face with no picture", () => {
             expect(markup).toContain(`color:${ink}`);
             expect(markup).toContain("AL");
         }
+    });
+});
+
+describe("the home screen without a vault", () => {
+    it("leaves the vault's row out for an account that cannot use a vault", () => {
+        const markup = renderToStaticMarkup(
+            <Home status={{ ...STATUS, canVault: false }} onOpen={() => {}} />
+        );
+        expect(markup).not.toContain(ENGLISH("shell.vault"));
+        expect(markup).not.toContain(ENGLISH("shell.noVault"));
     });
 });

@@ -50,7 +50,11 @@ describe("the right-click entries", () => {
 
 describe("Polar's right-click entries", () => {
     it("are left out for an account that cannot use Polar", () => {
-        expect(menuPlan(false)).toEqual({ contexts: ["editable"], polar: [] });
+        expect(menuPlan(false)).toEqual({
+            contexts: ["editable"],
+            vault: MENU_ENTRIES,
+            polar: []
+        });
         const allowed = menuPlan(true);
         expect(allowed.contexts).toEqual(ROOT_CONTEXTS);
         expect(allowed.polar).toHaveLength(POLAR_MENU_ENTRIES.length);
@@ -115,5 +119,18 @@ describe("Polar's right-click entries", () => {
         // Not a web address: nothing to ask about.
         expect(polarAskFor(POLAR_MENU.image, { srcUrl: "data:image/png;base64,AAAA" })).toBeNull();
         expect(polarAskFor(POLAR_MENU.link, { linkUrl: "javascript:void(0)" })).toBeNull();
+    });
+});
+
+describe("the vault's right-click entries", () => {
+    it("are left out for an account that cannot use a vault", () => {
+        const polarOnly = menuPlan(true, undefined, false);
+        expect(polarOnly.vault).toEqual([]);
+        expect(polarOnly.contexts).not.toContain("editable");
+        expect(polarOnly.polar).toHaveLength(POLAR_MENU_ENTRIES.length);
+    });
+
+    it("leave no menu at all when neither the vault nor Polar is the account's", () => {
+        expect(menuPlan(false, undefined, false)).toEqual({ contexts: [], vault: [], polar: [] });
     });
 });

@@ -450,6 +450,10 @@ async function vault(): Promise<OpenVault | null> {
     // memory, untouched, and gets it back the moment it connects - but nothing
     // is filled, listed or copied out of it until then.
     if ((await LINK_TOKEN.getValue()) === null) return null;
+    // Nor for an account Polaris says may not use one. Every fill, list, copy,
+    // save offer and badge count asks here, so this is the one line that keeps
+    // a vault whose access was taken away from being used in the meantime.
+    if (!(await LINK_VAULT.getValue())) return null;
     if (hasExpired(Date.now(), await LOCK_AT.getValue())) {
         open = null;
         // The submitted login goes with it. It is a password in the clear, held
@@ -1020,6 +1024,10 @@ const LINK_CHECK_MINUTES = 15;
  *  popup, which is a thing people do far more often than that. */
 const LINK_CHECK_FLOOR_MS = 60_000;
 
+/** The gap a popup's own check keeps, so a popup opened again and again does
+ *  not ask each time while still finding out about access taken away. */
+const LINK_RECHECK_FLOOR_MS = 5_000;
+
 /**
  * Forget the connection in front, without touching the vault it was for.
  *
@@ -1074,6 +1082,28 @@ async function dropLink(): Promise<void> {
 }
 
 /**
+ * Lock the vault of an account Polaris has just said may not use one.
+ *
+ * The connection stays - the account is still signed in to this browser, and
+ * Polar, the VPN and the rest are still its - but the keys go, and so does any
+ * login held to be offered for saving: neither has anywhere to go any more. A
+ * vault given back is unlocked again the usual way.
+ */
+async function closeForbiddenVault(): Promise<void> {
+    await inTurn(async () => {
+        if (await LINK_VAULT.getValue()) return;
+        open = null;
+        await Promise.all([
+            CAPTURE.setValue(null),
+            SECOND_STEP.setValue(null),
+            FIRST_STEP.setValue(null),
+            LOCK_AT.setValue(null)
+        ]);
+    });
+    await badge();
+}
+
+/**
  * Ask the server where this connection stands, and act on the answer.
  *
  * Only three answers are possible and each is acted on differently: still
@@ -1081,14 +1111,16 @@ async function dropLink(): Promise<void> {
  * everything, and an unreachable server changes nothing at all - a Polaris
  * somebody is behind a tunnel from is not a connection that was revoked.
  */
-async function refreshLink(force = false): Promise<void> {
+async function refreshLink(force = false, floorMs = LINK_CHECK_FLOOR_MS): Promise<void> {
     const [origin, token, checkedAt] = await Promise.all([
         reachOrigin(),
         LINK_TOKEN.getValue(),
         LINK_CHECKED.getValue()
     ]);
     if (!origin || !token) return;
-    if (!force && checkedAt !== null && Date.now() - checkedAt < LINK_CHECK_FLOOR_MS) return;
+    const age = checkedAt === null ? Infinity : Date.now() - checkedAt;
+    if (!force && age < floorMs) return;
+    const faces = force || age >= LINK_CHECK_FLOOR_MS;
     const state = await link.checkLink(origin, token);
     if (state === null) return;
     if (state === "ended") {
@@ -1102,10 +1134,13 @@ async function refreshLink(force = false): Promise<void> {
     ]);
     // Every face at once, and each one kept as it was when its answer is "could
     // not find out" - a slow server should not turn a photo back into initials.
-    const [self, ...orgFaces] = await Promise.all([
-        link.fetchFace(origin, token, null),
-        ...state.organizations.map((org) => link.fetchFace(origin, token, org.id))
-    ]);
+    // A popup's quick check reads only the access and leaves the faces held.
+    const [self, ...orgFaces] = faces
+        ? await Promise.all([
+              link.fetchFace(origin, token, null),
+              ...state.organizations.map((org) => link.fetchFace(origin, token, org.id))
+          ])
+        : [undefined, ...state.organizations.map(() => undefined)];
     const orgs: Record<string, string | null> = {};
     state.organizations.forEach((org, index) => {
         const found = orgFaces[index];
@@ -1130,6 +1165,27 @@ async function refreshLink(force = false): Promise<void> {
         ACCOUNT_LOCALE.setValue(state.locale)
     ]);
     if (state.locale !== spoken) await retitleMenus();
+}
+
+/** The check a popup asked for, while it runs, and the floor it was asked with:
+ *  a popup opening twice in a row, or its plain status and its checked one, ask
+ *  the server once. */
+let checkingLink: { readonly floorMs: number; readonly done: Promise<void> } | null = null;
+
+/** Ask the server unless it was asked within `floorMs`, sharing a check in flight.
+ *  A check in flight under a looser floor may have asked nothing, so a stricter
+ *  one waits for it and then decides for itself. */
+function checkLinkNow(floorMs = LINK_RECHECK_FLOOR_MS): Promise<void> {
+    if (checkingLink && checkingLink.floorMs <= floorMs) return checkingLink.done;
+    const before = checkingLink?.done ?? Promise.resolve();
+    const done: Promise<void> = before
+        .then(() => refreshLink(false, floorMs))
+        .catch(() => undefined)
+        .finally(() => {
+            if (checkingLink?.done === done) checkingLink = null;
+        });
+    checkingLink = { floorMs, done };
+    return done;
 }
 
 /** The collection running right now, so one request is never polled twice over. */
@@ -3148,11 +3204,14 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
         // from before (it stays until a reload) is told this site is off, and
         // gets nothing else. Stopping Polar is the one request that is not
         // about filling.
+        // And the same for an account that may not use a vault: the page script
+        // is not registered for it, and one still running from before is told
+        // the site is off, so it marks nothing and offers to save nothing.
         if (
             page &&
             !ours &&
             request.kind !== "polarBrowserStop" &&
-            !(await PAGE_FILLING.getValue())
+            (!(await PAGE_FILLING.getValue()) || !(await LINK_VAULT.getValue()))
         ) {
             return request.kind === "blocked"
                 ? { ok: true, host: hostOf(page.url), blocked: true }
@@ -3164,7 +3223,11 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // from what is held, and a connection that ended a moment ago
                 // shows as ended on the next draw rather than holding this one up
                 // behind a request to a server that may be unreachable.
-                void refreshLink();
+                void checkLinkNow(LINK_CHECK_FLOOR_MS);
+                return { ok: true, status: await status() };
+
+            case "statusChecked":
+                await checkLinkNow();
                 return { ok: true, status: await status() };
 
             case "connect": {
@@ -4081,6 +4144,10 @@ async function fromMenu(
     if (isBlockedHost(blocked, tab.url) || isBlockedHost(blocked, here)) return;
     const page = { tabId: tab.id, url: tab.url };
 
+    // A menu made before the account lost its vault, clicked before it was made
+    // again: nothing, rather than the popup opening on a vault it cannot have.
+    if (!(await LINK_VAULT.getValue())) return;
+
     if (entry === MENU.generate) {
         // Needs no vault: the generator is pure, and a password made for a form
         // is offered for saving when the form goes, like one typed by hand.
@@ -4131,12 +4198,15 @@ async function setupMenus(): Promise<void> {
     await menus.removeAll();
     fitted = null;
     const t = await words();
-    // Polar's entries only for an account that can use Polar; without them the
-    // menu is the vault's, on boxes you can type into, as before.
-    const plan = menuPlan(polarAllowed, t);
+    // The vault's entries only for an account that may use a vault, and Polar's
+    // only for one that can use Polar. Neither is no menu at all: a "Polaris"
+    // entry with nothing in it would be an entry that only says "not for you".
+    const plan = menuPlan(polarAllowed, t, vaultAllowed);
+    const [first, ...rest] = plan.contexts;
+    if (first === undefined) return;
     // i18n-ignore the product's name
-    menus.create({ id: MENU.root, title: "Polaris", contexts: [...plan.contexts] });
-    for (const entry of menuEntries(t)) {
+    menus.create({ id: MENU.root, title: "Polaris", contexts: [first, ...rest] });
+    for (const entry of plan.vault) {
         menus.create({
             id: entry.id,
             parentId: MENU.root,
@@ -4186,6 +4256,9 @@ let knownPolaris: string[] = [];
 let panelScope: polar.PanelScope = "all";
 /** Whether the connected account may use Polar, once read: yes until known. */
 let polarAllowed = true;
+/** Whether the connected account may use a vault, as `LINK_VAULT` last said -
+ *  kept here for the menus, which are made without awaiting anything. */
+let vaultAllowed = true;
 
 /** The menus made again one at a time: making an id that exists is an error. */
 let menusTurn: Promise<void> = Promise.resolve();
@@ -4271,6 +4344,18 @@ function followPolar(): void {
     };
     void LINK_POLAR.getValue().then(followAccess);
     LINK_POLAR.watch(followAccess);
+    // And the vault's: its right-click entries, the script that marks fields on
+    // pages, and an open vault for an account that has just lost it.
+    const followVault = (allowed: boolean | null): void => {
+        const next = allowed !== false;
+        if (next === vaultAllowed) return;
+        vaultAllowed = next;
+        void rebuildMenus();
+        void syncAutofill();
+        if (!next) void closeForbiddenVault();
+    };
+    void LINK_VAULT.getValue().then(followVault);
+    LINK_VAULT.watch(followVault);
     void PANEL_SCOPE.getValue().then((scope) => applyPanelScope(polar.readPanelScope(scope)));
     PANEL_SCOPE.watch((scope) => applyPanelScope(polar.readPanelScope(scope)));
 }
@@ -4492,6 +4577,7 @@ async function syncAutofill(): Promise<void> {
 
     await browser.scripting.unregisterContentScripts({ ids: [AUTOFILL_ID] }).catch(() => undefined);
     if (matches.length === 0 || !(await PAGE_FILLING.getValue())) return;
+    if (!(await LINK_VAULT.getValue())) return;
     await browser.scripting
         .registerContentScripts([
             {

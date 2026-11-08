@@ -13,6 +13,7 @@
 
 import * as core from "@polaris/core";
 import { deviceSchema } from "@polaris/core";
+import { userHasPermission } from "@polaris/auth";
 import { preloginFor } from "@/lib/vault/account";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { readExtensionToken } from "@/lib/extension/sessions";
@@ -57,7 +58,10 @@ export async function connectToken(context: VaultContext): Promise<Response> {
         // The name is optional and only a label; one that does not pass the
         // device rule is ignored rather than failing the refresh.
         const named = deviceSchema.shape.name.safeParse(body.deviceName);
-        const result = await vaultRefresh(body.refresh_token ?? "", named.success ? named.data : null);
+        const result = await vaultRefresh(
+            body.refresh_token ?? "",
+            named.success ? named.data : null
+        );
         if (!result.ok) return grantError("Refresh token is invalid.");
         return Response.json(result.body);
     }
@@ -267,6 +271,12 @@ export async function connectAuthorizeClaim(context: VaultContext): Promise<Resp
     const claim = await claimVaultAuthorization(deviceCode);
     if (claim.status !== "approved" || !claim.claimed) {
         return Response.json({ status: claim.status });
+    }
+    // Approving needed `vault.use`, and it can be taken away between the
+    // approval and this collection. The key is not handed over then: the
+    // request ends as refused, like one the account turned down.
+    if (!(await userHasPermission(claim.claimed.userId, "vault.use"))) {
+        return Response.json({ status: "denied" });
     }
 
     // The same credential the password grant issues, because it reaches the same

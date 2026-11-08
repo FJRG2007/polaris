@@ -91,7 +91,12 @@ function useStatus(): [VaultStatus | null, () => Promise<void>] {
         if ("status" in reply && reply.ok) setStatus(reply.status);
     }, []);
     useEffect(() => {
-        void read();
+        // What is held first, so the popup draws at once, and then the same
+        // again once Polaris has said what this account may still use.
+        void read().then(async () => {
+            const reply = await askBackground({ kind: "statusChecked" });
+            if ("status" in reply && reply.ok) setStatus(reply.status);
+        });
     }, [read]);
     return [status, read];
 }
@@ -336,7 +341,7 @@ export function App(): React.JSX.Element {
     const [status, refresh] = useStatus();
     const updates = useUpdate();
     const { notice: update, pending } = updates;
-    const [section, setSection] = useSection();
+    const [held, setSection] = useSection();
     /**
      * Asking Polaris to let this browser in, from the locked screen.
      *
@@ -358,6 +363,9 @@ export function App(): React.JSX.Element {
     if (!status) return <main className="pad" />;
 
     const shown = screenFor(status);
+    // The vault section, remembered from before the account lost its vault, is
+    // the home screen now: its row is gone, and so is everything behind it.
+    const section = held === "vault" && status.canVault === false ? "home" : held;
     // Asked for, or found waiting. The second is what a popup reopened in the
     // middle of an approval lands on: the worker is still holding the request,
     // and this is the screen that can show its code. Saying so explicitly is what
@@ -395,7 +403,10 @@ export function App(): React.JSX.Element {
             ) : section === "settings" ? (
                 <>
                     <SectionBar title={t("shell.settings")} onBack={() => setSection("home")} />
-                    <Settings canPolar={status.canPolar !== false} />
+                    <Settings
+                        canPolar={status.canPolar !== false}
+                        canVault={status.canVault !== false}
+                    />
                 </>
             ) : section === "vpn" ? (
                 <>

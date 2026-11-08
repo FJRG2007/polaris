@@ -66,4 +66,21 @@ describe("the extension's connection", () => {
         state.polar = "throws";
         expect((await can()).polar).toBe(false);
     });
+
+    it("says no vault for an account without vault.use, whatever Polar says", async () => {
+        state.vault = false;
+        expect(await can()).toEqual({ vault: false, polar: true });
+    });
+
+    it("decides the vault the way the dashboard's Vault entry does: vault.use, no other gate", async () => {
+        // The switcher (`reachableApps`) adds an install check (`requiresApp`), an
+        // administrator-only flag and an audience of its own (`closes`) on top of
+        // the permission. The vault has none of them; if it ever gains one, the
+        // session route has to answer with it too, and this is what says so.
+        const { POLARIS_APPS } = await import("@/lib/apps");
+        const vault = POLARIS_APPS.find((app) => app.id === "vault");
+        expect(vault?.permission).toBe("vault.use");
+        expect(vault?.requiresApp).toBeUndefined();
+        expect(vault?.adminOnly).toBeFalsy();
+    });
 });

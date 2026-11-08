@@ -50,7 +50,8 @@ export interface ShortcutGroup {
 export function shortcutGroups(
     all: readonly Command[],
     t: Words,
-    withPolar = true
+    withPolar = true,
+    withVault = true
 ): ShortcutGroup[] {
     const keys = (name: string): string => all.find((one) => one.name === name)?.shortcut ?? "";
     const groups: ShortcutGroup[] = [
@@ -71,7 +72,9 @@ export function shortcutGroups(
             ]
         }
     ];
-    return withPolar ? groups : groups.filter((group) => group.id !== "polar");
+    return groups.filter(
+        (group) => (group.id !== "polar" || withPolar) && (group.id !== "vault" || withVault)
+    );
 }
 
 /** A binding as key caps: "Ctrl+Shift+L" is three, a Mac's "⌘⇧L" is one each. */
@@ -306,7 +309,15 @@ export function PageFillingSheet({
 
 const firefoxBrowser = (): boolean => polar.isFirefox(browser);
 
-export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX.Element {
+export function Settings({
+    canPolar = true,
+    canVault = true
+}: {
+    canPolar?: boolean;
+    /** Whether the account may use a vault: filling in on pages and the fill
+     *  shortcut are the vault's, and are not offered to an account without one. */
+    canVault?: boolean;
+}): React.JSX.Element {
     const t = useWords();
     const [all, setAll] = useState<Command[] | null>(null);
     const [recording, setRecording] = useState<string | null>(null);
@@ -412,7 +423,7 @@ export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX
                     <div className="sheet-box skeleton" aria-hidden="true" />
                 ) : (
                     <ShortcutSheet
-                        groups={shortcutGroups(all, t, canPolar)}
+                        groups={shortcutGroups(all, t, canPolar, canVault)}
                         firefox={firefox}
                         recording={recording}
                         onChange={change}
@@ -423,7 +434,7 @@ export function Settings({ canPolar = true }: { canPolar?: boolean }): React.JSX
                 )}
                 {refused ? <p className="problem">{t("polar.shortcutRefused")}</p> : null}
             </SettingsSection>
-            {inlinePossible ? (
+            {inlinePossible && canVault ? (
                 <SettingsSection id="settings-pages" title={t("settings.pages")}>
                     {pages === null ? (
                         <div className="sheet-box skeleton" aria-hidden="true" />
