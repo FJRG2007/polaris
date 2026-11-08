@@ -119,16 +119,18 @@ describe("New York start-up builders", () => {
         if (process.env.NEW_YORK_SLICES_DUMP)
             writeFileSync(
                 process.env.NEW_YORK_SLICES_DUMP,
-                `${report}\n${JSON.stringify(yields)}\n`
+                `${report}
+${JSON.stringify(yields)}
+`
             );
-        for (const name of ["cityGrid", "blocks", "streetDetails", "traffic", "culling"])
-            expect(yields[name] ?? 0, name).toBeGreaterThan(0);
+        const builders = ["cityGrid", "boroughs", "blocks", "streetDetails", "traffic", "culling"];
+        for (const name of builders) expect(yields[name] ?? 0, name).toBeGreaterThan(0);
         // Each builder used to run unbroken for 0.5-1.4 s here; what is left unsliced are single library calls
-        // (geometry merges, a triangulation). One of them stretched by a GC pause or a busy runner is noise; a builder
-        // that stopped slicing is not, since most of the few slices it has left are long
-        for (const name of ["cityGrid", "blocks", "streetDetails", "traffic", "culling"]) {
+        // (geometry merges, a triangulation), about 120 ms on a loaded machine. One of them stretched by a GC pause or a
+        // busy runner is noise; a builder that stopped slicing is not, since most of the few slices it has left are long
+        for (const name of builders) {
             const own = slices.filter((s) => s.builder === name);
-            const long = own.filter((s) => s.ms > BUDGET * 10).length;
+            const long = own.filter((s) => s.ms > BUDGET * 5).length;
             expect(long / own.length, `${name}: ${report}`).toBeLessThan(0.25);
         }
     });
