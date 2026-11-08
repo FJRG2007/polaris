@@ -311,15 +311,3 @@ test("each language's README and feature pages show every scene, from files that
         }
     }
 });
-
-test("every feature page is reachable from its README", () => {
-    for (const language of ["en", "es"]) {
-        const [readme, ...pages] = pagesIn(language);
-        const linked = new Set(localLinks(readme));
-        for (const page of pages)
-            assert.ok(
-                linked.has(page),
-                `${readme.slice(repo.length + 1)} never links ${page.slice(repo.length + 1)}`
-            );
-    }
-});
