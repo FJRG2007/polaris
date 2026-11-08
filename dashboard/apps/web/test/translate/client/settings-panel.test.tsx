@@ -25,6 +25,8 @@ vi.mock("@polaris/app-host/client", async (original) => {
 
 vi.mock("@polaris-app/translate/src/actions/translate", () => ({
     settingsAction: async () => ({ ok: true, settings: DEFAULT_SETTINGS }),
+    libreTranslateAction: async () => ({ ok: true, server: { url: null, hasKey: false } }),
+    saveLibreTranslateAction: async () => ({ ok: true, server: { url: null, hasKey: false } }),
     saveSettingsAction: async (input: TranslateSettings) => {
         saved.push(input);
         return { ok: true, settings: input };
@@ -55,6 +57,7 @@ describe("the engines' order", () => {
         expect(names()).toEqual([
             "In your browser",
             "On this device",
+            "LibreTranslate",
             "DeepL",
             "Google Cloud",
             "Polar's model"
@@ -71,6 +74,7 @@ describe("the engines' order", () => {
         expect(names()).toEqual([
             "In your browser",
             "On this device",
+            "LibreTranslate",
             "DeepL",
             "Polar's model",
             "Google Cloud"
@@ -82,6 +86,7 @@ describe("the engines' order", () => {
         expect((saved[0] as TranslateSettings).order).toEqual([
             "browser",
             "local",
+            "libretranslate",
             "deepl",
             "polar",
             "google"
@@ -96,13 +101,14 @@ describe("the engines' order", () => {
             setData: (type: string, value: string) => data.set(type, value),
             getData: (type: string) => data.get(type) ?? ""
         };
-        fireEvent.dragStart(rows[4]!, { dataTransfer });
+        fireEvent.dragStart(rows[5]!, { dataTransfer });
         fireEvent.dragOver(rows[0]!, { dataTransfer });
         fireEvent.drop(rows[0]!, { dataTransfer });
         expect(names()).toEqual([
             "Polar's model",
             "In your browser",
             "On this device",
+            "LibreTranslate",
             "DeepL",
             "Google Cloud"
         ]);

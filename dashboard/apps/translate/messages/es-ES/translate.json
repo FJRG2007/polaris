@@ -297,14 +297,14 @@
     "libretranslate": {
         "title": "Servidor de LibreTranslate",
         "description": "La dirección de un servidor de LibreTranslate, y su clave de API si la pide.",
-        "url": "Dirección del servidor",
+        "url": "Dirección",
         "urlPlaceholder": "https://translate.example.com",
-        "key": "Clave de API",
+        "key": "Clave API",
         "keyKept": "Hay una clave guardada. Escribe otra para cambiarla.",
         "keyNone": "Opcional",
         "removeKey": "Quitar clave",
-        "save": "Guardar servidor",
-        "saved": "Servidor de LibreTranslate guardado",
+        "save": "Guardar",
+        "saved": "Servidor guardado",
         "off": "LibreTranslate apagado",
         "invalidUrl": "Escribe una dirección http o https, como https://translate.example.com.",
         "unreachable": "Ese servidor no respondió como LibreTranslate. Revisa la dirección y la clave."

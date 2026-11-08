@@ -160,7 +160,7 @@ describe("GET /api/translate", () => {
             browser: true,
             local: true,
             defaultTarget: "en",
-            order: ["browser", "local", "deepl", "google", "polar"],
+            order: ["browser", "local", "libretranslate", "deepl", "google", "polar"],
             charLimit: null,
             reads: { images: false, audio: false }
         });

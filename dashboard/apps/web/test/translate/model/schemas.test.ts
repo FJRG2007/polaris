@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { normalizeDetected } from "@polaris-app/translate/src/model/languages";
 import {
+    DEFAULT_ORDER,
     DEFAULT_SETTINGS,
     TEXT_MAX,
     TEXTS_MAX,
@@ -55,8 +56,15 @@ describe("readSettings", () => {
         expect(
             readSettings({ engines: { deepl: false, polar: "no" }, defaultTarget: "xx" })
         ).toEqual({
-            engines: { browser: true, local: true, polar: true, deepl: false, google: true },
-            order: ["browser", "local", "deepl", "google", "polar"],
+            engines: {
+                browser: true,
+                local: true,
+                polar: true,
+                libretranslate: true,
+                deepl: false,
+                google: true
+            },
+            order: ["browser", "local", "libretranslate", "deepl", "google", "polar"],
             defaultTarget: "en",
             charLimit: null
         });
@@ -86,6 +94,7 @@ describe("readSettings", () => {
         expect(readSettings({ order: ["polar", "google"] }).order).toEqual([
             "browser",
             "local",
+            "libretranslate",
             "deepl",
             "polar",
             "google"
@@ -93,6 +102,7 @@ describe("readSettings", () => {
         expect(readSettings({ order: ["polar", "polar", "bing", 3] }).order).toEqual([
             "browser",
             "local",
+            "libretranslate",
             "deepl",
             "google",
             "polar"
@@ -104,6 +114,7 @@ describe("readSettings", () => {
             "polar",
             "browser",
             "local",
+            "libretranslate",
             "google",
             "deepl"
         ]);
@@ -112,17 +123,19 @@ describe("readSettings", () => {
             "google",
             "polar",
             "browser",
-            "local"
+            "local",
+            "libretranslate"
         ]);
         // An order that already places it keeps it where it is.
         expect(readOrder(["local", "polar", "browser", "deepl", "google"])).toEqual([
             "local",
+            "libretranslate",
             "polar",
             "browser",
             "deepl",
             "google"
         ]);
-        expect(readSettings(null).order).toEqual(["browser", "local", "deepl", "google", "polar"]);
+        expect(readSettings(null).order).toEqual(DEFAULT_ORDER);
     });
 
     it("refuses an order that repeats or leaves out an engine", () => {
@@ -146,7 +159,8 @@ describe("readSettings", () => {
             "google",
             "deepl",
             "browser",
-            "local"
+            "local",
+            "libretranslate"
         ]);
         expect(older.success && older.data.engines.local).toBe(true);
     });

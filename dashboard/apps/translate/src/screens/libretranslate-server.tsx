@@ -7,6 +7,7 @@
  */
 
 import { useTranslateT } from "./i18n";
+import { normalizeServerUrl } from "../model/server-url";
 import { useEffect, useId, useState } from "react";
 import { Button, Input, Skeleton, useToast } from "@polaris/ui";
 import { libreTranslateAction, saveLibreTranslateAction } from "../actions/translate";
@@ -16,42 +17,33 @@ interface Server {
     readonly hasKey: boolean;
 }
 
-/** What the address field holds, as it would be kept; null when it is not an address. */
-export function serverUrlOf(text: string): string | null | undefined {
-    const trimmed = text.trim();
-    if (!trimmed) return null;
-    try {
-        const url = new URL(trimmed.replace(/\/+$/, ""));
-        if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
-        if (url.username || url.password) return undefined;
-        return url.toString().replace(/\/+$/, "");
-    } catch {
-        return undefined;
-    }
-}
-
 export function LibreTranslateServer() {
     const t = useTranslateT();
     const toast = useToast();
     const ids = useId();
-    const [loaded, setLoaded] = useState<Server | null>(null);
+    // Undefined while it loads, null when it is not this reader's to set.
+    const [loaded, setLoaded] = useState<Server | null | undefined>(undefined);
     const [url, setUrl] = useState("");
     const [key, setKey] = useState("");
     const [dropKey, setDropKey] = useState(false);
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        void libreTranslateAction().then((answer) => {
-            if (!answer.ok) return;
-            setLoaded(answer.server);
-            setUrl(answer.server.url ?? "");
-        });
+        void libreTranslateAction().then(
+            (answer) => {
+                if (!answer.ok) return setLoaded(null);
+                setLoaded(answer.server);
+                setUrl(answer.server.url ?? "");
+            },
+            () => setLoaded(null)
+        );
     }, []);
 
+    if (loaded === null) return null;
     if (!loaded) return <Skeleton className="h-28 w-full max-w-sm" />;
 
-    const wanted = serverUrlOf(url);
-    const valid = wanted !== undefined;
+    const wanted = url.trim() ? normalizeServerUrl(url) : null;
+    const valid = !url.trim() || wanted !== null;
     const changed = wanted !== loaded.url || key.trim() !== "" || dropKey;
 
     const save = async () => {

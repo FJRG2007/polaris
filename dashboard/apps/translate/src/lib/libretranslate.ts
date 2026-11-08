@@ -20,6 +20,7 @@
 
 import { z } from "zod";
 import { host } from "@polaris/app-host";
+import { normalizeServerUrl } from "../model/server-url";
 
 const KEY = "translate.libretranslate";
 
@@ -42,20 +43,6 @@ const NOTHING: Stored = { url: null, key: null };
 export interface LibreTranslateConfig {
     readonly url: string | null;
     readonly hasKey: boolean;
-}
-
-/** An address as kept: trimmed, no trailing slash, http or https, no credentials. */
-export function normalizeServerUrl(raw: string): string | null {
-    const text = raw.trim().replace(/\/+$/, "");
-    if (!text) return null;
-    try {
-        const url = new URL(text);
-        if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-        if (url.username || url.password) return null;
-        return url.toString().replace(/\/+$/, "");
-    } catch {
-        return null;
-    }
 }
 
 export const libreTranslateInput = z
