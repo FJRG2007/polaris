@@ -40,6 +40,13 @@ export function withBundleSlot(slot: AppSlot): AppSlot {
     return { ...slot, bundle: { src: bundleFileUrl(bundle, entry.file), name: drawn.name } };
 }
 
+/** Where one browser module of a loaded app is served, or null when it has none by that id. */
+export function bundleClientUrl(app: string, module: string): string | null {
+    const bundle = loadedBundle(app);
+    const entry = bundle?.manifest.client[module];
+    return bundle && entry ? bundleFileUrl(bundle, entry.file) : null;
+}
+
 export interface AppRouteHit {
     readonly app: string;
     readonly pattern: string;

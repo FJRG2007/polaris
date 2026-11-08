@@ -10,7 +10,7 @@
  */
 
 import type { ServerNode as AutomationServerNode } from "@/lib/automations/types";
-import { withBundleSlot } from "@/lib/app-bundles/code";
+import { bundleClientUrl, withBundleSlot } from "@/lib/app-bundles/code";
 import { installedExtensions } from "./installed";
 import type { BusyEvent, Locale } from "@polaris/core";
 import { isAppInstalled } from "@/lib/apps/install-presence";
@@ -750,7 +750,15 @@ export function textTranslator(appIds: readonly string[]): TextTranslationOffer 
     for (const extension of extensions()) {
         if (!extension.textTranslation || !appIds.includes(extension.id)) continue;
         try {
-            return { ...extension.textTranslation(), appId: extension.id };
+            const { device, ...offer } = extension.textTranslation();
+            const src = device ? bundleClientUrl(extension.id, device.module) : null;
+            return {
+                ...offer,
+                appId: extension.id,
+                ...(device && src
+                    ? { device: { module: device.module, name: device.name, src } }
+                    : {})
+            };
         } catch (caught) {
             console.error(`polaris: ${extension.id} could not say how it translates:`, caught);
         }

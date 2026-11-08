@@ -453,6 +453,14 @@ export interface TextTranslationOffer {
     readonly appId: string;
     readonly endpoint: string;
     readonly page: string;
+    /**
+     * The app's browser module whose export makes the engines that run on the
+     * reader's device: the app names it by module id (its path under `src/`,
+     * no extension), and core answers the shell with where it is served. Its
+     * export is called with one argument, the sentence a failure without a
+     * reason is shown as, and returns `{ browser, local }`.
+     */
+    readonly device?: { readonly module: string; readonly name: string; readonly src?: string };
 }
 
 /** A tool an app offers over MCP, its input type already erased by
