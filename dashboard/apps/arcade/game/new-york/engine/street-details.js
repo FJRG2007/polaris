@@ -23,7 +23,7 @@ import { createSubwayEntrances } from './subway-entrances.js';
 import { pavedPlazaRects, centralParkClearings, parkTreeSites, parkLampSites, drawnGroundAt } from './city-grid.js';
 import { bryantParkLawn } from './landmarks.js';
 import { lightBudget } from './quality.js';
-import { buildSlice } from './build-slice.js';
+import { buildSlice, yieldToHost } from './build-slice.js';
 
 // Instanced street furniture, traffic signals, trees and nearby light pools.
 
@@ -642,7 +642,10 @@ async function buildStreetDetails(scene, colliders = []) {
     color: 0xf4f6f8,
     roughness: 0.45
   });
+  // The steam material paints its cloud texture in one piece (tens of milliseconds): it starts a slice of its own
+  await yieldToHost();
   const steamMat = createSteamMaterial();
+  await buildSlice();
   const puffsPerStack = 36;
   const totalSteamSprites = steamLocations.length * puffsPerStack;
   const smokeOriginArr = new Float32Array(totalSteamSprites * 3);
@@ -759,7 +762,7 @@ async function buildStreetDetails(scene, colliders = []) {
   // =========================================================================
   // 4. MTA SUBWAY ENTRANCES WITH GLOWING GREEN GLOBE LAMPS
   // =========================================================================
-  const subwaySites = createSubwayEntrances(colliders, footprints);
+  const subwaySites = await createSubwayEntrances(colliders, footprints);
   const subwayMatrices = [];
   const subwayColliders = [];
   for (const { x, y, z, yaw } of subwaySites) {
@@ -1001,6 +1004,7 @@ async function buildStreetDetails(scene, colliders = []) {
   {
     let kept = firstParkTree;
     for (let i = firstParkTree; i < treePositions.length; i++) {
+      if ((i & 255) === 0) await buildSlice();
       const t = treePositions[i];
       const ground = drawnGroundAt(t.x, t.z);
       if (ground === null) continue;
@@ -1020,7 +1024,7 @@ async function buildStreetDetails(scene, colliders = []) {
     (x, z) => !inPlaza(x, z, 1.5) && isClearOfPoles(x, z, 2.2));
   for (const tree of sidewalkTreePositions) treePositions.push(tree);
   await buildSlice();
-  const treeField = createTreeField(scene, treePositions, [...colliders, ...subwayColliders]);
+  const treeField = await createTreeField(scene, treePositions, [...colliders, ...subwayColliders]);
   group.add(treeField.group);
   sidewalkTreePositions = sidewalkTreePositions.filter((t) => treeField.sites.has(t));
   console.info(`[streetDetails] ${treeField.stats.trees} trees (${sidewalkTreePositions.length} street trees)`);

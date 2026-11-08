@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { buildSlice } from './build-slice.js';
 import { SharedInstances } from './shared-instances.js';
 import {
   Fn,
@@ -292,7 +293,8 @@ const UPPER_LAND = landById('upper');
 
 // Land-id raster (32 m cells over the region the camera can see): cells clear of every shoreline answer landAt() with
 // one lookup, shoreline cells (255) fall back to the exact polygon tests
-const LAND_GRID = (() => {
+let LAND_GRID = null;
+async function rasterLandGrid() {
   const cell = 32;
   const minX = -16000;
   const minZ = -26000;
@@ -305,6 +307,7 @@ const LAND_GRID = (() => {
     const j0 = Math.max(0, Math.floor((b.minZ - minZ) / cell));
     const j1 = Math.min(nz - 1, Math.ceil((b.maxZ - minZ) / cell));
     for (let j = j0; j <= j1; j++) {
+      await buildSlice();
       rowCrossings(LAND[k].index, minZ + (j + 0.5) * cell, xs);
       for (let s = 0; s + 1 < xs.length; s += 2) {
         const i0 = Math.max(0, Math.ceil((xs[s] - minX) / cell - 0.5));
@@ -320,6 +323,7 @@ const LAND_GRID = (() => {
   };
   const r = cell * 0.3;
   for (const land of LAND) {
+    await buildSlice();
     const pts = land.pts;
     for (let e = 0; e < pts.length; e++) {
       const p = pts[e];
@@ -338,7 +342,7 @@ const LAND_GRID = (() => {
     }
   }
   return { cell, minX, minZ, nx, nz, data };
-})();
+}
 
 function landAt(x, z) {
   const g = LAND_GRID;
@@ -372,7 +376,8 @@ function shoreXNear(land, x, z) {
 
 // Coarse distance to Manhattan's shoreline (the detailed island south of the cut), only for level-of-detail decisions:
 // exact (to a 6 m simplification of the shore) within ~3 km of the island, bilinear from an 800 m grid beyond
-const MANHATTAN_DIST_GRID = (() => {
+let MANHATTAN_DIST_GRID = null;
+async function rasterManhattanDistance() {
   const cell = 100;
   const minX = -16000;
   const minZ = -26000;
@@ -384,9 +389,13 @@ const MANHATTAN_DIST_GRID = (() => {
   const cnx = Math.ceil((nx - 1) / k) + 1;
   const cnz = Math.ceil((nz - 1) / k) + 1;
   const coarse = new Float32Array(cnx * cnz);
-  for (let j = 0; j < cnz; j++) for (let i = 0; i < cnx; i++) coarse[j * cnx + i] = exact(minX + i * k * cell, minZ + j * k * cell);
+  for (let j = 0; j < cnz; j++) {
+    await buildSlice();
+    for (let i = 0; i < cnx; i++) coarse[j * cnx + i] = exact(minX + i * k * cell, minZ + j * k * cell);
+  }
   const data = new Float32Array(nx * nz);
   for (let j = 0; j < nz; j++) {
+    await buildSlice();
     const fj = j / k;
     const j0 = Math.min(cnz - 2, Math.floor(fj));
     const tj = fj - j0;
@@ -401,7 +410,7 @@ const MANHATTAN_DIST_GRID = (() => {
     }
   }
   return { cell, minX, minZ, nx, nz, data };
-})();
+}
 
 function distToManhattan(x, z) {
   const g = MANHATTAN_DIST_GRID;
@@ -509,11 +518,12 @@ function luShore(pts, x0, z0, x1, z1, halfW, ch, value) {
 }
 
 // Separable 3-tap box blur of all four channels
-function luBlur(passes) {
+async function luBlur(passes) {
   const tmp = new Uint8Array(luData.length);
   const W4 = LU.w * 4;
   for (let p = 0; p < passes; p++) {
     for (let j = 0; j < LU.h; j++) {
+      if (j % 64 === 0) await buildSlice();
       const row = j * W4;
       for (let i = 0; i < LU.w; i++) {
         const o = row + i * 4;
@@ -523,6 +533,7 @@ function luBlur(passes) {
       }
     }
     for (let j = 0; j < LU.h; j++) {
+      if (j % 64 === 0) await buildSlice();
       const row = j * W4;
       const up = j > 0 ? row - W4 : row;
       const dn = j < LU.h - 1 ? row + W4 : row;
@@ -543,7 +554,8 @@ const INDUSTRY = 1;
 const SUBURB = 2;
 const MARSH = 3;
 
-function paintLandUse() {
+async function paintLandUse() {
+  await buildSlice();
   // --- Regional character: suburbs west of the Hackensack and in eastern Queens, Staten Island, Westchester ---
   luRect(-16000, -30000, -11800, 30000, SUBURB, 165);         // Bergen, Essex & Union county suburbs
   luRect(-11800, -30000, -6000, -11000, SUBURB, 150);         // Hackensack, Teaneck, Englewood (behind the Palisades)
@@ -562,6 +574,7 @@ function paintLandUse() {
     luStroke(pts, PARK, 255, 60);
   }
 
+  await buildSlice();
   // --- Upper Manhattan ---
   const um = UPPER_MANHATTAN_POLYGON;
   luShore(um, -3200, -14600, -1900, -7090, 75, PARK, 255);     // Riverside Park, Riverbank, Fort Washington Park (Hudson shore)
@@ -571,6 +584,7 @@ function paintLandUse() {
   luRect(-990, -8900, -880, -8150, PARK, 210);                 // Jackie Robinson Park
   luRect(-960, -8050, -830, -7150, PARK, 200);                 // St. Nicholas Park
 
+  await buildSlice();
   // --- The Bronx ---
   luEllipseLL(-73.9285, 40.8268, 150, 230, PARK, 150);         // Macombs Dam Park / Yankee Stadium lawns
   luPolyLL([[-73.9025, 40.8880], [-73.8850, 40.8850], [-73.8760, 40.8960], [-73.8790, 40.9120], [-73.8960, 40.9125], [-73.9020, 40.9000]], PARK); // Van Cortlandt Park
@@ -587,6 +601,7 @@ function paintLandUse() {
     if (b.minX > 4000 && b.maxX < 6500 && b.maxZ < -6900 && b.minZ > -8400) luPaintPolygon(r, INDUSTRY, 210); // Rikers Island
   }
 
+  await buildSlice();
   // --- Queens ---
   luPolyLL([[-73.9280, 40.7700], [-73.9225, 40.7695], [-73.9175, 40.7815], [-73.9230, 40.7840]], PARK);     // Astoria Park
   luEllipseLL(-73.9478, 40.7565, 85, 150, PARK, 230);           // Queensbridge Park
@@ -602,6 +617,7 @@ function paintLandUse() {
   luPolyLL([[-73.9100, 40.6950], [-73.8780, 40.7000], [-73.8650, 40.6900], [-73.8950, 40.6850]], PARK, 200); // Cypress Hills cemeteries
   luPolyLL([[-73.9100, 40.6950], [-73.8780, 40.7000], [-73.8650, 40.6900], [-73.8950, 40.6850]], SUBURB, 200);
 
+  await buildSlice();
   // --- Brooklyn ---
   const bk = BROOKLYN_LAND ? BROOKLYN_LAND.pts : [];
   luPolyLL([[-73.9548, 40.7196], [-73.9500, 40.7178], [-73.9478, 40.7230], [-73.9522, 40.7247]], PARK);     // McCarren Park
@@ -632,6 +648,7 @@ function paintLandUse() {
   luPolyLL([[-73.8960, 40.5950], [-73.8800, 40.5960], [-73.8750, 40.5830], [-73.8930, 40.5810]], INDUSTRY, 200); // Floyd Bennett Field
   luPolyLL([[-73.8960, 40.5950], [-73.8800, 40.5960], [-73.8750, 40.5830], [-73.8930, 40.5810]], SUBURB, 220);
 
+  await buildSlice();
   // --- New Jersey ---
   luPolyLL([[-74.0565, 40.7080], [-74.0420, 40.7122], [-74.0330, 40.7082], [-74.0330, 40.7010], [-74.0430, 40.6960], [-74.0560, 40.6930],
     [-74.0632, 40.6980]], PARK);                                                        // Liberty State Park
@@ -658,6 +675,7 @@ function paintLandUse() {
   luShore(njShore, -6000, -30000, -3300, -10900, 260, PARK, 255); // Palisades Interstate Park (cliffs & wooded crest)
   luEllipseLL(-73.9690, 40.8475, 170, 140, PARK, 200);          // Fort Lee Historic Park
 
+  await buildSlice();
   // --- Staten Island ---
   luEllipseLL(-74.1400, 40.5900, 1500, 900, PARK, 235, 0.5);    // Staten Island Greenbelt (Todt Hill)
   luEllipseLL(-74.1020, 40.6440, 220, 150, PARK, 200);          // Snug Harbor
@@ -665,10 +683,9 @@ function paintLandUse() {
   luEllipseLL(-74.1000, 40.6180, 260, 380, PARK, 210);          // Clove Lakes & Silver Lake parks
   luEllipseLL(-74.1900, 40.5800, 1800, 1300, PARK, 200);        // Freshkills Park
 
-  luBlur(1);
+  await buildSlice();
+  await luBlur(1);
 }
-
-paintLandUse();
 
 const landUseTexture = new THREE.DataTexture(luData, LU.w, LU.h, THREE.RGBAFormat);
 landUseTexture.magFilter = THREE.LinearFilter;
@@ -721,9 +738,10 @@ ZONE_LIST.forEach((z, i) => {
 // Zone map: zone index per land-use texel (255 = no land)
 const zoneData = new Uint8Array(LU.w * LU.h).fill(255);
 
-function paintZones() {
+async function paintZones() {
   const DEFAULT = { nj: 'njheights', brooklyn: 'bksouth', queens: 'queens', upper: 'upper', bronx: 'bronx', si: 'si' };
   for (let k = LAND.length - 1; k >= 0; k--) {
+    await buildSlice();
     const land = LAND[k];
     const zone = land.id === 'minor' ? ZONES.island : ZONES[DEFAULT[land.borough] || 'island'];
     rasterPolygon(land.pts, (j, i0, i1) => zoneData.fill(zone.index, j * LU.w + i0, j * LU.w + i1 + 1));
@@ -752,6 +770,7 @@ function paintZones() {
   for (let pass = 0; pass < 2; pass++) {
     const src = zoneData.slice();
     for (let j = 0; j < LU.h; j++) {
+      await buildSlice();
       for (let i = 0; i < LU.w; i++) {
         const o = j * LU.w + i;
         if (src[o] !== 255) continue;
@@ -763,7 +782,6 @@ function paintZones() {
     }
   }
 }
-paintZones();
 
 const zoneTexture = new THREE.DataTexture(zoneData, LU.w, LU.h, THREE.RedFormat, THREE.UnsignedByteType);
 zoneTexture.magFilter = THREE.NearestFilter;
@@ -1168,7 +1186,8 @@ const RIDGE_KEYS = [
 ];
 
 // Per-z table (20 m rows) of the cliff foot x, crest height, cliff width, back-slope reach and the foot's limit
-const RIDGE_TABLE = (() => {
+let RIDGE_TABLE = null;
+function tabulateRidge() {
   const step = 20;
   const n = Math.floor((RIDGE_Z1 - RIDGE_Z0) / step) + 1;
   const ix = NJ_LAND.index;
@@ -1316,7 +1335,7 @@ const RIDGE_TABLE = (() => {
   boxFilter(cw, 3, 3);
   for (let i = 0; i < n; i++) footX[i] = Math.min(footX[i], footMax[i]);
   return { step, n, x: footX, h, cw, back, footMax };
-})();
+}
 
 // Gullies & buttresses: the cliff line wanders a few metres and the crest height breathes (wavelengths the mesh rows
 // resolve), calm where the George Washington Bridge lands on the cliff top and far north where the rows are sparse
@@ -1446,7 +1465,8 @@ const BUILD_LANDS = new Set(['nj', 'li', 'upper', 'bronx', 'si']);
 const MAX_BUILD_DIST = 9000;
 
 // World rectangles searched for each zone's blocks: the zone map's extent within reach of Manhattan
-const BUILD_REGIONS = (() => {
+let BUILD_REGIONS = null;
+function findBuildRegions() {
   const regions = {};
   const sx = (LU.maxX - LU.minX) / LU.w;
   const sz = (LU.maxZ - LU.minZ) / LU.h;
@@ -1466,7 +1486,29 @@ const BUILD_REGIONS = (() => {
     }
   }
   return regions;
-})();
+}
+
+// The land rasters, the ridge table and the land-use and zone maps are made on the first build, between slices, instead
+// of when the module loads, which held the page that frames the game for a quarter of a second before anything else had
+// started. Everything that reads them (landAt, distToManhattan, the ridge) runs after this.
+let groundPainted = null;
+function paintGround() {
+  groundPainted ??= (async () => {
+    await buildSlice();
+    LAND_GRID = await rasterLandGrid();
+    MANHATTAN_DIST_GRID = await rasterManhattanDistance();
+    await buildSlice();
+    RIDGE_TABLE = tabulateRidge();
+    await paintLandUse();
+    await buildSlice();
+    await paintZones();
+    await buildSlice();
+    BUILD_REGIONS = findBuildRegions();
+    landUseTexture.needsUpdate = true;
+    zoneTexture.needsUpdate = true;
+  })();
+  return groundPainted;
+}
 
 // Waterfront & downtown high-rise clusters (radii in m): blocks inside get podium + tower massing
 const hotspot = (lon, lat, r, h0, h1, p, style) => ({ ...LL(lon, lat), r, h0, h1, p, style });
@@ -1785,7 +1827,7 @@ function placeSignatureTowers(list) {
   }
 }
 
-function generateBoroughBuildings() {
+async function generateBoroughBuildings() {
   const list = [];
   const stats = {};
   placeSignatureTowers(list);
@@ -1807,6 +1849,7 @@ function generateBoroughBuildings() {
     }
     const before = list.length;
     for (let i = Math.floor(umin / zone.pu); i <= Math.ceil(umax / zone.pu); i++) {
+      await buildSlice();
       for (let j = Math.floor(vmin / zone.pv); j <= Math.ceil(vmax / zone.pv); j++) {
         const c = zoneToWorld(zone, (i + 0.5) * zone.pu, (j + 0.5) * zone.pv);
         if (c.x < reg.x0 || c.x > reg.x1 || c.z < reg.z0 || c.z > reg.z1) continue;
@@ -3314,49 +3357,71 @@ function createLandmarkMaterials() {
  * columns stand only on blocks. Returns the colliders of the bridge parts standing on Manhattan (anchorages, piers,
  * columns, deck ends too low to drive under).
  */
-function buildBoroughs(scene, { sidewalks = [] } = {}) {
+async function buildBoroughs(scene, { sidewalks = [] } = {}) {
   const t0 = performance.now();
   const group = new THREE.Group();
   group.name = 'Boroughs';
+  await paintGround();
 
   // Land, bulkheads & the Palisades ridge (all on the procedural ground shader)
   const landMat = createLandMaterial();
+  await buildSlice();
   const { topGeo, wallGeo } = buildLandGeometries();
   const landMesh = new THREE.Mesh(topGeo, landMat);
   landMesh.name = 'BoroughLand';
   const wallMesh = new THREE.Mesh(wallGeo, createBulkheadMaterial());
   wallMesh.name = 'BoroughBulkheads';
+  await buildSlice();
   const ridgeMesh = new THREE.Mesh(buildRidgeGeometry(), landMat);
   ridgeMesh.name = 'Palisades';
   group.add(landMesh, wallMesh, ridgeMesh);
 
   // Buildings (generic grid blocks + skyline signatures + island & landmark buildings) in chunked instanced meshes
+  await buildSlice();
   registerLandmarkExclusions();
-  const { list, stats } = generateBoroughBuildings();
+  await buildSlice();
+  const { list, stats } = await generateBoroughBuildings();
+  await buildSlice();
   const parts = createPartCollector();
   const lm = createLandmarkMaterials();
+  await buildSlice();
   addIslandBuildings(list);
+  await buildSlice();
   buildStatueOfLiberty(parts, lm);
+  await buildSlice();
   buildEllisIsland(parts, lm, list);
+  await buildSlice();
   buildGovernorsIsland(parts, lm, list, landMat, group);
+  await buildSlice();
   buildBoroughLandmarks(parts, lm, list, group);
+  await buildSlice();
   const buildingMat = createBoroughBuildingMaterial();
-  for (const mesh of buildBuildingChunks(list, buildingMat, 1200, 'BoroughBuildings')) group.add(mesh);
+  for (const mesh of buildBuildingChunks(list, buildingMat, 1200, 'BoroughBuildings')) {
+    await buildSlice();
+    group.add(mesh);
+  }
+  await buildSlice();
   parts.build(group);
 
   // East River bridges, and the Roosevelt Island Tramway beside the Queensboro Bridge (before the island's trees,
   // which keep out from under its cabins)
   bridgeSite = { sidewalks, colliders: [] };
+  await buildSlice();
   const bridgeMats = createBridgeMaterials();
   const bridgeParts = createPartCollector();
+  await buildSlice();
   const tram = buildRooseveltTram(group, bridgeParts, lm);
+  await buildSlice();
   buildIslandTrees(group);
   for (const spec of EAST_RIVER_BRIDGES) {
+    await buildSlice();
     if (spec.type === 'suspension') buildSuspensionBridge(group, bridgeParts, spec, bridgeMats);
     else if (spec.type === 'brooklyn') buildBrooklynBridge(group, bridgeParts, spec, bridgeMats);
     else if (spec.type === 'cantilever') buildQueensboroBridge(group, spec, bridgeMats);
   }
+  await buildSlice();
   for (const spec of OUTER_BRIDGES) buildOuterBridge(group, bridgeParts, spec, bridgeMats);
+  await buildSlice();
   bridgeParts.build(group, { castShadow: true });
 
   scene.add(group);

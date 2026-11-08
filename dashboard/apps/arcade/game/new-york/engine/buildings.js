@@ -219,7 +219,9 @@ async function buildCityBlocks(scene, landmarkColliders = []) {
       seed: 94.3
     }]
   ];
+  await buildSlice();
   const materials = facades.map(([create, opts]) => create({ ...opts, footprintLocal: true }));
+  await buildSlice();
   const storeys = facades.map(([, opts]) => opts.floorHeight);
 
   const broadwayBillboards = [];
@@ -253,11 +255,15 @@ async function buildCityBlocks(scene, landmarkColliders = []) {
     return { height: Infinity, x: t.x, z: t.z, x0: t.x - t.w / 2 - 3, x1: t.x + t.w / 2 + 3, z0: t.z - t.d / 2 - 3, z1: t.z + t.d / 2 + 3, ...(o || {}) };
   }).filter(Boolean);
   // Keep the authored landmark models; the survey supplies the surrounding buildings.
-  const surveyedBuildings = REAL_BUILDINGS.filter((b) => !LANDMARK_RESERVE.some((h) =>
-    b.polygons.some((p) => polygonContains({ outer: p.outer, holes: [] }, h.x, h.z)))
-    && !landmarkColliders.some((c) => b.minX < c.maxX && b.maxX > c.minX && b.minZ < c.maxZ && b.maxZ > c.minZ
-      && b.polygons.some((p) => polygonBoxOverlaps(p, (c.minX + c.maxX) / 2, (c.minZ + c.maxZ) / 2,
-        (c.maxX - c.minX) / 2, (c.maxZ - c.minZ) / 2))));
+  const surveyedBuildings = [];
+  for (const b of REAL_BUILDINGS) {
+    await buildSlice();
+    if (!LANDMARK_RESERVE.some((h) =>
+      b.polygons.some((p) => polygonContains({ outer: p.outer, holes: [] }, h.x, h.z)))
+      && !landmarkColliders.some((c) => b.minX < c.maxX && b.maxX > c.minX && b.minZ < c.maxZ && b.maxZ > c.minZ
+        && b.polygons.some((p) => polygonBoxOverlaps(p, (c.minX + c.maxX) / 2, (c.minZ + c.maxZ) / 2,
+          (c.maxX - c.minX) / 2, (c.maxZ - c.minZ) / 2)))) surveyedBuildings.push(b);
+  }
   const landmarkReserves = [...LANDMARK_RESERVE, ...landmarkColliders.map((c) =>
     ({ x0: c.minX, x1: c.maxX, z0: c.minZ, z1: c.maxZ, height: c.maxY ?? Infinity }))];
   const hitR = (a, x0, x1, z0, z1) => a.x0 < x1 && a.x1 > x0 && a.z0 < z1 && a.z1 > z0;

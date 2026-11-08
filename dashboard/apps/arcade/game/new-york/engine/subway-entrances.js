@@ -2,6 +2,7 @@ import { BLOCKS, blockAt } from './city-config.js';
 import { getStreetGroundHeight } from './city-grid.js';
 import { SUBWAY_ENTRANCES } from './subway-geodata.js';
 import { polygonBoxOverlaps } from './building-collision.js';
+import { buildSlice } from './build-slice.js';
 
 const HALF_WIDTH = 1.26;
 const HALF_LENGTH = 3.21;
@@ -33,7 +34,7 @@ function overlaps(a, b) {
 }
 
 // Adapt surveyed entrances to the generated sidewalks once, without moving them across a street.
-function createSubwayEntrances(colliders, occupied = []) {
+async function createSubwayEntrances(colliders, occupied = []) {
   const cells = new Map();
   function visitCells(b, callback) {
     for (let x = Math.floor(b.minX / CELL_SIZE); x <= Math.floor(b.maxX / CELL_SIZE); x++) {
@@ -50,6 +51,7 @@ function createSubwayEntrances(colliders, occupied = []) {
     });
   }
   for (const c of [...colliders, ...occupied]) {
+    await buildSlice();
     if ((c.minY ?? 0) >= 2.8 || (c.maxY ?? Infinity) <= 0.22) continue;
     if (c.polygon) { insert(c); continue; }
     const o = c.obb;
@@ -57,6 +59,7 @@ function createSubwayEntrances(colliders, occupied = []) {
       : box((c.minX + c.maxX) / 2, (c.minZ + c.maxZ) / 2, (c.maxX - c.minX) / 2, (c.maxZ - c.minZ) / 2));
   }
   for (const b of BLOCKS) {
+    await buildSlice();
     if (b.park > 0.6 || b.median) continue;
     for (const [angle, px, pz, rects] of b.frames || [[0, 0, 0, b.rects]]) {
       const cs = Math.cos(angle), sn = Math.sin(angle);
@@ -69,6 +72,7 @@ function createSubwayEntrances(colliders, occupied = []) {
 
   const sites = [];
   for (const [sourceX, sourceZ, stationIndex] of SUBWAY_ENTRANCES) {
+    await buildSlice();
     let block = blockAt(sourceX, sourceZ);
     const edges = [];
     for (const b of block ? [block] : BLOCKS) {
