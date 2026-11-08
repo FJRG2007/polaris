@@ -51,7 +51,7 @@ export async function repairRankSymbolVisits(): Promise<void> {
     }
 }
 
-async function repairServer(installedAppId: string, config: unknown): Promise<void> {
+async function repairServer(installedAppId: string, config: string): Promise<void> {
     // Every stored name with no letter, digit or underscore in it, which is
     // what `playerOfEntry` rejects; checked again in code below.
     const visits = await prisma.$queryRaw<{ id: string; name: string }[]>`
