@@ -25,34 +25,19 @@
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
-import { MailBodyForm } from "./mail-body-form";
+import { RetentionLoader } from "./loader";
 import { getTranslations } from "@/lib/i18n/request";
-import { RetentionView } from "./retention-view";
-import { getSetting } from "@/lib/setting-store";
-import { MAIL_BODY_KEEP_KEY, mailBodyKeep } from "@polaris/core";
-import { retentionPolicy } from "@/lib/retention-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function RetentionPage() {
     await requireAdmin();
-    // Two settings rows and the words; the counts are the view's to ask for. What
-    // the mail window is set to is read here, what it is holding the card asks for.
-    const [t, policy, storedKeep] = await Promise.all([
-        getTranslations("admin"),
-        retentionPolicy(),
-        getSetting(MAIL_BODY_KEEP_KEY)
-    ]);
+    const t = await getTranslations("admin");
 
     return (
-        // Narrow: three settings and nothing wide, so the column is centred in
-        // the content area rather than left against the rail.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader title={t("retention.title")} description={t("retention.description")} />
-            <RetentionView policy={policy} />
-            <div className="mt-4">
-                <MailBodyForm kept={mailBodyKeep(storedKeep)} />
-            </div>
+            <RetentionLoader revision={Date.now()} />
         </div>
     );
 }

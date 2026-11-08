@@ -11,16 +11,13 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { notFound, redirect } from "next/navigation";
-import { appSettingsPath, builtInHasSettings } from "@/lib/apps/app-settings";
+import { notFound } from "next/navigation";
+import { builtInHasSettings } from "@/lib/apps/app-settings";
 import { ChatAdminSettings } from "./_chat/chat-settings";
-import { Suspense } from "react";
 import { PageHeader } from "@polaris/ui";
 import { VpnAdminSettings } from "@/app/(app)/vpn/vpn-admin-settings";
 import { requireAdmin } from "@/lib/session";
-import { appHasServices, listAppServices } from "@/lib/apps/app-services";
-import { AppServicesPanel, AppServicesSkeleton } from "./app-services-panel";
-import { hasAppInstall } from "@/app/(app)/apps/marketplace/store-installs";
+import { AppSettingsLoader } from "./loader";
 import { findStoreApp } from "@/lib/apps/marketplace-store";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
@@ -32,22 +29,16 @@ export default async function PolarisAppSettingsPage({
 }: {
     params: Promise<{ appId: string }>;
 }) {
-    const user = await requireAdmin();
+    await requireAdmin();
     const { appId } = await params;
     if (builtInHasSettings(appId)) return <BuiltInSettings appId={appId} />;
+    // The catalogue is static: an id it does not know is a real 404, decided now.
+    // Whether the app has settings here at all depends on what is installed, so
+    // that is decided in the region (`loader.tsx`), after the shell paints.
     const app = findStoreApp(appId);
     if (!app) notFound();
-    // The services Polaris runs for this app are shown here whatever else the app
-    // keeps on its own screens: Deploy no longer lists them. Whether there are any
-    // is one read; their state and figures load after the page is drawn.
-    const ownsServices = await appHasServices(app.id);
-    if (!app.settingsAt && !ownsServices) notFound();
-    if (!ownsServices && !(await hasAppInstall(user, app.id)))
-        redirect(`/admin/apps/${encodeURIComponent(app.id)}`);
-    const drawnElsewhere = app.settingsAt && app.settingsAt !== appSettingsPath(app.id);
-    if (drawnElsewhere && !ownsServices) redirect(app.settingsAt as string);
-    if (!ownsServices && app.id !== "vpn") notFound();
     const t = await getTranslations("marketplace");
+
     return (
         <Messages namespaces={["vpn"]}>
             <div className="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-4">
@@ -59,33 +50,17 @@ export default async function PolarisAppSettingsPage({
                     {app.name}
                 </Link>
                 <PageHeader title={t("detail.settings")} />
-                {drawnElsewhere ? (
-                    <Link
-                        href={app.settingsAt as string}
-                        className="text-primary inline-flex w-fit items-center gap-1 text-sm hover:underline"
-                    >
-                        {t("services.appSettings", { name: app.name })}
-                    </Link>
-                ) : null}
-                {app.id === "vpn" ? <VpnAdminSettings /> : null}
-                {ownsServices ? (
-                    <Suspense fallback={<AppServicesSkeleton />}>
-                        <AppServices appId={app.id} viewerId={user.id} />
-                    </Suspense>
-                ) : null}
+                <AppSettingsLoader
+                    appId={app.id}
+                    elsewhereLabel={t("services.appSettings", { name: app.name })}
+                    own={app.id === "vpn" ? <VpnAdminSettings /> : null}
+                    revision={Date.now()}
+                />
             </div>
         </Messages>
     );
 }
 
-/** The app's services with their state and what they use, read from the engine. */
-async function AppServices({ appId, viewerId }: { appId: string; viewerId: string }) {
-    const services = await listAppServices(appId, viewerId);
-    return <AppServicesPanel appId={appId} services={services} />;
-}
-
-/** The settings of an app every Polaris comes with. Only an administrator gets
- *  here: the page asked `requireAdmin` before choosing this branch. */
 async function BuiltInSettings({ appId }: { appId: string }) {
     const [t, admin] = await Promise.all([
         getTranslations("marketplace"),

@@ -61,6 +61,7 @@ const { default: PolarisAppsPage } = await import("@/app/(app)/admin/apps/page")
 const { default: PolarisAppPage } = await import("@/app/(app)/admin/apps/[appId]/page");
 const { default: PolarisAppSettingsPage } =
     await import("@/app/(app)/admin/apps/[appId]/settings/page");
+const { loadAppSettingsAction } = await import("@/app/(app)/admin/apps/[appId]/settings/data");
 
 const query = (app?: string) => ({ searchParams: Promise.resolve(app ? { app } : {}) });
 const page = (appId: string) => ({ params: Promise.resolve({ appId }) });
@@ -108,23 +109,33 @@ describe("the admin screen", () => {
 });
 
 describe("an app's settings address", () => {
+    // The page paints its shell at once; where the settings are is decided by the
+    // read its region makes after the paint, which moves there when they are elsewhere.
+    it("paints the shell of an app the catalogue knows", async () => {
+        await expect(PolarisAppSettingsPage(page("translate"))).resolves.toBeTruthy();
+        await expect(PolarisAppSettingsPage(page("no-such-app"))).rejects.toThrow("not found");
+    });
+
     it("opens the app's own settings screen once it is installed", async () => {
         installs.catalogIds = ["translate"];
-        await expect(PolarisAppSettingsPage(page("translate"))).rejects.toThrow(
-            "redirect /translate/settings"
-        );
+        await expect(loadAppSettingsAction("translate")).resolves.toEqual({
+            screen: "moved",
+            to: "/translate/settings"
+        });
     });
 
     it("sends back to the app's page while it is not installed", async () => {
-        await expect(PolarisAppSettingsPage(page("translate"))).rejects.toThrow(
-            "redirect /admin/apps/translate"
-        );
-        await expect(PolarisAppSettingsPage(page("vpn"))).rejects.toThrow(
-            "redirect /admin/apps/vpn"
-        );
+        await expect(loadAppSettingsAction("translate")).resolves.toEqual({
+            screen: "moved",
+            to: "/admin/apps/translate"
+        });
+        await expect(loadAppSettingsAction("vpn")).resolves.toEqual({
+            screen: "moved",
+            to: "/admin/apps/vpn"
+        });
     });
 
-    it("answers an app with no settings with not found", async () => {
-        await expect(PolarisAppSettingsPage(page("dns-blocker"))).rejects.toThrow("not found");
+    it("answers an app with no settings with nothing to draw", async () => {
+        await expect(loadAppSettingsAction("dns-blocker")).resolves.toBeNull();
     });
 });

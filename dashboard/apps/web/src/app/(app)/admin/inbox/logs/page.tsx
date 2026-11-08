@@ -5,13 +5,24 @@
  */
 
 import { requirePermission } from "@/lib/session";
-import { listMessagingActivity } from "@/lib/messaging-service";
-import { LogsView } from "./logs-view";
+import { LogsLoader, tableSkeleton } from "../loaders";
+import { getTranslations } from "@/lib/i18n/request";
+import { ViewHeadingSkeleton } from "@/app/(app)/admin/region-skeletons";
 
 export const dynamic = "force-dynamic";
 
 export default async function LogsPage() {
-    const user = await requirePermission("inbox.read");
-    const activity = await listMessagingActivity(user.id);
-    return <LogsView initialActivity={activity} />;
+    await requirePermission("inbox.read");
+    const t = await getTranslations("admin");
+
+    return (
+        <LogsLoader
+            revision={Date.now()}
+            skeleton={
+                <ViewHeadingSkeleton title={t("inboxLogs.title")} intro={t("inboxLogs.intro")}>
+                    {tableSkeleton}
+                </ViewHeadingSkeleton>
+            }
+        />
+    );
 }
