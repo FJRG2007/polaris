@@ -1880,6 +1880,11 @@
                 "label": "Pillars",
                 "summary": "Each player who joins starts alone on top of a stone pillar in a ring over the void. Every few seconds everybody gets one random item: blocks, weapons, pearls, potions and more. Bridge across, knock the others off, and be the last one left. Falling or dying only puts you out - everybody's own things are kept and given back.",
                 "unit": "points"
+            },
+            "knockback-brawl": {
+                "label": "Knockback brawl",
+                "summary": "Everybody who joins starts on one platform in the sky, each with a Knockback Stick that pushes as hard as the event sets, up to level 255. Knock the others off the edge: whoever falls is out and watches from above, and the last one on the platform wins. If time runs out first, the most knock-offs among those still standing wins. Nobody takes real damage and nobody loses anything of theirs.",
+                "unit": "points"
             }
         },
         "triggers": {
@@ -2629,7 +2634,9 @@
         "voidAfter": "Void rises after (minutes)",
         "voidAfterHint": "0 to 15; 0 never, so it may run to time",
         "pillarMiddle": "Small platform in the middle",
-        "pillarTwists": "Random twists during the game"
+        "pillarTwists": "Random twists during the game",
+        "knockbackLevel": "Knockback level",
+        "knockbackLevelHint": "1 to 255. 5 pushes hard; 255 is extreme."
     },
     "moderation": {
         "announcements": {

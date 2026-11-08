@@ -244,6 +244,10 @@ const RULES: Readonly<Record<EventKind, Text>> = {
     pillars: {
         en: "A pillar each, an item every few seconds. Bridge, fight and be the last one left. Nothing of yours is lost.",
         es: "Un pilar cada uno, un objeto cada pocos segundos. Tiende puentes, lucha y sé el último en pie. No pierdes nada tuyo."
+    },
+    "knockback-brawl": {
+        en: "Everybody on one platform with a stick that pushes hard. Knock the others off and be the last one on it. Nobody gets hurt.",
+        es: "Todos en una plataforma con un palo que empuja fuerte. Tira a los demás y sé el último en ella. Nadie sale herido."
     }
 };
 

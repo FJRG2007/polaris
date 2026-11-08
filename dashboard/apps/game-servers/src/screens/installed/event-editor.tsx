@@ -49,7 +49,8 @@ import {
     PillarsFields,
     SkyWarsFields,
     TntRunFields,
-    TugOfWarFields
+    TugOfWarFields,
+    KnockbackBrawlFields
 } from "./event-options-sky";
 import { BingoFields, BossFishingFields, VillageDefenseFields } from "./event-options-anywhere";
 
@@ -1219,6 +1220,14 @@ function OptionsFields({
             return (
                 <SkyWarsFields
                     value={preset.options as catalog.EventOptions<"sky-wars">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "knockback-brawl":
+            return (
+                <KnockbackBrawlFields
+                    value={preset.options as catalog.EventOptions<"knockback-brawl">}
                     onChange={onChange}
                     issues={issues}
                 />

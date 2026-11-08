@@ -175,6 +175,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Impostor                                                       | day   | clear   |
 | Glass bridge                                                   | day   | clear   |
 | Tug of war                                                     | day   | clear   |
+| Knockback brawl                                                | day   | clear   |
 | TNT run, Dropper, Nether maze                                  | day   | clear   |
 | Elytra race, Downhill boat race                                | day   | clear   |
 | Acid rain                                                      | day   | -       |
@@ -961,6 +962,20 @@ left out.
   podium is the winning team by effort. Anybody out of their pen is put back
   and counts nothing that look. No PvP: the pens are more than ten blocks
   apart.
+- **Knockback brawl** (`knockback-brawl`) is everybody on one quartz octagon
+  in the sky, a gold heart in the middle and a red rim at the edge, sized for
+  who joined (`layoutFor`, up to `MOST`). Each entrant gets a marked stick
+  named "Knockback Stick" ("Palo con Empuje" in Spanish) with Knockback at the
+  event's `knockback` level (1 to 255, default 5): an SNBT name and a plain
+  enchantment map from 1.21.5, JSON and `levels` from 1.20.5, a `display` tag
+  and an `Enchantments` list before (`stickItem`). It goes out in one `give`
+  line for everybody standing who holds none, at "Go!" and every tick, so a
+  stick thrown away comes back. Regeneration outheals any blow, so only
+  falling puts a player out: under the platform or past the play area, played
+  out by `last-standing-service` like SkyWars and Pillars, with whoever hit
+  them in the last ten seconds credited a knock-off. The last one left wins;
+  at the time those still standing share the top and the knock-offs break the
+  tie. Needs PvP on.
 - **SkyWars** needs 1.17 (`catalog.stashesFirst`): its loot is fought over,
   so it must never sit beside what a player brought, and only from 1.17 is
   that put away first; an older server is refused before anything starts.
