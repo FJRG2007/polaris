@@ -32,6 +32,7 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
+    pushSubscriptions PushSubscription[]
     polarThreads      PolarThread[]
     polarProjects     PolarProject[]
     polarCommands     PolarCommand[]
@@ -9032,6 +9033,7 @@ model AgentSession {
     repo     AgentRepo?            @relation(fields: [repoId], references: [id], onDelete: Cascade)
     host     Host?                 @relation(fields: [hostId], references: [id], onDelete: SetNull)
     events   AgentSessionEvent[]
+    permissionRequests AgentPermissionRequest[]
     messages AgentSessionMessage[]
 
     @@unique([tokenHash])
@@ -16580,4 +16582,50 @@ model NameTagChoice {
     org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
     @@index([orgId])
+}
+
+// One browser or installed app that asked to be told things with the tab
+// closed (Web Push). The endpoint is the push service's address for that
+// device; the two keys encrypt what is sent to it. A device signed in again
+// under another account moves with the endpoint rather than being told
+// another account's news.
+model PushSubscription {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    userId     String   @db.Uuid
+    endpoint   String   @unique
+    p256dh     String
+    auth       String
+    // The browser's own description of itself, cut short: what the settings
+    // card lists so a person can tell their phone from their laptop.
+    userAgent  String   @default("")
+    createdAt  DateTime @default(now())
+    lastUsedAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+}
+
+// A permission prompt a Claude session's hook handed to Polaris to answer.
+// The hook waits a bounded time for `status` to leave "pending"; after that
+// (or once the agent moves on) the request is "expired" and the agent's own
+// prompt is the one that counts.
+model AgentPermissionRequest {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    sessionId   String    @db.Uuid
+    // The tool and one line of what it would do, both truncated on the way in.
+    tool        String
+    detail      String    @default("")
+    // The permission updates the agent offered for "always allow", as it sent
+    // them; replayed (in-session only) when that is the answer.
+    suggestions Json?
+    // pending | allow | deny | always | expired
+    status      String    @default("pending")
+    answeredById String?  @db.Uuid
+    answeredAt  DateTime?
+    createdAt   DateTime  @default(now())
+
+    session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    @@index([sessionId, status])
 }
