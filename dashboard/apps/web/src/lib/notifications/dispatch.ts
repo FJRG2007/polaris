@@ -26,6 +26,7 @@ import { getNotificationHolds, getNotificationPreferences, getQuietHours } from 
 import {
     createNotification,
     raiseCondition,
+    type RepeatPolicy,
     type NotificationAudience
 } from "@/lib/notification-service";
 import { destinationSummary, recordDestinationResult, resolveDestination } from "./destinations";
@@ -90,8 +91,13 @@ export interface NotifyInput {
      * derived from the event, title, body and link, so an exact repeat is
      * always caught. A repeat inside `REPEAT_WINDOW_MS` folds into the row
      * already on the bell and is sent nowhere else.
+     *
+     * `null` for an alert that carries what a person wrote (a comment, a
+     * mention, a reminder, an automation's own message): two identical ones are
+     * still two messages, so it is never folded and never held by the burst
+     * ceiling.
      */
-    dedupKey?: string;
+    dedupKey?: string | null;
 }
 
 /**
@@ -111,13 +117,39 @@ export const BURST_WINDOW_MS = 10 * 60 * 1000;
 export const FOLDED = "Folded into the same alert already on the bell; sent nowhere else.";
 export const HELD_BURST = "Held back: too many of these at once, so they are counted on one alert.";
 
-/** The identity of an alert nobody named: the same words to the same place. */
-export function derivedDedupKey(input: Pick<NotifyInput, "event" | "title" | "body" | "href">): string {
+/** The identity of an alert nobody named: the same words to the same place,
+ *  on the same shelf - the same sentence about two organizations' work is two
+ *  alerts, each on the shelf it belongs to. */
+export function derivedDedupKey(
+    input: Pick<NotifyInput, "event" | "title" | "body" | "href" | "shelf">
+): string {
+    const words = [input.event, input.title, input.body ?? null, input.href ?? null];
     const digest = createHash("sha256")
-        .update(JSON.stringify([input.event, input.title, input.body ?? null, input.href ?? null]))
+        .update(JSON.stringify(input.shelf ? [...words, input.shelf.orgId] : words))
         .digest("hex")
         .slice(0, 32);
     return `auto:${digest}`;
+}
+
+/** How a repeat of this alert is folded. No burst ceiling for a critical
+ *  event: a break-in is folded on exact repeats, never held back. */
+function repeatPolicy(input: NotifyInput, critical: boolean): RepeatPolicy {
+    if (critical) return { windowMs: REPEAT_WINDOW_MS };
+    return {
+        windowMs: REPEAT_WINDOW_MS,
+        burst: {
+            limit: BURST_LIMIT,
+            windowMs: BURST_WINDOW_MS,
+            summary: async () => {
+                const t = await wordsFor(input.userId, "notices");
+                return {
+                    title: t("repeats.burstTitle"),
+                    body: input.title,
+                    href: "/account/notifications"
+                };
+            }
+        }
+    };
 }
 
 /** What one attempt came to, as the delivery log recorded it. */
@@ -489,28 +521,15 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
             });
             if (outcome === "updated") return { inapp: "updated" };
         } else {
-            const critical = event.critical === true;
-            const outcome = await createNotification({
-                ...row,
-                dedupKey: input.dedupKey ?? derivedDedupKey(input),
-                repeat: {
-                    windowMs: REPEAT_WINDOW_MS,
-                    burst: critical
-                        ? undefined
-                        : {
-                              limit: BURST_LIMIT,
-                              windowMs: BURST_WINDOW_MS,
-                              summary: async () => {
-                                  const t = await wordsFor(input.userId, "notices");
-                                  return {
-                                      title: t("repeats.burstTitle"),
-                                      body: input.title,
-                                      href: "/account/notifications"
-                                  };
-                              }
-                          }
-                }
-            });
+            const outcome = await createNotification(
+                input.dedupKey === null
+                    ? row
+                    : {
+                          ...row,
+                          dedupKey: input.dedupKey ?? derivedDedupKey(input),
+                          repeat: repeatPolicy(input, event.critical === true)
+                      }
+            );
             // A repeat: the bell already says it, now with one more on its
             // count. Mail, texts and webhooks were told the first time, and
             // telling them every minute is the spam this exists to stop.

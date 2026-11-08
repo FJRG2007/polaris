@@ -76,7 +76,9 @@ export async function notifyMentions(input: MentionNotice): Promise<void> {
                 title: input.title,
                 body: "You were mentioned.",
                 href: input.href,
-                shelf
+                shelf,
+                // What a person wrote: two identical ones are two messages.
+                dedupKey: null
             });
         }
     } catch (caught) {

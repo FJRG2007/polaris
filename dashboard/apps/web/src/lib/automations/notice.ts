@@ -67,6 +67,9 @@ export async function deliverAutomationNotice(notice: AutomationNotice): Promise
         body: notice.body,
         href: notice.href,
         metadata: notice.metadata,
+        // The operator's own message, sent each time they set it to be: never
+        // folded into an earlier one or held back as a burst.
+        dedupKey: null,
         // A step that names its channels gets exactly those; one saved before
         // there was a choice keeps the account's rule for the event.
         bellOnly: notice.delivery !== undefined

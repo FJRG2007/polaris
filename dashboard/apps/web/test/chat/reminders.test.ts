@@ -239,7 +239,9 @@ describe("firing", () => {
                 title: "notices.reminder",
                 body: "Ship it on Friday",
                 href: `/chat/c/c1/${MESSAGE_ID}`,
-                shelf: undefined
+                shelf: undefined,
+                // What the person wrote: never folded into an earlier reminder.
+                dedupKey: null
             }
         ]);
         // A second pass over the same minute finds it claimed.

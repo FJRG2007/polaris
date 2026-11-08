@@ -249,7 +249,9 @@ async function fire(
         title: words("notices.reminder"),
         body: plainExcerpt(message.body) || null,
         href: reminderHref(message.channelId, row.messageId),
-        shelf
+        shelf,
+        // What a person wrote: two identical ones are two messages.
+        dedupKey: null
     });
     return "sent";
 }

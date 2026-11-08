@@ -74,11 +74,23 @@ describe("the identity of an alert", () => {
         expect(created.mock.calls[0]?.[0]).toMatchObject({ dedupKey: derivedDedupKey(outage) });
         expect(derivedDedupKey(outage)).toBe(derivedDedupKey({ ...outage }));
         expect(derivedDedupKey(outage)).not.toBe(derivedDedupKey({ ...outage, body: "other" }));
+        expect(derivedDedupKey({ ...outage, shelf: { orgId: "a" } })).not.toBe(
+            derivedDedupKey({ ...outage, shelf: { orgId: "b" } })
+        );
     });
 
     it("is the producer's when it names one", async () => {
         await notify({ ...outage, dedupKey: "places.offline:home" });
         expect(created.mock.calls[0]?.[0]).toMatchObject({ dedupKey: "places.offline:home" });
+    });
+});
+
+describe("what a person wrote", () => {
+    it("is never folded or held, however alike two of them are", async () => {
+        await notify({ ...outage, dedupKey: null });
+        const input = created.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(input.dedupKey).toBeUndefined();
+        expect(input.repeat).toBeUndefined();
     });
 });
 

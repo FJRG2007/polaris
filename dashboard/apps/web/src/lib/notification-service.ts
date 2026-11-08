@@ -243,10 +243,24 @@ export async function createNotification(input: NotificationInput): Promise<Noti
 }
 
 /**
- * Fold a repeat into the row for its key, if that row was first raised inside
- * the window. A single conditional UPDATE, so two processes folding at once each
- * add one. The latest text wins, as it does for a condition; whether it was read
- * is left as the reader left it.
+ * Which row of a key a repeat may fold into: one first raised inside the window
+ * and still unread. Once the reader has read it, the next repeat is news again
+ * and gets a row of its own - otherwise dismissing an alert would hide every
+ * repeat for the rest of the hour. A repeat that is itself written read (the
+ * page it points at is open, or it is muted) tells nobody anything either way,
+ * so it folds into the row whatever its state.
+ */
+function foldable(input: NotificationInput, windowMs: number, now: Date) {
+    return {
+        firstSeenAt: { gte: new Date(now.getTime() - windowMs) },
+        ...(input.read ? {} : { readAt: null })
+    };
+}
+
+/**
+ * Fold a repeat into the foldable row for its key. A single conditional UPDATE,
+ * so two processes folding at once each add one. The latest text wins, as it
+ * does for a condition; whether it was read is left as the reader left it.
  */
 async function foldRepeat(
     input: NotificationInput,
@@ -255,11 +269,7 @@ async function foldRepeat(
     now: Date
 ): Promise<boolean> {
     const done = await prisma.notification.updateMany({
-        where: {
-            userId: input.userId,
-            dedupKey,
-            firstSeenAt: { gte: new Date(now.getTime() - windowMs) }
-        },
+        where: { userId: input.userId, dedupKey, ...foldable(input, windowMs, now) },
         data: {
             title: input.title,
             body: input.body ?? null,
@@ -275,10 +285,13 @@ async function foldRepeat(
 }
 
 /**
- * A new row for a key nothing inside the window holds. An older row still
- * carrying the key gives it up first (it stays on the bell as it was), so the
- * unique index - one row per key per reader - has room for this one. Of two
- * processes racing to create, one wins and the other folds into it.
+ * A new row for a key no foldable row holds. A row still carrying the key that
+ * cannot be folded into - first raised before the window, or already read -
+ * gives it up first (it stays on the bell as it was, count and all), so the
+ * unique index - one row per key per reader - has room for this one. Only such
+ * a row: a fresh one another process wrote a moment ago is left holding its
+ * key, so this create hits the index and folds into it instead of the two
+ * racing processes ending in two rows.
  */
 async function writeRepeatable(
     input: NotificationInput,
@@ -287,8 +300,17 @@ async function writeRepeatable(
     now: Date
 ): Promise<NotificationOutcome> {
     if (await foldRepeat(input, dedupKey, windowMs, now)) return "collapsed";
+    const cutoff = new Date(now.getTime() - windowMs);
     await prisma.notification.updateMany({
-        where: { userId: input.userId, dedupKey },
+        where: {
+            userId: input.userId,
+            dedupKey,
+            OR: [
+                { firstSeenAt: null },
+                { firstSeenAt: { lt: cutoff } },
+                ...(input.read ? [] : [{ readAt: { not: null } }])
+            ]
+        },
         data: { dedupKey: null }
     });
     try {
