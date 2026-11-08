@@ -53,6 +53,14 @@ describe("the Chromium manifest", () => {
         expect(manifest["host_permissions"]).toEqual(["https://*/*", "http://*/*"]);
         expect(manifest["optional_host_permissions"]).toBeUndefined();
     });
+
+    // Required, it would carry an install warning and disable every installed
+    // copy until somebody re-approved the update that added it.
+    it("asks to manage extensions only on the VPN's button, never at install", () => {
+        const manifest = manifestFor({ browser: "chrome", manifestVersion: 3 });
+        expect(manifest["optional_permissions"]).toEqual(["management"]);
+        expect(manifest["permissions"]).not.toContain("management");
+    });
 });
 
 describe("the Firefox manifest", () => {

@@ -3156,7 +3156,8 @@ const vpn = new BrowserVpn({
     link: async () => ({ origin: await reachOrigin(), token: await LINK_TOKEN.getValue() }),
     origins: polarisOrigins,
     changed: badge,
-    perRequest: import.meta.env.BROWSER === "firefox"
+    perRequest: import.meta.env.BROWSER === "firefox",
+    selfId: browser.runtime.id
 });
 vpn.listen();
 
@@ -3861,6 +3862,14 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 if (!ours) return { ok: false, error: await say("errors.serverSilent") };
                 await vpn.disconnect();
                 return { ok: true, vpn: await vpn.state() };
+
+            case "vpnReclaim": {
+                if (!ours) return { ok: false, error: await say("errors.serverSilent") };
+                const outcome = await vpn.reclaim();
+                if (!outcome.ok)
+                    return { ok: false, error: await say(`vpn.refused.${outcome.code}`) };
+                return { ok: true, vpn: await vpn.state() };
+            }
 
             case "vpnWebRtc":
                 if (!ours || typeof request.on !== "boolean")

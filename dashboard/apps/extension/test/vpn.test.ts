@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
     BrowserVpn,
     bypassList,
+    proxyConflict,
+    type ManagedExtension,
     readNodes,
     staysOutside,
     type VpnApi,
@@ -41,25 +43,32 @@ function harness(
         control?: string;
         everySite?: boolean;
         noPrivacy?: boolean;
+        /** What `management.getAll` answers; no management API at all when missing. */
+        extensions?: ManagedExtension[];
+        /** Whether the optional `management` permission is granted. */
+        management?: boolean;
     } = {}
 ) {
     const route = stored<VpnRoute | null>(null);
     const login = stored<VpnLogin | null>(null);
     // What the browser's storage hands back for a key never written: the fallback.
     const guard = stored<boolean>(true);
+    const control = { level: options.control ?? "controllable_by_this_extension" };
+    let changeProxy: (detail: { levelOfControl?: string }) => void = () => undefined;
     const settings = {
-        set: vi.fn(async () => undefined),
+        set: vi.fn(async (_detail: object) => undefined),
         clear: vi.fn(async () => undefined),
-        get: vi.fn(async () => ({
-            levelOfControl: options.control ?? "controllable_by_this_extension"
-        }))
+        get: vi.fn(async () => ({ levelOfControl: control.level })),
+        onChange: { addListener: (listener: typeof changeProxy) => (changeProxy = listener) }
     };
     const webRtc = { set: vi.fn(async () => undefined), clear: vi.fn(async () => undefined) };
     let auth: Listener = () => undefined;
     let request: (info: { url: string }) => Promise<unknown> = async () => undefined;
     let removed: (detail: { origins?: string[] }) => void = () => undefined;
     const permissions = {
-        contains: vi.fn(async () => options.everySite ?? true),
+        contains: vi.fn(async (detail: { origins?: string[]; permissions?: string[] }) =>
+            detail.permissions ? (options.management ?? false) : (options.everySite ?? true)
+        ),
         onRemoved: { addListener: (listener: typeof removed) => (removed = listener) }
     };
     const api = {
@@ -69,7 +78,10 @@ function harness(
             onRequest: { addListener: (listener: typeof request) => (request = listener) }
         },
         webRequest: { onAuthRequired: { addListener: (listener: Listener) => (auth = listener) } },
-        privacy: options.noPrivacy ? undefined : { network: { webRTCIPHandlingPolicy: webRtc } }
+        privacy: options.noPrivacy ? undefined : { network: { webRTCIPHandlingPolicy: webRtc } },
+        management: options.extensions
+            ? { getAll: vi.fn(async () => options.extensions) }
+            : undefined
     } as unknown as VpnApi;
     const send =
         options.send ??
@@ -90,7 +102,8 @@ function harness(
         changed,
         perRequest: options.perRequest ?? false,
         fetch: send,
-        now: () => NOW * 1000
+        now: () => NOW * 1000,
+        selfId: "polaris-self"
     };
     const vpn = new BrowserVpn(deps);
     vpn.listen();
@@ -105,7 +118,13 @@ function harness(
         send,
         ask: (details: object) => new Promise<object>((resolve) => auth(details, resolve)),
         decide: (url: string) => request({ url }),
-        lose: (origins: string[]) => removed({ origins })
+        lose: (origins: string[]) => removed({ origins }),
+        control,
+        /** The browser saying the proxy setting changed hands. */
+        proxyChanged: (level: string) => {
+            control.level = level;
+            changeProxy({ levelOfControl: level });
+        }
     };
 }
 
@@ -396,7 +415,8 @@ describe("state", () => {
             available: false,
             nodes: [],
             active: null,
-            webRtcGuard: true
+            webRtcGuard: true,
+            conflict: null
         });
     });
 
@@ -474,5 +494,146 @@ describe("the WebRTC setting", () => {
         expect(guard.box.value).toBe(true);
         expect(webRtc.set).not.toHaveBeenCalled();
         expect(webRtc.clear).not.toHaveBeenCalled();
+    });
+});
+
+const PROXY_TOOL: ManagedExtension = {
+    id: "other-vpn",
+    name: "Other VPN",
+    enabled: true,
+    type: "extension",
+    permissions: ["proxy", "storage"],
+    icons: [
+        { size: 16, url: "chrome://extension-icon/other-vpn/16/0" },
+        { size: 48, url: "chrome://extension-icon/other-vpn/48/0" },
+        { size: 128, url: "chrome://extension-icon/other-vpn/128/0" }
+    ],
+    mayDisable: true
+};
+
+describe("who holds the proxy", () => {
+    it("is nobody while Polaris may set it or already has", () => {
+        expect(proxyConflict("controllable_by_this_extension", [PROXY_TOOL], "self")).toBeNull();
+        expect(proxyConflict("controlled_by_this_extension", [PROXY_TOOL], "self")).toBeNull();
+        expect(proxyConflict(undefined, null, "self")).toBeNull();
+    });
+
+    it("is the administrator under a policy, which no extension list changes", () => {
+        expect(proxyConflict("not_controllable", [PROXY_TOOL], "self")).toEqual({
+            kind: "policy"
+        });
+    });
+
+    it("is unnamed while Polaris may not look at the extensions", () => {
+        expect(proxyConflict("controlled_by_other_extensions", null, "self")).toEqual({
+            kind: "extensions",
+            extensions: null
+        });
+    });
+
+    it("lists every enabled extension that may set a proxy, never Polaris itself", () => {
+        const found = proxyConflict(
+            "controlled_by_other_extensions",
+            [
+                PROXY_TOOL,
+                { ...PROXY_TOOL, id: "self", name: "Polaris" },
+                { ...PROXY_TOOL, id: "off", name: "Switched off", enabled: false },
+                { ...PROXY_TOOL, id: "plain", name: "No proxy", permissions: ["storage"] },
+                { ...PROXY_TOOL, id: "theme", name: "A theme", type: "theme" },
+                {
+                    id: "managed",
+                    name: "Work proxy",
+                    enabled: true,
+                    permissions: ["proxy"],
+                    mayDisable: false
+                }
+            ],
+            "self"
+        );
+        expect(found).toEqual({
+            kind: "extensions",
+            extensions: [
+                {
+                    id: "other-vpn",
+                    name: "Other VPN",
+                    icon: "chrome://extension-icon/other-vpn/48/0",
+                    mayDisable: true
+                },
+                { id: "managed", name: "Work proxy", icon: null, mayDisable: false }
+            ]
+        });
+    });
+
+    it("keeps the conflict, with nobody named, when no candidate is left", () => {
+        expect(proxyConflict("controlled_by_other_extensions", [], "self")).toEqual({
+            kind: "extensions",
+            extensions: []
+        });
+    });
+});
+
+describe("the VPN's state with the proxy held elsewhere", () => {
+    it("names the holder once the management permission is granted", async () => {
+        const { vpn } = harness({
+            control: "controlled_by_other_extensions",
+            extensions: [PROXY_TOOL, { ...PROXY_TOOL, id: "polaris-self", name: "Polaris" }],
+            management: true
+        });
+        expect((await vpn.state()).conflict).toEqual({
+            kind: "extensions",
+            extensions: [expect.objectContaining({ id: "other-vpn", name: "Other VPN" })]
+        });
+    });
+
+    it("does not list the extensions without the permission", async () => {
+        const { vpn } = harness({
+            control: "controlled_by_other_extensions",
+            extensions: [PROXY_TOOL],
+            management: false
+        });
+        expect((await vpn.state()).conflict).toEqual({ kind: "extensions", extensions: null });
+    });
+
+    it("has no conflict on Firefox, which never competes for the setting", async () => {
+        const { vpn } = harness({ perRequest: true, control: "controlled_by_other_extensions" });
+        expect((await vpn.state()).conflict).toBeNull();
+    });
+
+    it("refuses to connect under a policy, naming the administrator", async () => {
+        const { vpn, settings, route } = harness({ control: "not_controllable" });
+        expect(await vpn.connect(NODE)).toEqual({ ok: false, code: "policy" });
+        expect(settings.set).not.toHaveBeenCalled();
+        expect(route.box.value).toBeNull();
+    });
+});
+
+describe("taking the proxy back", () => {
+    it("sets it again for the connection in place once the other extension lets go", async () => {
+        const h = harness();
+        expect(await h.vpn.connect(NODE)).toEqual({ ok: true });
+        h.settings.set.mockClear();
+        h.proxyChanged("controlled_by_other_extensions");
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(h.settings.set).not.toHaveBeenCalled();
+        h.proxyChanged("controllable_by_this_extension");
+        await vi.waitFor(() => expect(h.settings.set).toHaveBeenCalledTimes(1));
+        expect(h.settings.set.mock.calls[0]?.[0]).toMatchObject({
+            value: { mode: "fixed_servers" }
+        });
+    });
+
+    it("does nothing while disconnected", async () => {
+        const h = harness();
+        h.proxyChanged("controllable_by_this_extension");
+        expect(await h.vpn.reclaim()).toEqual({ ok: true });
+        expect(h.settings.set).not.toHaveBeenCalled();
+    });
+
+    it("says it is still held when another extension took over next", async () => {
+        const h = harness();
+        await h.vpn.connect(NODE);
+        h.control.level = "controlled_by_other_extensions";
+        expect(await h.vpn.reclaim()).toEqual({ ok: false, code: "blocked" });
+        expect(await h.vpn.isConnected()).toBe(true);
     });
 });
