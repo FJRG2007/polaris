@@ -547,7 +547,8 @@ export const serverHost = {
         safeUrl: later(load.safeFetch, "safeUrl")
     },
     seasonalService: {
-        seasonsAllowed: later(load.seasonalService, "seasonsAllowed")
+        seasonsAllowed: later(load.seasonalService, "seasonsAllowed"),
+        seasonCalendar: later(load.seasonalService, "seasonCalendar")
     },
     serverMetricsService: {
         getServerMetrics: later(load.serverMetricsService, "getServerMetrics"),

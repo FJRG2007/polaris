@@ -10,6 +10,7 @@ import { resolveSession } from "@/lib/session";
 import { CHUNK_RECOVERY_SCRIPT } from "@/lib/stale-build";
 import { getClient, getLocale, getTranslations } from "@/lib/i18n/request";
 import { pickMessages } from "@/lib/i18n/translate";
+import { seasonPreviewFor } from "@/lib/seasonal-preview";
 import { I18nProvider, LocaleSync } from "@/components/i18n/i18n-provider";
 import { ConnectionBanner } from "@/components/connection-banner";
 import { resolveTextSize, resolveTheme } from "@/lib/display-prefs-service";
@@ -192,11 +193,14 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
     const session = await resolveSession().catch(() => null);
-    const [theme, textSize, locale, client] = await Promise.all([
+    const [theme, textSize, locale, client, seasonPreview] = await Promise.all([
         resolveTheme(session?.id ?? null),
         resolveTextSize(session?.id ?? null),
         getLocale(),
-        getClient()
+        getClient(),
+        // An admin trying a season on paints in it from the first frame; the
+        // frame keeps it from there (see `lib/seasonal-preview`).
+        session?.isAdmin ? seasonPreviewFor(session.sessionId).catch(() => null) : null
     ]);
 
     return (
@@ -206,6 +210,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             // Everything Polaris draws is sized in rem, so this is what the whole
             // interface is laid out against - see globals.css.
             style={{ "--app-text-size": `${textSize}px` } as CSSProperties}
+            data-season={seasonPreview ?? undefined}
             suppressHydrationWarning
         >
             <head>

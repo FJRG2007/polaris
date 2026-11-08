@@ -9,6 +9,7 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
+import { setSeasonPreview } from "@/lib/seasonal-preview";
 import { saveSeasonalChoice } from "@/lib/seasonal-service";
 
 export async function saveSeasonalAction(
@@ -27,4 +28,14 @@ export async function saveSeasonalAction(
         console.error("[seasonal] save failed", caught);
         return { error: t("seasonal.notSaved") };
     }
+}
+
+/** Stop previewing a season (see `lib/seasonal-preview`). Only an admin can
+ *  start one, but any signed-in account may end its own: one that lost admin
+ *  since still gets out of it. */
+export async function stopSeasonPreviewAction(): Promise<{ error?: string }> {
+    const user = await requireUser();
+    await setSeasonPreview(user.sessionId, null);
+    revalidatePath("/", "layout");
+    return {};
 }

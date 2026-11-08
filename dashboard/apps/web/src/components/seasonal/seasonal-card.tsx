@@ -24,10 +24,13 @@ import { saveSeasonalAction } from "@/app/(app)/account/preferences/seasonal-act
 
 export function SeasonalCard({
     allowed,
-    initial
+    initial,
+    calendar
 }: {
     allowed: boolean;
     initial: core.SeasonalChoice;
+    /** The deployment's calendar (`seasonCalendar`). */
+    calendar: core.SeasonCalendar;
 }) {
     const t = useTranslations("account");
     const format = useDisplayFormat();
@@ -39,9 +42,9 @@ export function SeasonalCard({
     const [now, setNow] = useState<Date | null>(null);
     useEffect(() => setNow(new Date()), []);
 
-    const season = now ? core.seasonOn(now) : null;
-    const pack = now ? core.packOn(now) : null;
-    const lastDay = now ? core.packLastDay(now) : null;
+    const season = now ? core.seasonOn(now, calendar) : null;
+    const pack = now ? core.packOn(now, calendar) : null;
+    const lastDay = now ? core.packLastDay(now, calendar) : null;
     if (!allowed || !season || !pack || !lastDay) return null;
 
     const name = t(`seasonal.names.${core.packOf(season)}`);

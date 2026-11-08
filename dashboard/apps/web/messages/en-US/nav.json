@@ -435,5 +435,10 @@
         "winter": "Winter holidays",
         "newYear": "New Year",
         "lunarNewYear": "Lunar New Year"
+    },
+    "seasonPreview": {
+        "bar": "Previewing {season} - only you see this",
+        "stop": "Stop",
+        "notStopped": "The preview could not stop. Try again in a moment."
     }
 }

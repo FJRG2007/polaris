@@ -15,38 +15,59 @@
  * mark beside the logo stays, because it does not move. It drifts once, the
  * first time a device sees the season on a given day, and is gone after: a
  * decoration that never stops moving at the top of a work tool is a distraction.
+ *
+ * The dates are the deployment's calendar (`seasonCalendar`), handed down by the
+ * chrome. An admin previewing a season (`lib/seasonal-preview`) gets that
+ * season's look and sounds whatever the date or the switches say, from the
+ * first paint - the root layout already wrote it onto the document - with a bar
+ * that says so and stops it.
  */
 
 import type { ReactNode } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setSoundSeason } from "@/lib/sound-season";
-import { packOn, seasonOn, type Season } from "@polaris/core";
-import { createContext, useContext, useEffect, useState } from "react";
-import { Ghost, PartyPopper, Snowflake, Sparkles, type LucideIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Button } from "@polaris/ui";
+import * as core from "@polaris/core";
+import { createContext, useContext, useEffect, useState, useTransition } from "react";
+import { Eye, Ghost, PartyPopper, Snowflake, Sparkles, type LucideIcon } from "lucide-react";
+import { stopSeasonPreviewAction } from "@/app/(app)/account/preferences/seasonal-actions";
 
 /** How often the date is looked at again, for a tab left open across midnight. */
 const RECHECK_MS = 30 * 60_000;
 
-const SeasonContext = createContext<Season | null>(null);
+const SeasonContext = createContext<core.Season | null>(null);
+/** The season this session is previewing, as the frame drew it. `undefined`
+ *  outside a frame, so a reader can tell "no frame" from "no preview". */
+const PreviewContext = createContext<core.Season | null | undefined>(undefined);
 
 /** The season decorating this frame, or null when there is none or it is off. */
-export function useDecorationSeason(): Season | null {
+export function useDecorationSeason(): core.Season | null {
     return useContext(SeasonContext);
+}
+
+/** The season this session is previewing, from the frame: what a control that
+ *  starts or stops a preview reads, so it follows a stop made elsewhere. */
+export function usePreviewSeason(): core.Season | null | undefined {
+    return useContext(PreviewContext);
 }
 
 /** The season on the reader's calendar today, and the run of the sound pack it
  *  plays (see `packOn`), followed across midnight. Both null until the page is
  *  in the browser. */
-export function useSeasonToday(): { season: Season | null; pack: string | null } {
-    const [today, setToday] = useState<{ season: Season | null; pack: string | null }>({
+export function useSeasonToday(calendar: core.SeasonCalendar): {
+    season: core.Season | null;
+    pack: string | null;
+} {
+    const [today, setToday] = useState<{ season: core.Season | null; pack: string | null }>({
         season: null,
         pack: null
     });
     useEffect(() => {
         const look = () => {
             const now = new Date();
-            const season = seasonOn(now);
-            const pack = packOn(now);
+            const season = core.seasonOn(now, calendar);
+            const pack = core.packOn(now, calendar);
             setToday((was) =>
                 was.season === season && was.pack === pack ? was : { season, pack }
             );
@@ -58,24 +79,30 @@ export function useSeasonToday(): { season: Season | null; pack: string | null }
             window.clearInterval(timer);
             document.removeEventListener("visibilitychange", look);
         };
-    }, []);
+    }, [calendar]);
     return today;
 }
 
 export function SeasonalFrame({
     allowed,
     mutedPack,
+    calendar = core.DEFAULT_SEASON_CALENDAR,
+    preview = null,
     children
 }: {
     /** The deployment's switch. Off is off for everybody. */
     allowed: boolean;
     /** The run of a sound pack this account turned off. */
     mutedPack: string | null;
+    /** The deployment's calendar: each season's window and whether it runs. */
+    calendar?: core.SeasonCalendar;
+    /** The season an admin is previewing on this session, over everything else. */
+    preview?: core.Season | null;
     children: ReactNode;
 }) {
-    const { season: today, pack } = useSeasonToday();
-    const decoration = allowed ? today : null;
-    const soundsOf = allowed && pack !== mutedPack ? today : null;
+    const { season: today, pack } = useSeasonToday(calendar);
+    const decoration = preview ?? (allowed ? today : null);
+    const soundsOf = preview ?? (allowed && pack !== mutedPack ? today : null);
 
     useEffect(() => {
         setSoundSeason(soundsOf);
@@ -92,15 +119,19 @@ export function SeasonalFrame({
     }, [decoration]);
 
     return (
-        <SeasonContext.Provider value={decoration}>
-            {children}
-            {decoration ? <DriftOnce key={decoration} season={decoration} /> : null}
-        </SeasonContext.Provider>
+        <PreviewContext.Provider value={preview}>
+            <SeasonContext.Provider value={decoration}>
+                {children}
+                {preview ? <DriftOnce key={preview} season={preview} always /> : null}
+                {!preview && decoration ? <DriftOnce key={decoration} season={decoration} /> : null}
+                {preview ? <PreviewBar season={preview} /> : null}
+            </SeasonContext.Provider>
+        </PreviewContext.Provider>
     );
 }
 
 /** The icon each season is marked with. */
-export const SEASON_ICONS: Record<Season, LucideIcon> = {
+export const SEASON_ICONS: Record<core.Season, LucideIcon> = {
     halloween: Ghost,
     winter: Snowflake,
     newYear: PartyPopper,
@@ -108,7 +139,7 @@ export const SEASON_ICONS: Record<Season, LucideIcon> = {
 };
 
 /** What drifts: a shape per season, and whether it falls or rises. */
-const DRIFT: Record<Season, { icon: LucideIcon | null; rises: boolean }> = {
+const DRIFT: Record<core.Season, { icon: LucideIcon | null; rises: boolean }> = {
     // Ghosts float up.
     halloween: { icon: Ghost, rises: true },
     winter: { icon: Snowflake, rises: false },
@@ -128,7 +159,7 @@ const DRIFT_MS = (5 + 17) * 1000;
 /** Whether this device has drifted this season today, kept per device. A
  *  browser that will not store it drifts on every load, which is the old
  *  behaviour and harmless. */
-function driftedToday(season: Season): boolean {
+function driftedToday(season: core.Season): boolean {
     const key = `polaris.seasonDrift.${season}`;
     const today = new Date().toDateString();
     try {
@@ -141,20 +172,21 @@ function driftedToday(season: Season): boolean {
 }
 
 /** The drifting layer, for its one pass of the day and then not at all. */
-function DriftOnce({ season }: { season: Season }) {
+function DriftOnce({ season, always = false }: { season: core.Season; always?: boolean }) {
     const [on, setOn] = useState(false);
     useEffect(() => {
-        if (driftedToday(season)) return;
+        // A preview drifts every time it starts: that is what is being tried.
+        if (!always && driftedToday(season)) return;
         setOn(true);
         const timer = window.setTimeout(() => setOn(false), DRIFT_MS);
         return () => window.clearTimeout(timer);
-    }, [season]);
+    }, [season, always]);
     return on ? <Drift season={season} /> : null;
 }
 
 /** The drifting layer. Positions are worked out from the index rather than at
  *  random, so it looks the same on every render and costs no state. */
-function Drift({ season }: { season: Season }) {
+function Drift({ season }: { season: core.Season }) {
     const { icon: Icon, rises } = DRIFT[season];
     return (
         <div aria-hidden="true" className="season-drift" data-rises={rises ? "" : undefined}>
@@ -197,5 +229,41 @@ export function SeasonalBadge() {
                 strokeWidth={2}
             />
         </span>
+    );
+}
+
+/** What an admin previewing a season sees: which one, that nobody else does,
+ *  and the way out. Fixed to the bottom of the window, above the page and
+ *  under every dialog. */
+function PreviewBar({ season }: { season: core.Season }) {
+    const t = useTranslations("nav");
+    const router = useRouter();
+    const [error, setError] = useState("");
+    const [stopping, startStopping] = useTransition();
+
+    function stop() {
+        setError("");
+        startStopping(async () => {
+            const result = await stopSeasonPreviewAction().catch(() => ({
+                error: t("seasonPreview.notStopped")
+            }));
+            if (result.error) setError(result.error);
+            else router.refresh();
+        });
+    }
+
+    return (
+        <div
+            role="status"
+            className="fixed bottom-4 left-1/2 z-40 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-card py-1.5 pl-4 pr-1.5 text-sm shadow-lg"
+        >
+            <Eye aria-hidden="true" className="size-4 shrink-0 text-[hsl(var(--season-a))]" />
+            <span className="min-w-0 truncate">
+                {error || t("seasonPreview.bar", { season: t(`season.${season}`) })}
+            </span>
+            <Button size="sm" variant="secondary" onClick={stop} disabled={stopping}>
+                {t("seasonPreview.stop")}
+            </Button>
+        </div>
     );
 }

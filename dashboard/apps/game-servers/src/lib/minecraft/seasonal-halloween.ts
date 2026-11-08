@@ -156,13 +156,17 @@ export function bloodNightKey(now: Date, timeZone: string): number {
  * after its last day - or 0 out of it. The jar keeps graveyards up until then,
  * across a restart or an event that pauses the season.
  */
-export function halloweenSecondsLeft(now: Date, timeZone: string): number {
+export function halloweenSecondsLeft(
+    now: Date,
+    timeZone: string,
+    calendar: core.SeasonCalendar = core.DEFAULT_SEASON_CALENDAR
+): number {
     const zone =
         timeZone !== core.AUTOMATIC_TIME_ZONE && core.isTimeZone(timeZone) ? timeZone : "UTC";
     const wall = core.wallClock(now, zone);
     const today = new Date(wall.year, wall.month - 1, wall.day, 12);
-    if (core.seasonOn(today) !== "halloween") return 0;
-    const last = core.seasonLastDay(today);
+    if (core.seasonOn(today, calendar) !== "halloween") return 0;
+    const last = core.seasonLastDay(today, calendar);
     if (!last) return 0;
     const days = Math.round(
         (Date.UTC(last.getFullYear(), last.getMonth(), last.getDate()) -
