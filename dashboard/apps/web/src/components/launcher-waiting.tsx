@@ -146,7 +146,9 @@ export function useLauncherMarks(
                       { folderId: null, accountId: null, inbox: true, by: by("mail") }
                   ])
                 : null;
-            const undo = touched.filter((one) => one !== "mail").map((one) => nudge(one, by(one)));
+            const undo = new Map(
+                touched.filter((one) => one !== "mail").map((one) => [one, nudge(one, by(one))])
+            );
             marking.current += 1;
             const result = await markLauncherReadAction(
                 app ? { scope: "app", app } : { scope: "all" }
@@ -156,7 +158,7 @@ export function useLauncherMarks(
                     marking.current -= 1;
                 });
             if (result.error) {
-                for (const one of undo) one();
+                for (const one of undo.values()) one();
                 mail?.abandon();
                 notices?.abandon();
                 if (before && latest.current === after) apply(before);
@@ -166,7 +168,12 @@ export function useLauncherMarks(
             }
             mail?.settle();
             notices?.settle();
-            if (touched.includes("admin")) recountAdmin();
+            const admin = undo.get("admin");
+            if (admin) {
+                void recountAdmin().then((counted) => {
+                    if (counted) admin();
+                });
+            }
             if (marking.current === 0 && missed.current) {
                 missed.current = false;
                 void refresh();

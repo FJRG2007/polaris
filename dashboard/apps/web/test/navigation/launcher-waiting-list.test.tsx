@@ -48,7 +48,7 @@ vi.mock("@/components/app-unread", () => ({
         };
     }
 }));
-vi.mock("@/components/admin-waiting", () => ({ useAdminRecount: () => () => undefined }));
+vi.mock("@/components/admin-waiting", () => ({ useAdminRecount: () => () => Promise.resolve(false) }));
 // The bell's provider reaches the server actions, which read the environment.
 // The list only needs a hold it can settle.
 vi.mock("@/components/notifications/notifications-provider", () => ({

@@ -56,8 +56,9 @@ export const NO_ADMIN_WAITING: AdminWaiting = {
 };
 
 const WaitingContext = createContext<AdminWaiting>(NO_ADMIN_WAITING);
-/** Asks for the count again now, for a screen that just changed what it is. */
-const RecountContext = createContext<() => void>(() => undefined);
+/** Asks for the count again now, for a screen that just changed what it is.
+ *  Answers whether a new count arrived. */
+const RecountContext = createContext<() => Promise<boolean>>(() => Promise.resolve(false));
 
 /** What is waiting in Management. Nothing outside the provider, which is the
  *  honest answer for anybody who is not an administrator. */
@@ -103,19 +104,23 @@ export function AdminWaitingProvider({
     const [waiting, setWaiting] = useState(initial);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const recount = useCallback(() => {
-        void fetch(WAITING_PATH, { cache: "no-store" })
-            .then((response) => (response.ok ? response.json() : null))
-            .then((body) => {
-                const parsed = waitingSchema.safeParse(body);
-                if (parsed.success) setWaiting(parsed.data);
-            })
-            .catch(() => {
-                // Left as it was. A count that could not be fetched is not a
-                // count of zero, and clearing the badge over one failed request
-                // is how somebody misses the report it was there for.
-            });
-    }, []);
+    const recount = useCallback(
+        () =>
+            fetch(WAITING_PATH, { cache: "no-store" })
+                .then((response) => (response.ok ? response.json() : null))
+                .then((body) => {
+                    const parsed = waitingSchema.safeParse(body);
+                    if (parsed.success) setWaiting(parsed.data);
+                    return parsed.success;
+                })
+                .catch(() => {
+                    // Left as it was. A count that could not be fetched is not a
+                    // count of zero, and clearing the badge over one failed request
+                    // is how somebody misses the report it was there for.
+                    return false;
+                }),
+        []
+    );
 
     /**
      * Reconnected when the sound switch moves, exactly as the bell is.
@@ -169,6 +174,6 @@ export function AdminWaitingProvider({
 }
 
 /** Ask for the count again now, for a screen that just changed what it counts. */
-export function useAdminRecount(): () => void {
+export function useAdminRecount(): () => Promise<boolean> {
     return useContext(RecountContext);
 }

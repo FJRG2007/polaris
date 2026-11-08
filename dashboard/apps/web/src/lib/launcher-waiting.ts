@@ -138,18 +138,6 @@ export function withoutApp(waiting: LauncherWaiting, app: LauncherWaitingApp): L
     };
 }
 
-/** How much a mark takes off an app's badge: the difference between the group
- *  before and after. Negative, or zero when nothing moved. */
-export function badgeDelta(
-    before: LauncherWaiting,
-    after: LauncherWaiting,
-    app: LauncherWaitingApp
-): number {
-    const total = (waiting: LauncherWaiting) =>
-        waiting.groups.find((group) => group.app === app)?.total ?? 0;
-    return total(after) - total(before);
-}
-
 /** The menu after everything is marked read: only what cannot be dismissed. */
 export function withoutAll(waiting: LauncherWaiting): LauncherWaiting {
     return LAUNCHER_WAITING_APPS.reduce((left, app) => withoutApp(left, app), waiting);

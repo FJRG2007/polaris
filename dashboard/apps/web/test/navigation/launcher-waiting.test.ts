@@ -6,7 +6,6 @@
 
 import { describe, expect, it } from "vitest";
 import {
-    badgeDelta,
     clipText,
     LAUNCHER_TEXT_MAX,
     launcherWaitingSchema,
@@ -72,13 +71,11 @@ describe("marking one entry read", () => {
     it("takes the entry and its count off its group", () => {
         const after = withoutItem(waiting, "chat", "a");
         expect(after.groups[0]).toMatchObject({ total: 2, items: [{ id: "b" }] });
-        expect(badgeDelta(waiting, after, "chat")).toBe(-5);
     });
 
     it("drops a group left with nothing", () => {
         const after = withoutItem(withoutItem(waiting, "chat", "a"), "chat", "b");
         expect(after.groups.map((group) => group.app)).toEqual(["admin"]);
-        expect(badgeDelta(waiting, after, "chat")).toBe(-7);
     });
 
     it("leaves the menu alone for an entry it does not list", () => {
@@ -91,7 +88,6 @@ describe("marking a whole app read", () => {
     it("keeps only what cannot be dismissed", () => {
         const after = withoutApp(waiting, "admin");
         expect(after.groups[1]).toMatchObject({ total: 1, items: [{ id: "apis" }] });
-        expect(badgeDelta(waiting, after, "admin")).toBe(-3);
     });
 
     it("drops the group when everything could be", () => {
@@ -100,7 +96,7 @@ describe("marking a whole app read", () => {
 });
 
 describe("marking everything read", () => {
-    it("leaves only the faults, and moves each badge by what it dismissed", () => {
+    it("leaves only the faults", () => {
         const after = withoutAll(waiting);
         expect(after.groups).toEqual([
             expect.objectContaining({
@@ -109,8 +105,6 @@ describe("marking everything read", () => {
                 items: [expect.objectContaining({ id: "apis" })]
             })
         ]);
-        expect(badgeDelta(waiting, after, "chat")).toBe(-7);
-        expect(badgeDelta(waiting, after, "admin")).toBe(-3);
     });
 
     it("offers the mark on every app whose badge is up, before the route answers", () => {

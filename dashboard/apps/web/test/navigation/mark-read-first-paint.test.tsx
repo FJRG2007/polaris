@@ -21,6 +21,8 @@ const marked: unknown[] = [];
 const nudges: [string, number][] = [];
 const mailChanges: number[] = [];
 let refuse = false;
+let recounts = 0;
+let recounted = false;
 let route: "pending" | LauncherWaiting = "pending";
 const unread: Record<string, number> = { chat: 0, mail: 3, admin: 4 };
 
@@ -48,6 +50,13 @@ vi.mock("@/lib/mailbox/unread-overlay", () => ({
         };
     }
 }));
+vi.mock("@/components/admin-waiting", async (original) => ({
+    ...(await original<typeof import("@/components/admin-waiting")>()),
+    useAdminRecount: () => async () => {
+        recounts += 1;
+        return recounted;
+    }
+}));
 vi.mock("@/components/app-unread", () => ({
     useAppUnread: () => unread,
     useServerUnread: () => unread,
@@ -67,6 +76,8 @@ beforeEach(() => {
     nudges.length = 0;
     mailChanges.length = 0;
     refuse = false;
+    recounts = 0;
+    recounted = false;
     route = "pending";
     vi.stubGlobal(
         "fetch",
@@ -124,6 +135,28 @@ describe("before the waiting route has answered", () => {
         renderRail();
         await user.click(screen.getByRole("button", { name: "Mark all seen in Management" }));
         expect(marked).toEqual([{ scope: "app", app: "admin" }]);
+        expect(nudges).toEqual([["admin", -4]]);
+    });
+
+    it("hands Management's badge back to the recount once it has answered", async () => {
+        recounted = true;
+        const user = userEvent.setup();
+        renderRail();
+        await user.click(screen.getByRole("button", { name: "Mark all seen in Management" }));
+        await waitFor(() =>
+            expect(nudges).toEqual([
+                ["admin", -4],
+                ["admin", 4]
+            ])
+        );
+        expect(recounts).toBe(1);
+    });
+
+    it("keeps Management's badge down while the recount has not answered", async () => {
+        const user = userEvent.setup();
+        renderRail();
+        await user.click(screen.getByRole("button", { name: "Mark all seen in Management" }));
+        await waitFor(() => expect(recounts).toBe(1));
         expect(nudges).toEqual([["admin", -4]]);
     });
 
