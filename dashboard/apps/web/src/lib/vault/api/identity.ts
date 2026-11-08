@@ -58,7 +58,10 @@ export async function connectToken(context: VaultContext): Promise<Response> {
         // The name is optional and only a label; one that does not pass the
         // device rule is ignored rather than failing the refresh.
         const named = deviceSchema.shape.name.safeParse(body.deviceName);
-        const result = await vaultRefresh(body.refresh_token ?? "", named.success ? named.data : null);
+        const result = await vaultRefresh(
+            body.refresh_token ?? "",
+            named.success ? named.data : null
+        );
         if (!result.ok) return grantError("Refresh token is invalid.");
         return Response.json(result.body);
     }
