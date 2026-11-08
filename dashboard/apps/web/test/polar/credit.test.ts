@@ -42,9 +42,15 @@ describe("polarOutputTokens", () => {
 describe("freeVariantOf", () => {
     const models = [{ model: "deepseek/deepseek-r1" }, { model: "deepseek/deepseek-r1:free" }];
     it("finds the listed :free variant only", () => {
-        expect(freeVariantOf("deepseek/deepseek-r1", models)).toBe("deepseek/deepseek-r1:free");
-        expect(freeVariantOf("openai/gpt-4o", models)).toBeNull();
-        expect(freeVariantOf("deepseek/deepseek-r1:free", models)).toBeNull();
+        expect(freeVariantOf("openrouter", "deepseek/deepseek-r1", models)).toBe(
+            "deepseek/deepseek-r1:free"
+        );
+        expect(freeVariantOf("openrouter", "openai/gpt-4o", models)).toBeNull();
+        expect(freeVariantOf("openrouter", "deepseek/deepseek-r1:free", models)).toBeNull();
+    });
+
+    it("finds none for a provider that marks no free variants", () => {
+        expect(freeVariantOf("groq", "deepseek/deepseek-r1", models)).toBeNull();
     });
 });
 

@@ -82,7 +82,8 @@ function backedByChat(helper: ResolvedModel, chat: ResolvedModel): ResolvedModel
         helper.option.provider === chat.option.provider &&
         helper.option.model === chat.option.model;
     if (same || helper.credential.source !== chat.credential.source) return helper;
-    return withStandIn(helper, chat);
+    // The chat's model as it is, not with its own stand-ins: one retry a job.
+    return withStandIn(helper, { ...chat, model: chat.base ?? chat.model });
 }
 
 /** The least reasoning the helper takes, or none for a model that does not reason. */

@@ -13,10 +13,12 @@
 import { z } from "zod";
 import type { UIMessage } from "ai";
 
-/** `paid`: the account has no credit and the model has no free variant to
- *  fall back on (`credit.ts`). `busy`: the provider is fine but the model's
- *  own upstream is saturated - OpenRouter's shared `:free` models say so with
- *  a 429 - so another model answers where this one cannot. */
+/** `key`: the key is refused. `credit`: the account behind it cannot pay.
+ *  `paid`: it has no credit and the model has no free variant to fall back on
+ *  (`credit.ts`). `rate`: this key's own limit. `busy`: the provider or the
+ *  model is saturated for everybody, so another model answers where this one
+ *  cannot. `down`: the provider failed. `model`: it does not serve this model
+ *  to this key. */
 export const FAILURE_KINDS = [
     "key",
     "credit",
@@ -34,15 +36,176 @@ export interface ProviderFailure {
     status: number | null;
 }
 
-/** Out of credit, whatever status the provider chose to say it with. */
+/**
+ * What each provider calls each refusal, from its own error reference. A body
+ * names the reason in a structured field - OpenAI's and Groq's `error.code`,
+ * Anthropic's, Cerebras's and Moonshot's `error.type`, Gemini's `error.status`,
+ * OpenRouter's `error.metadata.error_type` - and that field decides before the
+ * status or the message does: Gemini's and Groq's rate-limit messages both
+ * mention billing, and OpenAI says "no credit" with a 429.
+ *
+ * - OpenAI: developers.openai.com/api/docs/guides/error-codes
+ * - Anthropic: platform.claude.com/docs/en/api/errors
+ * - Gemini: aistudio.google.com/docs/api-errors
+ * - Groq: console.groq.com/docs/errors
+ * - DeepSeek: api-docs.deepseek.com/quick_start/error_codes
+ * - Cerebras: inference-docs.cerebras.ai/support/error
+ * - xAI: docs.x.ai/docs/key-information/debugging
+ * - Together: docs.together.ai/docs/error-codes
+ * - OpenRouter: openrouter.ai/docs/api-reference/errors
+ * - LiteLLM: docs.litellm.ai/docs/exception_mapping
+ */
+const CODES: Readonly<Record<string, FailureKind>> = {
+    // No credit, or a spend ceiling the account set itself.
+    insufficient_quota: "credit",
+    credit_balance_exhausted: "credit",
+    organization_spend_limit_exceeded: "credit",
+    project_spend_limit_exceeded: "credit",
+    organization_usage_limit_exceeded: "credit",
+    billing_error: "credit",
+    payment_required: "credit",
+    payment_required_error: "credit",
+    insufficient_funds: "credit",
+    insufficient_balance: "credit",
+    budget_exceeded: "credit",
+    exceeded_current_quota_error: "credit",
+    failed_precondition: "credit",
+    openrouter_guardrail_budget: "credit",
+    openrouter_in_flight_budget: "credit",
+    // The provider or the model is saturated for everybody.
+    overloaded_error: "busy",
+    server_is_overloaded: "busy",
+    engine_overloaded_error: "busy",
+    provider_overloaded: "busy",
+    service_tier_capacity_exceeded: "busy",
+    queue_exceeded: "busy",
+    model_rate_limit_exceeded: "busy",
+    upstream_provider: "busy",
+    unavailable: "busy",
+    service_unavailable: "busy",
+    // This key's own limit.
+    rate_limit_exceeded: "rate",
+    rate_limit_error: "rate",
+    rate_limit_reached_error: "rate",
+    rate_limited: "rate",
+    too_many_requests_error: "rate",
+    token_quota_exceeded: "rate",
+    request_quota_exceeded: "rate",
+    resource_exhausted: "rate",
+    quota_exceeded: "rate",
+    slow_down: "rate",
+    // A model this key cannot have.
+    model_not_found: "model",
+    model_decommissioned: "model",
+    model_not_available: "model",
+    deploymentnotfound: "model",
+    not_found_error: "model",
+    not_found: "model",
+    // The key itself.
+    authentication_error: "key",
+    invalid_api_key: "key",
+    api_key_invalid: "key",
+    invalid_authentication_error: "key",
+    unauthenticated: "key",
+    permission_error: "key",
+    permission_denied: "key",
+    permission_denied_error: "key",
+    // Down, not busy: the model failed rather than refused.
+    provider_unavailable: "down",
+    api_error: "down",
+    internal_server_error: "down",
+    timeout_error: "down",
+    deadline_exceeded: "down"
+};
+
+/** Which kind wins when a body names more than one: a credit refusal is often
+ *  worded as a quota, and a model's upstream limit as a rate limit. */
+const RANK: readonly FailureKind[] = ["credit", "busy", "rate", "model", "key", "down"];
+
+/** Out of credit, in the words of a body with no structured reason: Anthropic's
+ *  400 "credit balance is too low", xAI's credits and spending limits,
+ *  DeepSeek's "Insufficient Balance", LiteLLM's budget. Never plain "billing":
+ *  Gemini's and Groq's rate limits say that word too. */
 const CREDIT =
-    /payment[_ ]required|insufficient[_ ](quota|funds|balance|credits?)|credit balance|billing|out of credits/i;
-/** A 429 about the model's upstream, not about this key: OpenRouter's
- *  `model_rate_limit_exceeded` with `limit_source: upstream_provider`. */
-const BUSY = /upstream|model[_ ]rate[_ ]limit/i;
-/** The model asked for is not one the provider serves. */
+    /payment[_ ]required|insufficient[_ ](quota|funds|balance|credits?)|credit balance|out of (credits?|balance)|(no|any) credits\b|used all (available )?credits|spend(ing)? (limit|cap)|budget has been exceeded/i;
+/** Saturated for everybody, in words: OpenRouter's shared `:free` models
+ *  "rate-limited upstream", an engine "overloaded". */
+const BUSY = /upstream|model[_ ]rate[_ ]limit|overloaded|over capacity|at capacity/i;
+/** The model asked for is not one the provider serves to this key: Ollama's
+ *  model "not found, try pulling it first", OpenAI's "does not exist or you do
+ *  not have access to it", Groq's decommissioned models. */
 const MODEL =
-    /model[_ ]not[_ ]found|no such model|unknown model|model\b[^.]{0,80}\b(not found|does not exist|is not supported)/i;
+    /model[_ ]not[_ ]found|no such model|unknown model|decommissioned|no endpoints found|model\b[^.]{0,80}\b(not found|does not exist|is not supported)/i;
+/** Refused for what the request said, not for who sent it: OpenRouter's
+ *  moderation flag and guardrail block are 403s that are not about the key. */
+const CONTENT = /flagged|moderation|guardrail|request blocked/i;
+
+/** Most characters of a body read for its reasons. */
+const BODY_MOST = 16_384;
+
+/** The short strings a body names its reason with, lower-cased, and its
+ *  messages. Reads `error`, `metadata` and Gemini's `details` a few levels
+ *  deep, an array's first entry (Gemini's streaming errors), and a body that
+ *  is not JSON as text. */
+function reasonsOf(body: unknown): { reasons: string[]; text: string; forwarded: boolean } {
+    const reasons: string[] = [];
+    const texts: string[] = [];
+    let forwarded = false;
+    const read = (value: unknown, depth: number) => {
+        if (typeof value !== "object" || value === null || depth > 3) return;
+        const entry = value as Record<string, unknown>;
+        for (const key of ["type", "code", "status", "error_type", "limit_source", "reason"]) {
+            const named = entry[key];
+            if (typeof named === "string" && named.length <= 80) reasons.push(named.toLowerCase());
+        }
+        // OpenRouter names the upstream provider whose own refusal it passes on.
+        if (typeof entry.provider_name === "string" || typeof entry.provider_code === "string") {
+            forwarded = true;
+        }
+        // xAI puts its sentence in `error` itself.
+        if (typeof entry.error === "string") texts.push(entry.error);
+        for (const key of ["message", "raw"]) {
+            const said = entry[key];
+            if (typeof said === "string") texts.push(said);
+        }
+        read(entry.error, depth + 1);
+        read(entry.metadata, depth + 1);
+        if (Array.isArray(entry.details)) {
+            for (const item of entry.details.slice(0, 8)) read(item, depth + 1);
+        }
+    };
+    let parsed: unknown = body;
+    if (typeof body === "string") {
+        const capped = body.slice(0, BODY_MOST);
+        try {
+            parsed = JSON.parse(capped);
+        } catch {
+            parsed = null;
+            texts.push(capped);
+        }
+    }
+    read(Array.isArray(parsed) ? parsed[0] : parsed, 0);
+    return { reasons, text: texts.join(" "), forwarded };
+}
+
+/** The kind a body's structured reasons name, the strongest first. */
+function kindOfReasons(reasons: readonly string[]): FailureKind | null {
+    const named = new Set(reasons.map((reason) => CODES[reason]).filter(Boolean));
+    return RANK.find((kind) => named.has(kind)) ?? null;
+}
+
+/** The kind a status says, for a body that names no reason. */
+function kindOfStatus(status: number, text: string): FailureKind {
+    if (status === 402) return "credit";
+    if (status === 401 || status === 403) return CONTENT.test(text) ? "other" : "key";
+    if (status === 404) return "model";
+    // Groq's 498 is its flex tier at capacity; Anthropic's and Together's 529
+    // and the 503 every provider documents are an overloaded service.
+    if (status === 498 || status === 503 || status === 529) return "busy";
+    if (status === 429) return BUSY.test(text) ? "busy" : "rate";
+    if (status === 408 || status >= 500) return "down";
+    return "other";
+}
 
 export interface CallErrorShape {
     statusCode?: unknown;
@@ -72,21 +235,35 @@ export function isPaidModelError(error: unknown, depth = 0): boolean {
     return isPaidModelError(shape.lastError, depth + 1) || isPaidModelError(shape.cause, depth + 1);
 }
 
-/** Pure. Anything that is not a provider's answer is `other`. */
+/**
+ * Pure. Structured reasons first, then credit in the message (a 400 or a 429
+ * that says the account cannot pay), then the status, then the message. A
+ * stream that failed after it started carries no status, only the provider's
+ * error object (Anthropic's mid-stream `overloaded_error`): its reasons decide.
+ * Anything else is `other`.
+ */
 export function classifyProviderFailure(error: unknown): ProviderFailure {
     if (isPaidModelError(error)) return { kind: "paid", status: 402 };
     const found = callError(error);
-    if (!found) return { kind: "other", status: null };
+    if (!found) return { kind: kindOfReasons(reasonsOf(error).reasons) ?? "other", status: null };
     const status = found.statusCode as number;
-    const said = `${typeof found.responseBody === "string" ? found.responseBody : ""} ${
-        typeof found.message === "string" ? found.message : ""
-    }`;
-    if (status === 402 || CREDIT.test(said)) return { kind: "credit", status };
-    if (status === 401 || status === 403) return { kind: "key", status };
-    if (status === 404 || MODEL.test(said)) return { kind: "model", status };
-    if (status === 429) return { kind: BUSY.test(said) ? "busy" : "rate", status };
-    if (status >= 500) return { kind: "down", status };
-    return { kind: "other", status };
+    const { reasons, text: said, forwarded } = reasonsOf(found.responseBody);
+    const text = `${said} ${typeof found.message === "string" ? found.message : ""}`;
+    const named = kindOfReasons(reasons);
+    if (named === "credit" || (named !== "busy" && CREDIT.test(text))) {
+        return { kind: "credit", status };
+    }
+    // OpenRouter forwards an upstream provider's own 429 with the provider's
+    // name on it: that limit is the provider's, shared by everyone routed there.
+    if (status === 429 && forwarded) {
+        return { kind: "busy", status };
+    }
+    // A generic server-error type on a 4xx (Ollama's 404 `api_error`) says
+    // less than the status does.
+    if (named && !(named === "down" && status < 500)) return { kind: named, status };
+    if (status === 429 && BUSY.test(text)) return { kind: "busy", status };
+    if (status < 500 && status !== 404 && MODEL.test(text)) return { kind: "model", status };
+    return { kind: kindOfStatus(status, text), status };
 }
 
 /** What the stream's error part carries to the panel. */
