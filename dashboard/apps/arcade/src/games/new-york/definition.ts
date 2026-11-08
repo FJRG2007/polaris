@@ -10,5 +10,6 @@ export const newYork: GameDefinition = {
     id: "new-york",
     icon: Building2,
     multiplayer: true,
+    rooms: { maxPlayers: 32 },
     cover: "cover.svg"
 };

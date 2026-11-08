@@ -1,8 +1,10 @@
 "use server";
 
 /**
- * Game rooms, as the server decides them: a lobby opened from the Games
- * library, with no conversation and no card around it. Played exactly like a
+ * Game rooms, as the server decides them: a lobby opened from a game's own
+ * page, with no conversation and no card around it. A room belongs to one game
+ * (`ArcadeSession.game`), and only a game whose definition declares rooms
+ * (`CallActivityGame.rooms`) can have any, seating at most the players it says. Played exactly like a
  * lobby - same page, same data-only room, same passes (`lobby-actions`) - and
  * reached three ways: by its short code, by an invitation from somebody in it
  * (`inviteToSession`), or, for a public room, from the list.
@@ -34,6 +36,23 @@ const createSchema = z
     .object({ game: z.string().trim().min(1).max(48), isPublic: z.boolean() })
     .strict();
 const joinSchema = z.object({ code: codes.roomCodeSchema }).strict();
+const listSchema = z
+    .object({ game: z.string().trim().min(1).max(48).optional() })
+    .strict()
+    .optional();
+
+type RoomGame = Awaited<ReturnType<typeof callActivityGames>>[number];
+
+/** The games that have rooms, in the reader's language. */
+async function roomGames(user: User): Promise<RoomGame[]> {
+    return (await callActivityGames(await getUserLocale(user.id))).filter((game) => game.rooms);
+}
+
+/** How many may sit in a room of this game: what it declares, never past the
+ *  cap every session has. */
+function seats(game: RoomGame | undefined): number {
+    return Math.min(game?.rooms?.maxPlayers ?? MAX_PLAYERS, MAX_PLAYERS);
+}
 
 /** The app, then the permissions, so a refusal names the first thing wrong. */
 async function mayPlayTogether(user: User): Promise<RoomRefusal | null> {
@@ -52,19 +71,17 @@ function drawCode(): string {
 }
 
 export type RoomAnswer =
-    | { readonly ok: true; readonly href: string }
+    | { readonly ok: true; readonly href: string; readonly game: string }
     | { readonly ok: false; readonly reason: RoomRefusal };
 
-/** Open a room for a game and answer where its opener goes to play. */
+/** Open a room for a game that has rooms and answer where its opener goes to play. */
 export async function createGameRoom(input: unknown): Promise<RoomAnswer> {
     const parsed = createSchema.safeParse(input);
     if (!parsed.success) return { ok: false, reason: "invalid" };
     const user = await requireUser();
     const refused = await mayPlayTogether(user);
     if (refused) return { ok: false, reason: refused };
-    const offered = (await callActivityGames(await getUserLocale(user.id))).some(
-        (game) => game.id === parsed.data.game
-    );
+    const offered = (await roomGames(user)).some((game) => game.id === parsed.data.game);
     if (!offered) return { ok: false, reason: "missing" };
     const limit = await rateLimit(
         `arcade-room-open:${user.id}`,
@@ -79,7 +96,7 @@ export async function createGameRoom(input: unknown): Promise<RoomAnswer> {
             parsed.data.isPublic,
             drawCode
         );
-        return { ok: true, href: card.lobbyHref(room.id) };
+        return { ok: true, href: card.lobbyHref(room.id), game: parsed.data.game };
     } catch (caught) {
         console.error("[arcade] could not open a room", caught);
         return { ok: false, reason: "failed" };
@@ -87,7 +104,8 @@ export async function createGameRoom(input: unknown): Promise<RoomAnswer> {
 }
 
 /**
- * Join a room by its code. Every attempt counts against the reader's limit,
+ * Join a room by its code, whatever game it was typed from: the code names the
+ * room, and the room its game, which is what the answer opens. Every attempt counts against the reader's limit,
  * a right one as much as a wrong one, so codes cannot be walked. A code that
  * names no running room says so, the same for one that never existed and one
  * whose room is over.
@@ -110,11 +128,13 @@ export async function joinGameRoom(input: unknown): Promise<RoomAnswer> {
     const now = Date.now();
     if (!session || card.sessionEnded({ ...session, callEnded: false }, now))
         return { ok: false, reason: "unknown" };
+    const game = (await roomGames(user)).find((entry) => entry.id === found.game);
+    if (!game) return { ok: false, reason: "missing" };
     const playing = session.players.filter((row) => card.stillPlaying(row, now));
     const inGame = playing.some((row) => row.userId === user.id);
-    if (!inGame && playing.length >= MAX_PLAYERS) return { ok: false, reason: "full" };
+    if (!inGame && playing.length >= seats(game)) return { ok: false, reason: "full" };
     await sessions.grantRoom(found.id, user.id, now);
-    return { ok: true, href: card.lobbyHref(found.id) };
+    return { ok: true, href: card.lobbyHref(found.id), game: found.game };
 }
 
 /** A public room as the list draws it. */
@@ -132,23 +152,27 @@ export type PublicRoomsAnswer =
     | { readonly ok: true; readonly rooms: readonly PublicRoom[] }
     | { readonly ok: false; readonly reason: RoomRefusal };
 
-/** The public rooms the reader could join now: running, of a game they can
- *  play, with a seat left. Answers why not for somebody who cannot play. */
-export async function publicGameRooms(): Promise<PublicRoomsAnswer> {
+/** The public rooms the reader could join now: running, of a game with rooms,
+ *  with a seat left - of one game when it is named (`{ game }`), the list a
+ *  game's own page shows. Answers why not for somebody who cannot play. */
+export async function publicGameRooms(input?: unknown): Promise<PublicRoomsAnswer> {
+    const parsed = listSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, reason: "invalid" };
     const user = await requireUser();
     const refused = await mayPlayTogether(user);
     if (refused) return { ok: false, reason: refused };
     const now = Date.now();
     const [rows, games] = await Promise.all([
-        sessions.publicRooms(now),
-        callActivityGames(await getUserLocale(user.id))
+        sessions.publicRooms(now, parsed.data?.game),
+        roomGames(user)
     ]);
     const open = rows.flatMap((row) => {
         const game = games.find((entry) => entry.id === row.game);
         if (!game || card.sessionEnded({ ...row, callEnded: false }, now)) return [];
         const players = row.players.filter((player) => card.stillPlaying(player, now)).length;
-        if (players >= MAX_PLAYERS) return [];
-        return [{ row, gameName: game.name, players }];
+        const max = seats(game);
+        if (players >= max) return [];
+        return [{ row, gameName: game.name, players, max }];
     });
     const hosts =
         open.length > 0
@@ -159,7 +183,7 @@ export async function publicGameRooms(): Promise<PublicRoomsAnswer> {
             : [];
     return {
         ok: true,
-        rooms: open.map(({ row, gameName, players }) => ({
+        rooms: open.map(({ row, gameName, players, max }) => ({
             id: row.id,
             game: row.game,
             gameName,
@@ -168,8 +192,23 @@ export async function publicGameRooms(): Promise<PublicRoomsAnswer> {
                 name: hosts.find((person) => person.id === row.startedById)?.name ?? ""
             },
             players,
-            max: MAX_PLAYERS,
+            max,
             href: card.lobbyHref(row.id)
         }))
     };
+}
+
+export type RoomCountsAnswer =
+    | { readonly ok: true; readonly counts: Readonly<Record<string, number>> }
+    | { readonly ok: false; readonly reason: RoomRefusal };
+
+/** How many public rooms are open now for each game with rooms, by game id -
+ *  what the library's cards show; the rooms themselves are on each game's
+ *  page. */
+export async function publicRoomCounts(): Promise<RoomCountsAnswer> {
+    const answer = await publicGameRooms();
+    if (!answer.ok) return answer;
+    const counts: Record<string, number> = {};
+    for (const room of answer.rooms) counts[room.game] = (counts[room.game] ?? 0) + 1;
+    return { ok: true, counts };
 }

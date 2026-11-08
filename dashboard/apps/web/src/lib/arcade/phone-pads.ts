@@ -46,6 +46,10 @@ interface Pad {
     readonly code: string;
     readonly ownerId: string;
     readonly openedAt: number;
+    /** The game it was opened for (its id) and the device it is open on, as
+     *  the owner's phone lists it; empty when not known. */
+    readonly game: string;
+    readonly device: string;
     phone: { token: string; userId: string; name: string } | null;
     readonly hosts: Set<(event: HostEvent) => void>;
     readonly phones: Set<(event: PhoneEvent) => void>;
@@ -83,7 +87,10 @@ function freshCode(): string {
 }
 
 /** Opens a pad for `ownerId`, or null where they (or the instance) hold too many. */
-export function openPad(ownerId: string): { id: string; code: string } | null {
+export function openPad(
+    ownerId: string,
+    about: { game?: string; device?: string } = {}
+): { id: string; code: string } | null {
     sweep();
     const owned = [...pads.values()].filter((pad) => pad.ownerId === ownerId);
     // The oldest of the owner's pads makes way: a reloaded game tab leaves one behind
@@ -95,6 +102,8 @@ export function openPad(ownerId: string): { id: string; code: string } | null {
         code: freshCode(),
         ownerId,
         openedAt: Date.now(),
+        game: about.game ?? "",
+        device: about.device ?? "",
         phone: null,
         hosts: new Set(),
         phones: new Set(),
@@ -123,12 +132,19 @@ export function closeOwnedPad(id: string, ownerId: string): boolean {
 }
 
 /** The owner's pads still waiting for a phone, newest first: what the phone offers with one tap. */
-export function waitingPads(ownerId: string): { id: string; openedAt: number }[] {
+export function waitingPads(
+    ownerId: string
+): { id: string; openedAt: number; game: string; device: string }[] {
     sweep();
     return [...pads.values()]
         .filter((pad) => pad.ownerId === ownerId && !pad.phone)
         .sort((a, b) => b.openedAt - a.openedAt)
-        .map((pad) => ({ id: pad.id, openedAt: pad.openedAt }));
+        .map((pad) => ({
+            id: pad.id,
+            openedAt: pad.openedAt,
+            game: pad.game,
+            device: pad.device
+        }));
 }
 
 /**

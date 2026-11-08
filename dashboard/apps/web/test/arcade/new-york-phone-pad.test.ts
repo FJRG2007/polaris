@@ -11,7 +11,8 @@ import { readFileSync } from "node:fs";
 import * as pads from "@/lib/arcade/phone-pads";
 import * as input from "../../../arcade/src/screens/phone-pad-input";
 import * as phonePad from "../../../arcade/game/new-york/engine/phone-pad.js";
-import * as start from "../../../arcade/game/new-york/engine/start-screen.js";
+import * as start from "../../../arcade/game/shared/start-screen.js";
+import { t } from "../../../arcade/game/new-york/engine/i18n.js";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("phone pads on the server", () => {
@@ -274,13 +275,15 @@ describe("the start screen with a phone", () => {
         };
         const onChoose = vi.fn();
         const view = new start.StartScreen({
+            t,
+            storageKey: "nyc-input",
             gamepad: () => ({ connected: false, padName: "" }),
             phone: phone as never,
             onChoose,
             onOpenChange: vi.fn()
         });
         view.open();
-        document.querySelector<HTMLButtonElement>('[data-start-open="controller"]')!.click();
+        // The phone is a way to play on the first page, not behind another
         document.querySelector<HTMLButtonElement>('[data-start-open="phone"]')!.click();
         expect(phone.request).toHaveBeenCalled();
         expect(
@@ -297,20 +300,53 @@ describe("the start screen with a phone", () => {
         phone.connected = true;
         listeners.forEach((listener) => listener());
         expect(onChoose).toHaveBeenCalledWith("phone");
-        expect(start.rememberedChoice()).toBe("phone");
+        expect(start.rememberedChoice("nyc-input")).toBe("phone");
     });
 
-    it("goes back from the phone page to the controllers", () => {
+    it("goes back from the phone page to every way to play", () => {
         const view = new start.StartScreen({
+            t,
+            storageKey: "nyc-input",
             gamepad: () => ({ connected: false, padName: "" }),
             onChoose: vi.fn(),
             onOpenChange: vi.fn()
         });
         view.open();
-        view.show("controller");
         view.show("phone");
         expect(document.getElementById("start-phone-status")!.textContent).not.toBe("");
         view.goBack();
-        expect(view.view).toBe("controller");
+        expect(view.view).toBe("main");
+        expect(document.activeElement).toBe(document.querySelector('[data-start-open="phone"]'));
+    });
+});
+
+describe("a phone on the same account", () => {
+    beforeEach(() => pads.resetPadsForTests());
+
+    it("lists the owner's waiting games by game and device, and nobody else's", () => {
+        const mine = pads.openPad("owner", { game: "new-york", device: "Chrome on Windows" })!;
+        pads.openPad("stranger", { game: "new-york", device: "Firefox on Linux" });
+        expect(pads.waitingPads("owner")).toEqual([
+            {
+                id: mine.id,
+                openedAt: expect.any(Number),
+                game: "new-york",
+                device: "Chrome on Windows"
+            }
+        ]);
+        // An older game page names nothing: still listed, with nothing to name it by
+        const bare = pads.openPad("owner")!;
+        expect(pads.waitingPads("owner").find((pad) => pad.id === bare.id)).toMatchObject({
+            game: "",
+            device: ""
+        });
+    });
+
+    it("connects with one tap only for the owner; another account needs the code", () => {
+        const pad = pads.openPad("owner", { game: "new-york" })!;
+        expect(pads.claimPad({ id: pad.id }, { userId: "stranger", name: "Stranger" })).toBeNull();
+        expect(pads.waitingPads("owner")).toHaveLength(1);
+        expect(pads.claimPad({ id: pad.id }, { userId: "owner", name: "Owner" })).not.toBeNull();
+        expect(pads.waitingPads("owner")).toEqual([]);
     });
 });

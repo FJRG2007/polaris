@@ -26,9 +26,7 @@
         "title": "Phone controller",
         "intro": "Play a game open on another screen with this phone.",
         "mine": "Waiting on your account",
-        "connectMine": "Connect to your game",
-        "connectMineNth": "Connect to game {n}",
-        "code": "Code on the game screen",
+        "code": "Code from another account",
         "connect": "Connect",
         "connecting": "Connecting",
         "notFound": "No game is waiting for that code. Check the code on the game screen.",
@@ -51,10 +49,19 @@
         "horn": "Horn",
         "camera": "Camera",
         "previous": "Previous",
-        "next": "Next one"
+        "next": "Next one",
+        "none": "No game is open on your account right now. To control one on another account, type the code it shows.",
+        "controlOne": "Control {game} on {device}",
+        "waitingLine": "{device} - opened at {time}",
+        "someGame": "A game",
+        "someDevice": "another screen"
     },
     "loadingInCall": "Loading...",
     "together": "Play with others",
     "togetherIntro": "Open a room, share its code, or join one already running.",
-    "togetherDenied": "An admin has turned off playing with others for your account."
+    "togetherDenied": "An admin has turned off playing with others for your account.",
+    "openRooms": "Open rooms: {count}",
+    "phonePad": "Phone controller",
+    "phonePadIntro": "Control a game open on another screen",
+    "multiplayerBadge": "Multiplayer"
 }

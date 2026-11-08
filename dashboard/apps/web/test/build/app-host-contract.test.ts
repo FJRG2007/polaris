@@ -217,6 +217,7 @@ const EAGER_UI = [
     "appAppsInstalledIdAccessActions.revokeInstallAccessAction",
     "appAppsInstalledIdAccessActions.shareInstallAction",
     "arcadeInvite.gameInviteAccess",
+    "arcadeRooms.publicRoomCounts",
     "serverPicker.dropServerOptions"
 ];
 

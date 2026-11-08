@@ -47,6 +47,8 @@ type CallActivityHost = AppHostTypes["CallActivityHost"];
 const fromGame = z.discriminatedUnion("type", [
     z.object({ type: z.literal("polaris-game:hello") }),
     z.object({ type: z.literal("polaris-game:exit") }),
+    // The reader chose Play with others on the game's start screen
+    z.object({ type: z.literal("polaris-game:rooms") }),
     z.object({
         type: z.literal("polaris-game:progress"),
         stage: z.enum(["data", "build", "compile"]),
@@ -99,15 +101,25 @@ type Load =
 
 const STARTING: Load = { phase: "starting" };
 
+/** Play with others as the game's start screen offers it: on, shown off
+ *  with the reason, or not at all. */
+export type FrameRooms = "on" | "denied" | "off";
+
 export function GameFrame({
     game,
     call,
-    onExit
+    onExit,
+    rooms = "off",
+    onRooms
 }: {
     game: GameDefinition;
     call?: CallActivityHost;
     /** Where the game's Exit game goes; without it the game's menu has no Exit. */
     onExit?: () => void;
+    /** Whether the start screen offers Play with others; never in a call. */
+    rooms?: FrameRooms;
+    /** Called when the reader chooses Play with others in the game. */
+    onRooms?: () => void;
 }) {
     const t = useArcadeT();
     const locale = hostUi.i18nProvider.useLocale();
@@ -123,6 +135,11 @@ export function GameFrame({
     const exit = useRef(onExit);
     exit.current = onExit;
     const canExit = Boolean(onExit);
+    const roomsOffer: FrameRooms = call || !onRooms ? "off" : rooms;
+    const roomsNow = useRef(roomsOffer);
+    roomsNow.current = roomsOffer;
+    const openRooms = useRef(onRooms);
+    openRooms.current = onRooms;
     const setup = useRef<() => void>(() => {});
     setup.current = () =>
         frame.current?.contentWindow?.postMessage(
@@ -130,7 +147,8 @@ export function GameFrame({
                 type: "polaris-game:setup",
                 locale,
                 messages: gameMessages(locale, game.id),
-                exit: canExit
+                exit: canExit,
+                rooms: roomsOffer
             },
             // The sandboxed page's origin is opaque, so no origin names it: the
             // message goes to that one window, whatever it is showing.
@@ -164,7 +182,9 @@ export function GameFrame({
             if (data.type === "polaris-game:state") host.current?.onState(data);
             else if (data.type === "polaris-game:hello") setup.current();
             else if (data.type === "polaris-game:exit") exit.current?.();
-            else if (data.type === "polaris-game:call-action") {
+            else if (data.type === "polaris-game:rooms") {
+                if (roomsNow.current === "on") openRooms.current?.();
+            } else if (data.type === "polaris-game:call-action") {
                 const controls = host.current?.controls;
                 if (data.action === "mic") controls?.toggleMic();
                 else if (data.action === "leave-game") controls?.leaveGame();
@@ -189,7 +209,7 @@ export function GameFrame({
     // A change of language while the game is open reaches it too
     useEffect(() => {
         setup.current();
-    }, [locale, canExit]);
+    }, [locale, canExit, roomsOffer]);
 
     // In a call, once the city is up: join, then draw the others wherever the
     // call says they are.
@@ -271,7 +291,7 @@ export function GameFrame({
                 onLoad={onFrameLoad}
                 className="absolute inset-0 h-full w-full border-0"
             />
-            <PhonePadBridge frame={frame} />
+            <PhonePadBridge frame={frame} game={game.id} />
             {(load.phase === "starting" || load.phase === "failed") && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black px-4 text-white">
                     {load.phase === "starting" ? (

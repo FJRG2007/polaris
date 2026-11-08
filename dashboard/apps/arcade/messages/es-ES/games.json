@@ -26,9 +26,7 @@
         "title": "Mando en el móvil",
         "intro": "Juega con este móvil a un juego abierto en otra pantalla.",
         "mine": "Esperando en tu cuenta",
-        "connectMine": "Conectar con tu juego",
-        "connectMineNth": "Conectar con el juego {n}",
-        "code": "Código del juego",
+        "code": "Código de otra cuenta",
         "connect": "Conectar",
         "connecting": "Conectando",
         "notFound": "Ningún juego espera ese código. Revisa el código en la pantalla del juego.",
@@ -51,10 +49,19 @@
         "horn": "Claxon",
         "camera": "Cámara",
         "previous": "Anterior",
-        "next": "Otro"
+        "next": "Otro",
+        "none": "Ahora no hay ningún juego abierto en tu cuenta. Para controlar uno de otra cuenta, escribe el código que muestra.",
+        "controlOne": "Controlar {game} en {device}",
+        "waitingLine": "{device} - abierto a las {time}",
+        "someGame": "Un juego",
+        "someDevice": "otra pantalla"
     },
     "loadingInCall": "Cargando...",
     "together": "Jugar con otros",
     "togetherIntro": "Abre una sala, comparte su código o únete a una en marcha.",
-    "togetherDenied": "Un administrador ha desactivado jugar con otros en tu cuenta."
+    "togetherDenied": "Un administrador ha desactivado jugar con otros en tu cuenta.",
+    "openRooms": "Salas abiertas: {count}",
+    "phonePad": "Mando con el móvil",
+    "phonePadIntro": "Controla un juego abierto en otra pantalla",
+    "multiplayerBadge": "Multijugador"
 }

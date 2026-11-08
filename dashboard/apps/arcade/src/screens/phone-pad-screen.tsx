@@ -10,6 +10,8 @@
  */
 
 import { useArcadeT } from "./i18n";
+import { findGame } from "../games/registry";
+import { hostUi } from "@polaris/app-host/client";
 import { Button, Input, Switch } from "@polaris/ui";
 import { padFrame, stickAxes, tiltAxis, type PadControls } from "./phone-pad-input";
 import {
@@ -21,6 +23,12 @@ import {
 } from "react";
 
 type Claimed = { id: string; token: string };
+/** A game open on the reader's own account, waiting for a phone. */
+type Waiting = { id: string; openedAt: number; game?: string; device?: string };
+
+/** How often the list of the reader's waiting games is asked again, so a game
+ *  opened on another screen turns up without a reload. */
+export const WAITING_POLL_MS = 4000;
 type Problem = "notFound" | "tooMany" | "failed" | "closed" | "lost" | null;
 
 /** Where each on-screen button sits in the standard layout. */
@@ -40,7 +48,8 @@ const FRAME_GAP_MS = 33;
 
 export function PhonePadScreen() {
     const t = useArcadeT();
-    const [mine, setMine] = useState<{ id: string }[]>([]);
+    const locale = hostUi.i18nProvider.useLocale();
+    const [mine, setMine] = useState<Waiting[] | null>(null);
     const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<Problem>(null);
@@ -80,14 +89,28 @@ export function PhonePadScreen() {
             return;
         }
         let live = true;
-        void fetch("/api/arcade/pad")
-            .then((response) => (response.ok ? response.json() : { pads: [] }))
-            .then((body: { pads?: { id: string }[] }) => live && setMine(body.pads ?? []))
-            .catch(() => {});
+        const read = () => {
+            if (document.hidden) return;
+            void fetch("/api/arcade/pad", { cache: "no-store" })
+                .then((response) => (response.ok ? response.json() : { pads: [] }))
+                .then((body: { pads?: Waiting[] }) => live && setMine(body.pads ?? []))
+                .catch(() => {});
+        };
+        read();
+        const timer = window.setInterval(read, WAITING_POLL_MS);
+        document.addEventListener("visibilitychange", read);
         return () => {
             live = false;
+            window.clearInterval(timer);
+            document.removeEventListener("visibilitychange", read);
         };
     }, [claim]);
+
+    const gameName = (pad: Waiting) =>
+        pad.game && findGame(pad.game) ? t(`games.${pad.game}.name` as never) : t("pad.someGame");
+    const device = (pad: Waiting) => pad.device || t("pad.someDevice");
+    const openedAt = (pad: Waiting) =>
+        new Date(pad.openedAt).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 
     if (claimed)
         return (
@@ -107,22 +130,49 @@ export function PhonePadScreen() {
                 <h1 className="truncate text-lg font-semibold">{t("pad.title")}</h1>
                 <p className="text-sm text-muted-foreground">{t("pad.intro")}</p>
             </div>
-            {mine.length > 0 && (
-                <div className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">{t("pad.mine")}</p>
-                    {mine.map((pad, i) => (
-                        <Button
-                            key={pad.id}
-                            disabled={busy}
-                            onClick={() => void claim({ id: pad.id })}
-                        >
-                            {mine.length === 1
-                                ? t("pad.connectMine")
-                                : t("pad.connectMineNth", { n: i + 1 })}
-                        </Button>
-                    ))}
-                </div>
-            )}
+            <section className="flex min-w-0 flex-col gap-2" aria-live="polite">
+                <p className="text-sm font-medium">{t("pad.mine")}</p>
+                {mine === null ? (
+                    <div className="h-14 w-full animate-pulse rounded-md bg-muted" aria-busy />
+                ) : mine.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t("pad.none")}</p>
+                ) : mine.length === 1 ? (
+                    <Button
+                        size="lg"
+                        className="h-auto min-h-14 w-full whitespace-normal py-3 text-base"
+                        disabled={busy}
+                        onClick={() => void claim({ id: mine[0]!.id })}
+                    >
+                        {t("pad.controlOne", {
+                            game: gameName(mine[0]!),
+                            device: device(mine[0]!)
+                        })}
+                    </Button>
+                ) : (
+                    <ul className="flex flex-col gap-2">
+                        {mine.map((pad) => (
+                            <li key={pad.id} className="min-w-0">
+                                <Button
+                                    variant="outline"
+                                    className="h-auto w-full min-w-0 flex-col items-start gap-0.5 whitespace-normal py-2 text-left"
+                                    disabled={busy}
+                                    onClick={() => void claim({ id: pad.id })}
+                                >
+                                    <span className="w-full truncate font-medium">
+                                        {gameName(pad)}
+                                    </span>
+                                    <span className="w-full truncate text-xs text-muted-foreground">
+                                        {t("pad.waitingLine", {
+                                            device: device(pad),
+                                            time: openedAt(pad)
+                                        })}
+                                    </span>
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </section>
             <form
                 className="flex flex-col gap-2"
                 onSubmit={(event) => {

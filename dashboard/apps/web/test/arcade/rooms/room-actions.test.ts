@@ -37,7 +37,10 @@ const state = vi.hoisted(() => ({
         players: Row[];
         createdAt: Date;
     },
-    listed: [] as unknown[]
+    listed: [] as unknown[],
+    listedFor: [] as (string | undefined)[],
+    seats: 32,
+    roomGame: "new-york"
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -62,7 +65,11 @@ vi.mock("@/lib/rate-limit-service", () => ({
 vi.mock("@/lib/i18n/locale-service", () => ({ getUserLocale: async () => "en-US" }));
 vi.mock("@/lib/apps/install-presence", () => ({ isAppInstalled: async () => state.installed }));
 vi.mock("@/lib/app-extensions/registry", () => ({
-    callActivityGames: async () => [{ id: "new-york", name: "Skyline Roam", src: "/x" }]
+    // A game with rooms, and one played together only in a call
+    callActivityGames: async () => [
+        { id: "new-york", name: "Skyline Roam", src: "/x", rooms: { maxPlayers: state.seats } },
+        { id: "call-only", name: "Call Only", src: "/y" }
+    ]
 }));
 vi.mock("@/lib/chat/access", () => ({
     requireChannel: async () => {
@@ -80,7 +87,7 @@ vi.mock("@/lib/chat/activity-sessions", () => ({
         return { id: ROOM, channelId: null, game, messageId: null, code };
     },
     roomByCode: async (code: string) =>
-        state.room && state.room.code === code ? { id: state.room.id, game: "new-york" } : null,
+        state.room && state.room.code === code ? { id: state.room.id, game: state.roomGame } : null,
     sessionForCard: async () =>
         state.room
             ? {
@@ -96,7 +103,10 @@ vi.mock("@/lib/chat/activity-sessions", () => ({
         state.granted.push(userId);
     },
     holdsInvite: async () => state.invited,
-    publicRooms: async () => state.listed
+    publicRooms: async (_now: number, game?: string) => {
+        state.listedFor.push(game);
+        return state.listed;
+    }
 }));
 
 import * as rooms from "@/app/(app)/chat/room-actions";
@@ -131,12 +141,15 @@ beforeEach(() => {
         createdAt: now()
     };
     state.listed = [];
+    state.listedFor = [];
+    state.seats = 32;
+    state.roomGame = "new-york";
 });
 
 describe("creating a room", () => {
     it("opens one under a fresh code and sends the opener to it", async () => {
         const answer = await rooms.createGameRoom({ game: "new-york", isPublic: true });
-        expect(answer).toEqual({ ok: true, href: `/chat/play/${ROOM}` });
+        expect(answer).toEqual({ ok: true, href: `/chat/play/${ROOM}`, game: "new-york" });
         const [opened] = state.opened;
         expect(opened).toMatchObject({ game: "new-york", isPublic: true });
         expect(opened!.code).toHaveLength(ROOM_CODE_LENGTH);
@@ -186,7 +199,8 @@ describe("joining by code", () => {
     it("takes the code as typed - lower case, a dash, spaces - and lets the reader in", async () => {
         expect(await rooms.joinGameRoom({ code: " abcd-2345 " })).toEqual({
             ok: true,
-            href: `/chat/play/${ROOM}`
+            href: `/chat/play/${ROOM}`,
+            game: "new-york"
         });
         expect(state.granted).toEqual(["user-1"]);
         expect(state.limitKeys).toEqual(["arcade-room-code:user-1"]);
@@ -207,6 +221,29 @@ describe("joining by code", () => {
             reason: "unknown"
         });
         expect(state.granted).toEqual([]);
+    });
+
+    it("opens the game the code's room belongs to, and only a game with rooms", async () => {
+        expect(await rooms.joinGameRoom({ code: "ABCD2345" })).toMatchObject({
+            ok: true,
+            game: "new-york"
+        });
+        state.granted = [];
+        state.roomGame = "call-only";
+        expect(await rooms.joinGameRoom({ code: "ABCD2345" })).toEqual({
+            ok: false,
+            reason: "missing"
+        });
+        expect(state.granted).toEqual([]);
+    });
+
+    it("seats no more than the game declares", async () => {
+        state.seats = 2;
+        state.room!.players = playing(2);
+        expect(await rooms.joinGameRoom({ code: "ABCD2345" })).toEqual({
+            ok: false,
+            reason: "full"
+        });
     });
 
     it("refuses a full room", async () => {
@@ -267,6 +304,29 @@ describe("the public rooms", () => {
                 }
             ]
         });
+    });
+
+    it("asks for one game's rooms when named, and counts each game's for the library", async () => {
+        state.listed = [listed(playing(1)), listed(playing(2))];
+        expect(await rooms.publicGameRooms({ game: "new-york" })).toMatchObject({ ok: true });
+        expect(state.listedFor).toEqual(["new-york"]);
+        expect(await rooms.publicRoomCounts()).toEqual({ ok: true, counts: { "new-york": 2 } });
+        expect(state.listedFor).toEqual(["new-york", undefined]);
+        expect(await rooms.publicGameRooms({ game: 7 })).toEqual({ ok: false, reason: "invalid" });
+    });
+
+    it("leaves out a room of a game without rooms, and one past the game's seats", async () => {
+        state.seats = 2;
+        state.listed = [listed(playing(1), "call-only"), listed(playing(2))];
+        expect(await rooms.publicGameRooms()).toEqual({ ok: true, rooms: [] });
+    });
+
+    it("refuses a room for a game played together only in a call", async () => {
+        expect(await rooms.createGameRoom({ game: "call-only", isPublic: false })).toEqual({
+            ok: false,
+            reason: "missing"
+        });
+        expect(state.opened).toEqual([]);
     });
 
     it("leaves out a full room, a finished one and one of a game not offered", async () => {

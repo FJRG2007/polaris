@@ -44,7 +44,16 @@ const padEvent = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("phone"), connected: z.boolean(), name: z.string() })
 ]);
 
-export function PhonePadBridge({ frame }: { frame: RefObject<HTMLIFrameElement | null> }) {
+export function PhonePadBridge({
+    frame,
+    game
+}: {
+    frame: RefObject<HTMLIFrameElement | null>;
+    /** The game's id, so the owner's phone lists the pad by the game's name. */
+    game?: string;
+}) {
+    const gameId = useRef(game);
+    gameId.current = game;
     // Read here, not at import: a host without an encoder (a test) still mounts the frame
     const QRCodeSVG = hostUi.qrCode?.QRCodeSVG;
     // Links go out on the Polaris domain, not the address this tab was opened on
@@ -79,7 +88,11 @@ export function PhonePadBridge({ frame }: { frame: RefObject<HTMLIFrameElement |
             }
             opening.current = true;
             try {
-                const response = await fetch("/api/arcade/pad", { method: "POST" });
+                const response = await fetch("/api/arcade/pad", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(gameId.current ? { game: gameId.current } : {})
+                });
                 const opened = padOpened.safeParse(response.ok ? await response.json() : null);
                 if (!opened.success) throw new Error("pad refused");
                 const events = new EventSource(`/api/arcade/pad/${opened.data.id}`);

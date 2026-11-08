@@ -293,7 +293,7 @@
   <!-- A gamepad connected or lost (main.js shows it for a few seconds) -->
   <div id="pad-notice" class="panel pad-notice" popover="manual" role="status" aria-live="polite"></div>
 
-  <!-- Start screen (start-screen.js): how to play, chosen before anything moves -->
+  <!-- Start screen (../shared/start-screen.js): every way to play, chosen before anything moves -->
   <dialog id="start-screen" class="game-menu start-screen" aria-labelledby="start-title">
     <div class="panel menu-panel">
       <header class="menu-head">
@@ -302,11 +302,9 @@
       </header>
       <div class="menu-view" data-start-view="main">
         <button class="menu-item" type="button" data-start-choose="device"><span class="menu-option-text"><span class="menu-name" data-t="start.device"></span><span class="menu-sub" data-t="start.deviceHint"></span></span></button>
-        <button class="menu-item" type="button" data-start-open="controller"><span class="menu-option-text"><span class="menu-name" data-t="start.controller"></span><span class="menu-sub" data-t="start.controllerHint"></span></span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
-      </div>
-      <div class="menu-view" data-start-view="controller" hidden>
         <button class="menu-item" type="button" data-start-choose="gamepad" disabled><span class="menu-option-text"><span class="menu-name" data-t="start.gamepad"></span><span id="start-pad-status" class="menu-sub" aria-live="polite"></span></span></button>
         <button class="menu-item" type="button" data-start-open="phone"><span class="menu-option-text"><span class="menu-name" data-t="start.phone"></span><span class="menu-sub" data-t="start.phoneHint"></span></span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+        <button class="menu-item" type="button" data-start-together hidden disabled><span class="menu-option-text"><span class="menu-name" data-t="start.together"></span><span id="start-together-status" class="menu-sub"></span></span></button>
       </div>
       <div class="menu-view" data-start-view="phone" hidden>
         <div class="start-phone">

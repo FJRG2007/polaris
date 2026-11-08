@@ -11,7 +11,9 @@
 //                                                              lamps: { brake 0..1, reverse, signal -1|0|1 }, only while one is lit
 //      polaris-game:exit                                       (the reader chose Exit game in the menu)
 //      polaris-game:call-action { action: 'mic' | 'leave-game' | 'leave-call' }   (a call control in the menu)
-// In:  polaris-game:setup { locale, messages, exit }            (the reader's words; whether Exit game is offered)
+//      polaris-game:rooms                                      (the reader chose Play with others on the start screen)
+// In:  polaris-game:setup { locale, messages, exit, rooms? }    (the reader's words; whether Exit game is offered;
+//                                                              rooms: 'on' | 'denied' | 'off', Play with others)
 //      polaris-game:join { self: { id, name } }
 //      polaris-game:players { players: [{ id, name, x, y, z, heading, mode, lamps? }] }   (everyone else, replaces the last list)
 //      polaris-game:leave
@@ -33,6 +35,9 @@ let canExit = false;
 const listeners = new Set();
 const progressListeners = new Set();
 const exitListeners = new Set();
+const ROOM_STATES = new Set(['on', 'denied', 'off']);
+let rooms = 'off';
+const roomListeners = new Set();
 let call = null;
 const callListeners = new Set();
 const CALL_ACTIONS = new Set(['mic', 'leave-game', 'leave-call']);
@@ -77,6 +82,21 @@ export function callAction(action) {
 /** Called when the host says whether Exit game is offered. */
 export function onExitAvailability(listener) {
   exitListeners.add(listener);
+}
+
+/** Play with others as the host offers it: 'on', 'denied' (shown off, with the reason) or 'off' (not shown). */
+export function roomsState() {
+  return rooms;
+}
+
+/** Called whenever the host says again whether Play with others is offered. */
+export function onRoomsChange(listener) {
+  roomListeners.add(listener);
+}
+
+/** Ask the host to show its rooms for this game over the page. */
+export function openRooms() {
+  if (rooms === 'on') tellHost({ type: 'polaris-game:rooms' });
 }
 
 export function exitGame() {
@@ -152,6 +172,8 @@ window.addEventListener('message', (event) => {
     else keepFallback();
     canExit = data.exit === true;
     for (const listener of exitListeners) listener(canExit);
+    rooms = ROOM_STATES.has(data.rooms) ? data.rooms : 'off';
+    for (const listener of roomListeners) listener(rooms);
   } else if (data.type === 'polaris-game:call') {
     call = data.controls === true ? { micOn: data.micOn === true } : null;
     for (const listener of callListeners) listener(call);
