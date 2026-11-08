@@ -49,7 +49,9 @@ describe("the account rail", () => {
         // What is left is the account itself, under no group of its own. Asserted
         // as "no credential screen is loose" rather than as a fixed list, so a new
         // profile screen does not fail this and a new security one does.
-        const ungrouped = sections.filter((section) => section.group === undefined).map((section) => section.href);
+        const ungrouped = sections
+            .filter((section) => section.group === undefined)
+            .map((section) => section.href);
         expect(ungrouped).toContain("/account");
         expect(
             ungrouped.filter((href) => [...SECURITY_SCREENS, ...DEVELOPER_SCREENS].includes(href))
