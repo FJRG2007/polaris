@@ -403,7 +403,8 @@ export function enableLogin(
  * one that is not itself writing the project list: that save is the
  * join-password card turning the guard off, and putting it back here would make
  * that button do nothing. The current environment is read only when both hold, so
- * an ordinary save costs no extra lookup.
+ * an ordinary save costs no extra lookup. A save that writes the list itself - the
+ * Mods screen - only loses a guard its release cannot load (`unfitGuardRemoved`).
  *
  * Polaris's login mod is looked at first. It has a build per release, so a save
  * that moves the server to software or a release it has none for takes it off -
@@ -422,12 +423,14 @@ export async function guardForSave(
     const writes = await loginGuardForSave(vars, once);
     const software = vars.find((entry) => entry.key === SOFTWARE_KEY)?.value;
     const version = vars.find((entry) => entry.key === "VERSION")?.value;
+    const projects = vars.find((entry) => entry.key === PROJECTS_KEY)?.value;
+    // A list saved by hand still never carries the guard onto a release it
+    // stops at boot.
+    if (projects !== undefined)
+        return [...writes, ...(await unfitInSaved(projects, software, version, once))];
     // Polaris's anti-cheat comes off software or a release its build does not
-    // load on, from the list as the login's own writes above leave it. Never on
-    // the card's own write.
-    if ((!software && !version) || vars.some((entry) => entry.key === PROJECTS_KEY)) {
-        return writes;
-    }
+    // load on, from the list as the login's own writes above leave it.
+    if (!software && !version) return writes;
     const current = await once();
     const nextSoftware = software || (current.get(SOFTWARE_KEY) ?? "");
     const nextVersion = version ?? current.get("VERSION") ?? "";
@@ -448,6 +451,27 @@ export async function guardForSave(
     );
     // Symbiote, off a release it does not load on.
     return overlay(afterSounds, symbioteMovedTo(nextSoftware, nextVersion, mods(afterSounds)));
+}
+
+/** The saved list without a guard its software and release cannot load, as a
+ *  write over it, or nothing when it carries none. */
+async function unfitInSaved(
+    projects: string,
+    software: string | undefined,
+    version: string | undefined,
+    readEnv: () => Promise<ReadonlyMap<string, string>>
+): Promise<{ key: string; value: string }[]> {
+    const listed = parseProjectList(projects).some((entry) =>
+        JOIN_GUARD_SLUGS.includes(slugOf(entry))
+    );
+    if (!listed) return [];
+    const current = software && version !== undefined ? null : await readEnv();
+    const cleaned = unfitGuardRemoved(
+        projects,
+        software || (current?.get(SOFTWARE_KEY) ?? ""),
+        version ?? current?.get(VERSION_KEY) ?? ""
+    );
+    return cleaned === null ? [] : [{ key: PROJECTS_KEY, value: cleaned }];
 }
 
 /** A list of writes with these keys written over, or as it was for none. */

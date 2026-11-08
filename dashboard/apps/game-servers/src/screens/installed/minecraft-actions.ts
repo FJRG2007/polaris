@@ -63,7 +63,7 @@ import { readMinecraftStats } from "../../lib/minecraft/stats-service";
 import {
     guardForSave,
     joinGuardFor,
-    joinGuardRunsOn,
+    joinGuardFits,
     PROJECTS_KEY,
     SOFTWARE_KEY
 } from "../../lib/minecraft/join-guard";
@@ -2535,8 +2535,10 @@ export async function projectFitsAction(input: {
         const version = env.find((entry) => entry.key === "VERSION")?.value ?? "";
         // A password project lists builds for releases it stops at boot on, so
         // its own floor is asked first rather than left to Modrinth.
-        const guard = joinGuardFor(software);
-        if (guard?.slug === parsed.data.slug.toLowerCase() && !joinGuardRunsOn(guard, version)) {
+        if (
+            joinGuardFor(software)?.slug === parsed.data.slug.toLowerCase() &&
+            joinGuardFits(software, version) === null
+        ) {
             return { fits: false, version };
         }
         if (!loader || wantsLatest(version)) return { fits: true };
@@ -2673,7 +2675,11 @@ export async function updateServerSettingsAction(
                 (current) => new Map(current.map((entry) => [entry.key, entry.value ?? ""]))
             ));
         const moved = await guardForSave(vars, readCurrent);
-        for (const entry of moved) vars.push({ ...entry, isSecret: false });
+        for (const entry of moved) {
+            const saved = vars.find((item) => item.key === entry.key);
+            if (saved) saved.value = entry.value;
+            else vars.push({ ...entry, isSecret: false });
+        }
         // A loader held for the old release is the wrong one for a new release or
         // new software: it is let go, and the new release's own is held once the
         // server is up on it.

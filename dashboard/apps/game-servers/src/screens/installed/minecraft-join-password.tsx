@@ -60,7 +60,7 @@ import { projectFitsAction, updateServerSettingsAction } from "./minecraft-actio
 import {
     foreignLogin,
     joinGuardFor,
-    joinGuardRunsOn,
+    joinGuardFits,
     joinGuardSlugs,
     PROJECTS_KEY
 } from "../../lib/minecraft/join-guard";
@@ -127,7 +127,7 @@ export function MinecraftJoinPassword({
      *  older slug it replaced, which is left to work as it already did. */
     const blocked =
         guard !== null &&
-        !joinGuardRunsOn(guard, version) &&
+        joinGuardFits(software, version) === null &&
         (listed === null || listed === guard.slug);
     // Only software Polaris login has a build for is asked about it.
     const modCapable = java && polarisLogin.hasBuildFor(software);

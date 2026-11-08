@@ -110,19 +110,34 @@ describe("which guard a server can take", () => {
 describe("what a new server's project list comes out with", () => {
     it("adds no guard to a plugin server", () => {
         // Opt-in: closing the server is the operator's call, not a default.
-        const list = protectionFor("java", "PAPER", "grimac?:alpha,coreprotect?,luckperms?", LATEST);
+        const list = protectionFor(
+            "java",
+            "PAPER",
+            "grimac?:alpha,coreprotect?,luckperms?",
+            LATEST
+        );
         expect(guardsOn(list)).toEqual([]);
     });
 
     it("keeps the plugins it was already given", () => {
         // The guard is added to the list, not substituted for it.
-        const list = protectionFor("java", "PAPER", "grimac?:alpha,coreprotect?,luckperms?", LATEST);
+        const list = protectionFor(
+            "java",
+            "PAPER",
+            "grimac?:alpha,coreprotect?,luckperms?",
+            LATEST
+        );
         expect(slugs(list)).toEqual(expect.arrayContaining(["grimac", "coreprotect", "luckperms"]));
     });
 
     it("carries no guard, and none of the plugins, on a modded server", () => {
         // Those three are Bukkit plugins and a modded server cannot load them.
-        const list = protectionFor("java", "NEOFORGE", "grimac?:alpha,coreprotect?,luckperms?", LATEST);
+        const list = protectionFor(
+            "java",
+            "NEOFORGE",
+            "grimac?:alpha,coreprotect?,luckperms?",
+            LATEST
+        );
         expect(guardsOn(list)).toEqual([]);
         expect(slugs(list)).not.toContain("grimac");
         expect(slugs(list)).not.toContain("luckperms");
@@ -270,6 +285,26 @@ describe("a release the plugin guard cannot load on", () => {
                 (entry) => entry.key === PROJECTS_KEY
             )
         ).toEqual([]);
+    });
+
+    it("comes off a list saved by hand on a release it cannot load", async () => {
+        const read = vi.fn(
+            async () =>
+                new Map([
+                    ["TYPE", "PAPER"],
+                    ["VERSION", "1.20.4"]
+                ])
+        );
+        const saved = [{ key: "MODRINTH_PROJECTS", value: `coreprotect?,${plugin}?` }];
+        expect(await guardForSave(saved, read)).toEqual([
+            { key: PROJECTS_KEY, value: "coreprotect?" }
+        ]);
+        const moved = [...saved, { key: "VERSION", value: "1.21.4" }];
+        expect(await guardForSave(moved, read)).toEqual([]);
+        const plain = [{ key: "MODRINTH_PROJECTS", value: "coreprotect?" }];
+        read.mockClear();
+        expect(await guardForSave(plain, read)).toEqual([]);
+        expect(read).not.toHaveBeenCalled();
     });
 
     it("is taken off an existing server by the periodic pass, and nothing else is", () => {
@@ -476,11 +511,18 @@ describe("reconciling the guard on a settings save", () => {
     });
 
     it("puts no guard on a server that had none, whatever the save moves", async () => {
-        const read = reader({ TYPE: "PAPER", VERSION: "1.21.4", MODRINTH_PROJECTS: "coreprotect?" });
+        const read = reader({
+            TYPE: "PAPER",
+            VERSION: "1.21.4",
+            MODRINTH_PROJECTS: "coreprotect?"
+        });
         for (const vars of [
             [{ key: "TYPE", value: "NEOFORGE" }],
             [{ key: "VERSION", value: "1.20.6" }],
-            [{ key: "TYPE", value: "FABRIC" }, { key: "VERSION", value: "1.21.1" }]
+            [
+                { key: "TYPE", value: "FABRIC" },
+                { key: "VERSION", value: "1.21.1" }
+            ]
         ]) {
             expect(await guardForSave(vars, read), JSON.stringify(vars)).toEqual([]);
         }
@@ -501,12 +543,23 @@ describe("reconciling the guard on a settings save", () => {
  */
 describe("the list of a server running Polaris login", () => {
     it("gets no project guard, and loses one it had", () => {
-        expect(guardsOn(protectionFor("java", "NEOFORGE", "auth?", { version: "LATEST", modOn: true }))).toEqual([]);
-        expect(guardsOn(protectionFor("java", "PAPER", "", { version: "LATEST", modOn: true }))).toEqual([]);
+        expect(
+            guardsOn(protectionFor("java", "NEOFORGE", "auth?", { version: "LATEST", modOn: true }))
+        ).toEqual([]);
+        expect(
+            guardsOn(protectionFor("java", "PAPER", "", { version: "LATEST", modOn: true }))
+        ).toEqual([]);
     });
 
     it("keeps everything that is not a guard", () => {
-        expect(slugs(protectionFor("java", "NEOFORGE", "create?,auth?", { version: "LATEST", modOn: true }))).toContain("create");
+        expect(
+            slugs(
+                protectionFor("java", "NEOFORGE", "create?,auth?", {
+                    version: "LATEST",
+                    modOn: true
+                })
+            )
+        ).toContain("create");
     });
 });
 
