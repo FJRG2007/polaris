@@ -293,7 +293,8 @@ const UPPER_LAND = landById('upper');
 
 // Land-id raster (32 m cells over the region the camera can see): cells clear of every shoreline answer landAt() with
 // one lookup, shoreline cells (255) fall back to the exact polygon tests
-const LAND_GRID = (() => {
+let LAND_GRID = null;
+async function rasterLandGrid() {
   const cell = 32;
   const minX = -16000;
   const minZ = -26000;
@@ -306,6 +307,7 @@ const LAND_GRID = (() => {
     const j0 = Math.max(0, Math.floor((b.minZ - minZ) / cell));
     const j1 = Math.min(nz - 1, Math.ceil((b.maxZ - minZ) / cell));
     for (let j = j0; j <= j1; j++) {
+      await buildSlice();
       rowCrossings(LAND[k].index, minZ + (j + 0.5) * cell, xs);
       for (let s = 0; s + 1 < xs.length; s += 2) {
         const i0 = Math.max(0, Math.ceil((xs[s] - minX) / cell - 0.5));
@@ -321,6 +323,7 @@ const LAND_GRID = (() => {
   };
   const r = cell * 0.3;
   for (const land of LAND) {
+    await buildSlice();
     const pts = land.pts;
     for (let e = 0; e < pts.length; e++) {
       const p = pts[e];
@@ -339,7 +342,7 @@ const LAND_GRID = (() => {
     }
   }
   return { cell, minX, minZ, nx, nz, data };
-})();
+}
 
 function landAt(x, z) {
   const g = LAND_GRID;
@@ -373,7 +376,8 @@ function shoreXNear(land, x, z) {
 
 // Coarse distance to Manhattan's shoreline (the detailed island south of the cut), only for level-of-detail decisions:
 // exact (to a 6 m simplification of the shore) within ~3 km of the island, bilinear from an 800 m grid beyond
-const MANHATTAN_DIST_GRID = (() => {
+let MANHATTAN_DIST_GRID = null;
+async function rasterManhattanDistance() {
   const cell = 100;
   const minX = -16000;
   const minZ = -26000;
@@ -385,9 +389,13 @@ const MANHATTAN_DIST_GRID = (() => {
   const cnx = Math.ceil((nx - 1) / k) + 1;
   const cnz = Math.ceil((nz - 1) / k) + 1;
   const coarse = new Float32Array(cnx * cnz);
-  for (let j = 0; j < cnz; j++) for (let i = 0; i < cnx; i++) coarse[j * cnx + i] = exact(minX + i * k * cell, minZ + j * k * cell);
+  for (let j = 0; j < cnz; j++) {
+    await buildSlice();
+    for (let i = 0; i < cnx; i++) coarse[j * cnx + i] = exact(minX + i * k * cell, minZ + j * k * cell);
+  }
   const data = new Float32Array(nx * nz);
   for (let j = 0; j < nz; j++) {
+    await buildSlice();
     const fj = j / k;
     const j0 = Math.min(cnz - 2, Math.floor(fj));
     const tj = fj - j0;
@@ -402,7 +410,7 @@ const MANHATTAN_DIST_GRID = (() => {
     }
   }
   return { cell, minX, minZ, nx, nz, data };
-})();
+}
 
 function distToManhattan(x, z) {
   const g = MANHATTAN_DIST_GRID;
@@ -1168,7 +1176,8 @@ const RIDGE_KEYS = [
 ];
 
 // Per-z table (20 m rows) of the cliff foot x, crest height, cliff width, back-slope reach and the foot's limit
-const RIDGE_TABLE = (() => {
+let RIDGE_TABLE = null;
+function tabulateRidge() {
   const step = 20;
   const n = Math.floor((RIDGE_Z1 - RIDGE_Z0) / step) + 1;
   const ix = NJ_LAND.index;
@@ -1316,7 +1325,7 @@ const RIDGE_TABLE = (() => {
   boxFilter(cw, 3, 3);
   for (let i = 0; i < n; i++) footX[i] = Math.min(footX[i], footMax[i]);
   return { step, n, x: footX, h, cw, back, footMax };
-})();
+}
 
 // Gullies & buttresses: the cliff line wanders a few metres and the crest height breathes (wavelengths the mesh rows
 // resolve), calm where the George Washington Bridge lands on the cliff top and far north where the rows are sparse
@@ -1469,11 +1478,17 @@ function findBuildRegions() {
   return regions;
 }
 
-// The land-use and zone maps are painted on the first build, between slices, instead of when the module loads, which
-// held the page that frames the game for a quarter of a second before anything else had started
+// The land rasters, the ridge table and the land-use and zone maps are made on the first build, between slices, instead
+// of when the module loads, which held the page that frames the game for a quarter of a second before anything else had
+// started. Everything that reads them (landAt, distToManhattan, the ridge) runs after this.
 let groundPainted = null;
 function paintGround() {
   groundPainted ??= (async () => {
+    await buildSlice();
+    LAND_GRID = await rasterLandGrid();
+    MANHATTAN_DIST_GRID = await rasterManhattanDistance();
+    await buildSlice();
+    RIDGE_TABLE = tabulateRidge();
     await buildSlice();
     paintLandUse();
     await buildSlice();

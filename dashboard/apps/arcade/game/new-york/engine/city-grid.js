@@ -811,7 +811,7 @@ function pierHullGeometry(len, beam, depth, bowFrac = 0.28, sternFrac = 0.06, do
 
 // Waterfront piers: builds every WATERFRONT_PIERS entry: concrete decks on timber piles with fenders, railings and
 // lamps, plus each pier's landmark structures. All static parts go through one batcher (~1 draw call per material).
-function buildWaterfrontPiers(group) {
+async function buildWaterfrontPiers(group) {
   const M = createWaterfrontPierMaterials();
   for (const [k, m] of Object.entries(M)) if (m && m.isMaterial) m.name = 'waterfrontPier.' + k;
   const B = createPierBoxBatcher();
@@ -1502,7 +1502,10 @@ function buildWaterfrontPiers(group) {
   };
   // [pier kinds]
 
-  for (const p of WATERFRONT_PIERS) (kinds[p.kind] || kinds.generic)(pierFrame(p), p);
+  for (const p of WATERFRONT_PIERS) {
+    await buildSlice();
+    (kinds[p.kind] || kinds.generic)(pierFrame(p), p);
+  }
 
   // Park trees: trunks and lumpy low-poly crowns (one of three summer greens) join the paint batch: no extra draw calls
   if (trees.length) {
@@ -1514,12 +1517,14 @@ function buildWaterfrontPiers(group) {
     }
     crownGeo.computeVertexNormals();
     for (const [x, y, z, r] of trees) {
+      await buildSlice();
       const th = r * (0.85 + rnd() * 0.35);
       B.box(PA, x, y + th * 0.5, z, 0.3, th, 0.3, 0, 8, true);
       const g = crownGeo.clone().scale(r, r * (0.8 + rnd() * 0.3), r);
       B.geo(PA, g, x, y + th + r * 0.6, z, rnd() * 6.28, 14 + Math.floor(rnd() * 3));
     }
   }
+  await buildSlice();
   B.build(group, new Set([BL, PA]));
 }
 
@@ -2589,7 +2594,7 @@ async function buildCityGrid(scene) {
   // Concrete decks on timber piles with fenders, railings & lanterns, plus each pier's real structures:
   // cruise terminals, Chelsea Piers, Pier 57, Little Island, Pier 40, the Intrepid, the 79th St Boat Basin,
   // Pier 17, the Wavertree, Pier 15, Pier 11 and the Staten Island Ferry Whitehall Terminal (see buildWaterfrontPiers)
-  buildWaterfrontPiers(group);
+  await buildWaterfrontPiers(group);
 
   // 9 & 10. The East River bridges, harbor islands and the surrounding boroughs are built by boroughs.js
 
@@ -3067,13 +3072,16 @@ async function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, 
   addMesh(wall, createParkWallMaterial(), true);
   await buildSlice();
   addMesh(concrete, new THREE.MeshStandardNodeMaterial({ color: 0x7f7c76, roughness: 0.92, metalness: 0.0 }));
+  await buildSlice();
   addMesh(fence, createIronFenceMaterial());
+  await buildSlice();
   // West St's underpass portal in the South Street Viaduct portal's materials (its lawn roof went in with the lawns)
   addMesh(wPortal.conc, viaduct.portalMats.conc, true);
   addMesh(wPortal.dark, viaduct.portalMats.dark);
   const wShade = addMesh(wPortal.shade, viaduct.portalMats.shade);
   if (wShade) wShade.renderOrder = 1; // over the lane markings (renderOrder -1)
 
+  await buildSlice();
   if (!roadPaint) {
     const shoreMarkings = paint.build();
     if (shoreMarkings.children.length) group.add(shoreMarkings);
