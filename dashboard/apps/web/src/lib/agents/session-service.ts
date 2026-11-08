@@ -12,6 +12,8 @@
  */
 
 import { prisma, type Prisma } from "@polaris/db";
+import { touchSession } from "./session-live";
+import { expirePermissions, settlesPermissions } from "./session-permissions";
 import * as core from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { readSessionCursor } from "./session-cursor";
@@ -549,6 +551,10 @@ export async function recordSessionEvents(
             return true;
         });
         if (!applied) continue;
+        // The agent moved past its prompt: a button for it would answer nothing.
+        if (events.some((event) => settlesPermissions(event.kind)))
+            await expirePermissions(sessionId).catch(() => undefined);
+        touchSession(sessionId);
         if (!next.stale) await tellOwner(sessionId, before, next.state);
         return next.state;
     }

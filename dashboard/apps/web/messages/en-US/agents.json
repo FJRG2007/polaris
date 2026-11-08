@@ -197,7 +197,9 @@
             "ended": "That session has ended.",
             "noAnswer": "The machine running this session did not answer.",
             "notResumable": "There is no conversation to reopen for this session yet.",
-            "stillRunning": "The agent is still running, so there is nothing to resume."
+            "stillRunning": "The agent is still running, so there is nothing to resume.",
+            "permissionGone": "That prompt is no longer waiting for an answer.",
+            "permissionAnswered": "That prompt was already answered."
         },
         "taskNote": "Handed to an agent. It is working on `{branch}` in {repo}: [the session]({href}).",
         "start": "Start a session",
@@ -386,6 +388,13 @@
             "errors": {
                 "invalid": "That history request is not valid."
             }
+        },
+        "permission": {
+            "title": "The agent asks for permission",
+            "allow": "Allow",
+            "always": "Always allow this",
+            "deny": "Deny",
+            "hint": "\"Always\" applies until this session ends. Unanswered, the agent asks again in its terminal."
         }
     },
     "rules": {

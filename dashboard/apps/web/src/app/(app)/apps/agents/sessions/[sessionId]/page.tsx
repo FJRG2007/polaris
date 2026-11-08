@@ -7,6 +7,7 @@ import { getSession, sessionEvents, sharedSession } from "@/lib/agents/session-s
 import { historyPage } from "@/lib/agents/session-history";
 import { getTranslations } from "@/lib/i18n/request";
 import { readSessionWaiting } from "@/lib/agents/agent-notices";
+import { pendingPermission } from "@/lib/agents/session-permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -25,11 +26,12 @@ export default async function AgentSessionPage({
     const t = await getTranslations("agents");
 
     // Opening the session is reading what the bell said about it.
-    const [events, history, , canControl] = await Promise.all([
+    const [events, history, , canControl, permission] = await Promise.all([
         sessionEvents(sessionId),
         historyPage(sessionId),
         readSessionWaiting(sessionId, user.id),
-        shared ? false : sessionCan(user, "agents.manage")
+        shared ? false : sessionCan(user, "agents.manage"),
+        shared ? null : pendingPermission(sessionId)
     ]);
 
     return (
@@ -60,6 +62,7 @@ export default async function AgentSessionPage({
                 events={events}
                 history={history}
                 canControl={canControl}
+                permission={canControl ? permission : null}
                 shared={shared}
             />
         </>

@@ -13,10 +13,15 @@
  */
 
 import { prisma } from "@polaris/db";
-import { notify } from "@/lib/notifications/dispatch";
+import { notify, pushNotice } from "@/lib/notifications/dispatch";
 import { wordsFor } from "@/lib/notifications/notice-words";
 
 export const WAITING_EVENT = "agent.waiting";
+
+/** One notification per session on a device: a later push replaces the earlier. */
+export function sessionPushTag(sessionId: string): string {
+    return `agent-session:${sessionId}`;
+}
 
 /** The page a session's notices point at. */
 export function sessionHref(sessionId: string): string {
@@ -79,7 +84,8 @@ export async function noticeSessionWaiting(sessionId: string): Promise<void> {
             body: t("agents.waitingBody"),
             href: sessionHref(subject.id),
             actionRequired: true,
-            metadata: { sessionId: subject.id }
+            metadata: { sessionId: subject.id },
+            push: { tag: sessionPushTag(subject.id), requireInteraction: true }
         });
     } catch (error) {
         quietly(`session ${sessionId} waiting`, error);
@@ -127,6 +133,41 @@ export async function readSessionWaiting(sessionId: string, userId: string): Pro
     }
 }
 
+/**
+ * A permission prompt Polaris can answer: pushed to the owner's devices with
+ * Allow and Deny on the notification itself, in place of the "needs you" one.
+ * The bell already holds that one, so no second row is written.
+ */
+export async function pushPermissionRequest(
+    sessionId: string,
+    requestId: string,
+    detail: string
+): Promise<void> {
+    try {
+        const subject = await sessionSubject(sessionId);
+        if (!subject?.ownerId) return;
+        const t = await wordsFor(subject.ownerId, "notices");
+        await pushNotice({
+            userId: subject.ownerId,
+            event: WAITING_EVENT,
+            title: t("agents.permissionTitle", { session: subject.title }),
+            body: detail || t("agents.waitingBody"),
+            href: sessionHref(subject.id),
+            push: {
+                tag: sessionPushTag(subject.id),
+                requireInteraction: true,
+                actions: [
+                    { action: "allow", title: t("agents.permissionAllow") },
+                    { action: "deny", title: t("agents.permissionDeny") }
+                ],
+                data: { requestId }
+            }
+        });
+    } catch (error) {
+        quietly(`session ${sessionId} permission`, error);
+    }
+}
+
 /** Why a session ended without anybody pressing Stop. */
 export type EndedReason = "failed" | "silent" | "exited";
 
@@ -148,7 +189,8 @@ export async function noticeSessionEnded(sessionId: string, reason: EndedReason)
             body: t(ENDED_BODY[reason]),
             href: sessionHref(subject.id),
             level: reason === "exited" ? "info" : reason === "failed" ? "danger" : "warning",
-            metadata: { sessionId: subject.id, reason }
+            metadata: { sessionId: subject.id, reason },
+            push: { tag: sessionPushTag(subject.id) }
         });
     } catch (error) {
         quietly(`session ${sessionId} ended`, error);

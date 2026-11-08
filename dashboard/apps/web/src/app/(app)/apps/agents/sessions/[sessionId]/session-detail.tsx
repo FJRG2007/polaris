@@ -50,13 +50,19 @@ import {
     discardSessionWorkAction,
     resumeSessionAction,
     retrySessionPushAction,
-    stopSessionAction
+    stopSessionAction,
+    answerPermissionAction
 } from "../actions";
+import type { PendingPermission } from "@/lib/agents/session-permissions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { agentText, SESSION_EVENT_KEYS as EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
 
 /** Fast while something is happening. A session that has finished polls nothing. */
 const REFRESH_MS = 3000;
+
+/** With the live stream open the poll is only a safety net: a change made by
+ *  another process of the dashboard is not on this one's stream. */
+const LIVE_REFRESH_MS = 20000;
 
 /** How often an open session asks whether its agent has exited. Slower than the
  *  page itself: each ask runs a command on the session's machine. */
@@ -79,6 +85,8 @@ interface Props {
     /** Whether this account may steer the session: read its checkout and ship
      *  from it. The actions check the same thing again. */
     canControl?: boolean;
+    /** A permission prompt the agent handed to Polaris, waiting for an answer. */
+    permission?: PendingPermission | null;
     /** Shared with this account to read (`agents.session`): no terminal, no
      *  typing to it, no stopping it. */
     shared?: boolean;
@@ -89,6 +97,7 @@ export function SessionDetail({
     events,
     history,
     canControl = false,
+    permission = null,
     shared = false
 }: Props) {
     const t = useTranslations("agents");
@@ -153,10 +162,42 @@ export function SessionDetail({
         };
     }, [session.id, watchExit]);
 
+    // Pushed rather than polled: the stream says when the session changed and
+    // the page reads it again. The poll stays underneath, fast while the stream
+    // is down and slow while it is up.
+    const [live, setLive] = useState(false);
+    useEffect(() => {
+        if (over || typeof EventSource === "undefined") return;
+        const source = new EventSource(`/api/agents/sessions/${session.id}/live`);
+        source.onopen = () => setLive(true);
+        source.onerror = () => setLive(false);
+        source.addEventListener("change", () => router.refresh());
+        return () => {
+            source.close();
+            setLive(false);
+        };
+    }, [over, router, session.id]);
     useEffect(() => {
         if (over) return;
-        return pollWhileVisible(() => router.refresh(), REFRESH_MS);
-    }, [over, router]);
+        return pollWhileVisible(() => router.refresh(), live ? LIVE_REFRESH_MS : REFRESH_MS);
+    }, [over, router, live]);
+
+    const [answering, startAnswering] = useTransition();
+    const [permissionError, setPermissionError] = useState<string | null>(null);
+    const [answered, setAnswered] = useState<string | null>(null);
+    function answerPermission(choice: "allow" | "deny" | "always") {
+        if (!permission) return;
+        setPermissionError(null);
+        setAnswered(permission.id);
+        startAnswering(async () => {
+            const result = await answerPermissionAction({ requestId: permission.id, choice });
+            if (result.error) {
+                setAnswered(null);
+                setPermissionError(result.error);
+            }
+            router.refresh();
+        });
+    }
 
     // Only while it is starting. After that the terminal belongs to the agent
     // and reading it on a timer would be polling somebody's session for a bar
@@ -518,6 +559,48 @@ export function SessionDetail({
                         </CardBody>
                     </Card>
                 </div>
+
+                {permission && !over && answered !== permission.id ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>{t("session.permission.title")}</CardTitle>
+                        </CardHeader>
+                        <CardBody className="space-y-3">
+                            <p className="min-w-0 break-words font-mono text-xs">
+                                {permission.detail || permission.tool}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    size="sm"
+                                    disabled={answering}
+                                    onClick={() => answerPermission("allow")}
+                                >
+                                    {t("session.permission.allow")}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={answering}
+                                    onClick={() => answerPermission("always")}
+                                >
+                                    {t("session.permission.always")}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={answering}
+                                    onClick={() => answerPermission("deny")}
+                                >
+                                    {t("session.permission.deny")}
+                                </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                {t("session.permission.hint")}
+                            </p>
+                        </CardBody>
+                    </Card>
+                ) : null}
+                {permissionError ? <p className="text-xs text-danger">{permissionError}</p> : null}
 
                 {over ? (
                     <p className="text-sm text-muted-foreground">

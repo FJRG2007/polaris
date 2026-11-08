@@ -295,7 +295,14 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
             .filter((credential) => credential.file)
             .map((credential) => `${credential.env}=${credential.file}`)
             .join(" "),
-        hookScript: hookScript(ingest, token),
+        // Only Claude Code's permission prompt is answered from Polaris: the
+        // decision it prints back is Claude Code's own shape, and another
+        // tool's hook would read it as something else.
+        hookScript: hookScript(
+            ingest,
+            token,
+            agent.cli.id === "claude" ? `${base}/api/agents/sessions/${session.id}/permission` : undefined
+        ),
         hookSettings: JSON.stringify(claudeHookSettings(`${stateDirFor(session)}/hook.sh`)),
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
         // Empty for a workspace, which clones nothing. A header built around an

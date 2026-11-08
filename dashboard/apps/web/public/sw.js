@@ -103,3 +103,68 @@ self.addEventListener("notificationclick", (event) => {
         })
     );
 });
+
+/*
+ * Web Push: a notice from Polaris with every tab closed. The payload is what
+ * `pushBody` in lib/notifications/web-push.ts writes. A notice with a request id
+ * carries Allow / Deny; pressing one answers the agent's permission prompt
+ * without opening anything, and a failed answer opens the session instead.
+ */
+self.addEventListener("push", (event) => {
+    let notice = {};
+    try {
+        notice = event.data ? event.data.json() : {};
+    } catch {
+        notice = {};
+    }
+    const title = typeof notice.title === "string" && notice.title ? notice.title : "Polaris";
+    const options = {
+        body: typeof notice.body === "string" ? notice.body : "",
+        icon: "/polaris-mark-192.png",
+        badge: "/polaris-mark-192.png",
+        tag: typeof notice.tag === "string" ? notice.tag : undefined,
+        renotify: typeof notice.tag === "string",
+        requireInteraction: notice.requireInteraction === true,
+        actions: Array.isArray(notice.actions) ? notice.actions.slice(0, 2) : [],
+        data: {
+            href: typeof notice.href === "string" && notice.href.startsWith("/") ? notice.href : "/",
+            extra: notice.data && typeof notice.data === "object" ? notice.data : {}
+        }
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+});
+
+function openPage(href) {
+    const url = new URL(href, self.location.origin).href;
+    return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+        for (const client of windows) {
+            if (client.url === url && "focus" in client) return client.focus();
+        }
+        return self.clients.openWindow(url);
+    });
+}
+
+self.addEventListener("notificationclick", (event) => {
+    const data = event.notification.data || {};
+    const href = typeof data.href === "string" ? data.href : "/";
+    const requestId = data.extra && data.extra.requestId;
+    event.notification.close();
+    if ((event.action === "allow" || event.action === "deny") && requestId) {
+        event.waitUntil(
+            fetch("/api/agents/sessions/permission", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ requestId, choice: event.action })
+            })
+                .then((answer) => answer.json().then((json) => ({ answer, json })))
+                .then(({ answer, json }) => {
+                    if (!answer.ok || !json || !json.value || json.value.error) return openPage(href);
+                    return undefined;
+                })
+                .catch(() => openPage(href))
+        );
+        return;
+    }
+    event.waitUntil(openPage(href));
+});

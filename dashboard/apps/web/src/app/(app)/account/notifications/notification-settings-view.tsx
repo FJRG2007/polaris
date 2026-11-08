@@ -19,6 +19,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useConnectionsHref } from "@/components/use-connections-href";
 import { DestinationsCard } from "./destinations-card";
 import { QuietHoursCard } from "./quiet-hours-card";
+import { PushCard } from "./push-card";
 import {
     saveNotificationRuleAction,
     saveSoundVolumeAction,
@@ -195,6 +196,7 @@ export function NotificationSettingsView({
             ) : null}
 
             <BrowserNoticesCard />
+            <PushCard />
             <SoundCard />
             <TabIconCard />
             {badgesClearOnVisit !== null ? <BadgesCard initial={badgesClearOnVisit} /> : null}
