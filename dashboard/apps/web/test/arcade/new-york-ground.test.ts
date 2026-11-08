@@ -19,7 +19,6 @@ import { writeFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { serveData } from "./new-york-data";
 
-
 type Site = { x: number; y: number; z: number };
 const captured = vi.hoisted(() => ({ sites: [] as Site[] }));
 
