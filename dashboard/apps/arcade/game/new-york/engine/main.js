@@ -62,8 +62,12 @@ import { startRenderer } from "./graphics-start.js";
 // Main entry point for New York City (Midtown Manhattan) in Three.js WebGPURenderer & TSL (three.js, bundled by the app build)
 
 // The start-up phases the host's progress bar counts while the city is built (`markInit` labels)
-// Milliseconds of pipeline building per frame (async-pipelines.js): behind the loading screen, then while playing
+// Milliseconds a start-up builder runs before it hands the thread back (build-slice.js)
 const LOADING_BUILD_BUDGET = 45;
+// Milliseconds of pipeline building per frame (async-pipelines.js): behind the loading screen, then while playing. A
+// frame also draws the city and may overshoot by one node graph, so the loading budget stays well under the build
+// budget for the frame to hand the page that frames the game its turn within about 100 ms
+const LOADING_PIPELINE_BUDGET = 15;
 const PLAYING_BUILD_BUDGET = 6;
 
 const BUILD_STEPS = [
@@ -162,7 +166,7 @@ async function initApp() {
     // From here on a draw whose pipeline is not built yet waits for it instead of stalling the frame (async-pipelines.js)
     const viewPosition = new THREE.Vector3();
     const pipelineGate = drawOnlyCompiled(renderer, { near: () => viewPosition });
-    pipelineGate.setBudget(LOADING_BUILD_BUDGET);
+    pipelineGate.setBudget(LOADING_PIPELINE_BUDGET);
     const qualitySetting = readQualitySetting();
     const quality = resolveQuality(qualitySetting, renderer);
     const preset = PRESETS[quality];
@@ -182,7 +186,7 @@ async function initApp() {
     // 3. Build Manhattan Geography, Iconic Landmarks, Blocks, Street Details & Traffic
     const cityGrid = await buildCityGrid(scene);
     await stepDone("cityGrid");
-    const boroughs = buildBoroughs(scene, { sidewalks: cityGrid.sidewalks });
+    const boroughs = await buildBoroughs(scene, { sidewalks: cityGrid.sidewalks });
     await stepDone("boroughs");
     const { colliders: landmarkColliders } = buildLandmarks(scene);
     await stepDone("landmarks");
@@ -207,6 +211,7 @@ async function initApp() {
     ]);
     await stepDone("traffic");
     const highwayTraffic = createHighwayTraffic(scene, cityGrid.highwayLanes);
+    await yieldToHost();
     buildRoadPaint(scene, trafficSystem.network, cityGrid.roadPaint);
     await stepDone("roadPaint");
 
@@ -1065,6 +1070,14 @@ async function initApp() {
     }
 
     if (graphicsLost) return;
+    // The first simulated step draws the radar (its layers built here between slices) and places the whole crowd and all
+    // the traffic around the player at once: it runs in a task of its own here instead of inside the first frame, which
+    // also builds pipelines
+    await mapSystem.prepare();
+    await yieldToHost();
+    simulate(1 / 60, performance.now());
+    await yieldToHost();
+    if (graphicsLost) return;
     renderer.setAnimationLoop((now) => {
         pipelineGate.beginFrame();
         const rawDt = (now - lastTime) * 0.001;
@@ -1096,6 +1109,9 @@ async function initApp() {
         } else if (!warmedUp) {
             warmedUp = true;
             markInit("firstFrame");
+            // The rest of the city's pipelines are built at the playing pace from here: the frames until the loading
+            // screen goes are no longer than the ones after it
+            pipelineGate.setBudget(PLAYING_BUILD_BUDGET);
             // The loading screen stays up until the GPU has got through the first frame (and the pipelines it compiled),
             // i.e. until the city is actually on screen; the rest of the city's pipelines compile after that
             const device = renderer.backend.device;
@@ -1110,7 +1126,6 @@ async function initApp() {
                     hideLoadingScreen();
                     playing = true;
                     startScreen.open();
-                    pipelineGate.setBudget(PLAYING_BUILD_BUDGET);
                     sunShadow.autoUpdate = true;
                     audioSystem.ready = true;
                     reportReady();

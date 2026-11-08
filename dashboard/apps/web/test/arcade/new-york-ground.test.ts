@@ -98,7 +98,7 @@ async function buildCityOnce() {
         await import("../../../arcade/game/new-york/engine/street-details.js");
     const scene = new THREE.Scene();
     const grid = await buildCityGrid(scene);
-    const boroughs = buildBoroughs(scene, { sidewalks: grid.sidewalks });
+    const boroughs = await buildBoroughs(scene, { sidewalks: grid.sidewalks });
     const { colliders } = buildLandmarks(scene);
     const blocks = await buildCityBlocks(scene, colliders);
     await buildStreetDetails(scene, [

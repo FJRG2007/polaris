@@ -2138,7 +2138,11 @@ function createHighwayTraffic(scene, lanes) {
       lane.box.push(Math.min(...run.map((p) => p.x)), Math.max(...run.map((p) => p.x)), Math.min(...run.map((p) => p.z)), Math.max(...run.map((p) => p.z)));
     }
     lane.cars = [];
+    // The segment each car starts on, found as they are spawned in order along the lane: update() would otherwise walk
+    // every car up from the lane's first segment on the first frame, which held that frame for over 100 ms
+    let seg = 0;
     for (let u = rand() * 30; u < lane.len - 12; u += 24 + rand() * 50) {
+      while (seg < lane.cum.length - 2 && lane.cum[seg + 1] < u) seg++;
       const h = rand();
       // Fewer vans than in town: commercial vehicles are barred from the parkways
       const kind = h < 0.2 ? 'taxi' : h < 0.56 ? 'sedan' : h < 0.82 ? 'suv' : h < 0.89 ? 'minivan' : h < 0.95 ? 'pickup' : 'van';
@@ -2147,7 +2151,7 @@ function createHighwayTraffic(scene, lanes) {
       const spec = BODY_SPECS[kind];
       // (float32 values, so update() can tell whether an instance slot's paint changes by comparing with the buffer)
       const car = {
-        lane, kind, u, v: lane.speed, acc: 0, seg: 0,
+        lane, kind, u, v: lane.speed, acc: 0, seg,
         placed: false, x: 0, y: -1000, z: 0, yaw: 0,
         len: spec.zFront - spec.zRear, engine: CAR_KINDS[kind].engine,
         col: [Math.fround(col.r), Math.fround(col.g), Math.fround(col.b)],
