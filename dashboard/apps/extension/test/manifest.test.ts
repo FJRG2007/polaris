@@ -68,7 +68,9 @@ describe("the Firefox manifest", () => {
     // spelling of this key is not one v2 reads - so the build that does not need
     // it does not carry it.
     it("carries no content policy of its own", () => {
-        expect(manifestFor({ browser: "firefox", manifestVersion: 2 })["content_security_policy"]).toBeUndefined();
+        expect(
+            manifestFor({ browser: "firefox", manifestVersion: 2 })["content_security_policy"]
+        ).toBeUndefined();
     });
 
     it("keeps the optional list under the name version 2 reads", () => {

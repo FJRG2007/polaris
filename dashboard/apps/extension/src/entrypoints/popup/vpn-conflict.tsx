@@ -13,7 +13,10 @@ import type { Words } from "@/lib/words";
 import { useEffect, useState } from "react";
 import type { ConflictExtension, ProxyConflict } from "@/lib/vpn";
 
-type Listenable = { addListener(listener: () => void): void; removeListener(listener: () => void): void };
+type Listenable = {
+    addListener(listener: () => void): void;
+    removeListener(listener: () => void): void;
+};
 
 /**
  * Calls `changed` whenever the proxy's holder may have changed: the setting
@@ -25,10 +28,17 @@ export function useProxyWatch(changed: () => void, key: string): void {
         if (import.meta.env?.BROWSER === "firefox") return;
         // The `browser` WXT resolves (`chrome` on Chromium, which has no global
         // `browser`), not `globalThis.browser`, which is undefined there.
-        const api = (typeof browser === "undefined" ? undefined : browser) as unknown as {
-            proxy?: { settings?: { onChange?: Listenable } };
-            management?: Partial<Record<"onEnabled" | "onDisabled" | "onInstalled" | "onUninstalled", Listenable>>;
-        } | undefined;
+        const api = (typeof browser === "undefined" ? undefined : browser) as unknown as
+            | {
+                  proxy?: { settings?: { onChange?: Listenable } };
+                  management?: Partial<
+                      Record<
+                          "onEnabled" | "onDisabled" | "onInstalled" | "onUninstalled",
+                          Listenable
+                      >
+                  >;
+              }
+            | undefined;
         const events = [
             api?.proxy?.settings?.onChange,
             api?.management?.onEnabled,

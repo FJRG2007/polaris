@@ -331,7 +331,9 @@ export function VpnPanel(): React.JSX.Element {
                         error={conflictError}
                         onFind={findHolder}
                         onDisable={disableHolder}
-                        onOpenExtensions={() => void browser.tabs.create({ url: "chrome://extensions" })}
+                        onOpenExtensions={() =>
+                            void browser.tabs.create({ url: "chrome://extensions" })
+                        }
                         t={t}
                     />
                 ) : null}
@@ -411,7 +413,10 @@ export function VpnPanel(): React.JSX.Element {
                                             <button
                                                 className="vpn-pick"
                                                 aria-disabled={
-                                                    busy || held || country.usable === 0 || undefined
+                                                    busy ||
+                                                    held ||
+                                                    country.usable === 0 ||
+                                                    undefined
                                                 }
                                                 title={
                                                     pick

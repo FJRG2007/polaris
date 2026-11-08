@@ -495,7 +495,8 @@ export class BrowserVpn {
         if (this.deps.perRequest || !settings) return null;
         const held = await settings.get({}).catch(() => null);
         const level = held?.levelOfControl;
-        if (level !== "controlled_by_other_extensions") return proxyConflict(level, null, undefined);
+        if (level !== "controlled_by_other_extensions")
+            return proxyConflict(level, null, undefined);
         return proxyConflict(level, await this.extensions(), this.deps.selfId);
     }
 
