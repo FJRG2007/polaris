@@ -11,5 +11,10 @@ type AppExtension = AppHostTypes["AppExtension"];
 
 export const translateExtension: AppExtension = {
     id: "translate",
-    textTranslation: () => ({ appId: "translate", endpoint: "/api/translate", page: "/translate" })
+    textTranslation: () => ({
+        appId: "translate",
+        endpoint: "/api/translate",
+        page: "/translate",
+        device: { module: "screens/selection-engines", name: "selectionEngines" }
+    })
 };

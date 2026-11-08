@@ -15,6 +15,8 @@
  */
 
 import { z } from "zod";
+import { loadEnv } from "@polaris/config";
+import { CredentialDecryptError, decryptSecret, encryptSecret } from "@polaris/storage";
 import { generateText } from "ai";
 import { PLAIN_TURN } from "@/lib/polar/automatic";
 import { automaticChoice } from "@/lib/polar/shared";
@@ -59,6 +61,45 @@ async function keyOf(engine: "deepl" | "google"): Promise<string | null> {
     const state = await getIntegrationState(INTEGRATION[engine]);
     if (!state?.enabled || !state.hasSecret) return null;
     return getIntegrationSecret(INTEGRATION[engine]);
+}
+
+/**
+ * A key an app's own engine keeps in its settings (LibreTranslate's), sealed
+ * with the master key into one string, so the stored setting never holds it in
+ * the clear.
+ */
+export async function sealEngineKey(secret: string): Promise<string> {
+    const blob = encryptSecret(secret, loadEnv().POLARIS_MASTER_KEY);
+    return JSON.stringify({
+        c: Buffer.from(blob.ciphertext).toString("base64"),
+        n: Buffer.from(blob.nonce).toString("base64"),
+        k: blob.keyId
+    });
+}
+
+const sealedKeyShape = z.object({ c: z.string(), n: z.string(), k: z.string() });
+
+/** The key back, or null when it does not parse or the master key it was sealed under is gone. */
+export async function openEngineKey(sealed: string): Promise<string | null> {
+    let parsed: z.infer<typeof sealedKeyShape>;
+    try {
+        parsed = sealedKeyShape.parse(JSON.parse(sealed));
+    } catch {
+        return null;
+    }
+    try {
+        return decryptSecret(
+            {
+                ciphertext: Buffer.from(parsed.c, "base64"),
+                nonce: Buffer.from(parsed.n, "base64"),
+                keyId: parsed.k
+            },
+            loadEnv().POLARIS_MASTER_KEY
+        );
+    } catch (caught) {
+        if (caught instanceof CredentialDecryptError) return null;
+        throw caught;
+    }
 }
 
 /** The model Polar would run a quick job on for this person, or null. */

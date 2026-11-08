@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { useLanguageOptions } from "./language-options";
 import { unwrap, useTranslateLocale, useTranslateT } from "./i18n";
+import { LibreTranslateServer } from "./libretranslate-server";
 import { saveSettingsAction, settingsAction } from "../actions/translate";
 import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import {
@@ -51,14 +52,18 @@ export function limitOf(text: string | null): number | null {
 
 const NAME = {
     browser: "engine.browser",
+    local: "engine.local",
     polar: "engine.polar",
+    libretranslate: "engine.libretranslate",
     deepl: "engine.deepl",
     google: "engine.google"
 } as const;
 
 const HINT = {
     browser: "settings.browserHint",
+    local: "settings.localHint",
     polar: "settings.polarHint",
+    libretranslate: "settings.libretranslateHint",
     deepl: "settings.deeplHint",
     google: "settings.googleHint"
 } as const;
@@ -248,6 +253,7 @@ export function SettingsPanel() {
                             </>
                         ) : null}
                     </div>
+                    <LibreTranslateServer />
                 </>
             )}
             <div className="flex flex-wrap justify-end gap-2">

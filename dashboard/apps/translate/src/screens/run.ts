@@ -55,8 +55,8 @@ export async function runTranslation(
         const engine = options.engines.get(id);
         if (!engine) continue;
         try {
-            // The browser takes a piece at a time; the server, what its route accepts.
-            const limit = id === "browser" ? ENGINE_LIMITS.browser : REQUEST_LIMIT;
+            // The device engines take a piece at a time; the server, what its route accepts.
+            const limit = id === "browser" || id === "local" ? ENGINE_LIMITS[id] : REQUEST_LIMIT;
             const answer = await translateInChunks(texts, limit, (batch) =>
                 engine.translate(batch, options.from, options.to, signal)
             );

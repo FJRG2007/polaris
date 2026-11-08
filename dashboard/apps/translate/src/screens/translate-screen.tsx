@@ -83,11 +83,14 @@ import { pickEngine, usableEngines, type TranslateEngine } from "../model/engine
 import { readCache, unwrap, useTranslateLocale, useTranslateT, writeCache } from "./i18n";
 import { createServerEngine, fetchServerStatus, type ServerStatusView } from "./server-engine";
 import { createBrowserEngine, hasBrowserTranslator, type BrowserScope } from "./browser-engine";
+import { canRunLocally } from "./local-engine";
+import { deviceEngine } from "./device-engine";
 import {
     DEFAULT_SETTINGS,
     readOrder,
     HISTORY_MAX,
     HISTORY_TEXT_MAX,
+    SERVER_ENGINE_IDS,
     type EngineId,
     type ServerEngineId
 } from "../model/schemas";
@@ -119,14 +122,21 @@ const INPUT_KEY = {
     website: "modes.website"
 } as const;
 
-const NO_SERVER: Record<ServerEngineId, boolean> = { deepl: false, google: false, polar: false };
+const NO_SERVER: Record<ServerEngineId, boolean> = {
+    libretranslate: false,
+    deepl: false,
+    google: false,
+    polar: false
+};
 
 const ENGINE_KEY = {
     browser: "engine.browser",
+    local: "engine.local",
     polar: "engine.polar",
+    libretranslate: "engine.libretranslate",
     deepl: "engine.deepl",
     google: "engine.google"
-} as const;
+} as const satisfies Record<EngineId, string>;
 
 /** A translation put on screen whole, from the history or a swap: no engine is asked for it again. */
 interface Loaded {
@@ -158,6 +168,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     );
     const [statusFailed, setStatusFailed] = useState(false);
     const [browser, setBrowser] = useState(false);
+    const [local, setLocal] = useState(false);
 
     const [from, setFrom] = useState<SourceLanguage>(AUTO);
     const [to, setTo] = useState<string | null>(null);
@@ -222,6 +233,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     // What only the browser knows: whether it has a translator, and a voice.
     useEffect(() => {
         setBrowser(hasBrowserTranslator(self as unknown as BrowserScope));
+        setLocal(canRunLocally(self as unknown as BrowserScope));
         setCanSpeak(typeof window.speechSynthesis !== "undefined");
         setCanRecord(
             typeof navigator.mediaDevices?.getUserMedia === "function" &&
@@ -245,7 +257,11 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const settings = useMemo(
         () => ({
             ...DEFAULT_SETTINGS,
-            engines: { ...DEFAULT_SETTINGS.engines, browser: status?.browser ?? true },
+            engines: {
+                ...DEFAULT_SETTINGS.engines,
+                browser: status?.browser ?? true,
+                local: status?.local ?? true
+            },
             order: readOrder(status?.order)
         }),
         [status]
@@ -256,8 +272,8 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         return on;
     }, [status]);
     const usable = useMemo(
-        () => usableEngines({ browser, available, settings }),
-        [browser, available, settings]
+        () => usableEngines({ browser, local, available, settings }),
+        [browser, local, available, settings]
     );
     const engineId = pickEngine(usable, chosen);
     const targetLanguage = to ?? status?.defaultTarget ?? DEFAULT_SETTINGS.defaultTarget;
@@ -268,11 +284,16 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         const made = new Map<EngineId, TranslateEngine>();
         if (browser)
             made.set("browser", createBrowserEngine(self as unknown as BrowserScope, setDownload));
-        for (const id of ["deepl", "google", "polar"] as const) {
+        if (local)
+            made.set(
+                "local",
+                deviceEngine(t("local.downloadFailed"), t("errors.failed"), setDownload)
+            );
+        for (const id of SERVER_ENGINE_IDS) {
             made.set(id, createServerEngine(id, t("errors.failed")));
         }
         return made;
-    }, [browser, t]);
+    }, [browser, local, t]);
 
     // Every mode translates through this: the chosen engine, or each usable
     // one in the administrator's order until one answers.

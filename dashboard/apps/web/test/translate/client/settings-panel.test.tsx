@@ -25,6 +25,8 @@ vi.mock("@polaris/app-host/client", async (original) => {
 
 vi.mock("@polaris-app/translate/src/actions/translate", () => ({
     settingsAction: async () => ({ ok: true, settings: DEFAULT_SETTINGS }),
+    libreTranslateAction: async () => ({ ok: true, server: { url: null, hasKey: false } }),
+    saveLibreTranslateAction: async () => ({ ok: true, server: { url: null, hasKey: false } }),
     saveSettingsAction: async (input: TranslateSettings) => {
         saved.push(input);
         return { ok: true, settings: input };
@@ -52,7 +54,14 @@ const names = () => engineSwitches().map((one) => one.getAttribute("aria-label")
 describe("the engines' order", () => {
     it("lists them in the order they are tried", async () => {
         await open();
-        expect(names()).toEqual(["In your browser", "DeepL", "Google Cloud", "Polar's model"]);
+        expect(names()).toEqual([
+            "In your browser",
+            "On this device",
+            "LibreTranslate",
+            "DeepL",
+            "Google Cloud",
+            "Polar's model"
+        ]);
         expect(screen.getByRole("button", { name: "Move In your browser up" })).toHaveProperty(
             "disabled",
             true
@@ -62,13 +71,22 @@ describe("the engines' order", () => {
     it("moves one with its arrows and saves the new order", async () => {
         await open();
         fireEvent.click(screen.getByRole("button", { name: "Move Polar's model up" }));
-        expect(names()).toEqual(["In your browser", "DeepL", "Polar's model", "Google Cloud"]);
+        expect(names()).toEqual([
+            "In your browser",
+            "On this device",
+            "LibreTranslate",
+            "DeepL",
+            "Polar's model",
+            "Google Cloud"
+        ]);
         await act(async () => {
             fireEvent.click(screen.getByRole("button", { name: "Save" }));
         });
         expect(saved).toHaveLength(1);
         expect((saved[0] as TranslateSettings).order).toEqual([
             "browser",
+            "local",
+            "libretranslate",
             "deepl",
             "polar",
             "google"
@@ -83,10 +101,17 @@ describe("the engines' order", () => {
             setData: (type: string, value: string) => data.set(type, value),
             getData: (type: string) => data.get(type) ?? ""
         };
-        fireEvent.dragStart(rows[3]!, { dataTransfer });
+        fireEvent.dragStart(rows[5]!, { dataTransfer });
         fireEvent.dragOver(rows[0]!, { dataTransfer });
         fireEvent.drop(rows[0]!, { dataTransfer });
-        expect(names()).toEqual(["Polar's model", "In your browser", "DeepL", "Google Cloud"]);
+        expect(names()).toEqual([
+            "Polar's model",
+            "In your browser",
+            "On this device",
+            "LibreTranslate",
+            "DeepL",
+            "Google Cloud"
+        ]);
     });
 
     it("keeps Save off until something changed, and after moving it back", async () => {
