@@ -49,11 +49,11 @@ import { arkServerEnv, expectedArkMemoryMb } from "./ark/config";
 import { HYTALE_CATALOG_ID, HYTALE_PORT } from "./hytale/paths";
 import { mintConsolePassword, PENDING_SETUP_KEY } from "./fivem/service";
 import {
-    defaultModFor,
-    enableLogin,
     PROJECTS_KEY,
     SOFTWARE_KEY,
-    withJoinGuard
+    VERSION_KEY,
+    withJoinGuard,
+    withJoinGuardOn
 } from "./minecraft/join-guard";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "./ark/service";
 import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "./ark/settings";
@@ -388,7 +388,8 @@ function javaSoftwareEnv(
         env.set(key, value);
     // Polaris's login mod, on a server being reset that already runs it: kept
     // when it has a build for where the server is going, taken off when it
-    // does not - and then the project guard below takes its place.
+    // does not - and then the project guard below takes its place, where that
+    // release can load one. A server that never ran it is given neither.
     const mod = polarisLogin.modMovedTo(env, software, env.get("VERSION") ?? "");
     for (const [key, value] of mod ?? []) env.set(key, value);
     // Polaris's anti-cheat, the same way: off software it cannot run on.
@@ -425,7 +426,11 @@ function javaSoftwareEnv(
             "java",
             software,
             projectList(blueprint, env.get(PROJECTS_KEY), shape.crossplay, map),
-            polarisLogin.loginOn(env)
+            {
+                version: env.get(VERSION_KEY) ?? "",
+                modOn: polarisLogin.loginOn(env),
+                keepClosed: polarisLogin.loginOn(before) && !polarisLogin.loginOn(env)
+            }
         )
     );
 }
@@ -613,16 +618,19 @@ async function createMinecraftServer(
         env.set(key, value);
     }
 
-    // Polaris login, wherever this software and release have a build. Last over
-    // the template for the same reason as the access above: a login is not a
-    // preference a saved server passes on, and the template may carry the project
-    // guard this replaces.
-    const seed = withShapedEnv(
-        manifest,
-        env,
-        shaped,
-        await anticheatSeed(env, await loginSeed(env))
-    );
+    // The join password is opt-in, so a new server gets neither Polaris login nor
+    // a password project. A template's list is taken as its owner left it, with
+    // one exception reconciled here, last over the template: a password project
+    // on a release it cannot load on comes off, since there it stops the server
+    // from starting rather than guarding it.
+    const listed = env.get(PROJECTS_KEY);
+    if (input.edition === "java" && listed !== undefined) {
+        env.set(
+            PROJECTS_KEY,
+            withJoinGuard(listed, env.get(SOFTWARE_KEY) ?? "", env.get(VERSION_KEY) ?? "")
+        );
+    }
+    const seed = withShapedEnv(manifest, env, shaped, await anticheatSeed(env, undefined));
 
     // Crossplay is Geyser listening on the Bedrock port inside the same container,
     // so that port has to be published as well - one service, two doors. Geyser's
@@ -714,40 +722,8 @@ function withShapedEnv(
 }
 
 /**
- * What a new server needs to run Polaris login from its first boot, or undefined
- * when it will not run it.
- *
- * The mod names its server by the install's id and proves it with a token, and
- * neither exists until the install does - so the id is chosen here and the
- * install is created with it. The project guard comes off the list in the same
- * step, since two logins would ask a player twice.
- *
- * Only where Polaris has a public address: the server fetches the mod from it and
- * does not start while it cannot reach it, and a LAN name such as
- * `polaris.local` does not resolve inside a container. Elsewhere the server keeps
- * the Modrinth guard, and the card offers the switch.
- */
-async function loginSeed(env: Map<string, string>): Promise<InstallSeed | undefined> {
-    const file = defaultModFor(env);
-    if (file === null) return undefined;
-    const baseUrl = await publicAppUrl().catch(() => null);
-    if (baseUrl === null) return undefined;
-    const installedAppId = randomUUID();
-    const written = enableLogin({
-        current: env,
-        baseUrl,
-        modKey: modToken(),
-        installedAppId,
-        file,
-        token: randomBytes(32).toString("hex")
-    });
-    env.set(PROJECTS_KEY, written.get(PROJECTS_KEY) ?? "");
-    return { installedAppId, env: polarisLogin.envWrites(written) };
-}
-
-/**
- * Polaris's anti-cheat on a new server wherever it runs, on top of the login's
- * seed when there is one: the same install id and the same token, since the two
+ * Polaris's anti-cheat on a new server wherever it runs, on top of a login seed
+ * when there is one: the same install id and the same token, since the two
  * plugins speak for the same server. Only where Polaris has a public address, which
  * the server downloads the plugin from; elsewhere the sweep that switches it on for
  * older servers does it once an address is set.
@@ -1116,20 +1092,28 @@ function seededPlugins(edition: "java" | "bedrock"): Set<string> {
  * it, and one jar it cannot boot on.
  *
  * Only what Polaris seeded is taken back, plus a password project meant for the
- * other loader (see `withJoinGuard`). Anything else on the list belongs to
- * whoever put it there, which on a modded server is every mod on it.
+ * other loader or one the release cannot load (see `withJoinGuard`). Anything
+ * else on the list belongs to whoever put it there, which on a modded server is
+ * every mod on it. No password project is added: the join password is opt-in,
+ * and a list that carries one keeps it.
  *
- * `modOn` is a server closed by Polaris's own login mod, which takes no password
- * project beside it.
+ * `version` is the release the server is going to. `modOn` is a server closed
+ * by Polaris's own login mod, which takes no password project beside it.
+ * `keepClosed` is a server whose login mod just came off, which takes the
+ * project guard in its place where the release can load one.
  */
 export function protectionFor(
     edition: "java" | "bedrock",
     software: string,
     current: string,
-    modOn = false
+    guard: { readonly version: string; readonly modOn?: boolean; readonly keepClosed?: boolean }
 ): string {
+    const guarded = (list: string): string =>
+        guard.keepClosed
+            ? withJoinGuardOn(list, software, guard.version)
+            : withJoinGuard(list, software, guard.version, guard.modOn ?? false);
     const loader = loaderForType(software);
-    if (loader && isPluginLoader(loader)) return withJoinGuard(current, software, modOn);
+    if (loader && isPluginLoader(loader)) return guarded(current);
     // Software nothing on Modrinth loads into gets nothing put on its list. A
     // modpack brings its own mods and its own versions of them, a custom jar is
     // whatever somebody built, and a lobby server has no world to protect - so
@@ -1147,7 +1131,7 @@ export function protectionFor(
         // is dropped here rather than written twice with two different suffixes.
         return slug === undefined || slug === null || (!seeded.has(slug) && !modded.has(slug));
     });
-    return withJoinGuard(formatProjectList([...kept, ...MODDED_PROTECTION]), software, modOn);
+    return guarded(formatProjectList([...kept, ...MODDED_PROTECTION]));
 }
 
 /**

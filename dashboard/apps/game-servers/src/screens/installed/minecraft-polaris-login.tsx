@@ -5,8 +5,8 @@
  *
  * Where a build exists (a plugin for Paper, Purpur and Spigot, a mod for
  * NeoForge 1.21.4) and Polaris has a public address, it is the only login the
- * card manages: what a new server gets, and what Turn on installs - replacing a
- * Modrinth guard the server still carries. It gives players real commands and
+ * card manages: what Turn on installs, replacing a Modrinth guard the server
+ * still carries. No server gets it until its operator turns it on. It gives players real commands and
  * text passwords where the modded project only has `/trigger` and numbers, and
  * it keeps the passwords here, where a forgotten one can be reset.
  *

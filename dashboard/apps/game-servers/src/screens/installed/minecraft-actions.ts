@@ -60,7 +60,13 @@ import type { InventoryItem } from "../../lib/minecraft/inventory";
 import { DIFFICULTIES, isDifficulty } from "../../lib/minecraft/rules";
 import { setGameSchedule } from "../../lib/minecraft/schedule-service";
 import { readMinecraftStats } from "../../lib/minecraft/stats-service";
-import { guardForSave, PROJECTS_KEY, SOFTWARE_KEY } from "../../lib/minecraft/join-guard";
+import {
+    guardForSave,
+    joinGuardFor,
+    joinGuardFits,
+    PROJECTS_KEY,
+    SOFTWARE_KEY
+} from "../../lib/minecraft/join-guard";
 import { setGameHostname, setGameRouted } from "../../lib/minecraft/address";
 import { liftTimeout, timeoutPlayer } from "../../lib/minecraft/timeout-service";
 import { EXPERIENCE_UNITS, MAX_EXPERIENCE } from "../../lib/minecraft/experience";
@@ -2524,8 +2530,17 @@ export async function projectFitsAction(input: {
         const { access } = await requireGameServer("games.manage", parsed.data.installedAppId);
         if (!access.install.applicationId) return { fits: true };
         const env = await listEnvVars("application", access.install.applicationId, access.ownerId);
-        const loader = loaderForType(env.find((entry) => entry.key === SOFTWARE_KEY)?.value ?? "");
+        const software = env.find((entry) => entry.key === SOFTWARE_KEY)?.value ?? "";
+        const loader = loaderForType(software);
         const version = env.find((entry) => entry.key === "VERSION")?.value ?? "";
+        // A password project lists builds for releases it stops at boot on, so
+        // its own floor is asked first rather than left to Modrinth.
+        if (
+            joinGuardFor(software)?.slug === parsed.data.slug.toLowerCase() &&
+            joinGuardFits(software, version) === null
+        ) {
+            return { fits: false, version };
+        }
         if (!loader || wantsLatest(version)) return { fits: true };
         return {
             fits: !knownUnsupported(await commonVersions([parsed.data.slug], loader), version),
@@ -2660,7 +2675,11 @@ export async function updateServerSettingsAction(
                 (current) => new Map(current.map((entry) => [entry.key, entry.value ?? ""]))
             ));
         const moved = await guardForSave(vars, readCurrent);
-        for (const entry of moved) vars.push({ ...entry, isSecret: false });
+        for (const entry of moved) {
+            const saved = vars.find((item) => item.key === entry.key);
+            if (saved) saved.value = entry.value;
+            else vars.push({ ...entry, isSecret: false });
+        }
         // A loader held for the old release is the wrong one for a new release or
         // new software: it is let go, and the new release's own is held once the
         // server is up on it.
