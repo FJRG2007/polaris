@@ -23,7 +23,9 @@ type Listenable = { addListener(listener: () => void): void; removeListener(list
 export function useProxyWatch(changed: () => void, key: string): void {
     useEffect(() => {
         if (import.meta.env?.BROWSER === "firefox") return;
-        const api = (globalThis as { browser?: unknown }).browser as {
+        // The `browser` WXT resolves (`chrome` on Chromium, which has no global
+        // `browser`), not `globalThis.browser`, which is undefined there.
+        const api = (typeof browser === "undefined" ? undefined : browser) as unknown as {
             proxy?: { settings?: { onChange?: Listenable } };
             management?: Partial<Record<"onEnabled" | "onDisabled" | "onInstalled" | "onUninstalled", Listenable>>;
         } | undefined;

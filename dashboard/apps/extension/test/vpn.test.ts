@@ -629,6 +629,20 @@ describe("taking the proxy back", () => {
         expect(h.settings.set).not.toHaveBeenCalled();
     });
 
+    it("leaves the proxy clear when a disconnect lands while it is being set", async () => {
+        const h = harness();
+        await h.vpn.connect(NODE);
+        h.settings.clear.mockClear();
+        h.settings.set.mockImplementationOnce(async () => {
+            await h.vpn.disconnect();
+            return undefined;
+        });
+        expect(await h.vpn.reclaim()).toEqual({ ok: true });
+        expect(h.route.box.value).toBeNull();
+        expect(h.settings.clear).toHaveBeenCalledTimes(2);
+        expect(h.webRtc.set).toHaveBeenCalledTimes(1);
+    });
+
     it("says it is still held when another extension took over next", async () => {
         const h = harness();
         await h.vpn.connect(NODE);

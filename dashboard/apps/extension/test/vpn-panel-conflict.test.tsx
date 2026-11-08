@@ -122,4 +122,37 @@ describe("the VPN screen with the proxy held elsewhere", () => {
         expect(connects).toBe(2);
         expect(screen.getByRole("button", { name: "Disconnect" })).toBeTruthy();
     });
+    it("redraws when the extension is turned off somewhere else", async () => {
+        let disabled: () => void = () => undefined;
+        const listen = { addListener: () => undefined, removeListener: () => undefined };
+        vi.stubGlobal("browser", {
+            runtime: {
+                sendMessage: async (request: { kind: string }) => {
+                    asked.push(request);
+                    return { ok: true, vpn: current };
+                }
+            },
+            proxy: { settings: { onChange: listen } },
+            management: {
+                setEnabled,
+                onEnabled: listen,
+                onInstalled: listen,
+                onUninstalled: listen,
+                onDisabled: {
+                    addListener: (listener: () => void) => (disabled = listener),
+                    removeListener: () => undefined
+                }
+            },
+            permissions: { request: async () => true }
+        });
+        await act(async () => {
+            render(<VpnPanel />);
+        });
+        expect(screen.getByText("Other VPN")).toBeTruthy();
+        current = { ...HELD, conflict: null };
+        await act(async () => {
+            disabled();
+        });
+        expect(screen.queryByText("Other VPN")).toBeNull();
+    });
 });

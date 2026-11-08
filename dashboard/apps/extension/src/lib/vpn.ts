@@ -444,16 +444,18 @@ export class BrowserVpn {
                 });
                 return;
             }
-            // Another extension let go of the proxy (turned off, removed): a
-            // connection it had taken over gets the proxy back without a press.
-            api.proxy?.settings?.onChange?.addListener(({ levelOfControl }) => {
-                if (levelOfControl === "controllable_by_this_extension") void this.reclaim();
-            });
             api.webRequest?.onAuthRequired?.addListener(
                 (details, callback) => this.answerAuth(details, callback),
                 all,
                 ["asyncBlocking"]
             );
+            // Another extension let go of the proxy (turned off, removed): a
+            // connection it had taken over gets the proxy back without a press.
+            // After the sign-in listener, so a browser refusing this one still
+            // answers the proxy's login.
+            api.proxy?.settings?.onChange?.addListener(({ levelOfControl }) => {
+                if (levelOfControl === "controllable_by_this_extension") void this.reclaim();
+            });
         } catch (error) {
             console.warn("polaris: the VPN cannot listen in this browser:", error);
         }
@@ -517,6 +519,13 @@ export class BrowserVpn {
         if (!route) return { ok: true };
         const refused = await this.applyProxy(route).catch((): VpnRefusal => "blocked");
         if (refused) return { ok: false, code: refused };
+        // A disconnect that landed while the proxy was being set has already
+        // cleared it: setting it after that would hold the browser to a server
+        // with no login to answer it with.
+        if (!(await this.deps.route.getValue())) {
+            await this.deps.api.proxy?.settings?.clear({ scope: "regular" }).catch(() => undefined);
+            return { ok: true };
+        }
         await this.guardWebRtc(true);
         await this.deps.changed();
         return { ok: true };
