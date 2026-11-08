@@ -66,7 +66,7 @@ const LOADING_BUILD_BUDGET = 45;
 // Milliseconds of pipeline building per frame (async-pipelines.js): behind the loading screen, then while playing. A
 // frame also draws the city and may overshoot by one node graph, so the loading budget stays well under the build
 // budget for the frame to hand the page that frames the game its turn within about 100 ms
-const LOADING_PIPELINE_BUDGET = 25;
+const LOADING_PIPELINE_BUDGET = 15;
 const PLAYING_BUILD_BUDGET = 6;
 
 const BUILD_STEPS = [
@@ -1064,8 +1064,11 @@ async function initApp() {
     }
 
     if (graphicsLost) return;
-    // The first simulated step places the whole crowd and all the traffic around the player at once: it runs in a task
-    // of its own here instead of inside the first frame, which also builds pipelines
+    // The first simulated step draws the radar (its layers built here between slices) and places the whole crowd and all
+    // the traffic around the player at once: it runs in a task of its own here instead of inside the first frame, which
+    // also builds pipelines
+    await mapSystem.prepare();
+    await yieldToHost();
     simulate(1 / 60, performance.now());
     await yieldToHost();
     if (graphicsLost) return;

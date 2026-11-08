@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import { createTreeMaterial } from './tsl-materials.js';
 import { SharedInstances } from './shared-instances.js';
 import { polygonBoxOverlaps } from './building-collision.js';
-import { buildSlice } from './build-slice.js';
+import { buildSlice, yieldToHost } from './build-slice.js';
 
 // Seeded street and park trees with three geometry levels, regrouped by spatial cell as the camera moves.
 // Bark tubes and leaf cards share a material; atlas mipmaps preserve leaf coverage at a distance.
@@ -867,6 +867,8 @@ function createTreeClearance(colliders) {
 async function createTreeField(_scene, sites, colliders = []) {
   const group = new THREE.Group();
   group.name = 'Trees';
+  // The leaf atlas is painted in one piece (tens of milliseconds): it starts a slice of its own
+  await yieldToHost();
   const atlas = createLeafAtlas();
   await buildSlice();
   const material = createTreeMaterial(atlas.texture);

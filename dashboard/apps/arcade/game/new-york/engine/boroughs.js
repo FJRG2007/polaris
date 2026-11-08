@@ -518,11 +518,12 @@ function luShore(pts, x0, z0, x1, z1, halfW, ch, value) {
 }
 
 // Separable 3-tap box blur of all four channels
-function luBlur(passes) {
+async function luBlur(passes) {
   const tmp = new Uint8Array(luData.length);
   const W4 = LU.w * 4;
   for (let p = 0; p < passes; p++) {
     for (let j = 0; j < LU.h; j++) {
+      if (j % 64 === 0) await buildSlice();
       const row = j * W4;
       for (let i = 0; i < LU.w; i++) {
         const o = row + i * 4;
@@ -532,6 +533,7 @@ function luBlur(passes) {
       }
     }
     for (let j = 0; j < LU.h; j++) {
+      if (j % 64 === 0) await buildSlice();
       const row = j * W4;
       const up = j > 0 ? row - W4 : row;
       const dn = j < LU.h - 1 ? row + W4 : row;
@@ -552,7 +554,8 @@ const INDUSTRY = 1;
 const SUBURB = 2;
 const MARSH = 3;
 
-function paintLandUse() {
+async function paintLandUse() {
+  await buildSlice();
   // --- Regional character: suburbs west of the Hackensack and in eastern Queens, Staten Island, Westchester ---
   luRect(-16000, -30000, -11800, 30000, SUBURB, 165);         // Bergen, Essex & Union county suburbs
   luRect(-11800, -30000, -6000, -11000, SUBURB, 150);         // Hackensack, Teaneck, Englewood (behind the Palisades)
@@ -571,6 +574,7 @@ function paintLandUse() {
     luStroke(pts, PARK, 255, 60);
   }
 
+  await buildSlice();
   // --- Upper Manhattan ---
   const um = UPPER_MANHATTAN_POLYGON;
   luShore(um, -3200, -14600, -1900, -7090, 75, PARK, 255);     // Riverside Park, Riverbank, Fort Washington Park (Hudson shore)
@@ -580,6 +584,7 @@ function paintLandUse() {
   luRect(-990, -8900, -880, -8150, PARK, 210);                 // Jackie Robinson Park
   luRect(-960, -8050, -830, -7150, PARK, 200);                 // St. Nicholas Park
 
+  await buildSlice();
   // --- The Bronx ---
   luEllipseLL(-73.9285, 40.8268, 150, 230, PARK, 150);         // Macombs Dam Park / Yankee Stadium lawns
   luPolyLL([[-73.9025, 40.8880], [-73.8850, 40.8850], [-73.8760, 40.8960], [-73.8790, 40.9120], [-73.8960, 40.9125], [-73.9020, 40.9000]], PARK); // Van Cortlandt Park
@@ -596,6 +601,7 @@ function paintLandUse() {
     if (b.minX > 4000 && b.maxX < 6500 && b.maxZ < -6900 && b.minZ > -8400) luPaintPolygon(r, INDUSTRY, 210); // Rikers Island
   }
 
+  await buildSlice();
   // --- Queens ---
   luPolyLL([[-73.9280, 40.7700], [-73.9225, 40.7695], [-73.9175, 40.7815], [-73.9230, 40.7840]], PARK);     // Astoria Park
   luEllipseLL(-73.9478, 40.7565, 85, 150, PARK, 230);           // Queensbridge Park
@@ -611,6 +617,7 @@ function paintLandUse() {
   luPolyLL([[-73.9100, 40.6950], [-73.8780, 40.7000], [-73.8650, 40.6900], [-73.8950, 40.6850]], PARK, 200); // Cypress Hills cemeteries
   luPolyLL([[-73.9100, 40.6950], [-73.8780, 40.7000], [-73.8650, 40.6900], [-73.8950, 40.6850]], SUBURB, 200);
 
+  await buildSlice();
   // --- Brooklyn ---
   const bk = BROOKLYN_LAND ? BROOKLYN_LAND.pts : [];
   luPolyLL([[-73.9548, 40.7196], [-73.9500, 40.7178], [-73.9478, 40.7230], [-73.9522, 40.7247]], PARK);     // McCarren Park
@@ -641,6 +648,7 @@ function paintLandUse() {
   luPolyLL([[-73.8960, 40.5950], [-73.8800, 40.5960], [-73.8750, 40.5830], [-73.8930, 40.5810]], INDUSTRY, 200); // Floyd Bennett Field
   luPolyLL([[-73.8960, 40.5950], [-73.8800, 40.5960], [-73.8750, 40.5830], [-73.8930, 40.5810]], SUBURB, 220);
 
+  await buildSlice();
   // --- New Jersey ---
   luPolyLL([[-74.0565, 40.7080], [-74.0420, 40.7122], [-74.0330, 40.7082], [-74.0330, 40.7010], [-74.0430, 40.6960], [-74.0560, 40.6930],
     [-74.0632, 40.6980]], PARK);                                                        // Liberty State Park
@@ -667,6 +675,7 @@ function paintLandUse() {
   luShore(njShore, -6000, -30000, -3300, -10900, 260, PARK, 255); // Palisades Interstate Park (cliffs & wooded crest)
   luEllipseLL(-73.9690, 40.8475, 170, 140, PARK, 200);          // Fort Lee Historic Park
 
+  await buildSlice();
   // --- Staten Island ---
   luEllipseLL(-74.1400, 40.5900, 1500, 900, PARK, 235, 0.5);    // Staten Island Greenbelt (Todt Hill)
   luEllipseLL(-74.1020, 40.6440, 220, 150, PARK, 200);          // Snug Harbor
@@ -674,7 +683,8 @@ function paintLandUse() {
   luEllipseLL(-74.1000, 40.6180, 260, 380, PARK, 210);          // Clove Lakes & Silver Lake parks
   luEllipseLL(-74.1900, 40.5800, 1800, 1300, PARK, 200);        // Freshkills Park
 
-  luBlur(1);
+  await buildSlice();
+  await luBlur(1);
 }
 
 const landUseTexture = new THREE.DataTexture(luData, LU.w, LU.h, THREE.RGBAFormat);
@@ -1489,8 +1499,7 @@ function paintGround() {
     MANHATTAN_DIST_GRID = await rasterManhattanDistance();
     await buildSlice();
     RIDGE_TABLE = tabulateRidge();
-    await buildSlice();
-    paintLandUse();
+    await paintLandUse();
     await buildSlice();
     await paintZones();
     await buildSlice();
