@@ -69,6 +69,15 @@ vi.mock("@polaris/ui", async (original) => ({
     )
 }));
 
+// The rail marks an app read through the launcher's action, which reaches the
+// server; the bell's provider does too.
+vi.mock("@/app/(app)/launcher-waiting-actions", () => ({
+    markLauncherReadAction: async () => ({})
+}));
+vi.mock("@/components/notifications/notifications-provider", () => ({
+    useHoldConversationNotices: () => () => ({ settle: () => undefined, abandon: () => undefined })
+}));
+
 const { AppSidebar } = await import("@/components/app-sidebar");
 const { DisplayPreferencesForm } = await import("@/components/display-preferences-form");
 const { LanguageCard } = await import("@/app/(app)/account/preferences/language-card");
