@@ -12,6 +12,7 @@ import {
     launcherWaitingSchema,
     markableApps,
     markLauncherReadSchema,
+    undismissable,
     withoutAll,
     withoutApp,
     withoutItem,
@@ -112,10 +113,20 @@ describe("marking everything read", () => {
         expect(badgeDelta(waiting, after, "admin")).toBe(-3);
     });
 
-    it("offers a tile's mark only for an app with something dismissable", () => {
-        expect([...markableApps(waiting)].sort()).toEqual(["admin", "chat"]);
-        expect([...markableApps(withoutAll(waiting))]).toEqual([]);
-        expect(markableApps(null).size).toBe(0);
+    it("offers the mark on every app whose badge is up, before the route answers", () => {
+        const badges = { chat: 7, mail: 2, admin: 4 };
+        expect([...markableApps(badges, null)].sort()).toEqual(["admin", "chat", "mail"]);
+        expect([...markableApps({ chat: 0, mail: 0, admin: 0 }, null)]).toEqual([]);
+        // The route answering without an app does not take its mark away.
+        expect([...markableApps(badges, waiting)].sort()).toEqual(["admin", "chat", "mail"]);
+    });
+
+    it("lets the route take the mark only off an app whose entries are all faults", () => {
+        const onlyFaults = withoutAll(waiting);
+        expect([...markableApps({ chat: 7, admin: 1 }, onlyFaults)]).toEqual(["chat"]);
+        expect(undismissable(waiting, "admin")).toBe(1);
+        expect(undismissable(waiting, "chat")).toBe(0);
+        expect(undismissable(null, "admin")).toBe(0);
     });
 });
 

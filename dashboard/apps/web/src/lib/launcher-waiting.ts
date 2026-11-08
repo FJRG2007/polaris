@@ -24,7 +24,9 @@
 
 import { z } from "zod";
 
-/** The apps the menu lists entries for. Each counts on its badge already. */
+/** Every app that counts on its badge (`useServerUnread` is typed by this
+ *  list, so an app cannot start counting without being markable here), and so
+ *  every app the menu lists entries for and marks read. */
 export const LAUNCHER_WAITING_APPS = ["chat", "mail", "admin"] as const;
 
 export type LauncherWaitingApp = (typeof LAUNCHER_WAITING_APPS)[number];
@@ -153,12 +155,37 @@ export function withoutAll(waiting: LauncherWaiting): LauncherWaiting {
     return LAUNCHER_WAITING_APPS.reduce((left, app) => withoutApp(left, app), waiting);
 }
 
-/** The apps whose tile offers "mark read": those with something the menu may
- *  dismiss. A fault alone - a Google API switched off - is not one. */
-export function markableApps(waiting: LauncherWaiting | null): Set<LauncherWaitingApp> {
+/** What a mark of an app leaves on its badge: the entries the route listed that
+ *  no mark dismisses. Zero before the route has answered, and for every app
+ *  whose entries are all dismissable. */
+export function undismissable(waiting: LauncherWaiting | null, app: LauncherWaitingApp): number {
+    const group = waiting?.groups.find((one) => one.app === app);
+    return (group?.items ?? [])
+        .filter((item) => !item.dismissable)
+        .reduce((sum, item) => sum + item.count, 0);
+}
+
+/**
+ * The apps a tile, a rail row and a right click offer "mark read" on: every app
+ * whose badge is up, from the first paint. The badge is what the mark is about,
+ * so it alone decides - an answer from the route that is late, or never comes,
+ * cannot take the mark away.
+ *
+ * The route only refines: an app whose listed entries are all faults no mark
+ * dismisses - a Google API switched off, while that is undismissable - is left
+ * without one, since pressing it would change nothing.
+ */
+export function markableApps(
+    unread: Readonly<Record<string, number>>,
+    waiting: LauncherWaiting | null
+): Set<LauncherWaitingApp> {
     const found = new Set<LauncherWaitingApp>();
-    for (const group of waiting?.groups ?? []) {
-        if (group.items.some((item) => item.dismissable)) found.add(group.app);
+    for (const app of LAUNCHER_WAITING_APPS) {
+        if ((unread[app] ?? 0) <= 0) continue;
+        const group = waiting?.groups.find((one) => one.app === app);
+        const onlyFaults =
+            !!group && group.items.length > 0 && group.items.every((item) => !item.dismissable);
+        if (!onlyFaults) found.add(app);
     }
     return found;
 }

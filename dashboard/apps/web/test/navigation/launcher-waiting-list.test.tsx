@@ -21,6 +21,7 @@ let refuse = false;
 const nudges: [string, number][] = [];
 const shown: string[] = [];
 let server = { chat: 7, mail: 2, admin: 4 };
+let badges: Record<string, number> = { chat: 7, mail: 2, admin: 4 };
 let hold: Promise<void> | null = null;
 
 vi.mock("@/app/(app)/launcher-waiting-actions", () => ({
@@ -31,11 +32,20 @@ vi.mock("@/app/(app)/launcher-waiting-actions", () => ({
     }
 }));
 vi.mock("@/components/app-unread", () => ({
-    useAppUnread: () => ({ chat: 7, mail: 2, admin: 4 }),
+    // The badges as drawn: a nudge moves them, as the drift overlay does, and
+    // Mail's moves on Mail's own ledger. The mark goes with its badge.
+    useAppUnread: () => ({
+        ...badges,
+        mail: Math.max(0, (badges.mail ?? 0) + unreadOverlay(0).inbox)
+    }),
     useServerUnread: () => server,
     useNudgeAppUnread: () => (app: string, by: number) => {
         nudges.push([app, by]);
-        return () => nudges.push([app, -by]);
+        badges[app] = (badges[app] ?? 0) + by;
+        return () => {
+            nudges.push([app, -by]);
+            badges[app] = (badges[app] ?? 0) - by;
+        };
     }
 }));
 vi.mock("@/components/admin-waiting", () => ({ useAdminRecount: () => () => undefined }));
@@ -154,6 +164,7 @@ beforeEach(() => {
     shown.length = 0;
     refuse = false;
     server = { chat: 7, mail: 2, admin: 4 };
+    badges = { chat: 7, mail: 2, admin: 4 };
     hold = null;
     vi.stubGlobal(
         "fetch",
