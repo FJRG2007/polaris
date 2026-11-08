@@ -17,6 +17,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/account/sessions" }));
 
+// The rail marks an app read through the launcher's action, which reaches the
+// server; the bell's provider does too.
+vi.mock("@/app/(app)/launcher-waiting-actions", () => ({
+    markLauncherReadAction: async () => ({})
+}));
+vi.mock("@/components/notifications/notifications-provider", () => ({
+    useHoldConversationNotices: () => () => ({ settle: () => undefined, abandon: () => undefined })
+}));
+
 const { AppSidebar } = await import("@/components/app-sidebar");
 
 const SECURITY_SCREENS = [
@@ -40,7 +49,9 @@ describe("the account rail", () => {
         // What is left is the account itself, under no group of its own. Asserted
         // as "no credential screen is loose" rather than as a fixed list, so a new
         // profile screen does not fail this and a new security one does.
-        const ungrouped = sections.filter((section) => section.group === undefined).map((section) => section.href);
+        const ungrouped = sections
+            .filter((section) => section.group === undefined)
+            .map((section) => section.href);
         expect(ungrouped).toContain("/account");
         expect(
             ungrouped.filter((href) => [...SECURITY_SCREENS, ...DEVELOPER_SCREENS].includes(href))

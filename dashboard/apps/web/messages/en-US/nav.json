@@ -19,7 +19,9 @@
         "favorite": "Add to favorites",
         "unfavorite": "Remove from favorites",
         "start": "Open on entry",
-        "notStart": "Stop opening on entry"
+        "notStart": "Stop opening on entry",
+        "markRead": "Mark as read",
+        "markSeen": "Mark as seen"
     },
     "waiting": {
         "unread": "{count, plural, one {# unread message} other {# unread messages}}",
