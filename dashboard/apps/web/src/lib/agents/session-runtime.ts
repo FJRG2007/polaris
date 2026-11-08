@@ -504,6 +504,7 @@ export async function startSession(session: SessionView, token: string): Promise
 
 async function startLocally(session: SessionView, boot: Bootstrap): Promise<void> {
     const name = commands.sessionContainerName(session.id);
+    const limits = await sessionLimits();
     await upWithFreshImage((pullPolicy) =>
         new HostdPorts().composeUp({
             project: name,
@@ -556,7 +557,12 @@ async function startLocally(session: SessionView, boot: Bootstrap): Promise<void
                     // box, so the boot finds it and reopens on it rather than
                     // cloning over it - see PREPARE_WORKTREE - and the agent
                     // comes back on the conversation it was in.
-                    restart: "unless-stopped"
+                    restart: "unless-stopped",
+                    // Bounded, so one session building something enormous slows
+                    // itself rather than every app on the box. See
+                    // `sessionLimits` for where the numbers come from.
+                    cpus: limits.cpus,
+                    memoryMb: limits.memoryMb
                 }
             ],
             volumes: [],

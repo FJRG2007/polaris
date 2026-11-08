@@ -25,6 +25,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import os from "node:os";
 import { getSetting } from "@/lib/setting-store";
 
 /** What an administrator may change these to. */
@@ -185,4 +186,54 @@ export function workspaceRefusal(claim: WorkspaceClaim, holders: number): string
         return "Somebody already has a session open on the shared machine, and it has one workspace. Wait for that to finish, or open this one on your own machine.";
     }
     return "You already have a workspace session open, and it is the same directory this one would use. Stop that session and this will start.";
+}
+
+/** What an administrator may change a session container's share of the box to. */
+export const CPUS_KEY = "agents.sessions.cpus";
+export const MEMORY_KEY = "agents.sessions.memoryMb";
+
+/**
+ * The defaults: two cores and 4 GB.
+ *
+ * Enough for a package install and a test run, which is what a session spends
+ * most of its machine on, and little enough that the twelve the deployment
+ * allows do not take a box that is also serving everything else on it. Nothing
+ * bounded a session container before, so one build could starve every
+ * deployed app.
+ */
+export const DEFAULT_CPUS = 2;
+export const DEFAULT_MEMORY_MB = 4096;
+
+/**
+ * The limits a session container is started with.
+ *
+ * Never more cores than the box has: the container engine refuses a CPU limit
+ * above that, and a session that will not start on a small box is worse than
+ * one that has all of it. The same for memory. A stored value that is not a
+ * positive number falls back to the default rather than to no limit.
+ */
+export function clampLimits(
+    stored: { cpus: number; memoryMb: number },
+    box: { cpus: number; memoryMb: number }
+): { cpus: number; memoryMb: number } {
+    const cpus = Number.isFinite(stored.cpus) && stored.cpus > 0 ? stored.cpus : DEFAULT_CPUS;
+    const memory =
+        Number.isInteger(stored.memoryMb) && stored.memoryMb >= 256
+            ? stored.memoryMb
+            : DEFAULT_MEMORY_MB;
+    return {
+        cpus: Math.max(0.05, Math.min(cpus, box.cpus > 0 ? box.cpus : cpus, 256)),
+        memoryMb: Math.max(256, Math.min(memory, box.memoryMb > 0 ? box.memoryMb : memory))
+    };
+}
+
+export async function sessionLimits(): Promise<{ cpus: number; memoryMb: number }> {
+    const [cpus, memoryMb] = await Promise.all([
+        getSetting(CPUS_KEY).catch(() => null),
+        getSetting(MEMORY_KEY).catch(() => null)
+    ]);
+    return clampLimits(
+        { cpus: Number(cpus ?? DEFAULT_CPUS), memoryMb: Number(memoryMb ?? DEFAULT_MEMORY_MB) },
+        { cpus: os.availableParallelism(), memoryMb: Math.floor(os.totalmem() / (1024 * 1024)) }
+    );
 }
