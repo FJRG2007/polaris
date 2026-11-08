@@ -28,6 +28,7 @@ import { serverVersion } from "../server-version";
 import * as written from "./messages";
 import * as waves from "./kinds/waves";
 import * as commands from "./commands";
+import * as outsideBoosts from "./outside-boosts";
 import * as stage from "./kinds/stage";
 import * as playing from "../activity";
 import * as delivery from "../delivery";
@@ -1464,9 +1465,24 @@ async function guardSpace(
     guarded.set(runId, { at: now, line });
 }
 
+/** When each run last took outside boosts off its players (`outside-boosts`). */
+const stripped = new Map<string, number>();
+
+/** Whether a run is due another pass, noting it when it is. */
+function stripDue(runId: string, now: number): boolean {
+    const last = stripped.get(runId);
+    if (last !== undefined && now - last < TICK_MS) return false;
+    if (!stripped.has(runId) && stripped.size >= 256)
+        stripped.delete(stripped.keys().next().value!);
+    stripped.set(runId, now);
+    return true;
+}
+
 /** The run's space let go (`guardSpace`). */
 async function unguardSpace(server: ServerContainer, runId: string): Promise<void> {
     guarded.delete(runId);
+    // Over with it, the players go back to their beacons.
+    if (stripped.delete(runId)) await server.say([outsideBoosts.RELEASE_LINE]).catch(() => "");
     if ((await inServer.capabilities(server)).has("guard"))
         await server.say([inServer.guardClear(inServer.guardKey(runId))]).catch(() => "");
 }
@@ -2068,6 +2084,11 @@ async function play(
     /** The run as the tick found it: what the season's ambience is told from. */
     const before = loop.run;
 
+    // A beacon's effects taken off whoever is playing (`outside-boosts`), at
+    // most every two seconds however fast the kind ticks.
+    if (outsideBoosts.strips(preset.kind) && stripDue(loop.run.id, now)) {
+        lines.push(...outsideBoosts.stripLines(insidersOf(loop.run)));
+    }
     // The boss bar's clock is `showClock`'s, a second at a time; the boss's
     // shows its health and a horde defense's the wave.
     // Every other tick: the game adds the statistics up faster than anybody
