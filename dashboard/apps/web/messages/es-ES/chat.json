@@ -373,6 +373,7 @@
         "always": "siempre"
     },
     "callRoom": {
+        "shareNotArriving": "La pantalla de {name} no te llega. Pídele que deje de compartir y vuelva a compartir.",
         "yourScreen": "Tu pantalla",
         "theirScreen": "{name} - pantalla",
         "backToTheGrid": "Volver al mosaico",

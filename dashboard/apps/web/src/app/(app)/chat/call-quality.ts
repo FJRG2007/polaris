@@ -249,6 +249,60 @@ export interface CallHealth {
      * reason. A camera always has noise in it and always has frames.
      */
     readonly fps?: number;
+    /** Round trip to the media server, in seconds, off the selected candidate
+     *  pair. Absent where the browser has not measured one yet. */
+    readonly rtt?: number;
+    /** The browser's estimate of what the uplink can carry, in bits a second.
+     *  Absent where it has not formed one. */
+    readonly available?: number;
+}
+
+/** What the transport says about the uplink, read off one sender's report. */
+export interface Uplink {
+    readonly rtt?: number;
+    readonly available?: number;
+}
+
+/** One entry of an RTC stats report, narrowed to what `uplinkFrom` reads. */
+export interface UplinkStatEntry {
+    readonly id?: string;
+    readonly type?: string;
+    readonly state?: string;
+    readonly nominated?: boolean;
+    readonly selected?: boolean;
+    readonly selectedCandidatePairId?: string;
+    readonly currentRoundTripTime?: number;
+    readonly availableOutgoingBitrate?: number;
+}
+
+/**
+ * The round trip and the send estimate of the connection a sender is on.
+ *
+ * The pair the transport names as selected, when it names one; otherwise the
+ * one flagged selected (Firefox), then a nominated pair that succeeded. A
+ * report with none of those says nothing about the line, which is not the
+ * same as saying it is bad.
+ */
+export function uplinkFrom(entries: Iterable<UplinkStatEntry> | undefined): Uplink {
+    if (!entries) return {};
+    const all = [...entries];
+    const pairs = all.filter((entry) => entry.type === "candidate-pair");
+    const named = all.find((entry) => entry.type === "transport")?.selectedCandidatePairId;
+    const pair =
+        (named ? pairs.find((entry) => entry.id === named) : undefined) ??
+        pairs.find((entry) => entry.selected) ??
+        pairs.find((entry) => entry.nominated && entry.state === "succeeded");
+    if (!pair) return {};
+    const rtt = finite(pair.currentRoundTripTime);
+    const available = finite(pair.availableOutgoingBitrate);
+    return {
+        ...(rtt !== undefined ? { rtt } : {}),
+        ...(available !== undefined ? { available } : {})
+    };
+}
+
+function finite(value: number | undefined): number | undefined {
+    return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
 /** One report from a sender's own stats, narrowed to what the walk reads. */
@@ -271,9 +325,10 @@ export interface SenderStatEntry {
 export function senderHealthFrom(
     stats: readonly SenderStatEntry[] | undefined,
     connection: string,
-    countFrames: boolean
+    countFrames: boolean,
+    uplink: Uplink = {}
 ): CallHealth {
-    if (!stats || stats.length === 0) return { connection };
+    if (!stats || stats.length === 0) return { connection, ...uplink };
     const top = stats.reduce((best, entry) =>
         (entry.frameHeight ?? 0) > (best.frameHeight ?? 0) ? entry : best
     );
@@ -286,7 +341,8 @@ export function senderHealthFrom(
     return {
         connection,
         limitation: limited?.qualityLimitationReason ?? top.qualityLimitationReason,
-        fps: countFrames ? top.framesPerSecond : undefined
+        fps: countFrames ? top.framesPerSecond : undefined,
+        ...uplink
     };
 }
 
@@ -328,10 +384,32 @@ export const DRIFT_SETTLING_MS = 5_000;
  *  the window rather than on its edge. */
 export const DRIFT_SETTLING_READS = LEVELS.length;
 
+/**
+ * A round trip, in seconds, that says the line is queueing rather than merely
+ * far away. Satellite and mobile backup lines sit well under it when they are
+ * idle; past it, packets are waiting behind each other, which is a line full.
+ * Only read while the data saver is on.
+ */
+export const SAVER_QUEUED_RTT_S = 0.4;
+
+/**
+ * The share of a rung's allowance the uplink estimate has to cover before auto
+ * climbs into it while the data saver is on. Not all of it: the allowance is a
+ * ceiling the encoder rarely reaches, and the estimate only grows with traffic.
+ */
+export const SAVER_CLIMB_SHARE = 0.6;
+
 /** Whether something is actually going wrong, as opposed to merely not being
- *  perfect. Only these three things bring the picture down. */
-function struggling(health: CallHealth, ladder: QualityLadder, level: CallLevel): boolean {
+ *  perfect. Only these bring the picture down; the data saver adds one more,
+ *  a line that has started to queue. */
+function struggling(
+    health: CallHealth,
+    ladder: QualityLadder,
+    level: CallLevel,
+    saver: boolean
+): boolean {
     if (health.connection === "poor" || health.connection === "lost") return true;
+    if (saver && health.rtt !== undefined && health.rtt >= SAVER_QUEUED_RTT_S) return true;
     // The encoder naming what is holding it back. Both answers mean the rung is
     // beyond this machine or this line right now, which is exactly the question.
     if (health.limitation === "bandwidth" || health.limitation === "cpu") return true;
@@ -342,8 +420,16 @@ function struggling(health: CallHealth, ladder: QualityLadder, level: CallLevel)
 /** Whether there is room to ask for more. Stricter than "not struggling": an
  *  encoder already trimming something is not evidence that a bigger picture
  *  would arrive intact. */
-function comfortable(health: CallHealth): boolean {
+function comfortable(health: CallHealth, next: QualityRung, saver: boolean): boolean {
     if (health.limitation !== undefined && health.limitation !== "none") return false;
+    // On a backup line the climb also wants the estimate to say the bigger rung
+    // fits. Without an estimate it is not held back: no evidence is not a cap.
+    if (
+        saver &&
+        health.available !== undefined &&
+        health.available < next.maxBitrate * SAVER_CLIMB_SHARE
+    )
+        return false;
     return health.connection === "excellent" || health.connection === "good";
 }
 
@@ -367,8 +453,13 @@ function lower(one: CallLevel | undefined, two: CallLevel): CallLevel {
  * complaint, when it comes, is specific: this machine cannot encode that, or
  * this line cannot carry it.
  */
-export function driftAuto(state: AutoState, health: CallHealth, ladder: QualityLadder): AutoState {
-    if (struggling(health, ladder, state.level)) {
+export function driftAuto(
+    state: AutoState,
+    health: CallHealth,
+    ladder: QualityLadder,
+    saver = hostDataSaver()
+): AutoState {
+    if (struggling(health, ladder, state.level, saver)) {
         const down = shift(ladder, state.level, -1);
         return {
             level: down,
@@ -379,9 +470,9 @@ export function driftAuto(state: AutoState, health: CallHealth, ladder: QualityL
             blocked: down === state.level ? state.blocked : lower(state.blocked, state.level)
         };
     }
-    if (!comfortable(health)) return { ...state, healthy: 0 };
-    const healthy = state.healthy + 1;
     const next = shift(ladder, state.level, 1);
+    if (!comfortable(health, ladder.rungs[next], saver)) return { ...state, healthy: 0 };
+    const healthy = state.healthy + 1;
     // At or above the rung that failed, not merely equal to it. Equality alone
     // damped exactly one rung, and the one under it went back to the ordinary
     // pace - so a call that had already given up on two of them climbed into the
@@ -399,17 +490,36 @@ export function startAuto(ladder: QualityLadder): AutoState {
     return { level: ladder.ceiling, healthy: 0 };
 }
 
-/** The highest rung while the server's data saver is on (backup access). */
-export const SAVER_CEILING: CallLevel = "medium";
+/**
+ * The rung actually in force: the one somebody picked, or the one auto is on.
+ *
+ * The data saver is not a ceiling here any more. It used to hold every call to
+ * the middle rung while the server was on its backup line, which meant a sharer
+ * on a line with room to spare could not make a page of text readable however
+ * far they moved the bar. A rung somebody picks is now what they get; what the
+ * saver changes is how auto walks - see `driftAuto` - so a backup line comes
+ * down only when it is actually full.
+ */
+export function levelOf(setting: CallQuality, auto: CallLevel): CallLevel {
+    return setting === "auto" ? auto : setting;
+}
 
 /**
- * The rung actually in force: the one somebody picked, or the one auto is on -
- * held to `SAVER_CEILING` while the server is on backup access with the data
- * saver on, since every call's media then crosses the backup line.
+ * How a shared screen should be encoded at this rung.
+ *
+ * Read off the framerate, as `screenIsMotion` is - except that a screen auto
+ * has had to bring down is held sharp instead. Under pressure a "motion" share
+ * gives up resolution first, and a document at half its size is unreadable,
+ * while one at half its framerate is not even noticed.
  */
-export function levelOf(setting: CallQuality, auto: CallLevel, saver = hostDataSaver()): CallLevel {
-    const level = setting === "auto" ? auto : setting;
-    return saver && LEVELS.indexOf(level) > LEVELS.indexOf(SAVER_CEILING) ? SAVER_CEILING : level;
+export function screenTuning(
+    level: CallLevel,
+    degraded: boolean
+): { hint: "motion" | "detail"; preference: RTCDegradationPreference } {
+    const motion = !degraded && screenIsMotion(level);
+    return motion
+        ? { hint: "motion", preference: "maintain-framerate" }
+        : { hint: "detail", preference: "maintain-resolution" };
 }
 
 /**

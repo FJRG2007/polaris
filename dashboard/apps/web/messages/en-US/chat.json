@@ -373,6 +373,7 @@
         "always": "always"
     },
     "callRoom": {
+        "shareNotArriving": "{name}'s screen is not reaching you. Ask them to stop sharing and share again.",
         "yourScreen": "Your screen",
         "theirScreen": "{name} - screen",
         "backToTheGrid": "Back to the grid",

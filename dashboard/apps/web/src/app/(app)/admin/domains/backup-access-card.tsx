@@ -8,7 +8,7 @@
  */
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Button, Checkbox, Skeleton } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -41,22 +41,70 @@ export function BackupAccessCard() {
         select: (body) => body as BackupView
     });
     const [busy, setBusy] = useState(false);
+    const [savingSaver, setSavingSaver] = useState(false);
     const [rechecking, setRechecking] = useState(false);
     const [error, setError] = useState("");
     const [confirm, confirmDialog] = useConfirm();
     const view = live.data;
+    /** The view as last drawn, for a save that comes back after other changes. */
+    const latest = useRef(view);
+    latest.current = view;
+    /** Changes drawn on screen whose save has not answered yet, oldest first. */
+    const pending = useRef<Partial<BackupConfig>[]>([]);
+    /** The config the server last confirmed, which every queued save starts from. */
+    const settled = useRef<BackupConfig | null>(null);
+    if (view && pending.current.length === 0) settled.current = view.config;
+    const queue = useRef<Promise<void>>(Promise.resolve());
+
+    function withPending(shown: BackupView): BackupView {
+        return { ...shown, config: Object.assign({ ...shown.config }, ...pending.current) };
+    }
+
+    /**
+     * Draws a change at once and saves it behind any save still running, so each
+     * request carries the config the server last confirmed plus this change and
+     * no answer can undo another one. A failed save takes back only its own change.
+     */
+    function enqueue(change: Partial<BackupConfig>, done: () => void): Promise<void> {
+        pending.current = [...pending.current, change];
+        if (latest.current) live.replace(withPending(latest.current));
+        const run = async () => {
+            const base = settled.current ?? latest.current?.config;
+            const result = base
+                ? await runAction(() => saveBackupAccessAction({ ...base, ...change }), setError)
+                : null;
+            pending.current = pending.current.filter((entry) => entry !== change);
+            if (result) settled.current = result.config;
+            const now = latest.current;
+            if (result) live.replace(withPending(result));
+            else if (now)
+                live.replace(withPending({ ...now, config: settled.current ?? now.config }));
+            done();
+        };
+        const next = queue.current.then(run);
+        queue.current = next;
+        return next;
+    }
 
     async function save(change: Partial<BackupConfig>) {
         if (!view) return;
         const next = { ...view.config, ...change };
         if (JSON.stringify(next) === JSON.stringify(view.config)) return;
-        const before = view;
-        live.replace({ ...view, config: next });
         setBusy(true);
         setError("");
-        const result = await runAction(() => saveBackupAccessAction(next), setError);
-        setBusy(false);
-        live.replace(result ?? before);
+        await enqueue(change, () => setBusy(false));
+    }
+
+    /**
+     * The data saver switch on its own: flipped on screen at once, saved behind
+     * it, and put back if the save fails. Only the switch waits on the answer -
+     * the rest of the card stays usable.
+     */
+    async function saveDataSaver(on: boolean) {
+        if (!view || view.config.dataSaver === on) return;
+        setSavingSaver(true);
+        setError("");
+        await enqueue({ dataSaver: on }, () => setSavingSaver(false));
     }
 
     async function recheck() {
@@ -66,7 +114,7 @@ export function BackupAccessCard() {
         const result = await runAction(recheckBackupAccessAction, setError);
         setRechecking(false);
         setBusy(false);
-        if (result) live.replace(result);
+        if (result) live.replace(withPending(result));
     }
 
     async function freePorts() {
@@ -95,7 +143,7 @@ export function BackupAccessCard() {
         const result = await runAction(action, setError);
         setBusy(false);
         if (!result) return;
-        live.replace(result.view);
+        live.replace(withPending(result.view));
         if (result.failure) setError(t(`domains.backup.repairFailed.${result.failure}`));
     }
 
@@ -219,10 +267,9 @@ export function BackupAccessCard() {
                             <label className="flex items-center gap-2">
                                 <Checkbox
                                     checked={view.config.dataSaver}
-                                    disabled={busy}
-                                    onChange={(event) =>
-                                        void save({ dataSaver: event.target.checked })
-                                    }
+                                    disabled={savingSaver}
+                                    aria-busy={savingSaver}
+                                    onChange={(event) => void saveDataSaver(event.target.checked)}
                                 />
                                 <span className="min-w-0">
                                     {t("domains.backup.dataSaver")}

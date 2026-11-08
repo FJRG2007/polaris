@@ -707,8 +707,8 @@
             "needsToken": "Conecta antes un token de Cloudflare",
             "needsServer": "Falta un servidor en la nube",
             "connectCloudflare": "El túnel y cada cambio necesitan un token de Cloudflare. <link>Conecta uno en Integraciones</link>.",
-            "dataSaver": "Ahorro de datos en respaldo",
-            "dataSaverHint": "Pausa descargas de imágenes, búsquedas de actualizaciones, despliegues y copias programadas hasta que vuelva la ruta directa.",
+            "dataSaver": "Ahorrar datos en la conexión de respaldo",
+            "dataSaverHint": "Mientras el dominio usa su conexión de respaldo, las descargas de imágenes, búsquedas de actualizaciones, despliegues y copias programadas esperan a la ruta directa, y las llamadas bajan de calidad solo cuando la conexión no da para más.",
             "state": {
                 "direct": "Directa",
                 "backup": "En respaldo desde",
