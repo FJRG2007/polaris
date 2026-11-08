@@ -52,6 +52,7 @@ import {
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { agentText, agentWord, sessionStateWord } from "@/lib/agents/words";
 import * as polls from "./sessions-polls";
+import { SessionUsageLabel } from "./session-usage-label";
 
 /** How often a live session is re-read. A session reports through its hooks, so
  *  this is only how quickly the list notices - fast enough that "needs you" is
@@ -172,6 +173,7 @@ export function SessionsView({
                                         t("sessions.thisBox")
                                     )}
                                 </span>
+                                <SessionUsageLabel usage={session.usage} />
                                 <span className={`shrink-0 text-xs ${TONE[session.state]}`}>
                                     {core.isSessionQueued(session.state) && positions[session.id]
                                         ? t("sessions.queuePosition", {

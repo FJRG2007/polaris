@@ -254,6 +254,11 @@
             "enigma": "Trabajar con tus estándares de Enigma",
             "enigmaHint": "Instala tus políticas, convenciones y guardarraíles en la sesión antes de que empiece el agente. Sus ajustes vienen de este repositorio y de los ajustes de Agentes.",
             "submit": "Iniciar"
+        },
+        "usage": {
+            "tokens": "{tokens} tokens",
+            "tokensCost": "{tokens} tokens, unos {cost}",
+            "detail": "{input} tokens de entrada, {output} de salida"
         }
     },
     "boot": {

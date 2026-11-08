@@ -254,6 +254,11 @@
             "enigma": "Work to your Enigma standards",
             "enigmaHint": "Installs your policies, conventions and guardrails into the session before the agent starts. Its own settings come from this repository and from Agents settings.",
             "submit": "Start"
+        },
+        "usage": {
+            "tokens": "{tokens} tokens",
+            "tokensCost": "{tokens} tokens, about {cost}",
+            "detail": "{input} tokens in, {output} out"
         }
     },
     "boot": {
