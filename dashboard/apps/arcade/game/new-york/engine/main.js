@@ -962,7 +962,8 @@ async function initApp() {
                     controllerManager.signalTurn(e.code === "KeyQ" ? 1 : -1);
                 break;
             case "KeyX":
-                if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) controllerManager.toggleHazard();
+                if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey)
+                    controllerManager.toggleHazard();
                 break;
             case "KeyB":
                 if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && !mapSystem.isFullMapOpen)
