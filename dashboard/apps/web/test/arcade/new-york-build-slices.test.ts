@@ -27,7 +27,9 @@ describe("New York start-up builders", () => {
             this: HTMLCanvasElement,
             type: string
         ) {
-            return type === "2d" ? createCanvas(this.width || 300, this.height || 150).getContext("2d") : null;
+            return type === "2d"
+                ? createCanvas(this.width || 300, this.height || 150).getContext("2d")
+                : null;
         } as never);
         const THREE = await import("../../../arcade/node_modules/three/build/three.webgpu.js");
         const slice = await import("../../../arcade/game/new-york/engine/build-slice.js");
@@ -80,7 +82,9 @@ describe("New York start-up builders", () => {
 
         const scene = new THREE.Scene();
         const grid = await run("cityGrid", () => buildCityGrid(scene));
-        const boroughs = await run("boroughs", () => buildBoroughs(scene, { sidewalks: grid.sidewalks }));
+        const boroughs = await run("boroughs", () =>
+            buildBoroughs(scene, { sidewalks: grid.sidewalks })
+        );
         const { colliders } = await run("landmarks", () => buildLandmarks(scene));
         const blocks = await run("blocks", () => buildCityBlocks(scene, colliders));
         const map = new NYCMapSystem({ allBlocks: blocks.allBlocks });
@@ -117,7 +121,8 @@ describe("New York start-up builders", () => {
         await run("culling", () => setupSceneCulling(scene, roots, shadow));
 
         const longestBy: Record<string, number> = {};
-        for (const s of slices) longestBy[s.builder] = Math.max(longestBy[s.builder] ?? 0, Math.round(s.ms));
+        for (const s of slices)
+            longestBy[s.builder] = Math.max(longestBy[s.builder] ?? 0, Math.round(s.ms));
         const longest = [...slices].sort((a, b) => b.ms - a.ms).slice(0, 15);
         const report = longest.map((s) => `${s.builder} ${Math.round(s.ms)}ms ${s.at}`).join("\n");
         if (process.env.NEW_YORK_SLICES_DUMP)
