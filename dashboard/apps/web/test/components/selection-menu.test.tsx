@@ -17,6 +17,8 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } 
 const polar = { allowed: true, ask: vi.fn() };
 
 vi.mock("@/components/polar/polar-panel", () => ({ usePolar: () => polar }));
+// The translation provider asks for the app router, which a test render has none of.
+vi.mock("next/navigation", () => ({ useRouter: () => ({}) }));
 
 import * as selectionMenu from "@/lib/selection-menu";
 import { SelectionMenu } from "@/components/selection-menu";
