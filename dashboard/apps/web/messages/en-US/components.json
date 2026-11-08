@@ -1760,6 +1760,33 @@
         "updateAll": "Update all apps",
         "checking": "Checking for updates"
     },
+    "gameRooms": {
+        "createTitle": "New room",
+        "game": "Game",
+        "public": "Public room",
+        "publicHint": "Anyone signed in can see it and join.",
+        "create": "Create room",
+        "joinTitle": "Join with a code",
+        "code": "Room code",
+        "codeInvalid": "A code has 8 letters and digits.",
+        "join": "Join",
+        "publicRooms": "Public rooms",
+        "refresh": "Refresh",
+        "empty": "No public rooms right now. Create one and others can join.",
+        "loadFailed": "Could not load the rooms.",
+        "retry": "Try again",
+        "roomLine": "Hosted by {name} - {count} of {max} playing",
+        "joinRoom": "Join",
+        "refused": {
+            "invalid": "Check the code and try again.",
+            "denied": "You do not have permission to play with others.",
+            "missing": "This game is not available here.",
+            "limited": "Too many tries. Wait a few minutes and try again.",
+            "unknown": "No running room has that code.",
+            "full": "That room is full.",
+            "failed": "Something went wrong. Try again."
+        }
+    },
     "gameInvite": {
         "title": "Invite to {game}",
         "intro": "They get an invitation to join. No call starts.",

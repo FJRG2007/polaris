@@ -22,5 +22,8 @@
     "inviteMissing": "Este juego no se puede jugar en grupo aquí.",
     "fullscreen": "Pantalla total",
     "exitFullscreen": "Volver al tamaño",
-    "coverMissing": "Sin portada aún"
+    "coverMissing": "Sin portada aún",
+    "together": "Jugar con otros",
+    "togetherIntro": "Abre una sala, comparte su código o únete a una en marcha.",
+    "togetherDenied": "Un administrador ha desactivado jugar con otros en tu cuenta."
 }

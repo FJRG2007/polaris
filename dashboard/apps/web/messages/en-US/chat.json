@@ -2084,6 +2084,8 @@
         "title": "Game",
         "back": "Back",
         "retry": "Try again",
+        "code": "Room code",
+        "publicCode": "Public room",
         "refused": {
             "missing": "This game is not installed here.",
             "denied": "You do not have permission to play games.",

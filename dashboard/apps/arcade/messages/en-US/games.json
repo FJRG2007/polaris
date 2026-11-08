@@ -22,5 +22,8 @@
     "inviteMissing": "This game cannot be played together here.",
     "fullscreen": "Full screen",
     "exitFullscreen": "Exit full screen",
-    "coverMissing": "No cover yet"
+    "coverMissing": "No cover yet",
+    "together": "Play with others",
+    "togetherIntro": "Open a room, share its code, or join one already running.",
+    "togetherDenied": "An admin has turned off playing with others for your account."
 }

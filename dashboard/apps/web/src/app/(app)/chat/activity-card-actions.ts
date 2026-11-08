@@ -41,10 +41,12 @@ export async function readActivityCard(sessionId: unknown): Promise<card.Activit
     if (!id.success) return null;
     const user = await requireUser();
     const session = await sessions.sessionForCard(id.data);
-    if (!session) return null;
+    // A room has no conversation, so no card.
+    const channelId = session?.channelId;
+    if (!session || !channelId) return null;
     const now = Date.now();
     try {
-        await requireChannel({ id: user.id }, session.channelId);
+        await requireChannel({ id: user.id }, channelId);
     } catch {
         if (session.meetingId !== null || !(await sessions.holdsInvite(session.id, user.id, now)))
             return null;
@@ -86,12 +88,9 @@ export async function readActivityCard(sessionId: unknown): Promise<card.Activit
 
     return {
         sessionId: session.id,
-        channelId: session.channelId,
+        channelId,
         meetingId: session.meetingId,
-        href:
-            session.meetingId === null
-                ? card.lobbyHref(session.id)
-                : card.joinHref(session.channelId, session.id),
+        href: card.sessionHref(session),
         game: session.game,
         gameName: offered?.name ?? "",
         startedBy: { id: session.startedById, name: nameOf(session.startedById) },
@@ -208,7 +207,7 @@ async function reachableBy(inviterId: string, userIds: readonly string[]): Promi
 /** Offer the invitation in each invitee's toast and bell, and answer how many
  *  it reached. */
 async function tell(
-    session: { readonly id: string; readonly channelId: string },
+    session: { readonly id: string; readonly channelId: string | null },
     user: Inviter,
     gameName: string,
     userIds: readonly string[],
@@ -298,17 +297,17 @@ export async function inviteToSession(input: unknown): Promise<SessionInviteAnsw
     const wanted = [...new Set(parsed.data.userIds)].filter((id) => id !== user.id);
     let reachable = wanted;
     if (session.meetingId !== null) {
-        const members = await prisma.chatChannelMember.findMany({
-            where: { channelId: session.channelId, userId: { in: wanted } },
-            select: { userId: true }
-        });
+        const channelId = session.channelId;
+        const members = channelId
+            ? await prisma.chatChannelMember.findMany({
+                  where: { channelId, userId: { in: wanted } },
+                  select: { userId: true }
+              })
+            : [];
         const inIt = new Set(members.map((row) => row.userId));
         reachable = wanted.filter((id) => inIt.has(id));
     }
-    const href =
-        session.meetingId === null
-            ? card.lobbyHref(session.id)
-            : card.joinHref(session.channelId, session.id);
+    const href = card.sessionHref(session);
     const invited = await tell(session, user, allowed.name, reachable, href);
     return { ok: true, invited, skipped: wanted.length - invited };
 }
@@ -387,10 +386,7 @@ export async function pendingGameInvites(): Promise<readonly PendingInvite[]> {
                 id: row.invitedById,
                 name: people.find((person) => person.id === row.invitedById)?.name ?? ""
             },
-            href:
-                row.session.meetingId === null
-                    ? card.lobbyHref(row.session.id)
-                    : card.joinHref(row.session.channelId, row.session.id),
+            href: card.sessionHref(row.session),
             inCall: row.session.meetingId !== null,
             expiresAt: row.expiresAt.toISOString()
         }));

@@ -1,6 +1,7 @@
 "use client";
 
-/** The Games library: every game, and the way into each. */
+/** The Games library: every game, the way into each, and - for whoever may
+ *  play with others - rooms to play the multiplayer ones together. */
 
 import Link from "next/link";
 import { Play } from "lucide-react";
@@ -8,10 +9,15 @@ import { useArcadeT } from "./i18n";
 import { GameCover } from "./game-cover";
 import { GAMES } from "../games/registry";
 import { Button, Card, CardBody } from "@polaris/ui";
+import { hostUi } from "@polaris/app-host/client";
 
-export function GamesScreen() {
+export function GamesScreen({ together }: { together: boolean }) {
     const t = useArcadeT();
     const shown = GAMES;
+    const multiplayer = shown
+        .filter((game) => game.multiplayer)
+        .map((game) => ({ id: game.id, name: t(`games.${game.id}.name` as never) }));
+    const Rooms = hostUi.arcadeRooms.GameRooms;
     return (
         <div className="mx-auto w-full max-w-5xl px-4 py-6">
             <h1 className="text-xl font-semibold">{t("title")}</h1>
@@ -55,6 +61,25 @@ export function GamesScreen() {
                         );
                     })}
                 </ul>
+            )}
+            {multiplayer.length > 0 && (
+                <section className="mt-10 min-w-0" aria-labelledby="games-together">
+                    <h2 id="games-together" className="text-lg font-semibold">
+                        {t("together")}
+                    </h2>
+                    {together ? (
+                        <>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {t("togetherIntro")}
+                            </p>
+                            <div className="mt-4">
+                                <Rooms games={multiplayer} />
+                            </div>
+                        </>
+                    ) : (
+                        <p className="mt-1 text-sm text-muted-foreground">{t("togetherDenied")}</p>
+                    )}
+                </section>
             )}
         </div>
     );
