@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { cityUniforms } from './tsl-materials.js';
+import { LAMP_GLOW } from './player-rules.js';
 import {
   float,
   vec2,
@@ -646,8 +647,9 @@ function createLoftedBusMaterial() {
     .mul(headEmit)
     .add(color(0xfff0d4).mul(cabinGlow))
     .add(color(0xff9210).mul(max(browMarker, sideMarkers).mul(mix(float(0.65), float(1.15), night))))
-    .add(color(0xff9a14).mul(max(turnFront, turnRear).mul(blink).mul(2.2)))
-    .add(color(0xff0c14).mul(tailLamp.mul(brake.mul(1.6).add(0.75)).add(highBrake.mul(brake.mul(1.8))).add(rearIdLamps.mul(night))));
+    .add(color(0xff9a14).mul(max(turnFront, turnRear).mul(blink).mul(LAMP_GLOW.turn)))
+    .add(color(0xff0c14).mul(tailLamp.mul(brake.mul(LAMP_GLOW.brake).add(night.mul(LAMP_GLOW.tailNight)).add(LAMP_GLOW.tail))
+      .add(highBrake.mul(brake.mul(LAMP_GLOW.chmsl))).add(rearIdLamps.mul(night))));
 
   _busLoftedMat = mat;
   return mat;

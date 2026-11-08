@@ -27,7 +27,8 @@ import { PersonCrowd, PersonRig } from './pedestrians.js';
 import { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
 import {
   HELI_CRUISE_SPEED, KEY_BINDINGS, PERSON_MOVE, approachVelocity, arrivalFor, cameraRelativeMove, createJumpState, createTurnSignal,
-  heliTopSpeed, playerBrakeLamp, settleBody, slideVelocity, stepJump, stepTurbo, stepTurnSignal, turnLamps, turnToward, wrapAngle
+  heliTopSpeed, playerBrakeLamp, settleBody, signalTurn, slideVelocity, stepJump, stepTurbo, stepTurnSignal, toggleHazard,
+  turnLamps, turnToward, wrapAngle
 } from './player-rules.js';
 import { bryantParkLawn } from './landmarks.js';
 import { polygonContact } from './building-collision.js';
@@ -373,6 +374,20 @@ class ThirdPersonControllerManager {
 
   getActiveEntity() {
     return this.entities[this.activeMode];
+  }
+
+  /** The taxi's indicator stalk set by hand: 1 left, -1 right (the side already showing turns it off). Car only. */
+  signalTurn(side) {
+    const car = this.entities.car;
+    if (this.activeMode !== 'car' || !car?.carState) return;
+    signalTurn(car.turnSignal ??= createTurnSignal(), side);
+  }
+
+  /** The taxi's hazard lamps on or off. Car only. */
+  toggleHazard() {
+    const car = this.entities.car;
+    if (this.activeMode !== 'car' || !car?.carState) return;
+    toggleHazard(car.turnSignal ??= createTurnSignal());
   }
 
   /**

@@ -168,6 +168,8 @@
             "move": "Avanzar / Atrás",
             "turn": "Girar",
             "horn": "Claxon",
+            "signal": "Intermitente",
+            "hazard": "Emergencia",
             "orbit": "Mirar"
         },
         "cyclist": {
@@ -195,6 +197,7 @@
         "gamepad": "Mando",
         "leftStick": "Stick izq.",
         "rightStick": "Stick der.",
+        "dpadSides": "Cruceta izq. / der.",
         "padMove": "Moverse y girar",
         "padLook": "Mirar",
         "padThrottle": "Acelerar y frenar",

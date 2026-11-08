@@ -89,6 +89,24 @@ function hudReadout(value, format = String) {
 // per-instance state changes only when a car starts or stops braking, not every frame.
 const BRAKE_LAMP = { slowing: 1, holding: 1, slowingAt: -0.8, standingBelow: 0.3 };
 
+// Emissive radiance of each vehicle lamp, in the scene-linear units the car and bus materials multiply their lens
+// colour by. ACES turns a red lamp salmon and then white once its radiance passes ~1.5, so a brighter lamp is not a
+// more visible one: brake and tail are told apart by level (dim red against full red) and by area (a braking car
+// lights its whole rear lens, turn and reverse sections included), not by pushing the red past its hue. Night only
+// adds to the running and head lamps.
+const LAMP_GLOW = Object.freeze({
+  tail: 0.5,          // tail lamps, always on (a dim, saturated red)
+  tailNight: 0.4,     // added to the tail lamps after dark
+  brake: 2.6,         // added across the whole rear lens while braking
+  chmsl: 3,           // centre high-mount stop lamp, while braking
+  turn: 1.6,          // amber indicators, front and rear, during the lit half of a blink (more washes them yellow)
+  reverse: 3,         // white reversing lamps while rolling backwards
+  headDay: 2.4,       // headlamp lenses by day (daytime running)
+  headNight: 3.6,     // headlamp lenses after dark
+  drlDay: 3,          // daytime running light blade by day
+  drlNight: 3.4       // daytime running light blade after dark
+});
+
 /** The brake lamp level for a traffic vehicle's acceleration (m/s^2) and speed (m/s). */
 function brakeLamp(acceleration, speed) {
   if (acceleration < BRAKE_LAMP.slowingAt) return BRAKE_LAMP.slowing;
@@ -102,18 +120,56 @@ function playerBrakeLamp(speed, throttle) {
 
 // The player car signals from the steering held: a turn held at town speed starts the indicator on that side, and it
 // cancels once the wheel has been straight a moment (or the car is up to speed), like a stalk returning after the corner.
-// Same 0.8 s cycle as traffic. Side 1 is left (+x), -1 right.
+// The stalk can also be set by hand (signalTurn): that side then stays on through straight driving and cancels only
+// after a turn to that side has been made and the wheel has come back, or when the same side is pressed again. The
+// hazard switch (toggleHazard) blinks both sides until it is pressed again. Same 0.8 s cycle as traffic. Side 1 is
+// left (+x), -1 right.
 const TURN_SIGNAL = { steerAbove: 0.5, holdFor: 0.25, cancelAfter: 0.6, minSpeed: 0.5, maxSpeed: 14, period: 0.8 };
 
 function createTurnSignal() {
-  return { side: 0, pending: 0, held: 0, straight: 0, clock: 0 };
+  return { side: 0, pending: 0, held: 0, straight: 0, clock: 0, manual: false, turned: false, hazard: false };
+}
+
+/** Sets the stalk to a side by hand (1 left, -1 right); the side already showing turns it off. */
+function signalTurn(signal, side) {
+  if (signal.side === side) {
+    signal.side = 0;
+    signal.manual = false;
+  } else {
+    signal.side = side;
+    signal.manual = true;
+    signal.clock = 0;
+  }
+  signal.turned = false;
+  signal.straight = 0;
+  return signal;
+}
+
+/** Flips the hazard lamps on or off. */
+function toggleHazard(signal) {
+  signal.hazard = !signal.hazard;
+  if (!signal.side) signal.clock = 0;
+  return signal;
 }
 
 /** Advances a turn signal by dt seconds of steering input (-1..1, positive left) at a speed in m/s. */
 function stepTurnSignal(signal, steer, speed, dt) {
   const s = Math.abs(speed);
   const side = steer > TURN_SIGNAL.steerAbove ? 1 : steer < -TURN_SIGNAL.steerAbove ? -1 : 0;
-  if (side !== 0 && s >= TURN_SIGNAL.minSpeed && s <= TURN_SIGNAL.maxSpeed) {
+  if (signal.manual) {
+    // A hand-set stalk ignores the speed window and cancels only once its turn is done
+    if (side === signal.side) {
+      signal.turned = true;
+      signal.straight = 0;
+    } else if (side === 0) {
+      signal.straight += dt;
+      if (signal.turned && signal.straight >= TURN_SIGNAL.cancelAfter) {
+        signal.side = 0;
+        signal.manual = false;
+        signal.turned = false;
+      }
+    } else signal.straight = 0;
+  } else if (side !== 0 && s >= TURN_SIGNAL.minSpeed && s <= TURN_SIGNAL.maxSpeed) {
     signal.held = signal.pending === side ? signal.held + dt : dt;
     signal.pending = side;
     signal.straight = 0;
@@ -124,13 +180,14 @@ function stepTurnSignal(signal, steer, speed, dt) {
     if (side === 0) signal.straight += dt;
     if (signal.straight >= TURN_SIGNAL.cancelAfter || s > TURN_SIGNAL.maxSpeed) signal.side = 0;
   }
-  signal.clock = signal.side ? signal.clock + dt : 0;
+  signal.clock = signal.side || signal.hazard ? signal.clock + dt : 0;
   return signal;
 }
 
 /** The lamp levels { left, right } a turn signal shows this instant: lit for the first half of each cycle. */
 function turnLamps(signal) {
-  const on = signal.side !== 0 && signal.clock % TURN_SIGNAL.period < TURN_SIGNAL.period / 2;
+  const on = (signal.side !== 0 || signal.hazard) && signal.clock % TURN_SIGNAL.period < TURN_SIGNAL.period / 2;
+  if (signal.hazard) return { left: on ? 1 : 0, right: on ? 1 : 0 };
   return { left: on && signal.side > 0 ? 1 : 0, right: on && signal.side < 0 ? 1 : 0 };
 }
 
@@ -418,9 +475,9 @@ const KEY_BINDINGS = Object.freeze({
 });
 
 export {
-  BODY_MOTION, KEY_BINDINGS, BRAKE_LAMP, HELI_CRUISE_SPEED, HELI_TURBO, LOOK_SENSITIVITY, PERSON_CAMERA, PERSON_MOVE, TURN_SIGNAL,
+  BODY_MOTION, KEY_BINDINGS, BRAKE_LAMP, HELI_CRUISE_SPEED, LAMP_GLOW, HELI_TURBO, LOOK_SENSITIVITY, PERSON_CAMERA, PERSON_MOVE, TURN_SIGNAL,
   approachVelocity, arrivalFor, bodyIsFinite, brakeLamp, cameraRelativeMove, clampSensitivity, clearLength,
   createJumpState, createTurnSignal, heliTopSpeed, hudReadout, lookCurve, lookDirection, personCameraPose,
-  playerBrakeLamp, rayEntersCollider, settleBody, slideVelocity, springArm, stepArm, stepJump, stepTurbo, stepTurnSignal,
-  turnLamps, turnLook, turnToward, wrapAngle
+  playerBrakeLamp, rayEntersCollider, settleBody, signalTurn, slideVelocity, springArm, stepArm, stepJump, stepTurbo,
+  stepTurnSignal, toggleHazard, turnLamps, turnLook, turnToward, wrapAngle
 };
