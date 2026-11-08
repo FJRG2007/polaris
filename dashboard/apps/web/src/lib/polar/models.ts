@@ -26,7 +26,6 @@ import {
     automaticCandidates,
     failingProviders,
     noteNoCredit,
-    noteProviderFailure,
     PLAIN_TURN,
     unpaidProviders,
     type AutoRoute,
@@ -44,7 +43,6 @@ import {
     creditMiddleware,
     freeVariantOf,
     isFreeModel,
-    polarOutputTokens,
     standInMiddleware,
     type LanguageModelV4
 } from "@/lib/polar/credit";
@@ -54,8 +52,6 @@ import {
     polarKeySources,
     type PolarAccess
 } from "@/lib/polar/access";
-import { polarLimitReached } from "@/lib/polar/usage";
-import type { FailureKind } from "@/lib/polar/provider-failure";
 
 /**
  * Base URLs of the providers that speak the OpenAI chat API, taken from the
@@ -251,17 +247,9 @@ export interface ResolvedModel {
     credential: ChatCredential;
     /** Set when Automatic picked the model: the kind of turn it saw. */
     automatic?: AutoRoute;
-    /** The models asked instead when this one is refused (`withStandIn`), in
-     *  the order they are tried. */
+    /** The models asked instead when this one is refused (`withStandIn`),
+     *  innermost first. */
     standIns?: readonly StandIn[];
-    /** The model before any stand-in was wrapped around it, so adding one
-     *  more keeps a single retry. */
-    base?: LanguageModel;
-    /** What the stand-ins were built from, for the same reason. */
-    standInSources?: readonly StandInSource[];
-    /** Runs with the kind of refusal the chosen model met, when a stand-in
-     *  middleware saw it: Automatic remembers the provider for later turns. */
-    onRefused?: (kind: FailureKind) => void;
 }
 
 /** A model that may answer in place of the one chosen, and whether it did. */
@@ -271,71 +259,45 @@ export interface StandIn {
     used: () => boolean;
 }
 
-/** A model to add as a stand-in. */
-export type StandInSource = Pick<ResolvedModel, "model" | "option" | "credential">;
-
 /**
- * `resolved`, asking the first fitting of `sources` once when its call is
- * refused (`standInMiddleware` in `credit.ts`). Only for a model Polar chose:
- * one the person pinned keeps its own refusal. Adding stand-ins to a model
- * that already has some extends the same list, so a turn is still retried
- * once at most.
+ * `resolved`, asking `standIn` once when its call is refused for want of
+ * credit or by a rate limit (`credit.ts`). Only for a model Polar chose: one
+ * the person pinned keeps its own refusal.
  */
-export function withStandIn(resolved: ResolvedModel, ...sources: StandInSource[]): ResolvedModel {
-    const all = [...(resolved.standInSources ?? []), ...sources];
-    if (all.length === 0) return resolved;
-    const base = resolved.base ?? resolved.model;
-    let usedAt = -1;
+export function withStandIn(
+    resolved: ResolvedModel,
+    standIn: Pick<ResolvedModel, "model" | "option" | "credential">
+): ResolvedModel {
+    let used = false;
     const model = wrapLanguageModel({
-        model: base as LanguageModelV4,
+        model: resolved.model as LanguageModelV4,
         middleware: standInMiddleware(
-            resolved.option.provider,
-            all.map((source) => ({
-                model: () => source.model as LanguageModelV4,
-                provider: source.option.provider,
-                free: isFreeModel(source.option),
-                reasoning: source.option.reasoning,
-                outputTokens: polarOutputTokens(source.option),
-                reads: source.option
-            })),
             {
-                onStandIn: (index) => {
-                    usedAt = index;
-                },
-                onRefused: resolved.onRefused
+                model: () => standIn.model as LanguageModelV4,
+                reasoning: standIn.option.reasoning
+            },
+            () => {
+                used = true;
             }
         )
     });
     return {
         ...resolved,
         model,
-        base,
-        standInSources: all,
-        standIns: all.map((source, index) => ({
-            option: source.option,
-            credential: source.credential,
-            used: () => usedAt === index
-        }))
+        standIns: [
+            ...(resolved.standIns ?? []),
+            { option: standIn.option, credential: standIn.credential, used: () => used }
+        ]
     };
 }
 
-/** The model that actually answered: the stand-in that was asked, else the
- *  one chosen. */
+/** The model that actually answered: the outermost stand-in that was asked,
+ *  else the one chosen. */
 export function answeredBy(
     resolved: Pick<ResolvedModel, "option" | "credential" | "standIns">
 ): Pick<ResolvedModel, "option" | "credential"> {
-    return (resolved.standIns ?? []).find((entry) => entry.used()) ?? resolved;
-}
-
-/** What a refusal of `provider` teaches Automatic for this person's next
- *  turns: no credit offers only its free models for a while; a refused key,
- *  a rate limit or an outage puts the provider last for a few minutes. A
- *  model busy or gone is the model's, not the provider's. */
-export function rememberRefusal(userId: string, provider: string, kind: FailureKind): void {
-    if (kind === "credit" || kind === "paid") noteNoCredit(userId, provider);
-    else if (kind === "key" || kind === "rate" || kind === "down") {
-        noteProviderFailure(userId, provider);
-    }
+    const asked = [...(resolved.standIns ?? [])].reverse().find((entry) => entry.used());
+    return asked ?? resolved;
 }
 
 /**
@@ -365,7 +327,7 @@ export async function resolvePolarModel(
         model: languageModel(
             credential,
             option.model,
-            freeVariantOf(option.provider, option.model, provider.models),
+            freeVariantOf(option.model, provider.models),
             () => noteNoCredit(userId, option.provider)
         ),
         option,
@@ -415,18 +377,13 @@ export function languageModel(
     }
 }
 
-/** Most other providers a turn keeps a stand-in from: each costs a key read. */
-const OTHER_PROVIDERS_MOST = 3;
-
 /**
  * The model Automatic answers a turn with: the first candidate whose key can
- * be read, with stand-ins in Automatic's own order - its own provider's next
- * free candidate (and, for a paid first pick, the next paid one), then the
- * first candidate of each other provider this person may spend on. Another
- * provider's key from this Polaris is offered only while the administrator's
- * ceilings leave room, as the turn itself would be. A provider that refused
- * for want of credit lately is offered only its free models. "no_key" when no
- * candidate's key can be read.
+ * be read, with the provider's next free candidate as its stand-in, so an
+ * account with no credit still gets an answer; a paid first pick falls back
+ * to the next paid one only when the provider lists nothing free.
+ * A provider that refused for want of credit lately is offered only its free
+ * models. "no_key" when no candidate's key can be read.
  */
 async function resolveAutomatic(
     userId: string,
@@ -453,7 +410,6 @@ async function resolveAutomatic(
             credential,
             option.model,
             freeVariantOf(
-                option.provider,
                 option.model,
                 options.find((entry) => entry.provider === option.provider)?.models ?? []
             ),
@@ -465,59 +421,15 @@ async function resolveAutomatic(
     for (const [index, option] of candidates.entries()) {
         const credential = await credentialOf(option.provider);
         if (!credential) continue;
-        const chosen: ResolvedModel = {
-            ...build(option, credential),
-            automatic: route,
-            onRefused: (kind) => rememberRefusal(userId, option.provider, kind)
-        };
-        const later = candidates.slice(index + 1);
-        // Same provider and key first: the turn's provider tools and options
-        // are that provider's, and the purse its ceiling was checked against.
-        const mine = later.filter((entry) => entry.provider === option.provider);
-        const free = mine.find(isFreeModel);
-        const paid = isFreeModel(option) ? undefined : mine.find((entry) => !isFreeModel(entry));
-        const sources: StandInSource[] = [free, paid]
-            .filter((entry): entry is PolarModelOption => !!entry)
-            .map((entry) => build(entry, credential));
-        sources.push(
-            ...(await otherStandIns(
-                userId,
-                later,
-                option.provider,
-                credential,
-                credentialOf,
-                build
-            ))
-        );
-        return withStandIn(chosen, ...sources);
+        const chosen: ResolvedModel = { ...build(option, credential), automatic: route };
+        const free = isFreeModel(option);
+        // Same provider and key: the turn's provider tools and options are
+        // that provider's, and the purse its ceiling was checked against.
+        const later = candidates
+            .slice(index + 1)
+            .filter((entry) => entry.provider === option.provider);
+        const next = later.find(isFreeModel) ?? (free ? undefined : later[0]);
+        return next ? withStandIn(chosen, build(next, credential)) : chosen;
     }
     return "no_key";
-}
-
-/** The first candidate of each other provider whose key this person may spend
- *  now, in Automatic's order. */
-async function otherStandIns(
-    userId: string,
-    later: readonly PolarModelOption[],
-    provider: string,
-    chosen: ChatCredential,
-    credentialOf: (provider: string) => Promise<ChatCredential | null>,
-    build: (option: PolarModelOption, credential: ChatCredential) => StandInSource
-): Promise<StandInSource[]> {
-    const found: StandInSource[] = [];
-    const seen = new Set([provider]);
-    let roomOnShared: boolean | null = chosen.source === "instance" ? true : null;
-    for (const option of later) {
-        if (found.length >= OTHER_PROVIDERS_MOST) break;
-        if (seen.has(option.provider)) continue;
-        seen.add(option.provider);
-        const credential = await credentialOf(option.provider);
-        if (!credential) continue;
-        if (credential.source === "instance") {
-            roomOnShared ??= !(await polarLimitReached(userId));
-            if (!roomOnShared) continue;
-        }
-        found.push(build(option, credential));
-    }
-    return found;
 }

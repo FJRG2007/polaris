@@ -2,7 +2,7 @@
 
 /**
  * New York's start screen: play on this device or with a controller, the
- * gamepad only once one is connected, the phone listed but switched off, and
+ * gamepad only once one is connected, the phone opening its pairing page, and
  * the last choice remembered where storage allows it.
  */
 
@@ -62,7 +62,7 @@ describe("the start screen", () => {
         expect(start.rememberedChoice()).toBe("device");
     });
 
-    it("waits for a gamepad before it can be chosen, and lists the phone switched off", () => {
+    it("waits for a gamepad before it can be chosen, and lists the phone", () => {
         const { view, onChoose, pad } = screen();
         view.open();
         button('[data-start-open="controller"]').click();
@@ -71,11 +71,9 @@ describe("the start screen", () => {
         expect(document.getElementById("start-pad-status")!.textContent).toBe(
             "Turn it on and press any button"
         );
-        const phone = [
-            ...document.querySelectorAll<HTMLButtonElement>('[data-start-view="controller"] button')
-        ].find((el) => el !== gamepad)!;
-        expect(phone.disabled).toBe(true);
-        expect(phone.querySelector('[data-t="start.phoneSoon"]')).not.toBeNull();
+        const phone = button('[data-start-open="phone"]');
+        expect(phone.disabled).toBe(false);
+        expect(phone.querySelector('[data-t="start.phoneHint"]')).not.toBeNull();
         gamepad.click();
         view.close();
         expect(onChoose).not.toHaveBeenCalled();

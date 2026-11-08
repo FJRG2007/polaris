@@ -852,11 +852,11 @@
                 "summary": "Everything Polaris remembers."
             },
             "traefik": {
-                "label": "Edge router",
+                "label": "Edge",
                 "summary": "Routes every domain and holds the certificates."
             },
             "edgeGuard": {
-                "label": "Firewall",
+                "label": "Edge guard",
                 "summary": "Applies the firewall to requests as they arrive."
             },
             "hostd": {
@@ -864,11 +864,11 @@
                 "summary": "Mounts, host files and the Docker proxy."
             },
             "livekit": {
-                "label": "Calls server",
+                "label": "Call server",
                 "summary": "Carries the sound and the picture in a call."
             },
             "mdns": {
-                "label": "Local DNS",
+                "label": "Local discovery",
                 "summary": "Answers to polaris.local on the network."
             },
             "mcRouter": {
@@ -876,7 +876,7 @@
                 "summary": "One port for every Java server."
             },
             "caddy": {
-                "label": "Edge router (legacy)",
+                "label": "Edge (legacy)",
                 "summary": "The previous edge, kept for rollback."
             },
             "tunnel": {

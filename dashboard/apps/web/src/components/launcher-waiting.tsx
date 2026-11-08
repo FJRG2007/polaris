@@ -51,12 +51,6 @@ function isWaitingApp(id: string): id is LauncherWaitingApp {
 export interface LauncherMarks {
     /** The "mark read" a tile carries, or null for one with nothing to mark. */
     readonly tileAction: (app: PolarisApp) => AppTileAction | null;
-    /**
-     * The same mark for any list that draws an app by its id - the Overview's
-     * rail, a right click on an app. `short` names it without the app, for a
-     * menu that is already about one app. Null with nothing to mark.
-     */
-    readonly markAction: (appId: string, appLabel: string, short?: boolean) => AppTileAction | null;
     /** Whether any app has something to mark, for "mark everything read". */
     readonly anything: boolean;
     readonly markAll: () => void;
@@ -174,25 +168,17 @@ export function useLauncherMarks(
     );
 
     const markable = markableApps(waiting);
-    const markAction = (appId: string, appLabel: string, short = false): AppTileAction | null => {
-        if (!isWaitingApp(appId) || !markable.has(appId)) return null;
-        const seen = appId === "admin";
+    const tileAction = (app: PolarisApp): AppTileAction | null => {
+        if (!isWaitingApp(app.id) || !markable.has(app.id)) return null;
+        const id = app.id;
         return {
-            label: short
-                ? t(seen ? "switcher.markSeen" : "switcher.markRead")
-                : t(seen ? "waitingList.markAllSeen" : "waitingList.markAllRead", {
-                      app: appLabel
-                  }),
+            label: t(id === "admin" ? "waitingList.markAllSeen" : "waitingList.markAllRead", {
+                app: app.label
+            }),
             icon: <CheckCheck aria-hidden="true" />,
-            onSelect: () => void mark(appId)
+            onSelect: () => void mark(id)
         };
     };
-    const tileAction = (app: PolarisApp) => markAction(app.id, app.label);
 
-    return {
-        tileAction,
-        markAction,
-        anything: markable.size > 0,
-        markAll: () => void mark(null)
-    };
+    return { tileAction, anything: markable.size > 0, markAll: () => void mark(null) };
 }

@@ -29,20 +29,7 @@ import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 import { formatAge } from "@/app/(app)/apps/containers/freshness";
 import { formatRate, percent } from "@/components/metrics-history";
-import { DockerMark, GitHubMark } from "@/components/brand-icons";
-import { restartApplicationAction } from "@/app/(app)/apps/deploy/actions";
-import {
-    Box,
-    ChevronRight,
-    CircleDashed,
-    Cpu,
-    HardDrive,
-    Layers,
-    MoreHorizontal,
-    RotateCw,
-    SearchX,
-    Server
-} from "lucide-react";
+import { Box, ChevronRight, Cpu, HardDrive, Layers, MoreHorizontal, SearchX } from "lucide-react";
 import { BREAKDOWN_GROUPS } from "@/lib/watch/breakdown-shape";
 import type {
     Breakdown,
@@ -51,7 +38,6 @@ import type {
     BreakdownRow
 } from "@/lib/watch/breakdown-shape";
 import {
-    Button,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -172,7 +158,7 @@ export function MetricBreakdownDialog({
                         description={t("breakdown.allZero")}
                     />
                 ) : (
-                    <Rows rows={result.rows} total={result.total} format={format ?? formatBytes} />
+                    <Rows rows={result.rows} format={format ?? formatBytes} />
                 )}
 
                 {result && (result.note || age !== null) ? (
@@ -205,44 +191,23 @@ function summarize(
     return t("breakdown.inTotal", { total: BREAKDOWN_FORMAT[open.metric](result.total) });
 }
 
-/** A row's share as a whole percentage: the parts are two readings taken
- *  moments apart, so a second decimal would be precision nobody measured. */
-function shareText(share: number): string {
-    const value = share * 100;
-    if (value <= 0) return "0%";
-    if (value < 1) return "<1%";
-    return `${Math.round(value)}%`;
-}
-
-/**
- * The list, under whose it is when it knows: each owner a heading with its
- * subtotal, its rows beneath it heaviest first. The buttons above narrow it to
- * one owner. Totals are of the whole list.
- */
+/** The list, with whose-is-it filters when it knows. Totals are of the whole list. */
 function Rows({
     rows,
-    total,
     format
 }: {
     rows: readonly BreakdownRow[];
-    total: number | null;
     format: (value: number) => string;
 }) {
     const t = useTranslations("watch");
     const [group, setGroup] = useState<BreakdownGroup | null>(null);
     const groups = BREAKDOWN_GROUPS.filter((name) => rows.some((row) => row.group === name));
     const sum = (name: BreakdownGroup) =>
-        rows.reduce((subtotal, row) => subtotal + (row.group === name ? row.value : 0), 0);
-    const grouped = groups.length > 1;
-    const sections: { name: BreakdownGroup | null; rows: readonly BreakdownRow[] }[] = grouped
-        ? (group ? [group] : groups).map((name) => ({
-              name,
-              rows: rows.filter((row) => row.group === name)
-          }))
-        : [{ name: null, rows }];
+        rows.reduce((total, row) => total + (row.group === name ? row.value : 0), 0);
+    const shown = group ? rows.filter((row) => row.group === group) : rows;
     return (
         <>
-            {grouped ? (
+            {groups.length > 1 ? (
                 <div
                     role="group"
                     aria-label={t("breakdown.whose")}
@@ -270,119 +235,36 @@ function Rows({
                     ))}
                 </div>
             ) : null}
-            <div className="flex max-h-[55vh] min-w-0 flex-col gap-3 overflow-y-auto overscroll-contain">
-                {sections.map((section) => (
-                    <section key={section.name ?? "all"} className="min-w-0">
-                        {/* A leftover alone under its heading (Free) would say the
-                            same name and figure twice, so it stands on its own. */}
-                        {section.name &&
-                        !(section.rows.length === 1 && section.rows[0]?.kind === "rest") ? (
-                            <h3 className="flex items-baseline gap-2 border-b border-border px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
-                                <span className="min-w-0 flex-1 truncate">
-                                    {t(`breakdown.group.${section.name}`)}
-                                </span>
-                                <span className="shrink-0 tabular-nums">
-                                    {format(sum(section.name))}
-                                </span>
-                                <span className="w-9 shrink-0 text-right tabular-nums">
-                                    {total !== null && total > 0
-                                        ? shareText(sum(section.name) / total)
-                                        : ""}
-                                </span>
-                            </h3>
-                        ) : null}
-                        <ul className="flex min-w-0 flex-col">
-                            {section.rows.map((row) => (
-                                <Row key={row.key} row={row} format={format} />
-                            ))}
-                        </ul>
-                    </section>
+            <ul className="flex max-h-[55vh] flex-col overflow-y-auto overscroll-contain">
+                {shown.map((row) => (
+                    <Row key={row.key} row={row} format={format} />
                 ))}
-            </div>
+            </ul>
         </>
     );
 }
 
-/** The Polaris star alone, the mark the shell draws beside its name. */
-function PolarisGlyph({ className }: { className: string }) {
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            className={`${className} text-primary`}
-            fill="currentColor"
-            aria-hidden
-        >
-            <path d="M12 2l1.9 6.6L20 10l-6.1 1.4L12 18l-1.9-6.6L4 10l6.1-1.4L12 2z" />
-        </svg>
-    );
-}
-
-/** What a row is drawn with: the service's own mark where Deploy draws one, and
- *  otherwise what kind of thing it is. */
-function RowIcon({ row }: { row: BreakdownRow }) {
-    const className = "mt-0.5 size-4 shrink-0 text-muted-foreground";
-    if (row.service?.source === "image") return <DockerMark className={className} />;
-    if (row.service?.source === "github") return <GitHubMark className={className} />;
-    if (row.group === "polaris") return <PolarisGlyph className={className} />;
-    if (row.group === "free") return <CircleDashed className={className} aria-hidden />;
-    if (row.group === "machine" && row.kind === "rest")
-        return <Server className={className} aria-hidden />;
-    const Icon = ICONS[row.kind];
-    return <Icon className={className} aria-hidden />;
-}
-
 function Row({ row, format }: { row: BreakdownRow; format: (value: number) => string }) {
-    const t = useTranslations("watch");
+    const Icon = ICONS[row.kind];
     // The leftover is not a thing anybody can go and look at, so it is drawn as
     // the background it is rather than competing with the rows that are.
     const rest = row.kind === "rest";
-    // Said only when it is not already the name: two services of one project are
-    // told apart by it, and a container nobody deployed is already called by it.
-    const container = row.container && row.container !== row.label ? row.container : null;
-    const second = [row.detail, row.image ? t("breakdown.image", { image: row.image }) : null]
-        .filter(Boolean)
-        .join(" - ");
-    const locked = row.service && !row.href ? t("breakdown.noAccess") : null;
     const body = (
         <>
-            <RowIcon row={row} />
+            <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-baseline gap-2">
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium" title={row.label}>
+                <div className="flex items-baseline gap-2">
+                    <span className="w-full max-w-0 flex-1 truncate text-sm" title={row.label}>
                         {row.label}
                     </span>
                     <span className="shrink-0 tabular-nums text-sm">{format(row.value)}</span>
-                    <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                        {row.share === null ? "" : shareText(row.share)}
+                    <span className="w-11 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                        {row.share === null ? "" : percent(row.share * 100)}
                     </span>
                 </div>
-                {second || container || row.limit ? (
-                    <div className="flex min-w-0 items-baseline gap-2 text-xs text-muted-foreground">
-                        {second ? (
-                            <span className="min-w-0 truncate" title={second}>
-                                {second}
-                            </span>
-                        ) : null}
-                        {container ? (
-                            <span
-                                className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground-subtle"
-                                title={container}
-                            >
-                                {container}
-                            </span>
-                        ) : (
-                            <span className="flex-1" />
-                        )}
-                        {row.limit ? (
-                            <span className="shrink-0 whitespace-nowrap tabular-nums">
-                                {t("breakdown.limit", { limit: format(row.limit) })}
-                            </span>
-                        ) : null}
-                    </div>
-                ) : null}
-                {locked ? (
-                    <p className="truncate text-xs text-foreground-subtle" title={locked}>
-                        {locked}
+                {row.detail ? (
+                    <p className="truncate text-xs text-muted-foreground" title={row.detail}>
+                        {row.detail}
                     </p>
                 ) : null}
                 {row.share === null ? null : (
@@ -405,89 +287,17 @@ function Row({ row, format }: { row: BreakdownRow; format: (value: number) => st
         </>
     );
     return (
-        <li className="flex min-w-0 items-start gap-1 border-b border-border/40 last:border-0">
+        <li className="border-b border-border/40 last:border-0">
             {row.href ? (
                 <Link
                     href={row.href}
-                    className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-1 py-2 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex items-start gap-2 rounded-md px-1 py-2 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     {body}
                 </Link>
             ) : (
-                <div className="flex min-w-0 flex-1 items-start gap-2 px-1 py-2">{body}</div>
+                <div className="flex items-start gap-2 px-1 py-2">{body}</div>
             )}
-            {row.service?.canRestart ? (
-                <RestartService id={row.service.id} name={row.label} />
-            ) : null}
         </li>
     );
-}
-
-/**
- * Restarting a service from the row that shows what it is holding. Two presses,
- * because it drops whatever the service is doing: the first asks, in place, and
- * the second does it - no second dialog on top of this one.
- */
-function RestartService({ id, name }: { id: string; name: string }) {
-    const t = useTranslations("watch");
-    const [state, setState] = useState<"idle" | "asking" | "working" | "done" | "failed">("idle");
-    const [error, setError] = useState<string | null>(null);
-    useEffect(() => {
-        if (state !== "asking" && state !== "done") return;
-        // A question left on screen is one somebody answers by accident later.
-        const timer = window.setTimeout(() => setState("idle"), state === "asking" ? 6000 : 4000);
-        return () => window.clearTimeout(timer);
-    }, [state]);
-    const run = async () => {
-        setState("working");
-        setError(null);
-        const result = await restartApplicationAction(id).catch(() => null);
-        setError(result?.error ?? null);
-        setState(!result || result.error ? "failed" : "done");
-    };
-    const ask = (
-        <Button
-            size="icon-xs"
-            variant="ghost"
-            className="mt-1.5 shrink-0"
-            aria-label={t("breakdown.restart", { name })}
-            title={t("breakdown.restart", { name })}
-            onClick={() => setState("asking")}
-        >
-            <RotateCw aria-hidden />
-        </Button>
-    );
-    if (state === "asking") {
-        return (
-            <div className="flex shrink-0 items-center gap-1 py-1.5">
-                <Button size="xs" variant="danger" onClick={() => void run()}>
-                    {t("breakdown.confirmRestart")}
-                </Button>
-                <Button size="xs" variant="ghost" onClick={() => setState("idle")}>
-                    {t("breakdown.cancelRestart")}
-                </Button>
-            </div>
-        );
-    }
-    if (state !== "idle") {
-        const text =
-            state === "working"
-                ? t("breakdown.restarting")
-                : state === "done"
-                  ? t("breakdown.restarted")
-                  : (error ?? t("breakdown.restartFailed"));
-        return (
-            <div className="flex min-w-0 max-w-[40%] shrink-0 items-start gap-1">
-                <span
-                    role="status"
-                    className={`min-w-0 truncate py-2 text-xs ${state === "failed" ? "text-danger" : "text-muted-foreground"}`}
-                    title={text}
-                >
-                    {text}
-                </span>
-                {state === "failed" ? ask : null}
-            </div>
-        );
-    }
-    return ask;
 }

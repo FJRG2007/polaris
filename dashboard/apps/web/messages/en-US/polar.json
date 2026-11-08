@@ -168,7 +168,7 @@
             "rate": "{provider} is limiting how often this key can be used. Wait a minute and try again.",
             "busy": "{provider} says this model is busy for everyone right now. That is not your key. Try again shortly, or pick another model.",
             "down": "{provider} is having trouble answering right now. Try again in a few minutes.",
-            "model": "{provider} does not offer this model to this key, or no longer serves it. Pick another one.",
+            "model": "{provider} no longer serves this model. Pick another one.",
             "other": "{provider} could not answer. Try again, or pick another model.",
             "askAdmin": "Ask your admin to check this Polaris's {provider} key.",
             "openKey": "Open the key",

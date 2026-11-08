@@ -72,7 +72,7 @@ import type { PlayerSessionEvent } from "../../lib/minecraft/sessions";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlayerAccessView } from "../../lib/minecraft/player-access";
 import type { RememberedLevel } from "../../lib/minecraft/level-memory";
-import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "../../lib/minecraft/join-guard";
+import { PROJECTS_KEY, SOFTWARE_KEY } from "../../lib/minecraft/join-guard";
 import { findBlueprint, hasCrossplay } from "../../lib/minecraft/blueprints";
 import {
     pinLoaderAndStartAction,
@@ -817,9 +817,6 @@ export function MinecraftPanel({
                             software={
                                 settings.find((setting) => setting.key === SOFTWARE_KEY)?.value ??
                                 ""
-                            }
-                            version={
-                                settings.find((setting) => setting.key === VERSION_KEY)?.value ?? ""
                             }
                             playersOnline={status?.players.online ?? 0}
                             login={login}

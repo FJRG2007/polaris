@@ -1151,8 +1151,6 @@
         "modOff": "Después, cualquiera de la lista de jugadores entra solo con su nombre. Las contraseñas se quedan aquí por si lo vuelves a activar.",
         "noBuild": "{name} no tiene versión para la release de este servidor. El servidor arrancaría sin él y nadie tendría que dar contraseña, así que se deja desactivado en vez de aparentar que está activo.",
         "noBuildFor": "{name} no tiene versión para la release de este servidor ({version}). El servidor arrancaría sin él y nadie tendría que dar contraseña, así que se deja desactivado en vez de aparentar que está activo.",
-        "releaseTooOld": "No disponible en Minecraft {version}. {name} necesita {since} o posterior, y el servidor no arrancaría con él. Pasa el servidor a una versión más nueva en Ajustes para activarlo.",
-        "releaseTooOldListed": "{name} no funciona en Minecraft {version} e impide que el servidor arranque. Desactívalo, o pasa el servidor a {since} o posterior en Ajustes.",
         "guardOn": "Cada uno pone la suya la próxima vez que entre.",
         "guardOff": "Después, cualquiera de la lista de jugadores entra solo con su nombre.",
         "foreign": "Los jugadores ya entran con <mono>{name}</mono>, que Polaris no gestiona. Quítalo en la pantalla Mods para usar un login de aquí.",

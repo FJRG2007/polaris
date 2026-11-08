@@ -12,7 +12,6 @@
 
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { hasFreeMarker } from "@/lib/polar/credit";
 import type { ModelSelectorProvider } from "./elements/model-selector";
 import type { PolarFailure, StoredFailure, RunningRefusal } from "@/lib/polar/provider-failure";
 
@@ -39,10 +38,9 @@ export function standIn(
     if (failure.kind === "busy") {
         const others = models.filter((model) => model.model !== failedModel);
         const mine = others.filter((model) => model.provider === failure.slug);
-        const free =
-            failedModel && hasFreeMarker(failure.slug, failedModel)
-                ? mine.find((model) => hasFreeMarker(failure.slug, model.model))
-                : undefined;
+        const free = failedModel?.endsWith(":free")
+            ? mine.find((model) => model.model.endsWith(":free"))
+            : undefined;
         return free ?? mine[0] ?? others[0] ?? null;
     }
     if (failure.kind === "other") return null;

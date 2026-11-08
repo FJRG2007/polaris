@@ -240,6 +240,15 @@
         "padWaiting": "Enciéndelo y pulsa cualquier botón",
         "padReady": "Listo",
         "phone": "Teléfono",
-        "phoneSoon": "Vincular un móvil llega después"
+        "phoneHint": "Emparéjalo con un código o un QR",
+        "phoneTitle": "Usa tu móvil",
+        "phoneSteps": "Escanéalo con el móvil, o abre Juegos en él, elige Mando en el móvil e introduce el código.",
+        "phoneQr": "Código QR que abre el mando en el móvil",
+        "phonePlay": "Jugar con el móvil",
+        "phoneRetry": "Reintentar",
+        "phoneOpening": "Creando un código",
+        "phoneWaiting": "Esperando a tu móvil",
+        "phoneFailed": "No se pudo crear un código. Reinténtalo.",
+        "phoneUnavailable": "Abre el juego desde Polaris para emparejar un móvil."
     }
 }

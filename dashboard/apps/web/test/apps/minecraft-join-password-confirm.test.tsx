@@ -61,7 +61,6 @@ function card(software: string, projects: string) {
             edition="java"
             projects={projects}
             software={software}
-            version="LATEST"
             playersOnline={0}
             onSaved={vi.fn()}
         />

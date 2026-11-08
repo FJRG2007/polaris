@@ -206,15 +206,7 @@ export function AppLauncher({
                 // The count on a tile is what is waiting in it; the tile marks it
                 // read without opening the app - see `launcher-waiting`.
                 tileAction={marks.tileAction}
-                // A right click offers the same mark, and only where the tile does.
-                wrapTile={(app, tile) => (
-                    <AppActionsMenu
-                        appId={app.id}
-                        markRead={marks.markAction(app.id, app.label, true)}
-                    >
-                        {tile}
-                    </AppActionsMenu>
-                )}
+                wrapTile={(app, tile) => <AppActionsMenu appId={app.id}>{tile}</AppActionsMenu>}
                 // Icons only, so the options take one short row under the grid;
                 // the words stay as the accessible name and the hover tooltip.
                 footer={

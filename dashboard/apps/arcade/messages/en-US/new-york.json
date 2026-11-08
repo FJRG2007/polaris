@@ -240,6 +240,15 @@
         "padWaiting": "Turn it on and press any button",
         "padReady": "Ready",
         "phone": "Phone",
-        "phoneSoon": "Pairing a phone comes later"
+        "phoneHint": "Pair it with a code or a QR",
+        "phoneTitle": "Use your phone",
+        "phoneSteps": "Scan this with your phone, or open Games on it, choose Phone controller and enter the code.",
+        "phoneQr": "QR code that opens the phone controller",
+        "phonePlay": "Play with the phone",
+        "phoneRetry": "Try again",
+        "phoneOpening": "Getting a code",
+        "phoneWaiting": "Waiting for your phone",
+        "phoneFailed": "No code could be made. Try again.",
+        "phoneUnavailable": "Open the game from Polaris to pair a phone."
     }
 }

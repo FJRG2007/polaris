@@ -1,9 +1,10 @@
 /**
- * The login a new Minecraft server is created with: none.
+ * The login a new Minecraft server is created with.
  *
- * The join password is opt-in. A new server gets neither Polaris login nor a
- * Modrinth password project, whatever it runs; the operator turns one on from
- * the join-password card. Polaris anti-cheat is unaffected and still seeded.
+ * Polaris login is the login wherever it has a build. The mod names its server by
+ * the install's id, so the install is created with an id chosen up front and the
+ * mod's settings written before the first boot - and the Modrinth guard it
+ * replaces must not be seeded beside it.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -84,50 +85,70 @@ beforeEach(() => {
 });
 
 describe("a new server's login", () => {
-    // The join password is opt-in: no new server is given Polaris login or a
-    // password project, whatever its software and release. The operator turns it
-    // on from the join-password card.
-    const GUARDS = /\b(simple-login|mylogin|auth)\b/;
-
-    for (const [software, version] of [
-        ["NEOFORGE", "1.21.4"],
-        ["NEOFORGE", "1.21.1"],
-        ["PAPER", "1.21.4"],
-        ["PAPER", "1.20.4"]
-    ] as const) {
-        it(`is none on ${software} ${version}`, async () => {
-            await createGameServer("owner", "actor", server(software, version));
-            const { env, seed } = created();
-            const written = new Map((seed?.env ?? []).map((entry) => [entry.key, entry.value]));
-            expect(written.has("POLARIS_LOGIN")).toBe(false);
-            expect(env.has("POLARIS_LOGIN")).toBe(false);
-            expect(written.get("MODS") ?? "").not.toMatch(/polaris-paper\.jar/);
-            expect(env.get("MODRINTH_PROJECTS") ?? "").not.toMatch(GUARDS);
-        });
-    }
-
-    it("is none where Polaris has no public address either", async () => {
-        publicAppUrl.mockResolvedValue(null);
+    it("is Polaris login where there is a build", async () => {
         await createGameServer("owner", "actor", server("NEOFORGE", "1.21.4"));
-        publicAppUrl.mockResolvedValue("https://polaris.example");
         const { env, seed } = created();
-        expect(polarisKeys(seed)).toEqual([]);
-        expect(env.get("MODRINTH_PROJECTS") ?? "").not.toMatch(GUARDS);
+        expect(seed).toBeDefined();
+        const written = new Map(seed!.env.map((entry) => [entry.key, entry]));
+        expect(written.get("POLARIS_LOGIN")?.value).toBe("on");
+        expect(written.get("POLARIS_SERVER_ID")?.value).toBe(seed!.installedAppId);
+        expect(written.get("POLARIS_URL")?.value).toBe("https://polaris.example");
+        expect(written.get("MODS")?.value).toBe(
+            "https://polaris.example/api/minecraft/mod/key/polaris-neoforge-1.21.4.jar"
+        );
+        expect(written.get("POLARIS_SERVER_TOKEN")?.isSecret).toBe(true);
+        expect(written.get("POLARIS_SERVER_TOKEN")?.value).toMatch(/^[0-9a-f]{64}$/);
+        expect(env.get("MODRINTH_PROJECTS") ?? "").not.toMatch(/\bauth\b/);
     });
 
-    it("still gets Polaris anti-cheat on a plugin server", async () => {
-        await createGameServer("owner", "actor", server("PAPER", "1.20.4"));
-        const { seed } = created();
+    it("is the Modrinth guard where Polaris has no public address", async () => {
+        // Asked for the login and again for the anti-cheat, which on NeoForge is
+        // the same mod.
+        publicAppUrl.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+        await createGameServer("owner", "actor", server("NEOFORGE", "1.21.4"));
+        const { env, seed } = created();
+        expect(polarisKeys(seed)).toEqual([]);
+        expect(env.get("MODRINTH_PROJECTS")).toMatch(/\bauth\?/);
+        expect(env.has("POLARIS_LOGIN")).toBe(false);
+    });
+
+    it("is the Modrinth guard where there is none", async () => {
+        await createGameServer("owner", "actor", server("NEOFORGE", "1.21.1"));
+        const { env, seed } = created();
+        expect(polarisKeys(seed)).toEqual([]);
+        expect(env.get("MODRINTH_PROJECTS")).toMatch(/\bauth\?/);
+    });
+
+    it("is Polaris login's plugin on a plugin server, with Polaris anti-cheat beside it", async () => {
+        await createGameServer("owner", "actor", server("PAPER", "1.21.4"));
+        const { env, seed } = created();
+        expect(seed).toBeDefined();
         const written = new Map(seed!.env.map((entry) => [entry.key, entry.value]));
+        expect(written.get("MODS")).toBe(
+            "https://polaris.example/api/minecraft/mod/key/polaris-paper.jar,https://polaris.example/api/minecraft/mod/key/polaris-anticheat-bukkit.jar"
+        );
+        expect(written.get("POLARIS_LOGIN")).toBe("on");
+        expect(written.get("POLARIS_ANTICHEAT")).toBe("on");
+        // One server, one token: the anti-cheat reports with the login's.
+        expect(seed!.env.filter((entry) => entry.key === "POLARIS_SERVER_TOKEN")).toHaveLength(1);
+        expect(env.get("MODRINTH_PROJECTS") ?? "").not.toMatch(/simple-login/);
+    });
+
+    it("is the Modrinth plugin on a release before Polaris login's, and Polaris anti-cheat still", async () => {
+        await createGameServer("owner", "actor", server("PAPER", "1.20.4"));
+        const { env, seed } = created();
+        const written = new Map(seed!.env.map((entry) => [entry.key, entry.value]));
+        expect(written.has("POLARIS_LOGIN")).toBe(false);
         expect(written.get("POLARIS_ANTICHEAT")).toBe("on");
         expect(written.get("MODS")).toBe(
             "https://polaris.example/api/minecraft/mod/key/polaris-anticheat-bukkit.jar"
         );
+        expect(env.get("MODRINTH_PROJECTS")).toMatch(/simple-login\?/);
     });
 
     it("gets a fresh id and token per server", async () => {
-        await createGameServer("owner", "actor", server("PAPER", "1.21.4"));
-        await createGameServer("owner", "actor", server("PAPER", "1.21.4"));
+        await createGameServer("owner", "actor", server("NEOFORGE", "1.21.4"));
+        await createGameServer("owner", "actor", server("NEOFORGE", "1.21.4"));
         const seeds = installApp.mock.calls.map((call) => call[4] as Seed);
         expect(seeds[0]!.installedAppId).not.toBe(seeds[1]!.installedAppId);
         const token = (seed: Seed) =>

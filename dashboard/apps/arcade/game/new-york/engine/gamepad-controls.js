@@ -127,6 +127,7 @@ class GamepadControls {
     this.callbacks = callbacks;
     this.connected = false;
     this.enabled = true;
+    this.phone = null; // () => the paired phone's pad (phone-pad.js), set by main.js
     this.padIndex = null;
     this.padId = null;
     this.padName = '';
@@ -157,6 +158,9 @@ class GamepadControls {
   }
 
   readPad() {
+    // A paired phone (phone-pad.js) is the pad while it is connected: the reader chose it to play with
+    const phone = this.phone?.();
+    if (usablePad(phone)) return phone;
     // Some browsers expose the API but reject it through Permissions Policy.
     try {
       if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') return null;

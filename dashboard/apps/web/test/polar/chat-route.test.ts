@@ -153,7 +153,6 @@ vi.mock("@/lib/polar/models", () => ({
     // call is answered by the model chosen.
     answeredBy: <T>(resolved: T) => resolved,
     withStandIn: <T>(resolved: T) => resolved,
-    rememberRefusal: () => {},
     polarModelOptions: async () => [
         { provider: "anthropic", models: [{ provider: "anthropic", model: "m-1" }] }
     ],

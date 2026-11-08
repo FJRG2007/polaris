@@ -40,16 +40,10 @@ import { prisma, type Prisma } from "@polaris/db";
 import { localDisk } from "@/lib/deploy/local-disk";
 import { hostSpace } from "@/lib/deploy/host-space";
 import { cachedSamples } from "@/lib/container-stats-cache";
-import { containerParts, type DeployedApp } from "./container-rows";
-import {
-    accessCan,
-    accessInEnvironment,
-    projectAccess,
-    type ProjectAccess
-} from "@/lib/deploy-project-access";
+import { describePart, isPolarisPart } from "@/lib/polaris-parts";
 import { getLocalHostId } from "@/lib/local-server";
 import { machineProcesses } from "./machine-processes";
-import { hostVolumes } from "@/lib/deploy/host-volumes";
+import { baseProject, hostVolumes } from "@/lib/deploy/host-volumes";
 import { LOCAL_SERVER_ID, serverIdSchema, type Permission } from "@polaris/core";
 import { counterAdvance, hostSubject, RAW_MAX_SPAN_MS } from "@/lib/metrics-shared";
 import type { ContainerStats, ContainerSummary, DockerDriver } from "@polaris/docker";
@@ -235,24 +229,27 @@ async function machineLoad(
         }
 
         const { samples, at } = await sampleContainers(driver, connectionId, running);
-        const owners = await deployedOn(serverId, viewerId);
+        const owners = await deployedOn(serverId);
+        const parts = running.flatMap<BreakdownPart>((container) => {
+            const stats = samples.get(container.id);
+            if (!stats) return [];
+            return [
+                {
+                    ...describeContainer(container, connectionId, owners),
+                    kind: "container",
+                    value: metric === "cpu" ? stats.cpuPercent : stats.memUsage
+                }
+            ];
+        });
+        if (parts.length === 0) {
+            return nothingToShow("This server would not say what its containers are using.");
+        }
+
         // CPU is already a share of the whole machine, so the machine is 100 of
         // it. Memory is against what the machine actually has, which is the
         // figure the chart puts a percentage beside.
         const machine =
             metric === "cpu" ? 100 : ((await driver.info().catch(() => null))?.memTotal ?? null);
-        const parts = containerParts(
-            running,
-            samples,
-            metric,
-            connectionId,
-            owners,
-            metric === "mem" ? machine : null
-        );
-        if (parts.length === 0) {
-            return nothingToShow("This server would not say what its containers are using.");
-        }
-
         const total = wholeOf(machine, parts);
         if (metric === "mem") {
             const split = await memoryOutside(serverId, total, parts);
@@ -402,7 +399,59 @@ async function sampleContainers(
     return { samples, at: oldest };
 }
 
-const ACCESS_LOOKUPS_AT_ONCE = 8;
+/** What to call a container, and where its page is. Three answers in order of how
+ *  much is known: part of Polaris itself, a service Polaris deployed, or
+ *  something started on the machine that only the Containers screen knows. */
+function describeContainer(
+    container: ContainerSummary,
+    connectionId: string,
+    owners: Map<string, DeployedApp>
+): {
+    key: string;
+    label: string;
+    detail: string | null;
+    href: string | null;
+    group: BreakdownGroup;
+} {
+    const containerHref = `/apps/containers/${encodeURIComponent(container.name)}?c=${encodeURIComponent(connectionId)}`;
+    if (isPolarisPart(container)) {
+        const part = describePart(container);
+        return {
+            key: container.id,
+            // i18n-ignore said in the reader's words by lib/watch/words.ts
+            label: `Polaris - ${part.label}`,
+            detail: part.summary || null,
+            href: containerHref,
+            group: "polaris"
+        };
+    }
+    const app = owners.get(baseProject(container.composeProject) ?? "");
+    if (app) {
+        return {
+            key: container.id,
+            label: app.name,
+            detail: app.where,
+            href: `/apps/deploy/${app.projectId}?service=${app.id}`,
+            group: "apps"
+        };
+    }
+    return {
+        key: container.id,
+        label: container.name,
+        detail: null,
+        href: containerHref,
+        group: "other"
+    };
+}
+
+/** A service Polaris deployed, in the terms a row needs it. */
+interface DeployedApp {
+    readonly id: string;
+    readonly name: string;
+    readonly projectId: string;
+    /** "Project / Environment", which is how a service is placed everywhere else. */
+    readonly where: string;
+}
 
 /**
  * The services Polaris deployed to one machine, keyed by the compose project each
@@ -415,49 +464,29 @@ const ACCESS_LOOKUPS_AT_ONCE = 8;
  * else's service. Only the name and where it lives are taken, and the caller has
  * already been gated on reading this machine.
  */
-async function deployedOn(serverId: string, viewerId: string): Promise<Map<string, DeployedApp>> {
+async function deployedOn(serverId: string): Promise<Map<string, DeployedApp>> {
     const apps = await prisma.application
         .findMany({
             where: { target: targetOn(serverId) },
             select: {
                 id: true,
                 name: true,
-                sourceType: true,
-                environmentId: true,
                 environment: {
                     select: { name: true, projectId: true, project: { select: { name: true } } }
                 }
             }
         })
         .catch(() => []);
-    // Whether a row links to its service is Deploy's own question, asked once per
-    // project: a service the reader cannot open there is named, never linked.
-    const projectIds = [...new Set(apps.map((app) => app.environment.projectId))];
-    const access = new Map<string, ProjectAccess | null>();
-    for (let start = 0; start < projectIds.length; start += ACCESS_LOOKUPS_AT_ONCE) {
-        const batch = projectIds.slice(start, start + ACCESS_LOOKUPS_AT_ONCE);
-        const granted = await Promise.all(
-            batch.map((projectId) => projectAccess(projectId, viewerId).catch(() => null))
-        );
-        batch.forEach((projectId, index) => access.set(projectId, granted[index] ?? null));
-    }
     return new Map(
-        apps.map((app) => {
-            const granted = access.get(app.environment.projectId) ?? null;
-            const canOpen = granted !== null && accessInEnvironment(granted, app.environmentId);
-            return [
-                `polaris-${shortHash(app.id, 8)}`,
-                {
-                    id: app.id,
-                    name: app.name,
-                    projectId: app.environment.projectId,
-                    where: `${app.environment.project.name} / ${app.environment.name}`,
-                    source: app.sourceType === "image" ? "image" : "github",
-                    canOpen,
-                    canRestart: granted !== null && canOpen && accessCan(granted, "deploy.run")
-                }
-            ];
-        })
+        apps.map((app) => [
+            `polaris-${shortHash(app.id, 8)}`,
+            {
+                id: app.id,
+                name: app.name,
+                projectId: app.environment.projectId,
+                where: `${app.environment.project.name} / ${app.environment.name}`
+            }
+        ])
     );
 }
 

@@ -19,6 +19,7 @@
  * docs/i18n.md.
  */
 
+import { useAppUrl } from "@/components/app-url";
 import dynamic from "next/dynamic";
 import type { ComponentProps } from "react";
 import { Skeleton } from "@polaris/ui";
@@ -260,6 +261,7 @@ export const clientHost = {
     notificationSound: { soundGain },
     pagedPicker: { PagedPicker },
     qrCode: { QRCodeSVG },
+    appUrl: { useAppUrl },
     metricsHistory: { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS },
     relativeTime: { RelativeTime, relativeTime },
     runAction: { runAction },

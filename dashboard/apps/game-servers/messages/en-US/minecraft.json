@@ -1151,8 +1151,6 @@
         "modOff": "Anybody on the player list gets in on their name alone afterward. The passwords stay here in case you turn it back on.",
         "noBuild": "{name} has no build for the release this server runs. The server would start without it and nobody would be asked for a password, so this is left off rather than left looking on.",
         "noBuildFor": "{name} has no build for the release this server runs ({version}). The server would start without it and nobody would be asked for a password, so this is left off rather than left looking on.",
-        "releaseTooOld": "Not available on Minecraft {version}. {name} needs {since} or newer, and the server would not start with it. Move the server to a newer release in Settings to turn this on.",
-        "releaseTooOldListed": "{name} does not run on Minecraft {version} and stops the server from starting. Turn it off, or move the server to {since} or newer in Settings.",
         "guardOn": "Everybody sets their own the next time they join.",
         "guardOff": "Anybody on the player list gets in on their name alone afterward.",
         "foreign": "Players already log in with <mono>{name}</mono>, which Polaris does not manage. Remove it from the Mods screen to use a login from here instead.",

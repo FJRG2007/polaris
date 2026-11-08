@@ -6,9 +6,8 @@
  * every screen answers with the same permission checks and the same words.
  */
 
-import { requirePermission, sessionCan, userHasManage } from "@/lib/session";
+import { requirePermission, userHasManage } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
-import type { NamespaceKey } from "@/lib/i18n/types";
 import { watchText } from "@/lib/watch/words";
 import { nothingToShow, type Breakdown } from "@/lib/watch/breakdown-shape";
 import {
@@ -36,35 +35,18 @@ export async function subjectBreakdownAction(input: unknown): Promise<Breakdown>
     const t = await getTranslations("watch");
     if (!parsed.success) return nothingToShow(t("text.nothingToBreakDown"));
     try {
-        const [canReadMachine, canRunDeploy, parts] = await Promise.all([
-            userHasManage(user, MACHINE_PERMISSION),
-            // The restart action refuses without it, so a row never offers it.
-            sessionCan(user, "deploy.manage"),
-            getTranslations("components")
-        ]);
+        const canReadMachine = await userHasManage(user, MACHINE_PERMISSION);
         const answer = await subjectBreakdown({ id: user.id, canReadMachine }, parsed.data);
         // The service says its rows and reasons in English; the reader gets theirs.
         return {
             ...answer,
             note: answer.note ? watchText(t, answer.note) : answer.note,
             unavailable: answer.unavailable ? watchText(t, answer.unavailable) : answer.unavailable,
-            rows: answer.rows.map((row) => {
-                const part = row.part ? `footprint.parts.${row.part}` : null;
-                return {
-                    ...row,
-                    label: part
-                        ? parts(`${part}.label` as NamespaceKey<"components">)
-                        : watchText(t, row.label),
-                    detail: part
-                        ? parts(`${part}.summary` as NamespaceKey<"components">)
-                        : row.detail
-                          ? watchText(t, row.detail)
-                          : row.detail,
-                    service: row.service
-                        ? { ...row.service, canRestart: row.service.canRestart && canRunDeploy }
-                        : row.service
-                };
-            })
+            rows: answer.rows.map((row) => ({
+                ...row,
+                label: watchText(t, row.label),
+                detail: row.detail ? watchText(t, row.detail) : row.detail
+            }))
         };
     } catch {
         // Whatever went wrong names a host, a socket or a query. What the reader

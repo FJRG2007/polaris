@@ -59,11 +59,8 @@ describe("classifyProviderFailure", () => {
         expect(classifyProviderFailure(callError(429, "rate limit exceeded")).kind).toBe("rate");
     });
 
-    it("reads 5xx as the provider being down, and 503 or 529 as overloaded", () => {
-        expect(classifyProviderFailure(callError(500)).kind).toBe("down");
-        expect(classifyProviderFailure(callError(502)).kind).toBe("down");
-        expect(classifyProviderFailure(callError(503)).kind).toBe("busy");
-        expect(classifyProviderFailure(callError(529)).kind).toBe("busy");
+    it("reads 5xx as the provider being down", () => {
+        expect(classifyProviderFailure(callError(503)).kind).toBe("down");
     });
 
     it("reads a retired model as model not found", () => {

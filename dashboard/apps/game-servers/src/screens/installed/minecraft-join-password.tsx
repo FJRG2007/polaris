@@ -21,15 +21,13 @@
  * of the ones offered here install on their own, with nothing else to add
  * alongside them, which matters because a dependency that cannot be resolved is a
  * server that does not come back up. `join-guard` makes that choice, and it makes
- * it for a reset and a change of software too, so what this screen calls On is
- * the same project those keep on a server that had it.
+ * it for the create path too, so what this screen calls On is the same project a
+ * new server already arrived with.
  *
- * Opt-in: no server gets it unless its operator turns it on, here or on the Mods
- * screen. A new server, a reset and a template carry it only where the list
- * already did. A release the project cannot load on (the plugin needs 1.20.5 or
- * newer) is told so plainly and offered no Turn on, because there the project is
- * not a guard but a server that does not start - and one that already carries it
- * there is told that, with Turn off as the way out.
+ * A new server has it on already. This screen is where it is turned off, and
+ * where somebody arriving at an older server turns it on - the switch stopped
+ * being the only way the guard ever got installed, because a switch only protects
+ * the servers whose owner went looking for it.
  *
  * Where Polaris's own login has a build (Paper, Purpur and Spigot from 1.20.6,
  * and NeoForge 1.21.4) and Polaris has a public address, it is the only login
@@ -60,7 +58,6 @@ import { projectFitsAction, updateServerSettingsAction } from "./minecraft-actio
 import {
     foreignLogin,
     joinGuardFor,
-    joinGuardFits,
     joinGuardSlugs,
     PROJECTS_KEY
 } from "../../lib/minecraft/join-guard";
@@ -94,7 +91,6 @@ export function MinecraftJoinPassword({
     edition,
     projects,
     software,
-    version,
     playersOnline,
     login: shared,
     onOpenPlayers,
@@ -107,8 +103,6 @@ export function MinecraftJoinPassword({
     projects: string;
     /** The server's `TYPE`, which decides whether it takes plugins or mods. */
     software: string;
-    /** The server's `VERSION`, which decides whether the project loads at all. */
-    version: string;
     playersOnline: number;
     /** The login state, when the page already reads it. */
     login?: LoginStateHandle;
@@ -123,12 +117,6 @@ export function MinecraftJoinPassword({
     const java = edition === "java";
     const guard = java ? joinGuardFor(software) : null;
     const listed = guard === null ? null : listedSlug(projects, joinGuardSlugs(guard));
-    /** The project cannot load on this release - unless the server is on an
-     *  older slug it replaced, which is left to work as it already did. */
-    const blocked =
-        guard !== null &&
-        joinGuardFits(software, version) === null &&
-        (listed === null || listed === guard.slug);
     // Only software Polaris login has a build for is asked about it.
     const modCapable = java && polarisLogin.hasBuildFor(software);
     const own = useLoginState(installedAppId, null, modCapable && !shared, LOGIN_IDLE_MS);
@@ -213,7 +201,7 @@ export function MinecraftJoinPassword({
     }
 
     function apply(wanted: boolean): void {
-        if (!guard || (wanted && (foreign !== null || blocked))) return;
+        if (!guard || (wanted && foreign !== null)) return;
         setError(null);
         void run(async () => {
             // Asked before the operator is asked anything, because the answer that
@@ -272,9 +260,7 @@ export function MinecraftJoinPassword({
                 <CardTitle className="flex items-center gap-2">
                     <KeyRound className="size-4 text-primary" />
                     {t("joinPassword.passwordOnJoin")}
-                    {shownOn && !(blocked && !modOn) && (
-                        <Badge variant="success">{t("joinPassword.on")}</Badge>
-                    )}
+                    {shownOn && <Badge variant="success">{t("joinPassword.on")}</Badge>}
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
@@ -322,15 +308,6 @@ export function MinecraftJoinPassword({
                             </p>
                         )}
                     </>
-                ) : blocked ? (
-                    <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
-                        <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                        {t(on ? "joinPassword.releaseTooOldListed" : "joinPassword.releaseTooOld", {
-                            name: guard.slug,
-                            version: version.trim(),
-                            since: (guard.since ?? []).join(".")
-                        })}
-                    </p>
                 ) : (
                     <>
                         <p className="text-xs text-muted-foreground">
@@ -371,7 +348,7 @@ export function MinecraftJoinPassword({
                 {/* No button at all on Bedrock rather than one that can never be
                     pressed: there is nothing behind it to install, and a disabled
                     control reads as something the reader is one step away from. */}
-                {java && !locked && !(blocked && !on && !preferMod && !modOn) && (
+                {java && !locked && (
                     <div className="flex justify-end">
                         <Button
                             size="sm"

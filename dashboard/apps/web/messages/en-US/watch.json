@@ -214,16 +214,7 @@
             "other": "Other containers",
             "machine": "The machine",
             "free": "Free"
-        },
-        "image": "Runs {image}",
-        "limit": "Limit {limit}",
-        "restart": "Restart {name}",
-        "confirmRestart": "Restart now",
-        "cancelRestart": "Keep running",
-        "restarting": "Restarting",
-        "restarted": "Restarted",
-        "restartFailed": "Could not restart it. Open it in Deploy to see why.",
-        "noAccess": "You do not have access to this service in Deploy."
+        }
     },
     "subject": {
         "metrics": "Metrics",

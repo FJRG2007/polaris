@@ -43,6 +43,7 @@ import { ThirdPersonControllerManager } from "./controllers.js";
 import { TouchControls } from "./touch-controls.js";
 import { GamepadControls } from "./gamepad-controls.js";
 import { StartScreen } from "./start-screen.js";
+import { PhonePad } from "./phone-pad.js";
 import { CameraSystem, CAMERA_PRESETS } from "./cameras.js";
 import { LightingSystem } from "./lighting.js";
 import { NYCMapSystem } from "./nyc-map.js";
@@ -863,11 +864,16 @@ async function initApp() {
     cameraSystem.lockAllowed = () =>
         playing && !paused && !startScreen?.isOpen && !mapSystem.isFullMapOpen;
     // Before anything moves, the reader picks how they play (start-screen.js); it opens once the city is on screen
+    // A phone paired from the start screen is one more gamepad (phone-pad.js)
+    const phonePad = new PhonePad();
+    gamepadControls.phone = () => phonePad.pad;
     startScreen = new StartScreen({
         gamepad: () => gamepadControls,
+        phone: phonePad,
         onOpenChange: setPaused,
         onChoose: (choice) => {
-            document.body.dataset.input = choice;
+            // A phone plays as a gamepad does: the page's touch controls step aside for it
+            document.body.dataset.input = choice === "phone" ? "gamepad" : choice;
         }
     });
     gamepadControls.callbacks.startScreen = startScreen;

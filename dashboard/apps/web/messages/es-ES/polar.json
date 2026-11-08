@@ -168,7 +168,7 @@
             "rate": "{provider} está limitando cuántas veces se usa esta clave. Espera un minuto y vuelve a probar.",
             "busy": "{provider} dice que este modelo está saturado para todos ahora. No es tu clave. Vuelve a probar en un rato o elige otro modelo.",
             "down": "{provider} tiene problemas para responder ahora mismo. Vuelve a probar en unos minutos.",
-            "model": "{provider} no ofrece este modelo con esta clave, o ya no lo sirve. Elige otro.",
+            "model": "{provider} ya no ofrece este modelo. Elige otro.",
             "other": "{provider} no pudo responder. Reintenta o elige otro modelo.",
             "askAdmin": "Pide a tu administrador que revise la clave de {provider} de este Polaris.",
             "openKey": "Abrir la clave",

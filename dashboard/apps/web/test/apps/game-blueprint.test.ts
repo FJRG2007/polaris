@@ -12,6 +12,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { joinGuardEntry } from "@polaris-app/game-servers/src/lib/minecraft/join-guard";
 import {
     entryReleaseType,
     forgetModrinthAnswers,
@@ -321,9 +322,13 @@ describe("the world a blueprint opens on", () => {
         const env = await envFor("bedwars", {}, { MODRINTH_PROJECTS: "grimac?,coreprotect?" });
         expect(env.get("TYPE")).toBe("PAPER");
         // The entry keeps the release type it was declared with, so the image
-        // applies the same rule the version was resolved under. No join password
-        // project: it is opt-in, so a new server is given none.
-        expect(env.get("MODRINTH_PROJECTS")).toBe("grimac?,coreprotect?,bedwars1058:beta");
+        // applies the same rule the version was resolved under. The guard comes
+        // last because every server is given one - it is not part of this
+        // blueprint, and naming it from the module keeps this from being a second
+        // place the slug has to be kept true.
+        expect(env.get("MODRINTH_PROJECTS")).toBe(
+            `grimac?,coreprotect?,bedwars1058:beta,${joinGuardEntry("PAPER")}`
+        );
         // A heavier game for the same number of players gets a heavier heap.
         expect(env.get("MEMORY")).toBe("3G");
     });
@@ -337,8 +342,7 @@ describe("the world a blueprint opens on", () => {
         const paper = await envFor("survival");
         const fabric = await envFor("survival", { software: "FABRIC" });
         expect(paper.get("MEMORY")).toBe("2G");
-        // One mod fewer than when every server was given the password mod.
-        expect(fabric.get("MEMORY")).toBe("2560M");
+        expect(fabric.get("MEMORY")).toBe("3G");
     });
 });
 

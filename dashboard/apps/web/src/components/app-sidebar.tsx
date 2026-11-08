@@ -29,7 +29,6 @@ import { AppLogo, cn } from "@polaris/ui";
 import * as nav from "@/lib/apps";
 import { railApps } from "@/lib/app-launcher";
 import { ChevronLeft, LayoutGrid, Star } from "lucide-react";
-import { useLauncherMarks, type LauncherMarks } from "@/components/launcher-waiting";
 import { useAppFavorites } from "@/components/use-app-favorites";
 import { useLastPlaces } from "@/lib/last-place";
 import { AppActionsMenu } from "@/components/app-actions-menu";
@@ -98,11 +97,6 @@ export function AppSidebar({
     const railIds = onOverview ? railApps({ available: appIds, favorites, arranged: order }) : [];
     const moreApps =
         onOverview && appIds.filter((id) => id !== nav.OVERVIEW_APP_ID).length > railIds.length;
-    // The list of apps marks an app read from its row, exactly as the app menu's
-    // tile does - one hook for the whole rail, asked only while a row it draws has
-    // something waiting, so an empty rail costs no request.
-    const unread = useAppUnread();
-    const marks = useLauncherMarks(railIds.some((id) => (unread[id] ?? 0) > 0));
     const sections = subapp
         ? subapp.sections
         : onOverview
@@ -182,7 +176,6 @@ export function AppSidebar({
                             pathname={pathname}
                             sections={sections}
                             inApp={subapp !== null || app.id !== nav.OVERVIEW_APP_ID}
-                            mark={marks.markAction}
                         />
                     ))}
                 </div>
@@ -262,8 +255,7 @@ function RailLink({
     named = false,
     pathname,
     sections,
-    inApp,
-    mark
+    inApp
 }: {
     item: nav.AppSection;
     /** A name somebody chose, drawn as it is rather than translated. */
@@ -272,8 +264,6 @@ function RailLink({
     sections: readonly nav.AppSection[];
     /** Whether this rail is one app's screens rather than the list of apps. */
     inApp: boolean;
-    /** The app's own "mark read", for a row in the list of apps. */
-    mark?: LauncherMarks["markAction"];
 }) {
     const active = nav.isSectionActive(pathname, item.href, sections);
     const Icon = item.icon;
@@ -292,14 +282,10 @@ function RailLink({
     // launcher opens it; an app's own screens are addresses, not apps.
     const places = useLastPlaces(!inApp && appId ? [{ id: appId, href: item.href }] : []);
     const href = (!inApp && places[appId]) || item.href;
-    // Offered only on a row whose badge is up: the mark is the badge's, and the
-    // app's own "read" decides whether there is anything it can take down.
-    const markRead = !inApp && appId && unread > 0 ? (mark?.(appId, label) ?? null) : null;
-    const shortMark = markRead && mark ? mark(appId, label, true) : null;
     // The active row is the one place the rail spends colour: a faint accent fill
     // and an accent icon. Everything else is a hover away and stays neutral, so
     // where you are is readable at a glance rather than hunted for.
-    const link = (
+    const row = (
         <Link
             href={href}
             aria-current={active ? "page" : undefined}
@@ -329,44 +315,12 @@ function RailLink({
                 <span
                     aria-label={waitingLabel(appId, unread, t)}
                     title={waitingLabel(appId, unread, t)}
-                    className={cn(
-                        "ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-medium leading-4 text-primary-foreground",
-                        // The mark takes the badge's place while it is offered.
-                        markRead &&
-                            "[@media(hover:hover)]:group-focus-within/rail:invisible [@media(hover:hover)]:group-hover/rail:invisible"
-                    )}
-                    data-rail-badge=""
+                    className="ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-medium leading-4 text-primary-foreground"
                 >
                     {badgeLabel(unread)}
                 </span>
             ) : null}
         </Link>
     );
-    const row = markRead ? (
-        <div className="group/rail relative min-w-0">
-            {link}
-            {/* Beside the link rather than in it: a button inside an anchor is
-                not a button. Shown on hover and on focus, reached by Tab after
-                its row; on a touch screen the long press offers it instead. */}
-            <button
-                type="button"
-                aria-label={markRead.label}
-                title={markRead.label}
-                data-rail-mark={appId}
-                onClick={markRead.onSelect}
-                className="absolute right-1 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-muted-foreground opacity-0 transition-opacity duration-fast hover:bg-card-hover hover:text-foreground focus-visible:opacity-100 group-focus-within/rail:opacity-100 group-hover/rail:opacity-100 [@media(hover:none)]:hidden [&_svg]:size-3.5 [&_svg]:shrink-0"
-            >
-                {markRead.icon}
-            </button>
-        </div>
-    ) : (
-        link
-    );
-    return !inApp && appId ? (
-        <AppActionsMenu appId={appId} markRead={shortMark}>
-            {row}
-        </AppActionsMenu>
-    ) : (
-        row
-    );
+    return !inApp && appId ? <AppActionsMenu appId={appId}>{row}</AppActionsMenu> : row;
 }
