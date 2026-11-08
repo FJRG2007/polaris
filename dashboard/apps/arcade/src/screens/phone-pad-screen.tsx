@@ -12,7 +12,13 @@
 import { useArcadeT } from "./i18n";
 import { Button, Input, Switch } from "@polaris/ui";
 import { padFrame, stickAxes, tiltAxis, type PadControls } from "./phone-pad-input";
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    type PointerEvent as ReactPointerEvent
+} from "react";
 
 type Claimed = { id: string; token: string };
 type Problem = "notFound" | "tooMany" | "failed" | "closed" | "lost" | null;
@@ -50,7 +56,14 @@ export function PhonePadScreen() {
                 body: JSON.stringify(by)
             });
             if (response.ok) setClaimed((await response.json()) as Claimed);
-            else setProblem(response.status === 404 ? "notFound" : response.status === 429 ? "tooMany" : "failed");
+            else
+                setProblem(
+                    response.status === 404
+                        ? "notFound"
+                        : response.status === 429
+                          ? "tooMany"
+                          : "failed"
+                );
         } catch {
             setProblem("failed");
         } finally {
@@ -98,8 +111,14 @@ export function PhonePadScreen() {
                 <div className="flex flex-col gap-2">
                     <p className="text-sm font-medium">{t("pad.mine")}</p>
                     {mine.map((pad, i) => (
-                        <Button key={pad.id} disabled={busy} onClick={() => void claim({ id: pad.id })}>
-                            {mine.length === 1 ? t("pad.connectMine") : t("pad.connectMineNth", { n: i + 1 })}
+                        <Button
+                            key={pad.id}
+                            disabled={busy}
+                            onClick={() => void claim({ id: pad.id })}
+                        >
+                            {mine.length === 1
+                                ? t("pad.connectMine")
+                                : t("pad.connectMineNth", { n: i + 1 })}
                         </Button>
                     ))}
                 </div>
@@ -138,7 +157,11 @@ export function PhonePadScreen() {
 
 function PadController({ pad, onEnd }: { pad: Claimed; onEnd: (why: Problem) => void }) {
     const t = useArcadeT();
-    const controls = useRef<PadControls>({ stick: { x: 0, y: 0 }, tilt: null, buttons: new Array(17).fill(0) });
+    const controls = useRef<PadControls>({
+        stick: { x: 0, y: 0 },
+        tilt: null,
+        buttons: new Array(17).fill(0)
+    });
     const [tilt, setTilt] = useState(false);
     const [note, setNote] = useState<string | null>(null);
     const [knob, setKnob] = useState({ x: 0, y: 0 });
@@ -235,10 +258,15 @@ function PadController({ pad, onEnd }: { pad: Claimed; onEnd: (why: Problem) => 
         setNote(null);
         if (!on) return setTilt(false);
         // iOS asks once, from a tap
-        const ask = (globalThis.DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> })
-            ?.requestPermission;
-        if (typeof window.DeviceOrientationEvent === "undefined") return setNote(t("pad.tiltDenied"));
-        if (ask && (await ask().catch(() => "denied")) !== "granted") return setNote(t("pad.tiltDenied"));
+        const ask = (
+            globalThis.DeviceOrientationEvent as unknown as {
+                requestPermission?: () => Promise<string>;
+            }
+        )?.requestPermission;
+        if (typeof window.DeviceOrientationEvent === "undefined")
+            return setNote(t("pad.tiltDenied"));
+        if (ask && (await ask().catch(() => "denied")) !== "granted")
+            return setNote(t("pad.tiltDenied"));
         setTilt(true);
     };
 
@@ -252,7 +280,11 @@ function PadController({ pad, onEnd }: { pad: Claimed; onEnd: (why: Problem) => 
     const moveStick = (event: ReactPointerEvent<HTMLDivElement>) => {
         const box = stickBox.current?.getBoundingClientRect();
         if (!box) return;
-        const stick = stickAxes(event.clientX - (box.left + box.width / 2), event.clientY - (box.top + box.height / 2), box.width / 2);
+        const stick = stickAxes(
+            event.clientX - (box.left + box.width / 2),
+            event.clientY - (box.top + box.height / 2),
+            box.width / 2
+        );
         controls.current.stick = stick;
         setKnob(stick);
         send.current();
@@ -276,9 +308,15 @@ function PadController({ pad, onEnd }: { pad: Claimed; onEnd: (why: Problem) => 
     return (
         <div className="fixed inset-0 z-50 flex select-none flex-col gap-3 bg-background p-3 [touch-action:none]">
             <div className="flex min-w-0 items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{t("pad.connected")}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {t("pad.connected")}
+                </span>
                 <label className="flex shrink-0 items-center gap-2 text-sm">
-                    <Switch checked={tilt} onChange={(on) => void toggleTilt(on)} aria-label={t("pad.tilt")} />
+                    <Switch
+                        checked={tilt}
+                        onChange={(on) => void toggleTilt(on)}
+                        aria-label={t("pad.tilt")}
+                    />
                     <span className="truncate">{t("pad.tilt")}</span>
                 </label>
                 <Button size="sm" variant="outline" {...hold(8)}>
@@ -291,7 +329,11 @@ function PadController({ pad, onEnd }: { pad: Claimed; onEnd: (why: Problem) => 
                     {t("pad.disconnect")}
                 </Button>
             </div>
-            {note && <p role="status" className="truncate text-xs text-muted-foreground" title={note}>{note}</p>}
+            {note && (
+                <p role="status" className="truncate text-xs text-muted-foreground" title={note}>
+                    {note}
+                </p>
+            )}
             <div className="flex min-h-0 flex-1 items-stretch gap-3">
                 <div
                     ref={stickBox}
@@ -303,7 +345,8 @@ function PadController({ pad, onEnd }: { pad: Claimed; onEnd: (why: Problem) => 
                         moveStick(event);
                     }}
                     onPointerMove={(event) => {
-                        if (event.currentTarget.hasPointerCapture(event.pointerId)) moveStick(event);
+                        if (event.currentTarget.hasPointerCapture(event.pointerId))
+                            moveStick(event);
                     }}
                     onPointerUp={releaseStick}
                     onPointerCancel={releaseStick}
@@ -317,7 +360,9 @@ function PadController({ pad, onEnd }: { pad: Claimed; onEnd: (why: Problem) => 
                     {BUTTONS.map((button) => (
                         <Button
                             key={button.index}
-                            variant={button.index === 7 || button.index === 0 ? "primary" : "outline"}
+                            variant={
+                                button.index === 7 || button.index === 0 ? "primary" : "outline"
+                            }
                             className="h-full min-h-12 min-w-0 truncate"
                             {...hold(button.index)}
                         >

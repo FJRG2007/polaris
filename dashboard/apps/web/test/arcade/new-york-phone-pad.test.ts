@@ -32,9 +32,16 @@ describe("phone pads on the server", () => {
         expect(pads.sendInput(claimed.id, "f".repeat(32), frame)).toBe(false);
         const phone = vi.fn();
         pads.listenAsPhone(claimed.id, claimed.token, phone);
-        expect(pads.sendRumble(opened.id, "guest", { strong: 1, weak: 1, duration: 100 })).toBe(false);
-        expect(pads.sendRumble(opened.id, "owner", { strong: 1, weak: 1, duration: 100 })).toBe(true);
-        expect(phone).toHaveBeenLastCalledWith({ kind: "rumble", rumble: { strong: 1, weak: 1, duration: 100 } });
+        expect(pads.sendRumble(opened.id, "guest", { strong: 1, weak: 1, duration: 100 })).toBe(
+            false
+        );
+        expect(pads.sendRumble(opened.id, "owner", { strong: 1, weak: 1, duration: 100 })).toBe(
+            true
+        );
+        expect(phone).toHaveBeenLastCalledWith({
+            kind: "rumble",
+            rumble: { strong: 1, weak: 1, duration: 100 }
+        });
         // The game's page leaving closes the pad and tells the phone, once it has had time to come back
         vi.useFakeTimers();
         try {
@@ -53,7 +60,10 @@ describe("phone pads on the server", () => {
         try {
             const opened = pads.openPad("owner")!;
             const stop = pads.listenAsHost(opened.id, "owner", vi.fn())!;
-            const claimed = pads.claimPad({ code: opened.code }, { userId: "guest", name: "Guest" })!;
+            const claimed = pads.claimPad(
+                { code: opened.code },
+                { userId: "guest", name: "Guest" }
+            )!;
             const phone = vi.fn();
             pads.listenAsPhone(claimed.id, claimed.token, phone);
             stop();
@@ -120,10 +130,12 @@ describe("the phone's controls", () => {
     });
 
     it("links the QR to the phone page on the Polaris domain, the page's origin only without one", () => {
-        expect(input.phonePadLink("https://polaris.example/", "http://polaris.local", "123456")).toBe(
-            "https://polaris.example/games/pad?code=123456"
+        expect(
+            input.phonePadLink("https://polaris.example/", "http://polaris.local", "123456")
+        ).toBe("https://polaris.example/games/pad?code=123456");
+        expect(input.phonePadLink("", "http://polaris.local", "123456")).toBe(
+            "http://polaris.local/games/pad?code=123456"
         );
-        expect(input.phonePadLink("", "http://polaris.local", "123456")).toBe("http://polaris.local/games/pad?code=123456");
         expect(input.svgDataUrl("<svg/>")).toBe("data:image/svg+xml;charset=utf-8,%3Csvg%2F%3E");
     });
 });
@@ -135,11 +147,16 @@ function framedWindow() {
     const win = {
         parent,
         location: { origin: "https://polaris.example" },
-        addEventListener: (_type: string, listener: (event: MessageEvent) => void) => listeners.push(listener)
+        addEventListener: (_type: string, listener: (event: MessageEvent) => void) =>
+            listeners.push(listener)
     };
     const deliver = (data: unknown) =>
         listeners.forEach((listener) =>
-            listener({ data, source: parent, origin: "https://polaris.example" } as unknown as MessageEvent)
+            listener({
+                data,
+                source: parent,
+                origin: "https://polaris.example"
+            } as unknown as MessageEvent)
         );
     return { win, deliver };
 }
@@ -150,10 +167,23 @@ describe("the game's phone pad", () => {
         const pad = new phonePad.PhonePad(win as never);
         const changed = vi.fn();
         pad.onChange(changed);
-        deliver({ type: "polaris-game:pad", code: "123456", link: "https://polaris.example/games/pad?code=123456", qr: "data:image/svg+xml,x" });
-        expect(pad.offer).toEqual({ code: "123456", link: "https://polaris.example/games/pad?code=123456", qr: "data:image/svg+xml,x" });
+        deliver({
+            type: "polaris-game:pad",
+            code: "123456",
+            link: "https://polaris.example/games/pad?code=123456",
+            qr: "data:image/svg+xml,x"
+        });
+        expect(pad.offer).toEqual({
+            code: "123456",
+            link: "https://polaris.example/games/pad?code=123456",
+            qr: "data:image/svg+xml,x"
+        });
         // Controls before a phone holds the pad are not played
-        deliver({ type: "polaris-game:pad-input", axes: [1, 0, 0, 0], buttons: new Array(17).fill(0) });
+        deliver({
+            type: "polaris-game:pad-input",
+            axes: [1, 0, 0, 0],
+            buttons: new Array(17).fill(0)
+        });
         expect(pad.pad.axes[0]).toBe(0);
         deliver({ type: "polaris-game:pad", connected: true, name: "Guest" });
         expect(pad.connected).toBe(true);
@@ -173,7 +203,9 @@ describe("the game's phone pad", () => {
     });
 
     it("ignores an offer whose image is not an image", () => {
-        expect(phonePad.readOffer({ code: "123456", qr: "javascript:alert(1)", link: "javascript:x" })).toEqual({
+        expect(
+            phonePad.readOffer({ code: "123456", qr: "javascript:alert(1)", link: "javascript:x" })
+        ).toEqual({
             code: "123456",
             link: "",
             qr: ""
@@ -183,7 +215,10 @@ describe("the game's phone pad", () => {
 });
 
 describe("the start screen with a phone", () => {
-    const page = readFileSync(resolve(__dirname, "../../../arcade/game/new-york/index.html"), "utf8");
+    const page = readFileSync(
+        resolve(__dirname, "../../../arcade/game/new-york/index.html"),
+        "utf8"
+    );
     const markup = page.match(/<dialog id="start-screen"[\s\S]*?<\/dialog>/)![0];
 
     beforeAll(() => {
@@ -224,8 +259,14 @@ describe("the start screen with a phone", () => {
         document.querySelector<HTMLButtonElement>('[data-start-open="controller"]')!.click();
         document.querySelector<HTMLButtonElement>('[data-start-open="phone"]')!.click();
         expect(phone.request).toHaveBeenCalled();
-        expect(document.querySelector<HTMLButtonElement>('[data-start-choose="phone"]')!.disabled).toBe(true);
-        phone.offer = { code: "123456", link: "https://polaris.example/games/pad?code=123456", qr: "data:image/svg+xml,x" };
+        expect(
+            document.querySelector<HTMLButtonElement>('[data-start-choose="phone"]')!.disabled
+        ).toBe(true);
+        phone.offer = {
+            code: "123456",
+            link: "https://polaris.example/games/pad?code=123456",
+            qr: "data:image/svg+xml,x"
+        };
         listeners.forEach((listener) => listener());
         expect(document.getElementById("start-phone-code")!.textContent).toBe("123 456");
         expect(document.querySelector<HTMLImageElement>("#start-phone-qr")!.hidden).toBe(false);

@@ -36,7 +36,13 @@ export function stickAxes(dx: number, dy: number, radius: number): { x: number; 
 export function tiltAxis(beta: number | null, gamma: number | null, angle: number): number {
     const turned = ((Math.round(angle) % 360) + 360) % 360;
     const roll =
-        turned === 90 ? (beta ?? 0) : turned === 270 ? -(beta ?? 0) : turned === 180 ? -(gamma ?? 0) : (gamma ?? 0);
+        turned === 90
+            ? (beta ?? 0)
+            : turned === 270
+              ? -(beta ?? 0)
+              : turned === 180
+                ? -(gamma ?? 0)
+                : (gamma ?? 0);
     return clamp(roll / TILT_FULL_DEGREES);
 }
 

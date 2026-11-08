@@ -38,8 +38,7 @@ export const rumbleSchema = z.object({
 export type Rumble = z.infer<typeof rumbleSchema>;
 
 export type HostEvent =
-    | { kind: "input"; frame: PadFrame }
-    | { kind: "phone"; connected: boolean; name: string };
+    { kind: "input"; frame: PadFrame } | { kind: "phone"; connected: boolean; name: string };
 export type PhoneEvent = { kind: "rumble"; rumble: Rumble } | { kind: "closed" };
 
 interface Pad {

@@ -21,5 +21,8 @@ export async function POST(): Promise<Response> {
 export async function GET(): Promise<Response> {
     const user = await padReader();
     if (user instanceof Response) return user;
-    return Response.json({ pads: waitingPads(user.id) }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json(
+        { pads: waitingPads(user.id) },
+        { headers: { "Cache-Control": "no-store" } }
+    );
 }

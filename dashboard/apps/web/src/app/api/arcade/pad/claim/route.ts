@@ -12,8 +12,22 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.union([
-    z.object({ code: z.string().trim().regex(/^\d{6}$/) }).strict(),
-    z.object({ id: z.string().trim().regex(/^[0-9a-f]{32}$/) }).strict()
+    z
+        .object({
+            code: z
+                .string()
+                .trim()
+                .regex(/^\d{6}$/)
+        })
+        .strict(),
+    z
+        .object({
+            id: z
+                .string()
+                .trim()
+                .regex(/^[0-9a-f]{32}$/)
+        })
+        .strict()
 ]);
 
 /** Failed claims a reader may make in a window before being told to wait. */
@@ -34,7 +48,8 @@ export async function POST(request: Request): Promise<Response> {
     const user = await padReader();
     if (user instanceof Response) return user;
     const now = Date.now();
-    if (recentFailures(user.id, now).length >= MAX_FAILURES) return padError("tooManyRequests", 429);
+    if (recentFailures(user.id, now).length >= MAX_FAILURES)
+        return padError("tooManyRequests", 429);
     const body = bodySchema.safeParse(await request.json().catch(() => null));
     if (!body.success) return padError("invalidRequest", 400);
     const claimed = claimPad(body.data, { userId: user.id, name: user.name });

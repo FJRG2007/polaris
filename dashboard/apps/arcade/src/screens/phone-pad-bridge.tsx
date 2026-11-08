@@ -15,8 +15,6 @@ import { phonePadLink, svgDataUrl } from "./phone-pad-input";
 import { hostUi } from "@polaris/app-host/client";
 import { useEffect, useRef, useState, type RefObject } from "react";
 
-
-
 const fromGame = z.discriminatedUnion("type", [
     z.object({ type: z.literal("polaris-game:pad-open") }),
     z.object({
@@ -27,12 +25,18 @@ const fromGame = z.discriminatedUnion("type", [
     })
 ]);
 
-const padOpened = z.object({ id: z.string().regex(/^[0-9a-f]{32}$/), code: z.string().regex(/^\d{6}$/) });
+const padOpened = z.object({
+    id: z.string().regex(/^[0-9a-f]{32}$/),
+    code: z.string().regex(/^\d{6}$/)
+});
 
 const padEvent = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("input"),
-        frame: z.object({ axes: z.array(z.number()).length(4), buttons: z.array(z.number()).length(17) })
+        frame: z.object({
+            axes: z.array(z.number()).length(4),
+            buttons: z.array(z.number()).length(17)
+        })
     }),
     z.object({ kind: z.literal("phone"), connected: z.boolean(), name: z.string() })
 ]);
@@ -80,12 +84,19 @@ export function PhonePadBridge({ frame }: { frame: RefObject<HTMLIFrameElement |
                     }
                     const event = padEvent.safeParse(data);
                     if (!event.success) return;
-                    if (event.data.kind === "input") post({ type: "polaris-game:pad-input", ...event.data.frame });
-                    else post({ type: "polaris-game:pad", connected: event.data.connected, name: event.data.name });
+                    if (event.data.kind === "input")
+                        post({ type: "polaris-game:pad-input", ...event.data.frame });
+                    else
+                        post({
+                            type: "polaris-game:pad",
+                            connected: event.data.connected,
+                            name: event.data.name
+                        });
                 };
                 // A stream the server ended (the pad is gone): the game may ask for a new one
                 events.onerror = () => {
-                    if (events.readyState !== EventSource.CLOSED || pad.current?.events !== events) return;
+                    if (events.readyState !== EventSource.CLOSED || pad.current?.events !== events)
+                        return;
                     pad.current = null;
                     post({ type: "polaris-game:pad", connected: false, name: "" });
                     post({ type: "polaris-game:pad", failed: true });
