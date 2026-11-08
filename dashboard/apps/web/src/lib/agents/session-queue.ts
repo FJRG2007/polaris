@@ -53,7 +53,7 @@ export function planQueue(
     while (free > 0) {
         const round = [...byAccount.entries()]
             .filter(([account, list]) => list.length > 0 && (alive.get(account) ?? 0) < perAccount)
-            .sort(([, a], [, b]) => a[0].queuedAt.getTime() - b[0].queuedAt.getTime());
+            .sort(([, a], [, b]) => a[0]!.queuedAt.getTime() - b[0]!.queuedAt.getTime());
         if (round.length === 0) break;
         for (const [account, list] of round) {
             if (free === 0) break;

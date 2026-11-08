@@ -120,7 +120,7 @@ export function resolveStatuses(tasks: readonly PlanTask[]): StatusChange[] {
 /** Which ready tasks to dispatch now, oldest first, within the run's
  *  concurrency. */
 export function toDispatch(
-    tasks: readonly Pick<PlanTask, "id" | "status" | "createdAt">[],
+    tasks: readonly { id: string; status: string; createdAt: Date }[],
     maxConcurrent: number
 ): string[] {
     const running = tasks.filter((task) => task.status === "dispatched").length;
