@@ -1708,7 +1708,7 @@ function createLoftedCarMaterial(spec, fixedColorHex = null) {
         const ledBar = ledBarMask.mul(tailLens).mul(one.sub(max(turnRearSection, reverseRearSection)));
         const tailFacet = smoothstep(-tlH, tlH, tlUV.y).mul(0.28).add(0.78);
         const tailRuby = mix(color(0x981018).mul(tailFacet), color(0xff2834), ledBar);
-        const tailColor = mix(mix(tailRuby, color(0xf07818), turnRearSection), color(0xe4edf4), reverseRearSection);
+        const tailColor = mix(mix(tailRuby, color(0x9a4a10), turnRearSection), color(0xe4edf4), reverseRearSection);
 
         const rearValance = smoothstep(rearSill + 0.075, rearSill + 0.02, p.y).mul(rear);
         const exhaust = rrectEdge(vec2(ax.sub(0.5), p.y.sub(rearSill + 0.036)), vec2(0.052, 0.017), 0.008, fwXY);

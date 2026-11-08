@@ -440,7 +440,10 @@ describe("brake lamps", () => {
         expect(g.tail + g.brake).toBeGreaterThanOrEqual(4 * g.tail);
         // Past ~1.6 on the 0.58 lens a red lamp tone-maps salmon, then white: a brighter brake is not a redder one
         expect((g.tail + g.tailNight + g.brake) * 0.58).toBeLessThan(2.2);
-        for (const level of [g.turn, g.reverse, g.chmsl, g.headDay, g.drlDay]) expect(level).toBeGreaterThanOrEqual(2);
+        for (const level of [g.reverse, g.chmsl, g.headDay, g.drlDay]) expect(level).toBeGreaterThanOrEqual(2);
+        // An amber indicator stays amber: lit, but short of the level that tone-maps it pale yellow
+        expect(g.turn).toBeGreaterThanOrEqual(1.2);
+        expect(g.turn).toBeLessThanOrEqual(2);
         expect(g.headNight).toBeGreaterThan(g.headDay);
     });
 

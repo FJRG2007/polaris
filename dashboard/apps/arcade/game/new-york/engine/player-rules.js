@@ -99,7 +99,7 @@ const LAMP_GLOW = Object.freeze({
   tailNight: 0.4,     // added to the tail lamps after dark
   brake: 2.6,         // added across the whole rear lens while braking
   chmsl: 3,           // centre high-mount stop lamp, while braking
-  turn: 3,            // amber indicators, front and rear, during the lit half of a blink
+  turn: 1.6,          // amber indicators, front and rear, during the lit half of a blink (more washes them yellow)
   reverse: 3,         // white reversing lamps while rolling backwards
   headDay: 2.4,       // headlamp lenses by day (daytime running)
   headNight: 3.6,     // headlamp lenses after dark
