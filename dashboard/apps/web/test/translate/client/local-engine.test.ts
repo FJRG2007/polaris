@@ -148,3 +148,86 @@ describe("canRunLocally", () => {
         expect(canRunLocally(undefined)).toBe(false);
     });
 });
+
+/** A local engine as a selection gets it, its downloads held until `arrive()`. */
+function selectionEngine(cached: boolean) {
+    const { worker, calls } = fakeWorker({});
+    let arrive: () => void = () => undefined;
+    const arrived = new Promise<void>((resolve) => (arrive = resolve));
+    const loadFile = vi.fn(
+        async (_pair: string, file: { size: number }, onBytes: (bytes: number) => void) => {
+            if (!cached) await arrived;
+            onBytes(file.size);
+            return new ArrayBuffer(8);
+        }
+    );
+    const isCached = vi.fn(async () => cached);
+    const made = createLocalEngine({
+        makeWorker: () => worker,
+        loadFile,
+        detect: async () => null,
+        isCached
+    });
+    return { made, calls, loadFile, isCached, arrive };
+}
+
+/** Lets the background download's promise chain run. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe("createLocalEngine on a selection", () => {
+    it("gives way at once when the model is not on the device, and fetches it for next time", async () => {
+        const { made, calls, loadFile, arrive } = selectionEngine(false);
+        await expect(made.translate(["Hello"], "en", "es")).rejects.toBeInstanceOf(
+            LocalEngineUnavailable
+        );
+        await settle();
+        expect(loadFile).toHaveBeenCalledTimes(pairFiles("en-es").length);
+        // Still arriving: the next selection does not wait on it, nor fetch it twice.
+        await expect(made.translate(["Hello"], "en", "es")).rejects.toBeInstanceOf(
+            LocalEngineUnavailable
+        );
+        expect(loadFile).toHaveBeenCalledTimes(pairFiles("en-es").length);
+        arrive();
+        await settle();
+        await settle();
+        expect(await made.translate(["Hello"], "en", "es")).toEqual({
+            texts: ["<Hello>"],
+            detected: null
+        });
+        expect(loadFile).toHaveBeenCalledTimes(pairFiles("en-es").length);
+        expect(calls.map((call) => call.name)).toEqual([
+            "initialize",
+            "loadTranslationModel",
+            "translate"
+        ]);
+    });
+
+    it("answers locally when the model is already kept on the device", async () => {
+        const { made, isCached, loadFile } = selectionEngine(true);
+        expect(await made.translate(["Hello"], "en", "es")).toEqual({
+            texts: ["<Hello>"],
+            detected: null
+        });
+        expect(isCached).toHaveBeenCalledWith("en-es");
+        expect(loadFile).toHaveBeenCalledTimes(pairFiles("en-es").length);
+    });
+
+    it("needs both legs of a pivot on the device", async () => {
+        const { worker } = fakeWorker({});
+        const loadFile = vi.fn(
+            async (_pair: string, file: { size: number }, onBytes: (bytes: number) => void) => {
+                onBytes(file.size);
+                return new ArrayBuffer(8);
+            }
+        );
+        const made = createLocalEngine({
+            makeWorker: () => worker,
+            loadFile,
+            detect: async () => null,
+            isCached: async (pair) => pair === "es-en"
+        });
+        await expect(made.translate(["Hola"], "es", "de")).rejects.toBeInstanceOf(
+            LocalEngineUnavailable
+        );
+    });
+});

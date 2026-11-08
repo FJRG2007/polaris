@@ -173,3 +173,71 @@ describe("selection translation on the device first", () => {
         expect(posts(fetcher)).toBe(1);
     });
 });
+
+describe("a selection never waits on a first model download", () => {
+    it("is answered by the server while the model arrives, and locally once it has", async () => {
+        const { createLocalEngine } =
+            await import("@polaris-app/translate/src/screens/local-engine");
+        let arrive: () => void = () => undefined;
+        const arrived = new Promise<void>((resolve) => (arrive = resolve));
+        let kept = false;
+        const local = createLocalEngine({
+            makeWorker: () => {
+                const listeners: ((event: { data: unknown }) => void)[] = [];
+                return {
+                    postMessage(message: unknown) {
+                        const { id, name, args } = message as {
+                            id: number;
+                            name: string;
+                            args: unknown[];
+                        };
+                        const result =
+                            name === "translate"
+                                ? (args[0] as { texts: { text: string }[] }).texts.map(
+                                      ({ text }) => ({
+                                          target: { text: `local:${text}` }
+                                      })
+                                  )
+                                : undefined;
+                        queueMicrotask(() =>
+                            listeners.forEach((listener) => listener({ data: { id, result } }))
+                        );
+                    },
+                    addEventListener(type: string, listener: (event: { data: unknown }) => void) {
+                        if (type === "message") listeners.push(listener);
+                    },
+                    terminate() {}
+                };
+            },
+            loadFile: async (_pair, file, onBytes) => {
+                await arrived;
+                kept = true;
+                onBytes(file.size);
+                return new ArrayBuffer(8);
+            },
+            detect: async () => "en",
+            isCached: async () => kept
+        });
+        const fetcher = server(all);
+        const queue = new TranslationQueue(
+            offer,
+            fetcher,
+            async () => null,
+            0,
+            async () => ({ browser: null, local })
+        );
+        // The download is held: the answer still comes, from the server.
+        expect(await queue.translate("hello", "es")).toMatchObject({
+            kind: "translated",
+            text: "srv:hello"
+        });
+        expect(posts(fetcher)).toBe(1);
+        arrive();
+        for (let i = 0; i < 3; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(await queue.translate("bye", "es")).toMatchObject({
+            kind: "translated",
+            text: "local:bye"
+        });
+        expect(posts(fetcher)).toBe(1);
+    });
+});

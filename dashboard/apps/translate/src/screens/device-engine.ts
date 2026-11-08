@@ -7,7 +7,7 @@
 import { detectOnServer } from "./server-engine";
 import type { TranslateEngine } from "../model/engines";
 import { createBrowserEngine, type BrowserScope } from "./browser-engine";
-import { bergamotWorker, cachedModelFiles, createLocalEngine } from "./local-engine";
+import { bergamotWorker, cachedModelFiles, createLocalEngine, modelCached } from "./local-engine";
 
 /**
  * `downloadFailed` is said when a model cannot be fetched and Polaris gave no
@@ -16,13 +16,16 @@ import { bergamotWorker, cachedModelFiles, createLocalEngine } from "./local-eng
 export function deviceEngine(
     downloadFailed: string,
     failed: string,
-    onProgress?: (loaded: number) => void
+    onProgress?: (loaded: number) => void,
+    /** True where nobody should wait on a first download; see `isCached` in `local-engine.ts`. */
+    cachedOnly = false
 ): TranslateEngine {
     const browser = createBrowserEngine(self as unknown as BrowserScope);
     return createLocalEngine({
         makeWorker: bergamotWorker,
         loadFile: cachedModelFiles(downloadFailed),
         onProgress,
+        isCached: cachedOnly ? modelCached : undefined,
         detect: async (text, signal) => {
             try {
                 const read = await browser.detect(text, signal);

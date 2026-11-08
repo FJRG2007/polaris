@@ -52,6 +52,13 @@ export interface LocalEngineOptions {
     detect: (text: string, signal?: AbortSignal) => Promise<string | null>;
     /** Hears a first download's progress, 0 to 1. */
     onProgress?: (loaded: number) => void;
+    /**
+     * Set where nobody should wait on a first download (a selection elsewhere
+     * in Polaris): a pair answers only once its model is loaded or kept on
+     * this device; otherwise the engine gives way at once and fetches the
+     * model in the background, so the next one is local.
+     */
+    isCached?: (pair: string) => Promise<boolean>;
 }
 
 /** Thrown when the local engine cannot do what was asked; the screen moves on. */
@@ -90,6 +97,8 @@ export function createLocalEngine(options: LocalEngineOptions): TranslateEngine 
     let next = 1;
     const pending = new Map<number, Pending>();
     const models = new Map<string, Promise<void>>();
+    /** Pairs whose model is loaded in the worker, not only on its way. */
+    const inWorker = new Set<string>();
 
     /** Drops the worker and everything loaded in it; the next call starts over. */
     const reset = (error: Error) => {
@@ -97,6 +106,7 @@ export function createLocalEngine(options: LocalEngineOptions): TranslateEngine 
         worker = null;
         ready = null;
         models.clear();
+        inWorker.clear();
         for (const entry of pending.values()) entry.reject(error);
         pending.clear();
     };
@@ -167,13 +177,30 @@ export function createLocalEngine(options: LocalEngineOptions): TranslateEngine 
                 );
             })();
             models.set(pair, loading);
-            loading.catch(() => models.delete(pair));
+            loading.then(
+                () => inWorker.add(pair),
+                () => models.delete(pair)
+            );
         }
         try {
             await Promise.all(steps.map((step) => models.get(`${step.from}-${step.to}`)));
         } finally {
             if (missing.length > 0) options.onProgress?.(1);
         }
+    };
+
+    /** Whether every model the steps need is loaded, or kept on this device and not still arriving. */
+    const onDevice = async (
+        steps: { from: string; to: string }[],
+        isCached: (pair: string) => Promise<boolean>
+    ): Promise<boolean> => {
+        for (const step of steps) {
+            const pair = `${step.from}-${step.to}`;
+            if (inWorker.has(pair)) continue;
+            if (models.has(pair)) return false;
+            if (!(await isCached(pair).catch(() => false))) return false;
+        }
+        return true;
     };
 
     return {
@@ -186,6 +213,13 @@ export function createLocalEngine(options: LocalEngineOptions): TranslateEngine 
             if (mirrorCode(source) === mirrorCode(to)) return { texts: [...texts], detected };
             const steps = modelsFor(source, to);
             if (!steps) throw new LocalEngineUnavailable("pair");
+            if (options.isCached && !(await onDevice(steps, options.isCached))) {
+                // Fetched for next time; this one goes to the next engine now.
+                void start()
+                    .then(() => loadPairs(steps))
+                    .catch(() => undefined);
+                throw new LocalEngineUnavailable("not downloaded");
+            }
             await start();
             await loadPairs(steps, signal);
             signal?.throwIfAborted();
@@ -277,6 +311,16 @@ export function cachedModelFiles(failed: string): LoadModelFile {
             .catch(() => undefined);
         return bytes.buffer;
     };
+}
+
+/** Whether this browser keeps every file of a pair's model, so loading it needs no download. */
+export async function modelCached(pair: string): Promise<boolean> {
+    if (typeof caches === "undefined") return false;
+    const cache = await caches.open(MODEL_CACHE);
+    for (const file of pairFiles(pair)) {
+        if (!(await cache.match(servedUrl(pair, file)))) return false;
+    }
+    return true;
 }
 
 /** The real worker, the runtime staged beside the dashboard. */

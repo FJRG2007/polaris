@@ -23,6 +23,7 @@ export function selectionEngines(failed: string): SelectionEngines {
     const scope = self as unknown as BrowserScope;
     return {
         browser: hasBrowserTranslator(scope) ? createBrowserEngine(scope) : null,
-        local: canRunLocally(scope) ? deviceEngine(failed, failed) : null
+        // A selection never waits on a first model download: the server answers it meanwhile.
+        local: canRunLocally(scope) ? deviceEngine(failed, failed, undefined, true) : null
     };
 }
