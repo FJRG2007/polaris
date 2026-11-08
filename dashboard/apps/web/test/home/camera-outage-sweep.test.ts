@@ -47,8 +47,7 @@ const messages = vi.fn(async () => ({ id: "message" }));
 vi.mock("@polaris/db", () => ({
     prisma: {
         camera: {
-            findMany: async () =>
-                cameras.map((camera) => ({ offlineReportedAt: null, ...camera })),
+            findMany: async () => cameras.map((camera) => ({ offlineReportedAt: null, ...camera })),
             update: (args: never) => cameraUpdates(args as never)
         },
         cameraEvent: {

@@ -12,8 +12,16 @@ const sentMail = vi.fn(async () => ({}));
 vi.mock("@polaris/db", () => ({
     prisma: {
         notificationDelivery: {
-            create: async ({ data }: { data: { kind: string; status: string; detail: string | null } }) => {
-                deliveries.push({ kind: data.kind, status: data.status, detail: data.detail ?? null });
+            create: async ({
+                data
+            }: {
+                data: { kind: string; status: string; detail: string | null };
+            }) => {
+                deliveries.push({
+                    kind: data.kind,
+                    status: data.status,
+                    detail: data.detail ?? null
+                });
                 return data;
             }
         },
@@ -43,7 +51,9 @@ vi.mock("../../src/lib/notifications/destinations", () => ({
 }));
 vi.mock("../../src/lib/notifications/webhook-sender", () => ({ sendWebhook: async () => ({}) }));
 const hooks = vi.fn(async () => {});
-vi.mock("../../src/lib/notifications/outbound-hooks", () => ({ queueOutboundHooks: () => hooks() }));
+vi.mock("../../src/lib/notifications/outbound-hooks", () => ({
+    queueOutboundHooks: () => hooks()
+}));
 vi.mock("../../src/lib/notifications/sms-service", () => ({ sendSms: async () => ({}) }));
 vi.mock("@/lib/display-prefs-service", () => ({
     resolveDisplayPreferencesFor: async () => ({ timeZone: "UTC" })
@@ -128,7 +138,9 @@ describe("the burst ceiling", () => {
 
     it("never applies to a critical one", async () => {
         await notify({ userId: "owner", event: "account.signin", title: "New sign-in" });
-        const input = created.mock.calls[0]?.[0] as { repeat: { windowMs: number; burst?: unknown } };
+        const input = created.mock.calls[0]?.[0] as {
+            repeat: { windowMs: number; burst?: unknown };
+        };
         expect(input.repeat.windowMs).toBeGreaterThan(0);
         expect(input.repeat.burst).toBeUndefined();
     });

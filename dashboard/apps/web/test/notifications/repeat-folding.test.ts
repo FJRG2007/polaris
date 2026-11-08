@@ -139,7 +139,10 @@ describe("a repeat inside the window", () => {
     });
 
     it("ends in one row when two processes raise it at once", async () => {
-        const outcomes = await Promise.all([createNotification(alert()), createNotification(alert())]);
+        const outcomes = await Promise.all([
+            createNotification(alert()),
+            createNotification(alert())
+        ]);
 
         expect(outcomes.sort()).toEqual(["collapsed", "created"]);
         expect(rows).toHaveLength(1);
