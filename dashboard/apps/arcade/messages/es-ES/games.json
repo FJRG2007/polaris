@@ -54,7 +54,8 @@
         "controlOne": "Controlar {game} en {device}",
         "waitingLine": "{device} - abierto a las {time}",
         "someGame": "Un juego",
-        "someDevice": "otra pantalla"
+        "someDevice": "otra pantalla",
+        "stayHint": "Para salir, pulsa Desconectar."
     },
     "loadingInCall": "Cargando...",
     "together": "Jugar con otros",

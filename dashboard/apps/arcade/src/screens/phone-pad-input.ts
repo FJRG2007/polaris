@@ -28,6 +28,20 @@ export function stickAxes(dx: number, dy: number, radius: number): { x: number; 
     return { x: clamp((dx * scale) / radius), y: clamp((dy * scale) / radius) };
 }
 
+/** Below this much of the stick's travel a thumb resting on it is not a push. */
+export const STICK_DEAD_ZONE = 0.12;
+
+/**
+ * The stick past its dead zone, rescaled so the edge of the dead zone is 0 and
+ * the rim is still 1: no creeping from a resting thumb, and no jump past it.
+ */
+export function stickDeadZone(stick: { x: number; y: number }): { x: number; y: number } {
+    const length = Math.hypot(stick.x, stick.y);
+    if (length <= STICK_DEAD_ZONE) return { x: 0, y: 0 };
+    const scale = Math.min(1, (length - STICK_DEAD_ZONE) / (1 - STICK_DEAD_ZONE)) / length;
+    return { x: clamp(stick.x * scale), y: clamp(stick.y * scale) };
+}
+
 /**
  * Steering from the phone's orientation: its roll across the way it is held.
  * Upright (`angle` 0 or 180) that is `gamma`; on its side (90 or 270) it is

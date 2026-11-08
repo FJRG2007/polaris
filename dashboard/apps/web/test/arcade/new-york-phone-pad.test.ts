@@ -95,6 +95,41 @@ describe("phone pads on the server", () => {
         expect(pads.waitingPads("owner")).toEqual([]);
     });
 
+    it("takes no code for a pad the game opened on its own until the game shows it", () => {
+        vi.useFakeTimers();
+        try {
+            const opened = pads.openPad("owner", { byCode: false })!;
+            const guest = { userId: "guest", name: "Guest" };
+            expect(pads.claimPad({ code: opened.code }, guest)).toBeNull();
+            expect(pads.offerCode(opened.id, "guest")).toBeNull();
+            expect(pads.offerCode(opened.id, "owner")).toEqual(opened);
+            // A shown code can be typed for a while, not for as long as the game stays open
+            pads.listenAsHost(opened.id, "owner", vi.fn());
+            vi.advanceTimersByTime(pads.PAD_UNCLAIMED_MS + 1);
+            expect(pads.claimPad({ code: opened.code }, guest)).toBeNull();
+            pads.offerCode(opened.id, "owner");
+            expect(pads.claimPad({ code: opened.code }, guest)).not.toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("keeps a pad its game is listening to, so the owner's phone still finds a game left open", () => {
+        vi.useFakeTimers();
+        try {
+            const opened = pads.openPad("owner", { byCode: false })!;
+            const end = vi.fn();
+            pads.listenAsHost(opened.id, "owner", vi.fn(), end);
+            vi.advanceTimersByTime(pads.PAD_UNCLAIMED_MS * 3);
+            expect(pads.waitingPads("owner").map((pad) => pad.id)).toEqual([opened.id]);
+            // Closing it ends the game's stream, so the page opens a new one instead of going deaf
+            pads.closeOwnedPad(opened.id, "owner");
+            expect(end).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("keeps an account to a few open pads, dropping the oldest", () => {
         const first = pads.openPad("owner")!;
         for (let i = 0; i < 4; i++) pads.openPad("owner");
@@ -105,6 +140,14 @@ describe("phone pads on the server", () => {
 });
 
 describe("the phone's controls", () => {
+    it("ignores a resting thumb and still reaches the rim", () => {
+        expect(input.stickDeadZone({ x: 0.1, y: 0 })).toEqual({ x: 0, y: 0 });
+        expect(input.stickDeadZone({ x: 1, y: 0 }).x).toBeCloseTo(1);
+        const half = input.stickDeadZone({ x: 0, y: 0.56 });
+        expect(half.x).toBe(0);
+        expect(half.y).toBeCloseTo(0.5);
+    });
+
     it("clamps the stick to its ring", () => {
         expect(input.stickAxes(50, 0, 100)).toEqual({ x: 0.5, y: 0 });
         const far = input.stickAxes(300, 400, 100);

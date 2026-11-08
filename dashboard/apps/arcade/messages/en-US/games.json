@@ -54,7 +54,8 @@
         "controlOne": "Control {game} on {device}",
         "waitingLine": "{device} - opened at {time}",
         "someGame": "A game",
-        "someDevice": "another screen"
+        "someDevice": "another screen",
+        "stayHint": "To leave, tap Disconnect."
     },
     "loadingInCall": "Loading...",
     "together": "Play with others",

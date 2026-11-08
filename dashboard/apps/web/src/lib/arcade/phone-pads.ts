@@ -14,7 +14,8 @@
 import { z } from "zod";
 import { randomBytes, randomInt } from "node:crypto";
 
-/** How long an unclaimed pad waits for a phone. */
+/** How long a pad's code can be typed once it is shown, and how long a pad no
+ *  game is listening to waits before it is dropped. */
 export const PAD_UNCLAIMED_MS = 10 * 60_000;
 /** How long a pad outlives its game's stream, so a reconnecting page finds it again. */
 export const PAD_RECONNECT_MS = 15_000;
@@ -50,8 +51,14 @@ interface Pad {
      *  the owner's phone lists it; empty when not known. */
     readonly game: string;
     readonly device: string;
+    /** Until when its code may be typed; 0 while the game has not shown it. A
+     *  pad opened with the game, before anyone asked to pair, is the owner's to
+     *  tap only, so an open game tab is no code for a stranger to guess. */
+    codeUntil: number;
     phone: { token: string; userId: string; name: string } | null;
     readonly hosts: Set<(event: HostEvent) => void>;
+    /** Ends each game stream, so a closed pad is not a stream left open and deaf. */
+    readonly hostEnds: Set<() => void>;
     readonly phones: Set<(event: PhoneEvent) => void>;
     unheard: ReturnType<typeof setTimeout> | null;
 }
@@ -73,8 +80,8 @@ function emit<T>(listeners: Set<(event: T) => void>, event: T) {
 /** Drops pads nobody claimed in time and nobody is listening to. */
 function sweep(now = Date.now()) {
     for (const pad of pads.values()) {
-        if (!pad.phone && now - pad.openedAt > PAD_UNCLAIMED_MS) closePad(pad.id);
-        else if (pad.hosts.size === 0 && now - pad.openedAt > PAD_UNCLAIMED_MS) closePad(pad.id);
+        // A game still listening keeps its pad for as long as it stays open
+        if (pad.hosts.size === 0 && now - pad.openedAt > PAD_UNCLAIMED_MS) closePad(pad.id);
     }
 }
 
@@ -86,10 +93,13 @@ function freshCode(): string {
     }
 }
 
-/** Opens a pad for `ownerId`, or null where they (or the instance) hold too many. */
+/**
+ * Opens a pad for `ownerId`, or null where they (or the instance) hold too many.
+ * `byCode: false` opens it for the owner's one tap only, until `offerCode`.
+ */
 export function openPad(
     ownerId: string,
-    about: { game?: string; device?: string } = {}
+    about: { game?: string; device?: string; byCode?: boolean } = {}
 ): { id: string; code: string } | null {
     sweep();
     const owned = [...pads.values()].filter((pad) => pad.ownerId === ownerId);
@@ -104,8 +114,10 @@ export function openPad(
         openedAt: Date.now(),
         game: about.game ?? "",
         device: about.device ?? "",
+        codeUntil: about.byCode === false ? 0 : Date.now() + PAD_UNCLAIMED_MS,
         phone: null,
         hosts: new Set(),
+        hostEnds: new Set(),
         phones: new Set(),
         unheard: null
     };
@@ -122,6 +134,23 @@ export function closePad(id: string) {
     emit(pad.phones, { kind: "closed" });
     pad.hosts.clear();
     pad.phones.clear();
+    const ends = [...pad.hostEnds];
+    pad.hostEnds.clear();
+    for (const end of ends) {
+        try {
+            end();
+        } catch {
+            // One dead stream never stops the rest
+        }
+    }
+}
+
+/** Lets the pad's code be typed from now, for the owner's game to show; null when it is not theirs. */
+export function offerCode(id: string, ownerId: string): { id: string; code: string } | null {
+    const pad = pads.get(id);
+    if (!pad || pad.ownerId !== ownerId) return null;
+    pad.codeUntil = Date.now() + PAD_UNCLAIMED_MS;
+    return { id: pad.id, code: pad.code };
 }
 
 /** Closes a pad for the account that opened it; false when it is not theirs. */
@@ -159,7 +188,9 @@ export function claimPad(
     sweep();
     const pad =
         "code" in by
-            ? [...pads.values()].find((candidate) => candidate.code === by.code)
+            ? [...pads.values()].find(
+                  (candidate) => candidate.code === by.code && candidate.codeUntil > Date.now()
+              )
             : pads.get(by.id);
     if (!pad || pad.phone) return null;
     if ("id" in by && pad.ownerId !== phone.userId) return null;
@@ -201,14 +232,21 @@ export function sendRumble(id: string, ownerId: string, rumble: Rumble): boolean
 }
 
 /** The game listens to its pad. Returns the unsubscribe, or null when the pad is not the owner's. */
-export function listenAsHost(id: string, ownerId: string, listener: (event: HostEvent) => void) {
+export function listenAsHost(
+    id: string,
+    ownerId: string,
+    listener: (event: HostEvent) => void,
+    end?: () => void
+) {
     const pad = pads.get(id);
     if (!pad || pad.ownerId !== ownerId) return null;
     if (pad.unheard) clearTimeout(pad.unheard);
     pad.unheard = null;
     pad.hosts.add(listener);
+    if (end) pad.hostEnds.add(end);
     if (pad.phone) listener({ kind: "phone", connected: true, name: pad.phone.name });
     return () => {
+        if (end) pad.hostEnds.delete(end);
         if (!pad.hosts.delete(listener) || pad.hosts.size > 0 || pads.get(pad.id) !== pad) return;
         // The game's page is gone, unless its stream comes back in time
         pad.unheard = setTimeout(() => {

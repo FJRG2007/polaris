@@ -1,7 +1,9 @@
 /**
  * Phone pads (`lib/arcade/phone-pads.ts`). POST opens one for the game the
  * reader is playing (`{ game }`, the game's id, optional; the device is read from
- * the request), so the owner's phone can name it; GET lists the reader's pads still waiting for a phone, so a
+ * the request), so the owner's phone can name it. `{ auto: true }` is the game
+ * opening it as it loads, for the owner's one tap only: its code is typed only
+ * once the game shows it (PUT `/api/arcade/pad/[id]`). GET lists the reader's pads still waiting for a phone, so a
  * phone signed in to the same account connects with one tap.
  */
 
@@ -19,7 +21,8 @@ const openSchema = z
             .string()
             .trim()
             .regex(/^[a-z0-9-]{1,48}$/)
-            .optional()
+            .optional(),
+        auto: z.boolean().optional()
     })
     .strict();
 
@@ -41,7 +44,11 @@ export async function POST(request: Request): Promise<Response> {
         request.headers.get("sec-ch-ua"),
         request.headers.get("sec-ch-ua-platform")
     ).slice(0, 80);
-    const pad = openPad(user.id, { game: parsed.data.game, device });
+    const pad = openPad(user.id, {
+        game: parsed.data.game,
+        device,
+        byCode: parsed.data.auto !== true
+    });
     if (!pad) return padError("tooManyRequests", 429);
     return Response.json(pad, { headers: { "Cache-Control": "no-store" } });
 }

@@ -104,7 +104,26 @@ describe("the phone pad bridge", () => {
         await askForPad();
         expect(offers()).toHaveLength(2);
         expect(offers()[1]).toEqual(offers()[0]);
-        // Asked again, not opened again: one pad on the server
-        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+        // Asked again, not opened again: one pad on the server, its code offered once
+        const calls = vi.mocked(fetch).mock.calls;
+        expect(calls).toHaveLength(2);
+        expect(calls[0]![0]).toBe("/api/arcade/pad");
+        expect(calls[1]![1]).toMatchObject({ method: "PUT" });
+    });
+
+    it("opens a pad with the game, for the owner's phone only, before anyone asks to pair", async () => {
+        render(<Host />);
+        frameWindow = document.querySelector("iframe")!.contentWindow!;
+        posted = vi.fn();
+        frameWindow.postMessage = posted as unknown as Window["postMessage"];
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+        const calls = vi.mocked(fetch).mock.calls;
+        expect(calls).toHaveLength(1);
+        expect(calls[0]![0]).toBe("/api/arcade/pad");
+        expect(JSON.parse(String(calls[0]![1]!.body))).toEqual({ auto: true });
+        // No code is offered to the game until it asks to pair
+        expect(offers()).toHaveLength(0);
     });
 });

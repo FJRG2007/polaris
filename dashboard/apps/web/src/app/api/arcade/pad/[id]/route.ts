@@ -1,6 +1,7 @@
 /**
  * The game's end of a pad: GET is the stream of the phone's controls (and
- * whether a phone holds it), POST a rumble for the phone, DELETE closes it.
+ * whether a phone holds it), POST a rumble for the phone, PUT lets its code be
+ * typed (the game is showing it), DELETE closes it.
  * Closing the stream closes the pad too.
  */
 
@@ -16,7 +17,9 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     const user = await padReader();
     if (user instanceof Response) return user;
     const { id } = await params;
-    return padStream<pads.HostEvent>(request, (send) => pads.listenAsHost(id, user.id, send));
+    return padStream<pads.HostEvent>(request, (send, end) =>
+        pads.listenAsHost(id, user.id, send, end)
+    );
 }
 
 export async function POST(request: Request, { params }: Params): Promise<Response> {
@@ -27,6 +30,15 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     if (!body.success) return padError("invalidRequest", 400);
     if (!pads.sendRumble(id, user.id, body.data)) return padError("notFound", 404);
     return new Response(null, { status: 204 });
+}
+
+export async function PUT(_request: Request, { params }: Params): Promise<Response> {
+    const user = await padReader();
+    if (user instanceof Response) return user;
+    const { id } = await params;
+    const pad = pads.offerCode(id, user.id);
+    if (!pad) return padError("notFound", 404);
+    return Response.json(pad, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function DELETE(_request: Request, { params }: Params): Promise<Response> {
