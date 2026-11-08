@@ -143,7 +143,10 @@ export function PhonePadScreen() {
                         disabled={busy}
                         onClick={() => void claim({ id: mine[0]!.id })}
                     >
-                        {t("pad.controlOne", { game: gameName(mine[0]!), device: device(mine[0]!) })}
+                        {t("pad.controlOne", {
+                            game: gameName(mine[0]!),
+                            device: device(mine[0]!)
+                        })}
                     </Button>
                 ) : (
                     <ul className="flex flex-col gap-2">
@@ -155,9 +158,14 @@ export function PhonePadScreen() {
                                     disabled={busy}
                                     onClick={() => void claim({ id: pad.id })}
                                 >
-                                    <span className="w-full truncate font-medium">{gameName(pad)}</span>
+                                    <span className="w-full truncate font-medium">
+                                        {gameName(pad)}
+                                    </span>
                                     <span className="w-full truncate text-xs text-muted-foreground">
-                                        {t("pad.waitingLine", { device: device(pad), time: openedAt(pad) })}
+                                        {t("pad.waitingLine", {
+                                            device: device(pad),
+                                            time: openedAt(pad)
+                                        })}
                                     </span>
                                 </Button>
                             </li>

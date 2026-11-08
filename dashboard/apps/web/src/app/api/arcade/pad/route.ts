@@ -14,7 +14,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const openSchema = z
-    .object({ game: z.string().trim().regex(/^[a-z0-9-]{1,48}$/).optional() })
+    .object({
+        game: z
+            .string()
+            .trim()
+            .regex(/^[a-z0-9-]{1,48}$/)
+            .optional()
+    })
     .strict();
 
 export async function POST(request: Request): Promise<Response> {

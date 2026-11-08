@@ -84,7 +84,9 @@ describe("the start screen", () => {
         expect(main.querySelector('[data-start-open="phone"]')).not.toBeNull();
         expect(main.querySelector("[data-start-together]")).not.toBeNull();
         expect(document.querySelector('[data-start-view="controller"]')).toBeNull();
-        expect(button('[data-start-open="phone"]').querySelector('[data-t="start.phone"]')).not.toBeNull();
+        expect(
+            button('[data-start-open="phone"]').querySelector('[data-t="start.phone"]')
+        ).not.toBeNull();
         expect(t("start.phone")).toBe("Phone as controller");
     });
 

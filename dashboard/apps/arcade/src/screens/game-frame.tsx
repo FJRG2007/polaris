@@ -184,8 +184,7 @@ export function GameFrame({
             else if (data.type === "polaris-game:exit") exit.current?.();
             else if (data.type === "polaris-game:rooms") {
                 if (roomsNow.current === "on") openRooms.current?.();
-            }
-            else if (data.type === "polaris-game:call-action") {
+            } else if (data.type === "polaris-game:call-action") {
                 const controls = host.current?.controls;
                 if (data.action === "mic") controls?.toggleMic();
                 else if (data.action === "leave-game") controls?.leaveGame();

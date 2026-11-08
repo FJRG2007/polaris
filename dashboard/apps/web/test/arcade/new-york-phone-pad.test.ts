@@ -292,9 +292,7 @@ describe("the start screen with a phone", () => {
         expect(document.getElementById("start-phone-status")!.textContent).not.toBe("");
         view.goBack();
         expect(view.view).toBe("main");
-        expect(document.activeElement).toBe(
-            document.querySelector('[data-start-open="phone"]')
-        );
+        expect(document.activeElement).toBe(document.querySelector('[data-start-open="phone"]'));
     });
 });
 
