@@ -108,8 +108,13 @@ export function useLobbyRoom(ticket: LobbyTicket | null): LobbyRoom {
         const local = room.current?.localParticipant;
         if (!local || to.length === 0) return;
         void local
+            // Reliable: a lobby's room publishes no tracks, so its lossy channel is
+            // opened only by the first position sent, and a player whose lossy
+            // channel never opened was seen standing still the whole game. The
+            // reliable one is up from the join, and a few small messages a second
+            // are nothing for it.
             .publishData(new TextEncoder().encode(JSON.stringify(message)), {
-                reliable: false,
+                reliable: true,
                 topic: ACTIVITY_TOPIC,
                 destinationIdentities: [...to]
             })

@@ -431,6 +431,8 @@ function usePoseSync({
     useEffect(
         () => () => {
             if (timer.current !== null) window.clearTimeout(timer.current);
+            // A timer cleared and still marked as running would hold back every update after it
+            timer.current = null;
         },
         []
     );
