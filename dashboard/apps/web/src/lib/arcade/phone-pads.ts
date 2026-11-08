@@ -16,6 +16,8 @@ import { randomBytes, randomInt } from "node:crypto";
 
 /** How long an unclaimed pad waits for a phone. */
 export const PAD_UNCLAIMED_MS = 10 * 60_000;
+/** How long a pad outlives its game's stream, so a reconnecting page finds it again. */
+export const PAD_RECONNECT_MS = 15_000;
 /** Open pads one account may hold at once, and in the whole instance. */
 const PER_OWNER = 4;
 const TOTAL = 2_000;
@@ -48,6 +50,7 @@ interface Pad {
     phone: { token: string; userId: string; name: string } | null;
     readonly hosts: Set<(event: HostEvent) => void>;
     readonly phones: Set<(event: PhoneEvent) => void>;
+    unheard: ReturnType<typeof setTimeout> | null;
 }
 
 const KEY = Symbol.for("polaris.arcade.phone-pads");
@@ -95,7 +98,8 @@ export function openPad(ownerId: string): { id: string; code: string } | null {
         openedAt: Date.now(),
         phone: null,
         hosts: new Set(),
-        phones: new Set()
+        phones: new Set(),
+        unheard: null
     };
     pads.set(pad.id, pad);
     return { id: pad.id, code: pad.code };
@@ -106,6 +110,7 @@ export function closePad(id: string) {
     const pad = pads.get(id);
     if (!pad) return;
     pads.delete(id);
+    if (pad.unheard) clearTimeout(pad.unheard);
     emit(pad.phones, { kind: "closed" });
     pad.hosts.clear();
     pad.phones.clear();
@@ -184,12 +189,17 @@ export function sendRumble(id: string, ownerId: string, rumble: Rumble): boolean
 export function listenAsHost(id: string, ownerId: string, listener: (event: HostEvent) => void) {
     const pad = pads.get(id);
     if (!pad || pad.ownerId !== ownerId) return null;
+    if (pad.unheard) clearTimeout(pad.unheard);
+    pad.unheard = null;
     pad.hosts.add(listener);
     if (pad.phone) listener({ kind: "phone", connected: true, name: pad.phone.name });
     return () => {
-        pad.hosts.delete(listener);
-        // The game's page is gone: so is its pad
-        if (pad.hosts.size === 0) closePad(pad.id);
+        if (!pad.hosts.delete(listener) || pad.hosts.size > 0 || pads.get(pad.id) !== pad) return;
+        // The game's page is gone, unless its stream comes back in time
+        pad.unheard = setTimeout(() => {
+            if (pad.hosts.size === 0) closePad(pad.id);
+        }, PAD_RECONNECT_MS);
+        pad.unheard.unref?.();
     };
 }
 
@@ -205,5 +215,6 @@ export function listenAsPhone(id: string, token: string, listener: (event: Phone
 
 /** Test seam: forgets every pad. */
 export function resetPadsForTests() {
+    for (const pad of pads.values()) if (pad.unheard) clearTimeout(pad.unheard);
     pads.clear();
 }

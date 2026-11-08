@@ -72,6 +72,7 @@ describe("the modded project's commands", () => {
                 edition="java"
                 projects=""
                 software="FABRIC"
+                version="LATEST"
                 playersOnline={0}
                 onSaved={vi.fn()}
             />
@@ -93,6 +94,7 @@ describe("the modded project's commands", () => {
                 edition="java"
                 projects=""
                 software="FABRIC"
+                version="LATEST"
                 playersOnline={0}
                 onSaved={vi.fn()}
             />
@@ -110,6 +112,7 @@ describe("the plugin project", () => {
                 edition="java"
                 projects=""
                 software="PAPER"
+                version="LATEST"
                 playersOnline={0}
                 onSaved={vi.fn()}
             />
@@ -144,6 +147,7 @@ describe("what the card says happens when there is no build", () => {
                 edition="java"
                 projects=""
                 software={software}
+                version="LATEST"
                 playersOnline={0}
                 onSaved={vi.fn()}
             />
@@ -192,6 +196,7 @@ describe("Polaris login", () => {
                 edition="java"
                 projects={projects}
                 software="NEOFORGE"
+                version="LATEST"
                 playersOnline={0}
                 onSaved={vi.fn()}
             />
@@ -292,6 +297,7 @@ describe("Polaris login", () => {
                 edition="java"
                 projects="simple-auth?"
                 software="PAPER"
+                version="LATEST"
                 playersOnline={0}
                 onSaved={vi.fn()}
             />
@@ -307,6 +313,7 @@ describe("Polaris login", () => {
                 edition="java"
                 projects=""
                 software="FABRIC"
+                version="LATEST"
                 playersOnline={0}
                 onSaved={vi.fn()}
             />
@@ -324,6 +331,7 @@ describe("Polaris login", () => {
                 edition="java"
                 projects="simple-login?"
                 software="PAPER"
+                version="LATEST"
                 playersOnline={0}
                 onSaved={vi.fn()}
             />
@@ -359,6 +367,7 @@ describe("Polaris login", () => {
                 edition="java"
                 projects=""
                 software="NEOFORGE"
+                version="LATEST"
                 playersOnline={0}
                 onOpenPlayers={openPlayers}
                 onSaved={vi.fn()}
@@ -397,5 +406,60 @@ describe("Polaris login", () => {
                 on: false
             })
         );
+    });
+});
+
+/**
+ * A release the plugin guard cannot load on.
+ *
+ * simple-login's builds need Java 21, which Minecraft moved to at 1.20.5. On an
+ * older release the server stops at the plugin, so the card must not offer it,
+ * and must say so - and a server that already carries it there is told what it
+ * is doing and given the way out.
+ */
+describe("a release the plugin cannot load on", () => {
+    function paper(version: string, projects = "") {
+        render(
+            <MinecraftJoinPassword
+                installedAppId="server-1"
+                edition="java"
+                projects={projects}
+                software="PAPER"
+                version={version}
+                playersOnline={0}
+                onSaved={vi.fn()}
+            />
+        );
+    }
+
+    it("says it is not available, and offers no Turn on", async () => {
+        paper("1.20.4");
+        expect(await screen.findByText(/Not available on Minecraft 1\.20\.4/)).toBeTruthy();
+        expect(screen.getByText(/needs 1\.20\.5 or newer/)).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Turn on" })).toBeNull();
+        expect(screen.queryByText(/documents on its Modrinth page/)).toBeNull();
+        expect(actions.projectFitsAction).not.toHaveBeenCalled();
+    });
+
+    it("says a plugin already there stops the server, and takes it off", async () => {
+        paper("1.20.4", "coreprotect?,simple-login?");
+        expect(await screen.findByText(/stops the server from starting/)).toBeTruthy();
+        expect(screen.queryByText("On")).toBeNull();
+        vi.mocked(actions.updateServerSettingsAction).mockResolvedValue({});
+        fireEvent.click(screen.getByRole("button", { name: "Turn off" }));
+        await waitFor(() =>
+            expect(actions.updateServerSettingsAction).toHaveBeenCalledWith("server-1", [
+                { key: "MODRINTH_PROJECTS", value: "coreprotect?" }
+            ])
+        );
+    });
+
+    it("is offered from 1.20.5, and on LATEST", async () => {
+        for (const version of ["1.20.5", "1.21.4", "LATEST", ""]) {
+            cleanup();
+            paper(version);
+            expect(await screen.findByRole("button", { name: "Turn on" }), version).toBeTruthy();
+            expect(screen.queryByText(/Not available on Minecraft/), version).toBeNull();
+        }
     });
 });

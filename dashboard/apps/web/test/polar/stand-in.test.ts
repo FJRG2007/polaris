@@ -105,6 +105,14 @@ const option = (model: string, reasoning = false) => ({
 const credential = { provider: "openrouter", secret: "k", source: "own" } as never;
 const params = { prompt: [], reasoning: "low" } as never;
 
+/** A free stand-in on the same provider and key. */
+const same = (target: ReturnType<typeof fakeModel>, reasoning = true) => ({
+    model: () => target as never,
+    provider: "openrouter",
+    free: true,
+    reasoning
+});
+
 describe("the refusals a stand-in may answer", () => {
     it("reads OpenRouter's upstream 429 as busy, not as this key's rate limit", () => {
         expect(classifyProviderFailure(upstreamBusy()).kind).toBe("busy");
@@ -118,16 +126,22 @@ describe("the refusals a stand-in may answer", () => {
         expect(standInRetry(paymentRequired())).toBe(true);
         expect(standInRetry(new PaidModelError(paymentRequired()))).toBe(true);
         expect(standInRetry({ lastError: upstreamBusy() })).toBe(true);
-        expect(standInRetry(Object.assign(new Error("x"), { statusCode: 401 }))).toBe(false);
-        expect(standInRetry(Object.assign(new Error("x"), { statusCode: 500 }))).toBe(false);
+        // Only another provider may answer these (`standInFits`).
+        expect(standInRetry(Object.assign(new Error("x"), { statusCode: 401 }))).toBe(true);
+        expect(standInRetry(Object.assign(new Error("x"), { statusCode: 500 }))).toBe(true);
+        expect(standInRetry(Object.assign(new Error("x"), { statusCode: 400 }))).toBe(false);
         expect(standInRetry(new Error("socket hang up"))).toBe(false);
     });
 
     it("counts a :free model or a zero price as free, an unknown price as not", () => {
-        expect(isFreeModel({ model: "a/b:free", costInput: null })).toBe(true);
-        expect(isFreeModel({ model: "a/b", costInput: 0, costOutput: 0 })).toBe(true);
-        expect(isFreeModel({ model: "a/b", costInput: null, costOutput: null })).toBe(false);
-        expect(isFreeModel({ model: "a/b", costInput: 0, costOutput: 2 })).toBe(false);
+        const free = (provider: string, model: string, cost: number | null, out?: number | null) =>
+            isFreeModel({ provider, model, costInput: cost, costOutput: out });
+        expect(free("openrouter", "a/b:free", null)).toBe(true);
+        expect(free("groq", "a/b", 0, 0)).toBe(true);
+        expect(free("openrouter", "a/b", null, null)).toBe(false);
+        expect(free("groq", "a/b", 0, 2)).toBe(false);
+        // `:free` is OpenRouter's marker, nobody else's.
+        expect(free("groq", "a/b:free", null)).toBe(false);
     });
 });
 
@@ -135,10 +149,9 @@ describe("standInMiddleware", () => {
     it("asks the stand-in once, without a reasoning level it cannot take", async () => {
         const target = fakeModel("meta/llama:free", async () => "answer");
         const switched = vi.fn();
-        const result = await standInMiddleware(
-            { model: () => target as never, reasoning: false },
-            switched
-        ).wrapStream!({
+        const result = await standInMiddleware("openrouter", [same(target, false)], {
+            onStandIn: switched
+        }).wrapStream!({
             doStream: () => Promise.reject(upstreamBusy()),
             doGenerate: vi.fn(),
             params,
@@ -154,10 +167,9 @@ describe("standInMiddleware", () => {
     it("keeps the stand-in for the turn's later steps", async () => {
         const target = fakeModel("meta/llama:free", async () => "answer");
         const first = vi.fn(() => Promise.reject(upstreamBusy()));
-        const middleware = standInMiddleware(
-            { model: () => target as never, reasoning: true },
-            () => undefined
-        );
+        const middleware = standInMiddleware("openrouter", [same(target)], {
+            onStandIn: () => undefined
+        });
         for (let step = 0; step < 2; step++) {
             await middleware.wrapGenerate!({
                 doGenerate: first,
@@ -172,10 +184,9 @@ describe("standInMiddleware", () => {
 
     it("surfaces the stand-in's own refusal rather than asking a third time", async () => {
         const target = fakeModel("meta/llama:free", () => Promise.reject(upstreamBusy()));
-        const failure = await standInMiddleware(
-            { model: () => target as never, reasoning: true },
-            () => undefined
-        ).wrapGenerate!({
+        const failure = await standInMiddleware("openrouter", [same(target)], {
+            onStandIn: () => undefined
+        }).wrapGenerate!({
             doGenerate: () => Promise.reject(upstreamBusy()),
             doStream: vi.fn(),
             params,
@@ -187,10 +198,9 @@ describe("standInMiddleware", () => {
 
     it("leaves a refused key alone", async () => {
         const target = fakeModel("meta/llama:free", async () => "answer");
-        const failure = await standInMiddleware(
-            { model: () => target as never, reasoning: true },
-            () => undefined
-        ).wrapGenerate!({
+        const failure = await standInMiddleware("openrouter", [same(target)], {
+            onStandIn: () => undefined
+        }).wrapGenerate!({
             doGenerate: () => Promise.reject(Object.assign(new Error("x"), { statusCode: 401 })),
             doStream: vi.fn(),
             params,
@@ -261,7 +271,8 @@ describe("Automatic for a free OpenRouter account", () => {
         if (typeof resolved === "string") throw new Error(resolved);
         expect(resolved.option.model).toBe("openai/gpt-mini");
         expect(resolved.standIns?.map((entry) => entry.option.model)).toEqual([
-            "liquid/lfm-3-1.7b:free"
+            "liquid/lfm-3-1.7b:free",
+            "openai/gpt-nano"
         ]);
     });
 
@@ -300,7 +311,8 @@ describe("the helper on a free account", () => {
         const chat = { model: chatModel as never, option: option("openai/gpt-mini"), credential };
         const helper = await polarHelperModel("helper-2", chat, null);
         expect(helper.resolved.standIns?.map((entry) => entry.option.model)).toEqual([
-            "liquid/lfm-3-1.7b:free"
+            "liquid/lfm-3-1.7b:free",
+            "openai/gpt-nano"
         ]);
     });
 });

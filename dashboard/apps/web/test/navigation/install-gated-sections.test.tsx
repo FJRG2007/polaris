@@ -16,6 +16,15 @@ import { APP_SECTIONS, POLARIS_APPS, sectionOffered, type AppSection } from "@/l
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/apps/deploy" }));
 
+// The rail marks an app read through the launcher's action, which reaches the
+// server; the bell's provider does too.
+vi.mock("@/app/(app)/launcher-waiting-actions", () => ({
+    markLauncherReadAction: async () => ({})
+}));
+vi.mock("@/components/notifications/notifications-provider", () => ({
+    useHoldConversationNotices: () => () => ({ settle: () => undefined, abandon: () => undefined })
+}));
+
 const { AppSidebar } = await import("@/components/app-sidebar");
 
 const MAIL = "/mail-server";

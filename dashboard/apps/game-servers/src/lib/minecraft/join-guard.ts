@@ -27,9 +27,17 @@
  * three Fabric builds covering two releases, against twenty-two releases for the
  * mod below. Seeding it onto a Fabric server would have looked right on the page
  * and installed nothing on almost every release anybody runs.
+ *
+ * Opt-in. Nothing here puts a guard on a server that does not already carry one:
+ * a new server, a reset, a template and a change of software or release all come
+ * out with the guard only where it already was. Turning it on is the operator's
+ * call, made on the join-password card or the Mods screen. The project the
+ * plugin guard names needs Java 21, so a release older than that cannot load it
+ * and is never given it (`joinGuardFits`); a server moved onto one loses it.
  */
 
 import * as polarisLogin from "./polaris-login";
+import { versionAtLeast } from "./version-compare";
 import { anticheatMovedTo, withoutAnticheatBuild } from "./polaris-anticheat";
 import { hasSymbiote, symbioteMovedTo, withoutSymbiote } from "./symbiote";
 import { soundsHoldPlugin, soundsMovedTo } from "./sounds-env";
@@ -68,6 +76,11 @@ export interface JoinGuard {
      * `joinGuardEntry` carries, reached by a different road.
      */
     readonly replaces: readonly string[];
+    /**
+     * The oldest release `slug` loads on, or absent for every release. Only the
+     * current slug: a replaced one is left exactly as the server already had it.
+     */
+    readonly since?: readonly number[];
 }
 
 /**
@@ -80,8 +93,18 @@ export interface JoinGuard {
  * is still the better of the two states: the log is readable by whoever already
  * administers the server, while the gap this closes is a stranger who learnt a
  * name. The screen says it rather than leaving somebody to find out.
+ *
+ * Its current builds are compiled for Java 21, which Minecraft moved to at
+ * 1.20.5. On 1.20.4 and older the server runs an older Java and stops at the
+ * plugin rather than skipping it, so the floor is enforced here, not left to the
+ * image.
  */
-const PLUGIN_GUARD: JoinGuard = { slug: "simple-login", entry: "command", replaces: ["mylogin"] };
+const PLUGIN_GUARD: JoinGuard = {
+    slug: "simple-login",
+    entry: "command",
+    replaces: ["mylogin"],
+    since: [1, 20, 5]
+};
 
 /** For a server that loads mods. A data pack, so `/trigger <objective> set
  *  <number>` and nothing else - see the note above. */
@@ -111,6 +134,22 @@ export function joinGuardFor(software: string): JoinGuard | null {
 export function joinGuardEntry(software: string): string | null {
     const guard = joinGuardFor(software);
     return guard === null ? null : `${guard.slug}?`;
+}
+
+/**
+ * Whether the guard's own slug loads on this release, as the server's `VERSION`
+ * spells it. LATEST and a blank (which the image reads as LATEST) are new.
+ */
+export function joinGuardRunsOn(guard: JoinGuard, version: string): boolean {
+    if (guard.since === undefined) return true;
+    return versionAtLeast(version.trim() || "LATEST", guard.since);
+}
+
+/** The guard this software takes, or null when it takes none or this release
+ *  cannot load it. */
+export function joinGuardFits(software: string, version: string): JoinGuard | null {
+    const guard = joinGuardFor(software);
+    return guard !== null && joinGuardRunsOn(guard, version) ? guard : null;
 }
 
 /** Every slug this guard answers to on a list: its own and the ones it replaced. */
@@ -148,30 +187,74 @@ export const JOIN_GUARD_SLUGS: readonly string[] = [
  * closed: taking it off would hand a server moved to Vanilla and back again a
  * list that says nobody ever asked for a password.
  *
+ * The release counts too: a server moved to one the guard cannot load on loses
+ * it (`joinGuardFits`), because there it is not a guard but a server that does
+ * not start, and none is put on in its place.
+ *
  * Null rather than the list unchanged, so a caller can tell "nothing to do" from
  * "write this" without comparing strings - and write nothing at all in the
  * ordinary case, which is every save that is not a change of software.
  */
-export function guardMovedTo(projects: string, software: string): string | null {
+export function guardMovedTo(projects: string, software: string, version: string): string | null {
     const guard = joinGuardFor(software);
     if (guard === null) return null;
     const own = joinGuardSlugs(guard);
+    const fits = joinGuardRunsOn(guard, version);
     const entries = parseProjectList(projects);
-    const slugOf = (entry: string) => projectSlug(entry)?.toLowerCase() ?? "";
 
     // What it is on now, whichever loader it was meant for. Nothing to move if
     // the server was never closed this way.
     if (!entries.some((entry) => JOIN_GUARD_SLUGS.includes(slugOf(entry)))) return null;
 
-    const kept = entries.filter((entry) => {
-        const slug = slugOf(entry);
-        return own.includes(slug) || !JOIN_GUARD_SLUGS.includes(slug);
-    });
+    const kept = entries.filter((entry) => keepsEntry(slugOf(entry), guard, own, fits));
     // Already on the right one - including an older slug it answers to, which is
     // left exactly as written for the reason `replaces` gives.
-    const settled = kept.some((entry) => own.includes(slugOf(entry)));
+    const settled = !fits || kept.some((entry) => own.includes(slugOf(entry)));
     const next = formatProjectList(settled ? kept : [...kept, `${guard.slug}?`]);
     return next === formatProjectList(entries) ? null : next;
+}
+
+/**
+ * The list without the password project this software's release cannot load, or
+ * null when it carries none.
+ *
+ * For servers already out there, which may carry the plugin guard from when it
+ * was seeded by default onto a release it stops at boot. Only that entry comes
+ * off: whether any other guard was asked for cannot be told from here, so the
+ * rest of the list is left exactly as it is. Run by the periodic pass over every
+ * server (`adoptPolarisComponent`), written for the next start.
+ */
+export function unfitGuardRemoved(
+    projects: string,
+    software: string,
+    version: string
+): string | null {
+    const guard = joinGuardFor(software);
+    if (guard === null || joinGuardRunsOn(guard, version)) return null;
+    const entries = parseProjectList(projects);
+    const kept = entries.filter((entry) => slugOf(entry) !== guard.slug);
+    return kept.length === entries.length ? null : formatProjectList(kept);
+}
+
+/** An entry's slug, lowercased, or empty for one that names no project. */
+function slugOf(entry: string): string {
+    return projectSlug(entry)?.toLowerCase() ?? "";
+}
+
+/**
+ * Whether a list keeps this entry under this guard: anything that is not a
+ * password project, and this guard's own slugs - except its current one on a
+ * release it cannot load on.
+ */
+function keepsEntry(
+    slug: string,
+    guard: JoinGuard | null,
+    own: readonly string[],
+    fits: boolean
+): boolean {
+    if (!JOIN_GUARD_SLUGS.includes(slug)) return true;
+    if (!own.includes(slug)) return false;
+    return fits || slug !== guard?.slug;
 }
 
 /**
@@ -192,18 +275,6 @@ export function foreignLogin(projects: string): string | null {
         if (typeof slug === "string" && FOREIGN_LOGIN_SLUGS.includes(slug)) return slug;
     }
     return null;
-}
-
-/**
- * The Polaris login build a server should run by default, or null.
- *
- * Polaris login is the login wherever it has a build for the server's software
- * and release, unless the server already has a login Polaris does not manage.
- * Everywhere else the project guard above stays the answer.
- */
-export function defaultModFor(env: ReadonlyMap<string, string>): string | null {
-    if (foreignLogin(env.get(PROJECTS_KEY) ?? "") !== null) return null;
-    return polarisLogin.modFileFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? "");
 }
 
 /**
@@ -235,50 +306,71 @@ export const VERSION_KEY = "VERSION";
 export const SOFTWARE_KEY = "TYPE";
 
 /**
- * The same list with the password-on-join project on it.
+ * The same list with its password-on-join project put right for this software
+ * and release - never added to a list that has none.
  *
- * Every server gets this, rather than the operator finding the switch: a server
- * with Mojang authentication off has only a name to go on, so anybody who learns
- * a name that is on the player list can wear it. That is worth closing by
- * default, and a default is the only version of it that protects the servers
- * whose owner never opened the screen.
+ * Opt-in: a server whose list carries no password project comes out with none.
+ * Closing a server is the operator's call, made on the join-password card or the
+ * Mods screen, and this runs where Polaris decides what a server starts life
+ * with - a new one, a reset, a template - which is not them making it. A list
+ * that does carry one keeps it, moved to the project this loader loads, because
+ * that server was closed and starting again is not a request to open it.
  *
- * Appended rather than forced. An entry already naming the guard, or the project
- * it replaced, is left exactly as it was written, because a pinned version, a
+ * Kept rather than forced. An entry already naming the guard, or the project it
+ * replaced, is left exactly as it was written, because a pinned version, a
  * dropped `"?"` or an older project players already registered with is somebody
- * saying something more specific than this function knows.
+ * saying something more specific than this function knows. The exception is a
+ * release the guard cannot load on (`joinGuardFits`): there it comes off,
+ * however it was written, and nothing goes on in its place.
  *
  * A server running Polaris's own login mod (`modOn`) gets no project at all, and
  * loses any it has: that mod is its guard, and a project beside it is a second
  * login keeping its passwords somewhere else. So does a server carrying a login
  * Polaris does not manage (`foreignLogin`), for the same reason.
- *
- * A default, not a policy: this runs where Polaris decides what a server starts
- * life with - a new one, and a reset, which is a server starting again - and where
- * a server loses the mod it was closed with. Turning it off afterwards is the Mods
- * screen and the join-password card, and both write the list straight out without
- * coming through here, so an operator who takes it off keeps it off. A reset puts
- * it back, along with everything else a fresh server is given.
  */
-export function withJoinGuard(current: string, software: string, modOn = false): string {
+export function withJoinGuard(
+    current: string,
+    software: string,
+    version: string,
+    modOn = false
+): string {
+    const wasOn = parseProjectList(current).some((entry) =>
+        JOIN_GUARD_SLUGS.includes(slugOf(entry))
+    );
+    return guardedList(current, software, version, modOn, wasOn);
+}
+
+/**
+ * The same list with the guard on, where this software and release can load
+ * one - for the one path that keeps a server closed by other means: Polaris
+ * login coming off a server that had it on.
+ */
+export function withJoinGuardOn(current: string, software: string, version: string): string {
+    return guardedList(current, software, version, false, true);
+}
+
+function guardedList(
+    current: string,
+    software: string,
+    version: string,
+    modOn: boolean,
+    on: boolean
+): string {
     const none = modOn || foreignLogin(current) !== null;
     const guard = none ? null : joinGuardFor(software);
-    const wanted = none ? null : joinGuardEntry(software);
+    const fits = guard !== null && joinGuardRunsOn(guard, version);
     const own = guard === null ? [] : joinGuardSlugs(guard);
     // A password project for the other loader, whoever put it there: usually left
     // over from the software being changed, and at best a project with almost no
-    // builds for this loader. Kept, it would sit beside the guard seeded below and
-    // give players two logins, so a reset takes it off like the protection
-    // plugins stripped beside it.
-    const kept = parseProjectList(current).filter((entry) => {
-        const listed = projectSlug(entry)?.toLowerCase();
-        return (
-            typeof listed !== "string" || own.includes(listed) || !JOIN_GUARD_SLUGS.includes(listed)
-        );
-    });
-    if (wanted === null) return formatProjectList(kept);
-    const already = kept.some((entry) => own.includes(projectSlug(entry)?.toLowerCase() ?? ""));
-    return formatProjectList(already ? kept : [...kept, wanted]);
+    // builds for this loader. Kept, it would sit beside the guard moved below and
+    // give players two logins, so it comes off like the protection plugins
+    // stripped beside it.
+    const kept = parseProjectList(current).filter((entry) =>
+        keepsEntry(slugOf(entry), guard, own, fits)
+    );
+    if (guard === null || !fits || !on) return formatProjectList(kept);
+    const already = kept.some((entry) => own.includes(slugOf(entry)));
+    return formatProjectList(already ? kept : [...kept, `${guard.slug}?`]);
 }
 
 /**
@@ -296,6 +388,7 @@ export function enableLogin(
         withJoinGuard(
             input.current.get(PROJECTS_KEY) ?? "",
             input.current.get(SOFTWARE_KEY) ?? "",
+            input.current.get(VERSION_KEY) ?? "",
             true
         )
     );
@@ -310,12 +403,15 @@ export function enableLogin(
  * one that is not itself writing the project list: that save is the
  * join-password card turning the guard off, and putting it back here would make
  * that button do nothing. The current environment is read only when both hold, so
- * an ordinary save costs no extra lookup.
+ * an ordinary save costs no extra lookup. A save that writes the list itself - the
+ * Mods screen - only loses a guard its release cannot load (`unfitGuardRemoved`).
  *
  * Polaris's login mod is looked at first. It has a build per release, so a save
  * that moves the server to software or a release it has none for takes it off -
- * and then seeds the project guard of the new software, because the server was
- * closed and the save did not ask to open it.
+ * and then seeds the project guard of the new software where that release can
+ * load it, because the server was closed and the save did not ask to open it.
+ * A server already on a project guard keeps it across the move (`guardMovedTo`),
+ * and loses it on a release it cannot load on. A server with no guard gets none.
  */
 export async function guardForSave(
     vars: readonly { key: string; value: string }[],
@@ -327,12 +423,14 @@ export async function guardForSave(
     const writes = await loginGuardForSave(vars, once);
     const software = vars.find((entry) => entry.key === SOFTWARE_KEY)?.value;
     const version = vars.find((entry) => entry.key === "VERSION")?.value;
+    const projects = vars.find((entry) => entry.key === PROJECTS_KEY)?.value;
+    // A list saved by hand still never carries the guard onto a release it
+    // stops at boot.
+    if (projects !== undefined)
+        return [...writes, ...(await unfitInSaved(projects, software, version, once))];
     // Polaris's anti-cheat comes off software or a release its build does not
-    // load on, from the list as the login's own writes above leave it. Never on
-    // the card's own write.
-    if ((!software && !version) || vars.some((entry) => entry.key === PROJECTS_KEY)) {
-        return writes;
-    }
+    // load on, from the list as the login's own writes above leave it.
+    if (!software && !version) return writes;
     const current = await once();
     const nextSoftware = software || (current.get(SOFTWARE_KEY) ?? "");
     const nextVersion = version ?? current.get("VERSION") ?? "";
@@ -353,6 +451,27 @@ export async function guardForSave(
     );
     // Symbiote, off a release it does not load on.
     return overlay(afterSounds, symbioteMovedTo(nextSoftware, nextVersion, mods(afterSounds)));
+}
+
+/** The saved list without a guard its software and release cannot load, as a
+ *  write over it, or nothing when it carries none. */
+async function unfitInSaved(
+    projects: string,
+    software: string | undefined,
+    version: string | undefined,
+    readEnv: () => Promise<ReadonlyMap<string, string>>
+): Promise<{ key: string; value: string }[]> {
+    const listed = parseProjectList(projects).some((entry) =>
+        JOIN_GUARD_SLUGS.includes(slugOf(entry))
+    );
+    if (!listed) return [];
+    const current = software && version !== undefined ? null : await readEnv();
+    const cleaned = unfitGuardRemoved(
+        projects,
+        software || (current?.get(SOFTWARE_KEY) ?? ""),
+        version ?? current?.get(VERSION_KEY) ?? ""
+    );
+    return cleaned === null ? [] : [{ key: PROJECTS_KEY, value: cleaned }];
 }
 
 /** A list of writes with these keys written over, or as it was for none. */
@@ -384,14 +503,14 @@ async function loginGuardForSave(
         const after = new Map([...current, ...mod]);
         const projects = polarisLogin.loginOn(after)
             ? null
-            : withJoinGuard(current.get(PROJECTS_KEY) ?? "", nextSoftware);
+            : withJoinGuardOn(current.get(PROJECTS_KEY) ?? "", nextSoftware, nextVersion);
         const writes = [...mod].map(([key, value]) => ({ key, value }));
         return projects === null || projects === (current.get(PROJECTS_KEY) ?? "")
             ? writes
             : [...writes, { key: PROJECTS_KEY, value: projects }];
     }
-    if (!software || polarisLogin.loginOn(current)) return [];
-    const moved = guardMovedTo(current.get(PROJECTS_KEY) ?? "", software);
+    if (polarisLogin.loginOn(current)) return [];
+    const moved = guardMovedTo(current.get(PROJECTS_KEY) ?? "", nextSoftware, nextVersion);
     return moved === null ? [] : [{ key: PROJECTS_KEY, value: moved }];
 }
 
@@ -400,9 +519,9 @@ async function loginGuardForSave(
  *
  * Polaris login belongs to the server it was switched on for - its id and token
  * are that server's, and a template never copies them - so a template made from
- * such a server would otherwise hand the next one the jar and a project list with
- * no guard on it. What it remembers instead is the project guard the software
- * would have been given, so a server built from it starts closed. Polaris's
+ * such a server would otherwise hand the next one the jar. The jar comes off and
+ * no project guard goes on in its place: the password is opt-in, and a server
+ * built from the template is turned on from its own card. Polaris's
  * anti-cheat is the same: its switch and token are that server's, so its jar is
  * not carried either, and a server built from the template gets it the way any
  * new one does. Symbiote too: it is downloaded through that server's own pack
@@ -428,6 +547,13 @@ export function guardAsTemplate(env: ReadonlyMap<string, string>): Map<string, s
     copy.delete(SOUNDS_KEY);
     if (!polarisLogin.loginOn(env)) return copy;
     copy.set(polarisLogin.MODS_KEY, polarisLogin.withoutMod(copy.get(polarisLogin.MODS_KEY) ?? ""));
-    copy.set(PROJECTS_KEY, withJoinGuard(env.get(PROJECTS_KEY) ?? "", env.get(SOFTWARE_KEY) ?? ""));
+    copy.set(
+        PROJECTS_KEY,
+        withJoinGuard(
+            env.get(PROJECTS_KEY) ?? "",
+            env.get(SOFTWARE_KEY) ?? "",
+            env.get(VERSION_KEY) ?? ""
+        )
+    );
     return copy;
 }

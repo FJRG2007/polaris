@@ -35,10 +35,44 @@ describe("phone pads on the server", () => {
         expect(pads.sendRumble(opened.id, "guest", { strong: 1, weak: 1, duration: 100 })).toBe(false);
         expect(pads.sendRumble(opened.id, "owner", { strong: 1, weak: 1, duration: 100 })).toBe(true);
         expect(phone).toHaveBeenLastCalledWith({ kind: "rumble", rumble: { strong: 1, weak: 1, duration: 100 } });
-        // The game's page leaving closes the pad and tells the phone
-        stop();
-        expect(phone).toHaveBeenLastCalledWith({ kind: "closed" });
-        expect(pads.sendInput(claimed.id, claimed.token, frame)).toBe(false);
+        // The game's page leaving closes the pad and tells the phone, once it has had time to come back
+        vi.useFakeTimers();
+        try {
+            stop();
+            expect(pads.sendInput(claimed.id, claimed.token, frame)).toBe(true);
+            vi.advanceTimersByTime(pads.PAD_RECONNECT_MS);
+            expect(phone).toHaveBeenLastCalledWith({ kind: "closed" });
+            expect(pads.sendInput(claimed.id, claimed.token, frame)).toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("keeps the pad and its phone while the game's stream reconnects", () => {
+        vi.useFakeTimers();
+        try {
+            const opened = pads.openPad("owner")!;
+            const stop = pads.listenAsHost(opened.id, "owner", vi.fn())!;
+            const claimed = pads.claimPad({ code: opened.code }, { userId: "guest", name: "Guest" })!;
+            const phone = vi.fn();
+            pads.listenAsPhone(claimed.id, claimed.token, phone);
+            stop();
+            vi.advanceTimersByTime(pads.PAD_RECONNECT_MS - 1);
+            const host = vi.fn();
+            const again = pads.listenAsHost(opened.id, "owner", host)!;
+            expect(host).toHaveBeenCalledWith({ kind: "phone", connected: true, name: "Guest" });
+            vi.advanceTimersByTime(pads.PAD_RECONNECT_MS * 2);
+            expect(phone).not.toHaveBeenCalledWith({ kind: "closed" });
+            const frame = { axes: [0, 0, 0, 0], buttons: new Array(17).fill(0) };
+            expect(pads.sendInput(claimed.id, claimed.token, frame)).toBe(true);
+            expect(host).toHaveBeenLastCalledWith({ kind: "input", frame });
+            again();
+            stop();
+            vi.advanceTimersByTime(pads.PAD_RECONNECT_MS);
+            expect(phone).toHaveBeenLastCalledWith({ kind: "closed" });
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("offers one tap only to the account that opened the pad", () => {

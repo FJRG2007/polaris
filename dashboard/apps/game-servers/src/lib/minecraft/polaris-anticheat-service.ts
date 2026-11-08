@@ -21,7 +21,7 @@ import {
     modUrl,
     withMod
 } from "./polaris-login";
-import { SOFTWARE_KEY } from "./join-guard";
+import { PROJECTS_KEY, SOFTWARE_KEY, unfitGuardRemoved } from "./join-guard";
 import { PUBLIC_MOD_FILES, anticheatBundled } from "./polaris-mod-files";
 import { modToken } from "./mod-token";
 import { mapUrlRewrites } from "./maps";
@@ -207,7 +207,9 @@ export async function adoptAnticheatDefaults(): Promise<{ adopted: number }> {
  * before the address carried a key would otherwise boot from the old one, which
  * only lets a handful of downloads through. And it moves a map's `WORLD` and
  * `RESOURCE_PACK` to where this dashboard serves them (`mapUrlRewrites`), when
- * Polaris wrote them and they name anywhere else.
+ * Polaris wrote them and they name anywhere else. And it takes the join password
+ * plugin off a server on a release that plugin stops at boot
+ * (`unfitGuardRemoved`) - the one password project Polaris removes on its own.
  */
 export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
     const baseUrl = await publicAppUrl().catch(() => null);
@@ -224,7 +226,9 @@ export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
         where: {
             scopeType: "application",
             scopeId: { in: installs.map((install) => install.applicationId!) },
-            key: { in: [MODS_KEY, SOFTWARE_KEY, "VERSION", "WORLD", "RESOURCE_PACK"] }
+            key: {
+                in: [MODS_KEY, PROJECTS_KEY, SOFTWARE_KEY, "VERSION", "WORLD", "RESOURCE_PACK"]
+            }
         },
         select: { scopeId: true, key: true, value: true }
     });
@@ -252,6 +256,13 @@ export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
             value,
             isSecret: false
         }));
+        const projects = unfitGuardRemoved(
+            env.get(PROJECTS_KEY) ?? "",
+            env.get(SOFTWARE_KEY) ?? "",
+            env.get("VERSION") ?? ""
+        );
+        if (projects !== null)
+            rewrites.push({ key: PROJECTS_KEY, value: projects, isSecret: false });
         if (wanted === mods && rewrites.length === 0) continue;
         try {
             await setEnvVars("application", install.applicationId!, install.ownerId, [
