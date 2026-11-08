@@ -60,7 +60,13 @@ import type { InventoryItem } from "../../lib/minecraft/inventory";
 import { DIFFICULTIES, isDifficulty } from "../../lib/minecraft/rules";
 import { setGameSchedule } from "../../lib/minecraft/schedule-service";
 import { readMinecraftStats } from "../../lib/minecraft/stats-service";
-import { guardForSave, PROJECTS_KEY, SOFTWARE_KEY } from "../../lib/minecraft/join-guard";
+import {
+    guardForSave,
+    joinGuardFor,
+    joinGuardRunsOn,
+    PROJECTS_KEY,
+    SOFTWARE_KEY
+} from "../../lib/minecraft/join-guard";
 import { setGameHostname, setGameRouted } from "../../lib/minecraft/address";
 import { liftTimeout, timeoutPlayer } from "../../lib/minecraft/timeout-service";
 import { EXPERIENCE_UNITS, MAX_EXPERIENCE } from "../../lib/minecraft/experience";
@@ -2524,8 +2530,15 @@ export async function projectFitsAction(input: {
         const { access } = await requireGameServer("games.manage", parsed.data.installedAppId);
         if (!access.install.applicationId) return { fits: true };
         const env = await listEnvVars("application", access.install.applicationId, access.ownerId);
-        const loader = loaderForType(env.find((entry) => entry.key === SOFTWARE_KEY)?.value ?? "");
+        const software = env.find((entry) => entry.key === SOFTWARE_KEY)?.value ?? "";
+        const loader = loaderForType(software);
         const version = env.find((entry) => entry.key === "VERSION")?.value ?? "";
+        // A password project lists builds for releases it stops at boot on, so
+        // its own floor is asked first rather than left to Modrinth.
+        const guard = joinGuardFor(software);
+        if (guard?.slug === parsed.data.slug.toLowerCase() && !joinGuardRunsOn(guard, version)) {
+            return { fits: false, version };
+        }
         if (!loader || wantsLatest(version)) return { fits: true };
         return {
             fits: !knownUnsupported(await commonVersions([parsed.data.slug], loader), version),
