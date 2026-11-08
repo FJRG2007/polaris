@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { LAMP_GLOW } from './player-rules.js';
 import { cityUniforms } from './tsl-materials.js';
 import {
   Fn,
@@ -1848,9 +1849,10 @@ function createLoftedCarMaterial(spec, fixedColorHex = null) {
       If(p.z.greaterThan(frontZone).and(n.z.greaterThan(0.02)), () => {
         const { turnFront, headlightLens, drl } = headlightMasks();
         const headlamps = color(0xfff8ec)
-          .mul(headlightLens.mul(nightHeadlamp.mul(1.35).add(1.45)).add(drl.mul(nightHeadlamp.mul(0.75).add(1.65))))
+          .mul(headlightLens.mul(mix(float(LAMP_GLOW.headDay), float(LAMP_GLOW.headNight), nightHeadlamp))
+            .add(drl.mul(mix(float(LAMP_GLOW.drlDay), float(LAMP_GLOW.drlNight), nightHeadlamp))))
           .mul(one.sub(max(turnFront, drl).mul(blink)));
-        const turn = color(0xff9812).mul(max(turnFront, drl.mul(0.75)).mul(blink).mul(2.4));
+        const turn = color(0xff6a00).mul(max(turnFront, drl.mul(0.75)).mul(blink).mul(LAMP_GLOW.turn));
         emit.assign(headlamps.add(turn));
       }).ElseIf(p.z.lessThan(rearZone).and(n.z.lessThan(-0.02)), () => {
         const { tailLens, turnRearSection, reverseRearSection, ledBar: ledBarMask } = taillightMasks();
@@ -1858,10 +1860,13 @@ function createLoftedCarMaterial(spec, fixedColorHex = null) {
         const redArea = tailLens.mul(one.sub(max(turnRearSection, reverseRearSection)));
         const ledBar = ledBarMask.mul(redArea);
         const redLens = max(redArea.mul(0.58), ledBar);
-        const tail = color(0xff0c16).mul(redLens.mul(brake.mul(2.3).add(nightHeadlamp.mul(0.55)).add(0.24)));
-        const turn = color(0xff9812).mul(turnRear.mul(blink).mul(2.4));
+        // Running light on the red sections only; braking lights the whole lens so it reads by area as well as level
+        const brakeLens = max(redLens, tailLens.mul(0.58));
+        const tail = color(0xff0c16).mul(redLens.mul(nightHeadlamp.mul(LAMP_GLOW.tailNight).add(LAMP_GLOW.tail))
+          .add(brakeLens.mul(brake.mul(LAMP_GLOW.brake))));
+        const turn = color(0xff6a00).mul(turnRear.mul(blink).mul(LAMP_GLOW.turn));
         let rearEmit = tail.add(turn);
-        if (fixed) rearEmit = rearEmit.add(color(0xf0f6ff).mul(tailLens).mul(reverseRearSection).mul(state.w).mul(1.8));
+        if (fixed) rearEmit = rearEmit.add(color(0xf0f6ff).mul(tailLens).mul(reverseRearSection).mul(state.w).mul(LAMP_GLOW.reverse));
         emit.assign(rearEmit);
       });
     }).ElseIf(isSign.greaterThan(0.5), () => {
@@ -1873,7 +1878,7 @@ function createLoftedCarMaterial(spec, fixedColorHex = null) {
         const rear = polygonEdge(ax, p.z, rearGlassPlanes, 0.085, fwX, fwZ);
         return cov(rear.d, rear.w);
       });
-      emit.assign(color(0xff0c16).mul(chmsl.mul(2.3)));
+      emit.assign(color(0xff0c16).mul(chmsl.mul(LAMP_GLOW.chmsl)));
     });
     return emit;
   });

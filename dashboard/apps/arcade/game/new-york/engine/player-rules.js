@@ -89,6 +89,24 @@ function hudReadout(value, format = String) {
 // per-instance state changes only when a car starts or stops braking, not every frame.
 const BRAKE_LAMP = { slowing: 1, holding: 1, slowingAt: -0.8, standingBelow: 0.3 };
 
+// Emissive radiance of each vehicle lamp, in the scene-linear units the car and bus materials multiply their lens
+// colour by. ACES turns a red lamp salmon and then white once its radiance passes ~1.5, so a brighter lamp is not a
+// more visible one: brake and tail are told apart by level (dim red against full red) and by area (a braking car
+// lights its whole rear lens, turn and reverse sections included), not by pushing the red past its hue. Night only
+// adds to the running and head lamps.
+const LAMP_GLOW = Object.freeze({
+  tail: 0.5,          // tail lamps, always on (a dim, saturated red)
+  tailNight: 0.4,     // added to the tail lamps after dark
+  brake: 2.6,         // added across the whole rear lens while braking
+  chmsl: 3,           // centre high-mount stop lamp, while braking
+  turn: 3,            // amber indicators, front and rear, during the lit half of a blink
+  reverse: 3,         // white reversing lamps while rolling backwards
+  headDay: 2.4,       // headlamp lenses by day (daytime running)
+  headNight: 3.6,     // headlamp lenses after dark
+  drlDay: 3,          // daytime running light blade by day
+  drlNight: 3.4       // daytime running light blade after dark
+});
+
 /** The brake lamp level for a traffic vehicle's acceleration (m/s^2) and speed (m/s). */
 function brakeLamp(acceleration, speed) {
   if (acceleration < BRAKE_LAMP.slowingAt) return BRAKE_LAMP.slowing;
@@ -418,7 +436,7 @@ const KEY_BINDINGS = Object.freeze({
 });
 
 export {
-  BODY_MOTION, KEY_BINDINGS, BRAKE_LAMP, HELI_CRUISE_SPEED, HELI_TURBO, LOOK_SENSITIVITY, PERSON_CAMERA, PERSON_MOVE, TURN_SIGNAL,
+  BODY_MOTION, KEY_BINDINGS, BRAKE_LAMP, HELI_CRUISE_SPEED, LAMP_GLOW, HELI_TURBO, LOOK_SENSITIVITY, PERSON_CAMERA, PERSON_MOVE, TURN_SIGNAL,
   approachVelocity, arrivalFor, bodyIsFinite, brakeLamp, cameraRelativeMove, clampSensitivity, clearLength,
   createJumpState, createTurnSignal, heliTopSpeed, hudReadout, lookCurve, lookDirection, personCameraPose,
   playerBrakeLamp, rayEntersCollider, settleBody, slideVelocity, springArm, stepArm, stepJump, stepTurbo, stepTurnSignal,
