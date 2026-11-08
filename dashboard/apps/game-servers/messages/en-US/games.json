@@ -1027,6 +1027,11 @@
                 "summary": "One block in the void that turns into the next when you break it. Installs OneBlock.",
                 "setup": "Polaris places the first block once the plugin has loaded, and each player lands on a block of their own."
             },
+            "oneblock-classic": {
+                "name": "OneBlock classic",
+                "summary": "One block in the void that climbs ten phases, from plains to the End.",
+                "setup": "Polaris places the first block and swaps in the ten phases once the plugin has loaded. Each player lands on a block of their own."
+            },
             "parkour": {
                 "name": "Infinite parkour",
                 "summary": "A course that generates as you run it, with times to beat.",
@@ -1040,7 +1045,7 @@
             "luckyblock": {
                 "name": "Lucky blocks",
                 "summary": "Break a block, take what it gives you, hope it was not the bad one.",
-                "setup": "Lucky blocks turn up across the world, and anyone can craft one from eight gold ingots around a quartz. No mod or resource pack needed to join."
+                "setup": "Lucky blocks turn up across the world, and anyone can craft one from eight gold ingots around a quartz. Everyone starts with three. No mod or resource pack needed to join."
             },
             "shrinking-world": {
                 "name": "Shrinking world",

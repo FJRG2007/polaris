@@ -33,6 +33,7 @@ import { parseMemoryMb } from "./games-service";
 import { DEFAULT_LEVEL_TYPE } from "./minecraft/world";
 import { SKYBLOCK_ISLANDS_KEY, SKYBLOCK_ISLANDS_TRIES_KEY } from "./minecraft/skyblock-islands";
 import { ONEBLOCK_READY_KEY, ONEBLOCK_TRIES_KEY } from "./minecraft/oneblock";
+import { ONEBLOCK_PHASES_KEY } from "./minecraft/oneblock-phases";
 import type { ResetMinecraftServerInput } from "./games-schema";
 import { parseProjectList, projectSlug } from "./minecraft/modrinth";
 import {
@@ -203,7 +204,10 @@ export async function resetMinecraftServer(
         [SKYBLOCK_ISLANDS_TRIES_KEY]: 0,
         // And whether OneBlock has been told where this new world's first block goes.
         [ONEBLOCK_READY_KEY]: null,
-        [ONEBLOCK_TRIES_KEY]: null
+        [ONEBLOCK_TRIES_KEY]: null,
+        // And whether the classic phases have been written, so a reset onto them
+        // writes them even when the server ran them once before.
+        [ONEBLOCK_PHASES_KEY]: null
     });
 
     // And the worlds this server will not be able to open.

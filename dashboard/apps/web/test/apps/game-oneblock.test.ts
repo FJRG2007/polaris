@@ -10,6 +10,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as oneblock from "@polaris-app/game-servers/src/lib/minecraft/oneblock";
+import * as phases from "@polaris-app/game-servers/src/lib/minecraft/oneblock-phases";
 import { FLAT_LEVEL_TYPE } from "@polaris-app/game-servers/src/lib/minecraft/world";
 import { findBlueprint } from "@polaris-app/game-servers/src/lib/minecraft/blueprints";
 import { forgetModrinthAnswers } from "@polaris-app/game-servers/src/lib/minecraft/modrinth";
@@ -24,6 +25,8 @@ let install = { config: "{}" };
 let file: string | null = null;
 /** Every batch of console lines the server was sent. */
 let sent: string[][] = [];
+/** Every file written onto the server, by path. */
+let written: Map<string, string> = new Map();
 
 vi.mock("@/lib/apps/install-config", async (importOriginal) => {
     const real = await importOriginal<typeof import("@/lib/apps/install-config")>();
@@ -50,7 +53,10 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
-    readContainerFile: async () => file
+    readContainerFile: async () => file,
+    writeContainerFile: async (_server: unknown, path: string, content: string) => {
+        written.set(path, content);
+    }
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/mod-announcements-service", () => ({
@@ -64,6 +70,7 @@ beforeEach(() => {
     install = { config: JSON.stringify({ blueprintId: "oneblock" }) };
     file = null;
     sent = [];
+    written = new Map();
     forgetModrinthAnswers();
     vi.stubGlobal("fetch", async (url: string) => ({
         ok: true,
@@ -190,5 +197,84 @@ describe("setting it up from the walk", () => {
         file = BUNDLED;
         await applyOneBlockSetup("owner", "app", JSON.stringify({ blueprintId: "skyblock" }));
         expect(sent).toEqual([]);
+    });
+});
+
+describe("the classic phases", () => {
+    /** The file parsed the way the plugin reads it: level key -> its list. */
+    function levels(text: string): Map<string, string[]> {
+        const out = new Map<string, string[]>();
+        let current: string[] | null = null;
+        for (const line of text.split("\n")) {
+            const head = /^'(\d+)':$/.exec(line);
+            if (head?.[1]) out.set(head[1], (current = []));
+            else if (line.startsWith("- ") && current) current.push(line.slice(2));
+            else if (line.startsWith("  weight: ") && current) current[current.length - 1] += ` x${line.slice(10)}`;
+        }
+        return out;
+    }
+
+    it("is a blueprint of its own on the same plugin and void", () => {
+        const plain = findBlueprint("oneblock");
+        const classic = findBlueprint("oneblock-classic");
+        expect(classic?.projects).toEqual(plain?.projects);
+        expect(classic?.env).toEqual(plain?.env);
+        expect(classic?.levelType).toBe(FLAT_LEVEL_TYPE);
+    });
+
+    it("walks ten phases from plains to the End, each a level with a name, colour and length", () => {
+        const file = levels(phases.phasesFile());
+        expect([...file.keys()]).toEqual(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
+        expect(file.get("0")?.slice(0, 3)).toEqual(["'Level: 0 - Plains'", "GREEN", "100"]);
+        expect(file.get("9")?.[0]).toBe("'Level: 9 - The End'");
+    });
+
+    it("is never a file the plugin takes for its legacy schema and rewrites", () => {
+        const text = phases.phasesFile();
+        // Legacy is a scalar MaxLevel or a bare-string pool entry.
+        expect(text).toMatch(/\nMaxLevel:\n$/);
+        for (const entries of levels(text).values())
+            for (const entry of entries.slice(3)) expect(entry).toMatch(/^(block|mob|chest): [A-Z_a-z]+ x\d+$/);
+    });
+
+    it("names only the chests the plugin ships", () => {
+        const chests = [...phases.phasesFile().matchAll(/chest: (\w+)/g)].map((m) => m[1]);
+        expect(new Set(chests)).toEqual(new Set(["small_chest", "medium_chest", "high_chest"]));
+    });
+
+    it("weights each phase's own blocks to at least half of the pool it draws from", () => {
+        // The plugin's pools are cumulative, so without weights the End is mostly grass.
+        let pool = 0;
+        for (const phase of phases.CLASSIC_PHASE_LIST) {
+            const weight = phases.ownWeight(pool, phase.blocks.length);
+            const own = weight * phase.blocks.length;
+            expect(own * 2).toBeGreaterThanOrEqual(pool + own);
+            pool += own + (phase.chest ? Math.max(1, Math.round(weight / 4)) : 0);
+        }
+    });
+
+    it("is written once the plugin has loaded, then reloaded, then left to the operator", async () => {
+        install = { config: JSON.stringify({ blueprintId: "oneblock-classic" }) };
+        await applyOneBlockSetup("owner", "app", install.config);
+        expect(written.size).toBe(0);
+
+        file = BUNDLED;
+        await applyOneBlockSetup("owner", "app", install.config);
+        expect(written.get(phases.ONEBLOCK_BLOCKS_PATH)).toBe(phases.phasesFile());
+        expect(sent).toEqual([["ob reload"], oneblock.setupLines("world")]);
+        expect(JSON.parse(install.config).oneblockPhases).toBe("classic");
+
+        written.clear();
+        file = CONFIGURED;
+        await applyOneBlockSetup("owner", "app", install.config);
+        expect(written.size).toBe(0);
+        expect(JSON.parse(install.config).oneblockReady).toBe(true);
+    });
+
+    it("is never written on a plain OneBlock server", async () => {
+        file = BUNDLED;
+        await applyOneBlockSetup("owner", "app", install.config);
+        expect(written.size).toBe(0);
+        expect(sent).toEqual([oneblock.setupLines("world")]);
     });
 });

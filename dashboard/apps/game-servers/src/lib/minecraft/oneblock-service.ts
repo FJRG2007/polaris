@@ -10,11 +10,12 @@
  */
 
 import * as oneblock from "./oneblock";
+import * as phases from "./oneblock-phases";
 import { host } from "@polaris/app-host";
 import { BLUEPRINT_KEY } from "../games-create";
 import { withServerContainer } from "./service";
 import { levelOf } from "./mod-announcements-service";
-import { readContainerFile } from "../container-files";
+import { readContainerFile, writeContainerFile } from "../container-files";
 
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 
@@ -28,7 +29,10 @@ export async function applyOneBlockSetup(
     config: string | null
 ): Promise<void> {
     const stored = readInstallConfig(config);
-    if (stored[BLUEPRINT_KEY] !== oneblock.ONEBLOCK_BLUEPRINT_ID) return;
+    const blueprintId = stored[BLUEPRINT_KEY];
+    if (typeof blueprintId !== "string" || !oneblock.ONEBLOCK_BLUEPRINT_IDS.includes(blueprintId)) return;
+    if (blueprintId === oneblock.ONEBLOCK_CLASSIC_BLUEPRINT_ID && stored[phases.ONEBLOCK_PHASES_KEY] !== phases.CLASSIC_PHASES)
+        await applyClassicPhases(ownerId, installedAppId);
     if (stored[oneblock.ONEBLOCK_READY_KEY] === true) return;
     const previous = stored[oneblock.ONEBLOCK_WORLD_KEY];
     const outcome = await withServerContainer(ownerId, installedAppId, async (server) => {
@@ -61,4 +65,25 @@ export async function applyOneBlockSetup(
             ? { [oneblock.ONEBLOCK_READY_KEY]: true, [oneblock.ONEBLOCK_TRIES_KEY]: 0 }
             : { [oneblock.ONEBLOCK_TRIES_KEY]: tries }
     );
+}
+
+/**
+ * Put the classic phases in place of the plugin's own levels, once.
+ *
+ * Waits for the plugin's settings file, the sign that it has loaded and written
+ * its bundled levels, so this one replaces them rather than being replaced. Then
+ * the plugin is told to read its files again. Recorded the moment the file is
+ * written: from then on the levels are the operator's to change, and a server
+ * whose console missed the reload picks them up on its next start anyway.
+ */
+async function applyClassicPhases(ownerId: string, installedAppId: string): Promise<void> {
+    const written = await withServerContainer(ownerId, installedAppId, async (server) => {
+        if (!server.running) return false;
+        if ((await readContainerFile(server, oneblock.ONEBLOCK_CONFIG_PATH)) === null) return false;
+        await writeContainerFile(server, phases.ONEBLOCK_BLOCKS_PATH, phases.phasesFile());
+        await server.sayAll(["ob reload"]);
+        return true;
+    });
+    if (written)
+        await patchInstallConfig(installedAppId, { [phases.ONEBLOCK_PHASES_KEY]: phases.CLASSIC_PHASES });
 }

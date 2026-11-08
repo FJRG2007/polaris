@@ -262,10 +262,14 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         archive: "luckyblock-towers.zip",
         sha256: "9c86023e637b4aae3a291932b395f3cd4b65db89d2bb646499d0e9946981a310",
         bytes: 2170584,
-        // Command blocks only, and every command in them is the modern syntax -
-        // no items are given with NBT, which is the change that breaks maps of
-        // this age - so it plays on the current release.
-        minecraft: { version: "1.13", policy: "from" },
+        // Pinned to the last release its command blocks run on. The lucky blocks
+        // are sponges in an adventure world, and the only thing that breaks one is
+        // the shears a command block hands out with
+        // `replaceitem entity @a hotbar.4 shears{CanDestroy:["sponge"]}` - a
+        // command the game dropped in 1.17, giving an item tag it dropped in
+        // 1.20.5. On anything newer the shears never arrive and nothing on the map
+        // can be broken. 1.16.5 is the last release that still has both.
+        minecraft: { version: "1.16.5", policy: "exact" },
         players: { min: 1, max: 12 },
         env: { ...MAP_BASE_ENV, MODE: "adventure", DIFFICULTY: "normal", PVP: "true" },
         // Written in 1.13, three releases before a world could say how it was made,

@@ -132,6 +132,22 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         weight: "light"
     },
     {
+        id: "oneblock-classic",
+        name: gameMessage("games", "lib.blueprints.oneblock-classic.name"),
+        summary: gameMessage("games", "lib.blueprints.oneblock-classic.summary"),
+        editions: ["java"],
+        software: "PAPER",
+        projects: ["oneblock_bukkit"],
+        // The same plugin and void as OneBlock; what changes is the ladder the
+        // block climbs, which Polaris writes over the plugin's own levels once it
+        // has loaded (see `oneblock-phases.ts`).
+        levelType: FLAT_LEVEL_TYPE,
+        env: { GENERATOR_SETTINGS: VOID_GENERATOR_SETTINGS },
+        setup: gameMessage("games", "lib.blueprints.oneblock-classic.setup"),
+        docs: "https://github.com/MrMarL/OneBlock",
+        weight: "light"
+    },
+    {
         id: "parkour",
         name: gameMessage("games", "lib.blueprints.parkour.name"),
         summary: gameMessage("games", "lib.blueprints.parkour.summary"),

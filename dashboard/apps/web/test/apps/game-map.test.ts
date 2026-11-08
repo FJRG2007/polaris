@@ -211,6 +211,16 @@ describe("building a server on a map", () => {
         );
     });
 
+    it("holds Luckyblock Towers to the last release its shears can break a lucky block on", async () => {
+        // Its command blocks hand out the only tool that breaks the sponges with
+        // replaceitem and a CanDestroy tag; neither exists after 1.16.
+        const env = await envFor("luckyblock", "luckyblock-towers");
+        expect(env.get("VERSION")).toBe("1.16.5");
+        expect(await rejection(envFor("luckyblock", "luckyblock-towers", {}, "1.21.4"))).toMatch(
+            /only plays on Minecraft 1\.16\.5/
+        );
+    });
+
     it("takes the newest release for a map that only brings terrain", async () => {
         // Skyblock 2.1 is a world and a chest, with no commands of its own to go
         // out of date, so nothing here should hold it to 1.16.
