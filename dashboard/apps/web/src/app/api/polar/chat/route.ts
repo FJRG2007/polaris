@@ -77,10 +77,16 @@ import {
     type PolarHelper
 } from "@/lib/polar/helper-model";
 import { fenceSummary, splitAtCompaction } from "@/lib/polar/compaction";
-import { noteProviderFailure, turnSignals } from "@/lib/polar/automatic";
+import { turnSignals } from "@/lib/polar/automatic";
 import { answerUsage, stepContext, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
-import { answeredBy, polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
+import {
+    answeredBy,
+    polarModelOptions,
+    reasoningFor,
+    rememberRefusal,
+    resolvePolarModel
+} from "@/lib/polar/models";
 import { POLAR_RUNS_MAX, beginPolarRun } from "@/lib/polar/runs";
 import { GOAL_CONDITION_MAX, goalHasRoom, goalTurnOf } from "@/lib/polar/goals";
 import { goalCheckStream } from "@/lib/polar/goal-service";
@@ -526,16 +532,19 @@ export async function POST(request: Request): Promise<Response> {
         // The provider's refusal is classified and named, never forwarded: its
         // body is the provider's own words about the account it belongs to.
         onError: (error) => {
-            // Automatic tries this provider last for a few minutes.
-            noteProviderFailure(user.id, resolved.option.provider);
+            // The model that last answered refused: a stand-in's own refusal
+            // names the stand-in. Automatic tries that provider last for a few
+            // minutes, and one out of credit only for its free models.
+            const { option, credential } = answeredBy(resolved);
             const failure = classifyProviderFailure(error);
-            console.warn(failureLogLine("a turn", resolved.option.providerName, failure));
+            rememberRefusal(user.id, option.provider, failure.kind);
+            console.warn(failureLogLine("a turn", option.providerName, failure));
             return encodePolarFailure({
                 code: "provider",
                 kind: failure.kind,
-                provider: resolved.option.providerName,
-                slug: resolved.option.provider,
-                payer: resolved.credential.source
+                provider: option.providerName,
+                slug: option.provider,
+                payer: credential.source
             });
         }
     });
