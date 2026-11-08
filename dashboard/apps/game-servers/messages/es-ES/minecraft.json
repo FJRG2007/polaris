@@ -1880,6 +1880,11 @@
                 "label": "Pilares",
                 "summary": "Cada jugador que se une empieza solo en lo alto de un pilar de piedra, en un anillo sobre el vacío. Cada pocos segundos todos reciben un objeto al azar: bloques, armas, perlas, pociones y más. Tiende puentes, tira a los demás y sé el último en pie. Caer o morir solo te deja fuera: las cosas de cada uno se guardan y se devuelven.",
                 "unit": "puntos"
+            },
+            "knockback-brawl": {
+                "label": "Empujones",
+                "summary": "Todos los que se apuntan empiezan en una plataforma en el cielo, cada uno con un Palo con Empuje que empuja tanto como marque el evento, hasta nivel 255. Echa a los demás por el borde: quien cae queda fuera y mira desde arriba, y gana el último que quede en la plataforma. Si se acaba el tiempo antes, gana quien más derribos lleve de los que siguen en pie. Nadie recibe daño de verdad y nadie pierde nada suyo.",
+                "unit": "puntos"
             }
         },
         "triggers": {
@@ -2629,7 +2634,9 @@
         "voidAfter": "El vacío sube tras (min)",
         "voidAfterHint": "De 0 a 15; 0 nunca, puede durar todo",
         "pillarMiddle": "Plataforma en el centro",
-        "pillarTwists": "Giros al azar en la partida"
+        "pillarTwists": "Giros al azar en la partida",
+        "knockbackLevel": "Nivel de empuje",
+        "knockbackLevelHint": "De 1 a 255. 5 empuja fuerte; 255 es extremo."
     },
     "moderation": {
         "announcements": {

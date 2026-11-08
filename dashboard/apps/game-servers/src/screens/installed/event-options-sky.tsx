@@ -735,6 +735,39 @@ export function TugOfWarFields({
     );
 }
 
+export function KnockbackBrawlFields({
+    value,
+    onChange,
+    issues
+}: {
+    value: catalog.EventOptions<"knockback-brawl">;
+    onChange: (options: catalog.EventOptions<"knockback-brawl">) => void;
+    issues: Issues;
+}) {
+    const t = useGameText("minecraft");
+    return (
+        <>
+            <NumberField
+                label={t("editor.knockbackLevel")}
+                hint={t("editor.knockbackLevelHint")}
+                min={1}
+                max={255}
+                value={value.knockback}
+                onChange={(knockback) => onChange({ ...value, knockback })}
+                issues={issues}
+                field="knockback"
+            />
+            <PlaceField
+                value={value.place}
+                onChange={(place) => onChange({ ...value, place })}
+                what={t("editor.place.arena")}
+                issues={issues}
+                path={["options", "place"]}
+            />
+        </>
+    );
+}
+
 export function ImpostorFields({
     value,
     onChange,

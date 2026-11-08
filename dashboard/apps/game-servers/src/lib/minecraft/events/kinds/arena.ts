@@ -363,7 +363,7 @@ export function clearMarked(name: string, id: string, marker: Marker): string {
 }
 
 /** How a marked item reads in an item entity's `Item`. */
-function markedItem(marker: Marker): string {
+export function markedItem(marker: Marker): string {
     return marker === "components"
         ? `{components:{"minecraft:custom_data":{${MARK}}}}`
         : `{tag:{${MARK}}}`;

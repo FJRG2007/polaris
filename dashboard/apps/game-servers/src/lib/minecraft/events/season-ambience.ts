@@ -37,7 +37,8 @@ export const AMBIENT_KINDS: ReadonlySet<EventKind> = new Set<EventKind>([
     "tnt-run",
     "glass-bridge",
     "sky-wars",
-    "pillars"
+    "pillars",
+    "knockback-brawl"
 ]);
 
 /** How often the particles are drawn, whatever a kind's tick. */

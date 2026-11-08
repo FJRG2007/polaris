@@ -66,7 +66,8 @@ export const EVENT_KINDS = [
     "impostor",
     "glass-bridge",
     "tug-of-war",
-    "pillars"
+    "pillars",
+    "knockback-brawl"
 ] as const;
 
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -993,6 +994,17 @@ export const optionsSchemas = {
             .min(0, problem("atLeast", { count: 0 }))
             .max(15, problem("atMost", { count: 15 }))
             .default(PILLARS_VOID_AFTER)
+    }),
+    "knockback-brawl": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        /** The Knockback level on everybody's stick: 255 sends a player out of
+         *  sight with one blow. */
+        knockback: z
+            .number()
+            .int()
+            .min(1, problem("atLeast", { count: 1 }))
+            .max(255, problem("atMost", { count: 255 }))
+            .default(5)
     })
 } as const satisfies Record<EventKind, z.ZodTypeAny>;
 
@@ -1151,6 +1163,10 @@ export const presetSchema = z
         presetBase.extend({
             kind: z.literal("pillars"),
             options: optionsSchemas["pillars"]
+        }),
+        presetBase.extend({
+            kind: z.literal("knockback-brawl"),
+            options: optionsSchemas["knockback-brawl"]
         })
     ])
     .superRefine((value, context) => {
@@ -1234,7 +1250,7 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 15;
+export const DEFAULTS_VERSION = 16;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
@@ -1284,7 +1300,8 @@ const KIND_SINCE: Partial<Readonly<Record<EventKind, number>>> = {
     impostor: 11,
     "glass-bridge": 12,
     "tug-of-war": 13,
-    pillars: 14
+    pillars: 14,
+    "knockback-brawl": 16
 };
 
 export const settingsSchema = z.object({
@@ -1387,7 +1404,8 @@ export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, st
     impostor: { en: "Impostor", es: "Impostor" },
     "glass-bridge": { en: "Glass bridge", es: "Puente frágil" },
     "tug-of-war": { en: "Tug of war", es: "Tira y afloja" },
-    pillars: { en: "Pillars", es: "Pilares" }
+    pillars: { en: "Pillars", es: "Pilares" },
+    "knockback-brawl": { en: "Knockback brawl", es: "Empujones" }
 };
 
 /** What an event of each kind is. Its name and summary on a screen are the
@@ -1551,6 +1569,10 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
     pillars: {
         unit: "points",
         competitive: true
+    },
+    "knockback-brawl": {
+        unit: "points",
+        competitive: true
     }
 };
 
@@ -1684,7 +1706,8 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     impostor: STANDARD,
     "glass-bridge": QUICK,
     "tug-of-war": QUICK,
-    pillars: HARD
+    pillars: HARD,
+    "knockback-brawl": QUICK
 };
 
 /** The names a king of the ring was given by default while it was a hill, and
@@ -1740,7 +1763,8 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
     impostor: 15,
     "glass-bridge": 10,
     "tug-of-war": 4,
-    pillars: 5
+    pillars: 5,
+    "knockback-brawl": 5
 };
 
 /** What every kind ran for before `DEFAULT_MINUTES`: an event still on exactly
@@ -2235,7 +2259,8 @@ export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
     impostor: 10,
     "glass-bridge": 1,
     "tug-of-war": 10,
-    pillars: 1
+    pillars: 1,
+    "knockback-brawl": 1
 };
 
 /** Whether the minimum is something an operator can set for this event. A
@@ -2390,6 +2415,7 @@ export function readyToPlay(run: {
         case "impostor":
         case "glass-bridge":
         case "tug-of-war":
+        case "knockback-brawl":
             // The arena writes its own start when everybody is in it.
             return run.readyAt !== null;
         default:
@@ -2533,6 +2559,7 @@ export function playsInArena(preset: EventPreset): boolean {
         preset.kind === "impostor" ||
         preset.kind === "glass-bridge" ||
         preset.kind === "tug-of-war" ||
+        preset.kind === "knockback-brawl" ||
         hillFistsOnly(preset)
     );
 }
@@ -2571,7 +2598,9 @@ export function acidParts(score: number): { place: number; dry: number } {
 }
 
 export function stashesFirst(preset: EventPreset): boolean {
-    return preset.kind === "sky-wars" || preset.kind === "pillars";
+    return (
+        preset.kind === "sky-wars" || preset.kind === "pillars" || preset.kind === "knockback-brawl"
+    );
 }
 
 export { versionAtLeast };
@@ -2654,7 +2683,12 @@ export function needsVersion(preset: EventPreset): readonly number[] | null {
 /** Played in an arena until one player is left: ranked by the order they went
  *  out in, so anybody who took part at all is ranked. */
 export function lastStanding(preset: EventPreset): boolean {
-    return preset.kind === "hot-potato" || preset.kind === "sky-wars" || preset.kind === "pillars";
+    return (
+        preset.kind === "hot-potato" ||
+        preset.kind === "sky-wars" ||
+        preset.kind === "pillars" ||
+        preset.kind === "knockback-brawl"
+    );
 }
 
 /**
@@ -2761,7 +2795,8 @@ export const WORLD_NEEDS: Readonly<Record<EventKind, WorldNeeds>> = {
     impostor: { time: "day", weather: "clear" },
     "glass-bridge": { time: "day", weather: "clear" },
     "tug-of-war": { time: "day", weather: "clear" },
-    pillars: { time: "day", weather: "clear" }
+    pillars: { time: "day", weather: "clear" },
+    "knockback-brawl": { time: "day", weather: "clear" }
 };
 
 export function worldNeeds(preset: Pick<EventPreset, "kind">): WorldNeeds {
@@ -2820,6 +2855,7 @@ export function needsPvp(preset: EventPreset): boolean {
         preset.kind === "hot-potato" ||
         preset.kind === "sky-wars" ||
         preset.kind === "pillars" ||
+        preset.kind === "knockback-brawl" ||
         preset.kind === "impostor" ||
         hillFistsOnly(preset)
     );
