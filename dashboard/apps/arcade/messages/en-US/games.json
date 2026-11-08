@@ -6,6 +6,7 @@
     "multiplayer": "Play together in calls",
     "solo": "On your own",
     "loading": "Loading {game}",
+    "loadingInCall": "Loading...",
     "failed": "The game could not start.",
     "retry": "Try again",
     "noGpu": "{surface, select, app {This app cannot draw 3D here. Try it in a recent Chrome, Edge, Firefox or Safari.} other {This browser cannot draw 3D. Try a recent Chrome, Edge, Firefox or Safari.}}",

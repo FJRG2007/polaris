@@ -144,6 +144,14 @@ describe("the game's frame", () => {
         expect(post).toHaveBeenCalledWith({ type: "polaris-game:call", controls: false }, "*");
     });
 
+    it("names the game once in a call, where the bar above already names it", () => {
+        render(<GameFrame game={game} call={call} />);
+        expect(screen.getByRole("status").textContent).toBe("loadingInCall");
+        cleanup();
+        render(<GameFrame game={game} onExit={() => {}} />);
+        expect(screen.getByRole("status").textContent).toBe("loading");
+    });
+
     it("tells its own messages apart from everybody else's", () => {
         const own = {} as Window;
         expect(fromFrame({ source: own, origin: "null" }, own)).toBe(true);

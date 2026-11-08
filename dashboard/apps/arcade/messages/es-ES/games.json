@@ -6,6 +6,7 @@
     "multiplayer": "Para jugar en llamadas",
     "solo": "En solitario",
     "loading": "Cargando {game}",
+    "loadingInCall": "Cargando...",
     "failed": "El juego no pudo arrancar.",
     "retry": "Reintentar",
     "noGpu": "{surface, select, app {Esta app no puede dibujar 3D aquí. Pruébalo en un Chrome, Edge, Firefox o Safari recientes.} other {Este navegador no puede dibujar 3D. Prueba un Chrome, Edge, Firefox o Safari recientes.}}",

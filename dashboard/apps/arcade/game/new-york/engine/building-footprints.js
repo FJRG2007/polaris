@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { WALL_KINDS } from './tsl-materials.js';
 import { polygonContains } from './building-collision.js';
+import { buildSlice } from './build-slice.js';
 
 function partyWallHeight(record, a, b, neighbours) {
   const dx = b.x - a.x, dz = b.y - a.y, length = Math.hypot(dx, dz);
@@ -21,10 +22,11 @@ function partyWallHeight(record, a, b, neighbours) {
 }
 
 // One merged facade/roof mesh per 1 km cell. Explicit wall coordinates keep window bays metre-sized on any angle.
-function createBuildingFootprints(material, records, getNeighbours) {
+async function createBuildingFootprints(material, records, getNeighbours) {
   const cells = new Map();
-  records.forEach((record, index) => {
-    if (!(record.height > 0)) return;
+  for (const [index, record] of records.entries()) {
+    await buildSlice();
+    if (!(record.height > 0)) continue;
     const key = Math.floor(record.cx / 1000) + ',' + Math.floor(record.cz / 1000);
     let cell = cells.get(key);
     if (!cell) cells.set(key, (cell = { positions: [], normals: [], indices: [], boxes: [], walls: [] }));
@@ -73,13 +75,14 @@ function createBuildingFootprints(material, records, getNeighbours) {
       }
       for (const [a, b, c] of triangles) cell.indices.push(offset + a, offset + c, offset + b);
     }
-  });
+  }
 
   const group = new THREE.Group();
   group.name = 'SurveyedBuildings';
   let first;
   for (const cell of cells.values()) {
     if (cell.indices.length === 0) continue;
+    await buildSlice();
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(cell.positions, 3));
     geometry.setAttribute('normal', new THREE.Float32BufferAttribute(cell.normals, 3));
