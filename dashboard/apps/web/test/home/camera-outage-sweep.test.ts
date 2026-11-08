@@ -17,6 +17,7 @@ interface CameraRow {
     installedAppId: string;
     reachVia: string;
     offlineSince: Date | null;
+    offlineReportedAt?: Date | null;
 }
 
 let cameras: CameraRow[] = [];
@@ -33,6 +34,8 @@ const cameraUpdates = vi.fn(
         const row = cameras.find((camera) => camera.id === args.where.id);
         if (row && "offlineSince" in args.data)
             row.offlineSince = args.data.offlineSince as Date | null;
+        if (row && "offlineReportedAt" in args.data)
+            row.offlineReportedAt = args.data.offlineReportedAt as Date | null;
         return row;
     }
 );
@@ -44,7 +47,8 @@ const messages = vi.fn(async () => ({ id: "message" }));
 vi.mock("@polaris/db", () => ({
     prisma: {
         camera: {
-            findMany: async () => cameras.map((camera) => ({ ...camera })),
+            findMany: async () =>
+                cameras.map((camera) => ({ offlineReportedAt: null, ...camera })),
             update: (args: never) => cameraUpdates(args as never)
         },
         cameraEvent: {
@@ -260,5 +264,66 @@ describe("a camera that comes back", () => {
         await sweepCameraReachability();
 
         expect(cameras[0]?.offlineSince).not.toBeNull();
+    });
+});
+
+describe("a place that stays dark", () => {
+    beforeEach(() => {
+        cameras = [quiet("a", "Indoor Studio Camera"), quiet("b", "Studio Camera")];
+        serving = cameras.flatMap((camera) => [`${camera.id}-main`, `${camera.id}-sub`]);
+    });
+
+    it("is reported once however many passes find it still down", async () => {
+        await sweepCameraReachability();
+        await sweepCameraReachability();
+        const third = await sweepCameraReachability();
+
+        expect(third.reported).toBe(0);
+        expect(eventCreates).toHaveBeenCalledTimes(2);
+        expect(notify).toHaveBeenCalledTimes(1);
+        expect(notify.mock.calls[0]?.[0]).toMatchObject({
+            title: "Every camera at Home stopped answering",
+            dedupKey: "places.offline:install:Every camera at Home stopped answering"
+        });
+    });
+
+    it("is not reported again when the outage line is cleared from the log", async () => {
+        // What happened on a real install: every minute the outage line was
+        // removed from the events list, the next pass found no row, decided the
+        // outage had never been reported, and rang the bell again.
+        await sweepCameraReachability();
+        events = [];
+        await sweepCameraReachability();
+        events = [];
+        await sweepCameraReachability();
+
+        expect(eventCreates).toHaveBeenCalledTimes(2);
+        expect(notify).toHaveBeenCalledTimes(1);
+    });
+
+    it("still says it came back after the line was cleared", async () => {
+        await sweepCameraReachability();
+        events = [];
+        answering = new Set(["a", "b"]);
+        const sweep = await sweepCameraReachability();
+
+        expect(sweep.recovered).toBe(2);
+        expect(notify).toHaveBeenCalledTimes(3);
+        expect(notify.mock.calls[1]?.[0]).toMatchObject({ href: "/places/events" });
+        expect(cameras.every((camera) => camera.offlineReportedAt === null)).toBe(true);
+    });
+
+    it("trusts an outage reported before the camera remembered it", async () => {
+        // An install upgraded mid-outage: the log has the row, the new column
+        // is still empty. That is reported, not new.
+        events = [
+            { id: "old-a", cameraId: "a", endedAt: null },
+            { id: "old-b", cameraId: "b", endedAt: null }
+        ];
+        const sweep = await sweepCameraReachability();
+
+        expect(sweep.reported).toBe(0);
+        expect(notify).not.toHaveBeenCalled();
+        expect(cameras.every((camera) => camera.offlineReportedAt !== null)).toBe(true);
     });
 });

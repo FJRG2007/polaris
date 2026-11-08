@@ -164,7 +164,9 @@
         "actionNeeded": "Action needed",
         "markReadNamed": "Mark \"{title}\" as read",
         "markRead": "Mark as read",
-        "viewAll": "View all"
+        "viewAll": "View all",
+        "repeated": "x{count}",
+        "repeatedTimes": "Repeated {count} times"
     },
     "audience": {
         "admins": "Admins",
@@ -1544,7 +1546,9 @@
         "quietHours": "Held back: it arrived during your quiet hours.",
         "muted": "Held back: you muted it.",
         "outsideSchedule": "Held back: outside the hours you set for it.",
-        "recordedQuietly": "Recorded without a sound or badge: it is muted or outside its hours."
+        "recordedQuietly": "Recorded without a sound or badge: it is muted or outside its hours.",
+        "folded": "Folded into the same alert already on the bell; sent nowhere else.",
+        "heldBurst": "Held back: too many of these at once, so they are counted on one alert."
     },
     "runtimeLogs": {
         "live": "Live",

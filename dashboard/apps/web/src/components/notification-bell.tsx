@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { badgeLabel } from "@/lib/notification-badge";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { RelativeTime } from "@/components/relative-time";
+import { NotificationRepeats } from "@/components/notifications/notification-repeats";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { NotificationFace } from "@/components/notifications/notification-face";
 import { describeAudience } from "@/components/notifications/notification-visuals";
@@ -125,6 +126,7 @@ export function NotificationBell() {
                                                 </span>
                                                 <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
                                                     <RelativeTime iso={item.createdAt} />
+                                                    <NotificationRepeats row={item} />
                                                     <span aria-hidden="true">-</span>
                                                     <span
                                                         className="truncate"

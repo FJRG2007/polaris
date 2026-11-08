@@ -45,7 +45,39 @@ export interface NotificationInput {
      * feature raising the alert - see notifications/presence.
      */
     read?: boolean;
+    /**
+     * What makes this alert the same as an earlier one. Given with `repeat`, a
+     * repeat raised inside the window folds into that row - its count goes up
+     * and it moves to the top - instead of writing another.
+     */
+    dedupKey?: string | null;
+    /** How repeats and bursts are folded; only read with `dedupKey`. */
+    repeat?: RepeatPolicy;
 }
+
+/**
+ * How the bell folds an alert that keeps being raised.
+ *
+ * Follows Alertmanager: `windowMs` is its `repeat_interval` (one alert per
+ * identity per window; a repeat inside it updates the open one and goes nowhere
+ * else), and `burst` is the ceiling on new rows of one event per reader in a
+ * short span, past which the rest land on one summary row - the way its
+ * group_wait/group_interval turns a storm into one grouped notification.
+ */
+export interface RepeatPolicy {
+    readonly windowMs: number;
+    /** Left out for an event that must never be held back (a critical one). */
+    readonly burst?: {
+        readonly limit: number;
+        readonly windowMs: number;
+        /** The summary row's text, built only when the ceiling is reached. */
+        readonly summary: () => Promise<Pick<NotificationInput, "title" | "body" | "href">>;
+    };
+}
+
+/** What writing one alert came to: a new row, a repeat folded into an earlier
+ *  row, one held on the burst summary, or nothing (the write failed). */
+export type NotificationOutcome = "created" | "collapsed" | "held" | "failed";
 
 export interface NotificationView {
     id: string;
@@ -58,7 +90,11 @@ export interface NotificationView {
     audienceLabel: string | null;
     actionRequired: boolean;
     read: boolean;
+    /** The latest time it was raised: a folded repeat moves it. */
     createdAt: string;
+    /** How many times it was raised while folded into this one row; 1, or left
+     *  out, for an alert that never repeated. */
+    repeatCount?: number;
     /**
      * The person the alert is about, when it is about one.
      *
@@ -88,7 +124,8 @@ const ROW_FIELDS = {
     actionRequired: true,
     metadata: true,
     readAt: true,
-    createdAt: true
+    createdAt: true,
+    repeatCount: true
 } as const;
 
 interface NotificationRow {
@@ -104,6 +141,7 @@ interface NotificationRow {
     metadata: string | null;
     readAt: Date | null;
     createdAt: Date;
+    repeatCount?: number;
 }
 
 function toView(row: NotificationRow, names: ReadonlyMap<string, string>): NotificationView {
@@ -121,6 +159,7 @@ function toView(row: NotificationRow, names: ReadonlyMap<string, string>): Notif
         actionRequired: row.actionRequired,
         read: row.readAt !== null,
         createdAt: row.createdAt.toISOString(),
+        repeatCount: Math.max(1, row.repeatCount ?? 1),
         // Only when the account is still there: a face for somebody who has
         // since been deleted would be a request for a picture that cannot exist.
         about: personId && name !== undefined ? { id: personId, name } : null
@@ -156,28 +195,130 @@ async function namesFor(rows: readonly NotificationRow[]): Promise<Map<string, s
     return new Map(people.map((person) => [person.id, person.name]));
 }
 
-/** Write a notification for a user. Best-effort; never throws to its caller. */
-export async function createNotification(input: NotificationInput): Promise<void> {
+function rowData(input: NotificationInput, now: Date) {
+    return {
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        body: input.body ?? null,
+        href: input.href ?? null,
+        level: input.level ?? "info",
+        audience: input.audience ?? "you",
+        audienceLabel: input.audienceLabel ?? null,
+        actionRequired: input.actionRequired ?? false,
+        metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+        shelf: input.shelf ?? null,
+        readAt: input.read ? now : null
+    };
+}
+
+/**
+ * Write a notification for a user. Best-effort; never throws to its caller.
+ *
+ * With a `dedupKey` and a `repeat` policy, a repeat inside the window folds into
+ * the row already written: one conditional UPDATE bumps its count and moves it
+ * to the top, so the bell shows "x12" rather than twelve lines - and nothing a
+ * repeat does can chime, because the client chimes only for an id it has not
+ * seen yet.
+ */
+export async function createNotification(input: NotificationInput): Promise<NotificationOutcome> {
     try {
-        await prisma.notification.create({
-            data: {
-                userId: input.userId,
-                type: input.type,
-                title: input.title,
-                body: input.body ?? null,
-                href: input.href ?? null,
-                level: input.level ?? "info",
-                audience: input.audience ?? "you",
-                audienceLabel: input.audienceLabel ?? null,
-                actionRequired: input.actionRequired ?? false,
-                metadata: input.metadata ? JSON.stringify(input.metadata) : null,
-                shelf: input.shelf ?? null,
-                readAt: input.read ? new Date() : null
-            }
-        });
+        const now = new Date();
+        if (!input.dedupKey || !input.repeat) {
+            await prisma.notification.create({ data: rowData(input, now) });
+            return "created";
+        }
+        const { windowMs, burst } = input.repeat;
+        if (await foldRepeat(input, input.dedupKey, windowMs, now)) return "collapsed";
+        if (burst && (await overBurst(input.userId, input.type, burst, now))) {
+            const summary = { ...input, ...(await burst.summary()) };
+            const outcome = await writeRepeatable(summary, `burst:${input.type}`, windowMs, now);
+            return outcome === "failed" ? "failed" : "held";
+        }
+        return await writeRepeatable(input, input.dedupKey, windowMs, now);
     } catch {
         // A notification failing must not break the action that triggered it.
+        return "failed";
     }
+}
+
+/**
+ * Fold a repeat into the row for its key, if that row was first raised inside
+ * the window. A single conditional UPDATE, so two processes folding at once each
+ * add one. The latest text wins, as it does for a condition; whether it was read
+ * is left as the reader left it.
+ */
+async function foldRepeat(
+    input: NotificationInput,
+    dedupKey: string,
+    windowMs: number,
+    now: Date
+): Promise<boolean> {
+    const done = await prisma.notification.updateMany({
+        where: {
+            userId: input.userId,
+            dedupKey,
+            firstSeenAt: { gte: new Date(now.getTime() - windowMs) }
+        },
+        data: {
+            title: input.title,
+            body: input.body ?? null,
+            ...(input.href !== undefined ? { href: input.href } : {}),
+            level: input.level ?? "info",
+            metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+            repeatCount: { increment: 1 },
+            createdAt: now,
+            updatedAt: now
+        }
+    });
+    return done.count > 0;
+}
+
+/**
+ * A new row for a key nothing inside the window holds. An older row still
+ * carrying the key gives it up first (it stays on the bell as it was), so the
+ * unique index - one row per key per reader - has room for this one. Of two
+ * processes racing to create, one wins and the other folds into it.
+ */
+async function writeRepeatable(
+    input: NotificationInput,
+    dedupKey: string,
+    windowMs: number,
+    now: Date
+): Promise<NotificationOutcome> {
+    if (await foldRepeat(input, dedupKey, windowMs, now)) return "collapsed";
+    await prisma.notification.updateMany({
+        where: { userId: input.userId, dedupKey },
+        data: { dedupKey: null }
+    });
+    try {
+        await prisma.notification.create({
+            data: { ...rowData(input, now), dedupKey, firstSeenAt: now, repeatCount: 1 }
+        });
+        return "created";
+    } catch (caught) {
+        if (isUniqueViolation(caught) && (await foldRepeat(input, dedupKey, windowMs, now)))
+            return "collapsed";
+        throw caught;
+    }
+}
+
+/** Whether this reader already got `limit` new rows of this event inside the
+ *  burst window. Bounded by the limit, on the (userId, createdAt) index. A count
+ *  that cannot be read never holds anything back. */
+async function overBurst(
+    userId: string,
+    type: string,
+    burst: NonNullable<RepeatPolicy["burst"]>,
+    now: Date
+): Promise<boolean> {
+    const recent = await prisma.notification
+        .count({
+            where: { userId, type, createdAt: { gte: new Date(now.getTime() - burst.windowMs) } },
+            take: burst.limit
+        })
+        .catch(() => 0);
+    return recent >= burst.limit;
 }
 
 /** What raising a condition came to: a new notice, the open one rewritten, or nothing. */

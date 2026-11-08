@@ -64,6 +64,7 @@ interface Watched extends FollowedCamera {
     readonly name: string;
     readonly placeId: string | null;
     readonly offlineSince: Date | null;
+    readonly offlineReportedAt: Date | null;
 }
 
 /** What one pass did, for the scheduler's log and for the tests. */
@@ -168,18 +169,31 @@ export function outageLength(
 }
 
 /**
- * Whether this outage has already been written down.
+ * Whether this outage has already been reported.
  *
- * Derived from the events rather than kept in a column of its own: the row that
- * records the outage is the record that it was reported, and one fewer piece of
- * state is one fewer way for the two to disagree after a restart.
+ * Read off the camera first (`offlineReportedAt`), and only then off the log.
+ * It used to be the log alone, and the log is the operator's to clear: somebody
+ * removing the outage line from the events list - which is what a person does
+ * with an alert they have already seen - made the next pass find nothing, report
+ * the same outage again and write the row back, a minute later and every minute
+ * they cleared it. The log is still asked for an outage reported before the
+ * column existed, and the column is filled in from it so it is asked once.
  */
-async function alreadyReported(cameraId: string, since: Date): Promise<boolean> {
+async function alreadyReported(camera: Watched, since: Date): Promise<boolean> {
+    if (camera.offlineReportedAt && camera.offlineReportedAt.getTime() >= since.getTime())
+        return true;
     const existing = await prisma.cameraEvent.findFirst({
-        where: { cameraId, kind: "offline", at: { gte: since } },
+        where: { cameraId: camera.id, kind: "offline", at: { gte: since } },
         select: { id: true }
     });
-    return existing !== null;
+    if (!existing) return false;
+    await markReported(camera.id, since);
+    return true;
+}
+
+/** Note on the camera that the outage starting at `since` has been reported. */
+async function markReported(cameraId: string, since: Date): Promise<void> {
+    await prisma.camera.update({ where: { id: cameraId }, data: { offlineReportedAt: since } });
 }
 
 /**
@@ -257,18 +271,22 @@ async function reportRecovery(camera: Watched, since: Date, now: Date, said: Sai
         select: { id: true },
         orderBy: { at: "desc" }
     });
+    // Reported, and the line in the log cleared since: the person who was told
+    // it went dark is still owed being told it came back.
+    const reported =
+        camera.offlineReportedAt !== null && camera.offlineReportedAt.getTime() >= since.getTime();
     // Nothing was ever reported, so this was a blip inside the grace window and
     // there is nothing to close and nobody to tell.
-    if (!open) return;
+    if (!open && !reported) return;
 
-    await prisma.cameraEvent.update({ where: { id: open.id }, data: { endedAt: now } });
+    if (open) await prisma.cameraEvent.update({ where: { id: open.id }, data: { endedAt: now } });
     await tell(
         camera.installedAppId,
         (t) => ({
             title: t("outage.back", { camera: camera.name }),
             body: t("outage.wasQuiet", { length: outageLength(since, now, t) })
         }),
-        open.id,
+        open?.id ?? null,
         said
     );
 }
@@ -279,12 +297,14 @@ async function reportRecovery(camera: Watched, since: Date, now: Date, said: Sai
 async function tell(
     installedAppId: string,
     words: (t: PlacesTranslator) => { title: string; body: string },
-    eventId: string,
+    eventId: string | null,
     said: Said
 ): Promise<void> {
-    // One line per sentence per pass. The dispatcher does not deduplicate, so a
-    // place that went dark all at once would otherwise leave one bell entry per
-    // camera, every one of them reading "Every camera at Home stopped answering".
+    // One line per sentence per pass, so a place that went dark all at once is
+    // one bell entry rather than one per camera, every one of them reading
+    // "Every camera at Home stopped answering". Across passes the same sentence
+    // also carries the same `dedupKey`, so the dispatcher folds a repeat into
+    // the entry already on the bell instead of writing another.
     const line = `${installedAppId}:${words(englishPlaces).title}`;
     if (said.has(line)) return;
     said.add(line);
@@ -301,8 +321,9 @@ async function tell(
         event: "places.offline",
         title,
         body,
-        href: `/places/events?event=${eventId}`,
-        metadata: { eventId }
+        href: eventId ? `/places/events?event=${eventId}` : "/places/events",
+        metadata: eventId ? { eventId } : null,
+        dedupKey: `places.offline:${line}`
     });
 }
 
@@ -338,6 +359,7 @@ export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
             installedAppId: true,
             reachVia: true,
             offlineSince: true,
+            offlineReportedAt: true,
             address: true,
             hardwareAddress: true,
             vendor: true,
@@ -419,7 +441,7 @@ export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
                 }
                 await prisma.camera.update({
                     where: { id: camera.id },
-                    data: { lastSeenAt: now, offlineSince: null }
+                    data: { lastSeenAt: now, offlineSince: null, offlineReportedAt: null }
                 });
                 continue;
             }
@@ -434,7 +456,7 @@ export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
                 continue;
             }
             if (now.getTime() - camera.offlineSince.getTime() < OFFLINE_GRACE_MS) continue;
-            if (await alreadyReported(camera.id, camera.offlineSince)) continue;
+            if (await alreadyReported(camera, camera.offlineSince)) continue;
 
             const key = camera.placeId ?? "";
             await reportOutage(
@@ -445,6 +467,7 @@ export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
                 totalAt.get(key) ?? 1,
                 said
             );
+            await markReported(camera.id, camera.offlineSince);
             reported += 1;
         } catch (error) {
             console.error("polaris: could not record a camera's availability:", error);

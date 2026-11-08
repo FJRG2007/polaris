@@ -164,7 +164,9 @@
         "actionNeeded": "Requiere acción",
         "markReadNamed": "Marcar \"{title}\" como leída",
         "markRead": "Marcar leída",
-        "viewAll": "Ver todas"
+        "viewAll": "Ver todas",
+        "repeated": "x{count}",
+        "repeatedTimes": "Repetida {count} veces"
     },
     "audience": {
         "admins": "Admins",
@@ -1544,7 +1546,9 @@
         "quietHours": "Retenida: llegó durante tus horas de silencio.",
         "muted": "Retenida: la silenciaste.",
         "outsideSchedule": "Retenida: fuera del horario que le pusiste.",
-        "recordedQuietly": "Guardada sin sonido ni contador: está silenciada o fuera de su horario."
+        "recordedQuietly": "Guardada sin sonido ni contador: está silenciada o fuera de su horario.",
+        "folded": "Sumada a la misma alerta que ya estaba en la campana; no se envió a ningún otro sitio.",
+        "heldBurst": "Retenida: llegaron demasiadas a la vez, así que se cuentan en una sola alerta."
     },
     "runtimeLogs": {
         "live": "Directo",
