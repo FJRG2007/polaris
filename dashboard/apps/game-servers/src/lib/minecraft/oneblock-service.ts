@@ -11,6 +11,7 @@
 
 import * as oneblock from "./oneblock";
 import * as phases from "./oneblock-phases";
+import { serverVersion } from "./server-version";
 import { host } from "@polaris/app-host";
 import { BLUEPRINT_KEY } from "../games-create";
 import { withServerContainer } from "./service";
@@ -31,8 +32,12 @@ export async function applyOneBlockSetup(
     const stored = readInstallConfig(config);
     const blueprintId = stored[BLUEPRINT_KEY];
     if (typeof blueprintId !== "string" || !oneblock.ONEBLOCK_BLUEPRINT_IDS.includes(blueprintId)) return;
+    // Isolated: a phases write that fails must not keep the first block from
+    // being placed, and is tried again on the next pass.
     if (blueprintId === oneblock.ONEBLOCK_CLASSIC_BLUEPRINT_ID && stored[phases.ONEBLOCK_PHASES_KEY] !== phases.CLASSIC_PHASES)
-        await applyClassicPhases(ownerId, installedAppId);
+        await applyClassicPhases(ownerId, installedAppId).catch((error) =>
+            console.warn("polaris: OneBlock classic phases failed", installedAppId, String(error))
+        );
     if (stored[oneblock.ONEBLOCK_READY_KEY] === true) return;
     const previous = stored[oneblock.ONEBLOCK_WORLD_KEY];
     const outcome = await withServerContainer(ownerId, installedAppId, async (server) => {
@@ -80,7 +85,11 @@ async function applyClassicPhases(ownerId: string, installedAppId: string): Prom
     const written = await withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.running) return false;
         if ((await readContainerFile(server, oneblock.ONEBLOCK_CONFIG_PATH)) === null) return false;
-        await writeContainerFile(server, phases.ONEBLOCK_BLOCKS_PATH, phases.phasesFile());
+        // The release it started as, so the ladder holds only what it has; a log
+        // that does not say yet is read again on the next pass.
+        const version = await serverVersion(server);
+        if (!version) return false;
+        await writeContainerFile(server, phases.ONEBLOCK_BLOCKS_PATH, phases.phasesFile(phases.phasesFor(version)));
         await server.sayAll(["ob reload"]);
         return true;
     });

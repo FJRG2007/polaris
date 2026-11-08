@@ -22,8 +22,16 @@
  * Material and mob names are the server's own enum names; the chest names are
  * the three the plugin's bundled `chests.yml` defines.
  *
+ * The plugin runs on every release from 1.8, and a name the server does not know
+ * is skipped with a warning and replaced by grass, so the ladder is cut to the
+ * release the server runs: what came later (`SINCE`) is left out rather than
+ * turned into grass. Names are the 1.13 ones, which the plugin maps back itself
+ * on an older server.
+ *
  * Pure: the data and the text. Writing it onto a server is `oneblock-service.ts`.
  */
+
+import { versionAtLeast } from "./version-compare";
 
 /** The plugin's levels file, inside the server's data directory. */
 export const ONEBLOCK_BLOCKS_PATH = "/data/plugins/OneBlock/blocks.yml";
@@ -140,6 +148,43 @@ export const CLASSIC_PHASE_LIST: readonly OneBlockPhase[] = [
         chest: "high_chest"
     }
 ];
+
+/** The release each block and mob newer than 1.13 arrived in. */
+export const SINCE: Readonly<Record<string, readonly number[]>> = {
+    COPPER_ORE: [1, 17],
+    MOSS_BLOCK: [1, 17],
+    DEEPSLATE: [1, 17],
+    FLOWERING_AZALEA_LEAVES: [1, 17],
+    CHERRY_LOG: [1, 20],
+    CHERRY_LEAVES: [1, 20],
+    BAMBOO_BLOCK: [1, 20],
+    NETHER_GOLD_ORE: [1, 16],
+    BLACKSTONE: [1, 16],
+    CRIMSON_STEM: [1, 16],
+    WARPED_STEM: [1, 16],
+    PIGLIN: [1, 16],
+    PANDA: [1, 14],
+    FOX: [1, 14],
+    PILLAGER: [1, 14],
+    BEE: [1, 15]
+};
+
+/** The phases as a server on `version` can play them: every block and mob it
+ *  does not have yet left out. Null or unreadable is taken as the newest. */
+export function phasesFor(
+    version: string | null,
+    phases: readonly OneBlockPhase[] = CLASSIC_PHASE_LIST
+): OneBlockPhase[] {
+    const has = (name: string) => {
+        const since = SINCE[name];
+        return !since || version === null || versionAtLeast(version, since);
+    };
+    return phases.map((phase) => ({
+        ...phase,
+        blocks: phase.blocks.filter(has),
+        mobs: phase.mobs.filter(has)
+    }));
+}
 
 /** The weight each of a phase's own entries needs to be at least half of a pool
  *  that already holds `prior` weight from the phases before it. */

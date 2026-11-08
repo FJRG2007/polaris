@@ -55,8 +55,18 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
 vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
     readContainerFile: async () => file,
     writeContainerFile: async (_server: unknown, path: string, content: string) => {
+        if (writeFails) throw new Error("container went away");
         written.set(path, content);
     }
+}));
+
+/** What the server's log says it started as. */
+let version: string | null = "26.3";
+/** Thrown by the next file write, when set. */
+let writeFails = false;
+
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/server-version", () => ({
+    serverVersion: async () => version
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/mod-announcements-service", () => ({
@@ -71,6 +81,8 @@ beforeEach(() => {
     file = null;
     sent = [];
     written = new Map();
+    version = "26.3";
+    writeFails = false;
     forgetModrinthAnswers();
     vi.stubGlobal("fetch", async (url: string) => ({
         ok: true,
@@ -260,7 +272,7 @@ describe("the classic phases", () => {
 
         file = BUNDLED;
         await applyOneBlockSetup("owner", "app", install.config);
-        expect(written.get(phases.ONEBLOCK_BLOCKS_PATH)).toBe(phases.phasesFile());
+        expect(written.get(phases.ONEBLOCK_BLOCKS_PATH)).toBe(phases.phasesFile(phases.phasesFor("26.3")));
         expect(sent).toEqual([["ob reload"], oneblock.setupLines("world")]);
         expect(JSON.parse(install.config).oneblockPhases).toBe("classic");
 
@@ -269,6 +281,44 @@ describe("the classic phases", () => {
         await applyOneBlockSetup("owner", "app", install.config);
         expect(written.size).toBe(0);
         expect(JSON.parse(install.config).oneblockReady).toBe(true);
+    });
+
+    it("holds only what the server's release has", () => {
+        const on = (release: string) => phases.phasesFile(phases.phasesFor(release));
+        // 1.16.5: no copper, moss, deepslate or cherry; the Nether's own blocks are there.
+        for (const name of ["COPPER_ORE", "MOSS_BLOCK", "DEEPSLATE", "FLOWERING_AZALEA_LEAVES", "CHERRY_LOG", "BAMBOO_BLOCK"])
+            expect(on("1.16.5")).not.toContain(`: ${name}\n`);
+        expect(on("1.16.5")).toContain("block: BLACKSTONE\n");
+        expect(on("1.16.5")).toContain("mob: PIGLIN\n");
+        // 1.19.4: the 1.17 blocks, still no cherry or bamboo block.
+        expect(on("1.19.4")).toContain("block: COPPER_ORE\n");
+        expect(on("1.19.4")).not.toContain("block: CHERRY_LOG\n");
+        expect(on("1.19.4")).not.toContain("block: BAMBOO_BLOCK\n");
+        expect(on("26.3")).toContain("block: CHERRY_LOG\n");
+        // And no phase is left with nothing to draw.
+        for (const release of ["1.13", "1.16.5", "1.19.4"])
+            for (const phase of phases.phasesFor(release)) expect(phase.blocks.length).toBeGreaterThan(0);
+    });
+
+    it("waits for the log to say which release the server runs", async () => {
+        install = { config: JSON.stringify({ blueprintId: "oneblock-classic" }) };
+        file = BUNDLED;
+        version = null;
+        await applyOneBlockSetup("owner", "app", install.config);
+        expect(written.size).toBe(0);
+        expect(JSON.parse(install.config).oneblockPhases).toBeUndefined();
+    });
+
+    it("still places the first block when writing the phases fails", async () => {
+        install = { config: JSON.stringify({ blueprintId: "oneblock-classic" }) };
+        file = BUNDLED;
+        writeFails = true;
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        await applyOneBlockSetup("owner", "app", install.config);
+        expect(sent).toEqual([oneblock.setupLines("world")]);
+        expect(JSON.parse(install.config).oneblockPhases).toBeUndefined();
+        expect(warn).toHaveBeenCalled();
+        warn.mockRestore();
     });
 
     it("is never written on a plain OneBlock server", async () => {
