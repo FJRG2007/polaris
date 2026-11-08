@@ -1702,7 +1702,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             const noteShareDrop = () => {
                 const held = shareRepair.current;
                 if (!screen.current || held.dropped !== undefined) return;
-                held.dropped = joined.localParticipant.getTrackPublication(SCREEN)?.trackSid ?? null;
+                held.dropped =
+                    joined.localParticipant.getTrackPublication(SCREEN)?.trackSid ?? null;
             };
 
             joined

@@ -77,7 +77,8 @@ export function BackupAccessCard() {
             if (result) settled.current = result.config;
             const now = latest.current;
             if (result) live.replace(withPending(result));
-            else if (now) live.replace(withPending({ ...now, config: settled.current ?? now.config }));
+            else if (now)
+                live.replace(withPending({ ...now, config: settled.current ?? now.config }));
             done();
         };
         const next = queue.current.then(run);
