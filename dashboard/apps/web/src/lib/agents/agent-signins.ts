@@ -118,6 +118,7 @@ export function agentSignins(): AgentSignin[] {
                 url: credential.url,
                 howto: credential.howto,
                 subscription: credential.subscription,
+                file: credential.file ?? null,
                 serves: [{ id: cli.id, label: cli.label }]
             });
         }

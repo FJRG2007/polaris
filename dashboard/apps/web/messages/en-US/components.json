@@ -1059,6 +1059,7 @@
         "nameHint": "What to call this account here. Leave it empty and Polaris names it after whoever it turns out to belong to.",
         "namePlaceholder": "Work subscription",
         "copyIn": "When it prints the {what}, copy it in here. Polaris does not read it off the screen for you - storing the wrong line would not show up until a session failed to sign in.",
+        "fileHint": "When the terminal says you are signed in, press Link it. Polaris keeps the login the tool saved, encrypted, and puts it back for any session that needs it.",
         "link": "Link it"
     },
     "providerSelect": {

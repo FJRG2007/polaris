@@ -25,6 +25,7 @@ import {
     agentSigninScreenAction,
     answerAgentSigninAction,
     beginAgentSigninAction,
+    captureAgentSigninAction,
     deleteModelKeyAction,
     endAgentSigninAction,
     reorderModelKeysAction,
@@ -111,6 +112,7 @@ export async function AiKeysPanel({ userId }: { userId: string }) {
                         screen: agentSigninScreenAction,
                         answer: answerAgentSigninAction,
                         identity: agentSigninIdentityAction,
+                        capture: captureAgentSigninAction,
                         end: endAgentSigninAction
                     }
                 }}

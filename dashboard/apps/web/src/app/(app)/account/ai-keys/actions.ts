@@ -15,6 +15,7 @@ import {
     canAssistSignin,
     answerSignin,
     beginSignin,
+    captureSignin,
     endSignin,
     identifySignin,
     signinScreen,
@@ -154,4 +155,30 @@ export async function agentSigninIdentityAction(input: unknown): Promise<SigninI
         .safeParse(input);
     if (!parsed.success) return {};
     return identifySignin(user.id, parsed.data.id, parsed.data.env);
+}
+
+/**
+ * The credential file the open login wrote, for a tool that keeps its login in
+ * a file rather than printing a token.
+ *
+ * Handed to the dialog the way a pasted token is, so it reaches the store
+ * through the same add - encrypted, named, ordered - rather than a second write
+ * path. Null while the login has not finished, which the dialog says as such.
+ */
+export async function captureAgentSigninAction(
+    input: unknown
+): Promise<{ value?: string; error?: string }> {
+    const user = await requireUser();
+    const t = await getTranslations("account");
+    const parsed = agentSigninAnswerSchema
+        .pick({ id: true })
+        .extend({ env: agentSigninEnvSchema })
+        .safeParse(input);
+    if (!parsed.success) return { error: t("aiKeys.errors.notOpen") };
+    try {
+        const value = await captureSignin(user.id, parsed.data.id, parsed.data.env);
+        return value ? { value } : { error: t("aiKeys.errors.notSignedInYet") };
+    } catch {
+        return { error: t("aiKeys.errors.notOpen") };
+    }
 }

@@ -1220,6 +1220,7 @@
             "notAssisted": "Ese no es un inicio de sesión que Polaris pueda hacer por ti.",
             "couldNotStart": "Polaris no ha podido arrancar una máquina para el inicio de sesión. Vuelve a intentarlo en un momento.",
             "notOpen": "Ese inicio de sesión ya no está abierto.",
+            "notSignedInYet": "El inicio de sesión aún no ha terminado. Termínalo en el terminal de arriba y vuelve a probar.",
             "typeSomething": "Escribe algo"
         }
     },
