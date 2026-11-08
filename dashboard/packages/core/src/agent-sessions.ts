@@ -384,6 +384,8 @@ export function sessionStateLabel(state: AgentSessionState, hasReported: boolean
 export function agentResumeStyle(cliId: string): "flag" | "subcommand" | "" {
     if (cliId === "claude") return "flag";
     if (cliId === "codex") return "subcommand";
+    // `gemini --resume <session id>`, from its session-management docs.
+    if (cliId === "gemini") return "flag";
     return "";
 }
 

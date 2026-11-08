@@ -133,6 +133,9 @@ interface Bootstrap {
     readonly firstRun: string;
     readonly hookScript: string;
     readonly hookSettings: string;
+    /** `ENV=relative/path` pairs, space separated: which of `credentials` are
+     *  a file the tool keeps, and where. Names and paths from the catalogue. */
+    readonly credentialFiles: string;
     readonly mcpConfig: string;
     readonly cloneHeader: string;
     /** The credential helper script, or empty for a workspace. */
@@ -288,6 +291,10 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // before Polaris arrived.
         firstRun:
             session.place === "host" ? "" : asFile(commands.firstRunScript(agent.cli.firstRun)),
+        credentialFiles: agent.cli.credentials
+            .filter((credential) => credential.file)
+            .map((credential) => `${credential.env}=${credential.file}`)
+            .join(" "),
         hookScript: hookScript(ingest, token),
         hookSettings: JSON.stringify(claudeHookSettings(`${stateDirFor(session)}/hook.sh`)),
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
@@ -417,6 +424,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_FIRST_RUN: boot.firstRun,
         POLARIS_HOOK_SCRIPT: asFile(boot.hookScript),
         POLARIS_HOOK_SETTINGS: asFile(boot.hookSettings),
+        POLARIS_CREDENTIAL_FILES: boot.credentialFiles,
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),
         POLARIS_GIT_CREDENTIAL: boot.gitCredential ? asFile(boot.gitCredential) : "",
         ...boot.autonomyEnv,

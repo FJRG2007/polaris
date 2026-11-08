@@ -46,7 +46,8 @@ export function readableTranscriptPath(path: string | null | undefined): path is
     // still a `.claude*` directory with the projects under it.
     return (
         /\/\.claude[^/]*\/(?:[^/]+\/)*projects\/[^/]+\/[^/]+\.jsonl$/.test(path) ||
-        /\/\.codex\/sessions\/(?:[^/]+\/)*[^/]+\.jsonl$/.test(path)
+        /\/\.codex\/sessions\/(?:[^/]+\/)*[^/]+\.jsonl$/.test(path) ||
+        /\/\.gemini\/tmp\/[^/]+\/chats\/[^/]+\.jsonl$/.test(path)
     );
 }
 

@@ -83,6 +83,16 @@ export interface AgentCredential {
      * "the plan you already pay for" and "a meter starts now".
      */
     readonly subscription: boolean;
+    /**
+     * Where the tool keeps this credential itself, relative to its home, for a
+     * login that writes a file rather than handing out a string.
+     *
+     * Absent for everything read from the environment. Present, the `env` is
+     * Polaris's own name for the stored copy - no tool reads it - and a session
+     * writes the copy into this file when the home has none, so a login done
+     * once survives a home that was cleared.
+     */
+    readonly file?: string;
 }
 
 /**
@@ -147,7 +157,114 @@ export type AgentFirstRunValue =
     | string
     | number
     | boolean
+    | readonly AgentFirstRunValue[]
     | { readonly [key: string]: AgentFirstRunValue };
+
+/**
+ * The one command every tool's hook configuration runs.
+ *
+ * Fixed text, and the same in every home: a container home is shared by every
+ * session that account runs, so a hook naming one session's script would report
+ * every other session's events as that one's. The session it belongs to is
+ * whichever exported `POLARIS_STATE_DIR` into the agent's environment, and a
+ * tool started anywhere else - the sign-in container, a terminal somebody
+ * opened by hand - finds no script and reports nothing.
+ *
+ * It prints `{}` either way: Codex and Gemini CLI read a hook's output as JSON,
+ * and an empty object is the answer that changes nothing.
+ */
+export const AGENT_HOOK_RELAY =
+    'h="$POLARIS_STATE_DIR/hook.sh"; if [ -n "$POLARIS_STATE_DIR" ] && [ -x "$h" ]; then exec "$h"; fi; cat >/dev/null; printf "{}"';
+
+/** Seconds a hook may take before the tool gives up on it. */
+const HOOK_TIMEOUT_SECONDS = 5;
+
+/**
+ * Codex's lifecycle hooks, in `~/.codex/hooks.json`.
+ *
+ * Format and event names from Codex's hooks documentation: the same shape as
+ * Claude Code's, `session_id` and `transcript_path` on stdin, `Stop` at the end
+ * of every turn and `PermissionRequest` before an approval prompt. Hooks are on
+ * by default.
+ */
+export const CODEX_HOOK_EVENTS = [
+    "SessionStart",
+    "UserPromptSubmit",
+    "PreToolUse",
+    "PostToolUse",
+    "PermissionRequest",
+    "Stop",
+    "PostCompact",
+    "SessionEnd"
+] as const;
+
+function codexHooks(): Record<string, AgentFirstRunValue> {
+    const hook = { type: "command", command: AGENT_HOOK_RELAY, timeout: HOOK_TIMEOUT_SECONDS };
+    const hooks: Record<string, AgentFirstRunValue> = {};
+    for (const event of CODEX_HOOK_EVENTS) hooks[event] = [{ hooks: [hook] }];
+    return { hooks };
+}
+
+/**
+ * Gemini CLI's hooks, in the `hooks` object of `~/.gemini/settings.json`.
+ *
+ * Event names from its hooks reference. The payload carries `session_id`,
+ * `transcript_path` and `hook_event_name` like the others; timeouts are in
+ * milliseconds here, not seconds.
+ */
+export const GEMINI_HOOK_EVENTS = [
+    "SessionStart",
+    "BeforeAgent",
+    "BeforeTool",
+    "AfterTool",
+    "AfterAgent",
+    "Notification",
+    "PreCompress",
+    "SessionEnd"
+] as const;
+
+function geminiHooks(): Record<string, AgentFirstRunValue> {
+    const hook = {
+        name: "polaris",
+        type: "command",
+        command: AGENT_HOOK_RELAY,
+        timeout: HOOK_TIMEOUT_SECONDS * 1000
+    };
+    const hooks: Record<string, AgentFirstRunValue> = {};
+    for (const event of GEMINI_HOOK_EVENTS) {
+        hooks[event] =
+            event === "BeforeTool" || event === "AfterTool"
+                ? [{ matcher: "*", hooks: [hook] }]
+                : [{ hooks: [hook] }];
+    }
+    return { hooks };
+}
+
+/**
+ * Copilot CLI's hooks: a file of its own under `~/.copilot/hooks/`, version 1,
+ * camelCase events and payloads (`sessionId`, `toolName`, `toolArgs`).
+ */
+export const COPILOT_HOOK_EVENTS = [
+    "sessionStart",
+    "userPromptSubmitted",
+    "preToolUse",
+    "postToolUse",
+    "permissionRequest",
+    "notification",
+    "agentStop",
+    "errorOccurred",
+    "sessionEnd"
+] as const;
+
+function copilotHooks(): Record<string, AgentFirstRunValue> {
+    const hooks: Record<string, AgentFirstRunValue> = {};
+    // Its payload does not name the event, so each registration does.
+    for (const event of COPILOT_HOOK_EVENTS) {
+        const bash = `export POLARIS_HOOK_EVENT=${event}; ${AGENT_HOOK_RELAY}`;
+        hooks[event] = [{ type: "command", bash, timeoutSec: HOOK_TIMEOUT_SECONDS }];
+    }
+    return { version: 1, hooks };
+}
 
 /**
  * The key that stands for the directory the agent is working in.
@@ -362,9 +479,20 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["codex"],
         install: "npm install -g @openai/codex",
         home: ".codex",
-        observe: "output",
+        observe: "hooks",
         docs: "https://github.com/openai/codex",
         credentials: [
+            // The ChatGPT plan first, for the same reason Claude's subscription
+            // is first. `codex login --device-auth` writes it to
+            // `~/.codex/auth.json`; Polaris keeps a copy of that file.
+            {
+                env: "CODEX_CHATGPT_AUTH",
+                label: "ChatGPT plan",
+                url: "https://developers.openai.com/codex/auth",
+                howto: null,
+                subscription: true,
+                file: ".codex/auth.json"
+            },
             {
                 env: "OPENAI_API_KEY",
                 label: "OpenAI API key",
@@ -375,7 +503,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: ["--dangerously-bypass-approvals-and-sandbox"],
         autonomyEnv: {},
-        firstRun: []
+        // No wizard to answer - the trust question is what the autonomy flag
+        // covers - only the hooks that let Polaris see its turns.
+        firstRun: [{ file: ".codex/hooks.json", assert: codexHooks() }]
     },
     {
         id: "opencode",
@@ -415,9 +545,19 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["gemini"],
         install: "npm install -g @google/gemini-cli",
         home: ".gemini",
-        observe: "output",
+        observe: "hooks",
         docs: "https://github.com/google-gemini/gemini-cli",
         credentials: [
+            // A Google account: the free tier or a Google AI Pro / Ultra plan.
+            // The CLI caches it in `~/.gemini/oauth_creds.json`.
+            {
+                env: "GEMINI_GOOGLE_AUTH",
+                label: "Google account",
+                url: "https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/authentication.mdx",
+                howto: null,
+                subscription: true,
+                file: ".gemini/oauth_creds.json"
+            },
             {
                 env: "GEMINI_API_KEY",
                 label: "Google AI API key",
@@ -428,7 +568,13 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: ["--yolo"],
         autonomyEnv: {},
-        firstRun: []
+        // The theme is what its first screen asks on a blank home (`ui.theme`,
+        // left alone once somebody picked one). Folder trust is off by
+        // default, so nothing to answer there.
+        firstRun: [
+            { file: ".gemini/settings.json", json: { ui: { theme: "Default" } } },
+            { file: ".gemini/settings.json", assert: geminiHooks() }
+        ]
     },
     {
         id: "copilot",
@@ -437,9 +583,19 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["copilot"],
         install: "npm install -g @github/copilot",
         home: ".copilot",
-        observe: "output",
+        observe: "hooks",
         docs: "https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli",
         credentials: [
+            // `copilot login --device-code`. With no keychain in the container
+            // the CLI offers to keep the token in `~/.copilot/config.json`.
+            {
+                env: "COPILOT_DEVICE_AUTH",
+                label: "GitHub Copilot plan",
+                url: "https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli",
+                howto: null,
+                subscription: true,
+                file: ".copilot/config.json"
+            },
             // Already satisfied in every session Polaris starts: the repository
             // is checked out with a GitHub App token that is exported under this
             // name, so this one never asks anybody for anything.
@@ -453,7 +609,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: ["--yolo"],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: [{ file: ".copilot/hooks/polaris.json", assert: copilotHooks() }]
     },
     {
         id: "cursor",

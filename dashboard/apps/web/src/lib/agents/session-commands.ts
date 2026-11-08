@@ -535,7 +535,9 @@ export function firstRunProgram(): string {
         "    for (const [name, value] of Object.entries(source)) {",
         `        const key = name === ${JSON.stringify(FIRST_RUN_WORKDIR)} ? workdir : name;`,
         "        if (!key) continue;",
-        '        if (value && typeof value === "object") {',
+        // A list is a value like any other: a hook registration is replaced
+        // whole, never merged index by index into whatever list was there.
+        '        if (value && typeof value === "object" && !Array.isArray(value)) {',
         "            const branch = target[key];",
         '            if (branch && typeof branch === "object" && !Array.isArray(branch)) {',
         "                if (fill(branch, value, assert)) wrote = true;",
@@ -555,7 +557,7 @@ export function firstRunProgram(): string {
         // Written when the file is silent, or when it says something else and this
         // is an answer Polaris gives. Never when it already agrees, so a session
         // with nothing to do writes nothing and prints nothing.
-        "        } else if (target[key] === undefined || (assert && target[key] !== value)) {",
+        "        } else if (target[key] === undefined || (assert && JSON.stringify(target[key]) !== JSON.stringify(value))) {",
         "            target[key] = value; wrote = true;",
         "        }",
         "    }",
@@ -722,6 +724,25 @@ const START_AGENT = [
     '  as_agent "sh /tmp/polaris-enigma.sh" || true',
     "  rm -f /tmp/polaris-enigma.sh",
     "fi",
+    // A login the tool keeps in a file of its own (Codex, Gemini CLI, Copilot
+    // CLI), put back from Polaris's copy when the home has none - and only
+    // then: these files hold refresh tokens the tool rotates, and an older copy
+    // written over a newer one is a login that stops working. Each value is
+    // base64 already, so it never carried a control character, and it leaves
+    // the environment here either way.
+    'for pair in $POLARIS_CREDENTIAL_FILES; do',
+    '  name="${pair%%=*}"',
+    '  rel="${pair#*=}"',
+    '  value="$(printenv "$name" 2>/dev/null || true)"',
+    '  if [ -n "$value" ] && [ -n "$POLARIS_HOME" ] && [ ! -s "$POLARIS_HOME/$rel" ]; then',
+    '    mkdir -p "$(dirname "$POLARIS_HOME/$rel")"',
+    '    printf %s "$value" | base64 -d > "$POLARIS_HOME/$rel" 2>/dev/null || rm -f "$POLARIS_HOME/$rel"',
+    '    chmod 0600 "$POLARIS_HOME/$rel" 2>/dev/null || true',
+    '    if [ "$POLARIS_AS_ROOT" = "yes" ]; then chown -R "$POLARIS_RUNAS" "$(dirname "$POLARIS_HOME/$rel")" 2>/dev/null || true; fi',
+    "  fi",
+    '  unset "$name"',
+    "done",
+    "unset value",
     // After Enigma, which writes into the same files, and before the launch,
     // which is the last moment anything can answer a question the tool is about
     // to ask on a screen nobody can reach. Only where Polaris owns the home.
