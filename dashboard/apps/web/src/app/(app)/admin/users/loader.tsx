@@ -13,7 +13,13 @@ import { CardSkeleton, TableSkeleton } from "../region-skeletons";
  * The directory and the policies under it. Not kept in the tab: invites and
  * recovery requests are account-access data, and invites carry dates.
  */
-export function UsersAdminLoader({ openUserId, revision }: { openUserId: string | null; revision: number }) {
+export function UsersAdminLoader({
+    openUserId,
+    revision
+}: {
+    openUserId: string | null;
+    revision: number;
+}) {
     return (
         <AfterPaint
             cacheKey="admin-users"
@@ -44,7 +50,10 @@ export function UsersAdminLoader({ openUserId, revision }: { openUserId: string 
                         roles={data.roles.map((role) => ({ value: role.name, label: role.name }))}
                     />
                     <UsernameCooldownForm days={data.cooldownDays} />
-                    <PublicProfilesForm enabled={data.publicProfiles} followerDefault={data.followerDefault} />
+                    <PublicProfilesForm
+                        enabled={data.publicProfiles}
+                        followerDefault={data.followerDefault}
+                    />
                     <PeopleDiscoveryForm policy={data.discovery} />
                 </>
             )}

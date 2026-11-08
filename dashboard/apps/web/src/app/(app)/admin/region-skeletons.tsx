@@ -33,7 +33,10 @@ export function TableSkeleton({ rows = 8 }: { rows?: number }) {
 /** A card with a title and `lines` fields under it. */
 export function CardSkeleton({ lines = 3, className }: { lines?: number; className?: string }) {
     return (
-        <div className={`flex flex-col gap-3 rounded-lg border p-4 ${className ?? ""}`} aria-hidden="true">
+        <div
+            className={`flex flex-col gap-3 rounded-lg border p-4 ${className ?? ""}`}
+            aria-hidden="true"
+        >
             <Skeleton className="h-5 w-40" />
             <Skeleton className="h-4 w-64 max-w-full" />
             {Array.from({ length: lines }, (_, index) => (

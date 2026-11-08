@@ -9,9 +9,21 @@ const PICK_LIMIT = 200;
 export async function loadAnnouncementPicksAction() {
     await requireAdmin();
     const [roles, groups, orgs] = await Promise.all([
-        prisma.role.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: PICK_LIMIT }),
-        prisma.group.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: PICK_LIMIT }),
-        prisma.organization.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: PICK_LIMIT })
+        prisma.role.findMany({
+            select: { id: true, name: true },
+            orderBy: { name: "asc" },
+            take: PICK_LIMIT
+        }),
+        prisma.group.findMany({
+            select: { id: true, name: true },
+            orderBy: { name: "asc" },
+            take: PICK_LIMIT
+        }),
+        prisma.organization.findMany({
+            select: { id: true, name: true },
+            orderBy: { name: "asc" },
+            take: PICK_LIMIT
+        })
     ]);
     return { roles, groups, orgs };
 }
