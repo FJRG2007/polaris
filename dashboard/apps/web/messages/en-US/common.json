@@ -178,5 +178,10 @@
         "orgHint": "Members of this organization can wear its tag.",
         "instanceHint": "The tag of this Polaris itself.",
         "view": "View organization"
+    },
+    "afterPaint": {
+        "loadFailed": "This could not be loaded.",
+        "retry": "Try again",
+        "notFound": "This is no longer here."
     }
 }

@@ -10,7 +10,7 @@ import { Eye, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { RoleOption } from "@/lib/role-service";
 import { useAccountAction } from "./use-account-action";
-import type { DirectoryUser } from "@/lib/user-admin-service";
+import type { UserOverviewAccount } from "./data";
 import { viewAsUserAction } from "@/app/(app)/view-as-actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -32,7 +32,7 @@ export function OverviewControls({
     roles,
     isSelf
 }: {
-    user: DirectoryUser;
+    user: UserOverviewAccount;
     /** Every role this instance defines, for the picker. */
     roles: RoleOption[];
     isSelf: boolean;

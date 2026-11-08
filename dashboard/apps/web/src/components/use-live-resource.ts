@@ -101,7 +101,8 @@ export function useLiveRead<T>({
     intervalMs,
     initial,
     enabled = true,
-    paused = false
+    paused = false,
+    persist = true
 }: {
     load: (signal: AbortSignal) => Promise<T>;
     cacheKey: string;
@@ -115,6 +116,13 @@ export function useLiveRead<T>({
     initial?: Snapshot<T>;
     enabled?: boolean;
     paused?: boolean;
+    /**
+     * False keeps the answer out of the tab's storage: an auth or security read,
+     * or one whose values do not survive JSON (a Date comes back a string). The
+     * screen still paints at once and fetches after; it only does not repaint the
+     * last answer on a revisit.
+     */
+    persist?: boolean;
 }): LiveResource<T> {
     /**
      * The shelf, in front of the key the caller gave.
@@ -174,7 +182,7 @@ export function useLiveRead<T>({
 
     // The kept snapshot wins over `initial` when there is one, being the newer.
     useLayoutEffect(() => {
-        const kept = read<T>(seededFor.current);
+        const kept = persist ? read<T>(seededFor.current) : null;
         if (!kept || shown.current > 0) return;
         latest.current = kept.value;
         shownAt.current = kept.at;
@@ -190,7 +198,7 @@ export function useLiveRead<T>({
         if (seededFor.current === cacheKey) return;
         seededFor.current = cacheKey;
         shown.current = started.current + 1;
-        const kept = read<T>(cacheKey);
+        const kept = persist ? read<T>(cacheKey) : null;
         latest.current = kept?.value ?? null;
         shownAt.current = kept?.at ?? 0;
         heardAt.current = 0;
@@ -198,7 +206,7 @@ export function useLiveRead<T>({
         setUpdatedAt(kept?.at ?? null);
         setKept(kept !== null);
         setError(null);
-    }, [cacheKey]);
+    }, [cacheKey, persist]);
 
     const refresh = useCallback(() => {
         const controller = new AbortController();
@@ -225,7 +233,7 @@ export function useLiveRead<T>({
                 setUpdatedAt(at);
                 setKept(false);
                 setError(null);
-                writeSnapshot(cacheKey, merged);
+                if (persist) writeSnapshot(cacheKey, merged);
                 answers.current?.post(value, askedAt);
             })
             .catch((caught: unknown) => {
@@ -240,7 +248,7 @@ export function useLiveRead<T>({
                 if (!controller.signal.aborted && turn === started.current) setRefreshing(false);
             });
         return () => controller.abort();
-    }, [load, cacheKey]);
+    }, [load, cacheKey, persist]);
 
     const replace = useCallback(
         (value: T) => {
@@ -252,10 +260,10 @@ export function useLiveRead<T>({
             setUpdatedAt(at);
             setKept(false);
             setError(null);
-            writeSnapshot(cacheKey, value);
+            if (persist) writeSnapshot(cacheKey, value);
             answers.current?.post(value, at);
         },
-        [cacheKey]
+        [cacheKey, persist]
     );
 
     // What the other tabs on this subject were given. Taken like an answer of
@@ -275,14 +283,14 @@ export function useLiveRead<T>({
             setUpdatedAt(at);
             setKept(false);
             setError(null);
-            writeSnapshot(cacheKey, merged);
+            if (persist) writeSnapshot(cacheKey, merged);
         });
         answers.current = channel;
         return () => {
             channel?.close();
             if (answers.current === channel) answers.current = null;
         };
-    }, [cacheKey, scope]);
+    }, [cacheKey, scope, persist]);
 
     // The read a subject needs to be on screen at all: once, and again whenever
     // the subject changes. Kept apart from the poll so pausing stops the refresh

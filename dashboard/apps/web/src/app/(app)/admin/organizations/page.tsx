@@ -8,21 +8,13 @@
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
-import { organizationPolicy } from "@/lib/orgs/policy";
-import { listOrgDirectoryPage } from "@/lib/org-directory";
-import { saveOrganizationPolicyAction } from "./actions";
-import { OrganizationsAdmin } from "./organizations-admin";
+import { OrganizationsAdminLoader } from "./loader";
 
 export const dynamic = "force-dynamic";
 
 export default async function OrganizationsAdminPage() {
     await requireAdmin();
-
-    const [policy, orgs, t] = await Promise.all([
-        organizationPolicy(),
-        listOrgDirectoryPage(),
-        getTranslations("admin")
-    ]);
+    const t = await getTranslations("admin");
 
     return (
         // Full width, like the people directory: the list of organizations is a
@@ -32,11 +24,7 @@ export default async function OrganizationsAdminPage() {
                 title={t("organizations.page.title")}
                 description={t("organizations.page.description")}
             />
-            <OrganizationsAdmin
-                initial={policy}
-                save={saveOrganizationPolicyAction}
-                first={orgs}
-            />
+            <OrganizationsAdminLoader revision={Date.now()} />
         </>
     );
 }
