@@ -23,6 +23,16 @@
 /** The blueprint this belongs to. */
 export const ONEBLOCK_BLUEPRINT_ID = "oneblock";
 
+/** The same game on the classic phases instead of the plugin's own levels
+ *  (see `oneblock-phases.ts`). */
+export const ONEBLOCK_CLASSIC_BLUEPRINT_ID = "oneblock-classic";
+
+/** Every blueprint built on the plugin, which all need its one setup step. */
+export const ONEBLOCK_BLUEPRINT_IDS: readonly string[] = [
+    ONEBLOCK_BLUEPRINT_ID,
+    ONEBLOCK_CLASSIC_BLUEPRINT_ID
+];
+
 /** The plugin's settings file, inside the server's data directory. */
 export const ONEBLOCK_CONFIG_PATH = "/data/plugins/OneBlock/config.yml";
 

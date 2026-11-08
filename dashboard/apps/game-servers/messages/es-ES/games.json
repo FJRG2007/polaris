@@ -1027,6 +1027,11 @@
                 "summary": "Un bloque en el vacío que se convierte en otro al romperlo. Instala OneBlock.",
                 "setup": "Polaris coloca el primer bloque cuando carga el plugin, y cada jugador aparece en un bloque propio."
             },
+            "oneblock-classic": {
+                "name": "OneBlock clásico",
+                "summary": "Un bloque en el vacío que recorre diez fases, de las llanuras al End.",
+                "setup": "Polaris coloca el primer bloque y pone las diez fases cuando carga el plugin. Cada jugador aparece en un bloque propio."
+            },
             "parkour": {
                 "name": "Parkour infinito",
                 "summary": "Un recorrido que se genera mientras corres, con tiempos que batir.",
@@ -1040,7 +1045,7 @@
             "luckyblock": {
                 "name": "Lucky blocks",
                 "summary": "Rompe un bloque, llévate lo que te dé, y ojalá no sea el malo.",
-                "setup": "Los lucky blocks están en el mapa, así que sin uno esto es un mundo vacío en modo aventura."
+                "setup": "Los lucky blocks aparecen por todo el mundo, y cualquiera puede fabricar uno con ocho lingotes de oro alrededor de un cuarzo. Todos empiezan con tres. Para entrar no hace falta ningún mod ni paquete de recursos."
             },
             "shrinking-world": {
                 "name": "Mundo menguante",

@@ -132,6 +132,22 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         weight: "light"
     },
     {
+        id: "oneblock-classic",
+        name: gameMessage("games", "lib.blueprints.oneblock-classic.name"),
+        summary: gameMessage("games", "lib.blueprints.oneblock-classic.summary"),
+        editions: ["java"],
+        software: "PAPER",
+        projects: ["oneblock_bukkit"],
+        // The same plugin and void as OneBlock; what changes is the ladder the
+        // block climbs, which Polaris writes over the plugin's own levels once it
+        // has loaded (see `oneblock-phases.ts`).
+        levelType: FLAT_LEVEL_TYPE,
+        env: { GENERATOR_SETTINGS: VOID_GENERATOR_SETTINGS },
+        setup: gameMessage("games", "lib.blueprints.oneblock-classic.setup"),
+        docs: "https://github.com/MrMarL/OneBlock",
+        weight: "light"
+    },
+    {
         id: "parkour",
         name: gameMessage("games", "lib.blueprints.parkour.name"),
         summary: gameMessage("games", "lib.blueprints.parkour.summary"),
@@ -172,16 +188,23 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         summary: gameMessage("games", "lib.blueprints.luckyblock.summary"),
         editions: ["java"],
         software: "PAPER",
-        // The game is the map here. There is no lucky block plugin that works on a
-        // current release without the mod half of it on every client, and asking
-        // for that is a server nobody can join - so this blueprint is the settings
-        // a lucky block map needs and the map itself carries the rest.
-        projects: [],
-        levelType: FLAT_LEVEL_TYPE,
-        env: { MODE: "adventure", PVP: "true" },
+        // Lucky Blocks by lullaby6 is a datapack, not a plugin: the block is a hay
+        // bale wearing a display entity, so it looks the part with no resource
+        // pack and no client mod, and breaking one rolls an item, a block, a chest
+        // of loot, a trap, a mob or a weapon kit. The world add-on scatters them
+        // through the overworld as a structure, which is why the world is an
+        // ordinary survival one rather than a flat lobby - and why the add-on has
+        // to be in place before the world is generated, which the image sees to.
+        // A "datapack:" entry is downloaded from Modrinth at every boot into the
+        // level's datapacks folder, the same as a plugin into plugins; nothing of
+        // either pack (AGPL / LGPL) is shipped with Polaris. The add-on declares
+        // no dependency on Modrinth, so both are named.
+        projects: ["datapack:ly-lucky-blocks", "datapack:lucky-blocks-world"],
+        env: { MODE: "survival", PVP: "true" },
         setup: gameMessage("games", "lib.blueprints.luckyblock.setup"),
+        docs: "https://modrinth.com/datapack/ly-lucky-blocks",
         mapCategory: "luckyblock",
-        weight: "light"
+        weight: "normal"
     },
     {
         id: "shrinking-world",
