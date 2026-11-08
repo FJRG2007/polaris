@@ -11,6 +11,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 let admin = true;
 const settings = new Map<string, string>();
 const jar = new Map<string, string>();
+/** Runs between a save's read and its write: another admin's save landing. */
+let beforeSwap: (() => void) | null = null;
 
 vi.mock("@/lib/session", () => ({
     requireAdmin: async () => {
@@ -30,6 +32,12 @@ vi.mock("@/lib/setting-store", () => ({
     setSetting: async (key: string, value: string | null) => {
         if (value === null) settings.delete(key);
         else settings.set(key, value);
+    },
+    swapSetting: async (key: string, expected: string | null, value: string) => {
+        beforeSwap?.();
+        if ((settings.get(key) ?? null) !== expected) return false;
+        settings.set(key, value);
+        return true;
     }
 }));
 vi.mock("next/headers", () => ({
@@ -57,6 +65,7 @@ beforeEach(() => {
     admin = true;
     settings.clear();
     jar.clear();
+    beforeSwap = null;
 });
 
 describe("saving a season", () => {
@@ -87,8 +96,41 @@ describe("saving a season", () => {
             from: md(12, 1),
             to: md(1, 9)
         });
-        expect(settings.has("seasonal.calendar")).toBe(false);
+        expect(JSON.parse(settings.get("seasonal.calendar")!)).toEqual({});
         expect(await service.seasonCalendar()).toEqual(core.DEFAULT_SEASON_CALENDAR);
+    });
+
+    it("keeps another admin's save that lands between this one's read and write", async () => {
+        beforeSwap = () => {
+            beforeSwap = null;
+            settings.set("seasonal.calendar", JSON.stringify({ winter: { enabled: false } }));
+        };
+        const result = await actions.saveSeasonRuleAction("halloween", {
+            enabled: false,
+            from: md(10, 7),
+            to: md(11, 2)
+        });
+        expect(result.error).toBeUndefined();
+        const stored = JSON.parse(settings.get("seasonal.calendar")!);
+        expect(stored.winter).toEqual({ enabled: false });
+        expect(stored.halloween.enabled).toBe(false);
+    });
+
+    it("checks the overlap against a save that landed first", async () => {
+        beforeSwap = () => {
+            beforeSwap = null;
+            settings.set(
+                "seasonal.calendar",
+                JSON.stringify({ winter: { from: md(11, 1), to: md(1, 9) } })
+            );
+        };
+        const result = await actions.saveSeasonRuleAction("halloween", {
+            enabled: true,
+            from: md(10, 20),
+            to: md(11, 5)
+        });
+        expect(result.error).toContain("season.winter");
+        expect(JSON.parse(settings.get("seasonal.calendar")!).halloween).toBeUndefined();
     });
 
     it("refuses a day its month does not have, naming the field", async () => {

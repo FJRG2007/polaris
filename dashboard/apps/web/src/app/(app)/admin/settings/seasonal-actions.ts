@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 import { getTranslations } from "@/lib/i18n/request";
 import { setSeasonPreview } from "@/lib/seasonal-preview";
 import { requireAdmin } from "@/lib/session";
-import { saveSeasonRule, seasonCalendar, setSeasonsAllowed } from "@/lib/seasonal-service";
+import { saveSeasonRule, setSeasonsAllowed } from "@/lib/seasonal-service";
 
 export async function setSeasonsAllowedAction(allowed: unknown): Promise<{ error?: string }> {
     await requireAdmin();
@@ -66,15 +66,15 @@ export async function saveSeasonRuleAction(
     const { enabled, from, to } = parsed.data;
     const next: core.SeasonRule = { enabled, window: { from, to } };
     try {
-        const current = await seasonCalendar();
-        const clash = core.seasonOverlaps({ ...current, [which.data]: next }, which.data)[0];
-        if (clash) {
+        const saved = await saveSeasonRule(which.data, next);
+        if ("clash" in saved) {
             const names = await getTranslations("nav");
-            return { error: t("settings.seasonal.overlaps", { season: names(`season.${clash}`) }) };
+            return {
+                error: t("settings.seasonal.overlaps", { season: names(`season.${saved.clash}`) })
+            };
         }
-        const calendar = await saveSeasonRule(which.data, next);
         revalidatePath("/", "layout");
-        return { calendar };
+        return { calendar: saved.calendar };
     } catch (caught) {
         console.error("[seasonal] season not saved", caught);
         return { error: t("settings.seasonal.notSaved") };

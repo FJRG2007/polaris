@@ -37,10 +37,19 @@ import { stopSeasonPreviewAction } from "@/app/(app)/account/preferences/seasona
 const RECHECK_MS = 30 * 60_000;
 
 const SeasonContext = createContext<core.Season | null>(null);
+/** The season this session is previewing, as the frame drew it. `undefined`
+ *  outside a frame, so a reader can tell "no frame" from "no preview". */
+const PreviewContext = createContext<core.Season | null | undefined>(undefined);
 
 /** The season decorating this frame, or null when there is none or it is off. */
 export function useDecorationSeason(): core.Season | null {
     return useContext(SeasonContext);
+}
+
+/** The season this session is previewing, from the frame: what a control that
+ *  starts or stops a preview reads, so it follows a stop made elsewhere. */
+export function usePreviewSeason(): core.Season | null | undefined {
+    return useContext(PreviewContext);
 }
 
 /** The season on the reader's calendar today, and the run of the sound pack it
@@ -110,12 +119,14 @@ export function SeasonalFrame({
     }, [decoration]);
 
     return (
-        <SeasonContext.Provider value={decoration}>
-            {children}
-            {preview ? <DriftOnce key={preview} season={preview} always /> : null}
-            {!preview && decoration ? <DriftOnce key={decoration} season={decoration} /> : null}
-            {preview ? <PreviewBar season={preview} /> : null}
-        </SeasonContext.Provider>
+        <PreviewContext.Provider value={preview}>
+            <SeasonContext.Provider value={decoration}>
+                {children}
+                {preview ? <DriftOnce key={preview} season={preview} always /> : null}
+                {!preview && decoration ? <DriftOnce key={decoration} season={decoration} /> : null}
+                {preview ? <PreviewBar season={preview} /> : null}
+            </SeasonContext.Provider>
+        </PreviewContext.Provider>
     );
 }
 

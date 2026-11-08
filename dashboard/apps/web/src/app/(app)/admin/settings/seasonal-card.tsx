@@ -12,8 +12,8 @@
 
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
-import { SEASON_ICONS } from "@/components/seasonal/seasonal-frame";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { SEASON_ICONS, usePreviewSeason } from "@/components/seasonal/seasonal-frame";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Select, Switch } from "@polaris/ui";
 import {
@@ -33,10 +33,18 @@ export function SeasonalAdminCard({
     preview: core.Season | null;
 }) {
     const t = useTranslations("admin");
+    const nav = useTranslations("nav");
     const router = useRouter();
     const [allowed, setAllowed] = useState(initial);
     const [calendar, setCalendar] = useState(initialCalendar);
     const [preview, setPreview] = useState(initialPreview);
+    // The frame is redrawn from the server whenever a preview starts or stops,
+    // here or from its own bar, so it is the answer this card follows; the copy
+    // above only covers the moment between a click and that redraw.
+    const framed = usePreviewSeason();
+    useEffect(() => {
+        if (framed !== undefined) setPreview(framed);
+    }, [framed]);
     const [error, setError] = useState("");
     const [, startSaving] = useTransition();
 
@@ -60,7 +68,9 @@ export function SeasonalAdminCard({
         const before = preview;
         setPreview(season);
         return (season ? previewSeasonAction(season) : stopSeasonPreviewAction())
-            .catch(() => ({ error: t("settings.seasonal.previewFailed") }))
+            .catch(() => ({
+                error: season ? t("settings.seasonal.previewFailed") : nav("seasonPreview.notStopped")
+            }))
             .then((result) => {
                 if (result.error) {
                     setPreview(before);
