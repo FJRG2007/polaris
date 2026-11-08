@@ -34,6 +34,7 @@
  */
 
 import { whereLine } from "@/lib/chat/call-place";
+import { callersMet } from "@/lib/chat/missed-call";
 import Link from "next/link";
 import { Avatar } from "./avatar";
 import { avatarUrl } from "@/lib/avatar-url";
@@ -377,6 +378,17 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                 // call from that conversation is answered. Every tab and every
                 // device hears the frame, so none of them needs telling.
                 if (answersMissedCall(frame, viewerId)) clearMissed(frame.channelId, false);
+                // Sitting in a call with whoever rang answers their missed call
+                // too, in whichever conversation the call is: calling them from
+                // a group, or them joining yours, is having talked to them.
+                const met = callersMet(frame.seated, viewerId);
+                if (met.length > 0) {
+                    setMissed((current) =>
+                        current.some((one) => met.includes(one.userId))
+                            ? current.filter((one) => !met.includes(one.userId))
+                            : current
+                    );
+                }
                 // Who is in the room, before anything is decided about it: the
                 // decision below cannot see this, and it is what tells a call
                 // nobody answered from one somebody else did.

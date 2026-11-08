@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { whoMissedTheCall } from "@/lib/chat/missed-call";
+import { callersMet, missedCallerOf, whoMissedTheCall } from "@/lib/chat/missed-call";
 import { noticeBody, renderNotice } from "@/lib/chat/notice-text";
 
 const ANA = "user-ana";
@@ -102,5 +102,34 @@ describe("the line it leaves in the conversation", () => {
         // A refused call and an unanswered one look the same from the other end.
         // Keeping that true is a decision, not an omission.
         expect(body).not.toMatch(/declin|refus|reject/i);
+    });
+});
+
+describe("whose missed calls a seat answers", () => {
+    it("is everybody else in the call, when the reader is in it", () => {
+        expect(callersMet([ANA, BEN, CAT], ANA)).toEqual([BEN, CAT]);
+    });
+
+    it("is nobody when the reader is not seated", () => {
+        expect(callersMet([BEN, CAT], ANA)).toEqual([]);
+    });
+
+    it("is nobody without a seated list, or with only the reader", () => {
+        expect(callersMet(undefined, ANA)).toEqual([]);
+        expect(callersMet([ANA], ANA)).toEqual([]);
+        expect(callersMet([ANA, BEN], "")).toEqual([]);
+    });
+});
+
+describe("who made a missed call, from the bell row", () => {
+    it("reads the caller recorded with it", () => {
+        expect(missedCallerOf(JSON.stringify({ callerId: BEN }))).toBe(BEN);
+    });
+
+    it("is nothing for a row without one", () => {
+        expect(missedCallerOf(null)).toBeNull();
+        expect(missedCallerOf("not json")).toBeNull();
+        expect(missedCallerOf(JSON.stringify({ callerId: 7 }))).toBeNull();
+        expect(missedCallerOf(JSON.stringify({}))).toBeNull();
     });
 });

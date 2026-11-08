@@ -21,7 +21,7 @@
 import * as core from "@polaris/core";
 import { randomBytes, randomInt } from "node:crypto";
 import { blockersOf } from "@/lib/blocks";
-import { whoMissedTheCall } from "./missed-call";
+import { MOST_SEATED_NAMED, callersMet, missedCallerOf, whoMissedTheCall } from "./missed-call";
 import { prisma, type Prisma } from "@polaris/db";
 import { discardMeetingChat } from "./meeting-files";
 import { notify } from "@/lib/notifications/dispatch";
@@ -512,6 +512,60 @@ export async function answerMissedCalls(userId: string, channelId: string): Prom
     } catch (error) {
         console.error("polaris: could not clear a missed call:", error);
     }
+}
+
+/** The most unread missed-call alerts one seating reads. A handful is the real
+ *  case; the bound is what keeps a strange account from making it a scan. */
+const MOST_MISSED_READ = 200;
+
+/**
+ * Take missed-call alerts off the bell for everybody seated in a call whose
+ * caller is seated with them: two people talking have answered each other's
+ * missed calls, in whichever conversation the call happens to be.
+ *
+ * Rows written before the caller was recorded carry nothing to match and are
+ * left to the conversation rule above. Never fails the join it rides on.
+ */
+async function answerMissedCallsAmong(seated: readonly string[]): Promise<void> {
+    if (seated.length < 2) return;
+    try {
+        const rows = await prisma.notification.findMany({
+            where: {
+                userId: { in: [...seated] },
+                type: "chat.callMissed",
+                readAt: null,
+                metadata: { not: null }
+            },
+            select: { id: true, userId: true, metadata: true },
+            take: MOST_MISSED_READ
+        });
+        const answered = rows
+            .filter((row) => {
+                const callerId = missedCallerOf(row.metadata);
+                return callerId !== null && callersMet(seated, row.userId).includes(callerId);
+            })
+            .map((row) => row.id);
+        if (answered.length === 0) return;
+        await prisma.notification.updateMany({
+            where: { id: { in: answered }, readAt: null },
+            data: { readAt: new Date() }
+        });
+    } catch (error) {
+        console.error("polaris: could not clear missed calls between callers:", error);
+    }
+}
+
+/** The accounts seated in a call, or null once there are too many to name. */
+async function seatedAccounts(meetingId: string): Promise<string[] | null> {
+    const rows = await prisma.meetingParticipant.findMany({
+        where: { meetingId, leftAt: null, admission: "admitted", userId: { not: null } },
+        select: { userId: true },
+        take: MOST_SEATED_NAMED + 1
+    });
+    const ids = [
+        ...new Set(rows.map((row) => row.userId).filter((id): id is string => Boolean(id)))
+    ];
+    return ids.length > MOST_SEATED_NAMED ? null : ids;
 }
 
 /**
@@ -1280,6 +1334,12 @@ async function announceCall(
     if (!meeting?.channelId) return;
     // Only a ring is drawn as a card, so only a ring needs to say where.
     const group = state === "ringing" ? await callGroupOf(meeting.channelId) : null;
+    // Who is sitting together, so their missed calls to each other are answered
+    // on the bell here and on every screen that draws a card. A mute changes
+    // nobody's seat, and an ended call seats nobody.
+    const seated =
+        state === "ended" || voice ? null : await seatedAccounts(meetingId).catch(() => null);
+    if (seated) await answerMissedCallsAmong(seated);
     publishChatChange({
         channelId: meeting.channelId,
         kind: "call",
@@ -1290,7 +1350,8 @@ async function announceCall(
             state,
             count: state === "ended" ? 0 : await admittedCount(meetingId),
             ...(voice ? { voice } : {}),
-            ...(group ? { group } : {})
+            ...(group ? { group } : {}),
+            ...(seated ? { seated } : {})
         }
     });
 }
@@ -1640,6 +1701,8 @@ async function noteCallOutcome(meetingId: string): Promise<void> {
                     }),
                     body: missedCallBody(meeting.channel, words),
                     href: missedCallHref(channelId),
+                    // Who rang, so talking to them anywhere answers it.
+                    metadata: { callerId: meeting.hostId },
                     shelf
                 }).catch(() => undefined);
             })

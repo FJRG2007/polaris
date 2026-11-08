@@ -16,6 +16,7 @@
 import { z } from "zod";
 import { useEffect, useRef } from "react";
 import { CHAT_ACTIVITIES } from "@polaris/core";
+import { MOST_SEATED_NAMED } from "@/lib/chat/missed-call";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
 
@@ -83,7 +84,10 @@ const frameSchema = z.discriminatedUnion("kind", [
         // The group it rings in, for the card that says where as well as who.
         group: z
             .object({ name: z.string().max(200).nullable(), size: z.number().int().min(0) })
-            .optional()
+            .optional(),
+        // Who is seated, so sitting with somebody answers their missed call
+        // wherever the call is. Absent from an older server and a large room.
+        seated: z.array(z.string().max(64)).max(MOST_SEATED_NAMED).optional()
     })
 ]);
 

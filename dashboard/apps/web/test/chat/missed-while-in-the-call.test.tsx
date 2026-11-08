@@ -200,3 +200,66 @@ describe("a missed call that was answered somewhere else", () => {
         expect(screen.queryByText("Missed call")).toBeTruthy();
     });
 });
+
+describe("a missed call answered by talking to whoever rang", () => {
+    async function missedOne(): Promise<void> {
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
+        await act(async () => onFrame?.(ring("m1"), { owner: true }));
+        await act(async () => onFrame?.(gaveUp("m1"), { owner: true }));
+        expect(screen.queryByText("Missed call")).toBeTruthy();
+    }
+
+    it("goes when the reader sits with the caller in another conversation", async () => {
+        await missedOne();
+        await act(async () =>
+            onFrame?.(
+                {
+                    ...ring("m2", "group"),
+                    state: "moved",
+                    userId: "grace",
+                    name: "Grace",
+                    count: 2,
+                    seated: ["ada", "grace"]
+                },
+                { owner: true }
+            )
+        );
+        expect(screen.queryByText("Missed call")).toBeNull();
+    });
+
+    it("stays while the caller is in a call the reader is not in", async () => {
+        await missedOne();
+        await act(async () =>
+            onFrame?.(
+                {
+                    ...ring("m2", "group"),
+                    state: "moved",
+                    userId: "grace",
+                    name: "Grace",
+                    count: 2,
+                    seated: ["grace", "bob"]
+                },
+                { owner: true }
+            )
+        );
+        expect(screen.queryByText("Missed call")).toBeTruthy();
+    });
+
+    it("stays when the reader sits with somebody else", async () => {
+        await missedOne();
+        await act(async () =>
+            onFrame?.(
+                {
+                    ...ring("m2", "c2"),
+                    state: "moved",
+                    userId: "ada",
+                    name: "Ada",
+                    count: 2,
+                    seated: ["ada", "bob"]
+                },
+                { owner: true }
+            )
+        );
+        expect(screen.queryByText("Missed call")).toBeTruthy();
+    });
+});

@@ -60,3 +60,40 @@ export function whoMissedTheCall(outcome: CallOutcome): string[] {
         )
     ];
 }
+
+/**
+ * The most people a call frame names as seated. Past this the room is a meeting,
+ * not a telephone call somebody missed, and naming everybody in it to every
+ * member of the conversation on every move is not worth what it costs.
+ */
+export const MOST_SEATED_NAMED = 25;
+
+/**
+ * Whose missed calls a person has answered by sitting in a call: everybody else
+ * seated in it, if they are seated there themselves, or nobody.
+ *
+ * A missed call is answered by talking to whoever made it, wherever that
+ * happens - the conversation it rang in, another one, a group call both walked
+ * into. Tying it to the conversation alone left "Missed call from Arnau" on
+ * screen through an hour on the phone with Arnau.
+ */
+export function callersMet(seated: readonly string[] | undefined, viewerId: string): string[] {
+    if (!seated || !viewerId || !seated.includes(viewerId)) return [];
+    return [...new Set(seated.filter((userId) => userId !== "" && userId !== viewerId))];
+}
+
+/** Who made the missed call a bell row is about, from its metadata, or null for
+ *  a row written before it was recorded there. */
+export function missedCallerOf(metadata: string | null): string | null {
+    if (!metadata) return null;
+    try {
+        const parsed: unknown = JSON.parse(metadata);
+        if (parsed && typeof parsed === "object" && "callerId" in parsed) {
+            const callerId = (parsed as { callerId: unknown }).callerId;
+            return typeof callerId === "string" && callerId !== "" ? callerId : null;
+        }
+    } catch {
+        // Not JSON: a row with nothing to say about who called.
+    }
+    return null;
+}

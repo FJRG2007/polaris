@@ -306,7 +306,8 @@ export async function GET(request: Request): Promise<Response> {
                                 name: change.actorName ?? "",
                                 ...(change.movedTo ? { movedTo: change.movedTo } : {}),
                                 ...(change.call.voice ? { voice: true } : {}),
-                                ...(change.call.group ? { group: change.call.group } : {})
+                                ...(change.call.group ? { group: change.call.group } : {}),
+                                ...(change.call.seated ? { seated: change.call.seated } : {})
                             });
                         }
                         return;

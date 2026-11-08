@@ -154,6 +154,10 @@ export interface ChatChange {
         /** The group a call is ringing in, so the card can say where as well
          *  as who. Absent for a one-to-one, which is only ever the caller. */
         readonly group?: CallGroup;
+        /** The accounts seated in it, while the room is small enough to name
+         *  (`MOST_SEATED_NAMED`): sitting with somebody answers their missed
+         *  calls on every screen. Absent from an ended call and a large room. */
+        readonly seated?: readonly string[];
     };
 }
 
