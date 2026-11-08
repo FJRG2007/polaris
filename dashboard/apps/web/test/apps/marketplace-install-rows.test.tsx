@@ -61,17 +61,14 @@ function row(id: string, ownerId: string): InstalledAppView {
     };
 }
 
-const { default: MarketplacePage } = await import("@/app/(app)/admin/apps/page");
+const { loadPolarisAppsAction } = await import("@/app/(app)/admin/apps/data");
 const { default: MarketplaceAppPage } = await import("@/app/(app)/admin/apps/[appId]/page");
 
 type Row = Record<string, unknown>;
 
-/** The rows the grid hands its client component. */
+/** The rows the grid reads after its shell paints. */
 async function gridRows(): Promise<Row[]> {
-    const page = (await MarketplacePage({
-        searchParams: Promise.resolve({})
-    })) as ReactElement<{ installed: Row[] }>;
-    return page.props.installed;
+    return (await loadPolarisAppsAction()).installed as unknown as Row[];
 }
 
 /** The rows the app page's install panel is handed. */
