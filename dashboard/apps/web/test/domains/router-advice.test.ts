@@ -35,7 +35,14 @@ vi.mock("@polaris/db", () => ({
     VISIBLE_USER: { bannedAt: null, disabledAt: null },
     prisma: {
         user: { findMany, findUnique: userRules },
-        notification: { create },
+        // A notice the bell may fold a repeat into is looked for first; there is
+        // none here (the create stub keeps no rows), so each one written is new,
+        // and no reader is anywhere near the burst ceiling.
+        notification: {
+            create,
+            updateMany: vi.fn(async () => ({ count: 0 })),
+            count: vi.fn(async () => 0)
+        },
         setting: { findUnique, upsert, deleteMany: vi.fn() }
     }
 }));
