@@ -36,14 +36,6 @@ add over SSH.
 
 ## A look inside
 
-Screenshots of the real interface with sample data. Most link to a page with
-the full feature list. Mobile versions are in
-[docs/assets/media](docs/assets/media).
-
-Polaris TV: [does it work on my TV?](docs/features/polaris-tv-compatibility.md),
-[install](docs/features/polaris-tv-install.md), [privacy switches by brand](docs/features/polaris-tv-privacy.md)
-and [ad blocking for any TV](docs/features/polaris-tv-network.md).
-
 ### Everywhere
 
 <p align="center">
