@@ -120,18 +120,56 @@ function playerBrakeLamp(speed, throttle) {
 
 // The player car signals from the steering held: a turn held at town speed starts the indicator on that side, and it
 // cancels once the wheel has been straight a moment (or the car is up to speed), like a stalk returning after the corner.
-// Same 0.8 s cycle as traffic. Side 1 is left (+x), -1 right.
+// The stalk can also be set by hand (signalTurn): that side then stays on through straight driving and cancels only
+// after a turn to that side has been made and the wheel has come back, or when the same side is pressed again. The
+// hazard switch (toggleHazard) blinks both sides until it is pressed again. Same 0.8 s cycle as traffic. Side 1 is
+// left (+x), -1 right.
 const TURN_SIGNAL = { steerAbove: 0.5, holdFor: 0.25, cancelAfter: 0.6, minSpeed: 0.5, maxSpeed: 14, period: 0.8 };
 
 function createTurnSignal() {
-  return { side: 0, pending: 0, held: 0, straight: 0, clock: 0 };
+  return { side: 0, pending: 0, held: 0, straight: 0, clock: 0, manual: false, turned: false, hazard: false };
+}
+
+/** Sets the stalk to a side by hand (1 left, -1 right); the side already showing turns it off. */
+function signalTurn(signal, side) {
+  if (signal.side === side) {
+    signal.side = 0;
+    signal.manual = false;
+  } else {
+    signal.side = side;
+    signal.manual = true;
+    signal.clock = 0;
+  }
+  signal.turned = false;
+  signal.straight = 0;
+  return signal;
+}
+
+/** Flips the hazard lamps on or off. */
+function toggleHazard(signal) {
+  signal.hazard = !signal.hazard;
+  if (!signal.side) signal.clock = 0;
+  return signal;
 }
 
 /** Advances a turn signal by dt seconds of steering input (-1..1, positive left) at a speed in m/s. */
 function stepTurnSignal(signal, steer, speed, dt) {
   const s = Math.abs(speed);
   const side = steer > TURN_SIGNAL.steerAbove ? 1 : steer < -TURN_SIGNAL.steerAbove ? -1 : 0;
-  if (side !== 0 && s >= TURN_SIGNAL.minSpeed && s <= TURN_SIGNAL.maxSpeed) {
+  if (signal.manual) {
+    // A hand-set stalk ignores the speed window and cancels only once its turn is done
+    if (side === signal.side) {
+      signal.turned = true;
+      signal.straight = 0;
+    } else if (side === 0) {
+      signal.straight += dt;
+      if (signal.turned && signal.straight >= TURN_SIGNAL.cancelAfter) {
+        signal.side = 0;
+        signal.manual = false;
+        signal.turned = false;
+      }
+    } else signal.straight = 0;
+  } else if (side !== 0 && s >= TURN_SIGNAL.minSpeed && s <= TURN_SIGNAL.maxSpeed) {
     signal.held = signal.pending === side ? signal.held + dt : dt;
     signal.pending = side;
     signal.straight = 0;
@@ -142,13 +180,14 @@ function stepTurnSignal(signal, steer, speed, dt) {
     if (side === 0) signal.straight += dt;
     if (signal.straight >= TURN_SIGNAL.cancelAfter || s > TURN_SIGNAL.maxSpeed) signal.side = 0;
   }
-  signal.clock = signal.side ? signal.clock + dt : 0;
+  signal.clock = signal.side || signal.hazard ? signal.clock + dt : 0;
   return signal;
 }
 
 /** The lamp levels { left, right } a turn signal shows this instant: lit for the first half of each cycle. */
 function turnLamps(signal) {
-  const on = signal.side !== 0 && signal.clock % TURN_SIGNAL.period < TURN_SIGNAL.period / 2;
+  const on = (signal.side !== 0 || signal.hazard) && signal.clock % TURN_SIGNAL.period < TURN_SIGNAL.period / 2;
+  if (signal.hazard) return { left: on ? 1 : 0, right: on ? 1 : 0 };
   return { left: on && signal.side > 0 ? 1 : 0, right: on && signal.side < 0 ? 1 : 0 };
 }
 
@@ -439,6 +478,6 @@ export {
   BODY_MOTION, KEY_BINDINGS, BRAKE_LAMP, HELI_CRUISE_SPEED, LAMP_GLOW, HELI_TURBO, LOOK_SENSITIVITY, PERSON_CAMERA, PERSON_MOVE, TURN_SIGNAL,
   approachVelocity, arrivalFor, bodyIsFinite, brakeLamp, cameraRelativeMove, clampSensitivity, clearLength,
   createJumpState, createTurnSignal, heliTopSpeed, hudReadout, lookCurve, lookDirection, personCameraPose,
-  playerBrakeLamp, rayEntersCollider, settleBody, slideVelocity, springArm, stepArm, stepJump, stepTurbo, stepTurnSignal,
-  turnLamps, turnLook, turnToward, wrapAngle
+  playerBrakeLamp, rayEntersCollider, settleBody, signalTurn, slideVelocity, springArm, stepArm, stepJump, stepTurbo,
+  stepTurnSignal, toggleHazard, turnLamps, turnLook, turnToward, wrapAngle
 };

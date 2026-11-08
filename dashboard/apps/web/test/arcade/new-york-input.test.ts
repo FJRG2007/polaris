@@ -566,3 +566,43 @@ describe("the helicopter on the keyboard", () => {
         expect(new Set(codes).size).toBe(codes.length);
     });
 });
+
+describe("Skyline Roam: the taxi's indicator stalk and hazard lamps", () => {
+    const run = (signal: ReturnType<typeof rules.createTurnSignal>, steer: number, speed: number, seconds: number) => {
+        for (let t = 0; t < seconds; t += 0.05) rules.stepTurnSignal(signal, steer, speed, 0.05);
+        return signal;
+    };
+
+    it("keeps a hand-set signal on through straight driving at any speed", () => {
+        const signal = rules.signalTurn(rules.createTurnSignal(), -1);
+        run(signal, 0, 25, 3);
+        expect(signal.side).toBe(-1);
+        signal.clock = 0; // the start of a cycle
+        expect(rules.turnLamps(signal)).toEqual({ left: 0, right: 1 });
+        run(signal, 0, 25, 0.4);
+        expect(rules.turnLamps(signal)).toEqual({ left: 0, right: 0 });
+    });
+
+    it("cancels a hand-set signal after its turn is made, or on the same key again", () => {
+        const turned = run(rules.signalTurn(rules.createTurnSignal(), 1), 1, 6, 1);
+        expect(turned.side).toBe(1);
+        run(turned, 0, 6, 1);
+        expect(turned.side).toBe(0);
+        const pressedTwice = rules.signalTurn(rules.signalTurn(rules.createTurnSignal(), 1), 1);
+        expect(pressedTwice.side).toBe(0);
+        const switched = rules.signalTurn(rules.signalTurn(rules.createTurnSignal(), 1), -1);
+        expect(switched.side).toBe(-1);
+    });
+
+    it("blinks both sides together with the hazard lamps, over any signal, until switched off", () => {
+        const signal = rules.toggleHazard(rules.signalTurn(rules.createTurnSignal(), 1));
+        expect(rules.turnLamps(signal)).toEqual({ left: 1, right: 1 });
+        run(signal, 0, 0, 0.4);
+        expect(rules.turnLamps(signal)).toEqual({ left: 0, right: 0 });
+        run(signal, 0, 0, 0.4);
+        expect(rules.turnLamps(signal)).toEqual({ left: 1, right: 1 });
+        rules.toggleHazard(signal);
+        expect(signal.hazard).toBe(false);
+        expect(rules.turnLamps(signal).right).toBe(0);
+    });
+});

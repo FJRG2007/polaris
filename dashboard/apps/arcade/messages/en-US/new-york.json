@@ -168,6 +168,8 @@
             "move": "Drive / Reverse",
             "turn": "Steer",
             "horn": "Horn",
+            "signal": "Turn signal",
+            "hazard": "Hazard lights",
             "orbit": "Look around"
         },
         "cyclist": {
@@ -195,6 +197,7 @@
         "gamepad": "Gamepad",
         "leftStick": "Left stick",
         "rightStick": "Right stick",
+        "dpadSides": "D-pad left / right",
         "padMove": "Move and steer",
         "padLook": "Look around",
         "padThrottle": "Throttle and brake",

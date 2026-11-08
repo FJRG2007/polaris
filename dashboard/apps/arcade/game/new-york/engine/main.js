@@ -432,6 +432,8 @@ async function initApp() {
         onToggleMap: () => mapSystem.toggleFullMap(!mapSystem.isFullMapOpen),
         onCloseMap: () => mapSystem.toggleFullMap(false),
         onHorn: () => audioSystem.honk(controllerManager.getActiveEntity()),
+        onSignal: (side) => controllerManager.signalTurn(side),
+        onHazard: () => controllerManager.toggleHazard(),
         onPadChange: ({ connected, name }) => {
             showPadNotice(
                 t(connected ? "controls.padConnected" : "controls.padDisconnected", {
@@ -478,6 +480,8 @@ async function initApp() {
             [["W", "S"], "move"],
             [["A", "D"], "turn"],
             [["B"], "horn"],
+            [["Q", "E"], "signal"],
+            [["X"], "hazard"],
             [["Drag"], "orbit"]
         ],
         cyclist: [
@@ -542,7 +546,13 @@ async function initApp() {
                           [["L3"], t("controls.person.sprint")]
                       ]
                     : []),
-                ...(mode === "car" ? [[["X"], t("controls.car.horn")]] : []),
+                ...(mode === "car"
+                    ? [
+                          [["X"], t("controls.car.horn")],
+                          [[t("controls.dpadSides")], t("controls.car.signal")],
+                          [["L3"], t("controls.car.hazard")]
+                      ]
+                    : []),
                 [["Y"], t("controls.padCamera")],
                 [["LB", "RB"], t("controls.padModes")],
                 [["↑", "↓"], t("controls.padZoom")],
@@ -945,6 +955,14 @@ async function initApp() {
             case "KeyN":
                 if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey)
                     audioSystem.setEnabled(!audioSystem.enabled);
+                break;
+            case "KeyQ":
+            case "KeyE":
+                if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey)
+                    controllerManager.signalTurn(e.code === "KeyQ" ? 1 : -1);
+                break;
+            case "KeyX":
+                if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) controllerManager.toggleHazard();
                 break;
             case "KeyB":
                 if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && !mapSystem.isFullMapOpen)

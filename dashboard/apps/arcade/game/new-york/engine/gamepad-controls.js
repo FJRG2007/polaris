@@ -246,6 +246,8 @@ class GamepadControls {
     const menuKeys = { up: edge(12), down: edge(13), left: edge(14), right: edge(15), accept: edge(0), back: edge(1) };
     const cycleMode = Number(Boolean(edge(5))) - Number(Boolean(edge(4)));
     const cycleCamera = edge(3), recenter = edge(11), horn = edge(2);
+    // In the taxi the d-pad's sides set the indicator stalk and the left stick's click the hazard lamps
+    const signalLeft = edge(14), signalRight = edge(15), hazard = edge(10);
     this.previousButtons = pressed;
 
     const target = document.activeElement;
@@ -298,6 +300,8 @@ class GamepadControls {
 
     const mode = this.controller.activeMode;
     if (horn && mode === 'car') this.callbacks.onHorn?.();
+    if (mode === 'car' && (signalLeft || signalRight)) this.callbacks.onSignal?.(signalLeft ? 1 : -1);
+    if (mode === 'car' && hazard) this.callbacks.onHazard?.();
     const driving = mode === 'car' || mode === 'cyclist';
     const movement = driving ? { x: steeringAxis(pad.axes?.[0]), y: 0 } : stick(pad, 0);
     const look = stick(pad, 2);
