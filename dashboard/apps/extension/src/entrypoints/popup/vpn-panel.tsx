@@ -21,8 +21,9 @@ import { useEffect, useMemo, useState } from "react";
 import * as places from "@/lib/vpn-places";
 import { EVERY_SITE } from "@/lib/injection";
 import { askBackground } from "@/lib/messages";
-import type { VpnNode, VpnState } from "@/lib/vpn";
+import type { ConflictExtension, VpnNode, VpnState } from "@/lib/vpn";
 import { activeNode, Flag, shareVpnState, useVpnState } from "./vpn-row";
+import { ProxyConflictCard, useProxyWatch } from "./vpn-conflict";
 
 const RECENTS_KEY = "polaris.vpn.recents";
 
@@ -54,6 +55,14 @@ export function VpnPanel(): React.JSX.Element {
     const [error, setError] = useState<{ text: string; retry: () => void } | null>(null);
     const [note, setNote] = useState<string | null>(null);
     const [guardError, setGuardError] = useState<string | null>(null);
+    /** What the proxy card is doing: an extension's id, "find", or nothing. */
+    const [working, setWorking] = useState<string | null>(null);
+    const [conflictError, setConflictError] = useState<string | null>(null);
+    /** The server a refused connect was for, tried again once the proxy is free. */
+    const [retryNode, setRetryNode] = useState<VpnNode | null>(null);
+    /** Moved once the management permission is granted, so its events are heard. */
+    const [watchKey, setWatchKey] = useState(0);
+    useProxyWatch(reload, String(watchKey));
 
     const countries = useMemo(
         () => places.groupByCountry(state?.nodes ?? [], t.locale, t("vpn.otherPlaces")),
@@ -83,13 +92,21 @@ export function VpnPanel(): React.JSX.Element {
      * Connects to `first`, and to `fallback()` once when that fails and one is
      * given. The grant is asked for here, inside the click: the worker cannot.
      */
-    const connect = (first: VpnNode, fallback?: (failed: VpnNode) => VpnNode | null): void => {
+    const connect = (
+        first: VpnNode,
+        fallback?: (failed: VpnNode) => VpnNode | null,
+        outsideClick = false
+    ): void => {
         setConnecting(first);
         setError(null);
         setNote(null);
         const retry = (): void => connect(first, fallback);
-        void browser.permissions
-            .request({ origins: [...EVERY_SITE] })
+        // Away from a click the browser refuses to ask; the worker still checks
+        // the grant and says so when it is missing.
+        const grant = outsideClick
+            ? Promise.resolve(true)
+            : browser.permissions.request({ origins: [...EVERY_SITE] });
+        void grant
             .catch(() => false)
             .then(async (granted) => {
                 if (!granted) return { ok: false, error: t("vpn.refused.noSites") } as Outcome;
@@ -106,8 +123,10 @@ export function VpnPanel(): React.JSX.Element {
                 if (!outcome.ok) {
                     // A failed switch can leave the old server off: draw what is true now.
                     reload();
+                    setRetryNode(first);
                     return setError({ text: outcome.error, retry });
                 }
+                setRetryNode(null);
                 shareVpnState(outcome.state);
                 const used = outcome.node ?? first;
                 const next = places.pushRecent(recents, used.id);
@@ -128,6 +147,60 @@ export function VpnPanel(): React.JSX.Element {
                     retry: disconnect
                 });
         });
+    };
+
+    /** Asks, inside the click, to see the extensions, so the card can name them. */
+    const findHolder = (): void => {
+        setConflictError(null);
+        setWorking("find");
+        void browser.permissions
+            .request({ permissions: ["management"] })
+            .catch(() => false)
+            .then((granted) => {
+                setWorking(null);
+                if (!granted) return setConflictError(t("vpn.conflict.findRefused"));
+                setWatchKey((key) => key + 1);
+                reload();
+            });
+    };
+
+    /**
+     * Disables the extension, inside the click as the browser wants, then takes
+     * the proxy back: a connection in place gets it again, and a connect that was
+     * refused for it is tried once more. Another extension next in line shows up
+     * in the card instead.
+     */
+    const disableHolder = (extension: ConflictExtension): void => {
+        setConflictError(null);
+        setWorking(extension.id);
+        const management = (
+            browser as unknown as {
+                management?: { setEnabled?(id: string, enabled: boolean): Promise<void> };
+            }
+        ).management;
+        const done = management?.setEnabled
+            ? management.setEnabled(extension.id, false)
+            : Promise.reject(new Error("management is not granted"));
+        void done
+            .then(
+                () => true,
+                () => false
+            )
+            .then(async (off) => {
+                if (!off) {
+                    setWorking(null);
+                    return setConflictError(
+                        t("vpn.conflict.disableFailed", { name: extension.name })
+                    );
+                }
+                const reply = await askBackground({ kind: "vpnReclaim" });
+                setWorking(null);
+                if (!reply.ok || !("vpn" in reply)) return reload();
+                shareVpnState(reply.vpn);
+                if (!reply.vpn.conflict && !reply.vpn.active && retryNode) {
+                    connect(retryNode, undefined, true);
+                }
+            });
     };
 
     /** Optimistic: the choice shows at once and goes back if the worker refuses it. */
@@ -160,6 +233,8 @@ export function VpnPanel(): React.JSX.Element {
             return next;
         });
 
+    /** Connecting cannot work while something else holds the proxy. */
+    const held = Boolean(state.conflict);
     const status = connecting ? "connecting" : state.active ? "on" : "off";
     const where = connecting ?? active;
     const place = where ? places.placeOf(where, t.locale) : null;
@@ -214,7 +289,7 @@ export function VpnPanel(): React.JSX.Element {
                     <div className="vpn-actions">
                         <button
                             className="vpn-main"
-                            disabled={busy || !quick}
+                            disabled={busy || held || !quick}
                             title={
                                 quick
                                     ? t("vpn.connectTo", { name: label(quick) })
@@ -227,7 +302,7 @@ export function VpnPanel(): React.JSX.Element {
                         </button>
                         <button
                             className="ghost vpn-random"
-                            disabled={busy || !random}
+                            disabled={busy || held || !random}
                             title={t("vpn.randomHint")}
                             onClick={() => random && connect(random, otherThan)}
                         >
@@ -241,19 +316,33 @@ export function VpnPanel(): React.JSX.Element {
                 {status === "on" ? (
                     <button
                         className="ghost vpn-change"
-                        disabled={!random}
+                        disabled={held || !random}
                         title={t("vpn.randomHint")}
                         onClick={() => random && connect(random, otherThan)}
                     >
                         {t("vpn.changeRandom")}
                     </button>
                 ) : null}
+                {state.conflict ? (
+                    <ProxyConflictCard
+                        conflict={state.conflict}
+                        connected={state.active !== null}
+                        working={working}
+                        error={conflictError}
+                        onFind={findHolder}
+                        onDisable={disableHolder}
+                        onOpenExtensions={() =>
+                            void browser.tabs.create({ url: "chrome://extensions" })
+                        }
+                        t={t}
+                    />
+                ) : null}
                 {note ? (
                     <p className="vpn-note small" role="status">
                         {note}
                     </p>
                 ) : null}
-                {error ? (
+                {error && !state.conflict ? (
                     <div className="vpn-error" role="alert">
                         <span className="strong small">{t("vpn.failed")}</span>
                         <span className="small">{error.text}</span>
@@ -292,7 +381,7 @@ export function VpnPanel(): React.JSX.Element {
                                         sub={places.placeOf(node, t.locale) ? label(node) : null}
                                         flag
                                         current={node.id === state.active?.nodeId}
-                                        busy={busy}
+                                        busy={busy || held}
                                         reason={node.browser ? null : reason(node)}
                                         onConnect={() => connect(node)}
                                     />
@@ -324,7 +413,10 @@ export function VpnPanel(): React.JSX.Element {
                                             <button
                                                 className="vpn-pick"
                                                 aria-disabled={
-                                                    busy || country.usable === 0 || undefined
+                                                    busy ||
+                                                    held ||
+                                                    country.usable === 0 ||
+                                                    undefined
                                                 }
                                                 title={
                                                     pick
@@ -335,6 +427,7 @@ export function VpnPanel(): React.JSX.Element {
                                                 }
                                                 onClick={() =>
                                                     !busy &&
+                                                    !held &&
                                                     pick &&
                                                     connect(pick, (failed) =>
                                                         places.randomPick(
@@ -395,7 +488,7 @@ export function VpnPanel(): React.JSX.Element {
                                                         title={node.city ?? label(node)}
                                                         sub={node.city ? label(node) : null}
                                                         current={node.id === state.active?.nodeId}
-                                                        busy={busy}
+                                                        busy={busy || held}
                                                         reason={node.browser ? null : reason(node)}
                                                         onConnect={() => connect(node)}
                                                     />

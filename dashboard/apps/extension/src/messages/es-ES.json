@@ -424,6 +424,7 @@
             "notReady": "Ese servidor aún no está listo para navegadores.",
             "unreachable": "Polaris no respondió. Inténtalo de nuevo en un momento.",
             "blocked": "Otra extensión controla el proxy del navegador. Apágala e inténtalo de nuevo.",
+            "policy": "El proxy de este navegador lo fija su administrador, así que la VPN no puede usarlo.",
             "noTraffic": "El servidor no dejó pasar tráfico, así que el navegador sigue como estaba."
         },
         "browserIssue": {
@@ -465,6 +466,24 @@
         "privacy": "Privacidad",
         "webRtcGuard": "Ocultar tu dirección a WebRTC",
         "webRtcOnHint": "Con la VPN conectada, las llamadas y demás WebRTC de los sitios pasan por el servidor y no revelan tu dirección real. Algunas pueden ir peor.",
-        "webRtcOffHint": "Las llamadas van directas y pueden ir mejor, pero un sitio puede ver tu dirección real por WebRTC aunque estés conectado."
+        "webRtcOffHint": "Las llamadas van directas y pueden ir mejor, pero un sitio puede ver tu dirección real por WebRTC aunque estés conectado.",
+        "conflict": {
+            "title": "{count, plural, one {Otra extensión tiene el proxy} other {Otras extensiones tienen el proxy}}",
+            "hint": "Desactívala para que la VPN lleve el tráfico del navegador.",
+            "hintConnected": "Mientras siga activa, el tráfico del navegador no pasa por la VPN.",
+            "row": "Otra extensión tiene el proxy",
+            "find": "Ver cuál es",
+            "findHint": "Polaris pide al navegador ver tus extensiones para nombrarla.",
+            "findRefused": "Sin ese permiso Polaris no puede nombrar la extensión.",
+            "unnamed": "El navegador no dice cuál es. Desactiva la que pone un proxy o una VPN.",
+            "openExtensions": "Abrir extensiones",
+            "disable": "Desactivar",
+            "disableNamed": "Desactivar {name}",
+            "disabling": "Desactivando",
+            "disableFailed": "El navegador no desactivó {name}. Inténtalo de nuevo.",
+            "locked": "Instalada por tu administrador",
+            "policyTitle": "El proxy lo fija tu administrador",
+            "policyHint": "Una directiva del navegador fija su proxy, así que la VPN no puede usarlo. Pregunta a quien lo gestiona."
+        }
     }
 }

@@ -417,6 +417,8 @@ export type Request =
     | { readonly kind: "vpn" }
     | { readonly kind: "vpnConnect"; readonly nodeId: string }
     | { readonly kind: "vpnDisconnect" }
+    /** Takes the proxy back for the connection in place, once another extension let go. */
+    | { readonly kind: "vpnReclaim" }
     /** Whether WebRTC is held to the proxy while connected. */
     | { readonly kind: "vpnWebRtc"; readonly on: boolean }
     /** Change how long an unlocked vault may sit unused before it locks itself. */

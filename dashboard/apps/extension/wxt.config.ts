@@ -128,6 +128,17 @@ export default defineConfig({
             ? {
                   host_permissions: ["https://*/*", "http://*/*"],
                   /**
+                   * Naming and disabling the extension that holds the proxy
+                   * while the VPN wants it (`src/lib/vpn.ts`). Asked for from the
+                   * popup's button, never at install: as a required permission it
+                   * carries the "manage your extensions" warning, and Chromium
+                   * disables an installed extension whose update adds one until
+                   * somebody re-approves it. Firefox's build leaves it out: there
+                   * the VPN never competes for one proxy setting, and
+                   * `management.setEnabled` only reaches themes.
+                   */
+                  optional_permissions: ["management"],
+                  /**
                    * WebAssembly, which a vault on Argon2id is opened through.
                    *
                    * Manifest v3 blocks it outright unless the manifest asks: the

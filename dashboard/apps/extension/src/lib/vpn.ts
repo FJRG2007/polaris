@@ -75,10 +75,88 @@ export interface VpnState {
     /** Whether WebRTC is held to the proxy while connected; null where this browser
      *  cannot be asked to. */
     readonly webRtcGuard: boolean | null;
+    /** Who holds the browser's proxy instead of Polaris; null when nobody does, or
+     *  on Firefox, which decides request by request and has no such holder. Missing
+     *  from a worker older than this. */
+    readonly conflict?: ProxyConflict | null;
+}
+
+/** Another extension, as `management.getAll` describes it. */
+export interface ManagedExtension {
+    readonly id: string;
+    readonly name: string;
+    readonly enabled: boolean;
+    readonly type?: string;
+    readonly permissions?: readonly string[];
+    readonly icons?: readonly { readonly size: number; readonly url: string }[];
+    readonly mayDisable?: boolean;
+}
+
+/** An extension that may be holding the proxy, as the popup draws it. */
+export interface ConflictExtension {
+    readonly id: string;
+    readonly name: string;
+    readonly icon: string | null;
+    /** False for one the browser's administrator installed: only they can remove it. */
+    readonly mayDisable: boolean;
+}
+
+/**
+ * Why Polaris cannot set the proxy. `policy` is the browser's administrator,
+ * which no button here can change. `extensions` is another extension: the ones
+ * that may hold it, or null while Polaris has not been allowed to look.
+ */
+export type ProxyConflict =
+    | { readonly kind: "policy" }
+    | { readonly kind: "extensions"; readonly extensions: readonly ConflictExtension[] | null };
+
+/** The icon nearest 32px, from the sizes an extension ships. */
+function iconOf(icons: ManagedExtension["icons"]): string | null {
+    const sorted = [...(icons ?? [])].sort((a, b) => a.size - b.size);
+    return (sorted.find((icon) => icon.size >= 32) ?? sorted.at(-1))?.url ?? null;
+}
+
+/**
+ * Who holds the proxy, from the setting's level of control and the installed
+ * extensions. The browser does not name the holder, so every enabled extension
+ * that may set a proxy is listed: the most recently installed of them is the one
+ * in control, and the next takes over as soon as that one is off.
+ */
+export function proxyConflict(
+    levelOfControl: string | undefined,
+    extensions: readonly ManagedExtension[] | null,
+    selfId: string | undefined
+): ProxyConflict | null {
+    if (levelOfControl === "not_controllable") return { kind: "policy" };
+    if (levelOfControl !== "controlled_by_other_extensions") return null;
+    if (extensions === null) return { kind: "extensions", extensions: null };
+    return {
+        kind: "extensions",
+        extensions: extensions
+            .filter(
+                (one) =>
+                    one.id !== selfId &&
+                    one.enabled &&
+                    (one.type ?? "extension") === "extension" &&
+                    (one.permissions ?? []).includes("proxy")
+            )
+            .map((one) => ({
+                id: one.id,
+                name: one.name,
+                icon: iconOf(one.icons),
+                mayDisable: one.mayDisable !== false
+            }))
+    };
+}
+
+/** The proxy's level of control, as the refusal it means for connecting. */
+function refusalOf(levelOfControl: string | undefined): VpnRefusal | null {
+    if (levelOfControl === "controlled_by_other_extensions") return "blocked";
+    return levelOfControl === "not_controllable" ? "policy" : null;
 }
 
 export type VpnRefusal =
-    "noSites" | "noAccess" | "notReady" | "unreachable" | "blocked" | "noTraffic";
+    "noSites" | "noAccess" | "notReady" | "unreachable" | "blocked" | "policy" | "noTraffic";
 
 export type VpnOutcome = { readonly ok: true } | { readonly ok: false; readonly code: VpnRefusal };
 
@@ -96,6 +174,9 @@ interface ProxySetting {
     set(detail: { value: unknown; scope: "regular" }): Promise<unknown>;
     clear(detail: { scope: "regular" }): Promise<unknown>;
     get(detail: object): Promise<{ levelOfControl?: string }>;
+    readonly onChange?: {
+        addListener(listener: (detail: { levelOfControl?: string }) => void): void;
+    };
 }
 
 /** The parts of the browser this touches, so a test can stand in for them. */
@@ -123,8 +204,12 @@ export interface VpnApi {
             readonly webRTCIPHandlingPolicy?: Pick<ProxySetting, "set" | "clear">;
         };
     };
+    /** Only there once the optional `management` permission is granted. */
+    readonly management?: {
+        getAll?(): Promise<ManagedExtension[]>;
+    };
     readonly permissions?: {
-        contains(detail: { origins: string[] }): Promise<boolean>;
+        contains(detail: { origins?: string[]; permissions?: string[] }): Promise<boolean>;
         readonly onRemoved?: {
             addListener(listener: (removed: { origins?: string[] }) => void): void;
         };
@@ -148,6 +233,8 @@ export interface VpnDeps {
     readonly perRequest: boolean;
     readonly fetch?: typeof fetch;
     readonly now?: () => number;
+    /** This extension's own id, never listed as the one holding the proxy. */
+    readonly selfId?: string;
 }
 
 const TIMEOUT_MS = 15_000;
@@ -362,6 +449,13 @@ export class BrowserVpn {
                 all,
                 ["asyncBlocking"]
             );
+            // Another extension let go of the proxy (turned off, removed): a
+            // connection it had taken over gets the proxy back without a press.
+            // After the sign-in listener, so a browser refusing this one still
+            // answers the proxy's login.
+            api.proxy?.settings?.onChange?.addListener(({ levelOfControl }) => {
+                if (levelOfControl === "controllable_by_this_extension") void this.reclaim();
+            });
         } catch (error) {
             console.warn("polaris: the VPN cannot listen in this browser:", error);
         }
@@ -383,14 +477,59 @@ export class BrowserVpn {
         const webRtcGuard = this.deps.api.privacy?.network?.webRTCIPHandlingPolicy
             ? await this.deps.webRtcGuard.getValue().catch(() => true)
             : null;
+        const conflict = await this.conflict();
         const { origin, token } = await this.deps.link();
-        if (!origin || !token) return { available: false, nodes: [], active, webRtcGuard };
+        const none = { available: false, nodes: [], active, webRtcGuard, conflict };
+        if (!origin || !token) return none;
         const reply = await this.send(`${origin}/api/extension/vpn`, {
             headers: { authorization: `Bearer ${token}` }
         });
-        if (!reply?.ok) return { available: false, nodes: [], active, webRtcGuard };
+        if (!reply?.ok) return none;
         const nodes = readNodes(await reply.json().catch(() => null));
-        return { available: nodes.length > 0, nodes, active, webRtcGuard };
+        return { available: nodes.length > 0, nodes, active, webRtcGuard, conflict };
+    }
+
+    /** Who holds the proxy instead of Polaris, on Chromium. */
+    async conflict(): Promise<ProxyConflict | null> {
+        const settings = this.deps.api.proxy?.settings;
+        if (this.deps.perRequest || !settings) return null;
+        const held = await settings.get({}).catch(() => null);
+        const level = held?.levelOfControl;
+        if (level !== "controlled_by_other_extensions")
+            return proxyConflict(level, null, undefined);
+        return proxyConflict(level, await this.extensions(), this.deps.selfId);
+    }
+
+    /** The installed extensions, or null while the permission to list them is not granted. */
+    private async extensions(): Promise<ManagedExtension[] | null> {
+        const { management, permissions } = this.deps.api;
+        if (!management?.getAll || !permissions) return null;
+        const granted = await permissions
+            .contains({ permissions: ["management"] })
+            .catch(() => false);
+        if (!granted) return null;
+        return management.getAll().catch(() => null);
+    }
+
+    /**
+     * Sets the proxy again for the connection in place, once whatever held it has
+     * let go. Nothing to do while disconnected.
+     */
+    async reclaim(): Promise<VpnOutcome> {
+        const route = await this.deps.route.getValue();
+        if (!route) return { ok: true };
+        const refused = await this.applyProxy(route).catch((): VpnRefusal => "blocked");
+        if (refused) return { ok: false, code: refused };
+        // A disconnect that landed while the proxy was being set has already
+        // cleared it: setting it after that would hold the browser to a server
+        // with no login to answer it with.
+        if (!(await this.deps.route.getValue())) {
+            await this.deps.api.proxy?.settings?.clear({ scope: "regular" }).catch(() => undefined);
+            return { ok: true };
+        }
+        await this.guardWebRtc(true);
+        await this.deps.changed();
+        return { ok: true };
     }
 
     /**
@@ -415,11 +554,13 @@ export class BrowserVpn {
         if (await this.isConnected()) await this.guardWebRtc(true);
     }
 
-    private async applyProxy(route: VpnRoute): Promise<boolean> {
+    /** Null once the proxy is Polaris's, or why it cannot be. */
+    private async applyProxy(route: VpnRoute): Promise<VpnRefusal | null> {
         const settings = this.deps.api.proxy?.settings;
-        if (this.deps.perRequest || !settings) return true;
+        if (this.deps.perRequest || !settings) return null;
         const held = await settings.get({}).catch(() => null);
-        if (held?.levelOfControl === "controlled_by_other_extensions") return false;
+        const refused = refusalOf(held?.levelOfControl);
+        if (refused) return refused;
         await settings.set({
             scope: "regular",
             value: {
@@ -430,7 +571,7 @@ export class BrowserVpn {
                 }
             }
         });
-        return true;
+        return null;
     }
 
     private async mayReachEverySite(): Promise<boolean> {
@@ -458,9 +599,10 @@ export class BrowserVpn {
         const previous = await this.deps.route.getValue();
         await this.deps.login.setValue(held);
         await this.deps.route.setValue(route);
-        if (!(await this.applyProxy(route))) {
+        const taken = await this.applyProxy(route);
+        if (taken) {
             await this.deps.route.setValue(previous);
-            return { ok: false, code: "blocked" };
+            return { ok: false, code: taken };
         }
         await this.guardWebRtc(true);
         if (!(await this.trafficFlows())) {

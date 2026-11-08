@@ -424,6 +424,7 @@
             "notReady": "That server is not ready for browsers yet.",
             "unreachable": "Polaris did not answer. Try again in a moment.",
             "blocked": "Another extension controls this browser's proxy. Turn it off and try again.",
+            "policy": "This browser's proxy is set by its administrator, so the VPN cannot use it.",
             "noTraffic": "The server did not carry traffic, so this browser stayed as it was."
         },
         "browserIssue": {
@@ -465,6 +466,24 @@
         "privacy": "Privacy",
         "webRtcGuard": "Hide your address from WebRTC",
         "webRtcOnHint": "While connected, calls and other WebRTC on sites go through the server, so they cannot reveal your real address. Some may connect worse.",
-        "webRtcOffHint": "Calls connect directly and may work better, but a site can learn your real address through WebRTC even while connected."
+        "webRtcOffHint": "Calls connect directly and may work better, but a site can learn your real address through WebRTC even while connected.",
+        "conflict": {
+            "title": "{count, plural, one {Another extension holds the proxy} other {Other extensions hold the proxy}}",
+            "hint": "Disable it so the VPN can carry this browser's traffic.",
+            "hintConnected": "Until it is off, this browser's traffic does not go through the VPN.",
+            "row": "Another extension holds the proxy",
+            "find": "Show which one",
+            "findHint": "Polaris asks the browser to see your extensions, to name it.",
+            "findRefused": "Without that permission Polaris cannot name the extension.",
+            "unnamed": "The browser does not say which one. Disable the one that sets a proxy or VPN.",
+            "openExtensions": "Open extensions",
+            "disable": "Disable",
+            "disableNamed": "Disable {name}",
+            "disabling": "Disabling",
+            "disableFailed": "The browser did not disable {name}. Try again.",
+            "locked": "Installed by your administrator",
+            "policyTitle": "The proxy is set by your administrator",
+            "policyHint": "A policy on this browser fixes its proxy, so the VPN cannot use it. Ask whoever manages it."
+        }
     }
 }
