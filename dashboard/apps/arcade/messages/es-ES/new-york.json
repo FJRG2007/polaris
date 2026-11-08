@@ -236,7 +236,7 @@
         "gamepad": "Mando Bluetooth o USB",
         "padWaiting": "Enciéndelo y pulsa cualquier botón",
         "padReady": "Listo",
-        "phone": "Teléfono como mando",
+        "phone": "Móvil como mando",
         "phoneHint": "Vincúlalo con un QR o un código",
         "phoneTitle": "Usa tu móvil",
         "phoneSteps": "Escanéalo con el móvil, o abre Juegos en él, elige Mando en el móvil e introduce el código.",
@@ -250,6 +250,6 @@
         "together": "Jugar con otros",
         "togetherHint": "Abre una sala o entra con un código",
         "togetherDenied": "Un admin lo ha desactivado en tu cuenta",
-        "phoneName": "Teléfono"
+        "phoneName": "Móvil"
     }
 }
