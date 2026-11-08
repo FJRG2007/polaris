@@ -22,7 +22,10 @@ export async function GET(
     const t = await translateT();
     const params = modelFileParams.safeParse(await context.params);
     if (!params.success) {
-        return Response.json({ error: "unknown", message: t("local.unknownModel") }, { status: 404 });
+        return Response.json(
+            { error: "unknown", message: t("local.unknownModel") },
+            { status: 404 }
+        );
     }
     const { pair, file } = params.data;
     let location: string;

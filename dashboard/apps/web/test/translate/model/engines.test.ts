@@ -81,12 +81,7 @@ describe("the screen's engines", () => {
         };
         expect(
             usableEngines({ browser: true, local: false, available: ALL, settings: order })
-        ).toEqual([
-            "polar",
-            "google",
-            "browser",
-            "deepl"
-        ]);
+        ).toEqual(["polar", "google", "browser", "deepl"]);
         expect(usableServerEngines(ALL, order)).toEqual(["polar", "google", "deepl"]);
         expect(pickServerEngine({ ...ALL, polar: false }, order)).toBe("google");
     });

@@ -131,7 +131,8 @@ export function createLocalEngine(options: LocalEngineOptions): TranslateEngine 
             const entry = data?.id === undefined ? undefined : pending.get(data.id);
             if (!entry) return;
             pending.delete(data.id!);
-            if (data.error) entry.reject(new LocalEngineUnavailable(data.error.message ?? "worker"));
+            if (data.error)
+                entry.reject(new LocalEngineUnavailable(data.error.message ?? "worker"));
             else entry.resolve(data.result);
         });
         made.addEventListener("error", () => reset(new LocalEngineUnavailable("worker")));
@@ -160,7 +161,9 @@ export function createLocalEngine(options: LocalEngineOptions): TranslateEngine 
                     })
                 );
                 const vocab = buffers.get("vocab");
-                const vocabs = vocab ? [vocab] : [buffers.get("srcvocab")!, buffers.get("trgvocab")!];
+                const vocabs = vocab
+                    ? [vocab]
+                    : [buffers.get("srcvocab")!, buffers.get("trgvocab")!];
                 await call(
                     "loadTranslationModel",
                     [
@@ -230,7 +233,11 @@ export function createLocalEngine(options: LocalEngineOptions): TranslateEngine 
                     : ((await call("translate", [
                           {
                               models: steps,
-                              texts: asked.map((text) => ({ text, html: false, qualityScores: false }))
+                              texts: asked.map((text) => ({
+                                  text,
+                                  html: false,
+                                  qualityScores: false
+                              }))
                           }
                       ])) as { target: { text: string } }[]);
             signal?.throwIfAborted();
@@ -300,14 +307,20 @@ export function cachedModelFiles(failed: string): LoadModelFile {
         for (;;) {
             const { done, value } = await reader.read();
             if (done) break;
-            if (at + value.byteLength > bytes.byteLength) throw new ServerEngineError("model", failed);
+            if (at + value.byteLength > bytes.byteLength)
+                throw new ServerEngineError("model", failed);
             bytes.set(value, at);
             at += value.byteLength;
             onBytes(value.byteLength);
         }
         if (at !== file.size) throw new ServerEngineError("model", failed);
         await cache
-            ?.put(url, new Response(bytes.slice(), { headers: { "content-type": "application/octet-stream" } }))
+            ?.put(
+                url,
+                new Response(bytes.slice(), {
+                    headers: { "content-type": "application/octet-stream" }
+                })
+            )
             .catch(() => undefined);
         return bytes.buffer;
     };

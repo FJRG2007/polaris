@@ -156,7 +156,12 @@ describe("LibreTranslate key handling", () => {
             }
         });
         await expect(
-            libreTranslate(["hello"], "en", "es", server(() => new Response(huge)))
+            libreTranslate(
+                ["hello"],
+                "en",
+                "es",
+                server(() => new Response(huge))
+            )
         ).rejects.toMatchObject({ name: "EngineRefusal", code: "failed" });
     });
 });

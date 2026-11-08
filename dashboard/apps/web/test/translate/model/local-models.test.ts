@@ -44,7 +44,8 @@ describe("modelsFor", () => {
             expect(roles).toContain("model");
             expect(roles).toContain("lex");
             expect(
-                roles.includes("vocab") || (roles.includes("srcvocab") && roles.includes("trgvocab"))
+                roles.includes("vocab") ||
+                    (roles.includes("srcvocab") && roles.includes("trgvocab"))
             ).toBe(true);
             for (const file of pairFiles(pair)) expect(file.sha256).toMatch(/^[0-9a-f]{64}$/);
         }

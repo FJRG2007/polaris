@@ -50,7 +50,11 @@ describe("server model store", () => {
         const other = path.join(dir, ".another-file.part");
         await writeFile(left, "half");
         await writeFile(other, "half");
-        await ensureModelFile("en-es", file, vi.fn(async () => served(bytes)));
+        await ensureModelFile(
+            "en-es",
+            file,
+            vi.fn(async () => served(bytes))
+        );
         expect((await readdir(dir)).sort()).toEqual([".another-file.part", file.sha256].sort());
     });
 

@@ -284,7 +284,11 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         const made = new Map<EngineId, TranslateEngine>();
         if (browser)
             made.set("browser", createBrowserEngine(self as unknown as BrowserScope, setDownload));
-        if (local) made.set("local", deviceEngine(t("local.downloadFailed"), t("errors.failed"), setDownload));
+        if (local)
+            made.set(
+                "local",
+                deviceEngine(t("local.downloadFailed"), t("errors.failed"), setDownload)
+            );
         for (const id of SERVER_ENGINE_IDS) {
             made.set(id, createServerEngine(id, t("errors.failed")));
         }

@@ -15,11 +15,7 @@ import { libreDetect, libreTranslate, libreTranslateReady } from "./libretransla
 import type { TranslateKey } from "../../messages";
 import { ENGINE_LIMITS, translateInChunks } from "../model/chunk";
 import { AUTO, normalizeDetected } from "../model/languages";
-import {
-    pickServerEngine,
-    usableServerEngines,
-    type ServerAvailability
-} from "../model/engines";
+import { pickServerEngine, usableServerEngines, type ServerAvailability } from "../model/engines";
 import type {
     DetectInput,
     ServerEngineId,

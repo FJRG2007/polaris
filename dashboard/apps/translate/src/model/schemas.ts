@@ -27,7 +27,14 @@ export const CHAR_LIMIT_MAX = 10_000_000;
 /** How many translations one person keeps. The oldest go on every write. */
 export const HISTORY_MAX = 100;
 
-export const ENGINE_IDS = ["browser", "local", "polar", "libretranslate", "deepl", "google"] as const;
+export const ENGINE_IDS = [
+    "browser",
+    "local",
+    "polar",
+    "libretranslate",
+    "deepl",
+    "google"
+] as const;
 export type EngineId = (typeof ENGINE_IDS)[number];
 
 export const SERVER_ENGINE_IDS = ["libretranslate", "deepl", "google", "polar"] as const;

@@ -45,7 +45,9 @@ function fakeWorker(fail: Partial<Record<string, string>>) {
     return { worker, calls };
 }
 
-function engine(options: { fail?: Partial<Record<string, string>>; detected?: string | null } = {}) {
+function engine(
+    options: { fail?: Partial<Record<string, string>>; detected?: string | null } = {}
+) {
     const { worker, calls } = fakeWorker(options.fail ?? {});
     const makeWorker = vi.fn(() => worker);
     const loadFile = vi.fn(
@@ -98,7 +100,9 @@ describe("createLocalEngine", () => {
         const buffers = loads[0]!.args[1] as { vocabs: unknown[]; model: unknown };
         expect(buffers.vocabs).toHaveLength(1);
         expect(buffers.model).toBeInstanceOf(ArrayBuffer);
-        const sent = calls.find((call) => call.name === "translate")!.args[0] as { models: unknown[] };
+        const sent = calls.find((call) => call.name === "translate")!.args[0] as {
+            models: unknown[];
+        };
         expect(sent.models).toHaveLength(2);
     });
 
