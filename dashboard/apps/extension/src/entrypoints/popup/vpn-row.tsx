@@ -87,7 +87,13 @@ export function VpnRow({ onOpen }: { onOpen: () => void }): React.JSX.Element | 
     const where = state.active
         ? ((node ? placeOf(node, t.locale) : null) ?? state.active.nodeName)
         : null;
-    const line = where ? t("vpn.connectedFrom", { place: where }) : t("vpn.off");
+    // A proxy somebody else holds is what the VPN screen is needed for, so it is
+    // what the row says, connected or not.
+    const line = state.conflict
+        ? t("vpn.conflict.row")
+        : where
+          ? t("vpn.connectedFrom", { place: where })
+          : t("vpn.off");
     return (
         <li className="section-row">
             <button className="section" onClick={onOpen}>
@@ -105,7 +111,9 @@ export function VpnRow({ onOpen }: { onOpen: () => void }): React.JSX.Element | 
                 <span className="section-text">
                     <span className="strong">{t("vpn.title")}</span>
                     <span className="muted small section-sub" title={line}>
-                        {state.active ? <span className="vpn-dot" aria-hidden="true" /> : null}
+                        {state.active && !state.conflict ? (
+                            <span className="vpn-dot" aria-hidden="true" />
+                        ) : null}
                         {line}
                     </span>
                 </span>

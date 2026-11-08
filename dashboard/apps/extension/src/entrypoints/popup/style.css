@@ -1758,6 +1758,69 @@ button.chip.choice {
     overflow-wrap: anywhere;
 }
 
+/* Another extension holds the proxy: a warning, not a failure, with what fixes it. */
+.vpn-conflict {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid hsl(var(--warning) / 0.5);
+    border-radius: var(--radius);
+    background: hsl(var(--warning) / 0.08);
+    overflow-wrap: anywhere;
+}
+
+.vpn-conflict-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-self: stretch;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.vpn-conflict-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.vpn-conflict-icon {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    object-fit: contain;
+}
+
+span.vpn-conflict-icon svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: hsl(var(--muted-foreground));
+    stroke-width: 1.6;
+}
+
+.vpn-conflict-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vpn-conflict-row button {
+    flex: none;
+}
+
+.vpn-conflict-error {
+    color: hsl(var(--danger-ink));
+}
+
 .vpn > .vpn-error {
     margin: 12px 16px;
 }
