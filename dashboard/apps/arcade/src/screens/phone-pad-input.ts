@@ -63,7 +63,17 @@ export function phonePadLink(appUrl: string, origin: string, code: string): stri
     return `${base}/games/pad?code=${code}`;
 }
 
-/** An SVG element as an image the sandboxed game can show without markup of its own. */
+const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+
+/**
+ * An SVG element as an image the sandboxed game can show without markup of its
+ * own. An `<svg>` drawn into an HTML page serializes without its namespace, and
+ * as an image it is parsed as XML, where an `<svg>` with none is not an SVG at
+ * all: the image fails to load. So the namespace is written in when it is missing.
+ */
 export function svgDataUrl(svg: string): string {
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    const markup = /^\s*<svg\b[^>]*\sxmlns\s*=/i.test(svg)
+        ? svg
+        : svg.replace(/^\s*<svg\b/i, `<svg xmlns="${SVG_NAMESPACE}"`);
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
 }

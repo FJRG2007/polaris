@@ -136,7 +136,31 @@ describe("the phone's controls", () => {
         expect(input.phonePadLink("", "http://polaris.local", "123456")).toBe(
             "http://polaris.local/games/pad?code=123456"
         );
-        expect(input.svgDataUrl("<svg/>")).toBe("data:image/svg+xml;charset=utf-8,%3Csvg%2F%3E");
+    });
+
+    it("writes the SVG namespace into the QR image, which as an image does not draw without it", () => {
+        const decoded = (url: string) => {
+            const prefix = "data:image/svg+xml;charset=utf-8,";
+            expect(url.startsWith(prefix)).toBe(true);
+            return decodeURIComponent(url.slice(prefix.length));
+        };
+        // What an <svg> drawn into an HTML page serializes to: no namespace
+        const drawn = decoded(
+            input.svgDataUrl(
+                '<svg height="176" viewBox="0 0 31 31"><path d="M0,0h31v31H0z"/></svg>'
+            )
+        );
+        const svg = new DOMParser().parseFromString(drawn, "image/svg+xml").documentElement;
+        expect(svg.namespaceURI).toBe("http://www.w3.org/2000/svg");
+        expect(svg.localName).toBe("svg");
+        expect(svg.querySelector("parsererror")).toBeNull();
+        // One that already names it is left alone, not given a second
+        const named =
+            '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"/>';
+        expect(decoded(input.svgDataUrl(named))).toBe(named);
+        expect(decoded(input.svgDataUrl('<svg xmlns:xlink="http://www.w3.org/1999/xlink"/>'))).toBe(
+            '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"/>'
+        );
     });
 });
 

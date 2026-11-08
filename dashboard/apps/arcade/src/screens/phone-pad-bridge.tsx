@@ -25,6 +25,9 @@ const fromGame = z.discriminatedUnion("type", [
     })
 ]);
 
+/** What the game is sent to pair a phone: the code, its link and a QR image of the link. */
+type PadOffer = { type: "polaris-game:pad"; code: string; link: string; qr: string };
+
 const padOpened = z.object({
     id: z.string().regex(/^[0-9a-f]{32}$/),
     code: z.string().regex(/^\d{6}$/)
@@ -52,6 +55,8 @@ export function PhonePadBridge({ frame }: { frame: RefObject<HTMLIFrameElement |
     const qr = useRef<HTMLDivElement>(null);
     const pad = useRef<{ id: string; code: string; events: EventSource } | null>(null);
     const opening = useRef(false);
+    // The last offer sent in, so a game that asks again for the same pad gets it again
+    const offered = useRef<PadOffer | null>(null);
 
     useEffect(() => {
         const post = (message: unknown) => frame.current?.contentWindow?.postMessage(message, "*");
@@ -64,9 +69,12 @@ export function PhonePadBridge({ frame }: { frame: RefObject<HTMLIFrameElement |
         };
         const open = async () => {
             if (opening.current) return;
-            // A pad already open is offered again (the game reloaded its start screen)
+            // A pad already open is offered again (the game reloaded its start screen). The
+            // same link sets no new state, so the offer already drawn is posted straight in;
+            // one not drawn yet goes in when its QR is on the page.
             if (pad.current) {
-                setLink(phonePadLink(base.current, window.location.origin, pad.current.code));
+                if (offered.current?.code === pad.current.code) post(offered.current);
+                else setLink(phonePadLink(base.current, window.location.origin, pad.current.code));
                 return;
             }
             opening.current = true;
@@ -138,10 +146,14 @@ export function PhonePadBridge({ frame }: { frame: RefObject<HTMLIFrameElement |
         const send = () => {
             const svg = box.querySelector("svg");
             if (!svg) return false;
-            frame.current?.contentWindow?.postMessage(
-                { type: "polaris-game:pad", code, link, qr: svgDataUrl(svg.outerHTML) },
-                "*"
-            );
+            const offer: PadOffer = {
+                type: "polaris-game:pad",
+                code,
+                link,
+                qr: svgDataUrl(svg.outerHTML)
+            };
+            offered.current = offer;
+            frame.current?.contentWindow?.postMessage(offer, "*");
             return true;
         };
         if (send()) return;
