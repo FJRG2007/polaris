@@ -292,7 +292,7 @@ export function GameFrame({
                 onLoad={onFrameLoad}
                 className="absolute inset-0 h-full w-full border-0"
             />
-            <PhonePadBridge frame={frame} />
+            <PhonePadBridge frame={frame} game={game.id} />
             {(load.phase === "starting" || load.phase === "failed") && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black px-4 text-white">
                     {load.phase === "starting" ? (

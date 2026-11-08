@@ -297,3 +297,34 @@ describe("the start screen with a phone", () => {
         );
     });
 });
+
+describe("a phone on the same account", () => {
+    beforeEach(() => pads.resetPadsForTests());
+
+    it("lists the owner's waiting games by game and device, and nobody else's", () => {
+        const mine = pads.openPad("owner", { game: "new-york", device: "Chrome on Windows" })!;
+        pads.openPad("stranger", { game: "new-york", device: "Firefox on Linux" });
+        expect(pads.waitingPads("owner")).toEqual([
+            {
+                id: mine.id,
+                openedAt: expect.any(Number),
+                game: "new-york",
+                device: "Chrome on Windows"
+            }
+        ]);
+        // An older game page names nothing: still listed, with nothing to name it by
+        const bare = pads.openPad("owner")!;
+        expect(pads.waitingPads("owner").find((pad) => pad.id === bare.id)).toMatchObject({
+            game: "",
+            device: ""
+        });
+    });
+
+    it("connects with one tap only for the owner; another account needs the code", () => {
+        const pad = pads.openPad("owner", { game: "new-york" })!;
+        expect(pads.claimPad({ id: pad.id }, { userId: "stranger", name: "Stranger" })).toBeNull();
+        expect(pads.waitingPads("owner")).toHaveLength(1);
+        expect(pads.claimPad({ id: pad.id }, { userId: "owner", name: "Owner" })).not.toBeNull();
+        expect(pads.waitingPads("owner")).toEqual([]);
+    });
+});
