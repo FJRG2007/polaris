@@ -107,6 +107,13 @@ export const gameServersExtension: AppExtension = {
             .catch((error) =>
                 console.error("polaris: interrupted server copies could not be recovered:", error)
             );
+        // Visits stored under a rank's symbol before `list` was read through
+        // team prefixes go back to the player they were, or away.
+        void import("./minecraft/visit-names-repair")
+            .then((repair) => repair.repairRankSymbolVisits())
+            .catch((error) =>
+                console.error("polaris: phantom player visits could not be repaired:", error)
+            );
         void import("./minecraft/symbiote-service")
             .then((service) => service.moveSymbioteLinks())
             .catch((error) => console.error("polaris: Symbiote links could not be moved:", error));

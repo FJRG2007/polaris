@@ -6,6 +6,7 @@
  */
 
 import { gameMessage } from "../game-message";
+import { PLAYER_NAME } from "./ranks";
 import { z } from "zod";
 
 /** Who is on the server right now, as `list` reports it. */
@@ -112,13 +113,31 @@ export function parsePlayerLevels(
     return found;
 }
 
-/** The trailing "Alice, Bob" of a list answer. Essentials-style suffixes and
- *  blank entries are dropped; a name Minecraft accepts has no spaces. */
+/**
+ * The player in one entry of a list answer. `list` prints DISPLAY names, so a
+ * rank's team prefix comes with it - `✦ [VIP] Steve` (see `ranks`) - and an
+ * Essentials-style suffix may follow, `Steve (AFK)`. Bracketed tags are not
+ * names, and of the words left the name is the last one a name can be, the rule
+ * `nameIn` applies to event replies. An entry with no such word is dropped
+ * rather than recorded as a player called `✦`.
+ */
+export function playerOfEntry(entry: string): string | null {
+    return (
+        entry
+            .replace(/\[[^\]]*\]|\([^)]*\)/g, " ")
+            .trim()
+            .split(/\s+/)
+            .filter((word) => PLAYER_NAME.test(word))
+            .at(-1) ?? null
+    );
+}
+
+/** The trailing "Alice, Bob" of a list answer, one real name per entry. */
 function parseNameList(tail: string): string[] {
     return tail
         .split(",")
-        .map((entry) => entry.trim().split(/\s+/)[0] ?? "")
-        .filter((name) => name.length > 0 && name.length <= 32);
+        .map(playerOfEntry)
+        .filter((name): name is string => name !== null);
 }
 
 /** `whitelist list` answers "There are 2 whitelisted players: Alice, Bob". */
