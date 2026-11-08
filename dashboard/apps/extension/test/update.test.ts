@@ -11,6 +11,7 @@ import {
     noticeFor,
     publishedVersion,
     UPDATE_COLOR,
+    upToDate,
     type UpdateNotice
 } from "../src/lib/update";
 
@@ -206,5 +207,14 @@ describe("what the popup says about it", () => {
         // script to run is a dead end on the screen that says it.
         const text = JSON.stringify(all.map((catalog) => catalog.popup));
         expect(text).not.toMatch(/PowerShell|Terminal|\brun this\b|ejecuta|\bcommand\b|comando/i);
+    });
+});
+
+describe("the version line's Up to date", () => {
+    it("is said once Polaris named a version that is not ahead, and only then", () => {
+        expect(upToDate("0.1.115", "0.1.115", null)).toBe(true);
+        expect(upToDate(null, "0.1.115", null)).toBe(false);
+        expect(upToDate("0.1.116", "0.1.115", null)).toBe(false);
+        expect(upToDate("0.1.115", "0.1.115", "0.1.116")).toBe(false);
     });
 });
