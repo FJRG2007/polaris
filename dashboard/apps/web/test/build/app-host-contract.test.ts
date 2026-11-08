@@ -187,6 +187,9 @@ const EAGER_UI = [
     "i18nProvider.useLocale",
     // Which Polaris the page is drawn in, from the same context.
     "i18nProvider.useClient",
+    // The address Polaris hands out: a hook over a context the app layout
+    // already provides.
+    "appUrl.useAppUrl",
     // How loud Polaris' sounds are: a number the frame's own chime and toasts
     // already read, so its module is in the shell's chunk anyway.
     "notificationSound.soundGain",
