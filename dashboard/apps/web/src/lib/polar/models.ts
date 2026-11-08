@@ -295,7 +295,8 @@ export function withStandIn(resolved: ResolvedModel, ...sources: StandInSource[]
                 provider: source.option.provider,
                 free: isFreeModel(source.option),
                 reasoning: source.option.reasoning,
-                outputTokens: polarOutputTokens(source.option)
+                outputTokens: polarOutputTokens(source.option),
+                reads: source.option
             })),
             {
                 onStandIn: (index) => {

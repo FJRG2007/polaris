@@ -23,6 +23,7 @@ import { prisma, Prisma } from "@polaris/db";
 import { chatTarget, removeStoredFiles } from "@/lib/chat/attachments";
 import { pipeThenDispose } from "@/lib/drive-stream";
 import { driverForTarget, LOCAL_TARGET, safeName, streamFile } from "@/lib/storage-target";
+import { fileRoute, type ModelReads } from "@/lib/polar/file-route";
 import {
     POLAR_ATTACHMENT_MAX_BYTES,
     POLAR_ATTACHMENT_TYPES,
@@ -39,6 +40,7 @@ const TURN_MAX_BYTES = 24 * 1024 * 1024;
 const UNSENT_TTL_MS = 24 * 60 * 60 * 1000;
 
 export { POLAR_ATTACHMENT_MAX_BYTES };
+export { fileRoute, type ModelReads };
 
 export interface PolarAttachmentView {
     id: string;
@@ -193,29 +195,6 @@ const DOCUMENT_TYPES = new Set([
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 ]);
-
-/** What the chosen model reads, from the catalogue. `inputs` empty is unknown:
- *  then only the older `attachment` flag says it takes pictures. */
-export interface ModelReads {
-    inputs: readonly string[];
-    attachment: boolean;
-}
-
-/**
- * How a file reaches the model: as the file itself when the model reads that
- * kind (a picture to a model that sees, a PDF to one whose catalogue entry lists
- * "pdf"), otherwise as the text taken out of it. Plain text always goes as text:
- * every model reads that, and not every provider takes a text file part.
- */
-export function fileRoute(mediaType: string, reads: ModelReads): "file" | "text" {
-    if (mediaType.startsWith("image/")) {
-        return reads.inputs.includes("image") || (reads.inputs.length === 0 && reads.attachment)
-            ? "file"
-            : "text";
-    }
-    if (mediaType === "application/pdf" && reads.inputs.includes("pdf")) return "file";
-    return "text";
-}
 
 /** The text of a document, bounded, or null when none can be taken out. */
 async function documentText(mediaType: string, bytes: Uint8Array): Promise<string | null> {

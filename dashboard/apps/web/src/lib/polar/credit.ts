@@ -22,6 +22,7 @@
  */
 
 import type { LanguageModelMiddleware } from "ai";
+import { fileRoute, type ModelReads } from "@/lib/polar/file-route";
 import {
     PAID_MODEL_MARK,
     callError,
@@ -224,6 +225,9 @@ export interface StandInTarget {
     /** The answer length it reserves (`polarOutputTokens`), used when it is
      *  another provider's: a length one provider takes another may refuse. */
     outputTokens?: number;
+    /** What it reads as a file: a call that sends a file it would only take
+     *  as text is not handed to it. Absent is "reads what the call sends". */
+    reads?: ModelReads;
 }
 
 type CallParams = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["params"];
@@ -234,15 +238,28 @@ export function sendsProviderTool(params: Pick<CallParams, "tools">): boolean {
     return (params.tools ?? []).some((entry) => entry.type === "provider");
 }
 
+/** Whether a model that reads `reads` takes every file part the call sends
+ *  as the file it is. Pure. */
+export function readsSentFiles(params: Pick<CallParams, "prompt">, reads: ModelReads): boolean {
+    return (params.prompt ?? []).every(
+        (message) =>
+            !Array.isArray(message.content) ||
+            message.content.every(
+                (part) => part.type !== "file" || fileRoute(part.mediaType, reads) === "file"
+            )
+    );
+}
+
 /** Whether `target` may answer a call `origin` refused with `kind`. Pure. */
 export function standInFits(
     kind: FailureKind,
     origin: string,
-    target: Pick<StandInTarget, "provider" | "free">,
-    params: Pick<CallParams, "tools">
+    target: Pick<StandInTarget, "provider" | "free" | "reads">,
+    params: Pick<CallParams, "tools" | "prompt">
 ): boolean {
     const same = target.provider === origin;
     if (!same && sendsProviderTool(params)) return false;
+    if (target.reads && !readsSentFiles(params, target.reads)) return false;
     if (kind === "key" || kind === "down") return !same;
     if (kind === "credit" || kind === "paid") return !same || target.free;
     return true;

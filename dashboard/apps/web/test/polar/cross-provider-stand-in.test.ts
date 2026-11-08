@@ -160,6 +160,37 @@ describe("which stand-in fits which refusal", () => {
             standInFits("busy", "anthropic", { provider: "anthropic", free: false }, webSearch)
         ).toBe(true);
     });
+
+    it("passes over a model that would only take the turn's picture or PDF as text", () => {
+        const picture = {
+            tools: [],
+            prompt: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: "What is this?" },
+                        { type: "file", mediaType: "image/png", data: "AA==" }
+                    ]
+                }
+            ]
+        } as never;
+        const sees = { inputs: ["text", "image"], attachment: true };
+        const blind = { inputs: ["text"], attachment: false };
+        expect(
+            standInFits(
+                "busy",
+                "anthropic",
+                { provider: "openrouter", free: true, reads: blind },
+                picture
+            )
+        ).toBe(false);
+        expect(
+            standInFits("busy", "anthropic", { provider: "groq", free: true, reads: sees }, picture)
+        ).toBe(true);
+        expect(
+            standInFits("busy", "anthropic", { provider: "groq", free: true, reads: blind }, tools)
+        ).toBe(true);
+    });
 });
 
 describe("standInMiddleware across providers", () => {

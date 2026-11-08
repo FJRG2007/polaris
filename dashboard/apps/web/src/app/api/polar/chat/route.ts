@@ -77,7 +77,7 @@ import {
     type PolarHelper
 } from "@/lib/polar/helper-model";
 import { fenceSummary, splitAtCompaction } from "@/lib/polar/compaction";
-import { noteProviderFailure, turnSignals } from "@/lib/polar/automatic";
+import { turnSignals } from "@/lib/polar/automatic";
 import { answerUsage, stepContext, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import {
@@ -536,7 +536,6 @@ export async function POST(request: Request): Promise<Response> {
             // names the stand-in. Automatic tries that provider last for a few
             // minutes, and one out of credit only for its free models.
             const { option, credential } = answeredBy(resolved);
-            noteProviderFailure(user.id, option.provider);
             const failure = classifyProviderFailure(error);
             rememberRefusal(user.id, option.provider, failure.kind);
             console.warn(failureLogLine("a turn", option.providerName, failure));
