@@ -9,6 +9,7 @@
  * here for longer than that.
  */
 
+import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import type { SessionView } from "@/lib/agents/session-service";
@@ -159,7 +160,7 @@ export function SessionPull({ session }: { session: SessionView }) {
                     )}
                 </PopoverContent>
             </Popover>
-            {failed > 0 && session.state !== "stopped" && session.state !== "failed" ? (
+            {failed > 0 && !core.isSessionOver(session.state) ? (
                 <Button size="sm" variant="secondary" onClick={sendFailing} disabled={busy}>
                     {busy && !merging ? (
                         <Loader2 className="size-4 shrink-0 animate-spin" />

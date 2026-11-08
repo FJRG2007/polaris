@@ -30,6 +30,7 @@ import {
     TriangleAlert
 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
+import { SessionPull } from "./session-pull";
 import { SessionChanges, ShipPullRequest } from "./session-changes";
 import { SessionHistory, type HistoryPage } from "./session-history";
 import { promptKey } from "@/lib/agents/transcript-decoders";
@@ -387,6 +388,7 @@ export function SessionDetail({
                     </>
                 )}
                 {canControl ? <ShipPullRequest session={session} /> : null}
+                {canControl ? <SessionPull session={session} /> : null}
             </div>
 
             {reviewable ? (
