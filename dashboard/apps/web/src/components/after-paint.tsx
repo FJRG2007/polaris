@@ -12,7 +12,10 @@
  * `children` is handed each answer as props, the way a server re-render hands a
  * view new ones. The single exception is the first live answer replacing a kept
  * one that differs: that remounts, so a form seeded from the cache does not keep
- * showing the old values.
+ * showing the old values. Until that answer lands the kept copy is drawn inert,
+ * so nothing can be typed into what the remount throws away or submitted
+ * against values that may have moved; when this visit's read fails it stays
+ * inert under the failure and its retry.
  *
  * `revision` is how a mutation that calls `router.refresh()` (or an action that
  * revalidates the path) still reaches data read here: the server page passes a
@@ -33,6 +36,8 @@ export function AfterPaint<T>({
     skeleton,
     persist = true,
     revision,
+    missing,
+    onAnswer,
     children
 }: {
     /** Names everything the read depends on (an id, a page), so two never share one. */
@@ -42,6 +47,10 @@ export function AfterPaint<T>({
     persist?: boolean;
     /** A value the server page renders anew each time (`Date.now()`). */
     revision?: number;
+    /** Drawn instead of the default notice when the answer is `null`. */
+    missing?: ReactNode;
+    /** Told every answer this visit asked for, the kept copy never. */
+    onAnswer?: (data: T | null) => void;
     children: (data: T) => ReactNode;
 }) {
     const t = useTranslations("common");
@@ -50,11 +59,20 @@ export function AfterPaint<T>({
     const latestLoad = useRef(load);
     latestLoad.current = load;
     const stableLoad = useCallback(async () => ({ value: await latestLoad.current() }), []);
-    const { data, error, kept, refresh } = useLiveRead<{ value: T | null }>({
+    const { data, error, kept, firstFailed, updatedAt, refresh } = useLiveRead<{
+        value: T | null;
+    }>({
         load: stableLoad,
         cacheKey,
         persist
     });
+
+    const listener = useRef(onAnswer);
+    listener.current = onAnswer;
+    useEffect(() => {
+        if (kept || data === null || updatedAt === null) return;
+        listener.current?.(data.value);
+    }, [kept, data, updatedAt]);
 
     const askedFor = useRef(revision);
     useEffect(() => {
@@ -71,22 +89,36 @@ export function AfterPaint<T>({
     }
     seen.current = { data, kept };
 
-    if (data === null) {
-        if (!error) return <>{skeleton}</>;
+    const alert = (
+        <div role="alert">
+            <EmptyState
+                title={t("afterPaint.loadFailed")}
+                action={
+                    <Button variant="outline" size="sm" onClick={refresh}>
+                        <RefreshCw className="size-4 shrink-0" aria-hidden="true" />
+                        {t("afterPaint.retry")}
+                    </Button>
+                }
+            />
+        </div>
+    );
+
+    if (data === null) return <>{error ? alert : skeleton}</>;
+    if (data.value === null) {
         return (
-            <div role="alert">
-                <EmptyState
-                    title={t("afterPaint.loadFailed")}
-                    action={
-                        <Button variant="outline" size="sm" onClick={refresh}>
-                            <RefreshCw className="size-4 shrink-0" aria-hidden="true" />
-                            {t("afterPaint.retry")}
-                        </Button>
-                    }
-                />
-            </div>
+            <>{missing !== undefined ? missing : <EmptyState title={t("afterPaint.notFound")} />}</>
         );
     }
-    if (data.value === null) return <EmptyState title={t("afterPaint.notFound")} />;
-    return <Fragment key={generation.current}>{children(data.value)}</Fragment>;
+    return (
+        <>
+            {firstFailed ? alert : null}
+            <div
+                className="contents"
+                inert={kept || undefined}
+                aria-busy={(kept && !firstFailed) || undefined}
+            >
+                <Fragment key={generation.current}>{children(data.value)}</Fragment>
+            </div>
+        </>
+    );
 }

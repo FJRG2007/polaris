@@ -217,9 +217,50 @@ describe("a region read after the paint", () => {
         expect(screen.getByText("Kept")).toBeTruthy();
     });
 
+    it("draws the kept answer inert until this visit's answer lands", async () => {
+        keep("test.inert", { value: { name: "Kept" } });
+        let answer: (value: { name: string }) => void = () => undefined;
+        render(
+            <AfterPaint<{ name: string }>
+                cacheKey="test.inert"
+                load={() => new Promise((resolve) => (answer = resolve))}
+                skeleton={null}
+            >
+                {(data) => <input aria-label="name" defaultValue={data.name} />}
+            </AfterPaint>
+        );
+        expect(screen.getByLabelText("name").closest("[inert]")).not.toBeNull();
+        await act(async () => answer({ name: "Live" }));
+        const field = screen.getByLabelText("name") as HTMLInputElement;
+        expect(field.closest("[inert]")).toBeNull();
+        expect(field.value).toBe("Live");
+    });
+
+    it("says the first read failed over a kept answer, and keeps that answer inert", async () => {
+        keep("test.keptFailed", { value: { name: "Kept" } });
+        const load = vi.fn(async (): Promise<{ name: string }> => {
+            throw new Error("down");
+        });
+        render(
+            <AfterPaint cacheKey="test.keptFailed" load={load} skeleton={null}>
+                {(data) => <button type="button">{data.name}</button>}
+            </AfterPaint>
+        );
+        expect(await screen.findByRole("alert")).toBeTruthy();
+        expect(screen.getByText("Kept").closest("[inert]")).not.toBeNull();
+        const calls = load.mock.calls.length;
+        await act(async () => fireEvent.click(screen.getByRole("button", { name: /retry/i })));
+        await waitFor(() => expect(load.mock.calls.length).toBe(calls + 1));
+    });
+
     it("keeps nothing in the tab when told not to", async () => {
         render(
-            <AfterPaint cacheKey="test.secret" load={async () => ({ name: "Grace" })} persist={false} skeleton={null}>
+            <AfterPaint
+                cacheKey="test.secret"
+                load={async () => ({ name: "Grace" })}
+                persist={false}
+                skeleton={null}
+            >
                 {(data) => <p>{data.name}</p>}
             </AfterPaint>
         );
@@ -282,7 +323,8 @@ describe("no Management page awaits its data before it paints", () => {
     const ADMIN = join(process.cwd(), "src", "app", "(app)", "admin");
 
     /** What a page may await: the session check, the request, its strings. */
-    const FAST = /^(require[A-Z]\w*|getTranslations|getLocale|params|searchParams|headers|cookies)$/;
+    const FAST =
+        /^(require[A-Z]\w*|getTranslations|getLocale|params|searchParams|headers|cookies)$/;
 
     /**
      * Pages that still await their data, each with the reason. An entry here is

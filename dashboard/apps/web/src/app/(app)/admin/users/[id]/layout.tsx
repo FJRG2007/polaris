@@ -2,14 +2,14 @@
  * One person, split into sections that each load only their own data.
  *
  * The header and the section links are all the layout draws: the name, the
- * address and the badges come from the one directory read every section shares.
+ * address and the badges come from the read the open section makes.
  */
 
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/session";
-import { UserRecordHeader } from "./loaders";
+import { UserRecordFrame, UserRecordHeader } from "./loaders";
 import { UserSectionNav } from "./section-nav";
 import { getTranslations } from "@/lib/i18n/request";
 
@@ -38,9 +38,11 @@ export default async function UserRecordLayout({
                 <ArrowLeft className="size-4 shrink-0" aria-hidden="true" />
                 {t("usersDetail.back")}
             </Link>
-            <UserRecordHeader userId={id} revision={Date.now()} />
-            <UserSectionNav userId={id} />
-            {children}
+            <UserRecordFrame>
+                <UserRecordHeader userId={id} revision={Date.now()} />
+                <UserSectionNav userId={id} />
+                {children}
+            </UserRecordFrame>
         </>
     );
 }
