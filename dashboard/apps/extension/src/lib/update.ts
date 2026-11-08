@@ -183,3 +183,12 @@ export function badgeFor(count: string, notice: UpdateNotice | null): BadgeState
     if (notice?.kind === "manual") return { text: "!", color: UPDATE_COLOR, announce };
     return { text: "", color: COUNT_COLOR, announce };
 }
+
+/**
+ * Whether the version line says "Up to date": a version Polaris named, no newer
+ * one waiting, and the one named not ahead of this copy. The update check beside
+ * it then keeps quiet about finding nothing, so the words are never shown twice.
+ */
+export function upToDate(latest: string | null, running: string, newer: string | null): boolean {
+    return !newer && !!latest && !isNewer(latest, running);
+}

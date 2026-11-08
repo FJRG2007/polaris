@@ -5,7 +5,7 @@ import { timeoutChoices } from "@/lib/lock";
 import { EVERY_SITE } from "@/lib/injection";
 import { PAGE_FILLING_KEY } from "@/lib/page-filling";
 import { readIntendedLogin } from "@/lib/save";
-import { isNewer, type UpdateNotice } from "@/lib/update";
+import { isNewer, upToDate, type UpdateNotice } from "@/lib/update";
 import { readOrigin } from "@/lib/address";
 import { localPermissions, type ReachStatus } from "@/lib/local-address";
 import { accountHost, describeAccount } from "@/lib/accounts";
@@ -139,9 +139,13 @@ type Checked =
  * then shows up on this line the way the hourly check would have shown it.
  */
 function CheckUpdates({
-    onChecked
+    onChecked,
+    currentShown
 }: {
     onChecked: (state: UpdateState) => void;
+    /** Whether the version line already says "Up to date", so a check that
+     *  found nothing new does not say it a second time beside it. */
+    currentShown: boolean;
 }): React.JSX.Element {
     const t = useWords();
     const [checked, setChecked] = useState<Checked | null>(null);
@@ -208,7 +212,9 @@ function CheckUpdates({
                 </span>
             ) : (
                 <>
-                    {checked && checked.kind !== "checking" ? (
+                    {checked &&
+                    checked.kind !== "checking" &&
+                    !(checked.kind === "current" && currentShown) ? (
                         <span>{t(`popup.version.${checked.kind}`)}</span>
                     ) : null}
                     <button
@@ -312,6 +318,7 @@ function VersionLine({
     const t = useWords();
     const running = browser.runtime.getManifest().version;
     const newer = pending ?? (notice && notice.kind !== "desktop" ? notice.version : null);
+    const current = upToDate(latest, running, newer);
     return (
         <p className="version-line">
             <span>{t("popup.version.running", { version: running })}</span>
@@ -328,10 +335,10 @@ function VersionLine({
                         <span>{t("popup.version.auto")}</span>
                     ) : null}
                 </>
-            ) : latest && !isNewer(latest, running) ? (
+            ) : current ? (
                 <span>{t("popup.version.current")}</span>
             ) : null}
-            <CheckUpdates onChecked={apply} />
+            <CheckUpdates onChecked={apply} currentShown={current} />
         </p>
     );
 }
