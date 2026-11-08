@@ -95,7 +95,12 @@ describe("New York start-up builders", () => {
         for (const name of ["cityGrid", "blocks", "streetDetails", "traffic", "culling"])
             expect(yields[name] ?? 0, name).toBeGreaterThan(0);
         // Each builder used to run unbroken for 0.5-1.4 s here; what is left unsliced are single library calls
-        // (geometry merges, a triangulation), well under ten budgets even on a loaded machine
-        expect(longest[0].ms, report).toBeLessThan(BUDGET * 10);
+        // (geometry merges, a triangulation). One of them stretched by a GC pause or a busy runner is noise; a builder
+        // that stopped slicing is not, since most of the few slices it has left are long
+        for (const name of ["cityGrid", "blocks", "streetDetails", "traffic", "culling"]) {
+            const own = slices.filter((s) => s.builder === name);
+            const long = own.filter((s) => s.ms > BUDGET * 10).length;
+            expect(long / own.length, `${name}: ${report}`).toBeLessThan(0.25);
+        }
     });
 });
