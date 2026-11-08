@@ -121,7 +121,12 @@ const INPUT_KEY = {
     website: "modes.website"
 } as const;
 
-const NO_SERVER: Record<ServerEngineId, boolean> = { deepl: false, google: false, polar: false };
+const NO_SERVER: Record<ServerEngineId, boolean> = {
+    libretranslate: false,
+    deepl: false,
+    google: false,
+    polar: false
+};
 
 const ENGINE_KEY = {
     browser: "engine.browser",

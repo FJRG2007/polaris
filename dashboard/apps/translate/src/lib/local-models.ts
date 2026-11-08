@@ -84,7 +84,9 @@ async function download(pair: string, file: LocalModelFile, fetcher: Fetcher): P
             hash.update(value);
             if (!out.write(value)) await new Promise((resolve) => out.once("drain", resolve));
         }
-        await new Promise<void>((resolve, reject) => out.end((error?: Error | null) => (error ? reject(error) : resolve())));
+        await new Promise<void>((resolve, reject) =>
+            out.end((error?: Error | null) => (error ? reject(error) : resolve()))
+        );
         if (size !== file.size || hash.digest("hex") !== file.sha256) {
             throw new ModelDownloadError("checksum");
         }

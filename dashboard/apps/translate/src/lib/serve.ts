@@ -11,10 +11,15 @@
 import { translateT } from "./i18n";
 import { host } from "@polaris/app-host";
 import { loadSettings } from "./settings";
+import { libreDetect, libreTranslate, libreTranslateReady } from "./libretranslate";
 import type { TranslateKey } from "../../messages";
 import { ENGINE_LIMITS, translateInChunks } from "../model/chunk";
 import { AUTO, normalizeDetected } from "../model/languages";
-import { pickServerEngine, usableServerEngines } from "../model/engines";
+import {
+    pickServerEngine,
+    usableServerEngines,
+    type ServerAvailability
+} from "../model/engines";
 import type {
     DetectInput,
     ServerEngineId,
@@ -55,11 +60,32 @@ export interface ServerStatus {
     engines: ServerEngineId[];
 }
 
-export async function serverStatus(userId: string): Promise<ServerStatus> {
-    const [settings, available] = await Promise.all([
-        loadSettings(),
-        host.translateEngines.serverEngineStatus(userId)
+/**
+ * Which server engines can answer this person: the host's, and LibreTranslate,
+ * which is this app's own. Sends nothing.
+ */
+async function availability(userId: string): Promise<ServerAvailability> {
+    const [hosted, libretranslate] = await Promise.all([
+        host.translateEngines.serverEngineStatus(userId),
+        libreTranslateReady().catch(() => false)
     ]);
+    return { ...hosted, libretranslate };
+}
+
+/** One request to one server engine; LibreTranslate is answered here, the rest by the host. */
+function engineTranslate(
+    engine: ServerEngineId,
+    userId: string,
+    texts: readonly string[],
+    from: string | null,
+    to: string
+): Promise<{ texts: string[]; detected: string | null }> {
+    if (engine === "libretranslate") return libreTranslate(texts, from, to);
+    return host.translateEngines.serverTranslate(engine, userId, texts, from, to);
+}
+
+export async function serverStatus(userId: string): Promise<ServerStatus> {
+    const [settings, available] = await Promise.all([loadSettings(), availability(userId)]);
     return { settings, engines: usableServerEngines(available, settings) };
 }
 
@@ -97,10 +123,7 @@ export async function translateOnServer(
     userId: string,
     input: TranslateInput
 ): Promise<Served<{ texts: string[]; detected: string | null }>> {
-    const [settings, available] = await Promise.all([
-        loadSettings(),
-        host.translateEngines.serverEngineStatus(userId)
-    ]);
+    const [settings, available] = await Promise.all([loadSettings(), availability(userId)]);
     const total = input.texts.reduce((sum, text) => sum + text.length, 0);
     if (settings.charLimit !== null && total > settings.charLimit) {
         return { ok: false, failure: "overLimit", limit: settings.charLimit };
@@ -110,7 +133,7 @@ export async function translateOnServer(
     try {
         // Cut to what this engine takes at once; the reader sees one answer.
         const answer = await translateInChunks(input.texts, ENGINE_LIMITS[engine], (batch) =>
-            host.translateEngines.serverTranslate(
+            engineTranslate(
                 engine,
                 userId,
                 batch,
@@ -144,7 +167,10 @@ export async function detectOnServer(
           : (engines[0] ?? null);
     if (!engine) return { ok: false, failure: input.engine ? "unavailable" : "noEngine" };
     try {
-        const raw = await host.translateEngines.serverDetect(engine, userId, input.text);
+        const raw =
+            engine === "libretranslate"
+                ? await libreDetect(input.text)
+                : await host.translateEngines.serverDetect(engine, userId, input.text);
         return { ok: true, engine, language: normalizeDetected(raw) };
     } catch (caught) {
         return { ok: false, failure: failureOf(caught) };

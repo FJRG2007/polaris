@@ -27,10 +27,10 @@ export const CHAR_LIMIT_MAX = 10_000_000;
 /** How many translations one person keeps. The oldest go on every write. */
 export const HISTORY_MAX = 100;
 
-export const ENGINE_IDS = ["browser", "local", "polar", "deepl", "google"] as const;
+export const ENGINE_IDS = ["browser", "local", "polar", "libretranslate", "deepl", "google"] as const;
 export type EngineId = (typeof ENGINE_IDS)[number];
 
-export const SERVER_ENGINE_IDS = ["deepl", "google", "polar"] as const;
+export const SERVER_ENGINE_IDS = ["libretranslate", "deepl", "google", "polar"] as const;
 export type ServerEngineId = (typeof SERVER_ENGINE_IDS)[number];
 
 export const languageCode = z.enum(LANGUAGE_CODES);
@@ -97,6 +97,8 @@ export const settingsInput = z
                 /** Absent from a client older than the local engine: on, like its default. */
                 local: z.boolean().default(true),
                 polar: z.boolean(),
+                /** Absent from a client older than LibreTranslate: on, like its default. */
+                libretranslate: z.boolean().default(true),
                 deepl: z.boolean(),
                 google: z.boolean()
             })
@@ -124,10 +126,18 @@ export type TranslateSettings = z.infer<typeof settingsInput>;
 /**
  * The order a Polaris that never set one tries the engines in: the browser's
  * own translator first, then the local one (both free, and the text stays on
- * the device), the paid providers next, Polar's model last (slowest, and it
+ * the device), a LibreTranslate server once one is set (free, and the
+ * administrator's own), the paid providers next, Polar's model last (slowest, and it
  * spends from Polar's allowance).
  */
-export const DEFAULT_ORDER: readonly EngineId[] = ["browser", "local", "deepl", "google", "polar"];
+export const DEFAULT_ORDER: readonly EngineId[] = [
+    "browser",
+    "local",
+    "libretranslate",
+    "deepl",
+    "google",
+    "polar"
+];
 
 /**
  * A stored order, read leniently: known engines once each in the order kept.
@@ -153,7 +163,14 @@ export function readOrder(raw: unknown): EngineId[] {
 
 /** What a Polaris that never opened the settings runs with: everything on. */
 export const DEFAULT_SETTINGS: TranslateSettings = {
-    engines: { browser: true, local: true, polar: true, deepl: true, google: true },
+    engines: {
+        browser: true,
+        local: true,
+        polar: true,
+        libretranslate: true,
+        deepl: true,
+        google: true
+    },
     order: [...DEFAULT_ORDER],
     defaultTarget: "en",
     charLimit: null
@@ -189,6 +206,7 @@ export function readSettings(raw: unknown): TranslateSettings {
             browser: flag("browser"),
             local: flag("local"),
             polar: flag("polar"),
+            libretranslate: flag("libretranslate"),
             deepl: flag("deepl"),
             google: flag("google")
         },

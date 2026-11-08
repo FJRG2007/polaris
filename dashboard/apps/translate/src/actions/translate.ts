@@ -13,6 +13,12 @@ import * as history from "../lib/history";
 import * as glossary from "../lib/glossary";
 import type { TranslateKey } from "../../messages";
 import { loadSettings, saveSettings } from "../lib/settings";
+import {
+    libreTranslateInput,
+    loadLibreTranslate,
+    saveLibreTranslate,
+    type LibreTranslateConfig
+} from "../lib/libretranslate";
 import { keepInput, saveGlossaryInput } from "../model/glossary";
 import { idInput, rememberInput, settingsInput, type TranslateSettings } from "../model/schemas";
 
@@ -82,6 +88,32 @@ export async function saveSettingsAction(
         await saveSettings(parsed.data);
         return { settings: parsed.data };
     });
+}
+
+/** The LibreTranslate server, as the administrator's page shows it: the address, and whether a key is kept. */
+export async function libreTranslateAction(): Promise<Outcome<{ server: LibreTranslateConfig }>> {
+    const user = await host.session.requirePermission("translate.use");
+    if (!user.isAdmin) return refuse("errors.adminOnly");
+    return settle(async () => ({ server: await loadLibreTranslate() }));
+}
+
+/** Keeps a LibreTranslate address and key once the server answers with them. */
+export async function saveLibreTranslateAction(
+    input: unknown
+): Promise<Outcome<{ server: LibreTranslateConfig }>> {
+    const parsed = libreTranslateInput.safeParse(input);
+    if (!parsed.success) return refuse("libretranslate.invalidUrl");
+    const user = await host.session.requirePermission("translate.use");
+    if (!user.isAdmin) return refuse("errors.adminOnly");
+    try {
+        return { ok: true, server: await saveLibreTranslate(parsed.data) };
+    } catch (caught) {
+        if (caught instanceof Error && caught.name === "EngineRefusal") {
+            return refuse("libretranslate.unreachable");
+        }
+        console.error("polaris: saving the LibreTranslate server failed:", caught);
+        return refuse("errors.generic");
+    }
 }
 
 /** The caller's glossaries, without their terms, and their never-translate list. */

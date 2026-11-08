@@ -35,7 +35,8 @@
         "google": "Google Cloud",
         "answeredBy": "Traducido con {engine}",
         "translating": "Traduciendo...",
-        "downloading": "Descargando el modelo del idioma, {percent}%"
+        "downloading": "Descargando el modelo del idioma, {percent}%",
+        "libretranslate": "LibreTranslate"
     },
     "none": {
         "title": "No hay ningún motor de traducción",
@@ -71,6 +72,7 @@
         "browserHint": "Gratis, en el dispositivo de quien lee. Solo Chrome de escritorio.",
         "localHint": "Gratis, sin conexión, sin límites, en cualquier navegador. Cada idioma se descarga una vez desde Polaris.",
         "polarHint": "Usa el modelo de Polar y cuenta para sus límites.",
+        "libretranslateHint": "Tu propio servidor de LibreTranslate. Apagado hasta que pongas su dirección abajo.",
         "deeplHint": "Necesita una clave de DeepL en Integraciones.",
         "googleHint": "Necesita una clave de Google Cloud en Integraciones.",
         "target": "Idioma por defecto",
@@ -291,5 +293,20 @@
     "local": {
         "unknownModel": "Ese modelo de idioma no es uno de los que ofrece Polaris.",
         "downloadFailed": "Polaris no pudo descargar el modelo del idioma. Revisa su conexión a internet y vuelve a intentarlo."
+    },
+    "libretranslate": {
+        "title": "Servidor de LibreTranslate",
+        "description": "La dirección de un servidor de LibreTranslate, y su clave de API si la pide.",
+        "url": "Dirección del servidor",
+        "urlPlaceholder": "https://translate.example.com",
+        "key": "Clave de API",
+        "keyKept": "Hay una clave guardada. Escribe otra para cambiarla.",
+        "keyNone": "Opcional",
+        "removeKey": "Quitar clave",
+        "save": "Guardar servidor",
+        "saved": "Servidor de LibreTranslate guardado",
+        "off": "LibreTranslate apagado",
+        "invalidUrl": "Escribe una dirección http o https, como https://translate.example.com.",
+        "unreachable": "Ese servidor no respondió como LibreTranslate. Revisa la dirección y la clave."
     }
 }

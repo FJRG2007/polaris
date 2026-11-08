@@ -541,6 +541,7 @@ export const serverHost = {
     // An address a person typed, fetched with every hop checked for a private
     // address, a timeout and a byte ceiling.
     safeFetch: {
+        configuredRequest: later(load.safeFetch, "configuredRequest"),
         follow: later(load.safeFetch, "follow"),
         readCapped: later(load.safeFetch, "readCapped"),
         safeUrl: later(load.safeFetch, "safeUrl")
@@ -604,6 +605,8 @@ export const serverHost = {
     // providers, whose keys never reach the app; and what reads a picture or a
     // recording for it, on the models Polar already has.
     translateEngines: {
+        openEngineKey: later(load.translateEngines, "openEngineKey"),
+        sealEngineKey: later(load.translateEngines, "sealEngineKey"),
         serverDetect: later(load.translateEngines, "serverDetect"),
         serverEngineStatus: later(load.translateEngines, "serverEngineStatus"),
         serverTranslate: later(load.translateEngines, "serverTranslate"),

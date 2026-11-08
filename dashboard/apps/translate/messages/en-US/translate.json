@@ -35,7 +35,8 @@
         "google": "Google Cloud",
         "answeredBy": "Translated by {engine}",
         "translating": "Translating...",
-        "downloading": "Downloading the language model, {percent}%"
+        "downloading": "Downloading the language model, {percent}%",
+        "libretranslate": "LibreTranslate"
     },
     "none": {
         "title": "No translation engine is available",
@@ -71,6 +72,7 @@
         "browserHint": "Free, on the reader's device. Desktop Chrome only.",
         "localHint": "Free, offline, no limits, any browser. A language downloads once from Polaris.",
         "polarHint": "Uses Polar's model and counts toward its limits.",
+        "libretranslateHint": "Your own LibreTranslate server. Off until its address is set below.",
         "deeplHint": "Needs a DeepL key on the Integrations screen.",
         "googleHint": "Needs a Google Cloud key on the Integrations screen.",
         "target": "Default language",
@@ -291,5 +293,20 @@
     "local": {
         "unknownModel": "That language model is not one Polaris offers.",
         "downloadFailed": "Polaris could not download the language model. Check its internet connection and try again."
+    },
+    "libretranslate": {
+        "title": "LibreTranslate server",
+        "description": "The address of a LibreTranslate server, and its API key if it asks for one.",
+        "url": "Server address",
+        "urlPlaceholder": "https://translate.example.com",
+        "key": "API key",
+        "keyKept": "A key is saved. Type a new one to replace it.",
+        "keyNone": "Optional",
+        "removeKey": "Remove key",
+        "save": "Save server",
+        "saved": "LibreTranslate server saved",
+        "off": "LibreTranslate switched off",
+        "invalidUrl": "Enter an http or https address, like https://translate.example.com.",
+        "unreachable": "That server did not answer as LibreTranslate. Check the address and the key."
     }
 }
