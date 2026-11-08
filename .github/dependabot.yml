@@ -82,6 +82,7 @@ updates:
         update-types: [patch]
         patterns:
           - "@better-auth/utils"
+          - "@browsermt/bergamot-translator"
           - "@enigmax/primitives"
           - "@jitl/quickjs-singlefile-cjs-release-sync"
           - "@sapphi-red/web-noise-suppressor"
@@ -131,6 +132,7 @@ updates:
           - "@types/react"
           - "@types/react-dom"
           - "@better-auth/utils"
+          - "@browsermt/bergamot-translator"
           - "@enigmax/primitives"
           - "@jitl/quickjs-singlefile-cjs-release-sync"
           - "@sapphi-red/web-noise-suppressor"
