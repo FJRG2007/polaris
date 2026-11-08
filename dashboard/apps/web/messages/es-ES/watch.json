@@ -214,7 +214,16 @@
             "other": "Otros contenedores",
             "machine": "La máquina",
             "free": "Libre"
-        }
+        },
+        "image": "Ejecuta {image}",
+        "limit": "Límite {limit}",
+        "restart": "Reiniciar {name}",
+        "confirmRestart": "Reiniciar ya",
+        "cancelRestart": "Dejarlo",
+        "restarting": "Reiniciando",
+        "restarted": "Reiniciado",
+        "restartFailed": "No se pudo reiniciar. Ábrelo en Deploy para ver por qué.",
+        "noAccess": "No tienes acceso a este servicio en Deploy."
     },
     "subject": {
         "metrics": "Métricas",

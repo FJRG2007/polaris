@@ -109,3 +109,27 @@ export function describePart(container: PartIdentity): { label: string; summary:
     const known = container.composeService ? PARTS[container.composeService] : undefined;
     return known ?? { label: container.composeService ?? container.name, summary: "" };
 }
+
+/** Each part by the English name `PARTS` gives it, as its key in the catalog
+ *  (`components.footprint.parts.<key>`), so a screen can say it in the reader's
+ *  words. Keyed by that name rather than the compose service so a reading
+ *  already on its way keeps meaning the same row. */
+const PART_CATALOG_KEYS: Readonly<Record<string, string>> = {
+    Dashboard: "web",
+    Database: "postgres",
+    Edge: "traefik",
+    "Edge guard": "edgeGuard",
+    "Host daemon": "hostd",
+    "Call server": "livekit",
+    "Local discovery": "mdns",
+    "Minecraft router": "mcRouter",
+    "Edge (legacy)": "caddy",
+    "Public tunnel": "tunnel",
+    "Remote access": "tailscale",
+    "VPN gateway": "vpnGateway"
+};
+
+/** A part's catalog key, or null for a part the catalog does not know. */
+export function partCatalogKey(label: string): string | null {
+    return PART_CATALOG_KEYS[label] ?? null;
+}

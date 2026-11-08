@@ -19,6 +19,7 @@ import { useCallback, useRef } from "react";
 import { formatBytes } from "@polaris/core";
 import { RefreshCw, Sparkles } from "lucide-react";
 import { useLiveRead } from "@/components/use-live-resource";
+import { partCatalogKey } from "@/lib/polaris-parts";
 import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
 import { footprintDiskBytes, type FootprintPart, type PolarisFootprint } from "./types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -26,26 +27,8 @@ import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
 type Words = NamespaceTranslator<"components">;
 
-/** The parts of the stack by the English name `lib/polaris-parts` gives them, so
- *  a reading already on its way keeps meaning the same row. A part this does not
- *  know keeps its own name. */
-const PART_KEYS: Readonly<Record<string, string>> = {
-    Dashboard: "web",
-    Database: "postgres",
-    Edge: "traefik",
-    "Edge guard": "edgeGuard",
-    "Host daemon": "hostd",
-    "Call server": "livekit",
-    "Local discovery": "mdns",
-    "Minecraft router": "mcRouter",
-    "Edge (legacy)": "caddy",
-    "Public tunnel": "tunnel",
-    "Remote access": "tailscale",
-    "VPN gateway": "vpnGateway"
-};
-
 function partWords(t: Words, part: FootprintPart): { label: string; summary: string } {
-    const key = PART_KEYS[part.label];
+    const key = partCatalogKey(part.label);
     if (!key) return { label: part.label, summary: part.summary };
     return {
         label: t(`footprint.parts.${key}.label` as NamespaceKey<"components">),
