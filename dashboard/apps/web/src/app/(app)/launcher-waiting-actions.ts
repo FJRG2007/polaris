@@ -20,10 +20,17 @@ import { markLauncherRead } from "@/lib/launcher-waiting-service";
 
 const rowId = z.string().uuid();
 
+/** The gate each app's badge uses - its own permission - by app, so an app
+ *  added to the launcher's list cannot be marked until it names one. */
+const MARK_GATE: Record<LauncherWaitingApp, (user: SessionUser) => Promise<boolean> | boolean> = {
+    chat: (user) => sessionCan(user, "chat.use"),
+    mail: (user) => sessionCan(user, "mail.use"),
+    admin: (user) => user.isAdmin
+};
+
 /** Whether this reader may mark this app's entries: the gate its badge uses. */
 async function mayMark(user: SessionUser, app: LauncherWaitingApp): Promise<boolean> {
-    if (app === "admin") return user.isAdmin;
-    return sessionCan(user, app === "chat" ? "chat.use" : "mail.use");
+    return MARK_GATE[app](user);
 }
 
 export async function markLauncherReadAction(input: unknown): Promise<{ error?: string }> {
