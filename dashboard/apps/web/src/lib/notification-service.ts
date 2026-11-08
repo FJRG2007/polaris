@@ -312,13 +312,15 @@ async function overBurst(
     burst: NonNullable<RepeatPolicy["burst"]>,
     now: Date
 ): Promise<boolean> {
-    const recent = await prisma.notification
-        .count({
+    try {
+        const recent = await prisma.notification.count({
             where: { userId, type, createdAt: { gte: new Date(now.getTime() - burst.windowMs) } },
             take: burst.limit
-        })
-        .catch(() => 0);
-    return recent >= burst.limit;
+        });
+        return recent >= burst.limit;
+    } catch {
+        return false;
+    }
 }
 
 /** What raising a condition came to: a new notice, the open one rewritten, or nothing. */

@@ -76,7 +76,8 @@ export async function deliverAutomationNotice(notice: AutomationNotice): Promise
 
     if (delivery.bell) {
         const report = await dispatch.notify(input);
-        if (report.inapp === "sent") delivered.push("bell");
+        // A repeat folded into the alert already on the bell is on the bell.
+        if (report.inapp === "sent" || report.inapp === "collapsed") delivered.push("bell");
         else missed.push({ channel: "bell", reason: `bell.${report.inapp}` });
         delivered.push(...(report.handedOff ?? []));
     }
