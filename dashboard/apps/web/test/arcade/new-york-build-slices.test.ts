@@ -12,17 +12,6 @@ import { writeFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { serveData } from "./new-york-data";
 
-vi.mock("../../../arcade/game/new-york/engine/trees.js", async () => {
-    const THREE = await import("../../../arcade/node_modules/three/build/three.webgpu.js");
-    return {
-        createTreeField: (_scene: unknown, sites: unknown[]) => ({
-            group: new THREE.Group(),
-            sites: new Set(sites),
-            stats: { trees: sites.length }
-        })
-    };
-});
-
 const BUDGET = 45;
 
 type Slice = { builder: string; ms: number; at: string };
@@ -30,12 +19,23 @@ type Slice = { builder: string; ms: number; at: string };
 describe("New York start-up builders", () => {
     it("hand the thread back within the build budget", { timeout: 300_000 }, async () => {
         serveData();
+        // jsdom has no 2D canvas: the textures painted at start-up (leaf atlas, steam, signs) paint on a real one, so the
+        // tree field and the rest run as they do in the browser
+        const { createCanvas, Path2D } = await import("@napi-rs/canvas");
+        vi.stubGlobal("Path2D", Path2D);
+        vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function (
+            this: HTMLCanvasElement,
+            type: string
+        ) {
+            return type === "2d" ? createCanvas(this.width || 300, this.height || 150).getContext("2d") : null;
+        } as never);
         const THREE = await import("../../../arcade/node_modules/three/build/three.webgpu.js");
         const slice = await import("../../../arcade/game/new-york/engine/build-slice.js");
         const { buildCityGrid } = await import("../../../arcade/game/new-york/engine/city-grid.js");
         const { buildBoroughs } = await import("../../../arcade/game/new-york/engine/boroughs.js");
         const { buildLandmarks } =
             await import("../../../arcade/game/new-york/engine/landmarks.js");
+        const { NYCMapSystem } = await import("../../../arcade/game/new-york/engine/nyc-map.js");
         const { buildCityBlocks } =
             await import("../../../arcade/game/new-york/engine/buildings.js");
         const { buildStreetDetails } =
@@ -81,8 +81,10 @@ describe("New York start-up builders", () => {
         const scene = new THREE.Scene();
         const grid = await run("cityGrid", () => buildCityGrid(scene));
         const boroughs = await run("boroughs", () => buildBoroughs(scene, { sidewalks: grid.sidewalks }));
-        const { colliders } = buildLandmarks(scene);
+        const { colliders } = await run("landmarks", () => buildLandmarks(scene));
         const blocks = await run("blocks", () => buildCityBlocks(scene, colliders));
+        const map = new NYCMapSystem({ allBlocks: blocks.allBlocks });
+        await run("map", () => map.prepare());
         const all = [
             ...colliders,
             ...blocks.colliders,
@@ -114,6 +116,8 @@ describe("New York start-up builders", () => {
         };
         await run("culling", () => setupSceneCulling(scene, roots, shadow));
 
+        const longestBy: Record<string, number> = {};
+        for (const s of slices) longestBy[s.builder] = Math.max(longestBy[s.builder] ?? 0, Math.round(s.ms));
         const longest = [...slices].sort((a, b) => b.ms - a.ms).slice(0, 15);
         const report = longest.map((s) => `${s.builder} ${Math.round(s.ms)}ms ${s.at}`).join("\n");
         if (process.env.NEW_YORK_SLICES_DUMP)
@@ -121,6 +125,7 @@ describe("New York start-up builders", () => {
                 process.env.NEW_YORK_SLICES_DUMP,
                 `${report}
 ${JSON.stringify(yields)}
+${JSON.stringify(longestBy)}
 `
             );
         const builders = ["cityGrid", "boroughs", "blocks", "streetDetails", "traffic", "culling"];
