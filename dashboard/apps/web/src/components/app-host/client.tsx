@@ -129,6 +129,11 @@ const GameInviteDialog = dynamic(
         import("@/components/arcade/game-invite-dialog").then((module) => module.GameInviteDialog),
     { ssr: false }
 );
+/** The Games library's rooms: open one, join by code, the public list. */
+const GameRooms = dynamic(
+    () => import("@/components/arcade/game-rooms").then((module) => module.GameRooms),
+    { ssr: false, loading: () => <Skeleton className="h-64 w-full" /> }
+);
 const gameInviteAccess = () =>
     import("@/app/(app)/chat/activity-card-actions").then((module) => module.gameInviteAccess());
 
@@ -229,6 +234,7 @@ export const clientHost = {
     accessShareDialog: { ShareDialog },
     accountInput: { AccountInput },
     arcadeInvite: { GameInviteDialog, gameInviteAccess },
+    arcadeRooms: { GameRooms },
     appAppsInstalledIdAccessActions: {
         installAccessAction,
         revokeInstallAccessAction,

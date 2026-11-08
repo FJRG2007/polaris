@@ -12,6 +12,9 @@
  *   publishes a microphone or a camera, no call starts, nothing rings - the way
  *   a game launcher invites. Leaving a call never touches a lobby, because a
  *   lobby never had one.
+ * - **In a room**, opened from the Games library: a lobby with no
+ *   conversation and no card (`channelId` null), a short code people join it
+ *   with, and - when public - a place in the list anybody signed in sees.
  *
  * Either way the server keeps a short record beside it: the session, the card
  * in the conversation that offers it, who has played, and who was invited. It
@@ -26,11 +29,18 @@
 
 import { publishChatChange } from "./live";
 import { prisma, type Prisma } from "@polaris/db";
-import { activityMark, INVITE_TTL_MS, sessionEnded, stillPlaying } from "./activity-card";
+import { PASS_TTL_MS } from "./call-activity";
+import {
+    activityMark,
+    INVITE_TTL_MS,
+    INVITE_WAIT_MS,
+    sessionEnded,
+    stillPlaying
+} from "./activity-card";
 
 export interface SessionRow {
     readonly id: string;
-    readonly channelId: string;
+    readonly channelId: string | null;
     readonly game: string;
     readonly messageId: string | null;
 }
@@ -39,7 +49,7 @@ const ROW = { id: true, channelId: true, game: true, messageId: true } as const;
 
 /** Wake the card's message on every screen showing it. */
 function wake(session: SessionRow, actorId: string): void {
-    if (!session.messageId) return;
+    if (!session.messageId || !session.channelId) return;
     publishChatChange({
         channelId: session.channelId,
         kind: "posted",
@@ -257,6 +267,8 @@ export async function sessionForCard(sessionId: string) {
             ...ROW,
             meetingId: true,
             startedById: true,
+            code: true,
+            isPublic: true,
             createdAt: true,
             endedAt: true,
             players: {
@@ -275,7 +287,7 @@ export async function sessionForCard(sessionId: string) {
  * them alone.
  */
 export async function inviteTo(
-    session: { readonly id: string; readonly channelId: string },
+    session: { readonly id: string; readonly channelId: string | null },
     inviterId: string,
     userIds: readonly string[],
     now = Date.now()
@@ -293,7 +305,7 @@ export async function inviteTo(
             "declinedAt" = NULL,
             "createdAt" = CURRENT_TIMESTAMP`;
     publishChatChange({
-        channelId: session.channelId,
+        ...(session.channelId ? { channelId: session.channelId } : {}),
         kind: "game-invite",
         actorId: inviterId,
         audience: ids,
@@ -321,6 +333,8 @@ export async function openInvites(userId: string, now = Date.now()) {
     return prisma.arcadeInvite.findMany({
         where: {
             userId,
+            // A room's code entered by its own reader is not an invitation.
+            NOT: { invitedById: userId },
             declinedAt: null,
             expiresAt: { gt: new Date(now) },
             session: { endedAt: null }
@@ -351,5 +365,101 @@ export async function declineInvite(sessionId: string, userId: string): Promise<
     await prisma.arcadeInvite.updateMany({
         where: { sessionId, userId, declinedAt: null },
         data: { declinedAt: new Date() }
+    });
+}
+
+/** How many times a fresh code is drawn before opening a room gives up. */
+const CODE_TRIES = 5;
+
+/**
+ * A room: a lobby of `game` with no conversation and no card, under a code
+ * nobody else holds. A drawn code that is taken - one in 10^12 per room open -
+ * is drawn again.
+ */
+export async function openRoom(
+    game: string,
+    startedById: string,
+    isPublic: boolean,
+    drawCode: () => string
+): Promise<SessionRow & { readonly code: string }> {
+    for (let attempt = 0; ; attempt += 1) {
+        const code = drawCode();
+        try {
+            const created = await prisma.arcadeSession.create({
+                data: { meetingId: null, channelId: null, game, startedById, code, isPublic },
+                select: ROW
+            });
+            return { ...created, code };
+        } catch (caught) {
+            const taken = (caught as { code?: unknown } | null)?.code === "P2002";
+            if (!taken || attempt + 1 >= CODE_TRIES) throw caught;
+        }
+    }
+}
+
+/** The running room under this code, or null. */
+export async function roomByCode(code: string) {
+    return prisma.arcadeSession.findFirst({
+        where: { code, meetingId: null, endedAt: null },
+        select: { id: true, game: true }
+    });
+}
+
+/** What the room's own screen shows about it: its code and whether it is
+ *  listed. Null for a session that is not a room. */
+export async function roomFacts(sessionId: string) {
+    return prisma.arcadeSession.findFirst({
+        where: { id: sessionId, code: { not: null } },
+        select: { code: true, isPublic: true }
+    });
+}
+
+/**
+ * Let somebody who typed a room's code in: the same invitation an invitee
+ * holds, issued by themselves - which keeps it out of their toast and bell
+ * (`openInvites`) - and lasting as long as any other.
+ */
+export async function grantRoom(
+    sessionId: string,
+    userId: string,
+    now = Date.now()
+): Promise<void> {
+    const expires = new Date(now + INVITE_TTL_MS);
+    await prisma.arcadeInvite.upsert({
+        where: { sessionId_userId: { sessionId, userId } },
+        create: { sessionId, userId, invitedById: userId, expiresAt: expires },
+        update: { expiresAt: expires, declinedAt: null }
+    });
+}
+
+/** The most rooms the list reads, and shows. */
+export const PUBLIC_ROOMS_MAX = 30;
+
+/** The public rooms still running, newest first, each with what it needs to be
+ *  judged over or full. The caller drops the ones that are. */
+export async function publicRooms(now = Date.now()) {
+    // Live in the database already: somebody still renewing a pass, or opened
+    // too recently for anybody to have sat down - so rooms left without a
+    // goodbye never crowd the running ones out of the page.
+    return prisma.arcadeSession.findMany({
+        where: {
+            isPublic: true,
+            meetingId: null,
+            endedAt: null,
+            OR: [
+                { players: { some: { leftAt: null, seenAt: { gt: new Date(now - PASS_TTL_MS) } } } },
+                { createdAt: { gt: new Date(now - INVITE_WAIT_MS) }, players: { none: {} } }
+            ]
+        },
+        orderBy: { createdAt: "desc" },
+        take: PUBLIC_ROOMS_MAX,
+        select: {
+            id: true,
+            game: true,
+            startedById: true,
+            createdAt: true,
+            endedAt: true,
+            players: { select: { userId: true, seenAt: true, leftAt: true }, take: 64 }
+        }
     });
 }

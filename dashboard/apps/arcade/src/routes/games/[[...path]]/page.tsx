@@ -26,5 +26,9 @@ export default async function GamesPage({
         if (!findGame(id)) notFound();
         return <GamePlayer gameId={id} />;
     }
-    return <GamesScreen />;
+    // Rooms are offered only to whoever may play with others, the same check
+    // every room action asks again.
+    const user = await host.session.requireUser();
+    const together = await host.session.sessionCan(user, "arcade.calls");
+    return <GamesScreen together={together} />;
 }

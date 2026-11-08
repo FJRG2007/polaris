@@ -1760,6 +1760,34 @@
         "updateAll": "Actualizar todo",
         "checking": "Buscando novedades"
     },
+    "gameRooms": {
+        "createTitle": "Sala nueva",
+        "game": "Juego",
+        "public": "Sala pública",
+        "publicHint": "Cualquiera con sesión iniciada puede verla y unirse.",
+        "create": "Crear sala",
+        "joinTitle": "Unirse con código",
+        "code": "Código",
+        "codeInvalid": "Un código tiene 8 letras y cifras.",
+        "join": "Unirse",
+        "publicRooms": "Salas públicas",
+        "refresh": "Actualizar",
+        "empty": "Ahora no hay salas públicas. Crea una y otros podrán unirse.",
+        "loadFailed": "No se pudieron cargar las salas.",
+        "retry": "Reintentar",
+        "hostedBy": "Creada por {name}",
+        "players": "{count} de {max} jugando",
+        "joinRoom": "Unirse",
+        "refused": {
+            "invalid": "Revisa el código e inténtalo de nuevo.",
+            "denied": "No tienes permiso para jugar con otros.",
+            "missing": "Este juego no está disponible aquí.",
+            "limited": "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.",
+            "unknown": "Ninguna sala en marcha tiene ese código.",
+            "full": "Esa sala está llena.",
+            "failed": "Algo salió mal. Inténtalo de nuevo."
+        }
+    },
     "gameInvite": {
         "title": "Invitar a {game}",
         "intro": "Reciben una invitación para unirse. No se inicia ninguna llamada.",

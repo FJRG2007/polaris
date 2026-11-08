@@ -12,11 +12,12 @@
  */
 
 import Link from "next/link";
-import { Button } from "@polaris/ui";
+import { Button, CopyButton } from "@polaris/ui";
 import * as lobby from "./lobby-actions";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Joystick } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatRoomCode } from "@/lib/arcade/room-code";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useLobbyRoom, type LobbyTicket } from "./use-lobby-room";
 import { GameInviteDialog } from "@/components/arcade/game-invite-dialog";
@@ -53,8 +54,8 @@ export function GameLobby({ sessionId }: { sessionId: string }) {
             entry?.ok && !left ? { url: entry.url, token: entry.token, seat: entry.seat } : null,
         [entry, left]
     );
-    const room = useLobbyRoom(ticket);
-    const activity = useCallActivity(sessionId, room, ticket !== null, API);
+    const media = useLobbyRoom(ticket);
+    const activity = useCallActivity(sessionId, media, ticket !== null, API);
 
     // In the lobby is playing: the seat is claimed as soon as the server says
     // the reader may, once - or again after a request that got no answer.
@@ -70,7 +71,15 @@ export function GameLobby({ sessionId }: { sessionId: string }) {
         activity.play(game);
     }, [game, left, activity]);
 
-    const back = entry?.ok && entry.member ? `/chat/c/${entry.channelId}` : "/chat";
+    // A room was opened from the Games library, and goes back there.
+    const back = !entry?.ok
+        ? "/chat"
+        : entry.room
+          ? "/games"
+          : entry.member && entry.channelId
+            ? `/chat/c/${entry.channelId}`
+            : "/chat";
+    const room = entry?.ok ? entry.room : null;
     const leave = () => {
         activity.leave();
         setLeft(true);
@@ -81,7 +90,7 @@ export function GameLobby({ sessionId }: { sessionId: string }) {
         ? null
         : !entry.ok
           ? t(`lobby.refused.${entry.reason}`)
-          : room.status === "failed"
+          : media.status === "failed"
             ? t("lobby.refused.server")
             : activity.answer?.ok === false && !activity.playing
               ? t(
@@ -90,7 +99,7 @@ export function GameLobby({ sessionId }: { sessionId: string }) {
               : activity.failed && !activity.playing
                 ? t("lobby.refused.server")
                 : null;
-    const canRetry = activity.failed && !activity.playing && room.status !== "failed";
+    const canRetry = activity.failed && !activity.playing && media.status !== "failed";
 
     return (
         <div className="flex h-full min-h-0 min-w-0 flex-col gap-3 p-3 sm:p-4">
@@ -105,6 +114,17 @@ export function GameLobby({ sessionId }: { sessionId: string }) {
                 <h1 className="min-w-0 flex-1 truncate text-base font-semibold" title={name ?? ""}>
                     {name ?? t("lobby.title")}
                 </h1>
+                {room && (
+                    <div className="flex shrink-0 items-center gap-1 text-sm">
+                        <span className="hidden text-muted-foreground sm:inline">
+                            {room.isPublic ? t("lobby.publicCode") : t("lobby.code")}
+                        </span>
+                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono tracking-wider">
+                            {formatRoomCode(room.code)}
+                        </code>
+                        <CopyButton value={formatRoomCode(room.code)} />
+                    </div>
+                )}
             </header>
             {problem ? (
                 <div role="alert" className="flex min-w-0 flex-col items-start gap-2">

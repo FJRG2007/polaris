@@ -196,3 +196,15 @@ export function lobbyPassScope(sessionId: string): string {
 export function joinHref(channelId: string, sessionId: string): string {
     return `/chat/c/${channelId}?activity=${sessionId}`;
 }
+
+/** Where a session is joined: a call's game through its conversation, a lobby
+ *  or a room on its own page. */
+export function sessionHref(session: {
+    readonly id: string;
+    readonly meetingId: string | null;
+    readonly channelId: string | null;
+}): string {
+    return session.meetingId === null || session.channelId === null
+        ? lobbyHref(session.id)
+        : joinHref(session.channelId, session.id);
+}

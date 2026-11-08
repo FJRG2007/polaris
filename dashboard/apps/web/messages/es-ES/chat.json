@@ -2084,6 +2084,8 @@
         "title": "Juego",
         "back": "Volver",
         "retry": "Reintentar",
+        "code": "Código",
+        "publicCode": "Sala pública",
         "refused": {
             "missing": "Este juego no está instalado aquí.",
             "denied": "No tienes permiso para jugar.",
