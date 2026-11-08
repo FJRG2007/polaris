@@ -431,7 +431,8 @@ export async function saveAutomationAction(input: unknown): Promise<{ error?: st
         condition: JSON.stringify(parsed.data.automation.condition),
         mode: parsed.data.automation.mode,
         instructions: parsed.data.automation.instructions,
-        enabled: parsed.data.automation.enabled
+        enabled: parsed.data.automation.enabled,
+        target: parsed.data.automation.target
     };
     if (parsed.data.id) {
         await prisma.agentAutomation.updateMany({

@@ -20,6 +20,7 @@ import { considerFallback } from "@/lib/agents/agent-fallback";
 import { githubAppInstallationToken } from "@/lib/github-service";
 import { policyForRepo } from "@/lib/agents/agent-defaults-service";
 import { agentRepoByFullName } from "@/lib/agents/agent-repo-service";
+import { startIssueSession } from "@/lib/agents/issue-sessions";
 import { finishAgentRun, sweepStaleRuns } from "@/lib/agents/agent-run-service";
 import {
     AGENT_WORKFLOW_PATH,
@@ -220,6 +221,15 @@ export function describe(incident: Incident, repoFullName: string): string {
     return lines.join("\n");
 }
 
+/** A session's title from the issue or pull request it is about. */
+function incidentTitle(payload: unknown, incident: Incident): string {
+    const row = payload as { issue?: { title?: unknown }; pull_request?: { title?: unknown } };
+    const title = row.issue?.title ?? row.pull_request?.title;
+    if (typeof title === "string" && title.trim()) return title.trim();
+    const number = incident.issueNumber ?? incident.prNumber;
+    return number !== null ? `#${number}` : AGENT_TRIGGER_LABELS[incident.trigger];
+}
+
 /** Whether the operator's conditions let this incident through. */
 function matches(
     condition: { labels: string[]; branches: string[]; authors: string[] },
@@ -331,6 +341,22 @@ export async function handleAgentWebhook(params: {
     // can comment already has that access.
     if (incident.trigger === ALWAYS_ON_TRIGGER) {
         if (!repo.isPrivate && !(await canWriteToRepo(repoFullName, incident.actor))) return [];
+        // A mention rule aimed at a session answers the mention with one
+        // somebody can steer, rather than the run a mention otherwise starts.
+        const steered = repo.automations.find(
+            (row) => row.trigger === ALWAYS_ON_TRIGGER && row.target === "session"
+        );
+        if (steered) {
+            const id = await startIssueSession({
+                repo,
+                issueNumber: incident.issueNumber,
+                prNumber: incident.prNumber,
+                title: incidentTitle(params.payload, incident),
+                instructions: steered.instructions,
+                described: describe(incident, repoFullName)
+            });
+            return id ? [id] : [];
+        }
         const result = await dispatchRun({
             repo,
             trigger: incident.trigger,
@@ -350,6 +376,20 @@ export async function handleAgentWebhook(params: {
 
     const started: string[] = [];
     for (const rule of allowed) {
+        // A rule aimed at a session opens one somebody can watch and steer,
+        // rather than a run that answers once and is gone.
+        if (rule.target === "session") {
+            const id = await startIssueSession({
+                repo,
+                issueNumber: incident.issueNumber,
+                prNumber: incident.prNumber,
+                title: incidentTitle(params.payload, incident),
+                instructions: rule.instructions,
+                described: describe(incident, repoFullName)
+            });
+            if (id) started.push(id);
+            continue;
+        }
         const result = await dispatchRun({
             repo,
             trigger: incident.trigger,

@@ -112,6 +112,9 @@ export interface LimitVerdict {
 export async function checkUsageLimits(input: {
     ownerId: string;
     repoFullName: string;
+    /** What is about to start. A session is held to the token rules only: a
+     *  "runs" rule counts headless runs, and a session is not one. */
+    kind?: "run" | "session";
 }): Promise<LimitVerdict> {
     const rules = await prisma.agentUsageLimit.findMany();
     if (rules.length === 0) return { allowed: true };
@@ -127,6 +130,7 @@ export async function checkUsageLimits(input: {
                 rule.subjectId.toLowerCase() === input.repoFullName.toLowerCase()) ||
             (subject === "org" && rule.subjectId.toLowerCase() === org);
         if (!applies) continue;
+        if (input.kind === "session" && rule.metric === "runs") continue;
 
         // Counted over whatever the rule is ABOUT, which for a role or a group is
         // the one person it is being applied to - see the note at the top.
@@ -137,8 +141,13 @@ export async function checkUsageLimits(input: {
                   ? { repo: { repoFullName: { startsWith: `${rule.subjectId}/` } } }
                   : { repo: { ownerId: input.ownerId } };
 
+        // Sessions count by who started them for a person rule: a session spends
+        // its starter's account, whoever owns the repository.
+        const sessionScope =
+            subject === "repo" || subject === "org" ? scope : { startedById: input.ownerId };
         const used = await usageSince(
             scope,
+            sessionScope,
             rule.metric as LimitMetric,
             since(rule.period as LimitPeriod)
         );
@@ -162,16 +171,27 @@ export async function checkUsageLimits(input: {
 /** What has been spent under this rule's scope in its window. */
 async function usageSince(
     scope: Record<string, unknown>,
+    sessionScope: Record<string, unknown>,
     metric: LimitMetric,
     from: Date
 ): Promise<number> {
     const where = { ...scope, createdAt: { gte: from } };
     if (metric === "runs") return await prisma.agentRun.count({ where });
-    const totals = await prisma.agentRun.aggregate({
-        where,
-        _sum: { tokensIn: true, tokensOut: true }
-    });
-    return (totals._sum.tokensIn ?? 0) + (totals._sum.tokensOut ?? 0);
+    // Tokens are tokens whichever half spent them: a session's are read from
+    // its transcript, a run's reported by the runtime.
+    const [runs, sessions] = await Promise.all([
+        prisma.agentRun.aggregate({ where, _sum: { tokensIn: true, tokensOut: true } }),
+        prisma.agentSession.aggregate({
+            where: { ...sessionScope, createdAt: { gte: from } },
+            _sum: { tokensIn: true, tokensOut: true }
+        })
+    ]);
+    return (
+        (runs._sum.tokensIn ?? 0) +
+        (runs._sum.tokensOut ?? 0) +
+        (sessions._sum.tokensIn ?? 0) +
+        (sessions._sum.tokensOut ?? 0)
+    );
 }
 
 /** Which roles and groups this person is in, for matching rules against. */

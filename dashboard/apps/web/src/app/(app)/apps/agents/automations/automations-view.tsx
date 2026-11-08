@@ -39,6 +39,7 @@ interface Rule {
     mode: string | null;
     instructions: string;
     enabled: boolean;
+    target: string;
 }
 
 /** A rule's narrowing, read back off the row. Anything malformed does not narrow,
@@ -176,6 +177,9 @@ export function AutomationsView({
                                                 </p>
                                             ) : null}
                                         </button>
+                                        {rule.target === "session" ? (
+                                            <Badge variant="primary">{t("rules.targets.session")}</Badge>
+                                        ) : null}
                                         {!rule.enabled ? (
                                             <Badge variant="neutral">{t("overview.off")}</Badge>
                                         ) : null}
@@ -232,6 +236,9 @@ function RuleDialog({
     const [branches, setBranches] = useState(existing.branches.join(", "));
     const [instructions, setInstructions] = useState(rule?.instructions ?? "");
     const [enabled, setEnabled] = useState(rule?.enabled ?? true);
+    const [target, setTarget] = useState<"run" | "session">(
+        rule?.target === "session" ? "session" : "run"
+    );
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -250,7 +257,8 @@ function RuleDialog({
                 labels: existing.labels,
                 branches: existing.branches,
                 instructions: rule.instructions,
-                enabled: rule.enabled
+                enabled: rule.enabled,
+                target: rule.target === "session" ? "session" : "run"
             },
             {
                 repoId,
@@ -258,7 +266,8 @@ function RuleDialog({
                 labels: list(labels),
                 branches: list(branches),
                 instructions,
-                enabled
+                enabled,
+                target
             }
         );
 
@@ -279,7 +288,8 @@ function RuleDialog({
                                 },
                                 mode: null,
                                 instructions,
-                                enabled
+                                enabled,
+                                target
                             }
                         }),
                     setError
@@ -314,11 +324,32 @@ function RuleDialog({
                             value={trigger}
                             onValueChange={(next) => setTrigger(next as AgentTrigger)}
                             options={AGENT_TRIGGERS.filter(
-                                (value) => value !== "manual" && value !== "mention"
+                                (value) =>
+                                    value !== "manual" &&
+                                    (value !== "mention" || target === "session")
                             ).map((value) => ({ value, label: agentWord(t, "trigger", value) }))}
                         />
                         <p className="text-xs text-muted-foreground">
                             {agentWord(t, "triggerNote", trigger)}
+                        </p>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-sm font-medium">{t("rules.target")}</label>
+                        <Select
+                            value={target}
+                            onValueChange={(next) => {
+                                const value = next === "session" ? "session" : "run";
+                                setTarget(value);
+                                if (value === "run" && trigger === "mention") setTrigger("issue.opened");
+                            }}
+                            options={[
+                                { value: "run", label: t("rules.targets.run") },
+                                { value: "session", label: t("rules.targets.session") }
+                            ]}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            {t(`rules.targetHints.${target}`)}
                         </p>
                     </div>
 

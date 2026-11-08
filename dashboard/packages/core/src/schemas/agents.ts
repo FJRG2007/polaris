@@ -180,7 +180,9 @@ export const agentAutomationSchema = z.object({
     condition: agentConditionSchema.default({ labels: [], branches: [], authors: [] }),
     mode: z.string().trim().max(40).nullable().default(null),
     instructions: z.string().trim().max(8000).default(""),
-    enabled: z.boolean().default(true)
+    enabled: z.boolean().default(true),
+    /** What it starts: a headless run, or a session somebody can steer. */
+    target: z.enum(["run", "session"]).default("run")
 });
 
 export type AgentAutomationInput = z.infer<typeof agentAutomationSchema>;

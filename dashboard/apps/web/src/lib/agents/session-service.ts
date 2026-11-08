@@ -122,6 +122,19 @@ export interface SessionView {
     /** The pull request opened from its branch, or null for none yet. Only the
      *  number and the link: whether it is open is GitHub's to say. */
     readonly pullRequest: { readonly number: number; readonly url: string } | null;
+    /** The GitHub issue an automation opened it for, or null. */
+    readonly issueNumber: number | null;
+    /** The session it was forked from, or null. */
+    readonly parentId: string | null;
+    /** What its transcript says it spent. Zero for an agent whose transcript
+     *  reports nothing; `costUsd` null while no counted turn had a priced model. */
+    readonly usage: SessionUsage;
+}
+
+export interface SessionUsage {
+    readonly tokensIn: number;
+    readonly tokensOut: number;
+    readonly costUsd: number | null;
 }
 
 /** The outcome of saving a session's work when it ended. */
@@ -193,6 +206,11 @@ const VIEW_SELECT = {
     workError: true,
     prNumber: true,
     prUrl: true,
+    issueNumber: true,
+    parentId: true,
+    tokensIn: true,
+    tokensOut: true,
+    costUsd: true,
     repo: { select: { repoFullName: true } },
     host: { select: { name: true } }
 } as const;
@@ -228,6 +246,11 @@ type SessionRecord = {
     workError: string | null;
     prNumber: number | null;
     prUrl: string | null;
+    issueNumber: number | null;
+    parentId: string | null;
+    tokensIn: number;
+    tokensOut: number;
+    costUsd: number | null;
     repo: { repoFullName: string } | null;
     host: { name: string } | null;
 };
@@ -271,7 +294,14 @@ function toView(record: SessionRecord): SessionView {
         pullRequest:
             record.prNumber !== null && record.prUrl
                 ? { number: record.prNumber, url: record.prUrl }
-                : null
+                : null,
+        issueNumber: record.issueNumber ?? null,
+        parentId: record.parentId ?? null,
+        usage: {
+            tokensIn: record.tokensIn ?? 0,
+            tokensOut: record.tokensOut ?? 0,
+            costUsd: record.costUsd ?? null
+        }
     };
 }
 
@@ -382,6 +412,10 @@ export interface SessionCreateInput {
     readonly enigma: core.EnigmaSettings | null;
     /** Created waiting for a free slot rather than starting (`session-queue`). */
     readonly queued?: boolean;
+    /** The GitHub issue an automation opened it for. */
+    readonly issueNumber?: number | null;
+    /** The session it is a fork of. */
+    readonly parentId?: string | null;
 }
 
 /**
@@ -416,6 +450,8 @@ export async function createSession(
             branch: core.sessionBranchName(id, input.title),
             taskId: input.taskId,
             enigma: input.enigma ? JSON.stringify(input.enigma) : null,
+            issueNumber: input.issueNumber ?? null,
+            parentId: input.parentId ?? null,
             tokenHash: hashToken(token),
             state: input.queued ? "queued" : "starting"
         },

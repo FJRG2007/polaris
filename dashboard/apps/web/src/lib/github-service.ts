@@ -1852,6 +1852,196 @@ export async function createPullRequest(
     }
 }
 
+/** Post a comment on an issue or pull request. False when GitHub refused it or
+ *  could not be reached; a comment is never worth failing the caller over. */
+export async function commentOnIssue(
+    owner: string,
+    repo: string,
+    number: number,
+    body: string,
+    token: string
+): Promise<boolean> {
+    try {
+        const res = await fetch(`${repoPath(owner, repo)}/issues/${number}/comments`, {
+            method: "POST",
+            headers: { ...apiHeaders(token), "Content-Type": "application/json" },
+            body: JSON.stringify({ body }),
+            cache: "no-store"
+        });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+/** How one check on a pull request's head commit stands. */
+export interface PullCheck {
+    readonly name: string;
+    /** queued | in_progress | completed, folded with a commit status's pending. */
+    readonly status: "pending" | "completed";
+    /** success | failure | neutral | cancelled | skipped | timed_out |
+     *  action_required | stale, or null while it has not finished. */
+    readonly conclusion: string | null;
+    readonly url: string | null;
+    /** What the check said about itself, for handing a failure to the agent. */
+    readonly summary: string;
+}
+
+export interface PullChecks {
+    readonly sha: string;
+    readonly checks: readonly PullCheck[];
+    /** GitHub's own word on whether it can be merged: clean, blocked, behind,
+     *  dirty, unstable, draft, unknown. */
+    readonly mergeableState: string;
+}
+
+const CHECK_SUMMARY_MAX = 4000;
+
+/**
+ * The checks and commit statuses on a pull request's head commit, or null when
+ * GitHub would not say. Both, because Actions reports check runs and older CI
+ * reports commit statuses, and a pull request shows the two in one list.
+ *
+ * GitHub REST: GET /repos/{o}/{r}/pulls/{n}, GET .../commits/{ref}/check-runs,
+ * GET .../commits/{ref}/status (docs.github.com/en/rest/checks/runs,
+ * docs.github.com/en/rest/commits/statuses).
+ */
+export async function pullRequestChecks(
+    owner: string,
+    repo: string,
+    number: number,
+    token: string | null
+): Promise<PullChecks | null> {
+    try {
+        const headers = optionalAuthHeaders(token);
+        const pullRes = await fetch(`${repoPath(owner, repo)}/pulls/${number}`, {
+            headers,
+            cache: "no-store"
+        });
+        if (!pullRes.ok) return null;
+        const pull = (await pullRes.json()) as {
+            head?: { sha?: string };
+            mergeable_state?: string;
+        };
+        const sha = pull.head?.sha;
+        if (typeof sha !== "string" || !sha) return null;
+        const [runsRes, statusRes] = await Promise.all([
+            fetch(`${repoPath(owner, repo)}/commits/${sha}/check-runs?per_page=100`, {
+                headers,
+                cache: "no-store"
+            }),
+            fetch(`${repoPath(owner, repo)}/commits/${sha}/status?per_page=100`, {
+                headers,
+                cache: "no-store"
+            })
+        ]);
+        const checks: PullCheck[] = [];
+        if (runsRes.ok) {
+            const body = (await runsRes.json()) as {
+                check_runs?: Array<{
+                    name?: string;
+                    status?: string;
+                    conclusion?: string | null;
+                    html_url?: string | null;
+                    output?: { title?: string | null; summary?: string | null; text?: string | null };
+                }>;
+            };
+            for (const run of body.check_runs ?? []) {
+                if (typeof run.name !== "string") continue;
+                const said = [run.output?.title, run.output?.summary, run.output?.text]
+                    .filter((part): part is string => typeof part === "string" && part.trim() !== "")
+                    .join("\n\n");
+                checks.push({
+                    name: run.name,
+                    status: run.status === "completed" ? "completed" : "pending",
+                    conclusion: run.status === "completed" ? (run.conclusion ?? null) : null,
+                    url: run.html_url ?? null,
+                    summary: said.slice(0, CHECK_SUMMARY_MAX)
+                });
+            }
+        }
+        if (statusRes.ok) {
+            const body = (await statusRes.json()) as {
+                statuses?: Array<{
+                    context?: string;
+                    state?: string;
+                    target_url?: string | null;
+                    description?: string | null;
+                }>;
+            };
+            for (const status of body.statuses ?? []) {
+                if (typeof status.context !== "string") continue;
+                const pending = status.state === "pending";
+                checks.push({
+                    name: status.context,
+                    status: pending ? "pending" : "completed",
+                    conclusion: pending
+                        ? null
+                        : status.state === "success"
+                          ? "success"
+                          : "failure",
+                    url: status.target_url ?? null,
+                    summary: (status.description ?? "").slice(0, CHECK_SUMMARY_MAX)
+                });
+            }
+        }
+        return { sha, checks, mergeableState: pull.mergeable_state ?? "unknown" };
+    } catch {
+        return null;
+    }
+}
+
+export type MergeMethod = "merge" | "squash" | "rebase";
+
+export type MergeResult =
+    | { ok: true }
+    /** `notAllowed`: 403, the token may not merge here. `notMergeable`: 405,
+     *  branch protection or a failing requirement; `message` is GitHub's own
+     *  sentence. `conflict`: 409, the head moved. */
+    | { ok: false; reason: "notAllowed" | "notMergeable" | "conflict" | "failed"; message: string };
+
+/** Merge a pull request. PUT /repos/{o}/{r}/pulls/{n}/merge
+ *  (docs.github.com/en/rest/pulls/pulls#merge-a-pull-request). */
+export async function mergePullRequest(
+    owner: string,
+    repo: string,
+    number: number,
+    input: { method: MergeMethod; sha?: string },
+    token: string
+): Promise<MergeResult> {
+    try {
+        const res = await fetch(`${repoPath(owner, repo)}/pulls/${number}/merge`, {
+            method: "PUT",
+            headers: { ...apiHeaders(token), "Content-Type": "application/json" },
+            body: JSON.stringify({
+                merge_method: input.method,
+                ...(input.sha ? { sha: input.sha } : {})
+            }),
+            cache: "no-store"
+        });
+        if (res.ok) return { ok: true };
+        const text = await res.text().catch(() => "");
+        let message = "";
+        try {
+            const parsed = JSON.parse(text) as { message?: unknown };
+            if (typeof parsed.message === "string") message = parsed.message.slice(0, 500);
+        } catch {
+            // Not JSON: no sentence to pass on.
+        }
+        const reason =
+            res.status === 403 || res.status === 404
+                ? "notAllowed"
+                : res.status === 405
+                  ? "notMergeable"
+                  : res.status === 409
+                    ? "conflict"
+                    : "failed";
+        return { ok: false, reason, message };
+    } catch {
+        return { ok: false, reason: "failed", message: "" };
+    }
+}
+
 // --- Deployments -----------------------------------------------------------
 //
 // The deployment box GitHub renders on a commit and on a pull request, with a
