@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
-import { isAppInstalled } from "@/lib/apps/install-presence";
+import { InboxCardWhenInstalled } from "./overview-inbox";
 import {
     Activity,
     Award,
@@ -65,19 +65,15 @@ const SECTIONS = [
 
 export default async function ManagementPage() {
     await requireAdmin();
-    const [t, bridge] = await Promise.all([
-        getTranslations("admin"),
-        isAppInstalled("messaging-bridge")
-    ]);
-    const sections = SECTIONS.filter((section) => section.key !== "inbox" || bridge);
+    const t = await getTranslations("admin");
 
     return (
         <>
             <PageHeader title={t("overview.title")} description={t("overview.description")} />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {sections.map((section) => {
+                {SECTIONS.map((section) => {
                     const Icon = section.icon;
-                    return (
+                    const card = (
                         <Link
                             key={section.href}
                             href={section.href}
@@ -96,6 +92,13 @@ export default async function ManagementPage() {
                                 </span>
                             </span>
                         </Link>
+                    );
+                    // The inbox exists only once the messaging bridge is installed;
+                    // whether it is, is read after the paint.
+                    return section.key === "inbox" ? (
+                        <InboxCardWhenInstalled key={section.href}>{card}</InboxCardWhenInstalled>
+                    ) : (
+                        card
                     );
                 })}
             </div>

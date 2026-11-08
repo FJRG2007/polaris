@@ -5,13 +5,24 @@
  */
 
 import { requirePermission } from "@/lib/session";
-import { listContacts } from "@/lib/messaging-service";
-import { ContactsView } from "./contacts-view";
+import { getTranslations } from "@/lib/i18n/request";
+import { ContactsLoader, tableSkeleton } from "../loaders";
+import { ViewHeadingSkeleton } from "@/app/(app)/admin/region-skeletons";
 
 export const dynamic = "force-dynamic";
 
 export default async function ContactsPage() {
-    const user = await requirePermission("inbox.read");
-    const contacts = await listContacts(user.id);
-    return <ContactsView initialContacts={contacts} />;
+    await requirePermission("inbox.read");
+    const t = await getTranslations("admin");
+
+    return (
+        <ContactsLoader
+            revision={Date.now()}
+            skeleton={
+                <ViewHeadingSkeleton title={t("inboxContacts.title")} intro={t("inboxContacts.intro")}>
+                    {tableSkeleton}
+                </ViewHeadingSkeleton>
+            }
+        />
+    );
 }

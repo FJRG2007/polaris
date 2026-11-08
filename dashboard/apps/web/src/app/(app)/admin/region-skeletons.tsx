@@ -4,6 +4,7 @@
  * content so nothing jumps when it arrives.
  */
 
+import type * as React from "react";
 import { Skeleton } from "@polaris/ui";
 
 /** A toolbar over a table of `rows` lines. */
@@ -52,6 +53,35 @@ export function RecordHeaderSkeleton() {
         <div className="mb-4 flex flex-col gap-2" aria-hidden="true">
             <Skeleton className="h-7 w-48" />
             <Skeleton className="h-4 w-64 max-w-full" />
+        </div>
+    );
+}
+
+/**
+ * The title and intro a view draws over itself, drawn by its page in the
+ * skeleton too, so the heading is on screen before the view's data is.
+ */
+export function ViewHeadingSkeleton({
+    title,
+    intro,
+    lead,
+    className = "mx-auto flex w-full max-w-4xl flex-col gap-4",
+    children
+}: {
+    title: string;
+    intro?: string;
+    lead?: React.ReactNode;
+    className?: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className={className}>
+            <div className="flex flex-col gap-1">
+                {lead}
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{title}</h1>
+                {intro ? <p className="text-sm text-muted-foreground">{intro}</p> : null}
+            </div>
+            {children}
         </div>
     );
 }

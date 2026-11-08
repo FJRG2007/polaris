@@ -2,49 +2,21 @@ import { SeenOnVisit } from "@/components/seen-on-visit";
 import { PageHeader } from "@polaris/ui";
 import { loadEnv } from "@polaris/config";
 import { requireAdmin } from "@/lib/session";
-import { getTranslations } from "@/lib/i18n/request";
-import { SettingsView } from "./settings-view";
 import { TransferCard } from "./transfer-card";
-import { SeasonalAdminCard } from "./seasonal-card";
-import { TerminalSessionsCard } from "./terminal-card";
+import { getTranslations } from "@/lib/i18n/request";
+import { SettingsCardsLoader, SettingsViewLoader } from "./loaders";
+import { MAX_TERMINAL_SESSION_CAP } from "@/lib/terminal-session-cap";
 import { AppUpdatesCard } from "@/components/app-bundles/app-updates-card";
-import { seasonsAllowed } from "@/lib/seasonal-service";
-import { MAX_TERMINAL_SESSION_CAP, terminalSessionCap } from "@/lib/terminal-session-cap";
-import { getUpdateSource } from "@/lib/update-source";
-import { getAutoUpdatePolicy } from "@/lib/update-watcher";
-import { getLegalContact, publicUrls } from "@/lib/legal/service";
 
 export const dynamic = "force-dynamic";
 
-/**
- * General settings. Admin-only.
- *
- * Only what is already known is awaited here: the environment, the update
- * schedule, the source and the public-page contact are all settings reads. The
- * three answers that go out to the network - what GitHub has, whether each
- * configured address answers, and what this box's public address is - are
- * fetched by the view once it has painted, because between them they used to
- * hold the navigation itself open with nothing on screen to say why. See
- * `/api/admin/settings/overview`.
- */
 export default async function SettingsPage() {
     const user = await requireAdmin();
     const t = await getTranslations("admin");
     const env = loadEnv();
-    const [policy, source, contact, publicPages, seasons, terminalCap] = await Promise.all([
-        getAutoUpdatePolicy(),
-        getUpdateSource(),
-        // The public pages, which are the only part of this deployment an outside
-        // review desk can read - and the one line on them an operator writes.
-        getLegalContact(),
-        publicUrls(),
-        seasonsAllowed(),
-        terminalSessionCap()
-    ]);
+    const revision = Date.now();
 
     return (
-        // Narrow page: centre the column in the content area, header included, and
-        // keep it at the top so it does not shift as the update card grows.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
                 title={t("settings.page.title")}
@@ -52,11 +24,8 @@ export default async function SettingsPage() {
             />
             {/* The update this page shows is one the reader now knows about. */}
             <SeenOnVisit screen="/admin/settings" />
-            <SettingsView
-                initialPolicy={policy}
-                initialSource={source}
-                initialContact={contact ?? ""}
-                publicPages={publicPages}
+            <SettingsViewLoader
+                revision={revision}
                 deployment={{
                     hostname: env.POLARIS_LOCAL_HOSTNAME,
                     repo: env.POLARIS_REPO,
@@ -65,8 +34,7 @@ export default async function SettingsPage() {
                 }}
             />
             <AppUpdatesCard />
-            <SeasonalAdminCard initial={seasons} />
-            <TerminalSessionsCard cap={terminalCap} max={MAX_TERMINAL_SESSION_CAP} />
+            <SettingsCardsLoader max={MAX_TERMINAL_SESSION_CAP} revision={revision} />
             <TransferCard identity={[user.email, user.name].filter(Boolean)} />
         </div>
     );

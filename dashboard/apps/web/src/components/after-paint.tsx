@@ -22,12 +22,16 @@
  * fresh value on every render, and a new one asks again.
  * An answer of `null` is the record being gone, shown as such instead of as a
  * failure.
+ *
+ * The kept copy is written in the wire format (`lib/app-bundles/wire`), so a
+ * `Date` or a `Map` in an answer is still one when a revisit paints it.
  */
 
 import { RefreshCw } from "lucide-react";
-import { Fragment, useCallback, useEffect, useRef, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Button, EmptyState } from "@polaris/ui";
 import { useLiveRead } from "@/components/use-live-resource";
+import { fromWire, toWire } from "@/lib/app-bundles/wire";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function AfterPaint<T>({
@@ -58,9 +62,9 @@ export function AfterPaint<T>({
     // every render: what is read is named by `cacheKey`.
     const latestLoad = useRef(load);
     latestLoad.current = load;
-    const stableLoad = useCallback(async () => ({ value: await latestLoad.current() }), []);
+    const stableLoad = useCallback(async () => ({ value: toWire(await latestLoad.current()) }), []);
     const { data, error, kept, firstFailed, updatedAt, refresh } = useLiveRead<{
-        value: T | null;
+        value: unknown;
     }>({
         load: stableLoad,
         cacheKey,
@@ -71,7 +75,7 @@ export function AfterPaint<T>({
     listener.current = onAnswer;
     useEffect(() => {
         if (kept || data === null || updatedAt === null) return;
-        listener.current?.(data.value);
+        listener.current?.(fromWire(data.value) as T | null);
     }, [kept, data, updatedAt]);
 
     const askedFor = useRef(revision);
@@ -88,6 +92,7 @@ export function AfterPaint<T>({
         generation.current += 1;
     }
     seen.current = { data, kept };
+    const value = useMemo(() => (data ? (fromWire(data.value) as T | null) : null), [data]);
 
     const alert = (
         <div role="alert">
@@ -104,7 +109,7 @@ export function AfterPaint<T>({
     );
 
     if (data === null) return <>{error ? alert : skeleton}</>;
-    if (data.value === null) {
+    if (value === null) {
         return (
             <>{missing !== undefined ? missing : <EmptyState title={t("afterPaint.notFound")} />}</>
         );
@@ -117,7 +122,7 @@ export function AfterPaint<T>({
                 inert={kept || undefined}
                 aria-busy={(kept && !firstFailed) || undefined}
             >
-                <Fragment key={generation.current}>{children(data.value)}</Fragment>
+                <Fragment key={generation.current}>{children(value as T)}</Fragment>
             </div>
         </>
     );
