@@ -491,8 +491,11 @@ export const POLARIS_APPS: AppEntry[] = [
         /**
          * Polar, the assistant. It lives in a panel on every page (the header
          * button, Ctrl/Cmd+J); this is the same chat as a page, with the
-         * conversation list beside it. No permission of its own: it acts with
-         * exactly what the person can already do, and asks before any change.
+         * conversation list beside it. It acts with exactly what the person can
+         * already do, and asks before any change. Who may open it is
+         * `polarAccessFor` (closed per person in `accessFor`): the `polar.use`
+         * permission where a role, a group or the account says so, else the
+         * deployment's Polar access under Management > Agents.
          */
         id: "polar",
         category: "work",

@@ -20,6 +20,7 @@ import {
 } from "@polaris/auth";
 import { requireAdmin } from "@/lib/session";
 import { publishAccessChange } from "@/lib/access-live";
+import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
 import { recordAudit } from "@/lib/audit-service";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -47,9 +48,17 @@ export async function createPolicyAction(
     if (parsed.error) return { error: parsed.error };
     try {
         const { id } = await createPolicy(name, description || undefined, parsed.value);
-        await recordAudit({ actorId: admin.id, action: "policy.create", targetType: "policy", targetId: id, metadata: { name } });
+        await recordAudit({
+            actorId: admin.id,
+            action: "policy.create",
+            targetType: "policy",
+            targetId: id,
+            metadata: { name }
+        });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : t("policies.errors.createFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : t("policies.errors.createFailed")
+        };
     }
     revalidatePath("/admin/policies");
     return {};
@@ -67,11 +76,19 @@ export async function updatePolicyAction(
     if (parsed.error) return { error: parsed.error };
     try {
         await updatePolicy(id, { name, description, document: parsed.value });
+        refreshVpnAccessLater();
         // Rewriting a policy changes what everybody it is attached to holds.
         publishAccessChange();
-        await recordAudit({ actorId: admin.id, action: "policy.update", targetType: "policy", targetId: id });
+        await recordAudit({
+            actorId: admin.id,
+            action: "policy.update",
+            targetType: "policy",
+            targetId: id
+        });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : t("policies.errors.updateFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : t("policies.errors.updateFailed")
+        };
     }
     revalidatePath("/admin/policies");
     return {};
@@ -80,8 +97,14 @@ export async function updatePolicyAction(
 export async function deletePolicyAction(id: string): Promise<void> {
     const admin = await requireAdmin();
     await deletePolicy(id);
+    refreshVpnAccessLater();
     publishAccessChange();
-    await recordAudit({ actorId: admin.id, action: "policy.delete", targetType: "policy", targetId: id });
+    await recordAudit({
+        actorId: admin.id,
+        action: "policy.delete",
+        targetType: "policy",
+        targetId: id
+    });
     revalidatePath("/admin/policies");
 }
 
@@ -93,11 +116,18 @@ export async function attachPolicyAction(
     const admin = await requireAdmin();
     if (!principalId) return;
     await attachPolicy(policyId, principalType, principalId);
+    refreshVpnAccessLater();
     // A policy attached to a group or a role is everybody in it, which is a
     // query and a chance to be wrong - so only a person is named. See
     // `access-live`.
     publishAccessChange(principalType === "user" ? { userIds: [principalId] } : {});
-    await recordAudit({ actorId: admin.id, action: "policy.attach", targetType: "policy", targetId: policyId, metadata: { principalType, principalId } });
+    await recordAudit({
+        actorId: admin.id,
+        action: "policy.attach",
+        targetType: "policy",
+        targetId: policyId,
+        metadata: { principalType, principalId }
+    });
     revalidatePath("/admin/policies");
 }
 
@@ -108,13 +138,22 @@ export async function detachPolicyAction(
 ): Promise<void> {
     const admin = await requireAdmin();
     await detachPolicy(policyId, principalType, principalId);
+    refreshVpnAccessLater();
     publishAccessChange(principalType === "user" ? { userIds: [principalId] } : {});
-    await recordAudit({ actorId: admin.id, action: "policy.detach", targetType: "policy", targetId: policyId, metadata: { principalType, principalId } });
+    await recordAudit({
+        actorId: admin.id,
+        action: "policy.detach",
+        targetType: "policy",
+        targetId: policyId,
+        metadata: { principalType, principalId }
+    });
     revalidatePath("/admin/policies");
 }
 
 /** People a policy can be attached to, found by what was typed. */
-export async function findPolicyPeopleAction(query: string): Promise<{ results: { id: string; name: string }[] }> {
+export async function findPolicyPeopleAction(
+    query: string
+): Promise<{ results: { id: string; name: string }[] }> {
     await requireAdmin();
     const term = z.string().trim().max(120).safeParse(query);
     return { results: term.success ? await findAccountsAsAdmin(term.data) : [] };

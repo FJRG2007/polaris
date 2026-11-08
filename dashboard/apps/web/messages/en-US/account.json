@@ -351,7 +351,8 @@
                 "tasks": "Tasks",
                 "inbox": "Inbox",
                 "family": "Family",
-                "administration": "Administration"
+                "administration": "Administration",
+                "polar": "Polar"
             }
         },
         "reference": {

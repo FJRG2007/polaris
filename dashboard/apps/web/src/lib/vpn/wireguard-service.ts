@@ -19,6 +19,8 @@ import { wordsFor } from "@/lib/notifications/notice-words";
 import { DEFAULT_LOCALE } from "@polaris/core";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { prisma, VISIBLE_USER } from "@polaris/db";
+import { evaluateStatements, policyDocumentSchema } from "@polaris/core";
+import { resolveGlobalStatementsBySource } from "@polaris/auth";
 import { edgeHostnameTaken } from "@/lib/app-edge";
 import { edgeLauncher } from "@/lib/deploy/server-edge";
 import { isIP } from "node:net";
@@ -120,14 +122,108 @@ const OPEN: Omit<wg.VpnAccess, "usedBytes"> = {
     suspended: false
 };
 
+/** The permission system's word on `vpn.use`, as `wg.vpnStanding` reads it. */
+export interface VpnPermission {
+    permission: "allow" | "deny" | "implicit-deny";
+    accountAllows: boolean;
+}
+
+/** What the permission system says about `vpn.use` for one account. */
+export async function vpnPermission(userId: string): Promise<VpnPermission> {
+    const sourced = await resolveGlobalStatementsBySource(userId);
+    const statements = sourced.flatMap((entry) => entry.statements);
+    const own = sourced
+        .filter((entry) => entry.source.kind === "account")
+        .flatMap((entry) => entry.statements);
+    return {
+        permission: evaluateStatements(statements, "vpn.use", "*"),
+        accountAllows: evaluateStatements(own, "vpn.use", "*") === "allow"
+    };
+}
+
+/** How many accounts one sync resolves in full at once. */
+const RESOLVE_BATCH = 16;
+
+/** Whether a stored policy document can deny `vpn.use` to anybody it is attached to. */
+function deniesVpn(raw: string): boolean {
+    try {
+        const parsed = policyDocumentSchema.safeParse(JSON.parse(raw));
+        if (!parsed.success) return false;
+        const denials = parsed.data.statements.filter((statement) => statement.effect === "deny");
+        return evaluateStatements(denials, "vpn.use", "*") === "deny";
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * `vpnPermission` for many accounts, as `wg.vpnStanding` reads it, in a fixed
+ * number of queries: the accounts' own switches in one, and every policy in
+ * another. Only when some policy can deny `vpn.use` is each account resolved in
+ * full, a batch at a time. Otherwise nothing but an account's own switch can
+ * deny it, and an allow from a role or a policy is reported as `implicit-deny`,
+ * which `wg.vpnStanding` treats the same.
+ */
+export async function vpnPermissionsAmong(
+    ids: readonly string[]
+): Promise<Map<string, VpnPermission>> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map();
+    const [overrides, policies] = await Promise.all([
+        prisma.userPermission.findMany({
+            where: { userId: { in: unique }, permission: "vpn.use" },
+            select: { userId: true, effect: true }
+        }),
+        prisma.policy.findMany({ select: { document: true } })
+    ]);
+    if (policies.some((policy) => deniesVpn(policy.document))) {
+        const answers = new Map<string, VpnPermission>();
+        for (let start = 0; start < unique.length; start += RESOLVE_BATCH) {
+            const batch = unique.slice(start, start + RESOLVE_BATCH);
+            const resolved = await Promise.all(batch.map((id) => vpnPermission(id)));
+            batch.forEach((id, index) => answers.set(id, resolved[index] as VpnPermission));
+        }
+        return answers;
+    }
+    const own = new Map(
+        overrides.map((row) => [row.userId, row.effect === "deny" ? "deny" : "allow"])
+    );
+    return new Map(
+        unique.map((id) => {
+            const effect = own.get(id);
+            return [
+                id,
+                {
+                    permission:
+                        effect === "deny" ? "deny" : effect === "allow" ? "allow" : "implicit-deny",
+                    accountAllows: effect === "allow"
+                }
+            ];
+        })
+    );
+}
+
 /** What a person may do, or null for no access. An administrator always has it, unless
- *  somebody gave them limits of their own. */
+ *  somebody gave them limits of their own. `vpn.use` is read as `wg.vpnStanding` says. */
 export async function accessOf(user: {
     id: string;
     isAdmin: boolean;
 }): Promise<wg.VpnAccess | null> {
-    const row = await prisma.vpnAccess.findUnique({ where: { userId: user.id } });
-    if (row) {
+    const [row, open, granted] = await Promise.all([
+        prisma.vpnAccess.findUnique({ where: { userId: user.id } }),
+        openAccess(),
+        user.isAdmin
+            ? Promise.resolve({ permission: "allow" as const, accountAllows: false })
+            : vpnPermission(user.id)
+    ]);
+    const standing = wg.vpnStanding({
+        isAdmin: user.isAdmin,
+        hasRow: row !== null,
+        open,
+        ...granted
+    });
+    if (standing === "none") return null;
+    if (standing === "row" && row) {
         return {
             nodes: row.nodes,
             deviceLimit: row.deviceLimit,
@@ -137,7 +233,7 @@ export async function accessOf(user: {
             usedBytes: row.usedBytes
         };
     }
-    return user.isAdmin || (await openAccess()) ? { ...OPEN, usedBytes: 0n } : null;
+    return { ...OPEN, usedBytes: 0n };
 }
 
 /** The peers a node should let in: every device whose owner is in good standing. */
@@ -147,14 +243,28 @@ async function allowedPeers(nodeId: string): Promise<{ publicKey: string; host: 
         select: {
             publicKey: true,
             hostIndex: true,
+            userId: true,
             user: { select: { isAdmin: true, vpnAccess: true } }
         }
     });
     const open = await openAccess();
     const now = new Date();
-    return peers.flatMap(({ publicKey, hostIndex, user }) => {
+    const granted = await vpnPermissionsAmong(
+        peers.filter((peer) => !peer.user.isAdmin).map((peer) => peer.userId)
+    );
+    return peers.flatMap(({ publicKey, hostIndex, userId, user }) => {
         const row = user.vpnAccess;
-        if (!row) return user.isAdmin || open ? [{ publicKey, host: hostIndex }] : [];
+        const standing = wg.vpnStanding({
+            isAdmin: user.isAdmin,
+            hasRow: row !== null,
+            open,
+            ...(granted.get(userId) ?? {
+                permission: "implicit-deny" as const,
+                accountAllows: false
+            })
+        });
+        if (standing === "none") return [];
+        if (standing === "open" || !row) return [{ publicKey, host: hostIndex }];
         const allowed = wg.accessStanding(row, now) === "active" && wg.mayUseNode(row, nodeId);
         return allowed ? [{ publicKey, host: hostIndex }] : [];
     });

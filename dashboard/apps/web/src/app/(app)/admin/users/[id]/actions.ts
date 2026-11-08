@@ -18,11 +18,16 @@ import { getTranslations } from "@/lib/i18n/request";
 import {
     PERMISSIONS,
     PERMISSION_META,
+    evaluateStatements,
     isAllowed,
     listedPermissions,
     parseResource,
     type Permission
 } from "@polaris/core";
+import { polarAccessWith } from "@/lib/polar/access";
+import { vpnStanding } from "@/lib/vpn/wireguard";
+import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
+import { openAccess } from "@/lib/vpn/wireguard-service";
 import { installedPermissionApps } from "@/lib/permission-presence";
 import { explainUserAccess, type AccessExplanation } from "@/lib/access-explain-service";
 import {
@@ -66,6 +71,7 @@ export async function setUserGroupAction(
         return { error: (await getTranslations("admin"))("usersDetail.errors.unknownGroup") };
     if (member) await addGroupMember(parsed.data.groupId, parsed.data.userId);
     else await removeGroupMember(parsed.data.groupId, parsed.data.userId);
+    refreshVpnAccessLater();
     await recordAudit({
         actorId: admin.id,
         action: member ? "group.member.add" : "group.member.remove",
@@ -92,6 +98,7 @@ export async function setUserPolicyAction(
         return { error: (await getTranslations("admin"))("usersDetail.errors.unknownPolicy") };
     if (attached) await attachPolicy(parsed.data.policyId, "user", parsed.data.userId);
     else await detachPolicy(parsed.data.policyId, "user", parsed.data.userId);
+    refreshVpnAccessLater();
     await recordAudit({
         actorId: admin.id,
         action: attached ? "policy.attach" : "policy.detach",
@@ -131,14 +138,16 @@ export async function userCapabilitiesAction(
     const parsed = idSchema.safeParse(userId);
     if (!parsed.success) return { error: t("usersDetail.errors.unknownAccount") };
 
-    const [account, sourced, overrides, installed] = await Promise.all([
+    const [account, sourced, overrides, installed, vpnRow, vpnOpen] = await Promise.all([
         prisma.user.findUnique({ where: { id: parsed.data }, select: { isAdmin: true } }),
         resolveGlobalStatementsBySource(parsed.data),
         prisma.userPermission.findMany({
             where: { userId: parsed.data },
             select: { permission: true, effect: true }
         }),
-        installedPermissionApps()
+        installedPermissionApps(),
+        prisma.vpnAccess.findUnique({ where: { userId: parsed.data }, select: { userId: true } }),
+        openAccess()
     ]);
     if (!account) return { error: t("usersDetail.errors.unknownAccount") };
 
@@ -148,6 +157,25 @@ export async function userCapabilitiesAction(
         .filter((entry) => entry.source.kind !== "account")
         .flatMap((entry) => entry.statements);
     const set = new Map(overrides.map((row) => [row.permission, row.effect]));
+    // Polar falls back to the deployment's own Polar access, not to nothing, so
+    // its "role allows" is that whole answer.
+    const polar = await polarAccessWith(parsed.data, inheritedStatements);
+    const vpn =
+        vpnStanding({
+            isAdmin: account.isAdmin,
+            hasRow: vpnRow !== null,
+            open: vpnOpen,
+            permission: evaluateStatements(inheritedStatements, "vpn.use", "*"),
+            accountAllows: false
+        }) !== "none";
+    const inheritedOf = (permission: Permission): boolean =>
+        permission === "polar.use"
+            ? polar.use
+            : permission === "polar.spend"
+              ? polar.spend
+              : permission === "vpn.use"
+                ? vpn
+                : isAllowed(inheritedStatements, permission, "*");
 
     return {
         isAdmin: account.isAdmin,
@@ -157,7 +185,7 @@ export async function userCapabilitiesAction(
             permission,
             area: PERMISSION_META[permission].area,
             label: PERMISSION_META[permission].label,
-            inherited: isAllowed(inheritedStatements, permission, "*"),
+            inherited: inheritedOf(permission),
             override: set.get(permission) === "deny" ? "deny" : set.has(permission) ? "allow" : null
         }))
     };
@@ -208,6 +236,7 @@ export async function setUserPermissionAction(
             }
         });
     }
+    if (parsed.data.permission === "vpn.use") refreshVpnAccessLater();
 
     await recordAudit({
         actorId: admin.id,

@@ -156,6 +156,40 @@ export interface VpnAccess {
     readonly usedBytes: bigint;
 }
 
+/**
+ * Where somebody's VPN comes from, with the `vpn.use` permission read the way
+ * every other app reads its own: `row` is the access an administrator gave them
+ * on the VPN's screen, `open` the deployment-wide defaults, `none` no VPN.
+ *
+ * - An administrator is always in, as everywhere else in Polaris.
+ * - A deny of `vpn.use` - switched Off under Management > Users, or a group
+ *   policy - shuts it, whatever access the VPN's own screen gave.
+ * - Switching it On for one account is the same as giving them the defaults.
+ * - Open access still reaches everybody nothing denies, roles included that do
+ *   not carry `vpn.use` (the seeded viewer role does not): that is what open
+ *   meant before the permission was read here, and an update keeps it.
+ *
+ * Holding `vpn.use` through a role is not enough on its own: the seeded member
+ * role carries it, and the VPN is never open just because somebody is signed in.
+ */
+export type VpnStanding = "row" | "open" | "none";
+
+export function vpnStanding(input: {
+    readonly isAdmin: boolean;
+    readonly hasRow: boolean;
+    readonly open: boolean;
+    /** `vpn.use` across roles, group policies and the account's own override. */
+    readonly permission: "allow" | "deny" | "implicit-deny";
+    /** Whether the account's own override switches it On. */
+    readonly accountAllows: boolean;
+}): VpnStanding {
+    if (input.isAdmin) return input.hasRow ? "row" : "open";
+    if (input.permission === "deny") return "none";
+    if (input.hasRow) return "row";
+    if (input.accountAllows) return "open";
+    return input.open ? "open" : "none";
+}
+
 export type AccessStanding = "active" | "suspended" | "expired" | "overLimit";
 
 /** Whether somebody's devices may pass traffic right now. */

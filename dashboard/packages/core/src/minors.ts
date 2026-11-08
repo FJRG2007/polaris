@@ -244,6 +244,8 @@ export const MINOR_FLOOR = [
     "settings.manage",
     "system.manage",
     "family.manage",
+    // Billed to the deployment's administrator, the same as a purchase.
+    "polar.spend",
     "feature:vpnTor",
     "feature:ageRestricted",
     "feature:purchases"
@@ -319,6 +321,7 @@ export const STAGE_PRESETS: Readonly<Record<PresetCapability, StageLevels>> = {
     "tools.manage": PUBLIC_ADDRESS,
     "tasks.read": EVERYDAY,
     "tasks.manage": EVERYDAY,
+    "polar.use": PUBLIC_ADDRESS,
     "app:polar": PUBLIC_ADDRESS,
     "feature:polarMemories": [O, O, O, O, Y],
     "feature:publicLinks": PUBLIC_ADDRESS,

@@ -45,6 +45,7 @@ export const AREA_APPS: Readonly<Record<string, string | null>> = {
     "Status pages": "status-pages",
     Chat: "chat",
     Games: "arcade",
+    Polar: "polar",
     Apps: "apps",
     "Game servers": "games",
     Home: "home",

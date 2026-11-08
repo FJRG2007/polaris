@@ -5,6 +5,8 @@ const tx = vi.hoisted(() => ({ $executeRaw: vi.fn(async () => 1) }));
 const db = vi.hoisted(() => ({
     $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(tx)),
     user: { findMany: vi.fn() },
+    userPermission: { findMany: vi.fn(async () => []) },
+    policy: { findMany: vi.fn(async () => []) },
     vpnProxyUsage: { findUnique: vi.fn(), upsert: vi.fn() },
     vpnAccess: { findUnique: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn() },
     vpnNode: {
@@ -26,6 +28,7 @@ const db = vi.hoisted(() => ({
 const script = vi.hoisted(() => ({ run: vi.fn(), setting: vi.fn(), taken: vi.fn() }));
 
 vi.mock("@polaris/db", () => ({ prisma: db }));
+vi.mock("@polaris/auth", () => ({ resolveGlobalStatementsBySource: async () => [] }));
 vi.mock("@/lib/setting-store", () => ({ getSetting: script.setting, setSetting: vi.fn() }));
 vi.mock("@/lib/deploy/server-edge", () => ({ edgeLauncher: () => "sh" }));
 vi.mock("@/lib/app-edge", () => ({ edgeHostnameTaken: script.taken }));

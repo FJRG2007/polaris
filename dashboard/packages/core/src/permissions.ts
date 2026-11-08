@@ -46,6 +46,8 @@ export const PERMISSIONS = [
     "games.manage",
     "agents.read",
     "agents.manage",
+    "polar.use",
+    "polar.spend",
     "home.read",
     "home.control",
     "home.manage",
@@ -329,6 +331,14 @@ export const PERMISSION_META: Readonly<Record<Permission, PermissionMeta>> = {
     },
     "agents.read": { area: "Apps", label: "See coding-agent repositories and runs" },
     "agents.manage": { area: "Apps", label: "Enable repositories and start agent runs" },
+    // Polar, the assistant. Neither is in a seeded role: who has Polar when
+    // nothing here says so is the deployment's Polar access (Management >
+    // Agents), which predates these and stays the default. A role, a group's
+    // policy or one account's override that names either one decides instead.
+    "polar.use": { area: "Polar", label: "Talk to Polar" },
+    // Every turn on the deployment's keys is billed to its administrator, which
+    // is why this is apart from using Polar at all.
+    "polar.spend": { area: "Polar", label: "Run Polar on this deployment's keys" },
     "home.read": { area: "Home", app: "home", label: "Watch the cameras and read what they saw" },
     // Pointing a camera somewhere is not the same decision as being allowed to
     // look at where it already points, and neither is silencing an alert.
@@ -396,6 +406,8 @@ export const IMPLIED_PERMISSIONS: Readonly<Partial<Record<Permission, readonly P
     "shares.manage": ["shares.create"],
     "requests.manage": ["requests.create"],
     "snippets.write": ["snippets.read"],
+    // Spending the deployment's keys on Polar without being able to open it.
+    "polar.spend": ["polar.use"],
     // Whoever may deploy anything on this machine may already run a game server
     // on it, so the game-server grants ride along - which also means an operator
     // who set their roles up before these existed does not have to redo them.

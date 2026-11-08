@@ -21,6 +21,7 @@
  */
 
 import { POLARIS_APPS } from "@/lib/apps";
+import { PERMISSIONS, type Permission } from "@polaris/core";
 import { describe, expect, it } from "vitest";
 import { join, relative, sep } from "node:path";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -35,9 +36,12 @@ const OPEN_TO_EVERYONE: Record<string, string> = {
     account: "the account's own settings"
 };
 
-/** Apps with no permission of their own, closed per person by `closes` in
- *  `accessFor` (lib/session.ts) - an audience an administrator chooses. */
-const CLOSED_PER_PERSON = ["polar", "vpn"];
+/** Apps with no `permission` in the registry, closed per person by `closes` in
+ *  `accessFor` (lib/session.ts) - an audience an administrator chooses - and
+ *  the permission that audience still answers to. Without one the app cannot be
+ *  given or taken away from somebody under Management > Users or in a role,
+ *  which is how Polar went missing from there. */
+const CLOSED_PER_PERSON: Record<string, Permission> = { polar: "polar.use", vpn: "vpn.use" };
 
 /**
  * A call that refuses somebody: a permission, the admin flag, or a check on the
@@ -94,7 +98,7 @@ describe("app access", () => {
                 !app.permission &&
                 !app.adminOnly &&
                 !(app.id in OPEN_TO_EVERYONE) &&
-                !CLOSED_PER_PERSON.includes(app.id)
+                !(app.id in CLOSED_PER_PERSON)
         ).map((app) => app.id);
         expect(
             unnamed,
@@ -110,11 +114,32 @@ describe("app access", () => {
     it("closes every app it says is closed per person", () => {
         const session = read(join(WEB, "src", "lib", "session.ts"));
         const closes = session.slice(session.indexOf("closes: async"));
-        const missing = CLOSED_PER_PERSON.filter((id) => !closes.includes(`appId === "${id}"`));
+        const missing = Object.keys(CLOSED_PER_PERSON).filter(
+            (id) => !closes.includes(`appId === "${id}"`)
+        );
         expect(
             missing,
             "accessFor's `closes` (lib/session.ts) must answer for these apps."
         ).toEqual([]);
+    });
+
+    it("lets every app closed per person be managed as a permission, and reads it", () => {
+        for (const [id, permission] of Object.entries(CLOSED_PER_PERSON)) {
+            expect(PERMISSIONS, `${id}: add ${permission} to PERMISSIONS`).toContain(permission);
+        }
+        // The audience's own check has to ask the permission system too, or the
+        // switch in Capabilities is listed and does nothing (the VPN's was).
+        const readers: Record<string, string> = {
+            polar: join(WEB, "src", "lib", "polar", "access.ts"),
+            vpn: join(WEB, "src", "lib", "vpn", "wireguard-service.ts")
+        };
+        for (const [id, permission] of Object.entries(CLOSED_PER_PERSON)) {
+            const file = readers[id];
+            expect(file, `${id}: say here which file decides its audience`).toBeTruthy();
+            expect(read(file!), `${id}: its audience never reads ${permission}`).toContain(
+                `"${permission}"`
+            );
+        }
     });
 
     it("refuses somebody without access on every screen of every app", () => {
