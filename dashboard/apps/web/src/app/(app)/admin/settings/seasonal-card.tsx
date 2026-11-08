@@ -69,7 +69,9 @@ export function SeasonalAdminCard({
         setPreview(season);
         return (season ? previewSeasonAction(season) : stopSeasonPreviewAction())
             .catch(() => ({
-                error: season ? t("settings.seasonal.previewFailed") : nav("seasonPreview.notStopped")
+                error: season
+                    ? t("settings.seasonal.previewFailed")
+                    : nav("seasonPreview.notStopped")
             }))
             .then((result) => {
                 if (result.error) {
