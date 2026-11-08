@@ -458,10 +458,7 @@ describe("a release the plugin cannot load on", () => {
         for (const version of ["1.20.5", "1.21.4", "LATEST", ""]) {
             cleanup();
             paper(version);
-            expect(
-                await screen.findByRole("button", { name: "Turn on" }),
-                version
-            ).toBeTruthy();
+            expect(await screen.findByRole("button", { name: "Turn on" }), version).toBeTruthy();
             expect(screen.queryByText(/Not available on Minecraft/), version).toBeNull();
         }
     });

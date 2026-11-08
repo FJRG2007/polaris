@@ -261,7 +261,8 @@ export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
             env.get(SOFTWARE_KEY) ?? "",
             env.get("VERSION") ?? ""
         );
-        if (projects !== null) rewrites.push({ key: PROJECTS_KEY, value: projects, isSecret: false });
+        if (projects !== null)
+            rewrites.push({ key: PROJECTS_KEY, value: projects, isSecret: false });
         if (wanted === mods && rewrites.length === 0) continue;
         try {
             await setEnvVars("application", install.applicationId!, install.ownerId, [
