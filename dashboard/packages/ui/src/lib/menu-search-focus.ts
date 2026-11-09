@@ -44,11 +44,21 @@ export const MENU_OPTION_SELECTOR =
  */
 export function redirectMenuFocus(event: FocusEvent<HTMLElement>): void {
     if (event.target !== event.currentTarget) return;
-    const field = event.currentTarget.querySelector<HTMLElement>(`[${MENU_SEARCH_ATTRIBUTE}]`);
+    const surface = event.currentTarget;
+    const field = surface.querySelector<HTMLElement>(`[${MENU_SEARCH_ATTRIBUTE}]`);
     if (!field) return;
-    field.focus();
+    // Without scrolling. The surface is focused again every time the pointer
+    // leaves an option, and a wheel scrolling the list slides one option after
+    // another out from under a pointer that never moved - so a plain focus()
+    // jumped a long list back up to the field at its top on every notch.
+    field.focus({ preventScroll: true });
     // Selected as well as focused, so a surface reopened with an old search in
-    // it is typed over rather than typed onto.
+    // it is typed over rather than typed onto. Only on the way in: focus coming
+    // back from inside the surface is the pointer leaving an option, and
+    // selecting then would have the next letter replace what was typed.
+    const related = event.relatedTarget;
+    const fromInside = related instanceof Node && surface.contains(related);
+    if (fromInside) return;
     if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) field.select();
 }
 
@@ -70,7 +80,8 @@ export function refocusMenuSearch(from: EventTarget | null): void {
         ?.closest("[data-radix-menu-content]")
         ?.querySelector<HTMLElement>(`[${MENU_SEARCH_ATTRIBUTE}]`);
     if (!field) return;
-    window.setTimeout(() => field.focus(), 0);
+    // Without scrolling: the option just picked may sit far down a long list.
+    window.setTimeout(() => field.focus({ preventScroll: true }), 0);
 }
 
 /**

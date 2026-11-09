@@ -17,7 +17,7 @@
  */
 
 import type { FocusEvent, PointerEvent } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { keepSearchFocus, MENU_SEARCH_ATTRIBUTE, redirectMenuFocus } from "../src/lib/menu-search-focus";
 
 /** A surface, and the focus event React would hand its `onFocus`. */
@@ -60,6 +60,45 @@ describe("a menu with a field in it", () => {
         option.focus();
         focused(option);
         expect(document.activeElement).toBe(option);
+    });
+});
+
+describe("the pointer leaving an option in a long list", () => {
+    /** The surface taking focus back from inside itself, as Radix does on every
+     *  pointer leave - which a wheel turning under a still pointer sets off. */
+    function leftOption(node: HTMLElement): void {
+        const option = node.querySelector("[role='menuitem']") as HTMLElement;
+        redirectMenuFocus({
+            target: node,
+            currentTarget: node,
+            relatedTarget: option
+        } as unknown as FocusEvent<HTMLElement>);
+    }
+
+    it("hands the field the focus without scrolling the list up to it", () => {
+        document.body.innerHTML = "";
+        const node = document.createElement("div");
+        node.tabIndex = -1;
+        node.innerHTML = `<input ${MENU_SEARCH_ATTRIBUTE} /><div role="menuitem" tabindex="-1">GPT</div>`;
+        document.body.append(node);
+        const field = node.querySelector("input") as HTMLInputElement;
+        const focus = vi.spyOn(field, "focus");
+        leftOption(node);
+        expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+        expect(document.activeElement).toBe(field);
+    });
+
+    it("does not select what was typed, so the next letter adds to it", () => {
+        document.body.innerHTML = "";
+        const node = document.createElement("div");
+        node.tabIndex = -1;
+        node.innerHTML = `<input ${MENU_SEARCH_ATTRIBUTE} value="gp" /><div role="menuitem" tabindex="-1">GPT</div>`;
+        document.body.append(node);
+        const field = node.querySelector("input") as HTMLInputElement;
+        field.setSelectionRange(2, 2);
+        leftOption(node);
+        expect(field.selectionStart).toBe(2);
+        expect(field.selectionEnd).toBe(2);
     });
 });
 
