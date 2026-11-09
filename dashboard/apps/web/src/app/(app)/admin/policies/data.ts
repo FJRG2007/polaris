@@ -1,6 +1,9 @@
 "use server";
 
 import { prisma } from "@polaris/db";
+import { policyTemplateOf } from "@polaris/core";
+import { syncPolicyTemplates } from "@polaris/auth";
+import { publishAccessChange } from "@/lib/access-live";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import type { PolicyRow, PrincipalOption } from "./policies-admin";
@@ -11,6 +14,9 @@ export async function loadPoliciesAdminAction(): Promise<{
     principals: PrincipalOption[];
 }> {
     await requireAdmin();
+    // The ready-made ones are here before anybody can attach one. A write only
+    // happens on the first visit after an update that changed a template.
+    if (await syncPolicyTemplates()) publishAccessChange();
     const t = await getTranslations("admin");
     const [policies, groups, roles] = await Promise.all([
         prisma.policy.findMany({
@@ -58,6 +64,7 @@ export async function loadPoliciesAdminAction(): Promise<{
             name: policy.name,
             description: policy.description,
             isSystem: policy.isSystem,
+            template: policy.isSystem ? (policyTemplateOf(policy.name)?.key ?? null) : null,
             document: policy.document,
             attachments: policy.attachments.map((attachment) => ({
                 principalType: attachment.principalType as PrincipalOption["type"],

@@ -22,6 +22,7 @@ import { requireAdmin } from "@/lib/session";
 import { publishAccessChange } from "@/lib/access-live";
 import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
 import { recordAudit } from "@/lib/audit-service";
+import { POLICY_TEMPLATE_PREFIX } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 
@@ -44,6 +45,8 @@ export async function createPolicyAction(
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const t = await getTranslations("admin");
+    // The prefix is how a ready-made policy is told apart from somebody's own.
+    if (name.trim().startsWith(POLICY_TEMPLATE_PREFIX)) return { error: t("policies.errors.reservedName") };
     const parsed = parseDocument(documentText, t);
     if (parsed.error) return { error: parsed.error };
     try {
@@ -72,6 +75,7 @@ export async function updatePolicyAction(
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const t = await getTranslations("admin");
+    if (name.trim().startsWith(POLICY_TEMPLATE_PREFIX)) return { error: t("policies.errors.reservedName") };
     const parsed = parseDocument(documentText, t);
     if (parsed.error) return { error: parsed.error };
     try {

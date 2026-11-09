@@ -210,6 +210,7 @@ export {
     detachPolicy,
     principalsOfUser,
     resolvePrincipalPolicyStatements,
+    syncPolicyTemplates,
     type PrincipalType,
     type PolicySummary
 } from "./policies.js";

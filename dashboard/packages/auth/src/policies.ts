@@ -10,7 +10,14 @@
 import { prisma } from "@polaris/db";
 import { perRequest } from "./request-cache.js";
 import { getUserGroupIds } from "./groups.js";
-import { policyDocumentSchema, type PolicyStatement } from "@polaris/core";
+import {
+    POLICY_TEMPLATES,
+    POLICY_TEMPLATE_PREFIX,
+    policyDocumentSchema,
+    policyTemplateDocument,
+    policyTemplateName,
+    type PolicyStatement
+} from "@polaris/core";
 
 /** The kinds of principal a policy can attach to. */
 export type PrincipalType = "user" | "group" | "role";
@@ -50,6 +57,7 @@ export async function createPolicy(
 ): Promise<{ id: string }> {
     const trimmed = name.trim();
     if (!trimmed) throw new Error("Enter a policy name");
+    if (trimmed.startsWith(POLICY_TEMPLATE_PREFIX)) throw new Error(`A policy name cannot start with "${POLICY_TEMPLATE_PREFIX}"`);
     return prisma.policy.create({
         data: {
             name: trimmed,
@@ -67,6 +75,9 @@ export async function updatePolicy(
 ): Promise<void> {
     const existing = await prisma.policy.findUnique({ where: { id }, select: { isSystem: true } });
     if (!existing || existing.isSystem) throw new Error("Policy not found");
+    if (changes.name?.trim().startsWith(POLICY_TEMPLATE_PREFIX)) {
+        throw new Error(`A policy name cannot start with "${POLICY_TEMPLATE_PREFIX}"`);
+    }
     await prisma.policy.update({
         where: { id },
         data: {
@@ -226,3 +237,40 @@ export const resolvePrincipalPolicyStatementsBySource = perRequest(
         });
     }
 );
+
+/**
+ * Store the ready-made policies, as Polaris currently writes them.
+ *
+ * Each template is a read-only system policy, created when missing and
+ * rewritten when its statements changed in an update - so attaching one is a
+ * reference to what Polaris means by it, not a copy that goes stale. A row an
+ * administrator made under the reserved prefix before it was reserved is taken
+ * over rather than duplicated. Idempotent and cheap when nothing changed: one
+ * read, no writes. Returns whether anything was written, so a caller can tell
+ * the accounts it reaches.
+ */
+export async function syncPolicyTemplates(): Promise<boolean> {
+    const names = POLICY_TEMPLATES.map((template) => policyTemplateName(template.key));
+    const rows = await prisma.policy.findMany({
+        where: { name: { in: names } },
+        select: { id: true, name: true, document: true, isSystem: true }
+    });
+    const byName = new Map(rows.map((row) => [row.name, row]));
+    let changed = false;
+    for (const template of POLICY_TEMPLATES) {
+        const name = policyTemplateName(template.key);
+        const document = policyTemplateDocument(template);
+        const row = byName.get(name);
+        if (!row) {
+            // Two first visits at once: the unique name lets one of them win.
+            const created = await prisma.policy
+                .create({ data: { name, document, isSystem: true }, select: { id: true } })
+                .catch(() => null);
+            changed ||= created !== null;
+        } else if (row.document !== document || !row.isSystem) {
+            await prisma.policy.update({ where: { id: row.id }, data: { document, isSystem: true } });
+            changed = true;
+        }
+    }
+    return changed;
+}

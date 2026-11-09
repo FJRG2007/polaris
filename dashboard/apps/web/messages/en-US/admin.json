@@ -2706,6 +2706,7 @@
         "errors": {
             "invalidJson": "The policy document is not valid JSON",
             "createFailed": "Could not create the policy",
+            "reservedName": "Policy names cannot start with \"polaris:\"",
             "updateFailed": "Could not update the policy"
         },
         "summary": {
@@ -2713,6 +2714,8 @@
             "invalid": "Invalid document"
         },
         "create": {
+            "startFrom": "Start from...",
+            "blank": "A blank policy",
             "title": "New policy",
             "name": "Policy name",
             "description": "Description (optional)",
@@ -2721,7 +2724,13 @@
             "submit": "Create policy"
         },
         "empty": "No policies yet.",
+        "sections": {
+            "own": "Your policies",
+            "ready": "Ready-made",
+            "readyHint": "Kept up to date by Polaris. Attach one as it is, or start a policy of your own from it."
+        },
         "card": {
+            "managed": "Polaris",
             "system": "system",
             "toggle": "Toggle details",
             "delete": "Delete policy {name}",
@@ -2734,6 +2743,48 @@
             "description": "Description",
             "document": "{name} document",
             "save": "Save changes"
+        },
+        "templates": {
+            "drive-user": {
+                "name": "Drive user",
+                "description": "Their own files, sharing them and asking for files. Cannot add a NAS or a cloud account."
+            },
+            "drive-viewer": {
+                "name": "Drive viewer",
+                "description": "Opens and downloads files. Changes nothing."
+            },
+            "no-new-connections": {
+                "name": "No new connections",
+                "description": "Cannot add storage, cameras or mail servers for Polaris to connect to."
+            },
+            "workspace-user": {
+                "name": "Office user",
+                "description": "Mail, calendar, documents, notes, chat, tasks and files, like a work account."
+            },
+            "read-only": {
+                "name": "Read-only",
+                "description": "Sees everything their role allows and changes nothing."
+            },
+            "no-administration": {
+                "name": "No administration",
+                "description": "Cannot manage people, settings or the system, whatever their role says."
+            },
+            "deploy-viewer": {
+                "name": "Deploy viewer",
+                "description": "Sees projects, deployments and logs. Cannot deploy or change them."
+            },
+            "developer": {
+                "name": "Developer",
+                "description": "Deploys projects, runs coding agents and builds automations."
+            },
+            "game-moderator": {
+                "name": "Game moderator",
+                "description": "Moderates players and uses the console. Cannot create or remove servers."
+            },
+            "home-resident": {
+                "name": "Resident",
+                "description": "Watches the cameras and uses the devices. Cannot add new ones."
+            }
         }
     },
     "reports": {

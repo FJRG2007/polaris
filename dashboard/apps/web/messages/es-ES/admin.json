@@ -2706,6 +2706,7 @@
         "errors": {
             "invalidJson": "El documento de la política no es JSON válido",
             "createFailed": "No se pudo crear la política",
+            "reservedName": "El nombre no puede empezar por \"polaris:\"",
             "updateFailed": "No se pudo actualizar la política"
         },
         "summary": {
@@ -2713,6 +2714,8 @@
             "invalid": "Documento no válido"
         },
         "create": {
+            "startFrom": "Partir de...",
+            "blank": "Una política vacía",
             "title": "Nueva política",
             "name": "Nombre",
             "description": "Descripción (opcional)",
@@ -2721,7 +2724,13 @@
             "submit": "Crear política"
         },
         "empty": "Aún no hay políticas.",
+        "sections": {
+            "own": "Tus políticas",
+            "ready": "Predefinidas",
+            "readyHint": "Polaris las mantiene al día. Asigna una tal cual o crea una propia a partir de ella."
+        },
         "card": {
+            "managed": "Polaris",
             "system": "sistema",
             "toggle": "Ver detalles",
             "delete": "Eliminar la política {name}",
@@ -2734,6 +2743,48 @@
             "description": "Descripción",
             "document": "Documento de {name}",
             "save": "Guardar cambios"
+        },
+        "templates": {
+            "drive-user": {
+                "name": "Usuario de Drive",
+                "description": "Sus archivos, compartirlos y pedir archivos. No puede añadir un NAS ni una cuenta en la nube."
+            },
+            "drive-viewer": {
+                "name": "Lector de Drive",
+                "description": "Abre y descarga archivos. No cambia nada."
+            },
+            "no-new-connections": {
+                "name": "Sin conexiones nuevas",
+                "description": "No puede añadir almacenamiento, cámaras ni servidores de correo."
+            },
+            "workspace-user": {
+                "name": "Usuario de oficina",
+                "description": "Correo, calendario, documentos, notas, chat, tareas y archivos."
+            },
+            "read-only": {
+                "name": "Solo lectura",
+                "description": "Ve todo lo que su rol permite y no cambia nada."
+            },
+            "no-administration": {
+                "name": "Sin administración",
+                "description": "No gestiona personas, ajustes ni el sistema, diga lo que diga su rol."
+            },
+            "deploy-viewer": {
+                "name": "Lector de Deploy",
+                "description": "Ve proyectos, despliegues y registros. No despliega ni cambia nada."
+            },
+            "developer": {
+                "name": "Desarrollador",
+                "description": "Despliega proyectos, usa agentes de código y crea automatizaciones."
+            },
+            "game-moderator": {
+                "name": "Moderador de juegos",
+                "description": "Modera jugadores y usa la consola. No crea ni elimina servidores."
+            },
+            "home-resident": {
+                "name": "Residente",
+                "description": "Ve las cámaras y usa los dispositivos. No añade nuevos."
+            }
         }
     },
     "reports": {

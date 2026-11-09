@@ -105,6 +105,7 @@ export * from "./format.js";
 export * from "./permissions.js";
 export * from "./minors.js";
 export * from "./authz.js";
+export * from "./policy-templates.js";
 export * from "./resources.js";
 export * from "./runners.js";
 export * from "./runner-policy.js";

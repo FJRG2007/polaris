@@ -12,6 +12,11 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, Plus, Trash2, X } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import { JsonEditor, JsonView, prettyJson } from "@/components/json-view";
+import {
+    POLICY_TEMPLATES,
+    policyTemplateDocument,
+    type PolicyTemplateKey
+} from "@polaris/core";
 import { PeoplePicker } from "@/components/people-picker";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -39,6 +44,8 @@ export interface PolicyRow {
     name: string;
     description: string | null;
     isSystem: boolean;
+    /** Which ready-made policy this is, or null for an administrator's own. */
+    template: PolicyTemplateKey | null;
     document: string;
     attachments: PolicyAttachmentView[];
 }
@@ -89,6 +96,16 @@ export function PoliciesAdmin({
     const [description, setDescription] = useState("");
     const [document, setDocument] = useState(TEMPLATE);
     const [error, setError] = useState<string | null>(null);
+    const [startFrom, setStartFrom] = useState("");
+    const own = policies.filter((policy) => policy.template === null);
+    const ready = policies.filter((policy) => policy.template !== null);
+
+    /** Fill the editor from a ready-made policy; what is saved is a copy. */
+    function onStartFrom(value: string) {
+        setStartFrom(value);
+        const template = POLICY_TEMPLATES.find((entry) => entry.key === value);
+        setDocument(template ? prettyJson(policyTemplateDocument(template)) : TEMPLATE);
+    }
 
     function mutate(run: () => Promise<unknown>) {
         startTransition(async () => {
@@ -108,6 +125,7 @@ export function PoliciesAdmin({
             setName("");
             setDescription("");
             setDocument(TEMPLATE);
+            setStartFrom("");
             router.refresh();
         });
     }
@@ -131,6 +149,20 @@ export function PoliciesAdmin({
                             onChange={(event) => setDescription(event.target.value)}
                         />
                     </div>
+                    <Select
+                        className="sm:max-w-sm"
+                        aria-label={t("policies.create.startFrom")}
+                        value={startFrom}
+                        onValueChange={onStartFrom}
+                        placeholder={t("policies.create.startFrom")}
+                        options={[
+                            { value: "blank", label: t("policies.create.blank") },
+                            ...POLICY_TEMPLATES.map((template) => ({
+                                value: template.key,
+                                label: t(`policies.templates.${template.key}.name`)
+                            }))
+                        ]}
+                    />
                     <JsonEditor
                         label={t("policies.create.document")}
                         className="max-h-96"
@@ -152,23 +184,48 @@ export function PoliciesAdmin({
                 </CardBody>
             </Card>
 
-            {policies.length === 0 ? (
-                <Card>
-                    <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                        {t("policies.empty")}
-                    </CardBody>
-                </Card>
-            ) : (
-                policies.map((policy) => (
-                    <PolicyCard
-                        key={policy.id}
-                        policy={policy}
-                        principals={principals}
-                        onMutate={mutate}
-                        disabled={pending}
-                    />
-                ))
-            )}
+            <section className="flex flex-col gap-3" aria-labelledby="policies-own">
+                <h2 id="policies-own" className="text-sm font-semibold">
+                    {t("policies.sections.own")}
+                </h2>
+                {own.length === 0 ? (
+                    <Card>
+                        <CardBody className="p-8 text-center text-sm text-muted-foreground">
+                            {t("policies.empty")}
+                        </CardBody>
+                    </Card>
+                ) : (
+                    own.map((policy) => (
+                        <PolicyCard
+                            key={policy.id}
+                            policy={policy}
+                            principals={principals}
+                            onMutate={mutate}
+                            disabled={pending}
+                        />
+                    ))
+                )}
+            </section>
+
+            {ready.length > 0 ? (
+                <section className="flex flex-col gap-3" aria-labelledby="policies-ready">
+                    <div className="flex flex-col gap-1">
+                        <h2 id="policies-ready" className="text-sm font-semibold">
+                            {t("policies.sections.ready")}
+                        </h2>
+                        <p className="text-xs text-muted-foreground">{t("policies.sections.readyHint")}</p>
+                    </div>
+                    {ready.map((policy) => (
+                        <PolicyCard
+                            key={policy.id}
+                            policy={policy}
+                            principals={principals}
+                            onMutate={mutate}
+                            disabled={pending}
+                        />
+                    ))}
+                </section>
+            ) : null}
         </div>
     );
 }
@@ -191,6 +248,7 @@ function PolicyCard({
     const [document, setDocument] = useState(() => prettyJson(policy.document));
     const [attach, setAttach] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const title = policy.template ? t(`policies.templates.${policy.template}.name`) : policy.name;
 
     /** Nothing to save while the editor still holds the stored policy. */
     const unchanged =
@@ -228,11 +286,20 @@ function PolicyCard({
             <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                        <CardTitle className="flex items-center gap-2">
-                            {policy.name}
-                            {policy.isSystem ? <Badge>{t("policies.card.system")}</Badge> : null}
+                        <CardTitle className="flex min-w-0 items-center gap-2">
+                            <span className="min-w-0 truncate">{title}</span>
+                            {policy.template ? (
+                                <Badge>{t("policies.card.managed")}</Badge>
+                            ) : policy.isSystem ? (
+                                <Badge>{t("policies.card.system")}</Badge>
+                            ) : null}
                         </CardTitle>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {policy.template ? (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {t(`policies.templates.${policy.template}.description`)}
+                            </p>
+                        ) : null}
+                        <p className="mt-1 truncate text-xs text-muted-foreground" title={summarize(policy.document, t)}>
                             {summarize(policy.document, t)}
                         </p>
                     </div>
@@ -362,7 +429,7 @@ function PolicyCard({
                                 </div>
                             </>
                         ) : (
-                            <JsonView value={document} label={t("policies.card.document", { name: policy.name })} className="max-h-96" />
+                            <JsonView value={document} label={t("policies.card.document", { name: title })} className="max-h-96" />
                         )}
                     </div>
                 ) : null}
