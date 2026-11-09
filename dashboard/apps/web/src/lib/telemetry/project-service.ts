@@ -20,6 +20,9 @@ import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto
 /** The slug and name Polaris' own project always has. */
 const SYSTEM_SLUG = "polaris";
 
+/** How far one account reaches into one project, weakest last. */
+export type TelemetryAccess = "owner" | "edit" | "view";
+
 export interface TelemetryActor {
     readonly id: string;
     readonly isAdmin: boolean;
@@ -60,8 +63,13 @@ export interface ProjectSummary {
     readonly retentionDays: number;
     readonly deployProjectId: string | null;
     readonly orgId: string | null;
-    /** Read through a share rather than owned: its issues only, nothing to change. */
+    /** Reached through a share rather than owned. */
     readonly shared: boolean;
+    /** What this account may do with it: everything as its owner (or an
+     *  administrator), work its issues and rules when shared as `edit`, read its
+     *  issues when shared as `view`. The screen draws from this and every
+     *  action checks the same thing on the server. */
+    readonly access: TelemetryAccess;
     /** Unresolved issues, which is the only number the list needs. */
     readonly openIssues: number;
     readonly lastSeen: string | null;
@@ -165,11 +173,13 @@ export function dsnFor(project: { number: number; publicKey: string }, origin: s
 /** Which projects this account may read. An instance administrator sees them
  *  all, which is what makes Polaris' own project reachable at all. `lent` are
  *  the projects shared with this account (`telemetry.project`), listed beside
- *  its own whatever shelf they sit on. */
+ *  its own whatever shelf they sit on; `editable` is the part of them shared
+ *  as `edit`. */
 export async function listProjects(
     actor: TelemetryActor,
     orgId: string | null,
-    lent: ReadonlySet<string> = new Set()
+    lent: ReadonlySet<string> = new Set(),
+    editable: ReadonlySet<string> = new Set()
 ): Promise<ProjectSummary[]> {
     const own = actor.isAdmin ? { orgId } : { ownerId: actor.id, orgId };
     const rows = await prisma.telemetryProject.findMany({
@@ -209,6 +219,10 @@ export async function listProjects(
     });
     return rows.map((row) => {
         const shared = !actor.isAdmin && row.ownerId !== actor.id;
+        const access: TelemetryAccess = !shared ? "owner" : editable.has(row.id) ? "edit" : "view";
+        // Who may report and who was turned away name addresses and agents:
+        // the business of whoever may change them, not of a reader.
+        const hidden = access === "view";
         return {
             id: row.id,
             number: row.number,
@@ -222,11 +236,10 @@ export async function listProjects(
             deployProjectId: row.deployProjectId,
             orgId: row.orgId,
             shared,
+            access,
             openIssues: row.issues.length,
             lastSeen: row.issues[0]?.lastSeen.toISOString() ?? null,
-            // Who may report and who was turned away name addresses and agents:
-            // the owner's business, not a reader's.
-            rules: shared
+            rules: hidden
                 ? rulesOf({
                       ...row,
                       allowedCidrs: "[]",
@@ -238,8 +251,8 @@ export async function listProjects(
             refused: {
                 count: row.refusedCount,
                 at: row.refusedAt?.toISOString() ?? null,
-                ip: shared ? null : row.refusedIp,
-                agent: shared ? null : row.refusedAgent,
+                ip: hidden ? null : row.refusedIp,
+                agent: hidden ? null : row.refusedAgent,
                 reason: (row.refusedReason as core.IngestRefusal) ?? null
             }
         };
@@ -537,8 +550,10 @@ export class TelemetryAccessError extends Error {
  * Ownership, plus every instance administrator - which is how Polaris' own
  * project is reachable at all, since it belongs to whoever installed the box and
  * the failures in it are the operator's business rather than that person's.
- * `lent` lets a project shared with this account through, which only the
- * reads pass: everything that changes a project asks without it.
+ * `lent` lets a project shared with this account through: the reads pass every
+ * shared project, what works a project's issues and rules passes only the ones
+ * shared as `edit`, and what only its owner does (its key, deleting it,
+ * sharing it) passes nothing.
  */
 export async function requireProject(
     actor: TelemetryActor,

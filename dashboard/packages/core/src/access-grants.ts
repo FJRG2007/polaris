@@ -220,9 +220,11 @@ export const GRANT_CAPABILITIES = {
     // One service's visitor numbers: its traffic, pages, sources and recent visits.
     // Switching its tracker and rotating its key stay with whoever configures it.
     "analytics.site": ["view"],
-    // One telemetry project: its issues and their events. Resolving, ignoring and
-    // deleting them, its address, reporters and settings stay with its owner.
-    "telemetry.project": ["view"],
+    // One telemetry project: its issues and their events, read; or also worked
+    // through - resolving, ignoring and deleting issues, who may report into it
+    // and what it keeps - which is Sentry's member beside its viewer. Its
+    // address (rotating the key), deleting it and sharing it stay with its owner.
+    "telemetry.project": ["view", "edit"],
     // One backup plan: its schedule, what it keeps and where. Changing, deleting
     // and putting things on it stay with its owner.
     "backup.plan": ["view"],

@@ -21,13 +21,15 @@
 
 import { useState } from "react";
 import { cn, Button } from "@polaris/ui";
-import { Eye, EyeOff } from "lucide-react";
+import { Cpu, Eye, EyeOff, Globe, Monitor, Server, Smartphone } from "lucide-react";
 import type { EventDetail } from "@/lib/telemetry/report-service";
 import type { ContextGroup, HeaderField, StackFrame } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { JsonView, isValidJson } from "@/components/json-view";
 import { useHighlighter } from "@/lib/code-highlight";
 import { languageForFile } from "@/lib/code-language";
+import { environmentOf, type EnvironmentFact } from "@/lib/telemetry/environment";
+import { PlatformMarkIcon } from "./platform-marks";
 
 /** The grammar a frame's file is written in, by its name past any query. */
 function frameLanguage(file: string): string | null {
@@ -52,8 +54,8 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
  *  somebody came for, so it gets the width. */
 function Pair({ name, children }: { name: string; children: React.ReactNode }) {
     return (
-        <div className="flex items-baseline gap-3 px-3 py-1.5 text-xs">
-            <span className="w-44 shrink-0 truncate text-muted-foreground" title={name}>
+        <div className="flex flex-col gap-0.5 px-3 py-1.5 text-xs sm:flex-row sm:items-baseline sm:gap-3">
+            <span className="truncate text-muted-foreground sm:w-44 sm:shrink-0" title={name}>
                 {name}
             </span>
             <span className="min-w-0 flex-1 break-all font-mono">{children}</span>
@@ -141,7 +143,7 @@ function Frame({ frame }: { frame: StackFrame }) {
         >
             <div className="flex flex-wrap items-baseline gap-x-2">
                 <span className="font-medium">{frame.function || "<anonymous>"}</span>
-                <span className="min-w-0 truncate" title={frame.file}>
+                <span className="min-w-0 break-all" title={frame.file}>
                     {frame.file}
                 </span>
                 {frame.line !== null && (
@@ -194,6 +196,80 @@ function Frame({ frame }: { frame: StackFrame }) {
     );
 }
 
+/** The glyph for a fact with no logo of its own: a runtime nobody here has a
+ *  mark for, a system that is none of the known ones, the device itself. */
+function FallbackIcon({ fact, server }: { fact: EnvironmentFact; server: boolean }) {
+    const className = "size-4 text-muted-foreground";
+    if (fact.kind === "runtime") return <Cpu className={className} aria-hidden="true" />;
+    if (fact.kind === "browser") return <Globe className={className} aria-hidden="true" />;
+    if (fact.mobile) return <Smartphone className={className} aria-hidden="true" />;
+    if (fact.kind === "device" && server) return <Server className={className} aria-hidden="true" />;
+    return <Monitor className={className} aria-hidden="true" />;
+}
+
+/**
+ * Runtime, system, browser and device at a glance, each with its mark - the
+ * strip Sentry draws above an event, because "only on Alpine" or "only in
+ * Safari" is the answer to most reports. The full groups stay further down.
+ */
+function EnvironmentStrip({ facts }: { facts: readonly EnvironmentFact[] }) {
+    const t = useTranslations("telemetry");
+    // A device beside a server runtime and no browser is a server.
+    const server = !facts.some((fact) => fact.kind === "browser");
+    return (
+        <ul
+            aria-label={t("event.environment")}
+            className="grid grid-cols-1 gap-2 min-[30rem]:grid-cols-2 xl:grid-cols-4"
+        >
+            {facts.map((fact) => {
+                const said = fact.version ? `${fact.name} ${fact.version}` : fact.name;
+                const detail =
+                    fact.detail === null
+                        ? null
+                        : fact.kind === "os"
+                          ? t("event.kernel", { version: fact.detail })
+                          : fact.detail;
+                return (
+                    <li
+                        key={fact.kind}
+                        className="flex min-w-0 items-center gap-2.5 rounded-lg border border-border bg-surface px-3 py-2"
+                    >
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                            {fact.mark ? (
+                                <PlatformMarkIcon mark={fact.mark} className="size-[1.125rem]" />
+                            ) : (
+                                <FallbackIcon fact={fact} server={server} />
+                            )}
+                        </span>
+                        <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="text-[0.6875rem] text-muted-foreground">
+                                {t(`event.facts.${fact.kind}`)}
+                            </span>
+                            <span className="truncate text-sm font-medium" title={said}>
+                                {fact.name}
+                                {fact.version && (
+                                    <span className="font-normal text-muted-foreground">
+                                        {" "}
+                                        {fact.version}
+                                    </span>
+                                )}
+                            </span>
+                            {detail && (
+                                <span
+                                    className="truncate font-mono text-[0.6875rem] text-muted-foreground"
+                                    title={detail}
+                                >
+                                    {detail}
+                                </span>
+                            )}
+                        </span>
+                    </li>
+                );
+            })}
+        </ul>
+    );
+}
+
 /** The machine, the runtime, the browser - whatever the client chose to send. */
 function Contexts({ groups }: { groups: readonly ContextGroup[] }) {
     return (
@@ -243,8 +319,11 @@ export function EventPanel({ event, kept }: { event: EventDetail; kept: number }
     const tags = Object.entries(event.tags);
     const request = event.request;
     const body = request?.body ?? null;
+    const facts = environmentOf(event.contexts, event.tags);
     return (
         <div className="flex flex-col gap-4">
+            {facts.length > 0 && <EnvironmentStrip facts={facts} />}
+
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <span>{t("event.mostRecent", { count: kept })}</span>
                 {event.serverName && <span>{t("event.on", { server: event.serverName })}</span>}

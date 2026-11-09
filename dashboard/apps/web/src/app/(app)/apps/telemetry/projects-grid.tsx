@@ -19,6 +19,8 @@ import { Bug, CircleCheck } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import type { ProjectSummary } from "@/lib/telemetry/project-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { platformMark } from "@/lib/telemetry/environment";
+import { PlatformMarkIcon } from "./platform-marks";
 
 export interface GridProject extends ProjectSummary {
     readonly dsn: string;
@@ -56,6 +58,7 @@ export function ProjectsGrid({
 function ProjectCard({ project, href }: { project: GridProject; href: string }) {
     const t = useTranslations("telemetry");
     const failing = project.openIssues > 0;
+    const mark = platformMark(project.platform);
     return (
         <Link href={href} className="group block rounded-xl focus-ring">
             <Card className="h-full transition-colors group-hover:border-border-strong">
@@ -73,12 +76,18 @@ function ProjectCard({ project, href }: { project: GridProject; href: string }) 
                             <p className="truncate text-sm font-medium" title={project.name}>
                                 {project.name}
                             </p>
-                            <p className="truncate text-xs text-muted-foreground">
-                                {/* The platform is what the first event said it
-                                    was, so a project nothing has reported into
-                                    yet says so rather than inventing a runtime. */}
-                                {project.platform ?? t("grid.nothingYet")}
-                                {project.system ? ` · ${t("grid.itself")}` : ""}
+                            <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                                {mark && (
+                                    <PlatformMarkIcon mark={mark} className="size-3 shrink-0" />
+                                )}
+                                <span className="truncate">
+                                    {/* The platform is what the first event said it
+                                        was, so a project nothing has reported into
+                                        yet says so rather than inventing a runtime. */}
+                                    {project.platform ?? t("grid.nothingYet")}
+                                    {project.system ? ` · ${t("grid.itself")}` : ""}
+                                    {project.shared ? ` · ${t("view.sharedWithYou")}` : ""}
+                                </span>
                             </p>
                         </div>
                         {!project.enabled && (

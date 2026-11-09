@@ -73,13 +73,17 @@ export function TelemetryView({
     projectId,
     issueId,
     status,
-    section
+    section,
+    mayCreate
 }: {
     projectId: string | null;
     issueId: string | null;
     status: string;
     /** Which part of the project is open. Only read once a project is. */
     section: string;
+    /** Whether this account may make a project: somebody reading only what was
+     *  shared with them is not offered a button the server would refuse. */
+    mayCreate: boolean;
 }) {
     const t = useTranslations("telemetry");
     const router = useRouter();
@@ -194,7 +198,7 @@ export function TelemetryView({
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between gap-2">
                         <Skeleton className="h-4 w-24" />
-                        <NewProject onDone={load} />
+                        {mayCreate && <NewProject onDone={load} />}
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         <Skeleton className="h-24 w-full" />
@@ -214,7 +218,7 @@ export function TelemetryView({
                     icon={<Bug />}
                     title={t("view.none")}
                     description={t("view.noneHint")}
-                    action={<NewProject onDone={load} />}
+                    action={mayCreate ? <NewProject onDone={load} /> : undefined}
                 />
                 {error && <p className="mt-3 text-sm text-danger">{error}</p>}
             </>
@@ -230,7 +234,7 @@ export function TelemetryView({
                 <ProjectsGrid
                     projects={data.projects}
                     hrefFor={hrefFor}
-                    action={<NewProject onDone={load} />}
+                    action={mayCreate ? <NewProject onDone={load} /> : null}
                 />
                 {failure}
             </div>
@@ -258,9 +262,13 @@ export function TelemetryView({
                     <Skeleton className="h-4 w-32" />
                 )}
                 {project?.shared ? (
-                    <Badge variant="neutral">{t("view.sharedWithYou")}</Badge>
+                    <Badge variant="neutral">
+                        {project.access === "edit"
+                            ? t("view.sharedToEdit")
+                            : t("view.sharedWithYou")}
+                    </Badge>
                 ) : null}
-                {project && !project.shared ? (
+                {project?.access === "owner" ? (
                     <Button
                         variant="ghost"
                         size="icon-sm"
@@ -283,14 +291,14 @@ export function TelemetryView({
                     />
                 ) : null}
                 {open === "issues" && (
-                    <div className="relative ml-auto">
+                    <div className="relative w-full sm:ml-auto sm:w-auto">
                         <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                         <input
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={t("view.find")}
                             aria-label={t("view.find")}
-                            className="h-8 w-52 rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
+                            className="h-8 w-full rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                         />
                     </div>
                 )}
@@ -300,8 +308,8 @@ export function TelemetryView({
 
             <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
                 <SectionNav
-                    open={project?.shared ? "issues" : open}
-                    only={project?.shared ? "issues" : null}
+                    open={project?.access === "view" ? "issues" : open}
+                    only={project?.access === "view" ? "issues" : null}
                     onOpen={(key) => go({ section: key, issue: null })}
                 />
                 <div className="min-w-0 flex-1">
@@ -312,21 +320,21 @@ export function TelemetryView({
                         </div>
                     ) : (
                         <>
-                            {open === "client" && !project.shared && (
+                            {open === "client" && project.access !== "view" && (
                                 <ProjectAddress project={project} onDone={load} />
                             )}
-                            {open === "reporters" && !project.shared && (
+                            {open === "reporters" && project.access !== "view" && (
                                 <ReporterRules project={project} onDone={load} />
                             )}
-                            {open === "settings" && !project.shared && (
+                            {open === "settings" && project.access !== "view" && (
                                 <ProjectSettings project={project} onDone={load} />
                             )}
-                            {(open === "issues" || project.shared) &&
+                            {(open === "issues" || project.access === "view") &&
                                 (issue ? (
                                     <IssuePanel
                                         issue={issue}
                                         busy={busy}
-                                        readOnly={project.shared}
+                                        readOnly={project.access === "view"}
                                         onBack={() => go({ issue: null })}
                                         onStatus={(next) =>
                                             act(() =>
@@ -580,23 +588,28 @@ function ProjectAddress({
                     {dsn}
                 </code>
                 <CopyButton value={dsn} label={t("client.copy")} />
-                <button
-                    type="button"
-                    title={t("client.rotate")}
-                    aria-label={t("client.rotate")}
-                    onClick={async () => {
-                        const result = await runAction(
-                            () => actions.rotateTelemetryKeyAction(project.id),
-                            setError
-                        );
-                        if (result?.dsn) setDsn(result.dsn);
-                        await onDone();
-                    }}
-                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                    <RotateCcw className="size-3.5" />
-                </button>
-                {!project.system && (
+                {/* A new key breaks every client reporting with the old one, and
+                    deleting the project loses everything it recorded: both stay
+                    with its owner, as the server answers them. */}
+                {project.access === "owner" && (
+                    <button
+                        type="button"
+                        title={t("client.rotate")}
+                        aria-label={t("client.rotate")}
+                        onClick={async () => {
+                            const result = await runAction(
+                                () => actions.rotateTelemetryKeyAction(project.id),
+                                setError
+                            );
+                            if (result?.dsn) setDsn(result.dsn);
+                            await onDone();
+                        }}
+                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        <RotateCcw className="size-3.5" />
+                    </button>
+                )}
+                {project.access === "owner" && !project.system && (
                     <button
                         type="button"
                         title={t("client.delete")}
@@ -726,7 +739,7 @@ function IssuePanel({
 }: {
     issue: IssueDetail;
     busy: boolean;
-    /** Shared with the reader: nothing here is theirs to change. */
+    /** Shared with the reader to view: nothing here is theirs to change. */
     readOnly: boolean;
     onBack: () => void;
     onStatus: (status: string) => void;
@@ -746,10 +759,13 @@ function IssuePanel({
                     <ArrowLeft className="size-4" />
                 </button>
                 <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-base font-semibold" title={issue.title}>
+                    <h2
+                        className="line-clamp-3 break-words text-base font-semibold"
+                        title={issue.title}
+                    >
                         {issue.title}
                     </h2>
-                    <p className="truncate text-xs text-muted-foreground">{issue.culprit}</p>
+                    <p className="break-all text-xs text-muted-foreground">{issue.culprit}</p>
                 </div>
                 {!readOnly && (
                     <div className="flex items-center gap-2">

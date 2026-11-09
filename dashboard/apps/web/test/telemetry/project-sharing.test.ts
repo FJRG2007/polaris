@@ -2,8 +2,9 @@
  * One telemetry project shared with somebody who does not own it
  * (`telemetry.project`). With a live grant they get into Telemetry, see the
  * project marked shared with its reporter rules and refusals blanked, and open
- * its issues; changing an issue stays refused; and only the owner (or an
- * administrator) may hand it out.
+ * its issues; changing an issue stays refused to a `view` grant and allowed
+ * to an `edit` one, which also sees the rules; its key and deleting it stay
+ * with the owner; and only the owner (or an administrator) may hand it out.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -51,7 +52,8 @@ vi.mock("@polaris/db", () => ({
                 state.where = args.where;
                 return state.granted.size > 0 ? [row] : [];
             }),
-            findUnique: vi.fn(async () => row)
+            findUnique: vi.fn(async () => row),
+            update: vi.fn(async () => row)
         }
     }
 }));
@@ -73,7 +75,8 @@ vi.mock("@/lib/telemetry/report-service", () => ({
     listIssues: vi.fn(async () => [{ id: "i1" }]),
     issueCounts: vi.fn(async () => ({ unresolved: 1 })),
     getIssue: vi.fn(async () => ({ id: "i1" })),
-    setIssueStatus: vi.fn()
+    setIssueStatus: vi.fn(),
+    deleteIssue: vi.fn()
 }));
 vi.mock("@/lib/domain-service", () => ({
     appBaseUrl: vi.fn(async () => "https://polaris.example.test")
@@ -113,6 +116,19 @@ describe("a shared telemetry project", () => {
         await expect(requireTelemetryReader()).rejects.toThrow("denied");
         state.granted = new Map([[PROJECT, "view"]]);
         expect((await requireTelemetryReader()).lent).toEqual(new Set([PROJECT]));
+        expect((await requireTelemetryReader()).editable).toEqual(new Set());
+        state.granted = new Map([[PROJECT, "edit"]]);
+        expect((await requireTelemetryReader()).editable).toEqual(new Set([PROJECT]));
+    });
+
+    it("turns away somebody it was not shared with, even one who runs services", async () => {
+        state.manages = true;
+        const { data } = await actions.telemetryOverviewAction({ projectId: PROJECT });
+        expect(data?.projects).toEqual([]);
+        expect(await actions.openIssueAction(PROJECT, "i1")).toEqual({ error: "errors.noAccess" });
+        expect(await actions.setIssueStatusAction(PROJECT, "i1", "resolved")).toEqual({
+            error: "errors.noAccess"
+        });
     });
 
     it("lists it marked shared, without the owner's rules or refusals, and opens its issues", async () => {
@@ -123,6 +139,7 @@ describe("a shared telemetry project", () => {
         });
         expect(data?.projects[0]).toMatchObject({
             shared: true,
+            access: "view",
             refused: { ip: null, agent: null }
         });
         expect(data?.projects[0]?.rules.allowedCidrs).toEqual([]);
@@ -134,6 +151,42 @@ describe("a shared telemetry project", () => {
         state.granted = new Map([[PROJECT, "view"]]);
         state.manages = true;
         expect(await actions.setIssueStatusAction(PROJECT, "i1", "resolved")).toEqual({
+            error: "errors.noAccess"
+        });
+    });
+
+    it("refuses a viewer every other change too", async () => {
+        state.granted = new Map([[PROJECT, "view"]]);
+        for (const answer of [
+            await actions.deleteIssueAction(PROJECT, "i1"),
+            await actions.updateTelemetryProjectAction(PROJECT, { retentionDays: 7 }),
+            await actions.clearTelemetryRefusalsAction(PROJECT),
+            await actions.clearTelemetrySecretAction(PROJECT)
+        ]) {
+            expect(answer).toEqual({ error: "errors.noAccess" });
+        }
+    });
+
+    it("lets an editor work its issues and settings and see its rules", async () => {
+        state.granted = new Map([[PROJECT, "edit"]]);
+        const { data } = await actions.telemetryOverviewAction({ projectId: PROJECT });
+        expect(data?.projects[0]).toMatchObject({ shared: true, access: "edit" });
+        expect(data?.projects[0]?.rules.allowedCidrs).toEqual(["10.0.0.0/8"]);
+        expect(data?.projects[0]?.refused.ip).toBe("203.0.113.9");
+        expect(await actions.setIssueStatusAction(PROJECT, "i1", "resolved")).toEqual({});
+        expect(await actions.deleteIssueAction(PROJECT, "i1")).toEqual({});
+        expect(
+            await actions.updateTelemetryProjectAction(PROJECT, { retentionDays: 7 })
+        ).toEqual({});
+    });
+
+    it("keeps its key and deleting it with the owner, even for an editor", async () => {
+        state.granted = new Map([[PROJECT, "edit"]]);
+        state.manages = true;
+        expect(await actions.rotateTelemetryKeyAction(PROJECT)).toEqual({
+            error: "errors.noAccess"
+        });
+        expect(await actions.deleteTelemetryProjectAction(PROJECT)).toEqual({
             error: "errors.noAccess"
         });
     });

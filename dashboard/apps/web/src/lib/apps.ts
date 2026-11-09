@@ -1579,6 +1579,8 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/apps/telemetry",
             needs: "deploy.manage",
             requiresApp: "telemetry",
+            // A project shared with somebody who runs nothing else here.
+            reachedBy: "telemetry.project",
             icon: Bug,
             keywords: [
                 "errors",

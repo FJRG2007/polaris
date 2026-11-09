@@ -31,7 +31,8 @@
         "projects": "Proyectos",
         "find": "Buscar un fallo",
         "newProject": "Nuevo proyecto",
-        "name": "Nombre"
+        "name": "Nombre",
+        "sharedToEdit": "Compartido para editar"
     },
     "settings": {
         "keepFor": "Guardar eventos",
@@ -119,7 +120,15 @@
         "query": "Consulta",
         "headers": "Cabeceras",
         "body": "Cuerpo",
-        "before": "Lo que pasó antes"
+        "before": "Lo que pasó antes",
+        "environment": "Entorno",
+        "kernel": "Kernel {version}",
+        "facts": {
+            "runtime": "Ejecución",
+            "os": "Sistema operativo",
+            "browser": "Navegador",
+            "device": "Máquina"
+        }
     },
     "page": {
         "title": "Telemetría",

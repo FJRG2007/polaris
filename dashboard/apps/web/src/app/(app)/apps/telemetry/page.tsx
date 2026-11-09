@@ -29,7 +29,7 @@ export default async function TelemetryPage({
         section?: string;
     }>;
 }) {
-    await requireTelemetryReader();
+    const { manages } = await requireTelemetryReader();
     await requireInstalledApp("telemetry", await requireUser());
     const { project, issue, status, section } = await searchParams;
     const t = await getTranslations("telemetry");
@@ -45,6 +45,7 @@ export default async function TelemetryPage({
                 issueId={issue ?? null}
                 status={status ?? "unresolved"}
                 section={section ?? ""}
+                mayCreate={manages}
             />
         </div>
     );

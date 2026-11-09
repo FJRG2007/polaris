@@ -12,6 +12,10 @@
  * open the app at all, and ownership of the project for everything inside it -
  * plus every instance administrator, which is how Polaris' own project is
  * reachable by whoever runs the box rather than only by whoever installed it.
+ * A project shared with somebody (`telemetry.project`) lets them in without
+ * `deploy.manage`: as `view` to read its issues, as `edit` to also work them
+ * and its reporter rules and settings. Its key, deleting it and sharing it
+ * stay with its owner, and making a project still needs `deploy.manage`.
  */
 
 import * as core from "@polaris/core";
@@ -47,6 +51,30 @@ const SCHEMA_WORDS: Readonly<Record<string, TelemetryKey>> = {
 
 const PATH = "/apps/telemetry";
 
+/** The caller, and the projects shared with them as `edit` - the only shared
+ *  ones anything that changes a project lets through. */
+async function editor(): Promise<{
+    caller: projects.TelemetryActor;
+    editable: ReadonlySet<string>;
+    manages: boolean;
+}> {
+    const { actor: caller, editable, manages } = await requireTelemetryReader();
+    return { caller, editable, manages };
+}
+
+/** The project, when this caller may change it: as its owner or an
+ *  administrator who still runs services, or through an `edit` share. An
+ *  owner who lost `deploy.manage` is refused changes, as before shares. */
+async function requireEditable(
+    caller: projects.TelemetryActor,
+    projectId: string,
+    editable: ReadonlySet<string>,
+    manages: boolean
+): ReturnType<typeof projects.requireProject> {
+    if (!manages && !editable.has(projectId)) throw new projects.TelemetryAccessError();
+    return projects.requireProject(caller, projectId, editable);
+}
+
 async function actor(): Promise<projects.TelemetryActor> {
     const user = await requirePermission("deploy.manage");
     return { id: user.id, isAdmin: user.isAdmin };
@@ -80,11 +108,11 @@ export async function telemetryOverviewAction(input: {
     status?: string;
     query?: string;
 }): Promise<{ data?: TelemetryOverview; error?: string }> {
-    const { actor: caller, lent } = await requireTelemetryReader();
+    const { actor: caller, lent, editable } = await requireTelemetryReader();
     try {
         const orgId = await scopeOrgIdFor(caller.id);
         const [rows, origin] = await Promise.all([
-            projects.listProjects(caller, orgId, lent),
+            projects.listProjects(caller, orgId, lent, editable),
             appBaseUrl()
         ]);
         const withDsn = rows.map((row) => ({ ...row, dsn: projects.dsnFor(row, origin) }));
@@ -137,12 +165,12 @@ export async function setIssueStatusAction(
     issueId: string,
     status: string
 ): Promise<{ error?: string }> {
-    const caller = await actor();
+    const { caller, editable, manages } = await editor();
     if (!(core.TELEMETRY_STATUSES as readonly string[]).includes(status)) {
         return { error: await say("errors.badStatus") };
     }
     try {
-        await projects.requireProject(caller, projectId);
+        await requireEditable(caller, projectId, editable, manages);
         await report.setIssueStatus(projectId, issueId, status as core.TelemetryStatus, caller.id);
         revalidatePath(PATH);
         return {};
@@ -155,9 +183,9 @@ export async function deleteIssueAction(
     projectId: string,
     issueId: string
 ): Promise<{ error?: string }> {
-    const caller = await actor();
+    const { caller, editable, manages } = await editor();
     try {
-        await projects.requireProject(caller, projectId);
+        await requireEditable(caller, projectId, editable, manages);
         await report.deleteIssue(projectId, issueId);
         revalidatePath(PATH);
         return {};
@@ -191,9 +219,9 @@ export async function updateTelemetryProjectAction(
     projectId: string,
     input: { name?: string; enabled?: boolean; retentionDays?: number }
 ): Promise<{ error?: string }> {
-    const caller = await actor();
+    const { caller, editable, manages } = await editor();
     try {
-        await projects.requireProject(caller, projectId);
+        await requireEditable(caller, projectId, editable, manages);
         const days = input.retentionDays;
         if (days !== undefined && (!Number.isInteger(days) || days < 1 || days > 365)) {
             return { error: await say("errors.retention") };
@@ -249,7 +277,7 @@ export async function setReporterRulesAction(
     projectId: string,
     input: unknown
 ): Promise<{ error?: string }> {
-    const caller = await actor();
+    const { caller, editable, manages } = await editor();
     const parsed = core.reporterRulesSchema.safeParse(input);
     if (!parsed.success) {
         const message = parsed.error.issues[0]?.message;
@@ -257,7 +285,7 @@ export async function setReporterRulesAction(
         return { error: await say(key ?? "errors.readRules") };
     }
     try {
-        await projects.requireProject(caller, projectId);
+        await requireEditable(caller, projectId, editable, manages);
         await projects.setReporterRules(projectId, parsed.data);
         revalidatePath(PATH);
         return {};
@@ -276,9 +304,9 @@ export async function setReporterRulesAction(
 export async function mintTelemetrySecretAction(
     projectId: string
 ): Promise<{ secret?: string; error?: string }> {
-    const caller = await actor();
+    const { caller, editable, manages } = await editor();
     try {
-        await projects.requireProject(caller, projectId);
+        await requireEditable(caller, projectId, editable, manages);
         const secret = await projects.mintSecret(projectId);
         revalidatePath(PATH);
         return { secret };
@@ -289,9 +317,9 @@ export async function mintTelemetrySecretAction(
 
 /** Stop asking for a key, and forget the one there was. */
 export async function clearTelemetrySecretAction(projectId: string): Promise<{ error?: string }> {
-    const caller = await actor();
+    const { caller, editable, manages } = await editor();
     try {
-        await projects.requireProject(caller, projectId);
+        await requireEditable(caller, projectId, editable, manages);
         await projects.clearSecret(projectId);
         revalidatePath(PATH);
         return {};
@@ -302,9 +330,9 @@ export async function clearTelemetrySecretAction(projectId: string): Promise<{ e
 
 /** Forget what was turned away, once somebody has read it and acted on it. */
 export async function clearTelemetryRefusalsAction(projectId: string): Promise<{ error?: string }> {
-    const caller = await actor();
+    const { caller, editable, manages } = await editor();
     try {
-        await projects.requireProject(caller, projectId);
+        await requireEditable(caller, projectId, editable, manages);
         await projects.clearRefusals(projectId);
         revalidatePath(PATH);
         return {};

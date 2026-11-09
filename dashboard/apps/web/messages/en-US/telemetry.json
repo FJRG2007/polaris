@@ -31,7 +31,8 @@
         "projects": "Projects",
         "find": "Find a fault",
         "newProject": "New project",
-        "name": "Name"
+        "name": "Name",
+        "sharedToEdit": "Shared with you to edit"
     },
     "settings": {
         "keepFor": "Keep events for",
@@ -119,7 +120,15 @@
         "query": "Query",
         "headers": "Headers",
         "body": "Body",
-        "before": "What happened before it"
+        "before": "What happened before it",
+        "environment": "Environment",
+        "kernel": "Kernel {version}",
+        "facts": {
+            "runtime": "Runtime",
+            "os": "Operating system",
+            "browser": "Browser",
+            "device": "Machine"
+        }
     },
     "page": {
         "title": "Telemetry",

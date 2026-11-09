@@ -18,10 +18,12 @@
  */
 
 import * as os from "node:os";
+import { readFileSync } from "node:fs";
 import * as core from "@polaris/core";
 import { captureEvent } from "./store";
 import { buildStamp } from "@/lib/build-stamp";
 import { systemProject } from "./project-service";
+import { readOsRelease } from "./environment";
 
 /** How many of the same fault to accept in a row before going quiet for a
  *  while. A dashboard in a crash loop must not spend its remaining capacity
@@ -77,6 +79,57 @@ function framesOf(error: Error): core.StackFrame[] {
     return frames.reverse().slice(-40);
 }
 
+/** The system as Sentry's Node SDK reports it, read once: it does not change
+ *  while the process runs. */
+let systemOs: core.ContextGroup["fields"] | null = null;
+
+/**
+ * The operating system, named the way a person would: on Linux the
+ * distribution from `/etc/os-release` (`Ubuntu` `22.04`) with the kernel beside
+ * it as `kernel_version`, which is what Sentry's Node SDK sends - `os.type()`
+ * alone is "Linux" on every one of them. Inside a container, which is how
+ * Polaris runs, this is the distribution of the container's image rather than
+ * of the host underneath it; the kernel is the host's.
+ */
+function systemFields(): core.ContextGroup["fields"] {
+    if (systemOs) return systemOs;
+    const kind = os.type();
+    const kernel = os.release();
+    let fields: { key: string; value: string }[] = [
+        {
+            key: "name",
+            value: kind === "Darwin" ? "macOS" : kind === "Windows_NT" ? "Windows" : kind
+        },
+        { key: "version", value: kernel }
+    ];
+    if (kind === "Linux") {
+        let release: ReturnType<typeof readOsRelease> = null;
+        for (const file of ["/etc/os-release", "/usr/lib/os-release"]) {
+            try {
+                release = readOsRelease(readFileSync(file, "utf8"));
+            } catch {
+                release = null;
+            }
+            if (release) break;
+        }
+        if (release) {
+            fields = [
+                { key: "name", value: release.name },
+                { key: "version", value: release.version ?? "" },
+                { key: "kernel_version", value: kernel },
+                { key: "raw_description", value: release.pretty ?? "" }
+            ].filter((field) => field.value !== "");
+        } else {
+            fields = [
+                { key: "name", value: kind },
+                { key: "kernel_version", value: kernel }
+            ];
+        }
+    }
+    systemOs = [...fields, { key: "arch", value: os.arch() }];
+    return systemOs;
+}
+
 /**
  * Where this is running, in the shape every other reporter sends it.
  *
@@ -103,11 +156,7 @@ function hereContexts(): core.ContextGroup[] {
         },
         {
             name: "os",
-            fields: [
-                { key: "name", value: os.type() },
-                { key: "version", value: os.release() },
-                { key: "arch", value: os.arch() }
-            ]
+            fields: systemFields()
         },
         {
             name: "device",
