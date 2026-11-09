@@ -58,6 +58,10 @@ vi.mock("@/lib/analytics-service", () => ({
     recentVisits: vi.fn(async () => []),
     getAnalyticsSettings: vi.fn(async () => ({}))
 }));
+vi.mock("@/lib/analytics-reports", () => ({
+    listReports: vi.fn(async () => []),
+    previousPeriod: vi.fn(async () => null)
+}));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));

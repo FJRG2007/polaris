@@ -137,6 +137,7 @@ const actions = vi.hoisted(() => {
         "trackerTargetsAction",
         "listAnalyticsSitesAction",
         "getAnalyticsOverviewAction",
+        "runAnalyticsReportAction",
         "listBackupKeysAction",
         "listWorkAction",
         "containerDriveLinkAction",
@@ -423,7 +424,8 @@ vi.mock("@/app/(app)/tasks/trackers/actions", () => ({
 }));
 vi.mock("@/app/(app)/apps/analytics/actions", () => ({
     listAnalyticsSitesAction: actions.listAnalyticsSitesAction,
-    getAnalyticsOverviewAction: actions.getAnalyticsOverviewAction
+    getAnalyticsOverviewAction: actions.getAnalyticsOverviewAction,
+    runAnalyticsReportAction: actions.runAnalyticsReportAction
 }));
 vi.mock("@/app/(app)/apps/backups/actions", () => ({
     listBackupKeysAction: actions.listBackupKeysAction
@@ -625,6 +627,7 @@ const ROUTES: Record<string, () => Promise<{ GET?: Handler; POST?: Handler }>> =
     "/api/tasks/create-context": () => import("@/app/api/tasks/create-context/route"),
     "/api/tasks/trackers/targets": () => import("@/app/api/tasks/trackers/targets/route"),
     "/api/analytics/sites": () => import("@/app/api/analytics/sites/route"),
+    "/api/analytics/report": () => import("@/app/api/analytics/report/route"),
     "/api/analytics/overview": () => import("@/app/api/analytics/overview/route"),
     "/api/backups/keys": () => import("@/app/api/backups/keys/route"),
     "/api/code/work": () => import("@/app/api/code/work/route"),
@@ -2202,10 +2205,37 @@ const CASES: Case[] = [
             ).analyticsOverview({
                 scopeType: "scopeType-1",
                 scopeId: "scopeId-1",
-                range: "range-1"
+                range: "range-1",
+                filters: "filters-1"
             }),
         action: "getAnalyticsOverviewAction",
-        args: [{ scopeType: "scopeType-1", scopeId: "scopeId-1", range: "range-1" }]
+        args: [{ scopeType: "scopeType-1", scopeId: "scopeId-1", range: "range-1", filters: "filters-1" }]
+    },
+    {
+        name: "one Analytics report past the overview",
+        path: "/api/analytics/report",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/apps/analytics/analytics-polls")>(
+                    "@/app/(app)/apps/analytics/analytics-polls"
+                )
+            ).analyticsReport({
+                scopeType: "scopeType-1",
+                scopeId: "scopeId-1",
+                range: "range-1",
+                filters: "filters-1",
+                request: "request-1"
+            }),
+        action: "runAnalyticsReportAction",
+        args: [
+            {
+                scopeType: "scopeType-1",
+                scopeId: "scopeId-1",
+                range: "range-1",
+                filters: "filters-1",
+                request: "request-1"
+            }
+        ]
     },
     {
         name: "the backup keys, without their recovery keys",

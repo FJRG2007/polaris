@@ -622,6 +622,11 @@ vi.mock("@/app/(app)/apps/analytics/analytics-polls", () => ({
         () => import("@/app/(app)/apps/analytics/actions"),
         "getAnalyticsOverviewAction",
         1
+    ),
+    analyticsReport: forward(
+        () => import("@/app/(app)/apps/analytics/actions"),
+        "runAnalyticsReportAction",
+        1
     )
 }));
 

@@ -21,8 +21,11 @@ vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/session", () => ({
     requirePermission: async () => ({ id: "u1", isAdmin: false }),
+    requireUser: async () => ({ id: "u1", isAdmin: false }),
+    sessionCan: async () => true,
     userHasManage: async () => false
 }));
+vi.mock("@/lib/access/grants", () => ({ grantedSubjects: async () => new Map() }));
 vi.mock("@/lib/deploy-service", () => ({
     listProjectScopes: async () => [],
     visibleApplication: (...args: unknown[]) => visibleApplication(...(args as []))

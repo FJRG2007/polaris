@@ -584,7 +584,7 @@ function SessionDialog(props: PanelProps & { id: string; onClose: () => void }) 
                 ) : !session ? (
                     <Empty>{t("sessions.gone")}</Empty>
                 ) : (
-                    <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
+                    <div className="flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain">
                         <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
                             {facts
                                 .filter((fact): fact is [string, string] => Boolean(fact[1]))
