@@ -35,8 +35,8 @@
         "patch-package": "8.0.1",
         "playwright": "1.64.1",
         "prettier": "3.9.10",
-        "react": "19.0.8",
-        "react-dom": "19.0.8",
+        "react": "19.3.1",
+        "react-dom": "19.3.1",
         "tsup": "8.3.5",
         "typescript": "5.7.3",
         "vitest": "4.1.11"
