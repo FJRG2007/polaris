@@ -623,7 +623,7 @@ export function ShareDialog({
                         </div>
                     </section>
                 ) : (
-                    <>
+                    <div className="flex min-w-0 flex-col gap-5">
                         {/* The one box: anybody this may go to, in one ranked list. */}
                         <div className="relative flex min-w-0 flex-col gap-2">
                             <label className="sr-only" htmlFor="share-add">
@@ -1286,7 +1286,7 @@ export function ShareDialog({
                                 {extra}
                             </>
                         )}
-                    </>
+                    </div>
                 )}
 
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
