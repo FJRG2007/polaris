@@ -43,6 +43,7 @@
 import { loadEnv } from "@polaris/config";
 import { readPublishedImage } from "./registry";
 import { getUpdateSource } from "./update-source";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import { DEFAULT_UPDATE_SOURCE, type UpdateSource } from "@polaris/core";
 
 /** Where a deployment stands relative to what has been published. */
@@ -117,6 +118,9 @@ const WEB_IMAGE_CHECKS = /^(changes|web|tag|dashboard-ci \/ .+)$/;
 
 let cache: { status: UpdateStatus; at: number } | null = null;
 let inflight: Promise<UpdateStatus> | null = null;
+/** False once the cached answer was thrown away on purpose (`resetUpdateStatus`):
+ *  the kept copy describes the same past, so it is not read back either. */
+let trustKept = true;
 
 function short(sha: string): string {
     return sha.slice(0, 7);
@@ -389,22 +393,60 @@ async function query(): Promise<UpdateStatus> {
  */
 export function resetUpdateStatus(): void {
     cache = null;
+    trustKept = false;
+    void setSetting(KEPT_KEY, null).catch(() => undefined);
+}
+
+/** The last answer, kept across restarts. An update is a restart, and the first
+ *  thing anybody does after one is open Settings to see it landed. */
+const KEPT_KEY = "updates.lastStatus";
+
+/** The kept answer, when it was made by this very build - one from before an
+ *  update describes a version that is no longer running. */
+async function keptStatus(): Promise<{ status: UpdateStatus; at: number } | null> {
+    try {
+        const raw = await getSetting(KEPT_KEY);
+        if (!raw) return null;
+        const kept = JSON.parse(raw) as { status?: UpdateStatus; at?: unknown };
+        if (!kept.status || typeof kept.at !== "number") return null;
+        const sha = loadEnv().POLARIS_BUILD_SHA;
+        if ((sha ? short(sha) : null) !== kept.status.current) return null;
+        return { status: kept.status, at: kept.at };
+    } catch {
+        return null;
+    }
 }
 
 /**
- * Current update status. Serves the cached result within the TTL; `force`
- * bypasses the cache (the settings "Check now" button). On a failed fetch it
- * keeps and returns the last good status, annotated with the error, rather than
- * throwing - a missing update check must never break a page.
+ * Current update status, without waiting on GitHub whenever an answer exists.
+ *
+ * The check asks GitHub and the registry, which takes seconds, and Settings
+ * waited for it every ten minutes and after every restart. So a known answer is
+ * served at once - from memory, or from the one kept across the restart - and a
+ * stale one is refreshed behind it for the next read. Only a deployment that has
+ * never checked waits. `force` (the "Check now" button) always asks. On a failed
+ * fetch it keeps and returns the last good status, annotated with the error,
+ * rather than throwing - a missing update check must never break a page.
  */
 export async function getUpdateStatus(force = false): Promise<UpdateStatus> {
     const now = Date.now();
-    if (!force && cache && now - cache.at < CACHE_TTL_MS) return cache.status;
+    if (!force) {
+        if (!cache && trustKept) cache = await keptStatus();
+        if (cache) {
+            if (now - cache.at >= CACHE_TTL_MS && !inflight) void check();
+            return cache.status;
+        }
+    }
+    return check();
+}
+
+function check(): Promise<UpdateStatus> {
     if (inflight) return inflight;
 
     inflight = query()
         .then((status) => {
             cache = { status, at: Date.now() };
+            void setSetting(KEPT_KEY, JSON.stringify(cache)).catch(() => undefined);
             return status;
         })
         .catch((caught): UpdateStatus => {

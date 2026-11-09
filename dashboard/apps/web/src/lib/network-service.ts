@@ -274,19 +274,40 @@ export async function rememberPublicIp(ip: string): Promise<void> {
     await setSetting(KEYS.detectedAt, String(Date.now()));
 }
 
-/** Fetch the box's external public IP from an echo service, cached with a TTL. */
+let probing: Promise<string | null> | null = null;
+
+/** Ask an echo service now, once at a time however many screens ask together. */
+function probeAndRemember(): Promise<string | null> {
+    probing ??= probePublicIp()
+        .then(async (ip) => {
+            if (ip) await rememberPublicIp(ip);
+            return ip ?? getSetting(KEYS.detectedIp);
+        })
+        .finally(() => {
+            probing = null;
+        });
+    return probing;
+}
+
+/**
+ * The box's external public IP, from an echo service, cached with a TTL.
+ *
+ * A known address is answered at once, and an old one is checked again behind
+ * it: the settings screen asked for this on every visit, and once the six hours
+ * were up it waited on up to three HTTP timeouts before drawing. Only a box that
+ * has never detected one, or `force`, waits for the probe.
+ */
 export async function detectPublicIp(force = false): Promise<string | null> {
     if (!force) {
         const at = Number(await getSetting(KEYS.detectedAt));
         const cached = await getSetting(KEYS.detectedIp);
-        if (cached && Number.isFinite(at) && Date.now() - at < DETECT_TTL_MS) return cached;
+        if (cached) {
+            if (!Number.isFinite(at) || Date.now() - at >= DETECT_TTL_MS)
+                void probeAndRemember().catch(() => undefined);
+            return cached;
+        }
     }
-    const ip = await probePublicIp();
-    if (ip) {
-        await rememberPublicIp(ip);
-        return ip;
-    }
-    return getSetting(KEYS.detectedIp);
+    return probeAndRemember();
 }
 
 /**

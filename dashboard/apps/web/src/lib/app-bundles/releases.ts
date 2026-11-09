@@ -160,6 +160,9 @@ async function readBounded(response: Response, max: number): Promise<Buffer> {
     return Buffer.concat(chunks);
 }
 
+/** The refreshes running behind an answer already given, one per app. */
+const refreshing = new Map<string, Promise<unknown>>();
+
 /** The newest published build of an app, from its channel in the registry. */
 export async function latestRelease(
     id: string,
@@ -167,7 +170,18 @@ export async function latestRelease(
 ): Promise<AppRelease> {
     if (!APP_ID.test(id)) throw new store.BundleUnavailable("That is not an app.");
     const cached = state.checks.get(id);
-    if (!force && cached?.release && Date.now() - cached.at < CHECK_TTL_MS) return cached.release;
+    // A known release is answered at once and an old one asked again behind it:
+    // Settings drew this card, and once the ten minutes were up it waited on
+    // the registry - up to the full timeout per app - before showing anything.
+    if (!force && cached?.release) {
+        if (Date.now() - cached.at >= CHECK_TTL_MS && !refreshing.has(id)) {
+            const behind = latestRelease(id, { force: true })
+                .catch(() => undefined)
+                .finally(() => refreshing.delete(id));
+            refreshing.set(id, behind);
+        }
+        return cached.release;
+    }
     const index = store.bundleIndex();
     if (!index)
         throw new store.BundleUnavailable("This version of Polaris was built without apps.");
