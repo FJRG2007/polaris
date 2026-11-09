@@ -11,12 +11,16 @@
 
 import type { DeepLink } from "@/shared/deep-link";
 
+/** A link to open: a page of a named Polaris, or (server null) of the one in use,
+ *  which is what a mailto link asks for. */
+export type AppLink = DeepLink | { readonly server: null; readonly path: string };
+
 export type DeepLinkRoute = "here" | "switch" | "browser";
 
 /** Where a link goes: the Polaris open here, another one kept here, or the browser
  *  for one this app does not know. */
-export function deepLinkRoute(link: DeepLink, current: string | null, saved: readonly string[]): DeepLinkRoute {
-    if (link.server === current) return "here";
+export function deepLinkRoute(link: AppLink, current: string | null, saved: readonly string[]): DeepLinkRoute {
+    if (link.server === null || link.server === current) return "here";
     return saved.includes(link.server) ? "switch" : "browser";
 }
 
@@ -32,19 +36,19 @@ export interface DeepLinkSteps {
 }
 
 export class DeepLinks {
-    #waiting: DeepLink | null;
+    #waiting: AppLink | null;
     #opened = false;
     #asking = false;
 
     constructor(
         private readonly steps: DeepLinkSteps,
-        startedFor: DeepLink | null
+        startedFor: AppLink | null
     ) {
         this.#waiting = startedFor;
     }
 
     /** A link has reached the app. The newest one wins while the app is opening. */
-    arrive(link: DeepLink): void {
+    arrive(link: AppLink): void {
         if (this.#opened) void this.#open(link);
         else this.#waiting = link;
     }
@@ -58,13 +62,13 @@ export class DeepLinks {
     }
 
     /** Everything up to the question happens at once, so a caller sees its window. */
-    async #open(link: DeepLink): Promise<void> {
+    async #open(link: AppLink): Promise<void> {
         const route = deepLinkRoute(link, this.steps.current(), this.steps.saved());
-        if (route === "browser") {
+        if (route === "browser" && link.server !== null) {
             this.steps.openInBrowser(`${link.server}${link.path}`);
             return;
         }
-        if (route === "here") {
+        if (route === "here" || link.server === null) {
             this.steps.show(link.path);
             return;
         }

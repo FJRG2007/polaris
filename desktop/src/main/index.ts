@@ -22,6 +22,8 @@ import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
 import { DEEP_LINK_SCHEME, deepLinkIn, readDeepLink } from "@/shared/deep-link";
 import { DeepLinks } from "./deep-links";
+import { registerMailHandler } from "./mail-handler";
+import { mailtoIn, mailtoPath } from "@/shared/mailto";
 import { GameWatcher } from "./game-detect";
 import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
@@ -156,6 +158,13 @@ async function confirmSwitch(origin: string): Promise<boolean> {
     return response === 0;
 }
 
+/** What a launch's arguments ask to open: a polaris:// page, or the composer for
+ *  a mailto link (on the Polaris in use). */
+function startedFor(argv: readonly string[]) {
+    const mail = mailtoIn(argv);
+    return deepLinkIn(argv) ?? (mail ? { server: null, path: mail } : null);
+}
+
 const deepLinks = new DeepLinks(
     {
         current: () => current,
@@ -165,7 +174,7 @@ const deepLinks = new DeepLinks(
         switchTo: switchOrSayWhy,
         openInBrowser: (url) => void shell.openExternal(url)
     },
-    deepLinkIn(process.argv)
+    startedFor(process.argv)
 );
 
 /** The first window: what the app was started for, and always something on
@@ -589,7 +598,12 @@ function start(): void {
         // Every start: the app's folder moves with each version, and the setting has
         // to reach installs from before it existed.
         setOpenAtLogin(settings.openAtLogin());
-        if (app.isPackaged) app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
+        if (app.isPackaged) {
+            app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
+            // One of the apps Windows offers for mailto links; macOS and Linux
+            // read that from the bundle and the desktop entry instead.
+            void registerMailHandler(process.execPath);
+        }
 
         // The same Polaris's own local certificate, on its other addresses only and
         // only when it chains to the CA learned over the usual address; every other
@@ -764,13 +778,14 @@ function start(): void {
     });
 
     app.on("second-instance", (_event, argv) => {
-        const link = deepLinkIn(argv);
+        const link = startedFor(argv);
         if (link) deepLinks.arrive(link);
         if (!link || updating) showPolaris();
     });
     app.on("open-url", (event, url) => {
         event.preventDefault();
-        const link = readDeepLink(url);
+        const mail = mailtoPath(url);
+        const link = readDeepLink(url) ?? (mail ? { server: null, path: mail } : null);
         if (link) deepLinks.arrive(link);
     });
 

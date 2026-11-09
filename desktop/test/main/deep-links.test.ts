@@ -36,6 +36,11 @@ const settle = () => new Promise((resolve) => setTimeout(resolve));
 describe("where a link goes", () => {
     const link = (server: string) => ({ server, path: "/chat" });
 
+    it("opens a link for the Polaris in use (a mailto) there", () => {
+        expect(deepLinkRoute({ server: null, path: "/mail/compose" }, HERE, [HERE])).toBe("here");
+        expect(deepLinkRoute({ server: null, path: "/mail/compose" }, null, [])).toBe("here");
+    });
+
     it("follows what this app knows", () => {
         expect(deepLinkRoute(link(HERE), HERE, [HERE, KEPT])).toBe("here");
         expect(deepLinkRoute(link(KEPT), HERE, [HERE, KEPT])).toBe("switch");
