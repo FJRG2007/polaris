@@ -17,6 +17,7 @@
  */
 
 import Link from "next/link";
+import { AgentLogo } from "@/components/logos";
 import type { PolarCodeChoices } from "@/lib/polar/code";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -572,7 +573,15 @@ export function AgentPicker({
                     aria-label={`${t("code.agent")}: ${picked ? agentName(picked) : ""}`}
                     className={cn(MODEL_TRIGGER, "disabled:opacity-60")}
                 >
-                    <Bot className="size-3.5 shrink-0" aria-hidden />
+                    {picked ? (
+                        <AgentLogo
+                            id={picked.cli}
+                            label={picked.label}
+                            className="size-3.5 shrink-0"
+                        />
+                    ) : (
+                        <Bot className="size-3.5 shrink-0" aria-hidden />
+                    )}
                     <span className="truncate text-foreground">
                         {picked?.label ?? t("code.agent")}
                     </span>
@@ -601,7 +610,11 @@ export function AgentPicker({
                         onSelect={() => onChange(option.key)}
                         className="items-start"
                     >
-                        <Bot className="mt-0.5 size-3.5 shrink-0" />
+                        <AgentLogo
+                            id={option.cli}
+                            label={option.label}
+                            className="mt-0.5 size-3.5 shrink-0"
+                        />
                         <span className="flex min-w-0 flex-col">
                             <span className="truncate" title={option.label}>
                                 {option.label}
