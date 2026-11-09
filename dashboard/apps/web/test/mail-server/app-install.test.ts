@@ -115,7 +115,7 @@ vi.mock("@polaris/db", () => {
             deleteMany: async () => ({ count: 0 })
         }
     };
-    return { prisma };
+    return { prisma, onAccessWrite: () => undefined };
 });
 
 const appInstall = await import("@/lib/mail-server/app-install");
