@@ -502,7 +502,7 @@
         "save": "Save",
         "target": "Starts",
         "targets": {
-            "run": "A run",
+            "run": "A one-off run",
             "session": "A session"
         },
         "targetHints": {

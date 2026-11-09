@@ -23,6 +23,7 @@ const state = {
     /** Counted per `where` the caller built, so a test can assert what was scoped. */
     runs: 0,
     tokens: { tokensIn: 0, tokensOut: 0 },
+    sessionTokens: { tokensIn: 0, tokensOut: 0 },
     countedWhere: [] as unknown[]
 };
 
@@ -44,6 +45,12 @@ vi.mock("@polaris/db", () => ({
                 state.countedWhere.push(where);
                 return { _sum: state.tokens };
             })
+        },
+        agentSession: {
+            aggregate: vi.fn(async ({ where }: { where: unknown }) => {
+                state.countedWhere.push(where);
+                return { _sum: state.sessionTokens };
+            })
         }
     }
 }));
@@ -58,6 +65,7 @@ beforeEach(() => {
     state.groups = [];
     state.runs = 0;
     state.tokens = { tokensIn: 0, tokensOut: 0 };
+    state.sessionTokens = { tokensIn: 0, tokensOut: 0 };
     state.countedWhere = [];
 });
 
@@ -155,6 +163,26 @@ describe("checkUsageLimits", () => {
             }
         ];
         state.tokens = { tokensIn: 600, tokensOut: 400 };
+        expect((await checkUsageLimits(RUN)).allowed).toBe(false);
+    });
+
+    it("counts what sessions spent toward the same token budget", async () => {
+        // A session reads its tokens from its transcript; they are the same bill.
+        state.rules = [
+            { subjectType: "everyone", subjectId: "", metric: "tokens", period: "month", amount: 1000 }
+        ];
+        state.tokens = { tokensIn: 300, tokensOut: 200 };
+        expect((await checkUsageLimits(RUN)).allowed).toBe(true);
+        state.sessionTokens = { tokensIn: 300, tokensOut: 200 };
+        expect((await checkUsageLimits(RUN)).allowed).toBe(false);
+    });
+
+    it("holds a session to token rules only, never to a runs rule", async () => {
+        state.rules = [
+            { subjectType: "everyone", subjectId: "", metric: "runs", period: "day", amount: 1 }
+        ];
+        state.runs = 5;
+        expect((await checkUsageLimits({ ...RUN, kind: "session" })).allowed).toBe(true);
         expect((await checkUsageLimits(RUN)).allowed).toBe(false);
     });
 

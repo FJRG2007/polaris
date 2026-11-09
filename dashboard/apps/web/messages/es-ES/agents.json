@@ -460,7 +460,7 @@
             "description": "Todos los checks pasaron. La rama se fusiona con su base en GitHub.",
             "blocked": "GitHub indica que la protección de rama bloquea esta pull request. Puede rechazar la fusión.",
             "checksNotGreen": "Algunos checks fallaron o siguen en curso. Fusionar ahora los ignora.",
-            "method": "Método de fusión",
+            "method": "Tipo de fusión",
             "methods": {
                 "squash": "Squash y fusionar",
                 "merge": "Commit de fusión",
