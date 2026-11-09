@@ -32,7 +32,7 @@ import { isIdentifier } from "../lib/fivem/players";
 import { expectedFivemMemoryMb } from "../lib/fivem/config";
 import { isLicenseKey, KEYMASTER_URL, LICENSE_KEY_HINT } from "../lib/fivem/config";
 import { ARK_MAPS, mapRequirementHint } from "@polaris/core";
-import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { isAddressRule, isPlayerName } from "../lib/minecraft/access";
 import { createGameServerSchema, isModIdList } from "../lib/games-schema";
 import { Gamepad2, Loader2, MemoryStick, RefreshCw, ShieldCheck, Users } from "lucide-react";
@@ -131,6 +131,28 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
     useEffect(() => {
         if (setup?.yourAddress && ownerAddress.length === 0) setOwnerAddress(setup.yourAddress);
     }, [setup, ownerAddress]);
+
+    // The player this operator already is, when they linked that game's account
+    // to Polaris. Offered once per field: somebody who clears it to type another
+    // name is not handed theirs back. A Java name is no gamertag, so Bedrock is
+    // left to be typed.
+    const prefilled = useRef(new Set<string>());
+    useEffect(() => {
+        const mine = setup?.yourAccounts;
+        if (!mine) return;
+        const offer = (field: string, value: string | null, empty: boolean, fill: (value: string) => void) => {
+            if (!value || !empty || prefilled.current.has(field)) return;
+            prefilled.current.add(field);
+            fill(value);
+        };
+        if (game === "minecraft" && edition === "java") {
+            offer("minecraft", mine.minecraft, ownerPlayer.length === 0, setOwnerPlayer);
+        } else if (game === "ark") {
+            offer("steam", mine.steam, ownerSteamId.length === 0, setOwnerSteamId);
+        } else if (game === "fivem") {
+            offer("discord", mine.discord && `discord:${mine.discord}`, ownerIdentifier.length === 0, setOwnerIdentifier);
+        }
+    }, [setup, game, edition, ownerPlayer, ownerSteamId, ownerIdentifier]);
 
     // What this person has saved, for the game they are creating. Read every time
     // the game changes rather than once, because a Minecraft template has no

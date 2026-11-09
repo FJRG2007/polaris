@@ -65,6 +65,33 @@ export interface GameSetup {
     /** The address this operator is on right now, offered as the one their own
      *  player is registered to - it is where they would connect from too. */
     readonly yourAddress: string | null;
+    /** The game accounts this operator linked to Polaris, offered as the
+     *  player they register on their own server. Null where none is linked. */
+    readonly yourAccounts: LinkedGameAccounts;
+}
+
+export interface LinkedGameAccounts {
+    /** The Minecraft: Java Edition name. */
+    readonly minecraft: string | null;
+    /** The SteamID64, which is what ARK knows a player by. */
+    readonly steam: string | null;
+    /** The Discord user id, one of the identifiers FiveM accepts. */
+    readonly discord: string | null;
+}
+
+/** The accounts somebody linked, newest of each kind. One read. */
+async function linkedGameAccounts(userId: string): Promise<LinkedGameAccounts> {
+    const rows = await prisma.userConnection.findMany({
+        where: { userId, provider: { in: ["minecraft", "steam", "discord"] } },
+        select: { provider: true, accountId: true, label: true },
+        orderBy: { linkedAt: "desc" }
+    });
+    const first = (provider: string) => rows.find((row) => row.provider === provider);
+    return {
+        minecraft: first("minecraft")?.label || null,
+        steam: first("steam")?.accountId || null,
+        discord: first("discord")?.accountId || null
+    };
 }
 
 /**
@@ -77,17 +104,19 @@ export interface GameSetup {
  */
 export async function gameSetupAction(): Promise<GameSetup> {
     const user = await requirePermission("games.manage");
-    const [suffixes, games, yourAddress] = await Promise.all([
+    const [suffixes, games, yourAddress, yourAccounts] = await Promise.all([
         Promise.all(GAMES.map((game) => gameDomainSuffix(game.domainLabel).catch(() => null))),
         installedGameIds(user.id),
-        clientIp()
+        clientIp(),
+        linkedGameAccounts(user.id)
     ]);
     return {
         domainSuffixes: Object.fromEntries(
             GAMES.map((game, index) => [game.id, suffixes[index] ?? null])
         ) as Record<GameId, string | null>,
         games,
-        yourAddress: yourAddress ?? null
+        yourAddress: yourAddress ?? null,
+        yourAccounts
     };
 }
 
