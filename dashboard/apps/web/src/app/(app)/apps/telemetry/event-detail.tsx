@@ -273,7 +273,7 @@ function EnvironmentStrip({ facts }: { facts: readonly EnvironmentFact[] }) {
 /** The machine, the runtime, the browser - whatever the client chose to send. */
 function Contexts({ groups }: { groups: readonly ContextGroup[] }) {
     return (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {groups.map((group) => (
                 <Panel key={group.name} title={humanize(group.name)}>
                     <div className="divide-y divide-border">
