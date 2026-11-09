@@ -29,6 +29,7 @@ import {
 import { openShelfFor } from "@/lib/workspace-scope";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { doNotDisturbOf } from "@/lib/presence-service";
+import { adminWaiting, type AdminWaiting } from "@/lib/admin-waiting";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,12 @@ const POLL_MS = 5000;
 /** How often do not disturb is worked out again on an open stream. It costs a
  *  presence read, and a few ticks late is far under anybody noticing. */
 const QUIET_EVERY_MS = 15_000;
+
+/** How often Management's count is worked out again for an administrator's
+ *  stream. Marking it seen in one window is not a notification, so without
+ *  this every other window - and the desktop app, which shares nothing with
+ *  the browser - kept the count until its five-minute sweep. */
+const WAITING_EVERY_MS = POLL_MS;
 
 /** What kind of Polaris is asking. A value nobody recognises is not refused - the
  *  kind only decides which client makes a sound, and getting it wrong must never
@@ -83,6 +90,8 @@ export async function GET(request: Request): Promise<Response> {
     let closed = false;
     let previous = "";
     let quiet = { on: false, at: 0 };
+    let waiting: { value: AdminWaiting | null; at: number } = { value: null, at: 0 };
+    const isAdmin = session.isAdmin;
     const feed = createFeedReader(userId, shelf);
 
     function stop(): void {
@@ -109,6 +118,11 @@ export async function GET(request: Request): Promise<Response> {
                         .catch(() => quiet.on);
                     quiet = { on, at: Date.now() };
                 }
+                if (isAdmin && Date.now() - waiting.at >= WAITING_EVERY_MS) {
+                    // A failed read keeps the last count rather than clearing it.
+                    const value = await adminWaiting(userId).catch(() => waiting.value);
+                    waiting = { value, at: Date.now() };
+                }
                 try {
                     payload = JSON.stringify({
                         items: await feed.read(),
@@ -132,7 +146,12 @@ export async function GET(request: Request): Promise<Response> {
                         // Do not disturb, as the server works it out. The client
                         // stays silent for anything but a critical arrival while
                         // it is on, so a tab that missed the change cannot ring.
-                        quiet: quiet.on
+                        quiet: quiet.on,
+                        // What is waiting in Management, for an administrator.
+                        // Riding the frame makes a change to it a frame of its
+                        // own, so every window follows the one where it was
+                        // marked seen. Null for everybody else.
+                        waiting: waiting.value
                     });
                 } catch {
                     return; // Transient database error: hold the connection and retry.

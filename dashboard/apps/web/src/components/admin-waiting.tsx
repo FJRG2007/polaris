@@ -77,6 +77,16 @@ const waitingSchema = z.object({
     total: z.number()
 });
 
+/** The count a stream frame carries, or null when it carries none. */
+export function waitingInFrame(data: string): AdminWaiting | null {
+    try {
+        const parsed = waitingSchema.safeParse((JSON.parse(data) as { waiting?: unknown }).waiting);
+        return parsed.success ? parsed.data : null;
+    } catch {
+        return null;
+    }
+}
+
 /** How long a burst is gathered before asking again. A person reporting four
  *  messages in a row is one recount, not four. */
 const SETTLE_MS = 800;
@@ -145,12 +155,22 @@ export function AdminWaitingProvider({
         // connection per device: `subscribeSharedStream` shares by the path it is
         // given, so a second spelling would be a second stream - and only one of
         // the two is the one the server elects to chime.
-        const stop = subscribeSharedStream(notificationStreamPath(shelf), scope, () => {
-            // Every frame, without reading it. What arrives on this stream is a
-            // notification for this account, and the cheap recount below is a
-            // better answer than teaching this component the vocabulary of every
-            // event that could ever change the queue - which is the list that
-            // would silently fall behind.
+        const stop = subscribeSharedStream(notificationStreamPath(shelf), scope, ({ data }) => {
+            // The count itself when the frame carries it (`waiting`, from a
+            // server that has it): marking Management seen in another window
+            // or in the desktop app arrives here that way.
+            const carried = waitingInFrame(data);
+            if (carried) {
+                if (timer.current) clearTimeout(timer.current);
+                timer.current = null;
+                setWaiting(carried);
+                return;
+            }
+            // Otherwise every frame, without reading it. What arrives on this
+            // stream is a notification for this account, and the cheap recount
+            // below is a better answer than teaching this component the
+            // vocabulary of every event that could ever change the queue -
+            // which is the list that would silently fall behind.
             if (timer.current) clearTimeout(timer.current);
             timer.current = setTimeout(recount, SETTLE_MS);
         });

@@ -15,7 +15,7 @@
  */
 
 import { claimForDevice } from "@/lib/device-once";
-import { notifyDesktop } from "@/lib/desktop-notify";
+import { closeDesktopNotice, notifyDesktop } from "@/lib/desktop-notify";
 import { noticeAllowed } from "@/lib/notifications/browser-notices";
 import { arrivalsMayAlert } from "@polaris/core";
 import { useSessionScope } from "@/components/session-scope";
@@ -276,6 +276,18 @@ export function NotificationsProvider({
             }),
         [scope, shelf, soundChanged]
     );
+
+    // A notice the system is still showing for an alert that has since been read
+    // - here, in another tab, or in the desktop app - is taken down with it, as
+    // Chat and Mail do for theirs. Only a row still listed and now read: one that
+    // left the list because the shelf changed is not answered.
+    const unreadBefore = useRef(new Set(initial.filter((row) => !row.read).map((row) => row.id)));
+    useEffect(() => {
+        for (const row of items) {
+            if (row.read && unreadBefore.current.has(row.id)) closeDesktopNotice(`notification:${row.id}`);
+        }
+        unreadBefore.current = new Set(items.filter((row) => !row.read).map((row) => row.id));
+    }, [items]);
 
     /** Apply a change here and in the other tabs, run it on the server, and
      *  restore this tab on failure. */
