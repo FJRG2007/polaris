@@ -131,7 +131,11 @@ export function storeShelves(
  * its capture instead.
  */
 export function featuredApps(apps: readonly AppManifest[], limit = 3): AppManifest[] {
-    return apps.filter((app) => isInstallable(app) && hasScreenshots(app.id)).slice(0, limit);
+    const byId = new Map(apps.map((app) => [app.id, app]));
+    return FEATURED.flatMap((id) => {
+        const app = byId.get(id);
+        return app && isInstallable(app) && hasScreenshots(app.id) ? [app] : [];
+    }).slice(0, limit);
 }
 
 /** What the store needs to know about one install. */
@@ -208,8 +212,49 @@ export function storeScope(app: AppManifest): StoreScope {
 }
 
 /** Everything the two marketplaces list: the catalog's offered apps, then Deploy's templates. */
+/**
+ * The store's own order: what most deployments install first, first. The
+ * catalog's array order is where an app's manifest happens to live, not a
+ * judgement of it, and it had put the messaging bridge - on its way out - at
+ * the top of the store. Anything not named here keeps the catalog's order after
+ * these, and `SUNSET` goes last.
+ */
+export const STORE_RANK: readonly string[] = [
+    "home",
+    "vpn",
+    "calendar",
+    "game-servers",
+    "crm",
+    "mail-server",
+    "dns-blocker",
+    "status-pages",
+    "analytics",
+    "telemetry",
+    "cloud-servers",
+    "security-scans",
+    "translate",
+    "tools",
+    "camera-hub",
+    "arcade"
+];
+
+/** Still installable for the deployments that rely on them, but being retired:
+ *  never featured, and last in the store. */
+export const SUNSET: ReadonlySet<string> = new Set(["messaging-bridge"]);
+
+/** The apps the featured row may show, in this order (those with a capture). */
+export const FEATURED: readonly string[] = ["home", "vpn", "calendar", "game-servers", "crm", "mail-server"];
+
+function storeRank(app: AppManifest): number {
+    if (SUNSET.has(app.id)) return Number.MAX_SAFE_INTEGER;
+    const at = STORE_RANK.indexOf(app.id);
+    return at === -1 ? STORE_RANK.length : at;
+}
+
 export function storeApps(): AppManifest[] {
-    return [...appsByCategory().flatMap((group) => group.apps), ...templateApps()];
+    const apps = [...appsByCategory().flatMap((group) => group.apps), ...templateApps()];
+    // Stable, so everything without a rank keeps the catalog's order.
+    return apps.sort((left, right) => storeRank(left) - storeRank(right));
 }
 
 /** A catalog app or a template entry, by its store id. */

@@ -182,3 +182,22 @@ describe("the action a card leads with", () => {
         expect(installBadge(app("calendar"), [])).toBeNull();
     });
 });
+
+describe("the store's order", () => {
+    it("leads with the apps most deployments install, and puts the one being retired last", async () => {
+        const store = await import("@/lib/apps/marketplace-store");
+        const ids = store.storeApps().map((app) => app.id);
+        expect(ids[0]).toBe("home");
+        const ranked = store.STORE_RANK.filter((id) => ids.includes(id));
+        expect(ranked.map((id) => ids.indexOf(id))).toEqual([...ranked.keys()]);
+        expect(ids.indexOf("messaging-bridge")).toBeGreaterThan(ids.indexOf("arcade"));
+    });
+
+    it("never features an app being retired, and features the chosen ones in order", async () => {
+        const store = await import("@/lib/apps/marketplace-store");
+        const featured = store.featuredApps(store.storeApps()).map((app) => app.id);
+        expect(featured.length).toBeGreaterThan(0);
+        expect(featured.some((id) => store.SUNSET.has(id))).toBe(false);
+        expect(featured).toEqual(store.FEATURED.filter((id) => featured.includes(id)));
+    });
+});
