@@ -131,6 +131,7 @@
         "stop": "Stop",
         "send": "Send (Enter)",
         "edit": "Edit message",
+        "resend": "Send again",
         "reply": "Reply to message",
         "copy": "Copy message",
         "regenerate": "Answer again",

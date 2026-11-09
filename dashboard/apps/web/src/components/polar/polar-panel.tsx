@@ -83,6 +83,7 @@ import {
     SquareSlash,
     Target,
     Zap,
+    RotateCw,
     X
 } from "lucide-react";
 import * as polarGoal from "@/components/polar/polar-goal";
@@ -2768,6 +2769,22 @@ export function PolarChat({
                                             setInput(textOf(message));
                                             textarea.current?.focus();
                                         }}
+                                        onResend={() => {
+                                            // Everything after it goes, as an edit
+                                            // does; the answer it had stays in the
+                                            // tree as the earlier version.
+                                            const at = chat.messages.findIndex(
+                                                (entry) => entry.id === message.id
+                                            );
+                                            if (at < 0 || busy || waitingApproval) return;
+                                            setLastApproved(false);
+                                            turnChoice.current = null;
+                                            chat.setMessages(chat.messages.slice(0, at));
+                                            void chat.sendMessage({
+                                                parts: message.parts,
+                                                metadata: message.metadata
+                                            });
+                                        }}
                                         onQuote={() => setQuote(textOf(message).slice(0, 200))}
                                         onSaveCommand={() =>
                                             setCommandDraft({
@@ -2978,6 +2995,7 @@ function MessageView({
     onVersion,
     onApprove,
     onEdit,
+    onResend,
     onQuote,
     onSaveCommand,
     onRegenerate,
@@ -3001,6 +3019,8 @@ function MessageView({
     onVersion: (step: -1 | 1) => void;
     onApprove: (id: string, approved: boolean, reason?: string) => void;
     onEdit: () => void;
+    /** Sends one of the person's own messages again, as it was. */
+    onResend?: () => void;
     onQuote: () => void;
     onSaveCommand: () => void;
     onRegenerate: (options: answerActions.RegenerateOptions) => void;
@@ -3328,6 +3348,11 @@ function MessageView({
                             <MessageAction label={t("actions.edit")} onClick={onEdit}>
                                 <Pencil />
                             </MessageAction>
+                            {!busy && onResend ? (
+                                <MessageAction label={t("actions.resend")} onClick={onResend}>
+                                    <RotateCw />
+                                </MessageAction>
+                            ) : null}
                             <MessageAction label={t("commands.saveAs")} onClick={onSaveCommand}>
                                 <BookmarkPlus />
                             </MessageAction>
