@@ -166,7 +166,7 @@ async function startParsed(
     value: core.StartAgentSessionInput,
     t: Awaited<ReturnType<typeof getTranslations>>,
     fork: { parentId: string; enigma: core.EnigmaSettings | null } | null
-): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap }> {
+): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap; queuedAt?: number | null }> {
     const user = { id: userId };
 
     // Only when one was named. A workspace checks nothing out, so there is no
@@ -330,7 +330,9 @@ async function startParsed(
  * conversation so far, as a copy the parent never sees. Goes through every check
  * a start does, so a fork is never a way round one.
  */
-export async function forkSessionAction(sessionId: string): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap }> {
+export async function forkSessionAction(
+    sessionId: string
+): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap; queuedAt?: number | null }> {
     const t = await getTranslations("agents");
     const id = sessionIdSchema.safeParse(sessionId);
     if (!id.success) return { error: t("session.changes.errors.invalid") };
