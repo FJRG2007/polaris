@@ -192,6 +192,8 @@ const nextConfig = {
         // service's settings in Deploy.
         { source: "/account/webhooks", destination: "/automations/webhooks", permanent: false },
         { source: "/overview", destination: "/home", permanent: false },
+        // The Drive overview was folded away; a saved link lands on the files.
+        { source: "/drive/overview", destination: "/drive", permanent: false },
         // The chat settings moved under Polaris apps > Chat > Settings. Kept for
         // good, temporary for the reason above.
         { source: "/admin/chat", destination: "/admin/apps/chat/settings", permanent: false },

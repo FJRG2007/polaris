@@ -413,6 +413,7 @@ model User {
     mailUploads         MailUpload[]
     mailTemplates       MailTemplate[]
     chatUploads         ChatUpload[]
+    disposableTransfers DisposableTransfer[]
     calendarSources      CalendarSource[]
     calendars            Calendar[]
     calendarDisplays     CalendarDisplay[]
@@ -16786,4 +16787,53 @@ model AgentOrchestrationMessage {
 
     @@index([runId, createdAt])
     @@index([kind, answeredAt])
+}
+
+// Files handed out by link, or to people here, and deleted on their own.
+//
+// Kept apart from Drive on purpose: nothing here is a Drive item, counts toward
+// one, or appears in a listing. The bytes live under Polaris's own folder on the
+// chosen storage, and the sweep removes them once the transfer has expired, run
+// out of downloads, or was never finished.
+model DisposableTransfer {
+    id      String @id @default(uuid(7)) @db.Uuid
+    ownerId String @db.Uuid
+    // The public credential. Long and random; never derived from anything.
+    token   String @unique
+    // A storage connection id, or `local`, fixed when the transfer was made so
+    // pointing new transfers elsewhere does not orphan this one.
+    targetId  String
+    expiresAt DateTime
+    // Downloads each file may serve, or null for no cap.
+    maxDownloads Int?
+    // Measured by the storage, summed as each file lands.
+    totalSize    BigInt    @default(0)
+    // Null while files are still arriving: an unfinished transfer serves nothing.
+    readyAt      DateTime?
+    note         String?
+    createdAt    DateTime  @default(now())
+
+    owner User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    files DisposableFile[]
+
+    @@index([ownerId, createdAt])
+    @@index([expiresAt])
+}
+
+model DisposableFile {
+    id         String @id @default(uuid(7)) @db.Uuid
+    transferId String @db.Uuid
+    // The sender's name for it, served back as given and never used as a path.
+    name        String
+    contentType String @default("application/octet-stream")
+    size        BigInt @default(0)
+    path        String
+    // Copied from the transfer so counting a download is one conditional update.
+    maxDownloads  Int?
+    downloadCount Int      @default(0)
+    createdAt     DateTime @default(now())
+
+    transfer DisposableTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+    @@index([transferId])
 }

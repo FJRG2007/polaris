@@ -170,7 +170,7 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         description: "How full each connected device is.", // i18n-ignore
         icon: HardDrive,
         permission: "drive.read",
-        href: "/drive/overview",
+        href: "/drive",
         // Somebody who lives in their files is in Drive, not on its usage screen.
         paths: ["/drive"],
         sizes: ALL_SIZES

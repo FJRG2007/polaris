@@ -522,7 +522,17 @@
         "testResult": "{device} - {pools} grupos, {bays} discos",
         "back": "Volver",
         "connecting": "Conectando...",
-        "create": "Crear"
+        "create": "Crear",
+        "picker": {
+            "search": "Buscar proveedores",
+            "none": "Ningún proveedor coincide.",
+            "groups": {
+                "nas": "NAS",
+                "cloud": "Nube",
+                "protocols": "Protocolos",
+                "server": "Este servidor"
+            }
+        }
     },
     "removeConnection": {
         "title": "Eliminar conexión",
@@ -1182,5 +1192,79 @@
         "confirmTrash": "Confirmar envío a papelera",
         "confirmTrashHint": "Pide confirmación antes de mover algo a la papelera. Borrar para siempre pregunta siempre.",
         "saveFailed": "No se pudo guardar. Inténtalo de nuevo."
+    },
+    "disposable": {
+        "title": "Envío rápido",
+        "description": "Comparte archivos por enlace o envíalos a personas. Se borran solos al caducar o agotar sus descargas.",
+        "dropHint": "Suelta aquí",
+        "choose": "Elegir archivos",
+        "limit": "Hasta {size} y {count} archivos por envío.",
+        "removeFile": "Quitar {name}",
+        "removePerson": "Quitar {name}",
+        "expiry": "Caduca en",
+        "downloads": "Descargas por archivo",
+        "unlimited": "Sin límite",
+        "downloadCount": "{count, plural, one {# descarga} other {# descargas}}",
+        "downloadsLeft": "{count, plural, one {Queda # descarga} other {Quedan # descargas}}",
+        "expiries": {
+            "1h": "1 hora",
+            "1d": "1 día",
+            "3d": "3 días",
+            "7d": "7 días",
+            "14d": "14 días"
+        },
+        "sendTo": "Enviar a personas (opcional)",
+        "sendToHint": "Buscar por nombre",
+        "notReceiving": "No acepta archivos",
+        "note": "Nota",
+        "notePlaceholder": "Añade una nota (opcional)",
+        "preparing": "Preparando...",
+        "uploading": "Subiendo {current} de {total}...",
+        "finishing": "Terminando...",
+        "create": "Crear enlace",
+        "send": "Enviar",
+        "ready": "Tu enlace está listo",
+        "link": "enlace",
+        "notified": "{count, plural, one {# persona avisada.} other {# personas avisadas.}}",
+        "refused": "{count, plural, one {# no pudo recibirlo.} other {# no pudieron recibirlo.}}",
+        "active": "Envíos activos",
+        "empty": "Nada compartido ahora.",
+        "manyFiles": "{first} y {count, plural, one {# más} other {# más}}",
+        "leftMinutes": "Quedan {count} min",
+        "leftHours": "Quedan {count} h",
+        "leftDays": "Quedan {count} d",
+        "revoke": "Borrar ya",
+        "revokeTitle": "¿Borrar este envío?",
+        "revokeBody": "El enlace deja de funcionar y se borran los archivos.",
+        "notify": {
+            "title": "{name} te envió archivos",
+            "body": "{count, plural, one {{first}} other {{first} y # más}}"
+        },
+        "public": {
+            "title": "{count, plural, one {# archivo compartido contigo} other {# archivos compartidos contigo}}",
+            "expires": "Disponible hasta {date}",
+            "download": "Descargar",
+            "downloadNamed": "Descargar {name}",
+            "hint": "Estos archivos se borran solos al llegar al tiempo o al límite de descargas.",
+            "goneTitle": "Archivos ya no disponibles",
+            "slowDown": "Demasiadas peticiones. Espera un minuto y reintenta.",
+            "gone": {
+                "missing": "Este enlace no existe o se borró.",
+                "expired": "Este enlace caducó y sus archivos se borraron.",
+                "exhausted": "Estos archivos llegaron a su límite de descargas y se borraron."
+            }
+        },
+        "errors": {
+            "tooMany": "Tienes demasiados envíos activos. Borra uno antes.",
+            "notFound": "Ese envío ya no existe.",
+            "tooManyFiles": "Son más archivos de los que cabe en un envío.",
+            "tooLarge": "Esos archivos superan el límite.",
+            "finished": "Ese envío ya se mandó.",
+            "empty": "Añade al menos un archivo.",
+            "invalid": "Revisa las opciones y reintenta.",
+            "generic": "Algo falló. Inténtalo de nuevo.",
+            "fileFailed": "No se pudo subir {name}: {reason}",
+            "revokeFailed": "No se pudo borrar. Reintenta."
+        }
     }
 }

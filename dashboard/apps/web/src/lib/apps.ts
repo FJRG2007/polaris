@@ -83,6 +83,7 @@ import {
     SendHorizontal,
     Server,
     Settings,
+    Send,
     Share2,
     ShieldBan,
     ShieldCheck,
@@ -1257,12 +1258,6 @@ function areaEntry(area: AppSubapp): AppSection {
 
 export const APP_SECTIONS: Record<string, AppSection[]> = {
     drive: [
-        {
-            label: "Overview", // i18n-ignore
-            href: "/drive/overview",
-            icon: LayoutDashboard,
-            keywords: ["usage", "storage"]
-        },
         { label: "Files", href: "/drive", icon: FolderOpen, keywords: ["browse", "folders"] }, // i18n-ignore
         {
             label: "Shared", // i18n-ignore
@@ -1277,6 +1272,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/drive/shared-links",
             icon: Link2,
             keywords: ["shares", "public"]
+        },
+        {
+            label: "Quick send", // i18n-ignore
+            href: "/drive/quick-send",
+            needs: "drive.write",
+            icon: Send,
+            keywords: ["send", "transfer", "temporary", "expiring", "file.io", "wetransfer", "disposable"]
         },
         {
             label: "Snippets", // i18n-ignore

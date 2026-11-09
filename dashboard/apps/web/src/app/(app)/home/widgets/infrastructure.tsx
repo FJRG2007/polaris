@@ -298,7 +298,7 @@ export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }
             <WidgetEmpty
                 action={
                     <Link
-                        href="/drive/overview"
+                        href="/drive"
                         className="text-xs font-medium text-primary hover:underline"
                     >
                         {t("storage.connect")}

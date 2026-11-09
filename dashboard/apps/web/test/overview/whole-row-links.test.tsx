@@ -52,7 +52,7 @@ describe("overview rows are whole links", () => {
                         name: "NAS",
                         usedBytes: 50,
                         totalBytes: 100,
-                        href: "/drive/overview"
+                        href: "/drive"
                     }
                 ]}
             />,

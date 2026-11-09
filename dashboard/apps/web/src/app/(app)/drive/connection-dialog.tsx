@@ -23,7 +23,6 @@ import {
     AlertTriangle,
     ArrowLeft,
     CheckCircle2,
-    ChevronRight,
     Plus,
     Radar,
     XCircle
@@ -53,6 +52,7 @@ import {
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import * as polls from "./drive-reads";
+import { ProviderPicker } from "./provider-picker";
 
 interface FieldDef {
     name: string;
@@ -117,23 +117,6 @@ const PROVIDER_NAMES: Partial<Record<ConnectionProviderSlug, string>> = {
     dropbox: "Dropbox"
 };
 
-// Display order for the picker: UniFi first (the featured quick connect), then
-// the rest. Every kind must appear so nothing is unreachable.
-const PROVIDER_ORDER: StorageProviderKind[] = [
-    "unifi-unas",
-    "local",
-    "sftp",
-    "smb",
-    "nfs",
-    "webdav",
-    "s3",
-    "gdrive",
-    "onedrive",
-    "dropbox",
-    "synology",
-    "qnap",
-    "truenas"
-];
 
 /**
  * Pick which linked account a consumer drive is reached through.
@@ -757,28 +740,11 @@ export function ConnectionDialog() {
                             ) : null}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                            {PROVIDER_ORDER.map((value) => (
-                                <button
-                                    key={value}
-                                    type="button"
-                                    onClick={() => chooseProvider(value)}
-                                    className={`flex flex-col gap-1 rounded-md border p-3 text-left transition-colors hover:border-primary hover:bg-primary/5 ${
-                                        value === "unifi-unas"
-                                            ? "border-primary/60 bg-primary/5"
-                                            : "border-border"
-                                    }`}
-                                >
-                                    <span className="flex items-center justify-between text-sm font-medium">
-                                        {t(LABELS[value])}
-                                        <ChevronRight className="size-4 text-muted-foreground" />
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        {t(DESCRIPTIONS[value])}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
+                        <ProviderPicker
+                            label={(value) => t(LABELS[value])}
+                            description={(value) => t(DESCRIPTIONS[value])}
+                            onChoose={chooseProvider}
+                        />
                     </div>
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">

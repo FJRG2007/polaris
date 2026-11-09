@@ -522,7 +522,17 @@
         "testResult": "{device} - {pools} pools, {bays} disks",
         "back": "Back",
         "connecting": "Connecting...",
-        "create": "Create"
+        "create": "Create",
+        "picker": {
+            "search": "Search providers",
+            "none": "No provider matches that search.",
+            "groups": {
+                "nas": "NAS",
+                "cloud": "Cloud",
+                "protocols": "Protocols",
+                "server": "This server"
+            }
+        }
     },
     "removeConnection": {
         "title": "Delete connection",
@@ -1182,5 +1192,79 @@
         "confirmTrash": "Ask before moving to Trash",
         "confirmTrashHint": "Show a confirmation before anything goes to the recycle bin. Deleting permanently always asks.",
         "saveFailed": "Could not save that. Try again."
+    },
+    "disposable": {
+        "title": "Quick send",
+        "description": "Share files by link or send them to people. They delete themselves when they expire or run out of downloads.",
+        "dropHint": "Drop files here",
+        "choose": "Choose files",
+        "limit": "Up to {size} and {count} files per transfer.",
+        "removeFile": "Remove {name}",
+        "removePerson": "Remove {name}",
+        "expiry": "Expires after",
+        "downloads": "Downloads per file",
+        "unlimited": "No limit",
+        "downloadCount": "{count, plural, one {# download} other {# downloads}}",
+        "downloadsLeft": "{count, plural, one {# download left} other {# downloads left}}",
+        "expiries": {
+            "1h": "1 hour",
+            "1d": "1 day",
+            "3d": "3 days",
+            "7d": "7 days",
+            "14d": "14 days"
+        },
+        "sendTo": "Send to people (optional)",
+        "sendToHint": "Search by name",
+        "notReceiving": "Not accepting files",
+        "note": "Note",
+        "notePlaceholder": "Add a note (optional)",
+        "preparing": "Preparing...",
+        "uploading": "Uploading {current} of {total}...",
+        "finishing": "Finishing...",
+        "create": "Create link",
+        "send": "Send",
+        "ready": "Your link is ready",
+        "link": "link",
+        "notified": "{count, plural, one {# person notified.} other {# people notified.}}",
+        "refused": "{count, plural, one {# could not receive it.} other {# could not receive it.}}",
+        "active": "Active transfers",
+        "empty": "Nothing shared right now.",
+        "manyFiles": "{first} and {count, plural, one {# more} other {# more}}",
+        "leftMinutes": "{count} min left",
+        "leftHours": "{count} h left",
+        "leftDays": "{count} d left",
+        "revoke": "Delete now",
+        "revokeTitle": "Delete this transfer?",
+        "revokeBody": "The link stops working and the files are deleted.",
+        "notify": {
+            "title": "{name} sent you files",
+            "body": "{count, plural, one {{first}} other {{first} and # more}}"
+        },
+        "public": {
+            "title": "{count, plural, one {# file shared with you} other {# files shared with you}}",
+            "expires": "Available until {date}",
+            "download": "Download",
+            "downloadNamed": "Download {name}",
+            "hint": "These files delete themselves after the time or download limit.",
+            "goneTitle": "Files no longer available",
+            "slowDown": "Too many requests. Wait a minute and try again.",
+            "gone": {
+                "missing": "This link does not exist or was deleted.",
+                "expired": "This link has expired and its files were deleted.",
+                "exhausted": "These files reached their download limit and were deleted."
+            }
+        },
+        "errors": {
+            "tooMany": "You have too many active transfers. Delete one first.",
+            "notFound": "That transfer no longer exists.",
+            "tooManyFiles": "That is more files than one transfer can hold.",
+            "tooLarge": "Those files are over the size limit.",
+            "finished": "That transfer is already sent.",
+            "empty": "Add at least one file.",
+            "invalid": "Check the options and try again.",
+            "generic": "Something went wrong. Try again.",
+            "fileFailed": "{name} could not be uploaded: {reason}",
+            "revokeFailed": "Could not delete it. Try again."
+        }
     }
 }

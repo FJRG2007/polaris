@@ -524,7 +524,7 @@ async function storageUsage(userId: string): Promise<OverviewStorageEntry[]> {
                     usedBytes: sample?.diskUsedBytes == null ? null : Number(sample.diskUsedBytes),
                     totalBytes:
                         sample?.diskTotalBytes == null ? null : Number(sample.diskTotalBytes),
-                    href: `/drive/overview#${connection.id}`
+                    href: `/drive?c=${encodeURIComponent(connection.id)}`
                 };
             })
             // A device that has never reported usage has nothing to draw, and a row of

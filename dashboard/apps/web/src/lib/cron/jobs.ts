@@ -46,6 +46,7 @@ import { tickDeployAutomations } from "@/lib/deploy/automations";
 import { evaluateAlarms } from "@/lib/watch/alarm-evaluator";
 import { scanServiceUpdates } from "@/lib/deploy/update-scan";
 import { expireTransfers } from "@/lib/drive-transfer-service";
+import { sweepDisposableTransfers } from "@/lib/disposable-transfer-service";
 import { runMailServerPass } from "@/lib/mail-server/scheduled";
 import { runVpnPass } from "@/lib/vpn/wireguard-service";
 import { runDesiredStatePass } from "@/lib/deploy/desired-state";
@@ -961,6 +962,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // runner finds nothing left.
         leaseMs: null,
         run: expireTransfers
+    },
+    {
+        key: "drive-quick-send",
+        // Every five minutes: a link that expired or ran out of downloads should
+        // lose its bytes soon after, not at the end of the day.
+        everyMs: 5 * MINUTE,
+        // Unleased: it deletes rows by their state, so a second runner finds
+        // nothing left to delete.
+        leaseMs: null,
+        run: () => sweepDisposableTransfers()
     },
     {
         key: "badge-unlocks",
