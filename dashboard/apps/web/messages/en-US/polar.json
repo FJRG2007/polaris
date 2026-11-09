@@ -865,6 +865,7 @@
         "unreachable": "Couldn't load this session.",
         "retry": "Try again",
         "quiet": "Nothing yet. The agent is getting its machine ready.",
+        "starting": "Starting the session. Your message goes to the agent as soon as it is ready.",
         "ended": "This session has ended. Open the full session to read everything it did.",
         "reply": "Reply to the agent",
         "send": "Send",

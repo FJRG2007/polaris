@@ -255,6 +255,7 @@ describe("the tool's own first-run wizard", () => {
         const run = answer(claude.firstRun, { workdir: "/session/repo" });
         expect(run.read(".claude/.claude.json")).toEqual({
             hasCompletedOnboarding: true,
+            bypassPermissionsModeAccepted: true,
             projects: { "/session/repo": { hasTrustDialogAccepted: true } }
         });
         expect(run.read(".claude/settings.json")).toEqual({ theme: "dark" });
@@ -301,6 +302,9 @@ describe("the tool's own first-run wizard", () => {
         });
         for (const file of [".claude/.claude.json", ".claude.json"]) {
             expect(run.read(file)?.hasCompletedOnboarding, file).toBe(true);
+            // The bypass warning, whose highlighted "No, exit" took the first
+            // prompt's Enter and closed the agent on the person's first message.
+            expect(run.read(file)?.bypassPermissionsModeAccepted, file).toBe(true);
             const project = run.read(file)?.projects["/session/repo"];
             expect(project.hasTrustDialogAccepted, file).toBe(true);
             // And only those keys: whatever the tool recorded beside them stays.
@@ -332,6 +336,7 @@ describe("the tool's own first-run wizard", () => {
         });
         expect(run.read(".claude/.claude.json")).toEqual({
             hasCompletedOnboarding: true,
+            bypassPermissionsModeAccepted: true,
             projects: { "/session/repo": { hasTrustDialogAccepted: true } }
         });
     });
@@ -349,6 +354,7 @@ describe("the tool's own first-run wizard", () => {
     it("says nothing at all when there is nothing left to answer", () => {
         const answered = {
             hasCompletedOnboarding: true,
+            bypassPermissionsModeAccepted: true,
             projects: { "/session/repo": { hasTrustDialogAccepted: true } }
         };
         const run = answer(claude.firstRun, {
@@ -377,7 +383,10 @@ describe("the tool's own first-run wizard", () => {
         // skipped rather than written under a key still spelling the
         // placeholder - and no empty `projects` is left in the tool's own file.
         const run = answer(claude.firstRun);
-        expect(run.read(".claude/.claude.json")).toEqual({ hasCompletedOnboarding: true });
+        expect(run.read(".claude/.claude.json")).toEqual({
+            hasCompletedOnboarding: true,
+            bypassPermissionsModeAccepted: true
+        });
     });
 
     it("adds a second worktree without taking the first one's answer away", () => {

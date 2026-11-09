@@ -652,7 +652,8 @@ async function startLocally(session: SessionView, boot: Bootstrap): Promise<void
             ],
             volumes: [],
             networks: []
-        })
+        }),
+        () => new HostdPorts().pull(commands.SESSION_IMAGE)
     );
 }
 

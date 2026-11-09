@@ -23,6 +23,7 @@
 
 import Link from "next/link";
 import { runAction } from "@/lib/run-action";
+import { preferredAgent } from "@/lib/polar/code-agent";
 import { fromWire } from "@/lib/app-bundles/wire";
 import { readPoll, sendAction, useUnmountSignal } from "@/lib/poll-fetch";
 import { mergeCodeRows } from "@/lib/polar/code-history";
@@ -360,9 +361,7 @@ function useCodeChoices(canStart: boolean) {
                             if (!found) setRepoId((now) => (now === current ? fallback : now));
                         })
                         .catch(() => undefined);
-                const ready =
-                    loaded.agents.find((agent) => agent.readiness !== "missing") ??
-                    loaded.agents[0];
+                const ready = preferredAgent(loaded.agents);
                 setAgentKey((current) =>
                     loaded.agents.some((agent) => agent.key === current)
                         ? current
@@ -405,7 +404,12 @@ export function PolarCodeView({
     const canStart = code.access === "manage";
     const picks = useCodeChoices(canStart);
     const [baseRef, setBaseRef] = useState("");
-    const started = (id: string) => {
+    // The words a task was started with, for the session they started: they are
+    // stored on it only once the agent is up, and until then its thread would
+    // otherwise open empty.
+    const [opening, setOpening] = useState<{ id: string; text: string } | null>(null);
+    const started = (id: string, text: string) => {
+        setOpening({ id, text });
         code.open(id);
         code.refresh();
     };
@@ -415,6 +419,7 @@ export function PolarCodeView({
             <CodeThread
                 key={code.selected}
                 sessionId={code.selected}
+                firstPrompt={opening?.id === code.selected ? opening.text : null}
                 canPrompt={canStart}
                 fullPage={fullPage}
                 voiceKit={voiceKit}
@@ -555,7 +560,7 @@ function CodeStart({
     voiceKit: PolarVoiceKit;
     /** Chat's own list of providers and models, for an agent that takes one. */
     providers: ModelSelectorProvider[] | null;
-    onStarted: (id: string) => void;
+    onStarted: (id: string, text: string) => void;
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
@@ -565,6 +570,10 @@ function CodeStart({
     const [busy, startTransition] = useTransition();
     const parts = useCodeComposerParts(busy);
     const [picked, setPicked] = useState<ModelChoice | null>(null);
+    // What was just sent, shown at once as the first message of the session
+    // while the machine for it comes up, rather than a composer that only
+    // greys out for the minute that can take.
+    const [sent, setSent] = useState<string | null>(null);
 
     const agent: AgentOption | null =
         choices?.agents.find((option) => option.key === agentKey) ?? null;
@@ -590,6 +599,14 @@ function CodeStart({
         setError(null);
         setGap(null);
         const text = prompt.trim();
+        setSent(text);
+        setPrompt("");
+        // Back into the composer when the session was not created, so nothing
+        // typed is lost to a failure.
+        const restore = () => {
+            setSent(null);
+            setPrompt((current) => current || text);
+        };
         startTransition(() => {
             void runAction(
                 () =>
@@ -619,12 +636,13 @@ function CodeStart({
                     ),
                 setError
             ).then((result) => {
+                if (!result?.id) restore();
                 if (!result) return;
                 // Created but not started still opens: the reason is on it.
                 if (result.id) {
-                    setPrompt("");
+                    setSent(null);
                     parts.uploads.clear();
-                    onStarted(result.id);
+                    onStarted(result.id, text);
                 }
                 if (result.githubGap) setGap(result.githubGap);
                 else if (result.error) setError(result.error);
@@ -634,7 +652,20 @@ function CodeStart({
 
     const shownError = error ?? choicesError;
     return (
-        <div className="flex min-w-0 flex-col gap-2" aria-busy={pending || undefined}>
+        <div className="flex min-w-0 flex-col gap-2" aria-busy={pending || sent !== null || undefined}>
+            {sent !== null ? (
+                <div className="flex min-w-0 flex-col gap-3 pb-2">
+                    <Message from="user">
+                        <MessageContent from="user">
+                            <p className="whitespace-pre-wrap">{sent}</p>
+                        </MessageContent>
+                    </Message>
+                    <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <ThinkingOrb state="breathing" size={20} decorative />
+                        <Shimmer>{t("code.starting")}</Shimmer>
+                    </div>
+                </div>
+            ) : null}
             <PolarComposer
                 kit={voiceKit}
                 notice={parts.notice}
@@ -721,11 +752,14 @@ function CodeStart({
 /** One session, followed while it runs, drawn as a chat thread. */
 function CodeThread({
     sessionId,
+    firstPrompt,
     canPrompt,
     fullPage,
     voiceKit
 }: {
     sessionId: string;
+    /** What the task was started with here, shown until the session has it. */
+    firstPrompt: string | null;
     canPrompt: boolean;
     fullPage: boolean;
     voiceKit: PolarVoiceKit;
@@ -908,6 +942,13 @@ function CodeThread({
                                 </Work>
                             )
                         )}
+                        {firstPrompt && !thread.entries.some((entry) => entry.role === "user") ? (
+                            <Message from="user">
+                                <MessageContent from="user">
+                                    <p className="whitespace-pre-wrap">{firstPrompt}</p>
+                                </MessageContent>
+                            </Message>
+                        ) : null}
                         {thread.entries.length === 0 && live ? (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <ThinkingOrb state="breathing" size={20} decorative />

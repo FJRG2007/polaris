@@ -297,7 +297,8 @@ export async function beginSignin(userId: string, env: string): Promise<SigninAt
                 ],
                 volumes: [],
                 networks: []
-            })
+            }),
+            () => new HostdPorts().pull(commands.SESSION_IMAGE)
         );
         return attempt;
     } catch (error) {

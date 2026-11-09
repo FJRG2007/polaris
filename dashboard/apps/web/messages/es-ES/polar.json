@@ -865,6 +865,7 @@
         "unreachable": "No se pudo cargar esta sesión.",
         "retry": "Reintentar",
         "quiet": "Aún nada. El agente está preparando su máquina.",
+        "starting": "Iniciando la sesión. Tu mensaje llega al agente en cuanto esté listo.",
         "ended": "Esta sesión terminó. Abre la sesión completa para ver todo lo que hizo.",
         "reply": "Responder al agente",
         "send": "Enviar",

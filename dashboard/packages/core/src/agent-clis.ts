@@ -315,6 +315,14 @@ export const FIRST_RUN_WORKDIR = "{workdir}";
  */
 const CLAUDE_WIZARD_ANSWER: Readonly<Record<string, AgentFirstRunValue>> = {
     hasCompletedOnboarding: true,
+    // The warning a session meets when it runs with permissions bypassed, which
+    // it does whenever Polaris or Enigma set it so. Its highlighted option is
+    // "No, exit", and the first prompt is typed and entered straight onto it -
+    // so the agent quit on the person's first message, before reading it, and
+    // the session just said it had stopped. The choice to bypass was already
+    // made by whoever set the mode; this is only that screen, answered. Checked
+    // against Claude Code 2.1.257: with it the session opens on the prompt.
+    bypassPermissionsModeAccepted: true,
     projects: { [FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true } }
 };
 
