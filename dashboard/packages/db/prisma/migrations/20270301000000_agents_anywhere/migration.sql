@@ -16,10 +16,8 @@ CREATE TABLE IF NOT EXISTS "PushSubscription" (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "PushSubscription_endpoint_key" ON "PushSubscription"("endpoint");
 CREATE INDEX IF NOT EXISTS "PushSubscription_userId_idx" ON "PushSubscription"("userId");
-DO $$ BEGIN
-    ALTER TABLE "PushSubscription" ADD CONSTRAINT "PushSubscription_userId_fkey"
-        FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "PushSubscription" DROP CONSTRAINT IF EXISTS "PushSubscription_userId_fkey";
+ALTER TABLE "PushSubscription" ADD CONSTRAINT "PushSubscription_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 CREATE TABLE IF NOT EXISTS "AgentPermissionRequest" (
     "id" UUID NOT NULL,
@@ -34,7 +32,5 @@ CREATE TABLE IF NOT EXISTS "AgentPermissionRequest" (
     CONSTRAINT "AgentPermissionRequest_pkey" PRIMARY KEY ("id")
 );
 CREATE INDEX IF NOT EXISTS "AgentPermissionRequest_sessionId_status_idx" ON "AgentPermissionRequest"("sessionId", "status");
-DO $$ BEGIN
-    ALTER TABLE "AgentPermissionRequest" ADD CONSTRAINT "AgentPermissionRequest_sessionId_fkey"
-        FOREIGN KEY ("sessionId") REFERENCES "AgentSession"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "AgentPermissionRequest" DROP CONSTRAINT IF EXISTS "AgentPermissionRequest_sessionId_fkey";
+ALTER TABLE "AgentPermissionRequest" ADD CONSTRAINT "AgentPermissionRequest_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "AgentSession"("id") ON DELETE CASCADE ON UPDATE CASCADE;
