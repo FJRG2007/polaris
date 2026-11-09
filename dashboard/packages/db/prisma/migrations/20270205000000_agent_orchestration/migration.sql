@@ -72,9 +72,7 @@ CREATE TABLE IF NOT EXISTS "AgentOrchestrationMessage" (
 CREATE INDEX IF NOT EXISTS "AgentOrchestrationMessage_runId_createdAt_idx" ON "AgentOrchestrationMessage"("runId", "createdAt");
 CREATE INDEX IF NOT EXISTS "AgentOrchestrationMessage_kind_answeredAt_idx" ON "AgentOrchestrationMessage"("kind", "answeredAt");
 
-DO $$ BEGIN
-    ALTER TABLE "AgentOrchestrationTask" ADD CONSTRAINT "AgentOrchestrationTask_runId_fkey" FOREIGN KEY ("runId") REFERENCES "AgentOrchestrationRun"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-    ALTER TABLE "AgentOrchestrationMessage" ADD CONSTRAINT "AgentOrchestrationMessage_runId_fkey" FOREIGN KEY ("runId") REFERENCES "AgentOrchestrationRun"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "AgentOrchestrationTask" DROP CONSTRAINT IF EXISTS "AgentOrchestrationTask_runId_fkey";
+ALTER TABLE "AgentOrchestrationTask" ADD CONSTRAINT "AgentOrchestrationTask_runId_fkey" FOREIGN KEY ("runId") REFERENCES "AgentOrchestrationRun"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "AgentOrchestrationMessage" DROP CONSTRAINT IF EXISTS "AgentOrchestrationMessage_runId_fkey";
+ALTER TABLE "AgentOrchestrationMessage" ADD CONSTRAINT "AgentOrchestrationMessage_runId_fkey" FOREIGN KEY ("runId") REFERENCES "AgentOrchestrationRun"("id") ON DELETE CASCADE ON UPDATE CASCADE;
