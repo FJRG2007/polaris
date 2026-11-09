@@ -117,6 +117,8 @@ export async function pushDeviceCount(userId: string): Promise<number> {
 export interface PushAction {
     readonly action: string;
     readonly title: string;
+    /** What a press posts, to this Polaris's own API only, with no tab open. */
+    readonly request?: { readonly url: string; readonly body: unknown };
 }
 
 /** What the service worker draws. Kept small: push services cap a payload at 4 KB. */
@@ -128,8 +130,6 @@ export interface PushPayload {
     /** Same tag replaces the earlier notification instead of stacking. */
     readonly tag?: string;
     readonly actions?: readonly PushAction[];
-    /** Handed back to the service worker with an action press. */
-    readonly data?: Record<string, string>;
     readonly requireInteraction?: boolean;
 }
 
@@ -145,10 +145,25 @@ export function pushBody(payload: PushPayload): string {
         body: payload.body ? clip(payload.body, 300) : "",
         href: payload.href ?? "/",
         tag: payload.tag ?? null,
-        actions: (payload.actions ?? []).slice(0, 2),
-        data: payload.data ?? {},
+        actions: (payload.actions ?? []).slice(0, 3),
         requireInteraction: payload.requireInteraction === true
     });
+}
+
+/**
+ * The contact the push service is given with every send. Pure.
+ *
+ * It must be an https or mailto address, or the library refuses the send; an
+ * install reached over plain http on its LAN gives its own host under https.
+ * The service never opens it, it is only who to ask about this traffic.
+ */
+export function vapidSubject(base: string): string {
+    try {
+        const url = new URL(base);
+        return `https://${url.host}`;
+    } catch {
+        return "https://localhost";
+    }
 }
 
 /** Most a single account sends to at once; older devices beyond it are skipped. */
@@ -171,7 +186,7 @@ export async function pushToUser(userId: string, payload: PushPayload): Promise<
         if (devices.length === 0) return 0;
         const [keys, base] = await Promise.all([vapidKeys(), appBaseUrl()]);
         const options = {
-            vapidDetails: { subject: base, publicKey: keys.publicKey, privateKey: keys.privateKey },
+            vapidDetails: { subject: vapidSubject(base), publicKey: keys.publicKey, privateKey: keys.privateKey },
             TTL: 60 * 60,
             urgency: "high" as const,
             timeout: 10_000

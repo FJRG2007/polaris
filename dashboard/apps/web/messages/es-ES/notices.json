@@ -473,7 +473,8 @@
         "workKeptBody": "Polaris no pudo subir {branch}, así que guardó la máquina de la sesión y su trabajo. Ábrela para reintentar o descartarlo.",
         "permissionTitle": "{session} pide permiso",
         "permissionAllow": "Permitir",
-        "permissionDeny": "Denegar"
+        "permissionDeny": "Denegar",
+        "permissionAlways": "Permitir siempre"
     },
     "cloudLeft": {
         "title": "{name} puede seguir funcionando en CloudAMQP",

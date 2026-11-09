@@ -779,8 +779,8 @@
         "standing": {
             "on": "On for this device.",
             "off": "Off for this device.",
-            "denied": "This browser blocks notices from Polaris. Allow them in its site settings.",
-            "unsupported": "This browser cannot receive notices with Polaris closed."
+            "denied": "{clientKind, select, desktop {The system blocks notices from Polaris. Allow them in the system settings.} other {This browser blocks notices from Polaris. Allow them in its site settings.}}",
+            "unsupported": "{clientKind, select, desktop {This app cannot receive notices with Polaris closed.} other {This browser cannot receive notices with Polaris closed.}}"
         }
     }
 }

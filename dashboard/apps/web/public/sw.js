@@ -70,6 +70,10 @@ self.addEventListener("notificationclick", (event) => {
     const notice = event.notification;
     const data = notice.data || {};
     notice.close();
+    const href =
+        typeof data.href === "string" && data.href.startsWith("/") && !data.href.startsWith("//")
+            ? data.href
+            : null;
 
     const pressed = (Array.isArray(data.actions) ? data.actions : []).find(
         (one) => one && one.id === event.action
@@ -84,16 +88,32 @@ self.addEventListener("notificationclick", (event) => {
                 credentials: "same-origin",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify(request.body ?? null)
-            }).catch(() => undefined)
+            })
+                .then((answer) => refused(answer))
+                .catch(() => true)
+                // A press that did not land opens the notice's page, where the
+                // reader can see why and try again, instead of failing unseen.
+                .then((failed) => (failed && href ? openOn(href) : undefined))
         );
         return;
     }
+    event.waitUntil(openOn(href));
+});
 
-    const href =
-        typeof data.href === "string" && data.href.startsWith("/") && !data.href.startsWith("//")
-            ? data.href
-            : null;
-    event.waitUntil(
+/** Whether a button's request was turned down: a failed status, or an action
+ *  route's `{ value: { error } }`. */
+function refused(answer) {
+    if (!answer.ok) return Promise.resolve(true);
+    const type = (answer.headers && answer.headers.get && answer.headers.get("content-type")) || "";
+    if (!type.includes("application/json")) return Promise.resolve(false);
+    return answer
+        .json()
+        .then((json) => Boolean(json && (json.error || (json.value && json.value.error))))
+        .catch(() => false);
+}
+
+function openOn(href) {
+    return (
         self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
             const target = windows.find((one) => one.focused) || windows[0];
             if (!target) return self.clients.openWindow(href || "/");
@@ -102,14 +122,21 @@ self.addEventListener("notificationclick", (event) => {
             });
         })
     );
-});
+}
 
 /*
  * Web Push: a notice from Polaris with every tab closed. The payload is what
- * `pushBody` in lib/notifications/web-push.ts writes. A notice with a request id
- * carries Allow / Deny; pressing one answers the agent's permission prompt
- * without opening anything, and a failed answer opens the session instead.
+ * `pushBody` in lib/notifications/web-push.ts writes. Its buttons carry the
+ * same `{ id, request }` as a notice a page draws, so the one click handler
+ * above answers both - an agent's permission prompt included, with no tab open.
  */
+
+/** How many buttons this device draws on a notification; two where it does not say. */
+function maxActions() {
+    const most = typeof Notification !== "undefined" ? Notification.maxActions : undefined;
+    return typeof most === "number" && most > 0 ? most : 2;
+}
+
 self.addEventListener("push", (event) => {
     let notice = {};
     try {
@@ -118,6 +145,9 @@ self.addEventListener("push", (event) => {
         notice = {};
     }
     const title = typeof notice.title === "string" && notice.title ? notice.title : "Polaris";
+    const buttons = (Array.isArray(notice.actions) ? notice.actions : [])
+        .filter((one) => one && typeof one.action === "string" && typeof one.title === "string")
+        .slice(0, maxActions());
     const options = {
         body: typeof notice.body === "string" ? notice.body : "",
         icon: "/polaris-mark-192.png",
@@ -125,46 +155,11 @@ self.addEventListener("push", (event) => {
         tag: typeof notice.tag === "string" ? notice.tag : undefined,
         renotify: typeof notice.tag === "string",
         requireInteraction: notice.requireInteraction === true,
-        actions: Array.isArray(notice.actions) ? notice.actions.slice(0, 2) : [],
+        actions: buttons.map((one) => ({ action: one.action, title: one.title })),
         data: {
-            href: typeof notice.href === "string" && notice.href.startsWith("/") ? notice.href : "/",
-            extra: notice.data && typeof notice.data === "object" ? notice.data : {}
+            href: typeof notice.href === "string" ? notice.href : "/",
+            actions: buttons.map((one) => ({ id: one.action, request: one.request || null }))
         }
     };
     event.waitUntil(self.registration.showNotification(title, options));
-});
-
-function openPage(href) {
-    const url = new URL(href, self.location.origin).href;
-    return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
-        for (const client of windows) {
-            if (client.url === url && "focus" in client) return client.focus();
-        }
-        return self.clients.openWindow(url);
-    });
-}
-
-self.addEventListener("notificationclick", (event) => {
-    const data = event.notification.data || {};
-    const href = typeof data.href === "string" ? data.href : "/";
-    const requestId = data.extra && data.extra.requestId;
-    event.notification.close();
-    if ((event.action === "allow" || event.action === "deny") && requestId) {
-        event.waitUntil(
-            fetch("/api/agents/sessions/permission", {
-                method: "POST",
-                credentials: "same-origin",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ requestId, choice: event.action })
-            })
-                .then((answer) => answer.json().then((json) => ({ answer, json })))
-                .then(({ answer, json }) => {
-                    if (!answer.ok || !json || !json.value || json.value.error) return openPage(href);
-                    return undefined;
-                })
-                .catch(() => openPage(href))
-        );
-        return;
-    }
-    event.waitUntil(openPage(href));
 });

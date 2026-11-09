@@ -4,7 +4,7 @@ vi.mock("@polaris/db", () => ({ prisma: {} }));
 
 import { hookDecision, readPermissionRequest, settlesPermissions } from "@/lib/agents/session-permissions";
 import { claudeHookSettings, hookScript, PERMISSION_HOOK_TIMEOUT_SECONDS } from "@/lib/agents/session-hooks";
-import { pushBody } from "@/lib/notifications/web-push";
+import { pushBody, vapidSubject } from "@/lib/notifications/web-push";
 import { arrivedDeployResults } from "@/lib/desktop-bridge";
 
 const SUGGESTION = {
@@ -89,7 +89,7 @@ describe("the permission hook", () => {
 });
 
 describe("pushBody", () => {
-    it("trims to fit a push and keeps two actions", () => {
+    it("trims to fit a push and keeps three actions", () => {
         const body = JSON.parse(
             pushBody({
                 title: "x".repeat(500),
@@ -97,14 +97,13 @@ describe("pushBody", () => {
                 actions: [
                     { action: "allow", title: "Allow" },
                     { action: "deny", title: "Deny" },
+                    { action: "always", title: "Always allow" },
                     { action: "other", title: "Other" }
-                ],
-                data: { requestId: "r" }
+                ]
             })
         );
         expect(body.title.length).toBe(120);
-        expect(body.actions).toHaveLength(2);
-        expect(body.data).toEqual({ requestId: "r" });
+        expect(body.actions).toHaveLength(3);
     });
 });
 
@@ -116,5 +115,13 @@ describe("desktop notices", () => {
             { id: "3", type: "chat.message", read: false }
         ];
         expect(arrivedDeployResults(new Set(), rows).map((row) => row.id)).toEqual(["1", "2"]);
+    });
+});
+
+describe("vapidSubject", () => {
+    it("is always an https address the push library accepts", () => {
+        expect(vapidSubject("https://polaris.example.test/")).toBe("https://polaris.example.test");
+        expect(vapidSubject("http://192.168.1.10:3000")).toBe("https://192.168.1.10:3000");
+        expect(vapidSubject("not a url")).toBe("https://localhost");
     });
 });

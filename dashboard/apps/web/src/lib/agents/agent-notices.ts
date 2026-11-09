@@ -133,6 +133,17 @@ export async function readSessionWaiting(sessionId: string, userId: string): Pro
     }
 }
 
+/** The route a notification's button answers a permission prompt through. */
+const PERMISSION_ANSWER_URL = "/api/agents/sessions/permission";
+
+/** "Always" last, so a device that draws only two buttons keeps the two that
+ *  answer this prompt alone. */
+const CHOICE_WORDS = {
+    allow: "agents.permissionAllow",
+    deny: "agents.permissionDeny",
+    always: "agents.permissionAlways"
+} as const;
+
 /**
  * A permission prompt Polaris can answer: pushed to the owner's devices with
  * Allow and Deny on the notification itself, in place of the "needs you" one.
@@ -156,11 +167,11 @@ export async function pushPermissionRequest(
             push: {
                 tag: sessionPushTag(subject.id),
                 requireInteraction: true,
-                actions: [
-                    { action: "allow", title: t("agents.permissionAllow") },
-                    { action: "deny", title: t("agents.permissionDeny") }
-                ],
-                data: { requestId }
+                actions: (["allow", "deny", "always"] as const).map((choice) => ({
+                    action: choice,
+                    title: t(CHOICE_WORDS[choice]),
+                    request: { url: PERMISSION_ANSWER_URL, body: { requestId, choice } }
+                }))
             }
         });
     } catch (error) {

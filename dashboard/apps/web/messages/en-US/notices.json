@@ -473,7 +473,8 @@
         "workKeptBody": "Polaris could not push {branch}, so it kept the session's machine and its work. Open the session to try again or discard it.",
         "permissionTitle": "{session} asks for permission",
         "permissionAllow": "Allow",
-        "permissionDeny": "Deny"
+        "permissionDeny": "Deny",
+        "permissionAlways": "Always allow this"
     },
     "cloudLeft": {
         "title": "{name} may still be running in CloudAMQP",
