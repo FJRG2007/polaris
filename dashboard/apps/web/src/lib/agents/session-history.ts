@@ -15,12 +15,14 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { runInSession } from "./session-runtime";
 import {
+    decodeClaudeLine,
     promptKey,
     transcriptDecoder,
     type HistoryRow,
     type TranscriptDecoder
 } from "./transcript-decoders";
 import { readableTranscriptPath, readTranscript } from "./session-transcript";
+import { claudeLineUsage, recordSessionUsage, type TurnUsage } from "./session-usage";
 
 /** The shortest gap between two reads of one transcript. */
 export const SYNC_DEBOUNCE_MS = 3_000;
@@ -122,6 +124,7 @@ async function readOnce(
     if (read.kind !== "ok") return read.kind;
 
     const rows: HistoryRow[] = [];
+    const spent: TurnUsage[] = [];
     let next = from;
     let capped = false;
     for (const line of read.lines) {
@@ -131,6 +134,8 @@ async function readOnce(
             break;
         }
         rows.push(...decoded);
+        const usage = decode === decodeClaudeLine ? claudeLineUsage(line.text) : null;
+        if (usage) spent.push(usage);
         next = line.end;
     }
     if (!capped) next = read.next;
@@ -146,6 +151,10 @@ async function readOnce(
         },
         data: { transcriptFile: path, transcriptOffset: BigInt(next) }
     });
+    if (moved.count > 0)
+        await recordSessionUsage(sessionId, spent).catch((error) =>
+            console.error(`[agent-session] ${sessionId}: could not count usage`, error)
+        );
     if (moved.count === 0 || next === from) return "done";
     return capped || read.more ? "more" : "done";
 }

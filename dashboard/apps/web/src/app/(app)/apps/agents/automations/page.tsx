@@ -21,7 +21,8 @@ export default async function AgentAutomationsPage() {
             condition: true,
             mode: true,
             instructions: true,
-            enabled: true
+            enabled: true,
+            target: true
         }
     });
 

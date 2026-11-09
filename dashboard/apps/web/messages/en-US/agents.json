@@ -254,6 +254,11 @@
             "enigma": "Work to your Enigma standards",
             "enigmaHint": "Installs your policies, conventions and guardrails into the session before the agent starts. Its own settings come from this repository and from Agents settings.",
             "submit": "Start"
+        },
+        "usage": {
+            "tokens": "{tokens} tokens",
+            "tokensCost": "{tokens} tokens, about {cost}",
+            "detail": "{input} tokens in, {output} out"
         }
     },
     "boot": {
@@ -413,6 +418,72 @@
             "always": "Always allow this",
             "deny": "Deny",
             "hint": "\"Always\" applies until this session ends. Unanswered, the agent asks again in its terminal."
+        },
+        "review": {
+            "start": "Comment on lines",
+            "stop": "Done commenting",
+            "add": "Comment on line {line}",
+            "edit": "Edit",
+            "remove": "Remove comment",
+            "placeholder": "What should change here",
+            "save": "Add comment",
+            "waiting": "{count, plural, one {# comment} other {# comments}} on {files, plural, one {# file} other {# files}}, not sent yet",
+            "discard": "Discard",
+            "send": "Send to the agent",
+            "sent": "Comments sent to the agent.",
+            "promptIntro": "Review comments on your changes. Address each one:",
+            "promptLine": "line {line}",
+            "promptRemoved": "removed line {line}",
+            "errors": {
+                "invalid": "These comments could not be sent. Check them and try again."
+            }
+        },
+        "checks": {
+            "none": "No checks",
+            "tally": "{passed} passed, {failed} failed, {pending} running",
+            "states": {
+                "passed": "Passed",
+                "failed": "Failed",
+                "pending": "Running"
+            },
+            "sendFailing": "Send failing checks to the agent",
+            "sent": "Failing checks sent to the agent.",
+            "noPull": "This session has no pull request yet.",
+            "unreachable": "GitHub could not be reached for this pull request's checks.",
+            "noneFailing": "No check is failing.",
+            "promptIntro": "These checks failed on pull request #{number}. Fix what they report:",
+            "promptNoSummary": "The check gave no summary. Open its link for the details."
+        },
+        "merge": {
+            "open": "Merge",
+            "title": "Merge pull request #{number}",
+            "description": "Every check passed. The branch is merged into its base on GitHub.",
+            "blocked": "GitHub reports this pull request as blocked by branch protection. It may refuse the merge.",
+            "checksNotGreen": "Some checks failed or are still running. Merging now skips them.",
+            "method": "Merge method",
+            "methods": {
+                "squash": "Squash and merge",
+                "merge": "Create a merge commit",
+                "rebase": "Rebase and merge"
+            },
+            "submit": "Merge",
+            "merging": "Merging...",
+            "done": "Pull request #{number} merged.",
+            "githubSaid": "GitHub said: {message}",
+            "errors": {
+                "invalid": "The merge could not be sent. Try again.",
+                "notAllowed": "You do not have permission to merge on this repository.",
+                "notMergeable": "GitHub cannot merge this pull request yet.",
+                "conflict": "The branch changed or conflicts with its base. Refresh and try again.",
+                "failed": "GitHub did not merge the pull request. Try again in a moment."
+            }
+        },
+        "fork": {
+            "action": "Fork session",
+            "hint": "Start a new session on this work, carrying the conversation where the agent can.",
+            "noRepo": "A workspace has no branch to fork from.",
+            "from": "Forked from",
+            "parent": "the original session"
         }
     },
     "rules": {
@@ -435,7 +506,16 @@
         "isOn": "Rule is on",
         "on": "On",
         "saving": "Saving...",
-        "save": "Save"
+        "save": "Save",
+        "target": "Starts",
+        "targets": {
+            "run": "A one-off run",
+            "session": "A session"
+        },
+        "targetHints": {
+            "run": "The agent answers once, on GitHub, and stops.",
+            "session": "Opens a session you can watch and steer. Its link is posted on the issue."
+        }
     },
     "repos": {
         "add": "Add a repository",
@@ -467,6 +547,10 @@
         "nothing": "Nothing can run this repository yet. Fix one of the reasons below."
     },
     "repoDialog": {
+        "setupPlaceholder": "npm ci",
+        "setup": "Setup script",
+        "setupHint": "Runs in each session's checkout before the agent starts, such as installing dependencies. Its output shows in the session's terminal.",
+        "setupRequired": "Stop the session if it fails",
         "change": "Change",
         "privateOff": "Private repositories are turned off for this account. Turn them back on under Agents settings, or the agent will never run here.",
         "publicOff": "Public repositories are turned off for this account. Turn them back on under Agents settings, or the agent will never run here.",
@@ -654,5 +738,12 @@
         "fallback": "If that provider refuses",
         "fallbackHint": "Tried in order when a run is turned away for the account's rate limit, an empty balance, a rejected key, or a window it did not fit in. Drag to reorder.",
         "saved": "Saved"
+    },
+    "issueSessions": {
+        "noAgent": "No agent is signed in on Polaris, so no session could be opened for this.",
+        "refused": "A session could not be opened right now: the owner is at their session or usage limit.",
+        "failed": "A session was created for this but did not start. It can be retried from Polaris.",
+        "started": "A session is working on this. Watch or steer it here: {url}\n\nBranch: `{branch}`",
+        "pullOpened": "The session opened pull request #{number}: {url}"
     }
 }

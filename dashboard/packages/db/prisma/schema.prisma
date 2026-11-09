@@ -8529,6 +8529,12 @@ model AgentRepo {
     // `server` execution, which needs no workflow at all, and for a repository
     // enabled before the write succeeded.
     workflowInstalledAt DateTime?
+    // Shell run in a session's checkout after it is cloned and before the agent
+    // starts: installing dependencies, seeding a database. Empty runs nothing.
+    setupScript   String   @default("")
+    // Whether a setup script that fails stops the session. Off, the failure is
+    // shown and the agent starts anyway.
+    setupRequired Boolean  @default(false)
     // Why the last dispatch could not be made, shown on the repository rather
     // than left in a log nobody opens.
     error         String?
@@ -8787,6 +8793,9 @@ model AgentAutomation {
     // an issue or a comment, which is a different trust level entirely.
     instructions String   @default("")
     enabled      Boolean  @default(true)
+    // run | session - what the trigger starts: a headless run, or an
+    // interactive session somebody can watch and steer.
+    target       String   @default("run")
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
 
@@ -9027,6 +9036,22 @@ model AgentSession {
     // shows it, never stored, so a merge made there is never shown as open.
     prNumber    Int?
     prUrl       String?
+    // The GitHub issue an automation opened this session for, so the issue can
+    // be told when its pull request opens. Null for one a person started.
+    issueNumber Int?
+    // The session this one was forked from, by id rather than as a relation:
+    // the parent can be deleted while the fork is still worth reading.
+    parentId    String?   @db.Uuid
+    // Tokens the agent's own transcript reports it spent, summed as the history
+    // is read. Zero for an agent whose transcript says nothing about usage.
+    tokensIn    Int       @default(0)
+    tokensOut   Int       @default(0)
+    // The estimated cost in USD, from the model catalogue's prices for the model
+    // the transcript names. Null while no counted turn had a priced model.
+    costUsd     Float?
+    // The vendor message id last counted. One API message is written as several
+    // transcript lines, each repeating its usage, and they can straddle reads.
+    usageMessageId String?
     createdAt   DateTime  @default(now())
     updatedAt   DateTime  @updatedAt
 

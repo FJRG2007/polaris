@@ -675,6 +675,12 @@ export const LAUNCH_SCRIPT = [
     '    *) id="" ;;',
     "  esac",
     "fi",
+    // A fork's first start reopens its parent's conversation as a new one of its
+    // own. Once: the marker is beside the checkout, so a later start - after the
+    // agent exited - is this session's own conversation rather than a second fork.
+    'if [ -z "$id" ] && [ -n "${POLARIS_AGENT_FORK:-}" ] && [ ! -e "$POLARIS_STATE_DIR/forked" ] && [ -f "$POLARIS_AGENT_FORK" ]; then',
+    '  case "$POLARIS_AGENT_FORK" in *[!A-Za-z0-9_./-]*) ;; *) line="$line --resume $POLARIS_AGENT_FORK --fork-session"; : > "$POLARIS_STATE_DIR/forked" ;; esac',
+    "fi",
     // Through Enigma where Polaris asked for it AND Enigma is actually here: the
     // install that put it there is best effort, and a launcher that did not
     // arrive falls back to the tool itself.
@@ -710,6 +716,35 @@ const LAUNCH_SCRIPT_BASE64 = Buffer.from(LAUNCH_SCRIPT, "utf8").toString("base64
 /** Where the answers land on the way in. Beside the other scripts the setup
  *  writes and removes, and holding nothing secret - the tool's own defaults. */
 const FIRST_RUN_FILE = "/tmp/polaris-first-run.json";
+
+/**
+ * The repository's own setup script - installing dependencies, seeding a
+ * database - run in the fresh checkout before the agent starts, in the window
+ * somebody watching the session sees.
+ *
+ * Once per checkout: a marker beside it says it passed, so a machine that
+ * restarts under a session does not install everything again, and one whose
+ * setup failed tries again. Run without the clone credential, which is still in
+ * the environment at this point and is not the repository's to read. A failure
+ * stops the session only where the repository asked for that; otherwise it is
+ * said and the agent starts anyway.
+ */
+export const REPO_SETUP = [
+    'if [ -n "$POLARIS_REPO_SETUP" ] && [ ! -f "$POLARIS_STATE_DIR/setup-done" ]; then',
+    '  echo "polaris: running the repository setup script"',
+    '  printf %s "$POLARIS_REPO_SETUP" | base64 -d > "$POLARIS_STATE_DIR/repo-setup.sh"',
+    '  chmod 0755 "$POLARIS_STATE_DIR/repo-setup.sh"',
+    '  if (unset GIT_AUTH_HEADER POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_REPO_SETUP; cd "$POLARIS_WORKDIR" && as_agent "sh \\"$POLARIS_STATE_DIR/repo-setup.sh\\""); then',
+    '    touch "$POLARIS_STATE_DIR/setup-done"',
+    '    echo "polaris: the setup script finished"',
+    '  elif [ "$POLARIS_REPO_SETUP_REQUIRED" = "yes" ]; then',
+    '    echo "polaris: the setup script failed, and this repository needs it to pass. The agent was not started. This terminal is yours."',
+    "    exec sh",
+    "  else",
+    '    echo "polaris: the setup script failed. The agent starts anyway."',
+    "  fi",
+    "fi"
+];
 
 const START_AGENT = [
     // Enigma's own settings, into the home the agent reads - the skills, the
@@ -757,7 +792,7 @@ const START_AGENT = [
     "  rm -f /tmp/polaris-first-run.sh",
     "fi",
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN",
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP",
     // Said once, in the terminal the person is looking at, because on a machine
     // they cannot see "please sign in" with no way to and no reason given is the
     // whole of what was wrong with this. Only when Polaris is carrying no
@@ -821,6 +856,7 @@ export const SESSION_SETUP = [
     ...INSTALL_ENIGMA,
     ...INSTALL_AGENT,
     ...REQUIRE_AGENT,
+    ...REPO_SETUP,
     ...START_AGENT
 ].join("\n");
 

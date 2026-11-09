@@ -2,6 +2,7 @@ import { Badge, PageHeader } from "@polaris/ui";
 import { SessionShareButton } from "./share-button";
 import { notFound } from "next/navigation";
 import { SessionDetail } from "./session-detail";
+import { SessionUsageLabel } from "../session-usage-label";
 import { requirePermission, sessionCan } from "@/lib/session";
 import { getSession, sessionEvents, sharedSession } from "@/lib/agents/session-service";
 import { historyPage } from "@/lib/agents/session-history";
@@ -50,11 +51,14 @@ export default async function AgentSessionPage({
                         : t("pages.sessionWorkspace")
                 }
                 actions={
-                    shared ? (
-                        <Badge variant="neutral">{t("session.sharedWithYou")}</Badge>
-                    ) : (
-                        <SessionShareButton sessionId={session.id} title={session.title} />
-                    )
+                    <>
+                        <SessionUsageLabel usage={session.usage} />
+                        {shared ? (
+                            <Badge variant="neutral">{t("session.sharedWithYou")}</Badge>
+                        ) : (
+                            <SessionShareButton sessionId={session.id} title={session.title} />
+                        )}
+                    </>
                 }
             />
             <SessionDetail

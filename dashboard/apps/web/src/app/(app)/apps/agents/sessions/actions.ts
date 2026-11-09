@@ -29,6 +29,15 @@ import * as history from "@/lib/agents/session-history";
 import { appBaseUrl } from "@/lib/domain-service";
 import { safeChangePath } from "@/lib/agents/session-changes";
 import { addComment } from "@/lib/tasks/task-detail-service";
+import { noteIssueOfPull } from "@/lib/agents/issue-sessions";
+import * as loop from "@/lib/agents/session-review-loop";
+import * as forking from "@/lib/agents/session-fork";
+import { githubTokenForUser } from "@/lib/github-access";
+import {
+    githubAppInstallationToken,
+    mergePullRequest,
+    pullRequestChecks
+} from "@/lib/github-service";
 import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
 import {
     sharedWorkspaceAllowed,
@@ -146,7 +155,19 @@ export async function startSessionAction(
             error: (message ? knownAgentText(t, message) : null) ?? t("sessions.errors.checkForm")
         };
     }
-    const value = parsed.data;
+    return startParsed(user.id, parsed.data, t, null);
+}
+
+/** Everything a start checks and does once the form has parsed. `fork` names
+ *  the session it is a fork of, and that session's Enigma choices, which the
+ *  form has no way to carry. */
+async function startParsed(
+    userId: string,
+    value: core.StartAgentSessionInput,
+    t: Awaited<ReturnType<typeof getTranslations>>,
+    fork: { parentId: string; enigma: core.EnigmaSettings | null } | null
+): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap; queuedAt?: number | null }> {
+    const user = { id: userId };
 
     // Only when one was named. A workspace checks nothing out, so there is no
     // repository to own and nothing to verify - what it is allowed to be is
@@ -260,7 +281,10 @@ export async function startSessionAction(
         hostId: value.place === "host" ? value.hostId : null,
         baseRef: value.baseRef,
         taskId: value.taskId,
-        enigma: value.enigma
+        parentId: fork?.parentId ?? null,
+        enigma: fork
+            ? fork.enigma
+            : value.enigma
             ? {
                   enabled: value.enigma.enabled ?? null,
                   scope: value.enigma.scope ?? null,
@@ -297,6 +321,51 @@ export async function startSessionAction(
     await noteOnTask(session, user.id);
     revalidatePath(SESSIONS_PATH);
     return { id: session.id, queuedAt: admission.queuedAt };
+}
+
+/**
+ * A new session on the same work as another: its branch once that reached
+ * GitHub, the same agent, account and machine, and - where the agent can fork a
+ * conversation and the transcript is in the home the new one opens on - the
+ * conversation so far, as a copy the parent never sees. Goes through every check
+ * a start does, so a fork is never a way round one.
+ */
+export async function forkSessionAction(
+    sessionId: string
+): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap; queuedAt?: number | null }> {
+    const t = await getTranslations("agents");
+    const id = sessionIdSchema.safeParse(sessionId);
+    if (!id.success) return { error: t("session.changes.errors.invalid") };
+    const parent = await controlledSession(id.data);
+    if (!parent) return { error: t("sessions.errors.gone") };
+    if (!parent.repoId) return { error: t("session.fork.noRepo") };
+    const user = await requirePermission("agents.manage");
+    const parsed = core.startAgentSessionSchema.safeParse({
+        title: parent.title,
+        repoId: parent.repoId,
+        cli: parent.cli,
+        command: parent.command ?? undefined,
+        place: parent.place,
+        hostId: parent.hostId,
+        sharedHome: parent.sharedHome,
+        unattended: parent.unattended,
+        accountId: parent.accountId,
+        useMachineLogin: parent.useMachineLogin,
+        baseRef: forking.forkBaseRef(parent),
+        taskId: parent.taskId
+    });
+    if (!parsed.success) {
+        const message = parsed.error.issues[0]?.message;
+        return {
+            error: (message ? knownAgentText(t, message) : null) ?? t("sessions.errors.checkForm")
+        };
+    }
+    const stored = await prisma.agentSession.findUnique({
+        where: { id: parent.id },
+        select: { enigma: true }
+    });
+    const enigma = stored?.enigma ? core.parseEnigmaSettings(stored.enigma) : null;
+    return startParsed(user.id, parsed.data, t, { parentId: parent.id, enigma });
 }
 
 /**
@@ -576,6 +645,7 @@ export async function openSessionPullRequestAction(
             return { error: t(`session.work.reasons.${result.pushReason ?? "other"}`) };
         return { error: t(`session.ship.refusals.${result.reason}`) };
     }
+    if (result.kind === "opened") after(() => noteIssueOfPull(session, result.pull));
     return {
         pull: {
             number: result.pull.number,
@@ -700,4 +770,188 @@ export async function answerPermissionAction(
                 ? t("sessions.errors.permissionAnswered")
                 : t("sessions.errors.permissionGone")
     };
+}
+
+// ---------------------------------------------------------------------------
+// Review loop
+//
+// What somebody reading the diff or the pull request's checks sends back to the
+// agent, and merging the pull request once it is right. Every one of these is
+// for whoever may steer the session, like the controls above.
+// ---------------------------------------------------------------------------
+
+/** Type a prompt into a live session and keep it in its conversation. */
+async function sendToAgent(
+    session: sessions.SessionView,
+    userId: string,
+    text: string
+): Promise<{ error?: string }> {
+    const t = await getTranslations("agents");
+    if (core.isSessionOver(session.state)) return { error: t("sessions.errors.ended") };
+    await sessions.addSessionMessage(session.id, "user", text, userId);
+    try {
+        await runtime.promptSession(session.id, text);
+    } catch (error) {
+        return { error: agentText(t, sessions.readableFailure(error, `prompting ${session.id}`)) };
+    }
+    revalidatePath(`${SESSIONS_PATH}/${session.id}`);
+    return {};
+}
+
+const reviewInputSchema = z
+    .object({
+        sessionId: sessionIdSchema,
+        comments: z
+            .array(
+                z
+                    .object({
+                        path: z.string().trim().min(1).max(1024),
+                        line: z.number().int().positive().max(10_000_000),
+                        side: z.enum(["new", "old"]),
+                        code: z.string().max(2000),
+                        body: z.string().trim().min(1).max(4000)
+                    })
+                    .strict()
+            )
+            .min(1)
+            .max(100)
+    })
+    .strict();
+
+/** Every comment left on the diff, sent to the agent as one prompt. */
+export async function sendReviewCommentsAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = reviewInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.review.errors.invalid") };
+    const session = await sessions.getSession(parsed.data.sessionId, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (!parsed.data.comments.every((comment) => safeChangePath(comment.path)))
+        return { error: t("session.review.errors.invalid") };
+    const text = loop.reviewPrompt(parsed.data.comments, {
+        intro: t("session.review.promptIntro"),
+        line: (line) => t("session.review.promptLine", { line }),
+        removedLine: (line) => t("session.review.promptRemoved", { line })
+    });
+    if (!text) return { error: t("session.review.errors.invalid") };
+    return sendToAgent(session, user.id, text.slice(0, 20_000));
+}
+
+export interface SessionChecksView {
+    checks: { name: string; state: "passed" | "failed" | "pending"; url: string | null }[];
+    tally: { passed: number; failed: number; pending: number };
+    mergeableState: string;
+    pullState: "open" | "closed" | "merged" | null;
+    canMerge: boolean;
+}
+
+/** The token a merge or a checks read is made with: the person's own linked
+ *  GitHub account when they have one, so GitHub holds them to their own
+ *  permissions on the repository, else the App installation. */
+async function pullToken(userId: string, owner: string): Promise<string | null> {
+    return (
+        (await githubTokenForUser(userId, owner).catch(() => null)) ??
+        (await githubAppInstallationToken(owner).catch(() => null))
+    );
+}
+
+/** The session's pull request's checks, as GitHub reports them now. */
+export async function sessionChecksAction(
+    input: unknown
+): Promise<{ view?: SessionChecksView | null; error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = sessionIdSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await sessions.getSession(parsed.data, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (!session.pullRequest || !session.repoFullName) return { view: null };
+    const [owner, repo] = session.repoFullName.split("/") as [string, string];
+    const token = await pullToken(user.id, owner);
+    const [found, pull, push] = await Promise.all([
+        pullRequestChecks(owner, repo, session.pullRequest.number, token),
+        review.linkedPullRequest(session).catch(() => null),
+        review.sessionPushSetting(session.id)
+    ]);
+    if (!found) return { error: t("session.checks.unreachable") };
+    return {
+        view: {
+            checks: found.checks.map((check) => ({
+                name: check.name,
+                state:
+                    check.status !== "completed"
+                        ? "pending"
+                        : loop.checkFailed(check)
+                          ? "failed"
+                          : "passed",
+                url: check.url
+            })),
+            tally: loop.checksTally(found.checks),
+            mergeableState: found.mergeableState,
+            pullState: pull?.state ?? null,
+            canMerge: pull?.state === "open" && push !== "disabled"
+        }
+    };
+}
+
+/** The failing checks, with what each said about itself, sent to the agent. */
+export async function sendFailingChecksAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = sessionIdSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await sessions.getSession(parsed.data, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (!session.pullRequest || !session.repoFullName)
+        return { error: t("session.checks.noPull") };
+    const [owner, repo] = session.repoFullName.split("/") as [string, string];
+    const found = await pullRequestChecks(
+        owner,
+        repo,
+        session.pullRequest.number,
+        await pullToken(user.id, owner)
+    );
+    if (!found) return { error: t("session.checks.unreachable") };
+    const text = loop.failingChecksPrompt(found.checks, {
+        intro: t("session.checks.promptIntro", { number: session.pullRequest.number }),
+        noSummary: t("session.checks.promptNoSummary")
+    });
+    if (!text) return { error: t("session.checks.noneFailing") };
+    return sendToAgent(session, user.id, text);
+}
+
+const mergeInputSchema = z
+    .object({ sessionId: sessionIdSchema, method: z.enum(["merge", "squash", "rebase"]) })
+    .strict();
+
+/** Merge the session's pull request on GitHub. Branch protection, required
+ *  checks and the person's own permission are GitHub's to enforce; its answer
+ *  is what the page shows when it says no. */
+export async function mergeSessionPullAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = mergeInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.merge.errors.invalid") };
+    const session = await sessions.getSession(parsed.data.sessionId, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (!session.pullRequest || !session.repoFullName)
+        return { error: t("session.checks.noPull") };
+    if ((await review.sessionPushSetting(session.id)) === "disabled")
+        return { error: t("session.ship.refusals.readOnly") };
+    const [owner, repo] = session.repoFullName.split("/") as [string, string];
+    const token = await pullToken(user.id, owner);
+    if (!token) return { error: t("session.ship.refusals.noAuth") };
+    const result = await mergePullRequest(
+        owner,
+        repo,
+        session.pullRequest.number,
+        { method: parsed.data.method },
+        token
+    );
+    revalidatePath(`${SESSIONS_PATH}/${session.id}`);
+    if (result.ok) return {};
+    const said = result.message
+        ? ` ${t("session.merge.githubSaid", { message: result.message })}`
+        : "";
+    return { error: `${t(`session.merge.errors.${result.reason}`)}${said}` };
 }

@@ -12,6 +12,7 @@
  */
 
 import * as core from "@polaris/core";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import type { SessionView } from "@/lib/agents/session-service";
@@ -23,6 +24,7 @@ import {
     Check,
     CircleDot,
     GitBranch,
+    GitFork,
     Loader2,
     Play,
     Send,
@@ -30,6 +32,7 @@ import {
     TriangleAlert
 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
+import { SessionPull } from "./session-pull";
 import { SessionChanges, ShipPullRequest } from "./session-changes";
 import { SessionHistory, type HistoryPage } from "./session-history";
 import { promptKey } from "@/lib/agents/transcript-decoders";
@@ -48,6 +51,7 @@ import {
     interruptSessionAction,
     promptSessionAction,
     discardSessionWorkAction,
+    forkSessionAction,
     resumeSessionAction,
     retrySessionPushAction,
     stopSessionAction,
@@ -295,6 +299,15 @@ export function SessionDetail({
         });
     };
 
+    const fork = () => {
+        startTransition(() => {
+            void runAction(() => forkSessionAction(session.id), setError).then((result) => {
+                if (result?.error) setError(result.error);
+                if (result?.id) router.push(`/apps/agents/sessions/${result.id}`);
+            });
+        });
+    };
+
     const stop = () => {
         startTransition(() => {
             void runAction(() => stopSessionAction(session.id), setError).then((result) => {
@@ -386,8 +399,35 @@ export function SessionDetail({
                         </Button>
                     </>
                 )}
+                {canControl && session.repoId ? (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={fork}
+                        disabled={busy}
+                        title={t("session.fork.hint")}
+                    >
+                        <GitFork className="size-4 shrink-0" />
+                        {t("session.fork.action")}
+                    </Button>
+                ) : null}
                 {canControl ? <ShipPullRequest session={session} /> : null}
+                {canControl ? <SessionPull session={session} /> : null}
             </div>
+            {session.parentId ? (
+                <p className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                    <GitFork className="size-3.5 shrink-0" />
+                    <span className="truncate">
+                        {t("session.fork.from")}{" "}
+                        <Link
+                            href={`/apps/agents/sessions/${session.parentId}`}
+                            className="underline underline-offset-2 hover:text-foreground"
+                        >
+                            {t("session.fork.parent")}
+                        </Link>
+                    </span>
+                </p>
+            ) : null}
 
             {reviewable ? (
                 <SegmentedControl

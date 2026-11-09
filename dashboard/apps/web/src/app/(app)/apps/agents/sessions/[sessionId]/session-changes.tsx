@@ -24,7 +24,9 @@ import {
     FileDiff as FileDiffIcon,
     GitPullRequest,
     Loader2,
-    RefreshCw
+    MessageSquare,
+    RefreshCw,
+    Send
 } from "lucide-react";
 import {
     Badge,
@@ -45,11 +47,14 @@ import {
 } from "@polaris/ui";
 import {
     openSessionPullRequestAction,
+    sendReviewCommentsAction,
     sessionFileDiffAction,
     sessionShipAction,
     type SessionShipView
 } from "../actions";
 import * as polls from "../sessions-polls";
+import { DiffReview, commentKey } from "./diff-review";
+import type { LineComment } from "@/lib/agents/session-review-loop";
 
 /** How often the list is read again while the agent is still working. */
 const REFRESH_MS = 15_000;
@@ -78,6 +83,12 @@ export function SessionChanges({ session }: { session: SessionView }) {
     // read after it arrives, rather than blanking the pane.
     const [generation, setGeneration] = useState(0);
     const over = core.isSessionOver(session.state);
+    const [comments, setComments] = useState<LineComment[]>([]);
+    const [reviewing, setReviewing] = useState(false);
+    const [sending, startSending] = useTransition();
+    const [reviewNote, setReviewNote] = useState<{ tone: "ok" | "error"; text: string } | null>(
+        null
+    );
     const reads = useRef(0);
     const shown = useRef(0);
 
@@ -204,6 +215,32 @@ export function SessionChanges({ session }: { session: SessionView }) {
         void load();
     };
 
+    const addComment = (comment: LineComment) => {
+        setReviewNote(null);
+        setComments((list) => [
+            ...list.filter((row) => commentKey(row) !== commentKey(comment)),
+            comment
+        ]);
+    };
+    const removeComment = (key: string) =>
+        setComments((list) => list.filter((row) => commentKey(row) !== key));
+    const sendReview = () =>
+        startSending(async () => {
+            const sent = comments;
+            const result = await runAction(
+                () => sendReviewCommentsAction({ sessionId: session.id, comments: sent }),
+                (text) => setReviewNote({ tone: "error", text })
+            );
+            if (!result) return;
+            if (result.error) {
+                setReviewNote({ tone: "error", text: result.error });
+                return;
+            }
+            setComments((list) => list.filter((row) => !sent.includes(row)));
+            setReviewNote({ tone: "ok", text: t("session.review.sent") });
+        });
+    const commentFiles = new Set(comments.map((row) => row.path)).size;
+
     return (
         <Card>
             <CardBody className="space-y-3">
@@ -219,6 +256,47 @@ export function SessionChanges({ session }: { session: SessionView }) {
                         {t("session.changes.refresh")}
                     </Button>
                 </div>
+
+                {comments.length > 0 || reviewNote ? (
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-md bg-muted px-3 py-2">
+                        <span
+                            className={cn(
+                                "min-w-0 flex-1 text-sm",
+                                comments.length === 0 && reviewNote?.tone === "error" && "text-danger"
+                            )}
+                        >
+                            {comments.length > 0
+                                ? t("session.review.waiting", {
+                                      count: comments.length,
+                                      files: commentFiles
+                                  })
+                                : reviewNote?.text}
+                        </span>
+                        {comments.length > 0 ? (
+                            <>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setComments([])}
+                                    disabled={sending}
+                                >
+                                    {t("session.review.discard")}
+                                </Button>
+                                <Button size="sm" onClick={sendReview} disabled={sending || over}>
+                                    {sending ? (
+                                        <Loader2 className="size-4 shrink-0 animate-spin" />
+                                    ) : (
+                                        <Send className="size-4 shrink-0" />
+                                    )}
+                                    {t("session.review.send")}
+                                </Button>
+                            </>
+                        ) : null}
+                        {comments.length > 0 && reviewNote?.tone === "error" ? (
+                            <p className="w-full text-xs text-danger">{reviewNote.text}</p>
+                        ) : null}
+                    </div>
+                ) : null}
 
                 {problem && !listing ? (
                     <p className="text-sm text-muted-foreground">{problem}</p>
@@ -290,6 +368,17 @@ export function SessionChanges({ session }: { session: SessionView }) {
                             diff={selected ? diffs[selected]?.diff : undefined}
                             loading={selected ? pending.has(selected) : false}
                             retry={() => selected && void open(selected)}
+                            review={
+                                over
+                                    ? null
+                                    : {
+                                          on: reviewing,
+                                          toggle: () => setReviewing((on) => !on),
+                                          comments: comments.filter((row) => row.path === selected),
+                                          add: addComment,
+                                          remove: removeComment
+                                      }
+                            }
                         />
                     </div>
                 ) : null}
@@ -303,12 +392,21 @@ function DiffPane({
     path,
     diff,
     loading,
-    retry
+    retry,
+    review
 }: {
     path: string | null;
     diff: FileDiff | "unreachable" | undefined;
     loading: boolean;
     retry: () => void;
+    /** Commenting on lines, or null once the agent can no longer read them. */
+    review: {
+        on: boolean;
+        toggle: () => void;
+        comments: readonly LineComment[];
+        add: (comment: LineComment) => void;
+        remove: (key: string) => void;
+    } | null;
 }) {
     const t = useTranslations("agents");
     if (!path) return <p className="text-sm text-muted-foreground">{t("session.changes.pick")}</p>;
@@ -331,6 +429,17 @@ function DiffPane({
                     {path}
                 </span>
                 <CopyButton value={path} />
+                {review && diff !== undefined && diff !== "unreachable" && diff.kind === "diff" ? (
+                    <Button
+                        size="sm"
+                        variant={review.on ? "secondary" : "ghost"}
+                        onClick={review.toggle}
+                        aria-pressed={review.on}
+                    >
+                        <MessageSquare className="size-4 shrink-0" />
+                        {review.on ? t("session.review.stop") : t("session.review.start")}
+                    </Button>
+                ) : null}
             </div>
             <div className="flex max-h-[70vh] min-h-24 min-w-0 flex-col">
                 {diff === undefined || (loading && diff === "unreachable") ? (
@@ -341,6 +450,15 @@ function DiffPane({
                     </div>
                 ) : diff === "unreachable" ? (
                     <div className="p-4">{said(t("session.changes.unreachable"), true)}</div>
+                ) : diff.kind === "diff" && review?.on ? (
+                    <DiffReview
+                        key={path}
+                        path={path}
+                        text={diff.text}
+                        comments={review.comments}
+                        onAdd={review.add}
+                        onRemove={review.remove}
+                    />
                 ) : diff.kind === "diff" ? (
                     <CodeSurface
                         code={diff.text.replace(/\n$/, "")}

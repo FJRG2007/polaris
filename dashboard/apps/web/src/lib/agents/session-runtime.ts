@@ -42,6 +42,7 @@ import {
     mcpConfig,
     shellQuote
 } from "./session-hooks";
+import * as fork from "./session-fork";
 import { endContainerSession, type SaveOutcome } from "./session-work";
 import { clearSessionWaiting, noticeSessionEnded } from "./agent-notices";
 import { syncFinalSessionHistory } from "./session-history";
@@ -49,6 +50,7 @@ import { sessionLimits } from "./session-capacity";
 import {
     addSessionMessage,
     finishSession,
+    forkSource,
     markSessionStarted,
     failureDetail,
     readableFailure,
@@ -122,6 +124,8 @@ interface Bootstrap {
     readonly agentLauncher: string;
     /** How the tool reopens a conversation, or empty. See `agentResumeStyle`. */
     readonly agentResume: string;
+    /** The parent's transcript a fork reopens, or empty. See `forkTranscript`. */
+    readonly agentFork: string;
     /** The whole of what installing Enigma means, base64 so it survives the
      *  daemon's rule about control characters. Empty when Enigma is off. */
     readonly enigmaSetup: string;
@@ -141,6 +145,10 @@ interface Bootstrap {
     readonly cloneHeader: string;
     /** The credential helper script, or empty for a workspace. */
     readonly gitCredential: string;
+    /** The repository's own setup script, encoded, or empty for none. */
+    readonly repoSetup: string;
+    /** Whether a failing setup script stops the session before the agent starts. */
+    readonly repoSetupRequired: boolean;
     /** What signs the agent in, narrowed to the variables its own tool reads.
      *  Empty on a machine where the tool is already signed in, and empty for a
      *  tool Polaris holds no sourced credential for. */
@@ -233,11 +241,20 @@ function workdirFor(session: SessionView): string {
     return session.repoFullName ? CONTAINER_WORKDIR : CONTAINER_WORKSPACE;
 }
 
+/** The parent's transcript a forked session reopens, or empty for any other. */
+async function forkTranscriptFor(session: SessionView, cli: string): Promise<string> {
+    if (!session.parentId) return "";
+    const parent = await forkSource(session.parentId);
+    if (!parent) return "";
+    return fork.forkTranscript({ ...session, cli }, parent);
+}
+
 async function bootstrapFor(session: SessionView, token: string): Promise<Bootstrap> {
     // A workspace checks nothing out, so it needs no installation and asks for
     // no token. Refusing to start one because an organization has not connected
     // GitHub would be refusing over a repository nobody named.
     const githubToken = session.repoFullName ? await cloneToken(session.repoFullName) : "";
+    const setup = session.repoId ? await repoSetupFor(session.repoId) : null;
 
     const base = (await appBaseUrl()).replace(/\/+$/, "");
     const ingest = `${base}/api/agents/sessions/${session.id}/events`;
@@ -279,6 +296,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         agentInstall: agent.install,
         agentLauncher: agent.launcher,
         agentResume: core.agentResumeStyle(agent.cli.id),
+        agentFork: await forkTranscriptFor(session, agent.cli.id),
         // Empty when Enigma is off, which is what the boot script tests for.
         // One script rather than an argv and a second script: it installs the
         // package globally so the agent can invoke `enigma`, then makes the
@@ -312,6 +330,8 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // Not a token: a script that asks for one. The agent's environment holds
         // no GitHub credential at all.
         gitCredential: session.repoFullName ? gitCredentialScript(credential, token) : "",
+        repoSetup: setup?.setupScript.trim() ? asFile(setup.setupScript) : "",
+        repoSetupRequired: setup?.setupRequired ?? false,
         // The account the person picked wins over whatever would have resolved.
         // Somebody holding three subscriptions chose one of them on the form,
         // and a session that quietly used the first is a session doing the work
@@ -374,6 +394,17 @@ async function cloneToken(repoFullName: string): Promise<string> {
     return token;
 }
 
+/** The repository's setup script and whether it may fail. Null for a repository
+ *  that is gone, which runs nothing rather than refusing the session. */
+async function repoSetupFor(
+    repoId: string
+): Promise<{ setupScript: string; setupRequired: boolean } | null> {
+    return prisma.agentRepo.findUnique({
+        where: { id: repoId },
+        select: { setupScript: true, setupRequired: true }
+    });
+}
+
 /**
  * A file's contents, as an environment value.
  *
@@ -427,6 +458,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_AGENT_INSTALL: boot.agentInstall,
         POLARIS_AGENT_LAUNCHER: boot.agentLauncher,
         POLARIS_AGENT_RESUME: boot.agentResume,
+        POLARIS_AGENT_FORK: boot.agentFork,
         POLARIS_ENIGMA_SETUP: boot.enigmaSetup,
         POLARIS_ENIGMA_CONFIGURE: boot.enigmaConfigure,
         POLARIS_FIRST_RUN: boot.firstRun,
@@ -435,6 +467,8 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_CREDENTIAL_FILES: boot.credentialFiles,
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),
         POLARIS_GIT_CREDENTIAL: boot.gitCredential ? asFile(boot.gitCredential) : "",
+        POLARIS_REPO_SETUP: boot.repoSetup,
+        POLARIS_REPO_SETUP_REQUIRED: boot.repoSetupRequired ? "yes" : "",
         ...boot.autonomyEnv,
         ...boot.credentials
     });

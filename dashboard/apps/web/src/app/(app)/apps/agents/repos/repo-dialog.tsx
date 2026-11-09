@@ -15,6 +15,8 @@ import {
     DialogTitle,
     Input,
     Select,
+    Switch,
+    Textarea,
     isDirty
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -45,6 +47,8 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
     const [pullRequests, setPullRequests] = useState<boolean | null>(repo.pullRequests);
     const [issues, setIssues] = useState<boolean | null>(repo.issues);
     const [gate, setGate] = useState<AgentGateMode | null>(repo.gate as AgentGateMode | null);
+    const [setupScript, setSetupScript] = useState(repo.setupScript);
+    const [setupRequired, setSetupRequired] = useState(repo.setupRequired);
     const [advice, setAdvice] = useState<ExecutionAdvice | null>(null);
     const [pools, setPools] = useState<Array<{ id: string; name: string }>>([]);
     const [allPools, setAllPools] = useState<Array<{ id: string; name: string }>>([]);
@@ -76,9 +80,23 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             shell: repo.shell,
             pullRequests: repo.pullRequests,
             issues: repo.issues,
-            gate: repo.gate
+            gate: repo.gate,
+            setupScript: repo.setupScript.trim(),
+            setupRequired: repo.setupRequired
         },
-        { execution, poolId, model, effort, push, shell, pullRequests, issues, gate }
+        {
+            execution,
+            poolId,
+            model,
+            effort,
+            push,
+            shell,
+            pullRequests,
+            issues,
+            gate,
+            setupScript: setupScript.trim(),
+            setupRequired
+        }
     );
 
     const save = () => {
@@ -99,7 +117,8 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                                 pullRequests,
                                 issues,
                                 gate
-                            }
+                            },
+                            setup: { script: setupScript, required: setupRequired }
                         }),
                     setError
                 );
@@ -183,6 +202,34 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                         onIssues={setIssues}
                         onGate={setGate}
                     />
+
+                    <div className="space-y-1">
+                        <label className="text-sm font-medium" htmlFor="repo-setup-script">
+                            {t("repoDialog.setup")}
+                        </label>
+                        <Textarea
+                            id="repo-setup-script"
+                            rows={4}
+                            maxLength={8000}
+                            spellCheck={false}
+                            className="font-mono text-xs"
+                            value={setupScript}
+                            onChange={(event) => setSetupScript(event.target.value)}
+                            placeholder={t("repoDialog.setupPlaceholder")}
+                        />
+                        <p className="text-xs text-muted-foreground">{t("repoDialog.setupHint")}</p>
+                    </div>
+
+                    {setupScript.trim() ? (
+                        <div className="flex items-center gap-2">
+                            <Switch
+                                checked={setupRequired}
+                                onChange={setSetupRequired}
+                                aria-label={t("repoDialog.setupRequired")}
+                            />
+                            <span className="text-sm">{t("repoDialog.setupRequired")}</span>
+                        </div>
+                    ) : null}
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>

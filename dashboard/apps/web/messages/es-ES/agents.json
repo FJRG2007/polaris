@@ -254,6 +254,11 @@
             "enigma": "Trabajar con tus estándares de Enigma",
             "enigmaHint": "Instala tus políticas, convenciones y guardarraíles en la sesión antes de que empiece el agente. Sus ajustes vienen de este repositorio y de los ajustes de Agentes.",
             "submit": "Iniciar"
+        },
+        "usage": {
+            "tokens": "{tokens} tokens",
+            "tokensCost": "{tokens} tokens, unos {cost}",
+            "detail": "{input} tokens de entrada, {output} de salida"
         }
     },
     "boot": {
@@ -413,6 +418,72 @@
             "always": "Permitir siempre",
             "deny": "Denegar",
             "hint": "\"Siempre\" dura hasta que acabe la sesión. Sin respuesta, el agente vuelve a preguntar en su terminal."
+        },
+        "review": {
+            "start": "Comentar líneas",
+            "stop": "Terminar",
+            "add": "Comentar la línea {line}",
+            "edit": "Editar",
+            "remove": "Quitar comentario",
+            "placeholder": "Qué debería cambiar aquí",
+            "save": "Añadir",
+            "waiting": "{count, plural, one {# comentario} other {# comentarios}} en {files, plural, one {# archivo} other {# archivos}}, sin enviar",
+            "discard": "Descartar",
+            "send": "Enviar al agente",
+            "sent": "Comentarios enviados al agente.",
+            "promptIntro": "Comentarios de revisión sobre tus cambios. Atiende cada uno:",
+            "promptLine": "línea {line}",
+            "promptRemoved": "línea eliminada {line}",
+            "errors": {
+                "invalid": "No se pudieron enviar estos comentarios. Revísalos e inténtalo de nuevo."
+            }
+        },
+        "checks": {
+            "none": "Sin checks",
+            "tally": "{passed} correctos, {failed} fallidos, {pending} en curso",
+            "states": {
+                "passed": "Correcto",
+                "failed": "Fallido",
+                "pending": "En curso"
+            },
+            "sendFailing": "Enviar checks fallidos al agente",
+            "sent": "Checks fallidos enviados al agente.",
+            "noPull": "Esta sesión aún no tiene pull request.",
+            "unreachable": "No se pudo contactar con GitHub para leer los checks.",
+            "noneFailing": "Ningún check está fallando.",
+            "promptIntro": "Estos checks fallaron en la pull request #{number}. Corrige lo que indican:",
+            "promptNoSummary": "El check no dio resumen. Abre su enlace para ver los detalles."
+        },
+        "merge": {
+            "open": "Fusionar",
+            "title": "Fusionar la pull request #{number}",
+            "description": "Todos los checks pasaron. La rama se fusiona con su base en GitHub.",
+            "blocked": "GitHub indica que la protección de rama bloquea esta pull request. Puede rechazar la fusión.",
+            "checksNotGreen": "Algunos checks fallaron o siguen en curso. Fusionar ahora los ignora.",
+            "method": "Tipo de fusión",
+            "methods": {
+                "squash": "Squash y fusionar",
+                "merge": "Commit de fusión",
+                "rebase": "Rebase y fusionar"
+            },
+            "submit": "Fusionar",
+            "merging": "Fusionando...",
+            "done": "Pull request #{number} fusionada.",
+            "githubSaid": "GitHub dijo: {message}",
+            "errors": {
+                "invalid": "No se pudo enviar la fusión. Inténtalo de nuevo.",
+                "notAllowed": "No tienes permiso para fusionar en este repositorio.",
+                "notMergeable": "GitHub aún no puede fusionar esta pull request.",
+                "conflict": "La rama cambió o tiene conflictos con su base. Actualiza e inténtalo de nuevo.",
+                "failed": "GitHub no fusionó la pull request. Inténtalo de nuevo en un momento."
+            }
+        },
+        "fork": {
+            "action": "Bifurcar",
+            "hint": "Abre una sesión nueva sobre este trabajo, con la conversación cuando el agente puede llevarla.",
+            "noRepo": "Un espacio de trabajo no tiene rama desde la que bifurcar.",
+            "from": "Bifurcada de",
+            "parent": "la sesión original"
         }
     },
     "rules": {
@@ -435,7 +506,16 @@
         "isOn": "Regla activa",
         "on": "Activa",
         "saving": "Guardando...",
-        "save": "Guardar"
+        "save": "Guardar",
+        "target": "Inicia",
+        "targets": {
+            "run": "Una ejecución",
+            "session": "Una sesión"
+        },
+        "targetHints": {
+            "run": "El agente responde una vez, en GitHub, y termina.",
+            "session": "Abre una sesión que puedes ver y dirigir. Su enlace se publica en la issue."
+        }
     },
     "repos": {
         "add": "Añadir repositorio",
@@ -467,6 +547,10 @@
         "nothing": "Aún no hay nada que pueda ejecutar este repositorio. Resuelve uno de los motivos de abajo."
     },
     "repoDialog": {
+        "setupPlaceholder": "npm ci",
+        "setup": "Preparación",
+        "setupHint": "Se ejecuta en la copia de cada sesión antes de que arranque el agente, por ejemplo para instalar dependencias. Su salida aparece en la terminal de la sesión.",
+        "setupRequired": "Parar la sesión si falla",
         "change": "Cambiar",
         "privateOff": "Los repositorios privados están desactivados para esta cuenta. Vuelve a activarlos en los ajustes de Agentes, o el agente nunca se ejecutará aquí.",
         "publicOff": "Los repositorios públicos están desactivados para esta cuenta. Vuelve a activarlos en los ajustes de Agentes, o el agente nunca se ejecutará aquí.",
@@ -654,5 +738,12 @@
         "fallback": "Si ese proveedor se niega",
         "fallbackHint": "Se prueban en orden cuando una ejecución se rechaza por el límite de la cuenta, un saldo vacío, una clave rechazada o una ventana en la que no cabía. Arrastra para reordenar.",
         "saved": "Guardado"
+    },
+    "issueSessions": {
+        "noAgent": "No hay ningún agente con sesión iniciada en Polaris, así que no se pudo abrir una sesión.",
+        "refused": "No se pudo abrir una sesión ahora: el propietario está en su límite de sesiones o de uso.",
+        "failed": "Se creó una sesión para esto pero no arrancó. Se puede reintentar desde Polaris.",
+        "started": "Una sesión está trabajando en esto. Síguela o dirígela aquí: {url}\n\nRama: `{branch}`",
+        "pullOpened": "La sesión abrió la pull request #{number}: {url}"
     }
 }
