@@ -185,7 +185,10 @@
         "mailtoUnsupported": "{surface, select, app {Esta app no puede encargarse de los enlaces de correo. Hazlo desde Polaris en Chrome, Edge o Firefox.} other {Este navegador no puede pasar enlaces de correo a una web. Chrome, Edge y Firefox sí pueden.}}",
         "mailtoConfirm": "Confírmalo en la barra que muestra tu navegador.",
         "mailtoRefused": "{surface, select, app {Esta app se negó. Solo lo permite en una página abierta por https.} other {Este navegador se negó. Solo lo permite en una página abierta por https.}}",
-        "mailtoButton": "Abrir enlaces de correo en Polaris"
+        "mailtoButton": "Abrir enlaces de correo en Polaris",
+        "mailtoWindowsHint": "Windows ya muestra Polaris entre las apps de correo. Elígelo para mailto en Apps predeterminadas y cada enlace abrirá un mensaje nuevo aquí.",
+        "mailtoWindowsButton": "Elegir Polaris en Windows",
+        "mailtoWindowsFailed": "No se abrió Configuración. Busca Apps predeterminadas en Inicio."
     },
     "privacy": {
         "keep": {

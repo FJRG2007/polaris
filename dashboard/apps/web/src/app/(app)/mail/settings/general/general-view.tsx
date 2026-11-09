@@ -25,6 +25,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useBusy } from "@/app/(app)/mail/use-busy";
 import { mailOptionLabel } from "@/app/(app)/mail/option-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { desktopBridge } from "@/lib/desktop-bridge";
 
 export function GeneralView({ preferences }: { preferences: core.MailPreferences }) {
     const toast = useToast();
@@ -193,9 +194,37 @@ function MailtoHandler() {
     const toast = useToast();
     const t = useTranslations("mailSettings");
     const [supported, setSupported] = useState<boolean | null>(null);
+    // Inside the desktop app the browser's handler does not exist; on Windows
+    // the app is one of the system's mail apps instead, picked in Settings.
+    const [desktop, setDesktop] = useState<"windows" | "other" | null>(null);
     useEffect(() => {
+        const bridge = desktopBridge();
+        if (bridge) {
+            setDesktop(bridge.platform === "win32" && bridge.openMailDefaults ? "windows" : "other");
+            setSupported(false);
+            return;
+        }
         setSupported(typeof navigator !== "undefined" && "registerProtocolHandler" in navigator);
     }, []);
+
+    if (desktop === "windows") {
+        return (
+            <Field label={t("general.mailto")} hint={t("general.mailtoWindowsHint")}>
+                <Button
+                    variant="secondary"
+                    onClick={() => {
+                        void desktopBridge()
+                            ?.openMailDefaults?.()
+                            .then((opened) => {
+                                if (!opened) toast.show({ title: t("general.mailtoWindowsFailed") });
+                            });
+                    }}
+                >
+                    {t("general.mailtoWindowsButton")}
+                </Button>
+            </Field>
+        );
+    }
 
     return (
         <Field
@@ -204,7 +233,7 @@ function MailtoHandler() {
         >
             {supported === false ? (
                 <p className="text-[13px] text-muted-foreground">
-                    {t("general.mailtoUnsupported")}
+                    {t("general.mailtoUnsupported", { surface: desktop ? "app" : "browser" })}
                 </p>
             ) : (
                 <Button
@@ -221,7 +250,7 @@ function MailtoHandler() {
                             // Refused outright - most often because this page is
                             // not served over https, which a handler requires.
                             toast.show({
-                                title: t("general.mailtoRefused")
+                                title: t("general.mailtoRefused", { surface: "browser" })
                             });
                         }
                     }}

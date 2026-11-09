@@ -213,6 +213,9 @@ export interface PolarisDesktop {
     systemIdle?(): Promise<"active" | "idle" | "locked" | "unknown">;
     /** The window that adds and switches servers. Absent from an older app. */
     openServers?(): Promise<void>;
+    /** Windows' Default apps at Polaris, to pick it for mailto links; false
+     *  off Windows. Absent from an app older than it. */
+    openMailDefaults?(): Promise<boolean>;
     /** What is waiting, on the app's icon in the taskbar or Dock. Missing on a
      *  desktop app older than it. */
     setAppBadge?(input: {

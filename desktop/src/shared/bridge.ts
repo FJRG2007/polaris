@@ -120,6 +120,9 @@ export interface PolarisDesktop {
     systemIdle(): Promise<SystemIdle>;
     /** Open the app's window for adding and switching servers. */
     openServers(): Promise<void>;
+    /** Open Windows' Default apps at Polaris, where it can be picked for mailto
+     *  links. False where there is no such screen to open (macOS, Linux). */
+    openMailDefaults(): Promise<boolean>;
     /** Show what is waiting on the app's own icon - the taskbar button, the
      *  Dock - the way a browser shows it on the tab's icon. */
     setAppBadge(input: {
@@ -473,6 +476,7 @@ export const CHANNELS = {
     defaultBrowser: "desktop:default-browser",
     systemIdle: "desktop:system-idle",
     openServers: "desktop:open-servers",
+    openMailDefaults: "desktop:open-mail-defaults",
     appBadge: "desktop:app-badge",
     shareSources: "desktop:share-sources",
     chooseShare: "desktop:choose-share",

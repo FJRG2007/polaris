@@ -185,7 +185,10 @@
         "mailtoUnsupported": "{surface, select, app {This app cannot take over email links. Do it from Polaris in Chrome, Edge or Firefox.} other {This browser cannot hand email links to a website. Chrome, Edge and Firefox can.}}",
         "mailtoConfirm": "Confirm it in the bar your browser shows.",
         "mailtoRefused": "{surface, select, app {This app refused. It only allows it on a page opened over https.} other {This browser refused. It only allows it on a page opened over https.}}",
-        "mailtoButton": "Open email links in Polaris"
+        "mailtoButton": "Open email links in Polaris",
+        "mailtoWindowsHint": "Windows now lists Polaris among the apps for email links. Pick it for mailto in Default apps, and every link you click opens a new message here.",
+        "mailtoWindowsButton": "Choose Polaris in Windows",
+        "mailtoWindowsFailed": "Windows Settings did not open. Find Default apps in the Start menu."
     },
     "privacy": {
         "keep": {

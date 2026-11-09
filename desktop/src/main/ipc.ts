@@ -46,6 +46,7 @@ import {
     ipcMain,
     nativeImage,
     powerMonitor,
+    shell,
     type IpcMainInvokeEvent,
     type NativeImage,
     type WebContents
@@ -415,6 +416,18 @@ export function registerIpc(host: IpcHost): void {
 
     ipcMain.handle(CHANNELS.openServers, (event): void => {
         if (fromPolaris(event)) host.openServers();
+    });
+
+    // The page cannot open an ms-settings: link itself: navigation sends only
+    // http, https and mailto out of the app.
+    ipcMain.handle(CHANNELS.openMailDefaults, async (event): Promise<boolean> => {
+        if (!fromPolaris(event) || process.platform !== "win32") return false;
+        try {
+            await shell.openExternal("ms-settings:defaultapps?registeredAppUser=Polaris");
+            return true;
+        } catch {
+            return false;
+        }
     });
 
     // The window buttons drawn over the page's header, in its colours.

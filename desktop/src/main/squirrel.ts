@@ -11,6 +11,7 @@
 import { setOpenAtLogin } from "./login-item";
 import { removeStoreEntries } from "./install-tool";
 import { DEEP_LINK_SCHEME } from "@/shared/deep-link";
+import { registerMailHandler, unregisterMailHandler } from "./mail-handler";
 import { app } from "electron";
 import { spawn } from "node:child_process";
 import { basename, dirname, resolve } from "node:path";
@@ -33,7 +34,7 @@ export function handledSquirrelEvent(): boolean {
 
     if (event === "--squirrel-install" || event === "--squirrel-updated") {
         app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
-        updateThenQuit([`--createShortcut=${exe}`]);
+        void registerMailHandler(process.execPath).finally(() => updateThenQuit([`--createShortcut=${exe}`]));
         return true;
     }
     if (event === "--squirrel-uninstall") {
@@ -41,7 +42,9 @@ export function handledSquirrelEvent(): boolean {
         app.removeAsDefaultProtocolClient(DEEP_LINK_SCHEME);
         // The browser's store entry goes with the app; the extension stays
         // installed in the browser, where it is the user's to remove.
-        void removeStoreEntries().finally(() => updateThenQuit([`--removeShortcut=${exe}`]));
+        void Promise.allSettled([removeStoreEntries(), unregisterMailHandler()]).finally(() =>
+            updateThenQuit([`--removeShortcut=${exe}`])
+        );
         return true;
     }
     if (event === "--squirrel-obsolete") {

@@ -15,7 +15,7 @@ const { chmodSync, existsSync, renameSync, writeFileSync } = require("node:fs");
 
 const ICON = path.join(__dirname, "assets", "icon");
 const env = process.env;
-const LINK_MIME_TYPES = ["x-scheme-handler/polaris"];
+const LINK_MIME_TYPES = ["x-scheme-handler/polaris", "x-scheme-handler/mailto"];
 
 /** macOS: signed with a Developer ID when one is given, notarized when the Apple
  *  account is given as well. Hardened runtime is what notarization requires. */
@@ -54,7 +54,12 @@ module.exports = {
         appBundleId: "io.github.fjrg2007.polaris",
         // macOS reads the links an app answers from its bundle, Linux from the
         // desktop entries below (LINK_MIME_TYPES); Windows registers them itself.
-        protocols: [{ name: "Polaris", schemes: ["polaris"] }],
+        // mailto makes Polaris one of the mail apps offered; Windows' list is
+        // written at runtime (src/main/mail-handler.ts).
+        protocols: [
+            { name: "Polaris", schemes: ["polaris"] },
+            { name: "Mail link", schemes: ["mailto"] }
+        ],
         appCategoryType: "public.app-category.developer-tools",
         // macOS asks before a call reaches the microphone or camera, and shows
         // these words when it does.
