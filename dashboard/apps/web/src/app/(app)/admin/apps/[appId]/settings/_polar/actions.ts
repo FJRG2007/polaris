@@ -13,6 +13,9 @@ import { setSetting } from "@/lib/setting-store";
 import { INSTANCE_KEY } from "@/lib/agents/session-capacity";
 import { poolSchema, writePool } from "@/lib/agents/session-placement";
 import { warmSchema, writeWarm } from "@/lib/agents/session-spares";
+import { checkReach } from "@/lib/agents/pool-reach";
+import { readPool } from "@/lib/agents/session-placement";
+import type { Reach } from "@/lib/agents/pool-reach-state";
 
 const saveSchema = z.object({
     pool: poolSchema,
@@ -50,4 +53,24 @@ export async function savePolarCodeAction(input: unknown): Promise<{ error?: str
     });
     revalidatePath(appSettingsPath("polar"));
     return {};
+}
+
+/**
+ * Ask a server whether it reaches Polaris, now. Any server with an engine may be
+ * asked - one about to be added included - but only a pool server's answer is
+ * kept, since that is the only one placement reads.
+ */
+export async function checkPoolReachAction(hostId: unknown): Promise<{ reach?: Reach; error?: string }> {
+    await requireAdmin();
+    const t = await getTranslations("polar");
+    const parsed = z.string().uuid().safeParse(hostId);
+    if (!parsed.success) return { error: t("admin.code.errors.invalid") };
+    const host = await prisma.host.findFirst({
+        where: { id: parsed.data, dockerId: { not: null } },
+        select: { id: true }
+    });
+    if (!host) return { error: t("admin.code.errors.noEngine") };
+    const pool = await readPool();
+    const ids = pool.servers.map((server) => server.hostId);
+    return { reach: await checkReach(host.id, ids.includes(host.id) ? ids : []) };
 }

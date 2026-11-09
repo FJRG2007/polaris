@@ -58,6 +58,13 @@ export const sessionFiles = (sessionId: string, signal?: AbortSignal) =>
         signal
     );
 
+export const sessionPreview = (sessionId: string, signal?: AbortSignal) =>
+    readPoll<Answer<typeof actions.sessionPreviewAction>>(
+        "/api/agents/sessions/preview",
+        { sessionId },
+        signal
+    );
+
 export const sessionFile = (
     input: Parameters<typeof actions.sessionFileAction>[0],
     signal?: AbortSignal

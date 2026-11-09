@@ -901,10 +901,11 @@
         "noBranchMatch": "Ninguna rama",
         "branchesFailed": "No se pudieron leer las ramas. Escribe una para usarla.",
         "pane": {
-            "open": "Archivos, cambios y terminal",
+            "open": "Archivos, vista previa y terminal",
             "title": "Entorno",
             "noRepo": "Un espacio sin repositorio",
             "files": "Archivos",
+            "preview": "Vista previa",
             "changes": "Cambios",
             "terminal": "Terminal",
             "terminalEnded": "La sesión ha terminado, así que su terminal está cerrado.",
@@ -920,6 +921,29 @@
             "binary": "No es un archivo de texto.",
             "tooLarge": "Este archivo es demasiado grande para mostrarlo aquí.",
             "missing": "Este archivo ya no existe."
+        },
+        "preview": {
+            "none": "Aún no hay ningún servidor web en esta sesión.",
+            "noneHint": "Pide al agente que arranque uno. Ya sabe cómo hacer que aparezca aquí.",
+            "inside": "El puerto {ports} solo escucha dentro de la sesión. Pide al agente que lo arranque en 0.0.0.0.",
+            "ended": "Esta sesión no está en marcha, así que no hay nada que ver.",
+            "unavailable": "Las vistas previas solo están aquí mientras la sesión corre en una máquina que gestiona Polaris.",
+            "failed": "No se pudieron leer los servidores web de la sesión. Inténtalo en un momento.",
+            "ports": "Servidores web",
+            "port": "Puerto {port}",
+            "reload": "Recargar",
+            "openTab": "Abrir en pestaña nueva",
+            "address": "Enlace de esta vista previa",
+            "frame": "Vista previa del puerto {port}",
+            "hotReload": "Aquí los cambios no se recargan solos. Recarga para verlos.",
+            "errors": {
+                "notFound": "No hay ninguna vista previa en esta dirección.",
+                "gone": "Esta sesión ya no está en marcha.",
+                "refused": "Nada responde en el puerto {port} de esta sesión. Arranca el servidor o revisa su puerto.",
+                "older": "Esta sesión empezó antes de que existieran las vistas previas. Empieza una nueva para verlas.",
+                "unreachable": "No se pudo llegar al servidor de la sesión ahora. Inténtalo en un momento.",
+                "slow": "El servidor del puerto {port} tardó demasiado en responder."
+            }
         }
     },
     "compare": {
@@ -1005,6 +1029,15 @@
             "errors": {
                 "invalid": "Algún valor está fuera de rango. Revisa los números y guarda de nuevo.",
                 "noEngine": "Uno de los servidores no tiene un Docker al que Polaris llegue. Quítalo o arréglalo en Servidores."
+            },
+            "reach": {
+                "asking": "Comprobando que llega a Polaris...",
+                "never": "Sin comprobar",
+                "ok": "Llega a Polaris",
+                "blocked": "No llega a {url}. Sus sesiones nunca darían señales, así que no se le envía ninguna hasta que llegue.",
+                "noTool": "No se pudo comprobar: este servidor no tiene curl ni wget.",
+                "down": "Polaris no pudo conectarse a este servidor para comprobarlo.",
+                "check": "Comprobar"
             }
         }
     }

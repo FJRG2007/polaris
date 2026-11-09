@@ -20,14 +20,15 @@
  * person rather than for anybody. That is also what keeps the cost honest - a
  * spare exists only while somebody is in Code, never as an idle fleet.
  *
- * What a spare costs, measured on a home server: the container is 0.5 MB of
+ * What a spare costs, measured on a home server: the container is 2.8 MB of
  * memory and no CPU while it waits (tmux is installed and asleep); the image is
  * the one sessions already use. Bounded per server by the administrator, and
  * gone after its expiry unless the person is still in Code.
  *
- * Kept in the settings table, one row per account (`polar.code.spare.u.<id>`),
- * so a reservation is read by key and taken by a conditional delete: two tabs
- * sending at once cannot both take one.
+ * Kept in `AgentSpare`, one row per account, so a reservation is read by key
+ * and taken by a conditional delete: two tabs sending at once cannot both take
+ * one. Counted per server and swept by expiry through its indexes, so neither
+ * reads every spare there is.
  */
 
 import { z } from "zod";
@@ -75,52 +76,40 @@ export async function writeWarm(settings: WarmSettings): Promise<void> {
     await setSetting(WARM_KEY, JSON.stringify(warmSchema.parse(settings)));
 }
 
-const SPARE_PREFIX = "polar.code.spare.u.";
+/** Where spares were kept before they had a table; removed by the sweep. */
+const LEGACY_PREFIX = "polar.code.spare.u.";
 
-const spareSchema = z.object({
-    id: z.string().uuid(),
-    hostId: z.string().uuid().nullable(),
-    expiresAt: z.number()
-});
+/** How many expired spares one sweep takes down. The next sweep takes the rest. */
+const SWEEP_BATCH = 200;
 
-type Spare = z.infer<typeof spareSchema>;
-
-function spareKey(userId: string): string {
-    return `${SPARE_PREFIX}${userId}`;
+interface Spare {
+    readonly sessionId: string;
+    readonly hostId: string | null;
+    readonly expiresAt: Date;
 }
 
-function parseSpare(value: string | null): Spare | null {
-    if (!value) return null;
-    try {
-        const parsed = spareSchema.safeParse(JSON.parse(value));
-        return parsed.success ? parsed.data : null;
-    } catch {
-        return null;
-    }
-}
+const SPARE_FIELDS = { sessionId: true, hostId: true, expiresAt: true } as const;
 
-/**
- * Every reservation, with its account. Bounded: there is at most one per
- * person in Code, and `perServer` caps them per machine.
- */
-// enigma: a settings-table prefix scan; a table of its own with an index on
-// (hostId, expiresAt) when spares are counted in the tens of thousands.
-async function allSpares(take = 5000): Promise<{ userId: string; spare: Spare; raw: string }[]> {
-    const rows = await prisma.setting.findMany({
-        where: { key: { startsWith: SPARE_PREFIX } },
-        select: { key: true, value: true },
-        take
+/** Which of these container ids are spares still waiting for a session, for
+ *  the sweep of leftover containers, which would otherwise take a spare for a
+ *  container nobody owns. */
+export async function reservedSpareIds(ids: readonly string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const rows = await prisma.agentSpare.findMany({
+        where: { sessionId: { in: [...ids] } },
+        select: { sessionId: true }
     });
-    return rows.flatMap((row) => {
-        const spare = parseSpare(row.value);
-        return spare ? [{ userId: row.key.slice(SPARE_PREFIX.length), spare, raw: row.value }] : [];
-    });
+    return new Set(rows.map((row) => row.sessionId));
 }
 
-/** The ids of every reserved spare, for the sweep of leftover containers,
- *  which would otherwise take a spare for a container nobody owns. */
-export async function reservedSpareIds(): Promise<Set<string>> {
-    return new Set((await allSpares()).map((entry) => entry.spare.id));
+/** Spares still waiting, per server. One grouped read over the index. */
+async function waitingPerServer(now: number): Promise<Map<string | null, number>> {
+    const groups = await prisma.agentSpare.groupBy({
+        by: ["hostId"],
+        where: { expiresAt: { gt: new Date(now) } },
+        _count: { _all: true }
+    });
+    return new Map(groups.map((group) => [group.hostId, group._count._all]));
 }
 
 /**
@@ -135,30 +124,27 @@ export async function keepSpare(userId: string, now = Date.now()): Promise<boole
     try {
         const warm = await readWarm();
         if (!warm.enabled || warm.perServer === 0) return false;
-        const expiresAt = now + warm.minutes * 60_000;
-        const key = spareKey(userId);
-        const current = await getSetting(key);
-        const held = parseSpare(current);
-        if (held && held.expiresAt > now) {
+        const expiresAt = new Date(now + warm.minutes * 60_000);
+        const held = await prisma.agentSpare.findUnique({ where: { userId }, select: SPARE_FIELDS });
+        if (held && held.expiresAt.getTime() > now) {
             // Pushed back only once half of it has run: Code asks every minute
             // while it is open, and a write per open tab per minute is a write
             // nobody needed.
-            if (held.expiresAt - now < (warm.minutes * 60_000) / 2)
-                await setSetting(key, JSON.stringify({ ...held, expiresAt }));
+            if (held.expiresAt.getTime() - now < (warm.minutes * 60_000) / 2) {
+                await prisma.agentSpare.updateMany({
+                    where: { userId, sessionId: held.sessionId },
+                    data: { expiresAt }
+                });
+            }
             return true;
         }
 
-        const [pool, box, spares, home] = await Promise.all([
+        const [pool, box, perServer, home] = await Promise.all([
             readPool(),
             totalCeiling(),
-            allSpares(),
+            waitingPerServer(now),
             homeOf(userId)
         ]);
-        const perServer = new Map<string | null, number>();
-        for (const { spare } of spares) {
-            if (spare.expiresAt > now)
-                perServer.set(spare.hostId, (perServer.get(spare.hostId) ?? 0) + 1);
-        }
         // Where a session would go, among the machines with room for a spare.
         const candidates = (await poolCandidates(pool, box)).filter(
             (candidate) => (perServer.get(candidate.hostId) ?? 0) < warm.perServer
@@ -166,23 +152,27 @@ export async function keepSpare(userId: string, now = Date.now()): Promise<boole
         const hostId = choosePlacement(candidates, home);
         if (hostId === undefined) return false;
 
-        const spare: Spare = { id: randomUUID(), hostId, expiresAt };
-        // Only if nothing took the key since it was read: two tabs opening Code
+        const spare: Spare = { sessionId: randomUUID(), hostId, expiresAt };
+        // Only if nothing took the row since it was read: two tabs opening Code
         // at once start one spare, not two.
-        const { count } = current
-            ? await prisma.setting.updateMany({
-                  where: { key, value: current },
-                  data: { value: JSON.stringify(spare) }
+        const { count } = held
+            ? await prisma.agentSpare.updateMany({
+                  where: { userId, sessionId: held.sessionId },
+                  data: { ...spare, createdAt: new Date(now) }
               })
-            : await prisma.setting.createMany({
-                  data: [{ key, value: JSON.stringify(spare), scope: "global" }],
+            : await prisma.agentSpare.createMany({
+                  data: [{ userId, ...spare }],
                   skipDuplicates: true
               });
         if (count !== 1) return true;
         // The one it replaced had expired; its container goes now rather than
-        // at the next sweep.
-        if (held) await removeSpareContainer(held);
-        await startContainer({ id: spare.id, hostId, ownerId: userId, sharedHome: false }, {}, commands.SPARE_BOOT);
+        // at the next sweep - unless a session was made of it meanwhile.
+        if (held) await removeUnclaimed(held);
+        await startContainer(
+            { id: spare.sessionId, hostId, ownerId: userId, sharedHome: false },
+            {},
+            commands.SPARE_BOOT
+        );
         return true;
     } catch (error) {
         console.error(`[agent-spare] could not prepare a spare for ${userId}:`, error);
@@ -215,13 +205,13 @@ export async function takeSpare(
 ): Promise<{ id: string; hostId: string | null } | null> {
     if (session.place !== "local" || session.sharedHome) return null;
     try {
-        const key = spareKey(userId);
-        const raw = await getSetting(key);
-        const spare = parseSpare(raw);
-        if (!raw || !spare || spare.expiresAt <= now) return null;
+        const spare = await prisma.agentSpare.findUnique({ where: { userId }, select: SPARE_FIELDS });
+        if (!spare || spare.expiresAt.getTime() <= now) return null;
         if (session.useMachineLogin && spare.hostId !== null) return null;
-        const { count } = await prisma.setting.deleteMany({ where: { key, value: raw } });
-        return count === 1 ? { id: spare.id, hostId: spare.hostId } : null;
+        const { count } = await prisma.agentSpare.deleteMany({
+            where: { userId, sessionId: spare.sessionId }
+        });
+        return count === 1 ? { id: spare.sessionId, hostId: spare.hostId } : null;
     } catch {
         return null;
     }
@@ -262,30 +252,68 @@ export async function claimSpare(
     }
 }
 
-async function removeSpareContainer(spare: Spare): Promise<void> {
+/** Take a spare's container down, unless a session was created under its id
+ *  in the meantime - then the container is that session's. */
+async function removeUnclaimed(spare: Spare): Promise<void> {
+    const session = await prisma.agentSession.findUnique({
+        where: { id: spare.sessionId },
+        select: { id: true }
+    });
+    if (session) return;
     await withContainerPorts(spare.hostId, (ports) =>
-        ports.composeDown(commands.sessionContainerName(spare.id))
+        ports.composeDown(commands.sessionContainerName(spare.sessionId))
     ).catch(() => undefined);
 }
 
+const legacySchema = z.object({ id: z.string().uuid(), hostId: z.string().uuid().nullable() });
+
 /**
- * Take down the spares nobody used. A reservation past its expiry goes, and
- * its container with it - unless a session was created under its id in the
- * meantime, in which case the container is that session's.
+ * Reservations from before the table, kept as settings rows. Their containers
+ * go with them: one on a pool server is found by nothing else, since the pool's
+ * leftover sweep reads session rows and a spare has none. Bounded per run.
+ */
+async function sweepLegacy(): Promise<void> {
+    const rows = await prisma.setting.findMany({
+        where: { key: { startsWith: LEGACY_PREFIX } },
+        select: { key: true, value: true },
+        take: SWEEP_BATCH
+    });
+    for (const row of rows) {
+        let parsed: z.infer<typeof legacySchema> | null = null;
+        try {
+            const result = legacySchema.safeParse(JSON.parse(row.value));
+            parsed = result.success ? result.data : null;
+        } catch {
+            parsed = null;
+        }
+        if (parsed) {
+            await removeUnclaimed({ sessionId: parsed.id, hostId: parsed.hostId, expiresAt: new Date(0) });
+        }
+        await prisma.setting.deleteMany({ where: { key: row.key } });
+    }
+}
+
+/**
+ * Take down the spares nobody used: a reservation past its expiry goes, and
+ * its container with it. Bounded per run; the rest wait for the next one.
  */
 export async function sweepSpares(now = Date.now()): Promise<number> {
+    await sweepLegacy().catch(() => undefined);
+    const cutoff = new Date(now);
+    const expired = await prisma.agentSpare.findMany({
+        where: { expiresAt: { lte: cutoff } },
+        select: { userId: true, ...SPARE_FIELDS },
+        orderBy: { expiresAt: "asc" },
+        take: SWEEP_BATCH
+    });
     let removed = 0;
-    for (const { userId, spare, raw } of await allSpares()) {
-        if (spare.expiresAt > now) continue;
-        const { count } = await prisma.setting.deleteMany({
-            where: { key: spareKey(userId), value: raw }
+    for (const spare of expired) {
+        // Only if it was not pushed back or replaced since it was read.
+        const { count } = await prisma.agentSpare.deleteMany({
+            where: { userId: spare.userId, sessionId: spare.sessionId, expiresAt: { lte: cutoff } }
         });
         if (count !== 1) continue;
-        const session = await prisma.agentSession.findUnique({
-            where: { id: spare.id },
-            select: { id: true }
-        });
-        if (!session) await removeSpareContainer(spare);
+        await removeUnclaimed(spare);
         removed += 1;
     }
     return removed;

@@ -8,10 +8,11 @@
  * administrator never chose.
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { runAction } from "@/lib/run-action";
-import { Loader2, Trash2 } from "lucide-react";
-import { savePolarCodeAction } from "./actions";
+import { Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { checkPoolReachAction, savePolarCodeAction } from "./actions";
+import type { Reach } from "@/lib/agents/pool-reach-state";
 import { ServerPicker } from "@/components/server-picker";
 import type { PolarCodeAdmin, PoolServerRow } from "./data";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -100,6 +101,13 @@ export function PolarCodeView({ initial }: { initial: PolarCodeAdmin }) {
                                         : t("admin.code.pool.unusable", { address: server.address })
                                 }
                                 warn={!server.usable}
+                                reach={
+                                    <ReachLine
+                                        hostId={server.hostId}
+                                        reach={server.reach}
+                                        onReach={(reach) => changeServer(server.hostId, { reach })}
+                                    />
+                                }
                                 live={server.live}
                                 sessions={server.sessions}
                                 onSessions={(sessions) => changeServer(server.hostId, { sessions })}
@@ -130,7 +138,8 @@ export function PolarCodeView({ initial }: { initial: PolarCodeAdmin }) {
                                             address: server.address,
                                             sessions: NEW_SERVER_SESSIONS,
                                             live: 0,
-                                            usable: true
+                                            usable: true,
+                                            reach: null
                                         }
                                     ]
                                 });
@@ -200,11 +209,78 @@ export function PolarCodeView({ initial }: { initial: PolarCodeAdmin }) {
     );
 }
 
+/**
+ * Whether a server reaches Polaris, as it was last asked, and asking again.
+ * A server added just now is asked at once, so what it lacks is said before
+ * the pool is saved rather than after its first session goes quiet.
+ */
+function ReachLine({
+    hostId,
+    reach,
+    onReach
+}: {
+    hostId: string;
+    reach: Reach | null;
+    onReach: (reach: Reach) => void;
+}) {
+    const t = useTranslations("polar");
+    const [asking, setAsking] = useState(false);
+    const [error, setError] = useState("");
+
+    const asked = useRef(false);
+
+    const ask = useCallback(async () => {
+        asked.current = true;
+        setAsking(true);
+        setError("");
+        const result = await runAction(() => checkPoolReachAction(hostId), setError);
+        setAsking(false);
+        if (result?.reach) onReach(result.reach);
+    }, [hostId, onReach]);
+
+    // Asked once by itself, for a server that has never been asked.
+    useEffect(() => {
+        if (!reach && !asked.current) void ask();
+    }, [reach, ask]);
+
+    const said = asking
+        ? t("admin.code.reach.asking")
+        : error
+          ? error
+          : !reach
+            ? t("admin.code.reach.never")
+            : t(`admin.code.reach.${reach.state}`, { url: reach.url });
+    const bad = !asking && (Boolean(error) || reach?.state === "blocked" || reach?.state === "down");
+    return (
+        <div className="flex min-w-0 items-center gap-1">
+            <p
+                role={bad ? "alert" : undefined}
+                className={cn("min-w-0 truncate text-xs", bad ? "text-warning" : "text-muted-foreground")}
+                title={said}
+            >
+                {said}
+            </p>
+            <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 shrink-0"
+                onClick={() => void ask()}
+                disabled={asking}
+                aria-label={t("admin.code.reach.check")}
+                title={t("admin.code.reach.check")}
+            >
+                {asking ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+            </Button>
+        </div>
+    );
+}
+
 /** One machine of the pool: its name, how full it is, and what it may hold. */
 function MachineRow({
     name,
     detail,
     warn,
+    reach,
     live,
     sessions,
     enabled,
@@ -215,6 +291,8 @@ function MachineRow({
     name: string;
     detail: string;
     warn?: boolean;
+    /** Whether it reaches Polaris; only a pool server is asked. */
+    reach?: ReactNode;
     live: number;
     sessions: number;
     /** Only this box can be switched off rather than removed. */
@@ -234,6 +312,7 @@ function MachineRow({
                 <p className={cn("truncate text-xs", warn ? "text-warning" : "text-muted-foreground")} title={detail}>
                     {detail}
                 </p>
+                {reach}
             </div>
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                 {t("admin.code.pool.live", { live, sessions })}

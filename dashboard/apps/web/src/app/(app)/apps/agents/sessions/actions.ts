@@ -26,6 +26,7 @@ import * as repoOptions from "@/lib/agents/repo-options";
 import { sessionCursorSchema } from "@/lib/agents/session-cursor";
 import * as review from "@/lib/agents/session-review";
 import * as files from "@/lib/agents/session-files";
+import * as preview from "@/lib/agents/session-preview";
 import * as history from "@/lib/agents/session-history";
 import { appBaseUrl } from "@/lib/domain-service";
 import { safeChangePath } from "@/lib/agents/session-changes";
@@ -614,6 +615,18 @@ export async function sessionFilesAction(sessionId: string): Promise<{ answer?: 
     const session = await controlledSession(parsed.data);
     if (!session) return { error: t("sessions.errors.gone") };
     return { answer: await files.listSessionFiles(session.id) };
+}
+
+/** The web servers it runs, for the preview beside a Code thread. */
+export async function sessionPreviewAction(
+    sessionId: string
+): Promise<{ answer?: preview.PreviewPortsAnswer; error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = sessionIdSchema.safeParse(sessionId);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await controlledSession(parsed.data);
+    if (!session) return { error: t("sessions.errors.gone") };
+    return { answer: await preview.sessionPreviewPorts(session.id) };
 }
 
 /** One file of it. The path is checked again where it is read. */

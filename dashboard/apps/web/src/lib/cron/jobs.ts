@@ -65,6 +65,8 @@ import { sweepSessionQueue } from "@/lib/agents/session-queue";
 import { advanceActiveRuns } from "@/lib/agents/orchestration-service";
 import { reapLeftoverContainers, reapPoolLeftovers } from "@/lib/agents/leftover-containers";
 import { sweepSpares } from "@/lib/agents/session-spares";
+import { readPool } from "@/lib/agents/session-placement";
+import { recheckReach } from "@/lib/agents/pool-reach";
 import { removeLeftoverVolumes } from "@/lib/deploy/leftover-volumes";
 import { sealAuditChain, verifyAuditChain } from "@/lib/audit-chain";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
@@ -1100,4 +1102,8 @@ async function sweepAgentLeftovers(): Promise<void> {
     await reapLeftoverContainers().catch(() => 0);
     await reapPoolLeftovers().catch(() => 0);
     await sweepSpares().catch(() => 0);
+    // Whether each pool server still reaches Polaris, a few servers a run.
+    await readPool()
+        .then((pool) => recheckReach(pool.servers.map((server) => server.hostId)))
+        .catch(() => 0);
 }

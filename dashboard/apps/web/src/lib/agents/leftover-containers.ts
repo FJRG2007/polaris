@@ -137,10 +137,6 @@ async function endedAt(kind: Kind, ids: string[]): Promise<Ended> {
 /** Take down every leftover container on this machine. Returns how many went. */
 export async function reapLeftoverContainers(now = new Date()): Promise<number> {
     const daemon = new HostdClient();
-    // A spare waiting for its message has no session row yet; it is the spare
-    // sweep's (`session-spares`), not this one's.
-    const spares = await reservedSpareIds().catch(() => null);
-    if (!spares) return 0;
     let reaped = 0;
     for (const { prefix, kind } of KINDS) {
         const containers = await listed(daemon, prefix);
@@ -149,13 +145,18 @@ export async function reapLeftoverContainers(now = new Date()): Promise<number> 
         const ids = containers
             .map((container) => (container.project ?? container.name).slice(prefix.length))
             .filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+        // A spare waiting for its message has no session row yet; it is the
+        // spare sweep's (`session-spares`), not this one's. Not knowing which
+        // are spares is not knowing which are leftovers.
+        const spares = kind === "session" ? await reservedSpareIds(ids).catch(() => null) : new Set();
+        if (!spares) continue;
         const ended = await endedAt(kind, ids);
         for (const project of leftoverProjects(containers, prefix, ended.at, now)) {
             // Only an id-shaped name, so nothing else that happens to share the
             // prefix is ever taken down.
             const id = project.slice(prefix.length);
             if (!/^[0-9a-f-]{36}$/i.test(id)) continue;
-            if (kind === "session" && spares.has(id)) continue;
+            if (spares.has(id)) continue;
             if (ended.unsaved.has(id)) {
                 const outcome = await endContainerSession(id).catch((error) => {
                     console.error(`polaris: could not save the work of session ${id}:`, error);

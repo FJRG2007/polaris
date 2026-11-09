@@ -9088,6 +9088,23 @@ model AgentSession {
     @@index([hostId])
 }
 
+// A container started for somebody while they are in Polar Code, waiting for
+// the session they are about to send (see `lib/agents/session-spares.ts`). One
+// per account; taken by a conditional delete, so two tabs cannot both take it.
+model AgentSpare {
+    userId    String   @id @db.Uuid
+    // The id the session it becomes is created under - its container's name.
+    sessionId String   @unique @db.Uuid
+    // The pool server it runs on; null is this box.
+    hostId    String?  @db.Uuid
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+
+    // Counting the waiting spares per server, and the sweep of expired ones.
+    @@index([hostId, expiresAt])
+    @@index([expiresAt])
+}
+
 // One thing a session reported, normalised.
 //
 // Written by the machine the session runs on, through the ingest endpoint, and

@@ -644,6 +644,25 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
 }
 
 /**
+ * What Claude Code is told about the preview, appended to its system prompt
+ * where the session has one (`POLARIS_PREVIEW_BASE`). Without it the agent
+ * binds its servers to localhost, which nothing outside the container reaches,
+ * and starts a framework at the root, whose page then asks for its scripts at
+ * Polaris's root.
+ *
+ * Placed inside double quotes in the launch line and read again by `sh -c`, so
+ * it holds no double quote, dollar sign, backtick or backslash of its own; the
+ * one variable in it is expanded when the line is built.
+ */
+export const PREVIEW_PROMPT =
+    "Polaris shows the web servers this session runs in a Preview tab beside the chat. " +
+    "Bind a server to 0.0.0.0, not localhost, or the preview cannot reach it. " +
+    "Port N opens at the path ${POLARIS_PREVIEW_BASE}/N/ of the Polaris address. " +
+    "A plain server works as it is; when a framework dev server needs a base path to run under a path " +
+    "(Vite --base, Next.js basePath, Astro base), start it with that path. " +
+    "Hot reload does not reach the preview, which is reloaded from its tab.";
+
+/**
  * Starts the agent, or reopens one of its conversations.
  *
  * A file rather than lines in the setup, so anything that has to start the agent
@@ -691,6 +710,7 @@ export const LAUNCH_SCRIPT = [
     // the repository's own .claude and .mcp.json. See PREPARE_WORKTREE.
     'if [ "$POLARIS_AGENT_CONFIG" = "claude" ]; then',
     '  line="$line --settings \\"$POLARIS_STATE_DIR/settings.json\\" --mcp-config \\"$POLARIS_STATE_DIR/mcp.json\\""',
+    `  if [ -n "\${POLARIS_PREVIEW_BASE:-}" ]; then line="$line --append-system-prompt \\"${PREVIEW_PROMPT}\\""; fi`,
     "fi",
     'if [ -n "$id" ]; then echo "polaris: starting $POLARIS_AGENT_COMMAND on conversation $id"; else echo "polaris: starting $POLARIS_AGENT_COMMAND"; fi',
     // Written last, so anything holding a prompt knows the terminal it is about

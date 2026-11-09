@@ -20,6 +20,8 @@ import { prisma } from "@polaris/db";
 import { getCapabilities } from "@polaris/config";
 import { HostdClient } from "@polaris/hostd-client";
 import * as deploy from "@polaris/deploy";
+import { ALIVE_STATES } from "@/lib/agents/session-capacity";
+import { sessionNetwork } from "@/lib/agents/session-network";
 
 /**
  * How an environment made from the Deploy screen keeps its services: closed to
@@ -181,7 +183,28 @@ export async function wantedPrivateNetworks(): Promise<string[]> {
         const links = await prisma.privateLink.findMany({ select: { id: true }, take: MAX_LINKS });
         for (const link of links) wanted.add(deploy.crossLinkNetwork(link.id));
     }
+    for (const name of await liveSessionNetworks()) wanted.add(name);
     return [...wanted].sort();
+}
+
+/**
+ * The networks of the Code sessions running on this box (see
+ * `sessionNetworks`). Wanted, so Polaris's own containers are attached to them
+ * again after an update recreates them - the preview dials over them. Bounded
+ * by the box's session ceiling. A read that fails leaves them out, which keeps
+ * them while a session is on them and only skips the attaching.
+ */
+async function liveSessionNetworks(): Promise<string[]> {
+    try {
+        const rows = await prisma.agentSession.findMany({
+            where: { place: "local", hostId: null, state: { in: [...ALIVE_STATES] } },
+            select: { id: true },
+            take: 5000
+        });
+        return rows.map((row) => sessionNetwork(row.id));
+    } catch {
+        return [];
+    }
 }
 
 /**

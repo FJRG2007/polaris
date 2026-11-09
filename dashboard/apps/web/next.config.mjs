@@ -96,6 +96,13 @@ const WEBPACK_CACHE_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000;
 const nextConfig = {
     output: "standalone",
     reactStrictMode: true,
+    // A Code session's preview (`/api/agents/preview/...`) is somebody's web
+    // server: `/3000/` and `/3000/docs/` must reach it as they were asked, or
+    // its relative addresses resolve one level up and a server that redirects a
+    // directory to its slash loops with Next taking the slash off again. Next's
+    // own slash removal is done by the first redirect below instead, for every
+    // other path.
+    skipTrailingSlashRedirect: true,
     env: { NEXT_PUBLIC_POLARIS_BUILD_STAMP: BUILD_STAMP },
     // Next only compiles in a separate worker by default when there is no custom
     // `webpack` hook, and there is one below. Without the worker, the server, edge
@@ -177,6 +184,9 @@ const nextConfig = {
     // permanence buys here is an unfixable mistake. The landing screen now answers
     // at /home for the same reason - a path nobody's browser has a stale answer for.
     redirects: async () => [
+        // What Next did itself before `skipTrailingSlashRedirect`, everywhere but
+        // a session's preview.
+        { source: "/:path((?!api/agents/preview/).+)/", destination: "/:path", permanent: true },
         { source: "/notifications", destination: "/account/notifications", permanent: false },
         // Signed webhooks moved into Automations; deploy hooks went to each
         // service's settings in Deploy.

@@ -7,6 +7,7 @@ import { prisma } from "@polaris/db";
 import { ALIVE_STATES, totalCeiling } from "@/lib/agents/session-capacity";
 import { readPool } from "@/lib/agents/session-placement";
 import { readWarm, type WarmSettings } from "@/lib/agents/session-spares";
+import { readReach, type Reach } from "@/lib/agents/pool-reach-state";
 
 export interface PoolServerRow {
     readonly hostId: string;
@@ -17,6 +18,8 @@ export interface PoolServerRow {
     /** Enrolled, switched on, answering and with a container engine. A server
      *  that is not is skipped by placement until it is again. */
     readonly usable: boolean;
+    /** Whether it reached Polaris when last asked; null before the first time. */
+    readonly reach: Reach | null;
 }
 
 export interface PolarCodeAdmin {
@@ -28,7 +31,12 @@ export interface PolarCodeAdmin {
 }
 
 export async function polarCodeAdmin(): Promise<PolarCodeAdmin> {
-    const [pool, boxSessions, warm] = await Promise.all([readPool(), totalCeiling(), readWarm()]);
+    const [pool, boxSessions, warm, reach] = await Promise.all([
+        readPool(),
+        totalCeiling(),
+        readWarm(),
+        readReach()
+    ]);
     const ids = pool.servers.map((server) => server.hostId);
     const [hosts, counts] = await Promise.all([
         ids.length
@@ -69,7 +77,8 @@ export async function polarCodeAdmin(): Promise<PolarCodeAdmin> {
                     sessions: server.sessions,
                     live: live.get(host.id) ?? 0,
                     usable:
-                        host.status === "active" && host.offlineSince === null && host.dockerId !== null
+                        host.status === "active" && host.offlineSince === null && host.dockerId !== null,
+                    reach: reach[host.id] ?? null
                 }
             ];
         })

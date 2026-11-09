@@ -24,6 +24,7 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { reachBlocked, readReach, type Reach } from "./pool-reach-state";
 
 /** Where the pool is stored. */
 export const POOL_KEY = "polar.code.pool";
@@ -143,7 +144,7 @@ export async function poolCandidates(
     boxCeiling: number
 ): Promise<Candidate[]> {
     const ids = pool.servers.map((server) => server.hostId);
-    const [hosts, counts] = await Promise.all([
+    const [hosts, counts, reach] = await Promise.all([
         ids.length
             ? prisma.host.findMany({
                   where: {
@@ -159,10 +160,15 @@ export async function poolCandidates(
             by: ["hostId"],
             where: { place: "local", state: { in: ALIVE } },
             _count: { _all: true }
-        })
+        }),
+        ids.length ? readReach() : Promise.resolve<Record<string, Reach>>({})
     ]);
     const live = new Map(counts.map((row) => [row.hostId, row._count._all]));
-    const usable = new Set(hosts.map((host) => host.id));
+    // A server that could not reach Polaris when last asked would start
+    // sessions that never report back (see `pool-reach`).
+    const usable = new Set(
+        hosts.map((host) => host.id).filter((id) => !reachBlocked(reach[id]))
+    );
     const candidates: Candidate[] = [];
     if (pool.box) candidates.push({ hostId: null, ceiling: boxCeiling, live: live.get(null) ?? 0 });
     for (const server of pool.servers) {

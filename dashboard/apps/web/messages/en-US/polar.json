@@ -901,10 +901,11 @@
         "noBranchMatch": "No branch matches",
         "branchesFailed": "Couldn't read the branches. Type one to use it.",
         "pane": {
-            "open": "Files, changes and terminal",
+            "open": "Files, preview and terminal",
             "title": "Workspace",
             "noRepo": "A workspace with no repository",
             "files": "Files",
+            "preview": "Live preview",
             "changes": "Changes",
             "terminal": "Terminal",
             "terminalEnded": "This session has ended, so its terminal is closed.",
@@ -920,6 +921,29 @@
             "binary": "This is not a text file.",
             "tooLarge": "This file is too large to show here.",
             "missing": "This file is no longer there."
+        },
+        "preview": {
+            "none": "No web server is running in this session yet.",
+            "noneHint": "Ask the agent to start one. It already knows how to make it show up here.",
+            "inside": "Port {ports} only listens inside the session. Ask the agent to start it on 0.0.0.0.",
+            "ended": "This session is not running, so there is nothing to preview.",
+            "unavailable": "Previews are only here while the session runs on a machine Polaris manages.",
+            "failed": "The session's web servers could not be read. Try again in a moment.",
+            "ports": "Web servers",
+            "port": "Port {port}",
+            "reload": "Reload",
+            "openTab": "Open in a new tab",
+            "address": "Address of this preview",
+            "frame": "Preview of port {port}",
+            "hotReload": "Changes do not reload here by themselves. Reload to see them.",
+            "errors": {
+                "notFound": "There is no preview at this address.",
+                "gone": "This session is not running any more.",
+                "refused": "Nothing answers on port {port} in this session. Start the server, or check its port.",
+                "older": "This session started before previews existed. Start a new session to preview its servers.",
+                "unreachable": "The session's server could not be reached just now. Try again in a moment.",
+                "slow": "The server on port {port} took too long to answer."
+            }
         }
     },
     "compare": {
@@ -1005,6 +1029,15 @@
             "errors": {
                 "invalid": "Some values are out of range. Check the numbers and save again.",
                 "noEngine": "One of the servers has no Docker that Polaris can reach. Remove it or fix it in Servers."
+            },
+            "reach": {
+                "asking": "Checking that it reaches Polaris...",
+                "never": "Not checked yet",
+                "ok": "Reaches Polaris",
+                "blocked": "Cannot reach {url}. Sessions here would never report back, so none are sent here until it can.",
+                "noTool": "Could not check: this server has neither curl nor wget.",
+                "down": "Polaris could not connect to this server to check.",
+                "check": "Check again"
             }
         }
     }

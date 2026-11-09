@@ -50,6 +50,7 @@ import { syncFinalSessionHistory } from "./session-history";
 import { totalCeiling } from "./session-capacity";
 import { startContainer } from "./session-container";
 import { claimSpare } from "./session-spares";
+import { previewBase } from "./session-preview-link";
 import * as placement from "./session-placement";
 import {
     addSessionMessage,
@@ -150,6 +151,10 @@ interface Bootstrap {
     readonly repoSetup: string;
     /** Whether a failing setup script stops the session before the agent starts. */
     readonly repoSetupRequired: boolean;
+    /** The path on Polaris's address a web server in the container is previewed
+     *  under, a port after it. Empty where there is no preview: a session on
+     *  somebody's own account on a server. See `session-preview`. */
+    readonly previewBase: string;
     /** What signs the agent in, narrowed to the variables its own tool reads.
      *  Empty on a machine where the tool is already signed in, and empty for a
      *  tool Polaris holds no sourced credential for. */
@@ -334,6 +339,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         gitCredential: session.repoFullName ? gitCredentialScript(credential, token) : "",
         repoSetup: setup?.setupScript.trim() ? asFile(setup.setupScript) : "",
         repoSetupRequired: setup?.setupRequired ?? false,
+        previewBase: session.place === "local" ? previewBase(session.id) : "",
         // The account the person picked wins over whatever would have resolved.
         // Somebody holding three subscriptions chose one of them on the form,
         // and a session that quietly used the first is a session doing the work
@@ -518,6 +524,9 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_GIT_CREDENTIAL: boot.gitCredential ? asFile(boot.gitCredential) : "",
         POLARIS_REPO_SETUP: boot.repoSetup,
         POLARIS_REPO_SETUP_REQUIRED: boot.repoSetupRequired ? "yes" : "",
+        // Told to the agent, so a framework that needs its base path can be
+        // started under it (see PREVIEW_PROMPT).
+        POLARIS_PREVIEW_BASE: boot.previewBase,
         ...boot.autonomyEnv,
         ...boot.credentials
     });
