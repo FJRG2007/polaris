@@ -629,6 +629,38 @@ export async function recordSessionConversation(
     });
 }
 
+/** Where a session's conversation lives, for a fork of it to reopen. Unscoped:
+ *  the boot asks, for a fork whose start was already checked. */
+export async function forkSource(sessionId: string): Promise<{
+    cli: string;
+    place: string;
+    hostId: string | null;
+    sharedHome: boolean;
+    ownerId: string | null;
+    transcriptPath: string | null;
+} | null> {
+    const row = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: {
+            cli: true,
+            place: true,
+            hostId: true,
+            sharedHome: true,
+            startedById: true,
+            transcriptPath: true
+        }
+    });
+    if (!row) return null;
+    return {
+        cli: row.cli,
+        place: row.place,
+        hostId: row.hostId,
+        sharedHome: row.sharedHome,
+        ownerId: row.startedById,
+        transcriptPath: row.transcriptPath
+    };
+}
+
 /** The agent's own id for the session's conversation, or null for none known. */
 export async function sessionVendorId(sessionId: string): Promise<string | null> {
     const row = await prisma.agentSession.findUnique({

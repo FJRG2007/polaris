@@ -31,6 +31,7 @@ import { safeChangePath } from "@/lib/agents/session-changes";
 import { addComment } from "@/lib/tasks/task-detail-service";
 import { noteIssueOfPull } from "@/lib/agents/issue-sessions";
 import * as loop from "@/lib/agents/session-review-loop";
+import * as forking from "@/lib/agents/session-fork";
 import { githubTokenForUser } from "@/lib/github-access";
 import {
     githubAppInstallationToken,
@@ -154,7 +155,19 @@ export async function startSessionAction(
             error: (message ? knownAgentText(t, message) : null) ?? t("sessions.errors.checkForm")
         };
     }
-    const value = parsed.data;
+    return startParsed(user.id, parsed.data, t, null);
+}
+
+/** Everything a start checks and does once the form has parsed. `fork` names
+ *  the session it is a fork of, and that session's Enigma choices, which the
+ *  form has no way to carry. */
+async function startParsed(
+    userId: string,
+    value: core.StartAgentSessionInput,
+    t: Awaited<ReturnType<typeof getTranslations>>,
+    fork: { parentId: string; enigma: core.EnigmaSettings | null } | null
+): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap }> {
+    const user = { id: userId };
 
     // Only when one was named. A workspace checks nothing out, so there is no
     // repository to own and nothing to verify - what it is allowed to be is
@@ -268,7 +281,10 @@ export async function startSessionAction(
         hostId: value.place === "host" ? value.hostId : null,
         baseRef: value.baseRef,
         taskId: value.taskId,
-        enigma: value.enigma
+        parentId: fork?.parentId ?? null,
+        enigma: fork
+            ? fork.enigma
+            : value.enigma
             ? {
                   enabled: value.enigma.enabled ?? null,
                   scope: value.enigma.scope ?? null,
@@ -305,6 +321,49 @@ export async function startSessionAction(
     await noteOnTask(session, user.id);
     revalidatePath(SESSIONS_PATH);
     return { id: session.id, queuedAt: admission.queuedAt };
+}
+
+/**
+ * A new session on the same work as another: its branch once that reached
+ * GitHub, the same agent, account and machine, and - where the agent can fork a
+ * conversation and the transcript is in the home the new one opens on - the
+ * conversation so far, as a copy the parent never sees. Goes through every check
+ * a start does, so a fork is never a way round one.
+ */
+export async function forkSessionAction(sessionId: string): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap }> {
+    const t = await getTranslations("agents");
+    const id = sessionIdSchema.safeParse(sessionId);
+    if (!id.success) return { error: t("session.changes.errors.invalid") };
+    const parent = await controlledSession(id.data);
+    if (!parent) return { error: t("sessions.errors.gone") };
+    if (!parent.repoId) return { error: t("session.fork.noRepo") };
+    const user = await requirePermission("agents.manage");
+    const parsed = core.startAgentSessionSchema.safeParse({
+        title: parent.title,
+        repoId: parent.repoId,
+        cli: parent.cli,
+        command: parent.command ?? undefined,
+        place: parent.place,
+        hostId: parent.hostId,
+        sharedHome: parent.sharedHome,
+        unattended: parent.unattended,
+        accountId: parent.accountId,
+        useMachineLogin: parent.useMachineLogin,
+        baseRef: forking.forkBaseRef(parent),
+        taskId: parent.taskId
+    });
+    if (!parsed.success) {
+        const message = parsed.error.issues[0]?.message;
+        return {
+            error: (message ? knownAgentText(t, message) : null) ?? t("sessions.errors.checkForm")
+        };
+    }
+    const stored = await prisma.agentSession.findUnique({
+        where: { id: parent.id },
+        select: { enigma: true }
+    });
+    const enigma = stored?.enigma ? core.parseEnigmaSettings(stored.enigma) : null;
+    return startParsed(user.id, parsed.data, t, { parentId: parent.id, enigma });
 }
 
 /**

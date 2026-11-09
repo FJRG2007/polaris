@@ -675,6 +675,12 @@ export const LAUNCH_SCRIPT = [
     '    *) id="" ;;',
     "  esac",
     "fi",
+    // A fork's first start reopens its parent's conversation as a new one of its
+    // own. Once: the marker is beside the checkout, so a later start - after the
+    // agent exited - is this session's own conversation rather than a second fork.
+    'if [ -z "$id" ] && [ -n "${POLARIS_AGENT_FORK:-}" ] && [ ! -e "$POLARIS_STATE_DIR/forked" ] && [ -f "$POLARIS_AGENT_FORK" ]; then',
+    '  case "$POLARIS_AGENT_FORK" in *[!A-Za-z0-9_./-]*) ;; *) line="$line --resume $POLARIS_AGENT_FORK --fork-session"; : > "$POLARIS_STATE_DIR/forked" ;; esac',
+    "fi",
     // Through Enigma where Polaris asked for it AND Enigma is actually here: the
     // install that put it there is best effort, and a launcher that did not
     // arrive falls back to the tool itself.

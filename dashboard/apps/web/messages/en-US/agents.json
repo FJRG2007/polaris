@@ -477,6 +477,13 @@
                 "conflict": "The branch changed or conflicts with its base. Refresh and try again.",
                 "failed": "GitHub did not merge the pull request. Try again in a moment."
             }
+        },
+        "fork": {
+            "action": "Fork",
+            "hint": "Start a new session on this work, carrying the conversation where the agent can.",
+            "noRepo": "A workspace has no branch to fork from.",
+            "from": "Forked from",
+            "parent": "the original session"
         }
     },
     "rules": {

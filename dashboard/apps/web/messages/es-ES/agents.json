@@ -477,6 +477,13 @@
                 "conflict": "La rama cambió o tiene conflictos con su base. Actualiza e inténtalo de nuevo.",
                 "failed": "GitHub no fusionó la pull request. Inténtalo de nuevo en un momento."
             }
+        },
+        "fork": {
+            "action": "Bifurcar",
+            "hint": "Abre una sesión nueva sobre este trabajo, con la conversación cuando el agente puede llevarla.",
+            "noRepo": "Un espacio de trabajo no tiene rama desde la que bifurcar.",
+            "from": "Bifurcada de",
+            "parent": "la sesión original"
         }
     },
     "rules": {

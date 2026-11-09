@@ -42,6 +42,7 @@ import {
     mcpConfig,
     shellQuote
 } from "./session-hooks";
+import * as fork from "./session-fork";
 import { endContainerSession, type SaveOutcome } from "./session-work";
 import { clearSessionWaiting, noticeSessionEnded } from "./agent-notices";
 import { syncFinalSessionHistory } from "./session-history";
@@ -49,6 +50,7 @@ import { sessionLimits } from "./session-capacity";
 import {
     addSessionMessage,
     finishSession,
+    forkSource,
     markSessionStarted,
     failureDetail,
     readableFailure,
@@ -122,6 +124,8 @@ interface Bootstrap {
     readonly agentLauncher: string;
     /** How the tool reopens a conversation, or empty. See `agentResumeStyle`. */
     readonly agentResume: string;
+    /** The parent's transcript a fork reopens, or empty. See `forkTranscript`. */
+    readonly agentFork: string;
     /** The whole of what installing Enigma means, base64 so it survives the
      *  daemon's rule about control characters. Empty when Enigma is off. */
     readonly enigmaSetup: string;
@@ -237,6 +241,14 @@ function workdirFor(session: SessionView): string {
     return session.repoFullName ? CONTAINER_WORKDIR : CONTAINER_WORKSPACE;
 }
 
+/** The parent's transcript a forked session reopens, or empty for any other. */
+async function forkTranscriptFor(session: SessionView, cli: string): Promise<string> {
+    if (!session.parentId) return "";
+    const parent = await forkSource(session.parentId);
+    if (!parent) return "";
+    return fork.forkTranscript({ ...session, cli }, parent);
+}
+
 async function bootstrapFor(session: SessionView, token: string): Promise<Bootstrap> {
     // A workspace checks nothing out, so it needs no installation and asks for
     // no token. Refusing to start one because an organization has not connected
@@ -284,6 +296,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         agentInstall: agent.install,
         agentLauncher: agent.launcher,
         agentResume: core.agentResumeStyle(agent.cli.id),
+        agentFork: await forkTranscriptFor(session, agent.cli.id),
         // Empty when Enigma is off, which is what the boot script tests for.
         // One script rather than an argv and a second script: it installs the
         // package globally so the agent can invoke `enigma`, then makes the
@@ -445,6 +458,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_AGENT_INSTALL: boot.agentInstall,
         POLARIS_AGENT_LAUNCHER: boot.agentLauncher,
         POLARIS_AGENT_RESUME: boot.agentResume,
+        POLARIS_AGENT_FORK: boot.agentFork,
         POLARIS_ENIGMA_SETUP: boot.enigmaSetup,
         POLARIS_ENIGMA_CONFIGURE: boot.enigmaConfigure,
         POLARIS_FIRST_RUN: boot.firstRun,
