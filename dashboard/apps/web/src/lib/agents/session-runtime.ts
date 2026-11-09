@@ -45,6 +45,7 @@ import {
 import { endContainerSession, type SaveOutcome } from "./session-work";
 import { clearSessionWaiting, noticeSessionEnded } from "./agent-notices";
 import { syncFinalSessionHistory } from "./session-history";
+import { sessionLimits } from "./session-capacity";
 import {
     addSessionMessage,
     finishSession,
