@@ -265,9 +265,10 @@ describe("tool inputs and decoders", () => {
         expect(toolInputSummary(null)).toBe("");
     });
 
-    it("exist for Claude Code only, until something records a Codex transcript", () => {
+    it("exist for the tools whose transcript format is sourced", () => {
         expect(transcriptDecoder("claude")).toBe(decodeClaudeLine);
-        expect(transcriptDecoder("codex")).toBeNull();
+        expect(transcriptDecoder("codex")).not.toBeNull();
+        expect(transcriptDecoder("gemini")).not.toBeNull();
         expect(transcriptDecoder("custom")).toBeNull();
     });
 });

@@ -327,7 +327,7 @@ describe("syncSessionHistory", () => {
             "skipped"
         );
         db.session!.transcriptPath = db.virtual;
-        db.session!.cli = "codex";
+        db.session!.cli = "copilot";
         expect(await syncSessionHistory(SESSION, { now: later(SYNC_DEBOUNCE_MS * 5) })).toBe(
             "skipped"
         );

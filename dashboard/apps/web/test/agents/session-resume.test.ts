@@ -191,8 +191,12 @@ describe("the resume line", () => {
         expect(launch("codex", VENDOR_ID).stdout).toContain(`codex resume ${VENDOR_ID} --yolo`);
     });
 
+    it("reopens Gemini CLI with its resume flag", () => {
+        expect(core.agentResumeStyle("gemini")).toBe("flag");
+    });
+
     it("offers no resume for a tool nothing has been sourced about", () => {
-        expect(core.agentResumeStyle("gemini")).toBe("");
+        expect(core.agentResumeStyle("copilot")).toBe("");
     });
 });
 
@@ -241,7 +245,7 @@ describe("the Resume action", () => {
             error: "sessions.errors.notResumable"
         });
         state.vendorId = VENDOR_ID;
-        state.session = { id: SESSION_ID, cli: "gemini", state: "idle" };
+        state.session = { id: SESSION_ID, cli: "copilot", state: "idle" };
         expect(await sessionResumableAction(SESSION_ID)).toEqual({ resumable: false });
         expect(state.resumed).toEqual([]);
     });
