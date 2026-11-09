@@ -24,6 +24,12 @@
  *   on a wide screen and the case where a mask or a captured wheel would both be
  *   wrong.
  *
+ * And one thing a tab strip owes on a phone: **the chosen entry is in view**. A
+ * strip opened on its sixth tab, or switched to it from a link, otherwise shows
+ * the first five and leaves nothing on screen saying which one is open. The
+ * chosen entry is whichever child says so - `aria-current`, `aria-selected` or
+ * `aria-checked` - so no strip has to pass anything for it.
+ *
  * Deliberately one element rather than a wrapper with the fades drawn over it:
  * this replaces the `div` or `ul` that was already there, in a dozen layouts
  * that had a border, a flex rule or a negative margin on it, and a wrapper would
@@ -33,6 +39,27 @@
 
 import { cn } from "../lib/cn";
 import { useCallback, useEffect, useRef, type ElementType, type ReactNode } from "react";
+
+/** The child a strip marks as the one that is open. */
+const CHOSEN = '[aria-current]:not([aria-current="false"]), [aria-selected="true"], [aria-checked="true"]';
+
+/**
+ * Bring the chosen child fully into view, sideways only.
+ *
+ * Not `scrollIntoView`: that scrolls every scrollable ancestor to reach it,
+ * which on a phone moves the whole page to wherever the strip is - the reader
+ * opened a tab, not asked to be taken to the top of the screen.
+ */
+function revealChosen(row: HTMLElement): void {
+    const chosen = row.querySelector<HTMLElement>(CHOSEN);
+    if (!chosen || row.scrollWidth - row.clientWidth <= 1) return;
+    const box = row.getBoundingClientRect();
+    const item = chosen.getBoundingClientRect();
+    // Past the faded end is not in view either, so the fade's width is kept clear.
+    const margin = Math.min(24, row.clientWidth / 4);
+    if (item.left < box.left + margin) row.scrollLeft -= box.left + margin - item.left;
+    else if (item.right > box.right - margin) row.scrollLeft += item.right - (box.right - margin);
+}
 
 /** How far a wheel notch moves the row. A notch is about a line of text, which
  *  sideways is nothing at all - this is roughly one item per notch. */
@@ -130,10 +157,35 @@ export function ScrollRow({
         // lose a fade - it throws while mounting and takes the whole screen down
         // with it, which is what happened the moment one of these was rendered
         // anywhere but a browser. The fades are a hint; the row is the component.
-        const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+        const resize =
+            typeof ResizeObserver === "undefined"
+                ? null
+                : new ResizeObserver(() => {
+                      // A phone turned, or the strip laid out once its font
+                      // arrived: the open entry may have moved off the side.
+                      revealChosen(node);
+                      measure();
+                  });
         resize?.observe(node);
-        const changes = typeof MutationObserver === "undefined" ? null : new MutationObserver(measure);
-        changes?.observe(node, { childList: true, subtree: true, characterData: true });
+        //
+        // A change to which child is chosen is watched too, and brings it into
+        // view: a strip whose tab changes from a link or a key press, not a tap
+        // on the tab itself, would otherwise leave the open one off the side.
+        const changes =
+            typeof MutationObserver === "undefined"
+                ? null
+                : new MutationObserver((records) => {
+                      if (records.some((record) => record.type === "attributes")) revealChosen(node);
+                      measure();
+                  });
+        changes?.observe(node, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+            attributes: true,
+            attributeFilter: ["aria-current", "aria-selected", "aria-checked"]
+        });
+        revealChosen(node);
         measure();
 
         return () => {

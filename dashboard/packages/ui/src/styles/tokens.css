@@ -503,6 +503,13 @@ html:has(.page-bleed) {
     border-color: hsl(var(--ring));
 }
 
+/* A strip that scrolls sideways clips whatever leaves it, which an outside ring
+   on a tab does by two pixels on every side. Inside a ScrollRow the ring is drawn
+   on the item's own edge instead. Zero specificity, like the rule above. */
+:where([data-scroll-row] :is(a, button, [role="button"], [role="tab"], [tabindex])):focus-visible {
+    outline-offset: -2px;
+}
+
 /* Something that appears or leaves moves on the same curve as everything that
    changes colour. tailwindcss-animate sets a name and a duration and leaves the
    timing to the browser's default `ease`, which is a second curve nobody chose.

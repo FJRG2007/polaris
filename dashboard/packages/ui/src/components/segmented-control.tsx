@@ -13,9 +13,15 @@
  *
  * Arrow keys move between the options and Home/End reach the ends, which is what
  * the pattern is expected to do and what none of the five copies did.
+ *
+ * More options than the width holds scroll sideways rather than shrink. It is
+ * also the tab strip of most detail screens - a UPS has eight - and options that
+ * shared out a phone's width came out as "O...", "E...", "P..." side by side:
+ * nothing on the row could be read. See dashboard/docs/design.md, "Tab strips".
  */
 
 import { cn } from "../lib/cn";
+import { ScrollRow } from "./scroll-row";
 import type { ReactNode } from "react";
 
 export interface SegmentedOption<T extends string> {
@@ -56,14 +62,14 @@ export function SegmentedControl<T extends string>({
     const anyActive = options.some((option) => option.value === value);
 
     return (
-        <div
+        <ScrollRow
             role="radiogroup"
             aria-label={ariaLabel}
-            // `min-w-0` and the truncation below are what keep a set of long
-            // labels inside a narrow column: without them the track keeps its
-            // natural width and runs off the side of whatever holds it.
+            // `min-w-0 max-w-full` keep the track inside a narrow column; what
+            // does not fit then scrolls (ScrollRow: wheel, faded ends, the
+            // chosen option kept in view) instead of running off the side.
             className={cn(
-                "inline-flex min-w-0 max-w-full items-center gap-0.5 rounded-md bg-muted p-0.5",
+                "no-scrollbar inline-flex min-w-0 max-w-full items-center gap-0.5 rounded-md bg-muted p-0.5",
                 className
             )}
         >
@@ -75,13 +81,7 @@ export function SegmentedControl<T extends string>({
                         type="button"
                         role="radio"
                         aria-checked={active}
-                        // Its own label when there is nothing more to say: a
-                        // narrow column truncates, and a truncated option that
-                        // cannot be hovered for the rest of it is a guess.
-                        title={
-                            option.title ??
-                            (typeof option.label === "string" ? option.label : undefined)
-                        }
+                        title={option.title}
                         disabled={option.disabled}
                         // Only the chosen option is in the tab order: one stop for
                         // the group, then the arrow keys choose within it.
@@ -105,7 +105,10 @@ export function SegmentedControl<T extends string>({
                             // out as "D..." - by half a pixel, which is the worst
                             // kind of wrong. Options size to their labels and share
                             // what is left over.
-                            "min-w-0 flex-1 basis-auto truncate rounded font-medium transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50",
+                            //
+                            // `shrink-0 whitespace-nowrap`: an option never gets
+                            // narrower than its label - the track scrolls instead.
+                            "flex-1 shrink-0 basis-auto whitespace-nowrap rounded font-medium transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50",
                             size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-[0.8125rem]",
                             active
                                 ? "border border-border-strong bg-card-hover text-foreground"
@@ -116,6 +119,6 @@ export function SegmentedControl<T extends string>({
                     </button>
                 );
             })}
-        </div>
+        </ScrollRow>
     );
 }

@@ -67,17 +67,15 @@ export function TimeView() {
 
     return (
         <div className="flex flex-col gap-4">
-            {/* Four tabs do not fit a phone at their full names, and cut down
-                to "Alar..." they say nothing: the row scrolls instead. */}
-            <div className="max-w-full self-start overflow-x-auto overscroll-x-contain">
-                <SegmentedControl
-                    aria-label={t("time.tabs.label")}
-                    value={tab}
-                    onValueChange={choose}
-                    options={options}
-                    className="w-max max-w-none"
-                />
-            </div>
+            {/* Four tabs do not fit a phone at their full names; the control
+                scrolls them rather than cutting them down to "Alar...". */}
+            <SegmentedControl
+                aria-label={t("time.tabs.label")}
+                value={tab}
+                onValueChange={choose}
+                options={options}
+                className="self-start"
+            />
             {tab === "alarms" ? (
                 <AlarmsPanel clock={clock} zone={zone} hour12={hour12} />
             ) : tab === "timers" ? (

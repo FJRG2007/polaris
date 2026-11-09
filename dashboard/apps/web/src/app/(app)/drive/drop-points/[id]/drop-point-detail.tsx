@@ -59,7 +59,8 @@ import {
     DialogContent,
     DialogDescription,
     Checkbox,
-    DateInput
+    DateInput,
+    ScrollRow
 } from "@polaris/ui";
 import {
     deleteFileRequestAction,
@@ -374,14 +375,15 @@ export function DropPointDetail({
                 </div>
             </div>
 
-            <div className="flex gap-1 border-b border-border">
+            <ScrollRow className="no-scrollbar flex gap-1 border-b border-border">
                 {tabs.map((entry) => (
                     <button
                         key={entry.id}
                         type="button"
                         onClick={() => setTab(entry.id)}
+                        aria-current={tab === entry.id ? "page" : undefined}
                         className={cn(
-                            "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors",
+                            "-mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors",
                             tab === entry.id
                                 ? "border-primary text-foreground"
                                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -394,7 +396,7 @@ export function DropPointDetail({
                         ) : null}
                     </button>
                 ))}
-            </div>
+            </ScrollRow>
 
             {tab === "overview" ? <OverviewTab config={config} /> : null}
             {tab === "files" ? (
