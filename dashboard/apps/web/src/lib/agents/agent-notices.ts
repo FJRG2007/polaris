@@ -23,9 +23,38 @@ export function sessionPushTag(sessionId: string): string {
     return `agent-session:${sessionId}`;
 }
 
-/** The page a session's notices point at. */
+/** The session's page in the Agents app. */
 export function sessionHref(sessionId: string): string {
     return `/apps/agents/sessions/${sessionId}`;
+}
+
+/** The same session opened in Polar's Code side. */
+export function polarSessionHref(sessionId: string): string {
+    return `/polar?session=${sessionId}`;
+}
+
+/** Every page a session's notices may point at, for finding them again. */
+function sessionHrefs(sessionId: string): string[] {
+    return [sessionHref(sessionId), polarSessionHref(sessionId)];
+}
+
+/**
+ * The page a session's notices point at, for the person they go to.
+ *
+ * Polar where that person can use it: a task started from Polar's composer
+ * belongs to the conversation it was typed into, and a notice that opened the
+ * Agents app instead dropped them on a page they had never seen. The Agents
+ * app for everybody else, since Polar's page sends them away.
+ */
+async function noticeHref(userId: string, sessionId: string): Promise<string> {
+    // Loaded here rather than at the top: Polar's access reads the session and
+    // auth modules, which nothing else that raises a notice needs. An answer
+    // that cannot be had keeps the Agents page, which works for everybody.
+    const use = await import("@/lib/polar/access")
+        .then((m) => m.polarAccessFor(userId))
+        .then((access) => access.use)
+        .catch(() => false);
+    return use ? polarSessionHref(sessionId) : sessionHref(sessionId);
 }
 
 /** The page a run's notices point at. */
@@ -82,7 +111,7 @@ export async function noticeSessionWaiting(sessionId: string): Promise<void> {
             event: WAITING_EVENT,
             title: t("agents.waitingTitle", { session: subject.title }),
             body: t("agents.waitingBody"),
-            href: sessionHref(subject.id),
+            href: await noticeHref(subject.ownerId, subject.id),
             actionRequired: true,
             metadata: { sessionId: subject.id },
             push: { tag: sessionPushTag(subject.id), requireInteraction: true }
@@ -106,7 +135,7 @@ export async function clearSessionWaiting(sessionId: string, userId?: string): P
         await prisma.notification.updateMany({
             where: {
                 type: WAITING_EVENT,
-                href: sessionHref(sessionId),
+                href: { in: sessionHrefs(sessionId) },
                 ...(userId ? { userId } : {}),
                 OR: [{ readAt: null }, { actionRequired: true }]
             },
@@ -125,7 +154,7 @@ export async function clearSessionWaiting(sessionId: string, userId?: string): P
 export async function readSessionWaiting(sessionId: string, userId: string): Promise<void> {
     try {
         await prisma.notification.updateMany({
-            where: { type: WAITING_EVENT, href: sessionHref(sessionId), userId, readAt: null },
+            where: { type: WAITING_EVENT, href: { in: sessionHrefs(sessionId) }, userId, readAt: null },
             data: { readAt: new Date() }
         });
     } catch (error) {
@@ -163,7 +192,7 @@ export async function pushPermissionRequest(
             event: WAITING_EVENT,
             title: t("agents.permissionTitle", { session: subject.title }),
             body: detail || t("agents.waitingBody"),
-            href: sessionHref(subject.id),
+            href: await noticeHref(subject.ownerId, subject.id),
             push: {
                 tag: sessionPushTag(subject.id),
                 requireInteraction: true,
@@ -198,7 +227,7 @@ export async function noticeSessionEnded(sessionId: string, reason: EndedReason)
             event: "agent.ended",
             title: t("agents.endedTitle", { session: subject.title }),
             body: t(ENDED_BODY[reason]),
-            href: sessionHref(subject.id),
+            href: await noticeHref(subject.ownerId, subject.id),
             level: reason === "exited" ? "info" : reason === "failed" ? "danger" : "warning",
             metadata: { sessionId: subject.id, reason },
             push: { tag: sessionPushTag(subject.id) }
@@ -219,7 +248,7 @@ export async function noticeWorkKept(sessionId: string, branch: string): Promise
             event: "agent.work",
             title: t("agents.workKeptTitle", { session: subject.title }),
             body: t("agents.workKeptBody", { branch }),
-            href: sessionHref(subject.id),
+            href: await noticeHref(subject.ownerId, subject.id),
             actionRequired: true,
             metadata: { sessionId: subject.id, branch }
         });
@@ -234,7 +263,7 @@ export async function clearWorkKept(sessionId: string): Promise<void> {
         await prisma.notification.updateMany({
             where: {
                 type: "agent.work",
-                href: sessionHref(sessionId),
+                href: { in: sessionHrefs(sessionId) },
                 OR: [{ readAt: null }, { actionRequired: true }]
             },
             data: { readAt: new Date(), actionRequired: false }

@@ -100,7 +100,12 @@ vi.mock("@polaris/db", () => {
                 }) => {
                     let count = 0;
                     for (const row of db.notifications) {
-                        if (row.type !== where.type || row.href !== where.href) continue;
+                        // A plain href, or Prisma's `{ in: [...] }` for a notice that
+                        // may point at either of a session's pages.
+                        const href = where.href as string | { in: string[] };
+                        const matches =
+                            typeof href === "string" ? row.href === href : href.in.includes(row.href);
+                        if (row.type !== where.type || !matches) continue;
                         if (where.userId && row.userId !== where.userId) continue;
                         Object.assign(row, data);
                         count += 1;
