@@ -25,6 +25,7 @@ import * as work from "@/lib/agents/session-work";
 import * as repoOptions from "@/lib/agents/repo-options";
 import { sessionCursorSchema } from "@/lib/agents/session-cursor";
 import * as review from "@/lib/agents/session-review";
+import * as files from "@/lib/agents/session-files";
 import * as history from "@/lib/agents/session-history";
 import { appBaseUrl } from "@/lib/domain-service";
 import { safeChangePath } from "@/lib/agents/session-changes";
@@ -603,6 +604,28 @@ export async function sessionFileDiffAction(
     const session = await controlledSession(parsed.data.sessionId);
     if (!session) return { error: t("sessions.errors.gone") };
     return { answer: await review.sessionFileDiff(session, parsed.data.path) };
+}
+
+/** The files in a running session's checkout, for the workspace beside it. */
+export async function sessionFilesAction(sessionId: string): Promise<{ answer?: files.FilesAnswer; error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = sessionIdSchema.safeParse(sessionId);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await controlledSession(parsed.data);
+    if (!session) return { error: t("sessions.errors.gone") };
+    return { answer: await files.listSessionFiles(session.id) };
+}
+
+/** One file of it. The path is checked again where it is read. */
+export async function sessionFileAction(
+    input: unknown
+): Promise<{ answer?: files.FileAnswer; error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = z.object({ sessionId: sessionIdSchema, path: z.string().min(1).max(1024) }).safeParse(input);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await controlledSession(parsed.data.sessionId);
+    if (!session) return { error: t("sessions.errors.gone") };
+    return { answer: await files.readSessionFile(session.id, parsed.data.path) };
 }
 
 export interface SessionShipView {

@@ -899,7 +899,28 @@
         "branchDefault": "default",
         "branchUse": "Use \"{name}\"",
         "noBranchMatch": "No branch matches",
-        "branchesFailed": "Couldn't read the branches. Type one to use it."
+        "branchesFailed": "Couldn't read the branches. Type one to use it.",
+        "pane": {
+            "open": "Files, changes and terminal",
+            "title": "Workspace",
+            "noRepo": "A workspace with no repository",
+            "files": "Files",
+            "changes": "Changes",
+            "terminal": "Terminal",
+            "terminalEnded": "This session has ended, so its terminal is closed.",
+            "search": "Find a file",
+            "refresh": "Read the files again",
+            "filesFailed": "The files could not be read. Try again in a moment.",
+            "filesUnavailable": "The files are only here while the session runs on a machine Polaris manages.",
+            "noMatch": "No file matches that.",
+            "empty": "No files yet.",
+            "more": "Showing {shown} of {total}. Search to find the rest.",
+            "pick": "Pick a file to read it.",
+            "fileFailed": "This file could not be read just now.",
+            "binary": "This is not a text file.",
+            "tooLarge": "This file is too large to show here.",
+            "missing": "This file is no longer there."
+        }
     },
     "compare": {
         "open": "Ask several models",
@@ -947,5 +968,44 @@
         "clearFailed": "Couldn't clear the goal. Try again.",
         "none": "No goal set. Type /goal and what done looks like.",
         "tooLong": "A goal can be up to {max} characters."
+    },
+    "admin": {
+        "code": {
+            "page": {
+                "title": "Polar",
+                "description": "Where Code sessions run and how fast they start."
+            },
+            "pool": {
+                "title": "Where sessions run",
+                "hint": "Each new session goes to the least busy machine here. Add servers to hold more sessions at once.",
+                "box": "This server",
+                "boxHint": "The machine Polaris runs on",
+                "useBox": "Run sessions on this server",
+                "unusable": "{address} - offline or without Docker, skipped for now",
+                "live": "{live} / {sessions} running",
+                "sessionsFor": "Sessions at once on {name}",
+                "add": "Add a server",
+                "remove": "Remove {name}",
+                "total": "Up to {count} sessions at once in total.",
+                "nowhere": "Turn this server on or add one: sessions need somewhere to run."
+            },
+            "warm": {
+                "title": "Instant start",
+                "hint": "While someone has Code open, a machine is prepared for them, so their first message starts the agent right away.",
+                "enabled": "Prepare a machine in advance",
+                "cost": "A waiting machine uses about 3 MB of memory and no CPU.",
+                "minutes": "Keep it for",
+                "minutesHint": "After Code is closed, the machine waits this long before it is removed.",
+                "minutesSuffix": "minutes",
+                "perServer": "Most at once per server",
+                "perServerHint": "Beyond this, sessions start the normal way, a few seconds slower.",
+                "perServerSuffix": "machines"
+            },
+            "save": "Save",
+            "errors": {
+                "invalid": "Some values are out of range. Check the numbers and save again.",
+                "noEngine": "One of the servers has no Docker that Polaris can reach. Remove it or fix it in Servers."
+            }
+        }
     }
 }

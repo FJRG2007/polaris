@@ -11,7 +11,7 @@ import { getLocale } from "@/lib/i18n/request";
 import { pickMessages } from "@/lib/i18n/translate";
 
 const askable = z
-    .array(z.enum(["automations"]))
+    .array(z.enum(["automations", "agents"]))
     .min(1)
     .max(4);
 

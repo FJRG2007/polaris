@@ -36,6 +36,10 @@ vi.mock("@/lib/deploy/ports-hostd", () => ({
         composeDown = state.composeDown;
     }
 }));
+const spares = { ids: new Set<string>() };
+vi.mock("@/lib/agents/session-spares", () => ({
+    reservedSpareIds: async () => spares.ids
+}));
 vi.mock("@/lib/agents/session-work", () => ({
     endContainerSession: state.endContainerSession,
     releaseContainer: state.releaseContainer
@@ -100,6 +104,17 @@ describe("reaping a session that ended on its own", () => {
                 Created: Math.floor(ago(86_400_000).getTime() / 1000)
             }
         ];
+    });
+
+    it("leaves a spare waiting for its message to the spare sweep", async () => {
+        state.sessions = [];
+        spares.ids = new Set([ID]);
+        try {
+            expect(await reapLeftoverContainers(NOW)).toBe(0);
+            expect(state.releaseContainer).not.toHaveBeenCalled();
+        } finally {
+            spares.ids = new Set();
+        }
     });
 
     it("saves its work first instead of taking the container down blind", async () => {

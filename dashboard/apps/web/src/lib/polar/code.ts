@@ -29,7 +29,8 @@ import { sessionCursor } from "@/lib/agents/session-cursor";
 import { dedupeCodeRows, POLAR_CODE_PAGE, polarCodeEditSchema } from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
 import * as repoOptions from "@/lib/agents/repo-options";
-import { hideSessionFromPolar, renameSession } from "@/lib/agents/session-service";
+import { hideSessionFromPolar, renameSession, type SessionView } from "@/lib/agents/session-service";
+import { keepSpare } from "@/lib/agents/session-spares";
 import {
     listSessionsAction,
     promptSessionAction,
@@ -75,6 +76,12 @@ export interface PolarCodeThread {
     readonly session: PolarCodeRow;
     readonly entries: readonly PolarCodeEntry[];
     readonly error: string | null;
+    /** The session as the Agents app has it, for the workspace beside the
+     *  thread - its changes and its terminal read from this. */
+    readonly view: SessionView;
+    /** Whether this reader may steer it: the terminal and the files are only
+     *  offered to somebody who could start a session. */
+    readonly canManage: boolean;
 }
 
 /** As many lines of activity as the thread shows; the session's own page keeps
@@ -147,7 +154,8 @@ export async function polarCodeThread(
     user: SessionUser,
     sessionId: string
 ): Promise<PolarCodeThread | null> {
-    if ((await accessOf(user)) === "none") return null;
+    const access = await accessOf(user);
+    if (access === "none") return null;
     const [detail, t] = await Promise.all([
         sessionDetailAction(sessionId),
         getTranslations("agents")
@@ -176,7 +184,9 @@ export async function polarCodeThread(
     return {
         session: rowOf(t, detail.session),
         entries,
-        error: detail.session.error ? agentText(t, detail.session.error) : null
+        error: detail.session.error ? agentText(t, detail.session.error) : null,
+        view: detail.session,
+        canManage: access === "manage"
     };
 }
 
@@ -280,6 +290,16 @@ export async function polarCodeStart(
         });
     }
     return startSessionAction(input);
+}
+
+/**
+ * Have this person's session machine waiting while they type. Called when Code
+ * opens and again while it stays open; answers whether a spare is ready or on
+ * its way. Nothing for somebody who could not start a session anyway.
+ */
+export async function polarCodeWarm(user: SessionUser): Promise<{ warm: boolean }> {
+    if ((await accessOf(user)) !== "manage") return { warm: false };
+    return { warm: await keepSpare(user.id) };
 }
 
 /** Say the next thing to a running session, through the Agents app's own reply. */

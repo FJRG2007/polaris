@@ -24,8 +24,19 @@ export function sessionPullPolicy(lastPulledAt: number | null, now: number): Com
         : "always";
 }
 
-let lastPulledAt: number | null = null;
-let refreshing: Promise<void> | null = null;
+/** Per server: each one keeps its own copy of the image, so each one is
+ *  refreshed on its own day. `BOX` is this machine. */
+const BOX = "box";
+const pulls = new Map<string, { lastPulledAt: number | null; refreshing: Promise<void> | null }>();
+
+function stateFor(server: string) {
+    let state = pulls.get(server);
+    if (!state) {
+        state = { lastPulledAt: null, refreshing: null };
+        pulls.set(server, state);
+    }
+    return state;
+}
 
 /**
  * Bring a session container up with `up`, and keep the image fresh with
@@ -42,34 +53,36 @@ let refreshing: Promise<void> | null = null;
 export async function upWithFreshImage(
     up: (pullPolicy: ComposePullPolicy) => Promise<void>,
     refresh: () => Promise<void>,
-    now: () => number = Date.now
+    now: () => number = Date.now,
+    server: string = BOX
 ): Promise<void> {
+    const state = stateFor(server);
     // On backup access the data saver keeps the cached image: a refresh is a pull
     // of the whole image over the backup line. One that is missing still pulls.
     const saver = await import("@/lib/backup-access")
         .then((m) => m.dataSaverActive())
         .catch(() => false);
     await up("missing");
-    if (saver || refreshing || sessionPullPolicy(lastPulledAt, now()) === "missing") return;
-    refreshing = refresh()
+    if (saver || state.refreshing || sessionPullPolicy(state.lastPulledAt, now()) === "missing")
+        return;
+    state.refreshing = refresh()
         .then(() => {
-            lastPulledAt = now();
+            state.lastPulledAt = now();
         })
         .catch((caught: unknown) => {
             console.warn("polaris: the session image could not be refreshed, using the cached one:", caught);
         })
         .finally(() => {
-            refreshing = null;
+            state.refreshing = null;
         });
 }
 
 /** For tests: the refresh running now, if any. */
-export function sessionImageRefreshing(): Promise<void> | null {
-    return refreshing;
+export function sessionImageRefreshing(server: string = BOX): Promise<void> | null {
+    return pulls.get(server)?.refreshing ?? null;
 }
 
 /** For tests: forget when the image was last refreshed. */
 export function resetSessionImageRefresh(): void {
-    lastPulledAt = null;
-    refreshing = null;
+    pulls.clear();
 }

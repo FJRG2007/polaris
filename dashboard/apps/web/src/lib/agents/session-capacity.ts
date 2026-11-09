@@ -27,6 +27,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import os from "node:os";
 import { getSetting } from "@/lib/setting-store";
+import { poolCeiling } from "@/lib/agents/session-placement";
 
 /** What an administrator may change these to. */
 export const PER_ACCOUNT_KEY = "agents.sessions.perAccount";
@@ -104,7 +105,9 @@ export async function sessionCapacity(userId: string): Promise<Capacity> {
         prisma.agentSession.count({ where: { startedById: userId, state: { in: ALIVE } } }),
         prisma.agentSession.count({ where: { state: { in: ALIVE } } }),
         ceiling(PER_ACCOUNT_KEY, DEFAULT_PER_ACCOUNT),
-        ceiling(INSTANCE_KEY, DEFAULT_TOTAL)
+        // The whole pool's: the box's own number plus every server an
+        // administrator gave Polar Code. See `session-placement`.
+        ceiling(INSTANCE_KEY, DEFAULT_TOTAL).then((box) => poolCeiling(box).catch(() => box))
     ]);
     return { mine, perAccount, total, totalCeiling };
 }

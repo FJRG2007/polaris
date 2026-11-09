@@ -19,7 +19,7 @@ import { Readable } from "node:stream";
 import { randomUUID } from "node:crypto";
 import { shellPath, shellQuote } from "./session-hooks";
 import * as commands from "./session-commands";
-import { HostdPorts } from "@/lib/deploy/ports-hostd";
+import { withContainerPorts } from "./session-ports";
 import type { SessionWorkReason } from "./session-service";
 import { clearWorkKept, noticeWorkKept } from "./agent-notices";
 import {
@@ -29,7 +29,7 @@ import {
 } from "@/lib/github-service";
 
 /** Where a checkout lives inside a session's container when the row has none. */
-const DEFAULT_WORKDIR = "/session/repo";
+export const DEFAULT_WORKDIR = "/session/repo";
 
 /** The line the script ends on, which is all of its output this reads. */
 const MARK = "polaris-work:";
@@ -229,6 +229,7 @@ export async function saveSessionWork(
         where: { id: sessionId },
         select: {
             place: true,
+            hostId: true,
             containerId: true,
             workdir: true,
             branch: true,
@@ -241,95 +242,101 @@ export async function saveSessionWork(
     const policy =
         options.neverDefault && row.repo.push === "enabled" ? "restricted" : row.repo.push;
 
-    const ports = new HostdPorts();
-    const kept = (reason: SessionWorkReason, commits = 0, branch = row.branch): SaveOutcome => ({
-        kind: "kept",
-        commits,
-        branch,
-        reason
-    });
+    const repoFullName = row.repo.repoFullName;
+    const runOnHost = options.host;
+    // Where the container is: this box, or the pool server it was placed on.
+    return withContainerPorts(onHost ? null : row.hostId, async (ports) => {
+        const kept = (reason: SessionWorkReason, commits = 0, branch = row.branch): SaveOutcome => ({
+            kind: "kept",
+            commits,
+            branch,
+            reason
+        });
 
-    let authFile = "";
-    let defaultBranch = "";
-    // On a server the script travels through sshd's stdin, never a command line,
-    // so the credential can be written by the script itself; a container is
-    // reached through an argv the daemon can see, so it gets a file first.
-    let prelude = "";
-    if (policy !== "disabled") {
-        const [owner = "", name = ""] = row.repo.repoFullName.split("/");
-        const token = await githubAppInstallationToken(owner).catch(() => null);
-        const repo = token ? await resolveGithubRepo(owner, name, token).catch(() => null) : null;
-        if (token && !repo) return kept("unreachable");
-        defaultBranch = repo?.defaultBranch ?? "";
-        const header = cloneAuthHeader(token);
-        if (header) {
-            const path = `/tmp/polaris-push-${randomUUID()}`;
-            if (onHost) {
-                prelude = `(umask 077; printf '%s' ${shellQuote(header)} > ${shellQuote(path)})\n`;
-                authFile = path;
-            } else {
-                const bytes = Buffer.from(header, "utf8");
-                try {
-                    await ports.writeFile(
-                        row.containerId!,
-                        path,
-                        Readable.from([bytes]),
-                        bytes.length
-                    );
+        let authFile = "";
+        let defaultBranch = "";
+        // On a server the script travels through sshd's stdin, never a command line,
+        // so the credential can be written by the script itself; a container is
+        // reached through an argv the daemon can see, so it gets a file first.
+        let prelude = "";
+        if (policy !== "disabled") {
+            const [owner = "", name = ""] = repoFullName.split("/");
+            const token = await githubAppInstallationToken(owner).catch(() => null);
+            const repo = token ? await resolveGithubRepo(owner, name, token).catch(() => null) : null;
+            if (token && !repo) return kept("unreachable");
+            defaultBranch = repo?.defaultBranch ?? "";
+            const header = cloneAuthHeader(token);
+            if (header) {
+                const path = `/tmp/polaris-push-${randomUUID()}`;
+                if (onHost) {
+                    prelude = `(umask 077; printf '%s' ${shellQuote(header)} > ${shellQuote(path)})\n`;
                     authFile = path;
-                } catch (error) {
-                    console.error(
-                        `polaris: could not hand session ${sessionId} its push credential:`,
-                        error
-                    );
-                    return kept("unreachable");
+                } else {
+                    const bytes = Buffer.from(header, "utf8");
+                    try {
+                        if (!ports.writeFile) throw new Error("this engine cannot write a file");
+                        await ports.writeFile(
+                            row.containerId!,
+                            path,
+                            Readable.from([bytes]),
+                            bytes.length
+                        );
+                        authFile = path;
+                    } catch (error) {
+                        console.error(
+                            `polaris: could not hand session ${sessionId} its push credential:`,
+                            error
+                        );
+                        return kept("unreachable");
+                    }
                 }
             }
         }
-    }
 
-    let output: string;
-    try {
-        const script = saveWorkScript({
-            workdir: row.workdir || DEFAULT_WORKDIR,
-            branch: row.branch,
-            defaultBranch,
-            policy,
-            authFile,
-            message: options.message
-        });
-        const result = onHost
-            ? await options.host!(prelude + script)
-            : await ports.runIn(row.containerId!, commands.shellArgv(script));
-        output = result.output;
-    } catch (error) {
-        console.error(`polaris: could not reach session ${sessionId} to save its work:`, error);
-        return kept("unreachable");
-    }
+        let output: string;
+        try {
+            const script = saveWorkScript({
+                workdir: row.workdir || DEFAULT_WORKDIR,
+                branch: row.branch,
+                defaultBranch,
+                policy,
+                authFile,
+                message: options.message
+            });
+            const result = onHost
+                ? await runOnHost!(prelude + script)
+                : await ports.runIn(row.containerId!, commands.shellArgv(script));
+            output = result.output;
+        } catch (error) {
+            console.error(`polaris: could not reach session ${sessionId} to save its work:`, error);
+            return kept("unreachable");
+        }
 
-    const parsed = parseSaveWork(output);
-    if (!parsed) {
-        console.error(`polaris: saving the work of session ${sessionId} said nothing usable`);
-        return kept("other");
-    }
-    const branch = parsed.branch || row.branch;
-    switch (parsed.status) {
-        case "none":
-            return { kind: "none" };
-        case "clean":
-            return { kind: "clean", branch };
-        case "pushed":
-            return { kind: "pushed", commits: parsed.commits, branch };
-        case "refused":
-            return kept("policy", parsed.commits, branch);
-        case "noauth":
-            return kept("auth", parsed.commits, branch);
-        case "rejected":
-            console.error(`polaris: the push for session ${sessionId} was refused:`, parsed.said);
-            return kept(pushFailureReason(parsed.said), parsed.commits, branch);
-        default:
-            return kept("other", parsed.commits, branch);
-    }
+        const parsed = parseSaveWork(output);
+        if (!parsed) {
+            console.error(`polaris: saving the work of session ${sessionId} said nothing usable`);
+            return kept("other");
+        }
+        const branch = parsed.branch || row.branch;
+        switch (parsed.status) {
+            case "none":
+                return { kind: "none" };
+            case "clean":
+                return { kind: "clean", branch };
+            case "pushed":
+                return { kind: "pushed", commits: parsed.commits, branch };
+            case "refused":
+                return kept("policy", parsed.commits, branch);
+            case "noauth":
+                return kept("auth", parsed.commits, branch);
+            case "rejected":
+                console.error(`polaris: the push for session ${sessionId} was refused:`, parsed.said);
+                return kept(pushFailureReason(parsed.said), parsed.commits, branch);
+            default:
+                return kept("other", parsed.commits, branch);
+        }
+    //ENDWRAP
+    });
 }
 
 /** Write the outcome on the session, for its page. */
@@ -357,30 +364,34 @@ async function recordOutcome(sessionId: string, outcome: SaveOutcome): Promise<v
  * outside a container. Best effort: a container that will not answer leaves an
  * empty-able directory behind, never a running container.
  */
-export async function releaseContainer(containerId: string): Promise<void> {
-    const ports = new HostdPorts();
-    await ports
-        .runIn(containerId, [
-            "sh",
-            "-c",
-            `rm -rf ${commands.SESSION_ROOT}/repo ${commands.SESSION_ROOT}/polaris`
-        ])
-        .catch(() => undefined);
-    await ports.composeDown(containerId).catch(() => undefined);
+export async function releaseContainer(
+    containerId: string,
+    hostId: string | null = null
+): Promise<void> {
+    await withContainerPorts(hostId, async (ports) => {
+        await ports
+            .runIn(containerId, [
+                "sh",
+                "-c",
+                `rm -rf ${commands.SESSION_ROOT}/repo ${commands.SESSION_ROOT}/polaris ${commands.CLAIM_FILE}`
+            ])
+            .catch(() => undefined);
+        await ports.composeDown(containerId).catch(() => undefined);
+    }).catch(() => undefined);
 }
 
 /** The container stays for its work, and restarts with the box, but its agent
  *  is not launched again on a session that is over. */
-async function markContainerEnded(containerId: string): Promise<void> {
-    await new HostdPorts()
-        .runIn(containerId, [
+async function markContainerEnded(containerId: string, hostId: string | null): Promise<void> {
+    await withContainerPorts(hostId, (ports) =>
+        ports.runIn(containerId, [
             "sh",
             "-c",
             `: > ${commands.SESSION_ROOT}/polaris/${commands.SESSION_ENDED_FILE}`
         ])
-        .catch((error) => {
-            console.error(`polaris: could not mark container ${containerId} as ended:`, error);
-        });
+    ).catch((error) => {
+        console.error(`polaris: could not mark container ${containerId} as ended:`, error);
+    });
 }
 
 /**
@@ -394,7 +405,7 @@ async function markContainerEnded(containerId: string): Promise<void> {
 export async function endContainerSession(sessionId: string): Promise<SaveOutcome> {
     const row = await prisma.agentSession.findUnique({
         where: { id: sessionId },
-        select: { containerId: true }
+        select: { containerId: true, hostId: true }
     });
     const outcome = await saveSessionWork(sessionId);
     await recordOutcome(sessionId, outcome).catch((error) => {
@@ -404,12 +415,12 @@ export async function endContainerSession(sessionId: string): Promise<SaveOutcom
         );
     });
     if (outcome.kind === "kept") {
-        if (row?.containerId) await markContainerEnded(row.containerId);
+        if (row?.containerId) await markContainerEnded(row.containerId, row.hostId);
         await noticeWorkKept(sessionId, outcome.branch);
         return outcome;
     }
     await clearWorkKept(sessionId);
-    if (row?.containerId) await releaseContainer(row.containerId);
+    if (row?.containerId) await releaseContainer(row.containerId, row.hostId);
     return outcome;
 }
 
@@ -417,12 +428,12 @@ export async function endContainerSession(sessionId: string): Promise<SaveOutcom
 export async function discardSessionWork(sessionId: string): Promise<void> {
     const row = await prisma.agentSession.findUnique({
         where: { id: sessionId },
-        select: { containerId: true }
+        select: { containerId: true, hostId: true }
     });
     await prisma.agentSession.update({
         where: { id: sessionId },
         data: { workState: "discarded", workError: null }
     });
     await clearWorkKept(sessionId);
-    if (row?.containerId) await releaseContainer(row.containerId);
+    if (row?.containerId) await releaseContainer(row.containerId, row.hostId);
 }

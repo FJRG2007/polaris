@@ -93,10 +93,14 @@ wss.on("connection", async (ws, req) => {
         return;
     }
 
+    // An agent session on a pool server is reached over that server's engine,
+    // which the ticket names; one on this box goes through the daemon.
     const session =
         ticket.mode === "docker"
             ? await openDockerSession(ticket, ws)
-            : await openContainerSession(ticket, ws, ticket.mode === "agent");
+            : ticket.mode === "agent" && ticket.docker
+              ? await openDockerSession(ticket, ws, ATTACH_TO_AGENT)
+              : await openContainerSession(ticket, ws, ticket.mode === "agent");
     if (!session) return;
 
     session.stream.on("data", (chunk) => {
@@ -257,7 +261,7 @@ async function openContainerSession(ticket, ws, attachToAgent = false) {
  * nothing itself - and the shell falls back to `sh` on an image without bash,
  * which is most of them.
  */
-async function openDockerSession(ticket, ws) {
+async function openDockerSession(ticket, ws, command = SHELL_IN_CONTAINER) {
     const target = ticket.docker;
     if (!target) {
         ws.close(4004, "connection unavailable");
@@ -268,11 +272,7 @@ async function openDockerSession(ticket, ws) {
         driver = new DockerDriver(streamRpc(dockerTransport(target)));
         // `exec` replaces the shell, so a failed one would end the session rather
         // than fall through - hence the test before it, not a `||`.
-        const exec = await driver.attach(ticket.containerRef, [
-            "/bin/sh",
-            "-c",
-            "[ -x /bin/bash ] && exec /bin/bash; exec /bin/sh"
-        ]);
+        const exec = await driver.attach(ticket.containerRef, command);
         console.error(`polaris ws: docker terminal open for ${ticket.containerRef}`);
         return {
             stream: exec.stream,
@@ -292,6 +292,9 @@ async function openDockerSession(ticket, ws) {
         return null;
     }
 }
+
+/** A shell in a container: bash where the image has it, else sh. */
+const SHELL_IN_CONTAINER = ["/bin/sh", "-c", "[ -x /bin/bash ] && exec /bin/bash; exec /bin/sh"];
 
 function dockerTransport(target) {
     if (target.transport === "socket") return socketTransport(target.socketPath);

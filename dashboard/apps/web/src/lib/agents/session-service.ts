@@ -440,6 +440,9 @@ export interface SessionCreateInput {
     readonly issueNumber?: number | null;
     /** The session it is a fork of. */
     readonly parentId?: string | null;
+    /** The id to create it under: a spare container's, which already carries
+     *  the name the session's container is found by. See `session-spares`. */
+    readonly id?: string;
 }
 
 /**
@@ -455,7 +458,7 @@ export async function createSession(
     input: SessionCreateInput
 ): Promise<{ session: SessionView; token: string }> {
     const token = generateToken();
-    const id = crypto.randomUUID();
+    const id = input.id ?? crypto.randomUUID();
     const record = await prisma.agentSession.create({
         data: {
             id,

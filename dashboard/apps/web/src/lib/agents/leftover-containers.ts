@@ -19,6 +19,7 @@ import { prisma } from "@polaris/db";
 import { HostdClient } from "@polaris/hostd-client";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { endContainerSession, releaseContainer } from "./session-work";
+import { reservedSpareIds } from "./session-spares";
 
 /** How long after its end a container is left alone: the teardown that ended it
  *  may still be running. A container with no row at all gets the same time from
@@ -136,6 +137,10 @@ async function endedAt(kind: Kind, ids: string[]): Promise<Ended> {
 /** Take down every leftover container on this machine. Returns how many went. */
 export async function reapLeftoverContainers(now = new Date()): Promise<number> {
     const daemon = new HostdClient();
+    // A spare waiting for its message has no session row yet; it is the spare
+    // sweep's (`session-spares`), not this one's.
+    const spares = await reservedSpareIds().catch(() => null);
+    if (!spares) return 0;
     let reaped = 0;
     for (const { prefix, kind } of KINDS) {
         const containers = await listed(daemon, prefix);
@@ -150,6 +155,7 @@ export async function reapLeftoverContainers(now = new Date()): Promise<number> 
             // prefix is ever taken down.
             const id = project.slice(prefix.length);
             if (!/^[0-9a-f-]{36}$/i.test(id)) continue;
+            if (kind === "session" && spares.has(id)) continue;
             if (ended.unsaved.has(id)) {
                 const outcome = await endContainerSession(id).catch((error) => {
                     console.error(`polaris: could not save the work of session ${id}:`, error);
@@ -169,6 +175,48 @@ export async function reapLeftoverContainers(now = new Date()): Promise<number> 
                 .then(() => (reaped += 1))
                 .catch(() => undefined);
         }
+    }
+    return reaped;
+}
+
+/**
+ * The same clean-up for the containers placed on pool servers.
+ *
+ * The box is asked what it runs, because a container there can outlive any
+ * record of it. A pool server is not: listing every server's containers on
+ * every pass is a connection per server per minute, and a container is only
+ * ever placed there by a session row that names the server. So the rows are
+ * the list - an ended session that still names a container, past its grace,
+ * with its work not kept - and `containerId` is cleared once it is taken down,
+ * so each one is visited once. Bounded per pass.
+ */
+export async function reapPoolLeftovers(now = new Date(), batch = 50): Promise<number> {
+    const rows = await prisma.agentSession.findMany({
+        where: {
+            place: "local",
+            hostId: { not: null },
+            containerId: { not: null },
+            state: { in: ["stopped", "failed"] },
+            finishedAt: { lt: new Date(now.getTime() - ENDED_GRACE_MS) },
+            OR: [{ workState: null }, { workState: { not: "kept" } }]
+        },
+        select: { id: true, hostId: true, containerId: true, workState: true },
+        orderBy: { finishedAt: "asc" },
+        take: batch
+    });
+    let reaped = 0;
+    for (const row of rows) {
+        if (!row.containerId) continue;
+        if (row.workState === null) {
+            const outcome = await endContainerSession(row.id).catch(() => null);
+            if (!outcome || outcome.kind === "kept") continue;
+        } else {
+            await releaseContainer(row.containerId, row.hostId);
+        }
+        await prisma.agentSession
+            .update({ where: { id: row.id }, data: { containerId: null } })
+            .then(() => (reaped += 1))
+            .catch(() => undefined);
     }
     return reaped;
 }

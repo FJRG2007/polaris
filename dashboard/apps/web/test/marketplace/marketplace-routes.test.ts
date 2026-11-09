@@ -48,6 +48,9 @@ vi.mock("@/app/(app)/admin/apps/[appId]/settings/app-services-panel", () => ({
 vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/chat-settings", () => ({
     ChatAdminSettings: () => null
 }));
+vi.mock("@/app/(app)/admin/apps/[appId]/settings/_polar/polar-settings", () => ({
+    PolarAdminSettings: () => null
+}));
 vi.mock("@/app/(app)/apps/marketplace/marketplace-view", () => ({ MarketplaceView: () => null }));
 vi.mock("@/app/(app)/apps/marketplace/[appId]/app-detail", () => ({
     AppDetail: () => null,

@@ -15,7 +15,7 @@ import { MessagesProvider, useHasMessages, useLocale, useTranslations } from "./
 import * as polls from "../shared-polls";
 
 /** The namespaces the action hands out; anything else it refuses. */
-type Askable = readonly "automations"[];
+type Askable = readonly ("automations" | "agents")[];
 
 const kept = new Map<string, Namespaces>();
 

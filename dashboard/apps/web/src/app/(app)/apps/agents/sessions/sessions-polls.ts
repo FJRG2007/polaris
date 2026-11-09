@@ -50,3 +50,20 @@ export const sessionHistory = (
         { input: JSON.stringify(input) },
         signal
     );
+
+export const sessionFiles = (sessionId: string, signal?: AbortSignal) =>
+    readPoll<Answer<typeof actions.sessionFilesAction>>(
+        "/api/agents/sessions/files",
+        { sessionId },
+        signal
+    );
+
+export const sessionFile = (
+    input: Parameters<typeof actions.sessionFileAction>[0],
+    signal?: AbortSignal
+) =>
+    readPoll<Answer<typeof actions.sessionFileAction>>(
+        "/api/agents/sessions/file",
+        { input: JSON.stringify(input) },
+        signal
+    );

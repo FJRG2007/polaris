@@ -17,7 +17,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { getHostConnection } from "@/lib/host-service";
+import { getHostConnection, getHostConnectionUnscoped } from "@/lib/host-service";
 import { terminalSessionCap } from "@/lib/terminal-session-cap";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { resolveDockerTransport, type DockerTransportTarget } from "@/lib/docker-service";
@@ -113,6 +113,15 @@ export async function redeemTerminalTicket(token: string): Promise<RedeemedTicke
             return null;
         }
     }
+    if (mode === "agent") {
+        return {
+            userId: ticket.userId,
+            targetId: ticket.targetId,
+            containerRef: ticket.containerRef,
+            mode,
+            docker: await agentContainerTransport(ticket.targetId)
+        };
+    }
     if (mode !== "ssh" && mode !== "ssh-root") {
         return {
             userId: ticket.userId,
@@ -148,6 +157,33 @@ export async function redeemTerminalTicket(token: string): Promise<RedeemedTicke
         // burned, which is the right outcome either way.
         return null;
     }
+}
+
+/**
+ * How to reach an agent session's container when it was placed on a pool
+ * server rather than this box (`session-placement`): that server's engine over
+ * SSH. Undefined for one on this box, which the daemon reaches. Unscoped for
+ * the reason the session runtime gives - minting the ticket already checked
+ * the reader may open this session, and where it runs is the pool's.
+ */
+async function agentContainerTransport(
+    sessionId: string
+): Promise<DockerTransportTarget | undefined> {
+    const row = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { place: true, hostId: true }
+    });
+    if (!row || row.place !== "local" || !row.hostId) return undefined;
+    const host = await getHostConnectionUnscoped(row.hostId).catch(() => null);
+    if (!host) return undefined;
+    return {
+        transport: "ssh",
+        host: host.address,
+        port: host.port,
+        username: host.username,
+        auth: host.auth,
+        pinnedHostKey: host.hostKey ? [host.hostKey] : []
+    };
 }
 
 function resolveMode(value: string): TerminalMode {

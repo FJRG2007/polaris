@@ -19,6 +19,7 @@ import * as core from "@polaris/core";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
 import * as capacity from "@/lib/agents/session-capacity";
+import { takeSpare } from "@/lib/agents/session-spares";
 
 /** One queued session, as the planner needs it. */
 export interface QueuedEntry {
@@ -240,7 +241,12 @@ export async function admitSession(
         if (prompt) await sessions.addSessionMessage(session.id, "user", prompt, input.startedById);
         return { session, queuedAt: (await queuePosition(session.id)) ?? 1 };
     }
-    const { session, token } = await sessions.createSession(input);
+    // The spare this person's Code started while they typed, when the session
+    // can be it: created under its id and on its server. See `session-spares`.
+    const spare = await takeSpare(input.startedById, input);
+    const { session, token } = await sessions.createSession(
+        spare ? { ...input, id: spare.id, hostId: spare.hostId } : input
+    );
     try {
         await runtime.startSession(session, token);
     } catch (startError) {

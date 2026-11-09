@@ -913,6 +913,40 @@ export const SESSION_BOOT = [
 ].join("\n");
 
 /**
+ * Where a spare container finds the session it was given. See `SPARE_BOOT`.
+ *
+ * In the session's own directory on the machine rather than in the container's
+ * layer, so a claimed container that restarts (a reboot of its server) reads the
+ * same session again instead of waiting for a claim that already happened.
+ * Outside `SESSION_ROOT/polaris`, which is handed to the agent's account: this
+ * holds the session's whole environment, credentials included, and stays root's.
+ */
+export const CLAIM_FILE = `${SESSION_ROOT}/claim.env`;
+
+/**
+ * What a spare container does: the slow part of a boot first, then wait for a
+ * session.
+ *
+ * A spare is started while somebody is still typing (see `session-spares`), for
+ * a session that does not exist yet, so it can know nothing about it: no
+ * repository, no token, no credentials. What it can do is everything that does
+ * not depend on those - the container itself and tmux, which is a package
+ * install - and then wait. The claim writes the session's environment to
+ * `CLAIM_FILE`, and from there it is exactly the boot of `SESSION_BOOT`.
+ *
+ * Polling a file rather than any signal because a file is the one thing both
+ * engines can hand a container (`writeFile`), and a fifth of a second is not
+ * what anybody waits on here.
+ */
+export const SPARE_BOOT = [
+    "set -eu",
+    ...INSTALL_TMUX,
+    `while [ ! -s ${CLAIM_FILE} ]; do sleep 0.2; done`,
+    `set -a; . ${CLAIM_FILE}; set +a`,
+    ...SESSION_BOOT.split("\n").slice(1)
+].join("\n");
+
+/**
  * The same boot, on a machine that is not Polaris's.
  *
  * Composed from the same fragments rather than filtered out of the script above.

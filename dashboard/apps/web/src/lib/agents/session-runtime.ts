@@ -22,10 +22,9 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { execCommand } from "@polaris/ssh";
 import * as commands from "./session-commands";
-import { upWithFreshImage } from "./session-image";
 import { borrowSsh } from "@/lib/connection-pool";
 import { appBaseUrl } from "@/lib/domain-service";
-import { HostdPorts } from "@/lib/deploy/ports-hostd";
+import { containerState, withContainerPorts } from "./session-ports";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
 import { credentialsForAgent } from "@/lib/agents/agent-readiness";
 import { chatCredentialFor, secretForAccount, sessionSecretsFor } from "@/lib/agents/model-keys";
@@ -48,7 +47,10 @@ import * as fork from "./session-fork";
 import { endContainerSession, type SaveOutcome } from "./session-work";
 import { clearSessionWaiting, noticeSessionEnded } from "./agent-notices";
 import { syncFinalSessionHistory } from "./session-history";
-import { sessionLimits } from "./session-capacity";
+import { totalCeiling } from "./session-capacity";
+import { startContainer } from "./session-container";
+import { claimSpare } from "./session-spares";
+import * as placement from "./session-placement";
 import {
     addSessionMessage,
     finishSession,
@@ -63,9 +65,6 @@ import {
     type SessionView
 } from "./session-service";
 
-/** Stamped on every container a session starts, so the sweep finds them by label
- *  rather than by matching names it does not own. */
-const LABEL_KEY = "polaris.agent-session";
 
 /** Where a `local` session's worktree lives inside its own container: on the
  *  session's own directory on the box, so it outlives the container. See
@@ -564,7 +563,7 @@ export async function startSession(session: SessionView, token: string): Promise
             await startOnHost(session, boot);
             await markSessionStarted(session.id, "", boot.workdir);
         } else {
-            await startLocally(session, boot);
+            await startPlaced(session, boot);
             await markSessionStarted(
                 session.id,
                 commands.sessionContainerName(session.id),
@@ -587,74 +586,52 @@ export async function startSession(session: SessionView, token: string): Promise
     }
 }
 
+/**
+ * Place a container session on the pool and bring it up there.
+ *
+ * A server that will not take it (unreachable, its engine refusing) is left
+ * out and the session is placed once more, on another server or this box,
+ * rather than failed: one machine going away must not fail the sessions that
+ * happened to be sent to it. A refusal Polaris wrote itself is not retried -
+ * it would say the same thing anywhere.
+ */
+async function startPlaced(session: SessionView, boot: Bootstrap): Promise<void> {
+    const box = await totalCeiling();
+    const place = async (current: SessionView, exclude: string[]) => {
+        try {
+            return await placement.placeSession(current, box, exclude);
+        } catch (error) {
+            if (error instanceof placement.PoolFull) {
+                throw new SessionRefusal(
+                    "Every server Polar Code may use is full right now. Try again when a session finishes."
+                );
+            }
+            throw error;
+        }
+    };
+    const hostId = await place(session, []);
+    try {
+        await startLocally({ ...session, hostId }, boot);
+    } catch (error) {
+        if (!hostId || error instanceof SessionRefusal) throw error;
+        console.error(`[agent-session] ${session.id}: server ${hostId} refused it, placing again:`, error);
+        // Whatever it got as far as starting there - a spare, half a container -
+        // goes, so nothing is left running under a name the session no longer
+        // points at. Best effort: a server that refused may not answer this either.
+        await withContainerPorts(hostId, (ports) =>
+            ports.composeDown(commands.sessionContainerName(session.id))
+        ).catch(() => undefined);
+        const next = await place({ ...session, hostId: null }, [hostId]);
+        await startLocally({ ...session, hostId: next }, boot);
+    }
+}
+
 async function startLocally(session: SessionView, boot: Bootstrap): Promise<void> {
-    const name = commands.sessionContainerName(session.id);
-    const limits = await sessionLimits();
-    await upWithFreshImage((pullPolicy) =>
-        new HostdPorts().composeUp({
-            project: name,
-            services: [
-                {
-                    name,
-                    image: commands.SESSION_IMAGE,
-                    pullPolicy,
-                    env: bootEnv(boot),
-                    ports: [],
-                    // The one thing that outlives the session. See `AGENT_HOME`:
-                    // the sign-in, the installed tools and Enigma's own settings
-                    // live here, per account, so the second session starts signed in
-                    // and in seconds rather than minutes.
-                    volumes: [
-                        {
-                            // The machine everybody shares, or this account's own.
-                            // Which of the two was settled when the session was
-                            // created and is stored on it, so it cannot change
-                            // under a session that is already running.
-                            //
-                            // Otherwise: whoever started it, which is whose
-                            // credentials the session spends. A session from before
-                            // that was recorded gets a home of its own rather than
-                            // joining a shared one - an empty key would put every
-                            // such session in the same directory, which is one
-                            // person's sign-in in another person's terminal.
-                            source: session.sharedHome
-                                ? commands.SHARED_HOME_SOURCE
-                                : commands.agentHomeSource(
-                                      session.ownerId ?? `session-${session.id}`
-                                  ),
-                            target: commands.AGENT_HOME,
-                            kind: "bind" as const
-                        },
-                        // The checkout and Polaris's files for it, on the box
-                        // rather than in the container's own layer, so a
-                        // container that is recreated comes back to the same
-                        // work. Removed when the work has been saved.
-                        {
-                            source: commands.sessionCheckoutSource(session.id),
-                            target: commands.SESSION_ROOT,
-                            kind: "bind" as const
-                        }
-                    ],
-                    labels: { [LABEL_KEY]: session.id },
-                    command: commands.bootArgv(commands.SESSION_BOOT),
-                    networks: [],
-                    // Back after a reboot of the box. The checkout is on the
-                    // box, so the boot finds it and reopens on it rather than
-                    // cloning over it - see PREPARE_WORKTREE - and the agent
-                    // comes back on the conversation it was in.
-                    restart: "unless-stopped",
-                    // Bounded, so one session building something enormous slows
-                    // itself rather than every app on the box. See
-                    // `sessionLimits` for where the numbers come from.
-                    cpus: limits.cpus,
-                    memoryMb: limits.memoryMb
-                }
-            ],
-            volumes: [],
-            networks: []
-        }),
-        () => new HostdPorts().pull(commands.SESSION_IMAGE)
-    );
+    const env = bootEnv(boot);
+    // A spare started while the message was typed already runs under this
+    // session's name, past the slow part of a boot. See `session-spares`.
+    if (await claimSpare(session, env)) return;
+    await startContainer(session, env, commands.SESSION_BOOT);
 }
 
 /**
@@ -774,7 +751,10 @@ export async function runInSession(
 
     if (!placement.containerId)
         throw new Error("That session never got as far as having a container.");
-    const result = await new HostdPorts().runIn(placement.containerId, commands.shellArgv(command));
+    const containerId = placement.containerId;
+    const result = await withContainerPorts(placement.hostId, (ports) =>
+        ports.runIn(containerId, commands.shellArgv(command))
+    );
     return { code: result.code, output: result.output };
 }
 
@@ -1006,13 +986,25 @@ export async function sweepSilentSessions(
                 { place: "host", AND: quietSince(new Date(now.getTime() - hostSilentMs)) }
             ]
         },
-        select: { id: true, place: true, containerId: true, lastEventAt: true, createdAt: true },
+        select: {
+            id: true,
+            place: true,
+            hostId: true,
+            containerId: true,
+            lastEventAt: true,
+            createdAt: true
+        },
         orderBy: { lastProbedAt: { sort: "asc", nulls: "first" } },
         take: 200
     });
     let failed = 0;
     for (const session of quiet) {
-        let probe = await probeSession(session.id, session.place, session.containerId);
+        let probe = await probeSession(
+            session.id,
+            session.place,
+            session.containerId,
+            session.hostId
+        );
         // A server that restarted took the terminal with it but kept the
         // checkout, so the session is reopened on it rather than failed.
         if (probe === "dead" && session.place === "host" && (await reopenOnHost(session.id)))
@@ -1067,7 +1059,8 @@ export async function sweepSilentSessions(
 async function probeSession(
     sessionId: string,
     place: string,
-    containerId: string | null
+    containerId: string | null,
+    hostId: string | null
 ): Promise<core.SessionProbe> {
     try {
         const result = await runInSession(sessionId, commands.aliveCommand());
@@ -1077,10 +1070,11 @@ async function probeSession(
     }
     if (place === "host" || !containerId) return "unreachable";
     try {
-        const ports = new HostdPorts();
-        const state = await ports.containerState(containerId);
-        if (state === "stopped") await ports.container(containerId, "start");
-        return state === "gone" ? "gone" : "unreachable";
+        return await withContainerPorts(hostId, async (ports) => {
+            const state = await containerState(ports, containerId);
+            if (state === "stopped") await ports.container(containerId, "start");
+            return state === "gone" ? "gone" : "unreachable";
+        });
     } catch {
         return "unreachable";
     }

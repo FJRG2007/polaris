@@ -14,7 +14,9 @@ import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { builtInHasSettings } from "@/lib/apps/app-settings";
 import { ChatAdminSettings } from "./_chat/chat-settings";
-import { PageHeader } from "@polaris/ui";
+import { PolarAdminSettings } from "./_polar/polar-settings";
+import { Suspense } from "react";
+import { PageHeader, Skeleton } from "@polaris/ui";
 import { VpnAdminSettings } from "@/app/(app)/vpn/vpn-admin-settings";
 import { requireAdmin } from "@/lib/session";
 import { AppSettingsLoader } from "./loader";
@@ -66,6 +68,7 @@ async function BuiltInSettings({ appId }: { appId: string }) {
         getTranslations("marketplace"),
         getTranslations("admin")
     ]);
+    if (appId === "polar") return <PolarSettings />;
     if (appId !== "chat") notFound();
     return (
         <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-4">
@@ -82,5 +85,33 @@ async function BuiltInSettings({ appId }: { appId: string }) {
             />
             <ChatAdminSettings />
         </div>
+    );
+}
+
+/** Polar's: the header now, the settings when they are read. */
+async function PolarSettings() {
+    const [t, polar] = await Promise.all([
+        getTranslations("marketplace"),
+        getTranslations("polar")
+    ]);
+    return (
+        <Messages namespaces={["polar"]}>
+            <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-4">
+                <Link
+                    href="/admin/apps"
+                    className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
+                >
+                    <ArrowLeft className="size-4" />
+                    {t("polaris.title")}
+                </Link>
+                <PageHeader
+                    title={polar("admin.code.page.title")}
+                    description={polar("admin.code.page.description")}
+                />
+                <Suspense fallback={<Skeleton className="h-96 w-full max-w-2xl rounded-lg" />}>
+                    <PolarAdminSettings />
+                </Suspense>
+            </div>
+        </Messages>
     );
 }

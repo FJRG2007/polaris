@@ -41,6 +41,9 @@ vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string
 vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/chat-settings", () => ({
     ChatAdminSettings
 }));
+vi.mock("@/app/(app)/admin/apps/[appId]/settings/_polar/polar-settings", () => ({
+    PolarAdminSettings: () => null
+}));
 
 import config from "../../next.config.mjs";
 import { join } from "node:path";

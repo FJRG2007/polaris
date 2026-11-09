@@ -484,6 +484,23 @@ export class SshPorts implements RuntimePorts {
         return Array.isArray(parsed) ? parsed[0] : parsed;
     }
 
+    /** Whether a container is running, stopped or gone - the host daemon's
+     *  `containerState`, over SSH. One command that answers all three, so a
+     *  container that is not there is told apart from a server that is not. */
+    public async containerState(ref: string): Promise<"running" | "stopped" | "gone"> {
+        let out = "";
+        await this.run(
+            `docker inspect --format '{{.State.Running}}' ${quoteArg(ref)} 2>/dev/null || echo gone`,
+            (chunk) => {
+                out += chunk.toString("utf8");
+            }
+        );
+        const said = out.trim().split("\n").at(-1) ?? "";
+        if (said === "true") return "running";
+        if (said === "false") return "stopped";
+        return "gone";
+    }
+
     public async container(ref: string, action: "restart" | "stop" | "start"): Promise<void> {
         await this.run(`docker ${action} ${quoteArg(ref)}`);
     }

@@ -899,7 +899,28 @@
         "branchDefault": "principal",
         "branchUse": "Usar \"{name}\"",
         "noBranchMatch": "Ninguna rama",
-        "branchesFailed": "No se pudieron leer las ramas. Escribe una para usarla."
+        "branchesFailed": "No se pudieron leer las ramas. Escribe una para usarla.",
+        "pane": {
+            "open": "Archivos, cambios y terminal",
+            "title": "Entorno",
+            "noRepo": "Un espacio sin repositorio",
+            "files": "Archivos",
+            "changes": "Cambios",
+            "terminal": "Terminal",
+            "terminalEnded": "La sesión ha terminado, así que su terminal está cerrado.",
+            "search": "Buscar archivo",
+            "refresh": "Releer los archivos",
+            "filesFailed": "No se pudieron leer los archivos. Inténtalo en un momento.",
+            "filesUnavailable": "Los archivos solo están aquí mientras la sesión corre en una máquina que gestiona Polaris.",
+            "noMatch": "Ningún archivo coincide.",
+            "empty": "Aún no hay archivos.",
+            "more": "Se muestran {shown} de {total}. Busca para encontrar el resto.",
+            "pick": "Elige un archivo para leerlo.",
+            "fileFailed": "Este archivo no se pudo leer ahora.",
+            "binary": "No es un archivo de texto.",
+            "tooLarge": "Este archivo es demasiado grande para mostrarlo aquí.",
+            "missing": "Este archivo ya no existe."
+        }
     },
     "compare": {
         "open": "Preguntar a varios",
@@ -947,5 +968,44 @@
         "clearFailed": "No se pudo quitar el objetivo. Inténtalo de nuevo.",
         "none": "No hay objetivo. Escribe /goal y cuándo se da por terminado.",
         "tooLong": "Un objetivo puede tener hasta {max} caracteres."
+    },
+    "admin": {
+        "code": {
+            "page": {
+                "title": "Polar",
+                "description": "Dónde se ejecutan las sesiones de Code y lo rápido que arrancan."
+            },
+            "pool": {
+                "title": "Dónde se ejecutan",
+                "hint": "Cada sesión nueva va a la máquina menos ocupada de esta lista. Añade servidores para tener más sesiones a la vez.",
+                "box": "Este servidor",
+                "boxHint": "La máquina en la que corre Polaris",
+                "useBox": "Ejecutar sesiones en este servidor",
+                "unusable": "{address} - sin conexión o sin Docker, se omite por ahora",
+                "live": "{live} / {sessions} en marcha",
+                "sessionsFor": "Sesiones a la vez en {name}",
+                "add": "Añadir servidor",
+                "remove": "Quitar {name}",
+                "total": "Hasta {count} sesiones a la vez en total.",
+                "nowhere": "Activa este servidor o añade uno: las sesiones necesitan dónde ejecutarse."
+            },
+            "warm": {
+                "title": "Inicio inmediato",
+                "hint": "Mientras alguien tiene Code abierto, se le prepara una máquina para que su primer mensaje arranque el agente al momento.",
+                "enabled": "Preparar una máquina por adelantado",
+                "cost": "Una máquina en espera usa unos 3 MB de memoria y nada de CPU.",
+                "minutes": "Mantenerla",
+                "minutesHint": "Al cerrar Code, la máquina espera este tiempo antes de retirarse.",
+                "minutesSuffix": "minutos",
+                "perServer": "Máximo a la vez por servidor",
+                "perServerHint": "Por encima, las sesiones arrancan de la forma normal, unos segundos más lentas.",
+                "perServerSuffix": "máquinas"
+            },
+            "save": "Guardar",
+            "errors": {
+                "invalid": "Algún valor está fuera de rango. Revisa los números y guarda de nuevo.",
+                "noEngine": "Uno de los servidores no tiene un Docker al que Polaris llegue. Quítalo o arréglalo en Servidores."
+            }
+        }
     }
 }

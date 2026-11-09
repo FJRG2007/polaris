@@ -63,7 +63,8 @@ import { sweepBadgeUnlocks } from "@/lib/badges/badge-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
 import { sweepSessionQueue } from "@/lib/agents/session-queue";
 import { advanceActiveRuns } from "@/lib/agents/orchestration-service";
-import { reapLeftoverContainers } from "@/lib/agents/leftover-containers";
+import { reapLeftoverContainers, reapPoolLeftovers } from "@/lib/agents/leftover-containers";
+import { sweepSpares } from "@/lib/agents/session-spares";
 import { removeLeftoverVolumes } from "@/lib/deploy/leftover-volumes";
 import { sealAuditChain, verifyAuditChain } from "@/lib/audit-chain";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
@@ -1097,4 +1098,6 @@ async function sweepAgentLeftovers(): Promise<void> {
     // After both: what they ended in this pass is inside its grace and waits for
     // the next one; what an earlier pass or a Stop failed to take down goes now.
     await reapLeftoverContainers().catch(() => 0);
+    await reapPoolLeftovers().catch(() => 0);
+    await sweepSpares().catch(() => 0);
 }

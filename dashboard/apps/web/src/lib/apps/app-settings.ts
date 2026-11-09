@@ -23,7 +23,7 @@ export function appSettingsHref(app: Pick<AppManifest, "id" | "settingsAt">): st
  * they are always installed, and their settings are drawn by the same settings
  * page as an installed app's.
  */
-const BUILT_IN_SETTINGS: ReadonlySet<string> = new Set(["chat"]);
+const BUILT_IN_SETTINGS: ReadonlySet<string> = new Set(["chat", "polar"]);
 
 /** Whether a built-in app draws settings on the shared settings page. */
 export function builtInHasSettings(appId: string): boolean {

@@ -76,7 +76,14 @@ import type {
     PolarCodeRow,
     PolarCodeThread
 } from "@/lib/polar/code";
-import { Code2, ExternalLink, MessageSquare, TriangleAlert } from "lucide-react";
+import { Code2, ExternalLink, MessageSquare, PanelRight, TriangleAlert } from "lucide-react";
+import dynamic from "next/dynamic";
+
+/** Loaded after the thread, not with it: its terminal is not needed to read one. */
+const PolarCodeWorkspace = dynamic(
+    () => import("@/components/polar/polar-code-workspace").then((module) => module.PolarCodeWorkspace),
+    { ssr: false }
+);
 
 export type PolarMode = "chat" | "code";
 
@@ -103,6 +110,33 @@ async function postCode<T>(path: string, body: unknown): Promise<T> {
     if (!response.ok) throw new Error(`${path} answered ${response.status}`);
     const answer = (await response.json()) as { value?: unknown };
     return fromWire(answer.value) as T;
+}
+
+/** How often an open Code asks again for its spare, well inside the spare's
+ *  shortest expiry so it never lapses while somebody is still typing. */
+const WARM_EVERY_MS = 50_000;
+
+/**
+ * Keep a session machine waiting while Code is open (`session-spares`): asked
+ * once on opening and again while the tab is in view. A spare is nearly free
+ * while it waits, and it is what lets a sent message start in seconds. Best
+ * effort - a failure only means the session starts the ordinary way.
+ */
+function useSpareWarmup(enabled: boolean): void {
+    useEffect(() => {
+        if (!enabled) return;
+        const ask = () => {
+            if (document.visibilityState !== "visible") return;
+            void fetch("/api/polar/code/warm", { method: "POST" }).catch(() => undefined);
+        };
+        ask();
+        const timer = window.setInterval(ask, WARM_EVERY_MS);
+        document.addEventListener("visibilitychange", ask);
+        return () => {
+            window.clearInterval(timer);
+            document.removeEventListener("visibilitychange", ask);
+        };
+    }, [enabled]);
 }
 
 /** A title for a session started from a prompt: its first line, cut to fit. */
@@ -574,6 +608,8 @@ function CodeStart({
     // while the machine for it comes up, rather than a composer that only
     // greys out for the minute that can take.
     const [sent, setSent] = useState<string | null>(null);
+    // Again after a send: the next session gets a spare of its own.
+    useSpareWarmup(sent === null);
 
     const agent: AgentOption | null =
         choices?.agents.find((option) => option.key === agentKey) ?? null;
@@ -768,6 +804,8 @@ function CodeThread({
     const inputId = useId();
     // Undefined while the first answer is on its way; null when it is not there.
     const [thread, setThread] = useState<PolarCodeThread | null | undefined>(undefined);
+    // The files, the changes and the terminal, beside the thread.
+    const [workspace, setWorkspace] = useState(false);
     const [failed, setFailed] = useState(false);
     const [reply, setReply] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -870,6 +908,17 @@ function CodeThread({
                         {session.stateLabel}
                     </span>
                 ) : null}
+                {thread?.canManage ? (
+                    <button
+                        type="button"
+                        onClick={() => setWorkspace(true)}
+                        aria-label={t("code.pane.open")}
+                        title={t("code.pane.open")}
+                        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:size-11"
+                    >
+                        <PanelRight className="size-4" />
+                    </button>
+                ) : null}
                 <Link
                     href={`${SESSIONS_PAGE}/${sessionId}`}
                     aria-label={t("code.openSession")}
@@ -959,6 +1008,14 @@ function CodeThread({
                     </>
                 )}
             </PolarThreadFrame>
+            {thread?.canManage ? (
+                <PolarCodeWorkspace
+                    open={workspace}
+                    onOpenChange={setWorkspace}
+                    session={thread.view}
+                    live={live}
+                />
+            ) : null}
         </>
     );
 }
