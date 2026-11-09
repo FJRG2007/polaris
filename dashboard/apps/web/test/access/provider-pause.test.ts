@@ -36,6 +36,8 @@ vi.mock("@/lib/connections/attention", () => ({
 
 const {
     ProviderPaused,
+    comeBackAt,
+    saidUntil,
     clearProviderPause,
     pauseReasonFor,
     providerPaused,
@@ -214,5 +216,60 @@ describe("reading a failure", () => {
 
     it("reads the status Criminal IP's own error carries", () => {
         expect(pauseReasonFor(Object.assign(new Error("no"), { status: 402 }))).toBe("credits");
+    });
+});
+
+describe("when the provider says it can be asked again", () => {
+    const NOW = Date.parse("2026-11-09T20:00:00Z");
+    const refusal = (status: number, headers: Record<string, string>) =>
+        Object.assign(new Error("failed"), { response: { status, headers } });
+
+    it("reads seconds, durations, epochs and dates", () => {
+        expect(comeBackAt("120", NOW)).toBe(NOW + 120_000);
+        expect(comeBackAt("1h30m", NOW)).toBe(NOW + 90 * 60_000);
+        expect(comeBackAt("45s", NOW)).toBe(NOW + 45_000);
+        expect(comeBackAt("200ms", NOW)).toBe(NOW + 200);
+        expect(comeBackAt("2d", NOW)).toBe(NOW + 2 * 86_400_000);
+        expect(comeBackAt(String((NOW + 60_000) / 1000), NOW)).toBe(NOW + 60_000);
+        expect(comeBackAt(String(NOW + 60_000), NOW)).toBe(NOW + 60_000);
+        expect(comeBackAt("2026-12-01T00:00:00Z", NOW)).toBe(Date.parse("2026-12-01T00:00:00Z"));
+        expect(comeBackAt("soon", NOW)).toBeNull();
+    });
+
+    it("takes the latest a refusal names, and ignores one past or a year off", () => {
+        expect(saidUntil(refusal(402, { "retry-after": "60", "x-ratelimit-reset-requests": "2h" }), NOW)).toBe(
+            NOW + 2 * 3_600_000
+        );
+        expect(saidUntil(refusal(402, { "retry-after": "2020-01-01T00:00:00Z" }), NOW)).toBeNull();
+        expect(saidUntil(refusal(402, { "retry-after": "2027-12-01T00:00:00Z" }), NOW)).toBeNull();
+        expect(saidUntil(refusal(402, {}), NOW)).toBeNull();
+        const axiosHeaders = { get: (name: string) => (name === "retry-after" ? "30" : undefined) };
+        expect(saidUntil(Object.assign(new Error("x"), { response: { status: 429, headers: axiosHeaders } }), NOW)).toBe(
+            NOW + 30_000
+        );
+    });
+
+    it("sends nothing until the credits renew when the refusal says when", async () => {
+        const renew = new Date(Date.now() + 3 * 86_400_000).toISOString();
+        const ask = vi.fn(async () => {
+            throw refusal(402, { "x-ratelimit-reset-requests": renew });
+        });
+        await expect(whileServing("dymo", "Dymo", ask)).rejects.toThrow();
+        const stored = JSON.parse(settings.get("integration.pause.dymo")!) as { until: number };
+        expect(stored.until).toBe(Date.parse(renew));
+        vi.useFakeTimers({ now: Date.now() + 2 * 3_600_000, toFake: ["Date"] });
+        await expect(whileServing("dymo", "Dymo", ask)).rejects.toBeInstanceOf(ProviderPaused);
+        expect(ask).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the hour when it does not say", async () => {
+        const ask = vi.fn(async () => {
+            throw refusal(402, {});
+        });
+        const before = Date.now();
+        await expect(whileServing("dymo", "Dymo", ask)).rejects.toThrow();
+        const stored = JSON.parse(settings.get("integration.pause.dymo")!) as { until: number };
+        expect(stored.until - before).toBeGreaterThanOrEqual(60 * 60 * 1000);
+        expect(stored.until - before).toBeLessThan(60 * 60 * 1000 + 5000);
     });
 });

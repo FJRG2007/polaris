@@ -149,6 +149,68 @@ function describe(caught: unknown): string {
     return String(failureStatus(caught) ?? (caught instanceof Error ? caught.name : "unknown"));
 }
 
+/** The longest a provider's own "come back at" is taken at its word. */
+const LONGEST_SAID_MS = 31 * 24 * 60 * 60 * 1000;
+
+/** A response header off an axios error (a plain object or AxiosHeaders) or a fetch one. */
+function failureHeader(caught: unknown, name: string): string | undefined {
+    if (!caught || typeof caught !== "object") return undefined;
+    const headers = (caught as { response?: { headers?: unknown } }).response?.headers;
+    if (!headers || typeof headers !== "object") return undefined;
+    const reader = headers as { get?: (key: string) => unknown };
+    const value =
+        typeof reader.get === "function"
+            ? reader.get(name)
+            : (headers as Record<string, unknown>)[name];
+    if (typeof value === "number") return String(value);
+    return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+/**
+ * When a header says to come back, as a time: seconds (`120`), a duration
+ * (`1h30m`, `45s`, `200ms`), an epoch in seconds or milliseconds, or a date.
+ * Null when it says nothing usable.
+ */
+export function comeBackAt(value: string, now: number): number | null {
+    if (/^\d+(\.\d+)?$/.test(value)) {
+        const number = Number(value);
+        // An epoch, in milliseconds or in seconds, against a count of seconds.
+        if (number > 1e12) return number;
+        if (number > 1e9) return number * 1000;
+        return now + number * 1000;
+    }
+    const duration = /^(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)m(?!s))?(?:(\d+(?:\.\d+)?)s)?(?:(\d+)ms)?$/.exec(value);
+    if (duration && duration.slice(1).some(Boolean)) {
+        const [, d, h, m, sec, ms] = duration;
+        return (
+            now +
+            Number(d ?? 0) * 86_400_000 +
+            Number(h ?? 0) * 3_600_000 +
+            Number(m ?? 0) * 60_000 +
+            Number(sec ?? 0) * 1000 +
+            Number(ms ?? 0)
+        );
+    }
+    const date = Date.parse(value);
+    return Number.isNaN(date) ? null : date;
+}
+
+/**
+ * When the provider said it can be asked again: out of credits until they
+ * renew, busy until the window resets. Read from the refusal itself, so nothing
+ * is sent before then just to find out. Null when it did not say, or said
+ * something already past or absurdly far off.
+ */
+export function saidUntil(caught: unknown, now = Date.now()): number | null {
+    let latest: number | null = null;
+    for (const name of ["retry-after", "x-ratelimit-reset-requests", "x-ratelimit-reset"]) {
+        const value = failureHeader(caught, name);
+        const at = value ? comeBackAt(value, now) : null;
+        if (at !== null && at > now && at - now <= LONGEST_SAID_MS) latest = Math.max(latest ?? 0, at);
+    }
+    return latest;
+}
+
 /** What a failure means for the next request, or null when it says nothing about
  *  any request but this one. */
 export function pauseReasonFor(caught: unknown): PauseReason | null {
@@ -194,10 +256,17 @@ export async function whileServing<T>(
         }
         const needsOperator = reason === "credits" || reason === "key";
         const wait = needsOperator ? NEEDS_OPERATOR_MS : PASSES_ON_ITS_OWN_MS;
-        console.error(`polaris: ${name} paused (${reason}):`, describe(caught));
+        // The provider's own word on when it can be asked again - credits renewing,
+        // a window resetting - beats a guess, so nothing is sent before then.
+        const said = reason === "key" ? null : saidUntil(caught);
+        const until = said ?? Date.now() + wait;
+        console.error(
+            `polaris: ${name} paused (${reason}) until ${new Date(until).toISOString()}${said ? " as it said" : ""}:`,
+            describe(caught)
+        );
         await setSetting(
             settingKey(provider),
-            JSON.stringify({ until: Date.now() + wait, reason } satisfies StoredPause)
+            JSON.stringify({ until, reason } satisfies StoredPause)
         );
         if (needsOperator) await tellOperators(provider, name, reason);
         throw caught;
