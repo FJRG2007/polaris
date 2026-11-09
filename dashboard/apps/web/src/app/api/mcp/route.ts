@@ -34,6 +34,7 @@ import { withKeyUsage } from "@/lib/api-usage/recorder";
 import { tooManyCalls } from "@/lib/deploy/api/http";
 import { auditToolChange, spendToolBudget, viaOf } from "@/lib/mcp/call-guard";
 import { sessionForToken, sessionOwner } from "@/lib/agents/session-service";
+import { sessionRole } from "@/lib/agents/orchestration-service";
 import { clientIp } from "@/lib/request-context";
 import { mcpScopes } from "@/lib/mcp/oauth/scopes";
 import { originOf } from "@/lib/mcp/oauth/origin";
@@ -233,7 +234,15 @@ async function callerFor(
     // Never an administrator, whoever started it. A session acts inside one
     // person's work; the instance-wide reach an admin has is not something an
     // agent should inherit by being started by one.
-    return { userId: owner, isAdmin: false, scopes: SESSION_SCOPES, sessionId: session.id };
+    // A session in an orchestration run gets exactly the scope its part in it
+    // needs, and nothing that starts sessions of its own choosing.
+    const role = await sessionRole(session.id).catch(() => ({ coordinates: false, works: false }));
+    const scopes: McpScope[] = [
+        ...SESSION_SCOPES,
+        ...(role.coordinates ? (["agents.coordinate"] as const) : []),
+        ...(role.works ? (["agents.report"] as const) : [])
+    ];
+    return { userId: owner, isAdmin: false, scopes, sessionId: session.id };
 }
 
 /** Spend a tool call's budgets (see `lib/mcp/call-guard`). Answers the reply

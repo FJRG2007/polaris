@@ -81,6 +81,9 @@ describe("the work Polaris runs on a schedule", () => {
             // Two runners would ask Spotify about everybody twice, and put every
             // listen-along song on twice.
             "activity-spotify",
+            // Two runners would each see the same free slot and start two queued
+            // sessions, or dispatch the same orchestration task twice.
+            "agent-queue",
             // Two runners tearing the same container down race each other onto
             // the same daemon call, and the one that loses fails on a container
             // the other already removed.

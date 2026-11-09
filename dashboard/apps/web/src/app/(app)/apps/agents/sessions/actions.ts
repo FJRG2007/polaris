@@ -20,6 +20,7 @@ import { requirePermission } from "@/lib/session";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
 import * as permissions from "@/lib/agents/session-permissions";
+import * as queue from "@/lib/agents/session-queue";
 import * as work from "@/lib/agents/session-work";
 import * as repoOptions from "@/lib/agents/repo-options";
 import { sessionCursorSchema } from "@/lib/agents/session-cursor";
@@ -30,8 +31,6 @@ import { safeChangePath } from "@/lib/agents/session-changes";
 import { addComment } from "@/lib/tasks/task-detail-service";
 import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
 import {
-    capacityRefusal,
-    sessionCapacity,
     sharedWorkspaceAllowed,
     workspaceHolders,
     workspaceRefusal
@@ -131,7 +130,13 @@ export async function sessionDetailAction(sessionId: string): Promise<{
  */
 export async function startSessionAction(
     input: unknown
-): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap }> {
+): Promise<{
+    id?: string;
+    error?: string;
+    githubGap?: GithubInstallGap;
+    /** Where it stands in the queue, when every slot was taken. */
+    queuedAt?: number | null;
+}> {
     const user = await requirePermission("agents.manage");
     const parsed = core.startAgentSessionSchema.safeParse(input);
     const t = await getTranslations("agents");
@@ -180,12 +185,6 @@ export async function startSessionAction(
         });
         if (!host) return { error: t("sessions.errors.serverNotYours") };
     }
-
-    // Before anything else, because it is the cheapest question and the one whose
-    // answer does not change with the form: a box already running as many
-    // containers as it is set to should not be asked to check credentials first.
-    const refusal = capacityRefusal(await sessionCapacity(user.id));
-    if (refusal) return { error: agentText(t, refusal) };
 
     // A workspace opens on a directory that outlives it, and every workspace
     // session on that machine opens on the same one. Two at once is two agents
@@ -242,7 +241,12 @@ export async function startSessionAction(
         }
     }
 
-    const { session, token } = await sessions.createSession({
+    // Over a ceiling this queues rather than refuses: the session is written
+    // down now and starts when a slot frees, with its place shown on the list.
+    let admission: Awaited<ReturnType<typeof queue.admitSession>>;
+    try {
+        admission = await queue.admitSession(
+            {
         repoId: value.repoId,
         startedById: user.id,
         title: value.title,
@@ -265,33 +269,34 @@ export async function startSessionAction(
                   config: value.enigma.config ?? null
               }
             : null
-    });
-
-    try {
-        await runtime.startSession(session, token);
+    },
+            value.prompt || null
+        );
     } catch (error) {
+        if (error instanceof sessions.SessionRefusal) return { error: agentText(t, error.message) };
+        throw error;
+    }
+    const { session } = admission;
+    if (admission.startError) {
         revalidatePath(SESSIONS_PATH);
         return {
             id: session.id,
-            error: agentText(t, sessions.readableFailure(error, `starting ${session.id}`))
+            error: agentText(t, sessions.readableFailure(admission.startError, `starting ${session.id}`))
         };
     }
 
-    if (value.prompt) {
-        await sessions.addSessionMessage(session.id, "user", value.prompt, user.id);
+    if (value.prompt && admission.queuedAt === null) {
         // After the response rather than before it, because the agent does not
         // exist yet: the container is still cloning the repository and installing
-        // the tool. Holding the click open for that would tie a start to a minute
-        // of somebody else's network, and sending the prompt now would send it to
-        // a terminal that is not there. The delivery waits, and writes into the
-        // transcript if it never gets a terminal to type into.
+        // the tool. The delivery waits, and writes into the transcript if it never
+        // gets a terminal to type into. A queued session is handed it by the queue.
         const prompt = value.prompt;
         after(() => runtime.deliverFirstPrompt(session.id, prompt));
     }
 
     await noteOnTask(session, user.id);
     revalidatePath(SESSIONS_PATH);
-    return { id: session.id };
+    return { id: session.id, queuedAt: admission.queuedAt };
 }
 
 /**
@@ -344,6 +349,9 @@ export async function promptSessionAction(input: unknown): Promise<{ error?: str
     const session = await sessions.getSession(parsed.data.sessionId, user.id);
     if (!session) return { error: t("sessions.errors.gone") };
     if (core.isSessionOver(session.state)) return { error: t("sessions.errors.ended") };
+    // No terminal yet. Only the first prompt waits with it; anything after that
+    // would be typed into a machine that does not exist.
+    if (core.isSessionQueued(session.state)) return { error: t("sessions.errors.queued") };
 
     await sessions.addSessionMessage(session.id, "user", parsed.data.text, user.id);
     try {
@@ -375,7 +383,12 @@ export async function stopSessionAction(sessionId: string): Promise<{ error?: st
     const user = await requirePermission("agents.manage");
     const session = await sessions.getSession(sessionId, user.id);
     if (!session) return { error: (await getTranslations("agents"))("sessions.errors.gone") };
-    await runtime.stopSession(sessionId);
+    // A queued session has no machine to take down: cancelling is the whole
+    // stop. One that started in the meantime is stopped the ordinary way.
+    if (!(await queue.cancelQueued(sessionId))) await runtime.stopSession(sessionId);
+    // Whatever this freed goes to whoever is waiting, now rather than on the
+    // next pass of the timer.
+    after(() => queue.sweepSessionQueue().catch(() => 0));
     revalidatePath(SESSIONS_PATH);
     // And the session's own page, which is where the button was pressed. Only
     // the list was revalidated, so the screen somebody was actually looking at

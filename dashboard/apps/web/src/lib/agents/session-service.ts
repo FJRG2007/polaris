@@ -380,6 +380,8 @@ export interface SessionCreateInput {
     readonly baseRef: string;
     readonly taskId: string | null;
     readonly enigma: core.EnigmaSettings | null;
+    /** Created waiting for a free slot rather than starting (`session-queue`). */
+    readonly queued?: boolean;
 }
 
 /**
@@ -415,7 +417,7 @@ export async function createSession(
             taskId: input.taskId,
             enigma: input.enigma ? JSON.stringify(input.enigma) : null,
             tokenHash: hashToken(token),
-            state: "starting"
+            state: input.queued ? "queued" : "starting"
         },
         select: VIEW_SELECT
     });

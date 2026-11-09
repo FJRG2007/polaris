@@ -129,6 +129,13 @@ interface ScopeRule {
  * grants under one word.
  */
 export const MCP_ONLY_SCOPES = {
+    // Orchestration. Narrower than managing agents: a coordinator may plan the
+    // run it coordinates and talk to its own workers, and a worker may only
+    // report on the task it was dispatched on - neither may start a session of
+    // its own choosing. A session's token is handed exactly one of these by
+    // what it is in a run; a person's key holds them only if ticked.
+    "agents.coordinate": { requires: "agents.manage", category: "development", sensitive: true },
+    "agents.report": { requires: "agents.read", category: "development" },
     "mail.read": { requires: "mail.use", category: "mail" },
     // Sending is its own grant: an assistant that writes to people outside
     // Polaris in the person's name is a different decision from one that reads.

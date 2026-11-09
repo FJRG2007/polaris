@@ -61,6 +61,8 @@ import { sweepAppStorage } from "@/lib/storage-moves/app-storage";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepBadgeUnlocks } from "@/lib/badges/badge-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
+import { sweepSessionQueue } from "@/lib/agents/session-queue";
+import { advanceActiveRuns } from "@/lib/agents/orchestration-service";
 import { reapLeftoverContainers } from "@/lib/agents/leftover-containers";
 import { removeLeftoverVolumes } from "@/lib/deploy/leftover-volumes";
 import { sealAuditChain, verifyAuditChain } from "@/lib/audit-chain";
@@ -698,6 +700,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: syncTrackers
     },
     {
+        key: "agent-queue",
+        // Sessions waiting for a slot, and orchestration tasks whose turn has
+        // come. A Stop already sweeps the moment it frees a slot; this catches a
+        // session that ended on its own, and every queue left by a restart.
+        everyMs: MINUTE,
+        leaseMs: 5 * MINUTE,
+        run: sweepAgentQueue
+    },
+    {
         key: "agent-sessions",
         // A session reports through its own hooks, so silence is the only signal
         // there is that its container was reaped or its server went away. Five
@@ -1073,6 +1084,13 @@ export async function runJobBody(job: ScheduledJob): Promise<unknown> {
  * third pass takes down the containers any of them - or a Stop - ended without
  * managing to remove.
  */
+/** Start what the ceilings allow, then move every orchestration run on. Neither
+ *  failing stops the other. */
+async function sweepAgentQueue(): Promise<void> {
+    await sweepSessionQueue().catch(() => 0);
+    await advanceActiveRuns().catch(() => 0);
+}
+
 async function sweepAgentLeftovers(): Promise<void> {
     await sweepSilentSessions().catch(() => 0);
     await sweepExpiredSignins().catch(() => 0);

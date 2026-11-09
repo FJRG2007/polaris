@@ -15,7 +15,10 @@
 import { describe, expect, it } from "vitest";
 import {
     capacityRefusal,
+    clampLimits,
     workspaceRefusal,
+    DEFAULT_CPUS,
+    DEFAULT_MEMORY_MB,
     DEFAULT_PER_ACCOUNT,
     DEFAULT_TOTAL,
     type WorkspaceClaim
@@ -103,5 +106,41 @@ describe("workspaceRefusal", () => {
         // else's, and it is not theirs to stop.
         expect(workspaceRefusal({ ...mine, sharedHome: true }, 1)).not.toContain("Stop that");
         expect(workspaceRefusal({ ...mine, place: "host", hostId: "h1" }, 1)).toContain("server");
+    });
+});
+
+describe("clampLimits", () => {
+    const box = { cpus: 8, memoryMb: 16384 };
+
+    it("keeps a stored value that fits the box", () => {
+        expect(clampLimits({ cpus: 3, memoryMb: 6144 }, box)).toEqual({ cpus: 3, memoryMb: 6144 });
+    });
+
+    it("never asks for more than the box has", () => {
+        // The engine refuses a CPU limit above the machine's cores, and a
+        // session that will not start on a small box is worse than one that
+        // has all of it.
+        expect(clampLimits({ cpus: 2, memoryMb: 4096 }, { cpus: 1, memoryMb: 2048 })).toEqual({
+            cpus: 1,
+            memoryMb: 2048
+        });
+    });
+
+    it("falls back to the defaults, never to no limit, on a stored value that is not a number", () => {
+        expect(clampLimits({ cpus: Number.NaN, memoryMb: Number.NaN }, box)).toEqual({
+            cpus: DEFAULT_CPUS,
+            memoryMb: DEFAULT_MEMORY_MB
+        });
+        expect(clampLimits({ cpus: -1, memoryMb: 12 }, box)).toEqual({
+            cpus: DEFAULT_CPUS,
+            memoryMb: DEFAULT_MEMORY_MB
+        });
+    });
+
+    it("trusts the stored value when the box size cannot be read", () => {
+        expect(clampLimits({ cpus: 4, memoryMb: 8192 }, { cpus: 0, memoryMb: 0 })).toEqual({
+            cpus: 4,
+            memoryMb: 8192
+        });
     });
 });

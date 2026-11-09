@@ -413,6 +413,7 @@ export function PolarCodeView({
 }
 
 const DOT: Record<PolarCodeRow["state"], string> = {
+    queued: "bg-muted-foreground/50",
     starting: "bg-muted-foreground",
     working: "bg-violet-400 motion-safe:animate-pulse",
     waiting: "bg-warning",

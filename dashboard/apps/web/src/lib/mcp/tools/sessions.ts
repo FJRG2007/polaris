@@ -20,6 +20,7 @@ import * as core from "@polaris/core";
 import { McpRefusal, type McpTool } from "../protocol";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
+import * as queue from "@/lib/agents/session-queue";
 
 const listInput = z.object({
     live: z.boolean().default(true).describe("Only sessions that have not ended.")
@@ -122,6 +123,10 @@ const promptSessionTool: McpTool<z.infer<typeof promptInput>> = {
         const session = await sessions.getSession(input.sessionId, caller.userId);
         if (!session) throw new McpRefusal("No session with that id that this key can reach.");
         if (core.isSessionOver(session.state)) throw new McpRefusal("That session has ended.");
+        if (core.isSessionQueued(session.state))
+            throw new McpRefusal(
+                "That session is still waiting for a free slot. It gets its first prompt when it starts."
+            );
         await sessions.addSessionMessage(session.id, "user", input.text, caller.userId);
         await runtime.promptSession(session.id, input.text);
         return { text: "Sent." };
@@ -163,7 +168,12 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
                 `${input.repo} is not a repository the Agents app reaches for this key.`
             );
 
-        const { session, token } = await sessions.createSession({
+        // Through the same admission as the screen, so a model cannot start past
+        // the ceilings a person is held to: over one, the session queues.
+        let admission: Awaited<ReturnType<typeof queue.admitSession>>;
+        try {
+            admission = await queue.admitSession(
+                {
             repoId: repo.id,
             startedById: caller.userId,
             title: input.title,
@@ -192,9 +202,25 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
             baseRef: input.baseRef,
             taskId: null,
             enigma: null
-        });
-        await runtime.startSession(session, token);
-        await sessions.addSessionMessage(session.id, "user", input.prompt, caller.userId);
+        },
+                input.prompt
+            );
+        } catch (error) {
+            if (error instanceof sessions.SessionRefusal) throw new McpRefusal(error.message);
+            throw error;
+        }
+        const { session } = admission;
+        if (admission.startError) {
+            throw new McpRefusal(
+                sessions.readableFailure(admission.startError, `starting ${session.id}`)
+            );
+        }
+        if (admission.queuedAt !== null) {
+            return {
+                text: `Queued ${session.id} on ${session.branch}: every slot is taken, and it is number ${admission.queuedAt} in line. It starts by itself when one frees, and gets the prompt then.`,
+                structured: { id: session.id, branch: session.branch, queuedAt: admission.queuedAt }
+            };
+        }
         // After the answer, not before it: the container is still cloning and
         // installing, and a model held for that would spend its turn waiting on
         // apt-get. The delivery waits for the agent's terminal and records what
@@ -202,7 +228,7 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
         after(() => runtime.deliverFirstPrompt(session.id, input.prompt));
         return {
             text: `Started ${session.id} on ${session.branch}. It gets the prompt as soon as it is up; check on it with agent_session_get.`,
-            structured: { id: session.id, branch: session.branch }
+            structured: { id: session.id, branch: session.branch, queuedAt: null }
         };
     }
 };

@@ -68,6 +68,16 @@ export function agentWord(
  * printed - passes through.
  */
 const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
+    "Cancelled before it started.": "text.queueCancelled",
+    "That task is not waiting on a decision.": "text.runGateGone",
+    "That question has been answered.": "text.runAnswered",
+    "No question with that id in this run.": "text.runAnswered",
+    "That task is not one of several variants.": "text.runNotVariant",
+    "The session ended before it reported.": "text.runSessionEnded",
+    "Rejected at its gate.": "text.runRejected",
+    "The run was cancelled.": "text.runCancelled",
+    "Polaris could not start a session for it.": "text.runNoSession",
+    "That run is not going any more.": "text.runOver",
     "Pick a repository": "text.pickRepository",
     "Not a repository name": "text.notRepository",
     "Pick a model": "text.pickModel",
@@ -181,6 +191,27 @@ const SHAPED: readonly (readonly [RegExp, NamespaceKey<"agents">, readonly strin
         /^You already have (\d+) sessions running, which is the most one account may have at once\. Stop one and this will start\.$/,
         "text.accountFull",
         ["count"]
+    ],
+    [
+        /^You already have (\d+) sessions waiting to start, which is as many as one account may queue\. Cancel one, or wait for one to start\.$/,
+        "text.queueFull",
+        ["count"]
+    ],
+    [
+        /^You already have (\d+) runs going, which is as many as one account may have at once\. Finish or cancel one first\.$/,
+        "text.runsFull",
+        ["count"]
+    ],
+    [/^Pick between 2 and (\d+) agents to compare\.$/, "text.runVariants", ["max"]],
+    [
+        /^This run already has (\d+) tasks, and it was created to hold at most (\d+)\.$/,
+        "text.runTasksFull",
+        ["count", "max"]
+    ],
+    [
+        /^That would put the task (\d+) steps down a chain of dependencies, and this run allows (\d+)\.$/,
+        "text.runTooDeep",
+        ["depth", "max"]
     ],
     [/^Polaris no longer knows an agent called (.+)\.$/, "text.unknownAgent", ["cli"]],
     [/^GitHub returned (\d+) starting the workflow$/, "text.githubStart", ["status"]],

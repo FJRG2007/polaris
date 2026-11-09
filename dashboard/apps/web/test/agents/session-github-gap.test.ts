@@ -50,6 +50,7 @@ vi.mock("@/lib/agents/agent-readiness", () => ({
     agentOptionsFor: async () => []
 }));
 vi.mock("@/lib/agents/session-service", () => ({
+    SessionRefusal: class SessionRefusal extends Error {},
     createSession: async (input: unknown) => {
         created.push(input);
         throw new Error("stop here");

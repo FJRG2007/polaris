@@ -45,6 +45,7 @@ import {
 import { endContainerSession, type SaveOutcome } from "./session-work";
 import { clearSessionWaiting, noticeSessionEnded } from "./agent-notices";
 import { syncFinalSessionHistory } from "./session-history";
+import { sessionLimits } from "./session-capacity";
 import {
     addSessionMessage,
     finishSession,
@@ -504,6 +505,7 @@ export async function startSession(session: SessionView, token: string): Promise
 
 async function startLocally(session: SessionView, boot: Bootstrap): Promise<void> {
     const name = commands.sessionContainerName(session.id);
+    const limits = await sessionLimits();
     await upWithFreshImage((pullPolicy) =>
         new HostdPorts().composeUp({
             project: name,
@@ -556,7 +558,12 @@ async function startLocally(session: SessionView, boot: Bootstrap): Promise<void
                     // box, so the boot finds it and reopens on it rather than
                     // cloning over it - see PREPARE_WORKTREE - and the agent
                     // comes back on the conversation it was in.
-                    restart: "unless-stopped"
+                    restart: "unless-stopped",
+                    // Bounded, so one session building something enormous slows
+                    // itself rather than every app on the box. See
+                    // `sessionLimits` for where the numbers come from.
+                    cpus: limits.cpus,
+                    memoryMb: limits.memoryMb
                 }
             ],
             volumes: [],
@@ -894,7 +901,8 @@ export async function sweepSilentSessions(
     ];
     const quiet = await prisma.agentSession.findMany({
         where: {
-            state: { notIn: ["stopped", "failed"] },
+            // A queued session has no machine to probe. It is the queue's.
+            state: { notIn: ["stopped", "failed", "queued"] },
             OR: [
                 {
                     place: { not: "host" },
