@@ -8361,6 +8361,10 @@ model AnalyticsSite {
     publicKey String @unique
     /// Whether the tracker endpoint accepts beats for this site.
     trackerEnabled Boolean @default(false)
+    /// Paths never recorded, as a JSON string array; a trailing `*` is a prefix.
+    excludedPaths  String  @default("[]")
+    /// Addresses never recorded (exact, or an IPv4 CIDR), as a JSON string array.
+    ignoredIps     String  @default("[]")
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -8368,6 +8372,7 @@ model AnalyticsSite {
     sessions AnalyticsSession[]
     events   AnalyticsEvent[]
     days     AnalyticsDay[]
+    reports  AnalyticsReport[]
 
     @@unique([scopeType, scopeId])
 }
@@ -8404,11 +8409,19 @@ model AnalyticsSession {
     referrerSource String?
     campaign       String?
     medium         String?
+    /// The site's own id for the visitor, from `polaris.identify()`. Only what
+    /// the page chose to send; the one thing that spans days, so retention is
+    /// measured over it and over nothing else.
+    distinctId     String?
+    /// What `polaris.identify()` said about the visitor, as a JSON string object.
+    data           String?
 
     site   AnalyticsSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
     events AnalyticsEvent[]
 
     @@index([siteId, startedAt])
+    @@index([siteId, lastSeenAt])
+    @@index([siteId, distinctId])
     @@index([lastSeenAt])
 }
 
@@ -8472,6 +8485,26 @@ model AnalyticsDay {
 
     @@unique([siteId, day, dimension, value])
     @@index([siteId, day])
+}
+
+/// A question about one site, saved to be asked again: a funnel, a goal, a
+/// journey or a segment (a named set of filters). The definition is validated
+/// against its kind's schema in `@polaris/core` on every write and every read.
+model AnalyticsReport {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    siteId      String   @db.Uuid
+    /// funnel | goal | journey | segment
+    kind        String
+    name        String
+    /// JSON string, shaped by the kind.
+    definition  String
+    createdById String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    site AnalyticsSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+    @@index([siteId, kind])
 }
 
 // ---------------------------------------------------------------------------

@@ -16,7 +16,7 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { parseLanguage, visitBeatSchema } from "@polaris/core";
-import { getAnalyticsSiteByKey, recordVisit, recordVisitLeave } from "@/lib/analytics-service";
+import { getAnalyticsSiteByKey, recordVisit, recordVisitIdentify, recordVisitLeave } from "@/lib/analytics-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,11 +83,15 @@ export async function POST(request: Request): Promise<NextResponse> {
         language: parseLanguage(beat.language) ?? null,
         screen: beat.screen ?? null,
         timezone: beat.timezone ?? null,
-        countryHeader: request.headers.get("cf-ipcountry")
+        countryHeader: request.headers.get("cf-ipcountry"),
+        distinctId: beat.distinctId ?? null,
+        data: beat.data ?? null
     };
 
     try {
-        if (beat.type === "leave") {
+        if (beat.type === "identify") {
+            await recordVisitIdentify(common);
+        } else if (beat.type === "leave") {
             await recordVisitLeave({ ...common, durationMs: beat.durationMs ?? null });
         } else {
             await recordVisit({

@@ -19,15 +19,16 @@ import { requireAnalyticsReader } from "./reader";
 import { requireInstalledApp } from "@/lib/apps/require-installed";
 import { visitRangeSchema, type VisitRange } from "@polaris/core";
 import { isAnalyticsScope, type AnalyticsScope } from "./site-catalog";
+import { isAnalyticsTab } from "./analytics-reports";
 
 export const dynamic = "force-dynamic";
 
 export default async function AnalyticsPage({
     searchParams
 }: {
-    searchParams: Promise<{ scope?: string; id?: string; range?: string }>;
+    searchParams: Promise<{ scope?: string; id?: string; range?: string; tab?: string }>;
 }) {
-    const { scope, id, range } = await searchParams;
+    const { scope, id, range, tab } = await searchParams;
     const { user } = await requireAnalyticsReader();
     await requireInstalledApp("analytics", user);
     const canOperate = await userHasManage(user, "system.manage");
@@ -54,6 +55,7 @@ export default async function AnalyticsPage({
             siteId={siteId}
             range={activeRange}
             canOperate={canOperate}
+            tab={isAnalyticsTab(tab) ? tab : "overview"}
         />
     );
 }

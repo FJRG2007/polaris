@@ -18,11 +18,21 @@ export const analyticsSites = (signal?: AbortSignal) =>
     );
 
 export const analyticsOverview = (
-    input: { scopeType: string; scopeId: string; range: string },
+    input: { scopeType: string; scopeId: string; range: string; filters: string },
     signal?: AbortSignal
 ) =>
     readPoll<Answer<typeof analyticsActionsModule.getAnalyticsOverviewAction>>(
         "/api/analytics/overview",
+        input,
+        signal
+    );
+
+export const analyticsReport = (
+    input: { scopeType: string; scopeId: string; range: string; filters: string; request: string },
+    signal?: AbortSignal
+) =>
+    readPoll<Answer<typeof analyticsActionsModule.runAnalyticsReportAction>>(
+        "/api/analytics/report",
         input,
         signal
     );

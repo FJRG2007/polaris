@@ -13,6 +13,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { sessionWhere } from "@/lib/analytics-reports";
 import { randomBytes } from "node:crypto";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
@@ -25,7 +26,12 @@ import {
     resolveCountry,
     visitDay,
     visitSessionId,
+    analyticsSiteSettingsSchema,
+    visitIpIgnored,
+    visitPathMatches,
     type AnalyticsSettings,
+    type AnalyticsSiteSettings,
+    type VisitFilter,
     type VisitDimension,
     type VisitEventRow,
     type VisitRange,
@@ -52,6 +58,8 @@ export interface AnalyticsSiteView {
     readonly hostnames: readonly string[];
     readonly publicKey: string;
     readonly trackerEnabled: boolean;
+    /** What this site never records. */
+    readonly rules: AnalyticsSiteSettings;
 }
 
 // --- settings ---------------------------------------------------------------
@@ -125,6 +133,39 @@ export async function getAnalyticsSiteByKey(publicKey: string): Promise<Analytic
     return site ? toSiteView(site) : null;
 }
 
+/** What a site ignores, read on every recorded visit and so held briefly. */
+const rulesCache = new Map<string, { at: number; rules: AnalyticsSiteSettings }>();
+const RULES_TTL_MS = 30_000;
+
+async function siteRules(siteId: string): Promise<AnalyticsSiteSettings> {
+    const cached = rulesCache.get(siteId);
+    if (cached && Date.now() - cached.at < RULES_TTL_MS) return cached.rules;
+    const site = await prisma.analyticsSite.findUnique({
+        where: { id: siteId },
+        select: { excludedPaths: true, ignoredIps: true }
+    });
+    const rules = readRules(site);
+    if (rulesCache.size > 5000) rulesCache.clear();
+    rulesCache.set(siteId, { at: Date.now(), rules });
+    return rules;
+}
+
+function readRules(site: { excludedPaths: string; ignoredIps: string } | null): AnalyticsSiteSettings {
+    const parsed = analyticsSiteSettingsSchema.safeParse({
+        excludedPaths: safeJson(site?.excludedPaths ?? "[]"),
+        ignoredIps: safeJson(site?.ignoredIps ?? "[]")
+    });
+    return parsed.success ? parsed.data : { excludedPaths: [], ignoredIps: [] };
+}
+
+export async function setSiteRules(siteId: string, rules: AnalyticsSiteSettings): Promise<void> {
+    await prisma.analyticsSite.update({
+        where: { id: siteId },
+        data: { excludedPaths: JSON.stringify(rules.excludedPaths), ignoredIps: JSON.stringify(rules.ignoredIps) }
+    });
+    rulesCache.delete(siteId);
+}
+
 export async function setTrackerEnabled(siteId: string, enabled: boolean): Promise<void> {
     await prisma.analyticsSite.update({ where: { id: siteId }, data: { trackerEnabled: enabled } });
 }
@@ -145,6 +186,8 @@ function toSiteView(site: {
     hostnames: string;
     publicKey: string;
     trackerEnabled: boolean;
+    excludedPaths?: string;
+    ignoredIps?: string;
 }): AnalyticsSiteView {
     const hostnames = safeJson(site.hostnames);
     return {
@@ -154,7 +197,8 @@ function toSiteView(site: {
         name: site.name,
         hostnames: Array.isArray(hostnames) ? hostnames.filter((entry): entry is string => typeof entry === "string") : [],
         publicKey: site.publicKey,
-        trackerEnabled: site.trackerEnabled
+        trackerEnabled: site.trackerEnabled,
+        rules: readRules({ excludedPaths: site.excludedPaths ?? "[]", ignoredIps: site.ignoredIps ?? "[]" })
     };
 }
 
@@ -180,6 +224,17 @@ export interface VisitInput {
     readonly countryHeader?: string | null;
     /** Milliseconds the visitor spent, when the source can measure it. */
     readonly durationMs?: number | null;
+    /** The site's own id for this visitor, from `polaris.identify()`. */
+    readonly distinctId?: string | null;
+    /** What `polaris.identify()` said about the visitor. */
+    readonly data?: Record<string, unknown> | null;
+}
+
+/** Whether this site ignores this visit: an excluded page or an ignored address. */
+async function ignored(input: VisitInput, path: string): Promise<boolean> {
+    const rules = await siteRules(input.siteId);
+    if (rules.ignoredIps.length && visitIpIgnored(rules.ignoredIps, input.ip)) return true;
+    return rules.excludedPaths.some((pattern) => visitPathMatches(pattern, path));
 }
 
 /**
@@ -196,6 +251,7 @@ export async function recordVisit(input: VisitInput): Promise<void> {
     if (agent.device === "bot" && !settings.countBots) return;
 
     const [path, query] = splitUrl(input.url);
+    if (await ignored(input, path)) return;
     const source = parseVisitSource(input.referrer ?? null, query, input.self ?? null);
     const salt = await dailySalt(input.at);
     const sessionId = await visitSessionId({
@@ -219,7 +275,9 @@ export async function recordVisit(input: VisitInput): Promise<void> {
         // unknown one and never the other way round.
         ...(country ? { country } : {}),
         ...(input.language ? { language: input.language } : {}),
-        ...(input.screen ? { screen: input.screen } : {})
+        ...(input.screen ? { screen: input.screen } : {}),
+        ...(input.distinctId ? { distinctId: input.distinctId } : {}),
+        ...(input.data ? { data: JSON.stringify(input.data) } : {})
     };
 
     await prisma.analyticsSession.upsert({
@@ -240,7 +298,9 @@ export async function recordVisit(input: VisitInput): Promise<void> {
             referrerKind: source.kind,
             referrerSource: source.source,
             campaign: source.campaign,
-            medium: source.medium
+            medium: source.medium,
+            distinctId: input.distinctId ?? null,
+            data: input.data ? JSON.stringify(input.data) : null
         },
         update: {
             ...common,
@@ -280,6 +340,26 @@ export async function recordVisitLeave(input: VisitInput): Promise<void> {
     });
 }
 
+/** Name the visit, from `polaris.identify()`. Writes no event and starts no visit:
+ *  an identity on its own is not a visit to anything. */
+export async function recordVisitIdentify(input: VisitInput): Promise<void> {
+    if (!input.distinctId && !input.data) return;
+    const salt = await dailySalt(input.at);
+    const sessionId = await visitSessionId({
+        salt,
+        siteId: input.siteId,
+        ip: input.ip,
+        userAgent: input.userAgent ?? ""
+    });
+    await prisma.analyticsSession.updateMany({
+        where: { id: sessionId, siteId: input.siteId },
+        data: {
+            ...(input.distinctId ? { distinctId: input.distinctId } : {}),
+            ...(input.data ? { data: JSON.stringify(input.data) } : {})
+        }
+    });
+}
+
 // --- reading ----------------------------------------------------------------
 
 export interface AnalyticsView extends VisitReport {
@@ -294,6 +374,9 @@ export interface AnalyticsView extends VisitReport {
     /** The dimensions this source cannot answer, so the screen can say why a panel is
      *  empty instead of implying nobody used a screen size all quarter. */
     readonly unavailable: readonly VisitDimension[];
+    /** Filters were asked for over a window only the daily totals answer, which
+     *  cannot be narrowed - so these numbers are unfiltered and the screen says so. */
+    readonly filtersIgnored: boolean;
 }
 
 /**
@@ -315,26 +398,41 @@ const RAW_ONLY: readonly VisitDimension[] = ["entry", "exit", "campaign", "langu
 export async function readAnalytics(
     site: AnalyticsSiteView,
     range: VisitRange,
-    now = Date.now()
+    now = Date.now(),
+    filters: readonly VisitFilter[] = []
 ): Promise<AnalyticsView> {
     const spec = VISIT_RANGE_SPEC[range];
     const from = now - spec.ms;
+    const narrow = sessionWhere(filters);
     const online = await prisma.analyticsSession.count({
-        where: { siteId: site.id, lastSeenAt: { gte: new Date(now - 5 * 60 * 1000) } }
+        where: { siteId: site.id, lastSeenAt: { gte: new Date(now - 5 * 60 * 1000) }, ...narrow }
     });
 
     if (spec.ms > RAW_MAX_MS) {
         const report = await reportFromDays(site.id, from, now, spec.buckets);
-        return { ...report, site, from, to: now, online, source: "daily", unavailable: RAW_ONLY };
+        return {
+            ...report,
+            site,
+            from,
+            to: now,
+            online,
+            source: "daily",
+            unavailable: RAW_ONLY,
+            filtersIgnored: filters.length > 0
+        };
     }
 
     const [sessions, events] = await Promise.all([
         prisma.analyticsSession.findMany({
-            where: { siteId: site.id, lastSeenAt: { gte: new Date(from) } },
+            where: { siteId: site.id, lastSeenAt: { gte: new Date(from) }, ...narrow },
             orderBy: { startedAt: "asc" }
         }),
         prisma.analyticsEvent.findMany({
-            where: { siteId: site.id, at: { gte: new Date(from), lt: new Date(now) } },
+            where: {
+                siteId: site.id,
+                at: { gte: new Date(from), lt: new Date(now) },
+                ...(filters.length ? { session: { is: narrow } } : {})
+            },
             orderBy: { at: "asc" },
             take: RAW_EVENT_CAP,
             select: { sessionId: true, at: true, kind: true, name: true, path: true }
@@ -348,7 +446,7 @@ export async function readAnalytics(
         to: now,
         buckets: spec.buckets
     });
-    return { ...report, site, from, to: now, online, source: "raw", unavailable: [] };
+    return { ...report, site, from, to: now, online, source: "raw", unavailable: [], filtersIgnored: false };
 }
 
 /**
@@ -434,9 +532,17 @@ async function reportFromDays(siteId: string, from: number, to: number, buckets:
 
 /** The most recent visits, for the live list. Sessions rather than events: the
  *  question this answers is "who is here", not "what was fetched". */
-export async function recentVisits(siteId: string, limit = 25) {
+export async function recentVisits(
+    siteId: string,
+    limit = 25,
+    options: { filters?: readonly VisitFilter[]; before?: Date | null } = {}
+) {
     const sessions = await prisma.analyticsSession.findMany({
-        where: { siteId },
+        where: {
+            siteId,
+            ...(options.before ? { lastSeenAt: { lt: options.before } } : {}),
+            ...sessionWhere(options.filters ?? [])
+        },
         orderBy: { lastSeenAt: "desc" },
         take: Math.min(limit, 200)
     });
@@ -461,6 +567,7 @@ export async function recentVisits(siteId: string, limit = 25) {
         language: session.language,
         referrerKind: session.referrerKind,
         referrerSource: session.referrerSource,
+        distinctId: session.distinctId,
         views: session.views,
         startedAt: session.startedAt.toISOString(),
         lastSeenAt: session.lastSeenAt.toISOString(),

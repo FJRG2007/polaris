@@ -24,8 +24,25 @@
  *   <script defer fetchpriority="low" src="https://polaris.example/analytics.js" data-key="..."></script>
  *
  * Optional attributes:
- *   data-host         - where to send beats, if not the script's own origin
- *   data-auto="false" - do not track automatically; call polaris.view() yourself
+ *   data-host                  - where to send beats, if not the script's own origin
+ *   data-auto="false"          - do not track automatically; call polaris.view() yourself
+ *   data-domains="a.com,b.com" - only count visits on these hostnames
+ *   data-do-not-track="true"   - count nobody whose browser sends Do Not Track
+ *   data-exclude-search="true" - drop the query string from every page
+ *   data-outbound="true"       - record clicks on links to other sites
+ *   data-before-send="fnName"  - a global function that sees every beat first and
+ *                                returns it (changed or not), or a falsy value to drop it
+ *
+ * In the page:
+ *   polaris.view(url?)              - count a page by hand
+ *   polaris.event(name, props?)     - a custom event; a numeric `revenue` and a
+ *                                     `currency` prop are reported as revenue
+ *   polaris.identify(id, data?)     - name this visitor in the site's own terms
+ *   <button data-polaris-event="signup" data-polaris-event-plan="pro">
+ *                                   - an event on click, its props from the attributes
+ *
+ * Somebody who does not want to be counted on a site (its own team, usually) runs
+ * `localStorage.setItem("polaris.disabled", "1")` there; the script only reads it.
  */
 (() => {
     "use strict";
@@ -39,11 +56,36 @@
     const host = (script.getAttribute("data-host") || new URL(script.src).origin).replace(/\/$/, "");
     const endpoint = `${host}/api/analytics/collect`;
     const auto = script.getAttribute("data-auto") !== "false";
+    const flag = (name) => script.getAttribute(name) === "true";
+    const domains = (script.getAttribute("data-domains") || "")
+        .split(",")
+        .map((entry) => entry.trim().toLowerCase())
+        .filter(Boolean);
+    const excludeSearch = flag("data-exclude-search");
+    const beforeSendName = script.getAttribute("data-before-send");
+
+    /** Whether this visit is one the site asked not to count. Read each time: a
+     *  visitor can opt out without reloading. */
+    function silenced() {
+        try {
+            if (domains.length && !domains.includes(location.hostname.toLowerCase())) return true;
+            if (flag("data-do-not-track")) {
+                const dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+                if (dnt === "1" || dnt === "yes") return true;
+            }
+            if (localStorage.getItem("polaris.disabled")) return true;
+        } catch {
+            /* storage refused: count as usual */
+        }
+        return false;
+    }
+
+    let distinctId = null;
 
     let lastUrl = null;
     let enteredAt = 0;
 
-    const currentUrl = () => location.pathname + location.search;
+    const currentUrl = () => location.pathname + (excludeSearch ? "" : location.search);
 
     /**
      * Do this when the browser has nothing better to do.
@@ -61,7 +103,19 @@
         }
     }
 
-    function send(body, viaBeacon) {
+    function send(raw, viaBeacon) {
+        if (silenced()) return;
+        let body = raw;
+        if (distinctId && !body.distinctId) body = { ...body, distinctId };
+        if (beforeSendName) {
+            try {
+                const hook = window[beforeSendName];
+                if (typeof hook === "function") body = hook(body);
+            } catch {
+                return;
+            }
+            if (!body) return;
+        }
         const payload = JSON.stringify(body);
         // A page being closed is exactly when the most interesting beat is sent, and
         // that is the one moment a normal fetch is allowed to be cancelled. sendBeacon
@@ -136,7 +190,49 @@
         send(body, false);
     }
 
-    window.polaris = { view, event };
+    function identify(id, data) {
+        if (id && typeof id === "object") {
+            data = id;
+            id = null;
+        }
+        if (id) distinctId = String(id).slice(0, 100);
+        const body = base("identify");
+        if (distinctId) body.distinctId = distinctId;
+        if (data && typeof data === "object") body.data = data;
+        send(body, false);
+    }
+
+    window.polaris = { view, event, identify };
+
+    // Events declared in the markup, and links that leave the site. One listener
+    // on the document, in the capture phase, so a page that stops propagation on
+    // its own buttons still reports them.
+    addEventListener(
+        "click",
+        (clicked) => {
+            try {
+                const target = clicked.target instanceof Element ? clicked.target : null;
+                if (!target) return;
+                const tagged = target.closest("[data-polaris-event]");
+                if (tagged) {
+                    const props = {};
+                    for (const attribute of tagged.attributes) {
+                        const match = /^data-polaris-event-(.+)$/.exec(attribute.name);
+                        if (match) props[match[1]] = attribute.value.slice(0, 240);
+                    }
+                    event(tagged.getAttribute("data-polaris-event"), Object.keys(props).length ? props : undefined);
+                    return;
+                }
+                if (!flag("data-outbound")) return;
+                const link = target.closest("a[href]");
+                if (!link || !/^https?:$/.test(link.protocol) || link.host === location.host) return;
+                event("outbound-link-click", { url: link.href.slice(0, 240) });
+            } catch {
+                /* ignore */
+            }
+        },
+        true
+    );
 
     if (!auto) return;
 

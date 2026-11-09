@@ -217,9 +217,11 @@ export const GRANT_CAPABILITIES = {
     // One automation: its steps, its versions and its runs. Changing, publishing,
     // switching and running it stay on its shelf, as it runs as whoever published it.
     "automation.automation": ["view"],
-    // One service's visitor numbers: its traffic, pages, sources and recent visits.
-    // Switching its tracker and rotating its key stay with whoever configures it.
-    "analytics.site": ["view"],
+    // One service's visitor numbers: its traffic, pages, sources, visits and saved
+    // reports, read - or also run: its tracker, its key, its reports, what it
+    // ignores and wiping its history. Sharing it on stays with whoever configures
+    // the service.
+    "analytics.site": ["view", "edit"],
     // One telemetry project: its issues and their events, read; or also worked
     // through - resolving, ignoring and deleting issues, who may report into it
     // and what it keeps - which is Sentry's member beside its viewer. Its

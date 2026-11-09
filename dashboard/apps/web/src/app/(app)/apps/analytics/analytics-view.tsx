@@ -69,6 +69,17 @@ import {
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as polls from "./analytics-polls";
+import {
+    BREAKDOWN_FILTER,
+    Delta,
+    FilterBar,
+    FilterPick,
+    ReportPanel,
+    SectionTabs,
+    useFilterNav,
+    useFilterPick,
+    type AnalyticsTab
+} from "./analytics-reports";
 
 /** Thousands separators without a locale: the browser's separator disagrees with the
  *  server on the first render, and it is not the reader's chosen format either. */
@@ -95,14 +106,17 @@ export function AnalyticsView({
     scope,
     siteId,
     range,
-    canOperate
+    canOperate,
+    tab = "overview"
 }: {
     scope: AnalyticsScope;
     siteId: string;
     range: VisitRange;
     canOperate: boolean;
+    tab?: AnalyticsTab;
 }) {
     const t = useTranslations("analytics");
+    const { filters, filtersParam, set: setFilters, add: addFilter } = useFilterNav();
     const router = useRouter();
     const [data, setData] = useState<AnalyticsOverview | null>(null);
     const [failure, setFailure] = useState<string | null>(null);
@@ -149,7 +163,8 @@ export function AnalyticsView({
             const result = await polls.analyticsOverview({
                 scopeType: scope,
                 scopeId: siteId,
-                range
+                range,
+                filters: filtersParam
             });
             if ("error" in result) {
                 setFailure(result.error);
@@ -159,7 +174,7 @@ export function AnalyticsView({
             setFailure(null);
             setData(result);
         });
-    }, [scope, siteId, range]);
+    }, [scope, siteId, range, filtersParam]);
 
     useEffect(load, [load]);
 
@@ -239,6 +254,15 @@ export function AnalyticsView({
                     />
                 ) : null}
                 <RangeTabs range={range} />
+                <FilterBar
+                    filters={filters}
+                    set={setFilters}
+                    data={data}
+                    scope={scope}
+                    siteId={siteId}
+                    onSaved={load}
+                />
+                <SectionTabs tab={tab} />
             </div>
 
             {failure ? (
@@ -252,15 +276,32 @@ export function AnalyticsView({
                     {t("view.noServices")}
                 </p>
             ) : (
-                <>
-                    <Overview data={data} range={range} />
-                    <Breakdowns data={data} />
-                    <Recent data={data} />
-                    {data ? (
+                <FilterPick.Provider value={addFilter}>
+                    {tab === "overview" ? (
+                        <>
+                            <Overview data={data} range={range} />
+                            <Breakdowns data={data} />
+                            <Recent data={data} />
+                        </>
+                    ) : data ? (
+                        <ReportPanel
+                            tab={tab}
+                            data={data}
+                            scope={scope}
+                            siteId={siteId}
+                            filtersParam={filtersParam}
+                            onSaved={load}
+                        />
+                    ) : (
+                        <Skeleton className="h-48 w-full" />
+                    )}
+                    {tab === "site" && data && data.level !== "view" ? (
                         <TrackerPanel data={data} scope={scope} siteId={siteId} mutate={mutate} />
                     ) : null}
-                    {data && canOperate ? <SettingsPanel data={data} mutate={mutate} /> : null}
-                </>
+                    {tab === "site" && data && canOperate ? (
+                        <SettingsPanel data={data} mutate={mutate} />
+                    ) : null}
+                </FilterPick.Provider>
             )}
         </div>
     );
@@ -380,11 +421,21 @@ function Overview({ data, range }: { data: AnalyticsOverview | null; range: Visi
     const format = useDisplayFormat();
     const multiDay = range !== "24h";
 
-    const cards: { label: string; value: string; hint: string }[] = data
+    const previous = data?.previous ?? null;
+    const cards: {
+        label: string;
+        value: string;
+        hint: string;
+        now?: number | null;
+        before?: number | null;
+        lowerIsBetter?: boolean;
+    }[] = data
         ? [
               {
                   label: multiDay ? t("cards.dailyVisitors") : t("cards.visitors"),
                   value: grouped(data.view.overview.visitors),
+                  now: data.view.overview.visitors,
+                  before: previous?.visitors,
                   // Sessions rotate daily and are cookieless, so there is no identity to
                   // deduplicate across days. Saying so beats quietly showing a number
                   // that means something different at every range.
@@ -393,16 +444,23 @@ function Overview({ data, range }: { data: AnalyticsOverview | null; range: Visi
               {
                   label: t("cards.pageviews"),
                   value: grouped(data.view.overview.views),
+                  now: data.view.overview.views,
+                  before: previous?.views,
                   hint: t("cards.pageviewsHint")
               },
               {
                   label: t("cards.bounce"),
                   value: percent(data.view.overview.bounceRate),
+                  now: data.view.overview.bounceRate,
+                  before: previous?.bounceRate,
+                  lowerIsBetter: true,
                   hint: t("cards.bounceHint")
               },
               {
                   label: t("cards.duration"),
                   value: duration(data.view.overview.avgVisitSec),
+                  now: data.view.overview.avgVisitSec,
+                  before: previous?.avgVisitSec,
                   hint: data.site.trackerEnabled ? t("cards.durationHint") : t("cards.durationOff")
               }
           ]
@@ -418,8 +476,15 @@ function Overview({ data, range }: { data: AnalyticsOverview | null; range: Visi
                                   <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                       {card.label}
                                   </span>
-                                  <span className="text-2xl font-semibold tabular-nums">
-                                      {card.value}
+                                  <span className="flex items-baseline gap-2">
+                                      <span className="text-2xl font-semibold tabular-nums">
+                                          {card.value}
+                                      </span>
+                                      <Delta
+                                          current={card.now ?? null}
+                                          previous={card.before}
+                                          lowerIsBetter={card.lowerIsBetter}
+                                      />
                                   </span>
                                   <span className="text-xs text-muted-foreground">{card.hint}</span>
                               </CardBody>
@@ -479,6 +544,8 @@ function Overview({ data, range }: { data: AnalyticsOverview | null; range: Visi
 interface Panel {
     label: string;
     rows: readonly VisitRow[] | null;
+    /** The breakdown this list answers, so a row can narrow the screen to it. */
+    dimension?: VisitDimension;
     empty: string;
     render?: (key: string) => React.ReactNode;
 }
@@ -488,7 +555,10 @@ interface Panel {
  *  the first entry is ten times the second. */
 function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Panel[] }) {
     const [active, setActive] = useState(0);
+    const pick = useFilterPick();
+    const t = useTranslations("analytics");
     const panel = panels[Math.min(active, panels.length - 1)];
+    const narrow = panel?.dimension ? BREAKDOWN_FILTER[panel.dimension] : undefined;
     if (!panel) return null;
     const rows = panel.rows;
     const top = rows && rows.length > 0 ? Math.max(...rows.map((row) => row.visitors)) : 0;
@@ -541,12 +611,23 @@ function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Pa
                                         width: `${top > 0 ? Math.max(2, (row.visitors / top) * 100) : 0}%`
                                     }}
                                 />
-                                <span
-                                    className="relative min-w-0 flex-1 truncate pl-2"
-                                    title={row.key}
-                                >
-                                    {panel.render ? panel.render(row.key) : row.key}
-                                </span>
+                                {pick && narrow ? (
+                                    <button
+                                        type="button"
+                                        className="relative min-w-0 flex-1 truncate pl-2 text-left hover:underline"
+                                        title={t("filters.narrowTo", { value: row.key })}
+                                        onClick={() => pick(narrow, row.key)}
+                                    >
+                                        {panel.render ? panel.render(row.key) : row.key}
+                                    </button>
+                                ) : (
+                                    <span
+                                        className="relative min-w-0 flex-1 truncate pl-2"
+                                        title={row.key}
+                                    >
+                                        {panel.render ? panel.render(row.key) : row.key}
+                                    </span>
+                                )}
                                 <span className="relative shrink-0 pr-2 tabular-nums">
                                     {grouped(row.visitors)}
                                 </span>
@@ -576,16 +657,19 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null }) {
                     {
                         label: t("breakdowns.pages"),
                         rows: rows?.path ?? null,
+                        dimension: "path",
                         empty: t("breakdowns.noPages")
                     },
                     {
                         label: t("breakdowns.entry"),
                         rows: rows?.entry ?? null,
+                        dimension: "entry",
                         empty: why("entry", t("breakdowns.noVisits"))
                     },
                     {
                         label: t("breakdowns.exit"),
                         rows: rows?.exit ?? null,
+                        dimension: "exit",
                         empty: why("exit", t("breakdowns.noVisits"))
                     }
                 ]}
@@ -595,16 +679,19 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null }) {
                     {
                         label: t("breakdowns.referrers"),
                         rows: rows?.referrer ?? null,
+                        dimension: "referrer",
                         empty: t("breakdowns.nowhere")
                     },
                     {
                         label: t("breakdowns.channels"),
                         rows: rows?.channel ?? null,
+                        dimension: "channel",
                         empty: t("breakdowns.nothing")
                     },
                     {
                         label: t("breakdowns.campaigns"),
                         rows: rows?.campaign ?? null,
+                        dimension: "campaign",
                         empty: why("campaign", t("breakdowns.noCampaigns"))
                     }
                 ]}
@@ -615,21 +702,25 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null }) {
                     {
                         label: t("breakdowns.browsers"),
                         rows: rows?.browser ?? null,
+                        dimension: "browser",
                         empty: t("breakdowns.nothing")
                     },
                     {
                         label: t("breakdowns.systems"),
                         rows: rows?.os ?? null,
+                        dimension: "os",
                         empty: t("breakdowns.nothing")
                     },
                     {
                         label: t("breakdowns.devices"),
                         rows: rows?.device ?? null,
+                        dimension: "device",
                         empty: t("breakdowns.nothing")
                     },
                     {
                         label: t("breakdowns.screens"),
                         rows: rows?.screen ?? null,
+                        dimension: "screen",
                         empty: why("screen", t("breakdowns.noScreens"))
                     }
                 ]}
@@ -640,12 +731,14 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null }) {
                     {
                         label: t("breakdowns.countries"),
                         rows: rows?.country ?? null,
+                        dimension: "country",
                         empty: t("breakdowns.noCountries"),
                         render: (code) => `${countryFlag(code)} ${countryName(code)}`
                     },
                     {
                         label: t("breakdowns.languages"),
                         rows: rows?.language ?? null,
+                        dimension: "language",
                         empty: why("language", t("breakdowns.nothing"))
                     }
                 ]}
@@ -655,6 +748,7 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null }) {
                     {
                         label: t("breakdowns.addresses"),
                         rows: rows?.ip ?? null,
+                        dimension: "ip",
                         empty: why("ip", t("breakdowns.nothing")),
                         render: (ip) => <IpRow ip={ip} />
                     }
@@ -665,6 +759,7 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null }) {
                     {
                         label: t("breakdowns.events"),
                         rows: rows?.event ?? null,
+                        dimension: "event",
                         empty: t("breakdowns.noEvents")
                     }
                 ]}

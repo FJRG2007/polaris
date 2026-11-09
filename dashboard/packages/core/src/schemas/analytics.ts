@@ -17,7 +17,7 @@ import { z } from "zod";
 const URL_MAX = 2048;
 const NAME_MAX = 120;
 
-export const VISIT_BEATS = ["view", "event", "leave"] as const;
+export const VISIT_BEATS = ["view", "event", "leave", "identify"] as const;
 export type VisitBeat = (typeof VISIT_BEATS)[number];
 
 /**
@@ -43,6 +43,12 @@ export const visitBeatSchema = z.object({
     /** Custom event name. Required for an event beat, meaningless on the others. */
     name: z.string().min(1).max(NAME_MAX).optional(),
     props: visitPropsSchema.optional(),
+    /** The site's own name for this visitor, sent by `polaris.identify()`. Only
+     *  ever what the page chose to send; it is what lets a returning visitor be
+     *  recognised past the daily salt, and only on sites that ask for it. */
+    distinctId: z.string().trim().min(1).max(100).optional(),
+    /** What `polaris.identify()` says about the visitor, kept on the visit. */
+    data: visitPropsSchema.optional(),
     /** "1920x1080". Read off the client because the server cannot see it. */
     screen: z
         .string()
@@ -93,3 +99,163 @@ export const ANALYTICS_DEFAULTS: AnalyticsSettings = {
     countBots: false,
     retentionDays: 180
 };
+// --- reading: filters, reports and per-site settings --------------------------
+
+/**
+ * The dimensions a report can be narrowed by. A session dimension narrows the
+ * visits; `path` and `event` narrow them to the visits that saw that page or did
+ * that thing, which is what "people who looked at /pricing" means.
+ */
+export const VISIT_FILTER_DIMENSIONS = [
+    "path",
+    "event",
+    "referrer",
+    "channel",
+    "campaign",
+    "medium",
+    "browser",
+    "os",
+    "device",
+    "country",
+    "language",
+    "screen",
+    "ip",
+    "distinctId"
+] as const;
+export type VisitFilterDimension = (typeof VISIT_FILTER_DIMENSIONS)[number];
+
+export const visitFilterSchema = z.object({
+    dimension: z.enum(VISIT_FILTER_DIMENSIONS),
+    value: z.string().trim().min(1).max(240),
+    /** Whether the filter keeps the matching visits or every other one. */
+    negate: z.boolean().default(false)
+});
+export type VisitFilter = z.infer<typeof visitFilterSchema>;
+
+/** At most this many at once: past it the URL is unreadable and the query is not
+ *  a breakdown any more. */
+export const visitFiltersSchema = z.array(visitFilterSchema).max(10);
+
+/** Read the filters off a URL parameter. Anything malformed reads as none. */
+export function parseVisitFilters(raw: string | null | undefined): VisitFilter[] {
+    if (!raw) return [];
+    try {
+        const parsed = visitFiltersSchema.safeParse(JSON.parse(raw));
+        return parsed.success ? parsed.data : [];
+    } catch {
+        return [];
+    }
+}
+
+/** A page or an event: one step of a funnel, a goal. A path ending in `*` matches
+ *  every path that starts with what comes before it. */
+export const visitMatchSchema = z
+    .object({
+        type: z.enum(["path", "event"]),
+        value: z.string().trim().min(1).max(240)
+    })
+    .superRefine((match, context) => {
+        if (match.type === "path" && !match.value.startsWith("/"))
+            context.addIssue({ code: "custom", path: ["value"], message: "A path starts with /" });
+    });
+export type VisitMatch = z.infer<typeof visitMatchSchema>;
+
+export const funnelDefinitionSchema = z.object({
+    steps: z.array(visitMatchSchema).min(2).max(8),
+    /** How long a visitor has, from the first step, to reach the last. */
+    windowMinutes: z.number().int().min(1).max(10_080)
+});
+export type FunnelDefinition = z.infer<typeof funnelDefinitionSchema>;
+
+export const goalDefinitionSchema = visitMatchSchema;
+export type GoalDefinition = z.infer<typeof goalDefinitionSchema>;
+
+export const journeyDefinitionSchema = z.object({
+    /** Pages per journey shown. */
+    steps: z.number().int().min(2).max(7),
+    /** Only journeys that start here, when set. */
+    start: z.string().trim().max(240).optional()
+});
+export type JourneyDefinition = z.infer<typeof journeyDefinitionSchema>;
+
+export const segmentDefinitionSchema = z.object({ filters: visitFiltersSchema.min(1) });
+export type SegmentDefinition = z.infer<typeof segmentDefinitionSchema>;
+
+export const ANALYTICS_REPORT_KINDS = ["funnel", "goal", "journey", "segment"] as const;
+export type AnalyticsReportKind = (typeof ANALYTICS_REPORT_KINDS)[number];
+
+const reportName = z.string().trim().min(1).max(80);
+
+/** A report as it is saved: a name, and what it asks. */
+export const analyticsReportSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("funnel"), name: reportName, definition: funnelDefinitionSchema }),
+    z.object({ kind: z.literal("goal"), name: reportName, definition: goalDefinitionSchema }),
+    z.object({ kind: z.literal("journey"), name: reportName, definition: journeyDefinitionSchema }),
+    z.object({ kind: z.literal("segment"), name: reportName, definition: segmentDefinitionSchema })
+]);
+export type AnalyticsReportInput = z.infer<typeof analyticsReportSchema>;
+
+/**
+ * What one site ignores. Both apply to the edge log and the tracker alike, at
+ * the moment a visit is recorded, so an excluded page never reaches a total.
+ * A path pattern ending in `*` is a prefix.
+ */
+export const analyticsSiteSettingsSchema = z.object({
+    excludedPaths: z
+        .array(
+            z
+                .string()
+                .trim()
+                .min(1)
+                .max(200)
+                .regex(/^\/\S*$/, "A path starts with / and has no spaces")
+        )
+        .max(50),
+    ignoredIps: z
+        .array(
+            z
+                .string()
+                .trim()
+                .min(2)
+                .max(64)
+                .regex(/^[0-9a-fA-F:.]+(\/\d{1,3})?$/, "Not an address")
+        )
+        .max(50)
+});
+export type AnalyticsSiteSettings = z.infer<typeof analyticsSiteSettingsSchema>;
+
+/** Whether a path matches a pattern: exact, or a prefix when it ends in `*`. */
+export function visitPathMatches(pattern: string, path: string): boolean {
+    return pattern.endsWith("*") ? path.startsWith(pattern.slice(0, -1)) : path === pattern;
+}
+
+/** Whether an address is one a site ignores: exact, or inside an IPv4 CIDR. */
+export function visitIpIgnored(patterns: readonly string[], ip: string): boolean {
+    for (const pattern of patterns) {
+        if (!pattern.includes("/")) {
+            if (pattern.toLowerCase() === ip.toLowerCase()) return true;
+            continue;
+        }
+        const [base, bitsText] = pattern.split("/");
+        const bits = Number(bitsText);
+        const a = ipv4ToInt(base ?? "");
+        const b = ipv4ToInt(ip);
+        if (a === null || b === null || !(bits >= 0 && bits <= 32)) continue;
+        const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
+        if ((a & mask) >>> 0 === (b & mask) >>> 0) return true;
+    }
+    return false;
+}
+
+function ipv4ToInt(value: string): number | null {
+    const parts = value.split(".");
+    if (parts.length !== 4) return null;
+    let out = 0;
+    for (const part of parts) {
+        if (!/^\d{1,3}$/.test(part)) return null;
+        const n = Number(part);
+        if (n > 255) return null;
+        out = out * 256 + n;
+    }
+    return out >>> 0;
+}
