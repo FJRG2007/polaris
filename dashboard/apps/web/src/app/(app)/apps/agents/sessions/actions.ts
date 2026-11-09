@@ -39,6 +39,8 @@ import {
     pullRequestChecks
 } from "@/lib/github-service";
 import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
+import { chatCredentialFor } from "@/lib/agents/model-keys";
+import * as sessionAttachments from "@/lib/agents/session-attachments";
 import {
     sharedWorkspaceAllowed,
     workspaceHolders,
@@ -97,12 +99,16 @@ export async function repoOptionsAction(
 }
 
 const listPage = z
-    .object({ mine: z.boolean().optional(), after: sessionCursorSchema.optional() })
+    .object({
+        mine: z.boolean().optional(),
+        after: sessionCursorSchema.optional(),
+        polar: z.boolean().optional()
+    })
     .strict();
 
 export async function listSessionsAction(
     limit?: number,
-    page?: { mine?: boolean; after?: string }
+    page?: { mine?: boolean; after?: string; polar?: boolean }
 ): Promise<sessions.SessionView[]> {
     const user = await requirePermission("agents.read");
     const take = z.number().int().positive().optional().safeParse(limit);
@@ -233,8 +239,21 @@ async function startParsed(
     // that exists, so it can never be the missing case. Neither can the machine's
     // own login: it is the answer for exactly the tool Polaris holds nothing for,
     // so refusing it here would refuse the case the option exists for.
+    // A model picked on the form signs the tool in with that provider's key,
+    // which is checked here rather than the tool's own sign-in.
+    if (value.modelChoice) {
+        const credential = await chatCredentialFor(
+            user.id,
+            value.modelChoice.provider,
+            value.modelChoice.payer
+        );
+        if (!credential) return { error: t("sessions.errors.noModelKey") };
+    }
+    const files = await sessionAttachments.sessionAttachmentsFor(user.id, value.attachments);
+    if ("refusal" in files) return { error: t(`sessions.errors.files.${files.refusal}`) };
+
     const blocked =
-        value.accountId || value.useMachineLogin
+        value.accountId || value.useMachineLogin || value.modelChoice
             ? undefined
             : (await agentChoicesFor(user.id)).find(
                   (agent) => agent.id === value.cli && agent.readiness === "missing"
@@ -278,6 +297,7 @@ async function startParsed(
         unattended: value.unattended,
         accountId: value.accountId,
         useMachineLogin: value.useMachineLogin,
+        modelChoice: value.modelChoice,
         hostId: value.place === "host" ? value.hostId : null,
         baseRef: value.baseRef,
         taskId: value.taskId,
@@ -310,12 +330,25 @@ async function startParsed(
     }
 
     if (value.prompt && admission.queuedAt === null) {
+        const prompt = sessionAttachments.withAttachmentNote(
+            value.prompt,
+            files.files.map((file) => file.path)
+        );
         // After the response rather than before it, because the agent does not
         // exist yet: the container is still cloning the repository and installing
         // the tool. The delivery waits, and writes into the transcript if it never
         // gets a terminal to type into. A queued session is handed it by the queue.
-        const prompt = value.prompt;
-        after(() => runtime.deliverFirstPrompt(session.id, prompt));
+        const carried = files.files.length > 0 ? { session, userId: user.id, files: files.files } : null;
+        after(() => runtime.deliverFirstPrompt(session.id, prompt, carried));
+    } else if (admission.queuedAt !== null && files.files.length > 0) {
+        // The queue starts it later with the prompt alone: the files have no
+        // machine to go to yet, and saying so beats a prompt about files that
+        // never arrived.
+        await sessions.addSessionMessage(
+            session.id,
+            "system",
+            "The attached files were not kept while this session waited for a slot. Attach them again once it starts."
+        );
     }
 
     await noteOnTask(session, user.id);
@@ -422,9 +455,16 @@ export async function promptSessionAction(input: unknown): Promise<{ error?: str
     // would be typed into a machine that does not exist.
     if (core.isSessionQueued(session.state)) return { error: t("sessions.errors.queued") };
 
-    await sessions.addSessionMessage(session.id, "user", parsed.data.text, user.id);
+    const files = await sessionAttachments.sessionAttachmentsFor(user.id, parsed.data.attachments);
+    if ("refusal" in files) return { error: t(`sessions.errors.files.${files.refusal}`) };
+    const text = sessionAttachments.withAttachmentNote(
+        parsed.data.text,
+        files.files.map((file) => file.path)
+    );
+    await sessions.addSessionMessage(session.id, "user", text, user.id);
     try {
-        await runtime.promptSession(session.id, parsed.data.text);
+        await runtime.placeAttachments(session, user.id, files.files);
+        await runtime.promptSession(session.id, text);
     } catch (error) {
         return { error: agentText(t, sessions.readableFailure(error, `prompting ${session.id}`)) };
     }

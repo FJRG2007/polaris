@@ -134,7 +134,7 @@ describe("polarCodeOverview", () => {
     it("asks for this person's own sessions only, a page and one more", async () => {
         state.held.add("agents.read");
         await polarCodeOverview(USER);
-        expect(state.page).toEqual({ mine: true });
+        expect(state.page).toEqual({ mine: true, polar: true });
         expect(state.limit).toBe(21);
     });
 
@@ -156,7 +156,7 @@ describe("polarCodeOverview", () => {
         expect(first.sessions).toHaveLength(19);
         expect(first.next).toBe(`${at(21).createdAt}_${at(21).id}`);
         await polarCodeOverview(USER, first.next);
-        expect(state.page).toEqual({ mine: true, after: first.next });
+        expect(state.page).toEqual({ mine: true, polar: true, after: first.next });
     });
 
     it("says manage for somebody who can start sessions", async () => {

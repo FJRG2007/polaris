@@ -91,6 +91,9 @@ import * as goals from "@/lib/polar/goals";
 import { PolarThreads } from "@/components/polar/polar-threads";
 import * as toolPrefs from "@/components/polar/tool-prefs";
 import { PolarCodeView, PolarModeSwitch, usePolarCode } from "@/components/polar/polar-code";
+import { refusalOf, UPLOAD_ERRORS, uploadFile, type UploadError } from "@/components/polar/polar-uploads";
+
+export { refusalOf };
 import * as polarRuns from "@/components/polar/polar-runs";
 import * as polarCompare from "@/components/polar/polar-compare";
 import * as polarShared from "@/lib/polar/shared";
@@ -150,7 +153,6 @@ import {
 import { GithubAppGapNotice, gapIdentity, gapsOf } from "@/components/github-app-gap";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
 import { learnPath, pathThrough, versionsOf, type VersionTree } from "@/lib/polar/versions";
-import { sendFile } from "@/components/transfers/move-file";
 import { AttachmentList, type AttachmentData } from "@/components/polar/elements/attachments";
 import {
     ModelSelector,
@@ -177,7 +179,6 @@ import {
     isAutomatic,
     MAX_QUEUE,
     polarAttachmentId,
-    POLAR_ATTACHMENT_MAX_BYTES,
     POLAR_ATTACHMENT_MOST,
     POLAR_ATTACHMENT_TYPES,
     type ModelChoice,
@@ -683,25 +684,6 @@ function sizeOf(metadata: unknown): number | undefined {
     return typeof size === "number" && Number.isFinite(size) && size >= 0 ? size : undefined;
 }
 
-/** Upload refusals the composer explains; anything else reads as a failed upload. */
-const UPLOAD_ERRORS = [
-    "unsupported_type",
-    "too_large",
-    "rate_limited",
-    "storage_failed",
-    "upload_failed",
-    "not_found"
-] as const;
-type UploadError = (typeof UPLOAD_ERRORS)[number];
-
-/** Why a file cannot be attached at all, decided before a byte is sent. */
-export function refusalOf(file: Pick<File, "type" | "size">): UploadError | null {
-    if (!(POLAR_ATTACHMENT_TYPES as readonly string[]).includes(file.type))
-        return "unsupported_type";
-    if (file.size > POLAR_ATTACHMENT_MAX_BYTES) return "too_large";
-    return null;
-}
-
 /** The files a paste carries: `files` where the browser fills it, else the items. */
 export function pastedFiles(data: DataTransfer): File[] {
     const files = Array.from(data.files ?? []);
@@ -727,37 +709,6 @@ async function attachItem(item: droppedItems.DroppedItem): Promise<AttachmentDat
         : null;
     if (!response?.ok || !body?.file) return body?.error ?? "upload_failed";
     return { ...body.file };
-}
-
-async function uploadFile(
-    file: File,
-    onProgress: (share: number) => void
-): Promise<AttachmentData | string> {
-    const sent = await sendFile(
-        `/api/polar/attachments?name=${encodeURIComponent(file.name)}`,
-        file,
-        {
-            method: "POST",
-            onProgress: (moved, total) => onProgress(total > 0 ? moved / total : 0)
-        }
-    ).catch(() => null);
-    let body: {
-        error?: string;
-        file?: { id: string; url: string; filename: string; mediaType: string };
-    } | null = null;
-    try {
-        body = sent?.body ? JSON.parse(sent.body) : null;
-    } catch {
-        body = null;
-    }
-    if (!sent?.ok || !body?.file) return body?.error ?? "upload_failed";
-    return {
-        id: body.file.id,
-        url: body.file.url,
-        filename: body.file.filename,
-        mediaType: body.file.mediaType,
-        size: file.size
-    };
 }
 
 export function PolarChat({
@@ -2175,6 +2126,7 @@ export function PolarChat({
                     : {
                           history: code.history,
                           activeId: chatMode ? null : code.selected,
+                          canRename: code.access === "manage",
                           first: !chatMode,
                           onOpen: (id) => {
                               code.open(id);
@@ -2636,6 +2588,7 @@ export function PolarChat({
                             fullPage={fullPage}
                             avatar={<PolarAvatar state={avatarState} size={64} />}
                             voiceKit={voiceKit}
+                            providers={providers}
                         />
                     </div>
                 )}

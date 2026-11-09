@@ -104,6 +104,8 @@ export interface SessionView {
      *  login answer. Distinct from a null `accountId`, which is "whichever of
      *  mine resolves". */
     readonly useMachineLogin: boolean;
+    /** The provider and model a multi-provider tool works with, or null. */
+    readonly modelChoice: core.SessionModelChoice | null;
     readonly hostId: string | null;
     readonly hostName: string | null;
     readonly state: core.AgentSessionState;
@@ -189,6 +191,9 @@ const VIEW_SELECT = {
     unattended: true,
     accountId: true,
     useMachineLogin: true,
+    modelProvider: true,
+    model: true,
+    modelPayer: true,
     hostId: true,
     state: true,
     detail: true,
@@ -229,6 +234,9 @@ type SessionRecord = {
     unattended: boolean | null;
     accountId: string | null;
     useMachineLogin: boolean;
+    modelProvider: string | null;
+    model: string | null;
+    modelPayer: string | null;
     hostId: string | null;
     state: string;
     detail: string;
@@ -278,6 +286,17 @@ function toView(record: SessionRecord): SessionView {
         unattended: record.unattended,
         accountId: record.accountId,
         useMachineLogin: record.useMachineLogin,
+        modelChoice:
+            record.modelProvider && record.model
+                ? {
+                      provider: record.modelProvider,
+                      model: record.model,
+                      payer:
+                          record.modelPayer === "own" || record.modelPayer === "instance"
+                              ? record.modelPayer
+                              : null
+                  }
+                : null,
         hostId: record.hostId,
         hostName: record.host?.name ?? null,
         state: readState(record.state),
@@ -328,6 +347,8 @@ export async function listSessions(
         /** `sessionCursor` of the last session of the previous page: the list
          *  goes on after it, even once that session is gone. */
         after?: string;
+        /** Leave out what the person took out of Polar's Code history. */
+        polar?: boolean;
     } = {}
 ): Promise<SessionView[]> {
     const after = options.after === undefined ? null : readSessionCursor(options.after);
@@ -336,6 +357,7 @@ export async function listSessions(
         where: {
             OR: [{ repo: { ownerId } }, { repoId: null, startedById: ownerId }],
             ...(options.mine ? { startedById: ownerId } : {}),
+            ...(options.polar ? { polarHiddenAt: null } : {}),
             ...(options.repoId ? { repoId: options.repoId } : {}),
             ...(options.live ? { state: { notIn: ["stopped", "failed"] } } : {}),
             ...(after
@@ -406,6 +428,8 @@ export interface SessionCreateInput {
     readonly accountId: string | null;
     /** Sign it in with nothing, and let the machine's own login answer. */
     readonly useMachineLogin: boolean;
+    /** The provider and model, for a tool that takes them from Polaris. */
+    readonly modelChoice?: core.SessionModelChoice | null;
     readonly hostId: string | null;
     readonly baseRef: string;
     readonly taskId: string | null;
@@ -445,6 +469,9 @@ export async function createSession(
             unattended: input.unattended,
             accountId: input.accountId,
             useMachineLogin: input.useMachineLogin,
+            modelProvider: input.modelChoice?.provider ?? null,
+            model: input.modelChoice?.model ?? null,
+            modelPayer: input.modelChoice?.payer ?? null,
             hostId: input.hostId,
             baseRef: input.baseRef,
             branch: core.sessionBranchName(id, input.title),
@@ -899,4 +926,34 @@ export async function resolveSessionEnigma(sessionId: string): Promise<core.Reso
         byScope(GENERAL_SCOPE),
         platformEnigma
     );
+}
+
+/** Sessions that can still be told something: taking one out of a history
+ *  would hide work that is still going on. */
+const FINISHED_STATES = ["stopped", "failed"];
+
+/**
+ * Take a session out of its starter's Polar Code history. Only the person who
+ * started it, and only once it has finished; the session itself stays, listed
+ * in Agents. False when nothing was taken out.
+ */
+export async function hideSessionFromPolar(sessionId: string, userId: string): Promise<boolean> {
+    const { count } = await prisma.agentSession.updateMany({
+        where: { id: sessionId, startedById: userId, state: { in: FINISHED_STATES } },
+        data: { polarHiddenAt: new Date() }
+    });
+    return count > 0;
+}
+
+/** Rename a session its starter started. False when it is not theirs. */
+export async function renameSession(
+    sessionId: string,
+    userId: string,
+    title: string
+): Promise<boolean> {
+    const { count } = await prisma.agentSession.updateMany({
+        where: { id: sessionId, startedById: userId },
+        data: { title }
+    });
+    return count > 0;
 }

@@ -5,7 +5,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { codeTaskKey, dedupeCodeRows, mergeCodeRows } from "@/lib/polar/code-history";
+import {
+    codeTaskKey,
+    dedupeCodeRows,
+    filterCodeRows,
+    mergeCodeRows,
+    polarCodeEditSchema
+} from "@/lib/polar/code-history";
 
 function row(
     id: string,
@@ -105,5 +111,63 @@ describe("mergeCodeRows", () => {
 
     it("starts the list over from null", () => {
         expect(mergeCodeRows(null, [row("a", "One", "1")]).map((entry) => entry.id)).toEqual(["a"]);
+    });
+});
+
+describe("filterCodeRows", () => {
+    const rows = [
+        row("a", "Fix the login redirect", "3"),
+        row("b", "Review the billing page", "2", "acme/billing"),
+        row("c", "Tidy the README", "1", "")
+    ];
+
+    it("keeps every row for no words", () => {
+        expect(filterCodeRows(rows, "  ").map((entry) => entry.id)).toEqual(["a", "b", "c"]);
+    });
+
+    it("needs every word, in the title or the repository, whatever the case", () => {
+        expect(filterCodeRows(rows, "LOGIN fix").map((entry) => entry.id)).toEqual(["a"]);
+        expect(filterCodeRows(rows, "billing").map((entry) => entry.id)).toEqual(["b"]);
+        expect(filterCodeRows(rows, "acme review").map((entry) => entry.id)).toEqual(["b"]);
+    });
+
+    it("is empty when nothing matches", () => {
+        expect(filterCodeRows(rows, "deploy")).toEqual([]);
+    });
+});
+
+describe("polarCodeEditSchema", () => {
+    const sessionId = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+
+    it("takes a delete of one session", () => {
+        expect(polarCodeEditSchema.safeParse({ action: "delete", sessionId }).success).toBe(true);
+    });
+
+    it("trims a new name and refuses an empty or overlong one", () => {
+        const renamed = polarCodeEditSchema.safeParse({
+            action: "rename",
+            sessionId,
+            title: "  New name  "
+        });
+        expect(renamed.success && renamed.data.action === "rename" && renamed.data.title).toBe(
+            "New name"
+        );
+        expect(
+            polarCodeEditSchema.safeParse({ action: "rename", sessionId, title: "   " }).success
+        ).toBe(false);
+        expect(
+            polarCodeEditSchema.safeParse({ action: "rename", sessionId, title: "x".repeat(81) })
+                .success
+        ).toBe(false);
+    });
+
+    it("refuses an id that is not one, an unknown action and extra fields", () => {
+        expect(polarCodeEditSchema.safeParse({ action: "delete", sessionId: "1" }).success).toBe(
+            false
+        );
+        expect(polarCodeEditSchema.safeParse({ action: "pin", sessionId }).success).toBe(false);
+        expect(
+            polarCodeEditSchema.safeParse({ action: "delete", sessionId, title: "x" }).success
+        ).toBe(false);
     });
 });

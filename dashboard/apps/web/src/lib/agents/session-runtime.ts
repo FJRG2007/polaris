@@ -28,7 +28,9 @@ import { appBaseUrl } from "@/lib/domain-service";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
 import { credentialsForAgent } from "@/lib/agents/agent-readiness";
-import { secretForAccount, sessionSecretsFor } from "@/lib/agents/model-keys";
+import { chatCredentialFor, secretForAccount, sessionSecretsFor } from "@/lib/agents/model-keys";
+import { opencodeModelEnv } from "@/lib/agents/opencode-model";
+import * as attachments from "@/lib/agents/session-attachments";
 import {
     GitHubStatusError,
     cloneAuthHeader,
@@ -281,6 +283,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
             "Polaris could not read the stored credentials just now. Try again in a moment."
         );
     }
+    const modelEnv = await modelEnvFor(session);
 
     return {
         repoFullName: session.repoFullName,
@@ -341,11 +344,15 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // token injected over that is how a credential somebody revoked months
         // ago comes to beat a login that works - the tool reads the variable
         // first and never looks at the home.
-        credentials: session.useMachineLogin
-            ? {}
-            : chosen
-              ? { ...credentialsForAgent(agent.cli, available), [chosen.env]: chosen.secret }
-              : credentialsForAgent(agent.cli, available),
+        credentials: {
+            ...(session.useMachineLogin
+                ? {}
+                : chosen
+                  ? { ...credentialsForAgent(agent.cli, available), [chosen.env]: chosen.secret }
+                  : credentialsForAgent(agent.cli, available)),
+            // The provider and model picked on the form, last, so they win.
+            ...modelEnv
+        },
         // The same decision, for the tools that take a variable rather than a
         // flag. Held to the same rule so the two halves cannot disagree.
         autonomyEnv: core.polarisAppliesAutonomy(session.place, session.unattended, enigma.enabled)
@@ -354,6 +361,49 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         runAs: session.place === "host" ? "" : commands.CONTAINER_USER,
         home: session.place === "host" ? "" : commands.AGENT_HOME
     };
+}
+
+/**
+ * The provider, model and key a multi-provider tool was started with, as the
+ * variables it reads. Resolved again at every boot through the same order a
+ * chat uses (the person's own key, then the deployment's where it shares them,
+ * narrowed by who pays), so a key removed since is not one a reopened session
+ * keeps spending. Nothing for a session that picked no model.
+ */
+async function modelEnvFor(session: SessionView): Promise<Record<string, string>> {
+    const choice = session.modelChoice;
+    if (!choice || !core.MODEL_CHOICE_AGENT_CLIS.includes(session.cli)) return {};
+    const credential = session.ownerId
+        ? await chatCredentialFor(session.ownerId, choice.provider, choice.payer)
+        : null;
+    if (!credential) {
+        throw new SessionRefusal(
+            "There is no usable key for the provider this session was started with. Add one under AI keys, or start it on another model."
+        );
+    }
+    return opencodeModelEnv({
+        provider: choice.provider,
+        model: choice.model,
+        secret: credential.secret,
+        baseUrl: credential.baseUrl,
+        gatewayModel: credential.gatewayModel
+    });
+}
+
+/**
+ * Write a prompt's files into the session's working directory, each slice
+ * insisted on, so a prompt never names a file that did not arrive.
+ */
+export async function placeAttachments(
+    session: SessionView,
+    userId: string,
+    files: readonly attachments.SessionAttachment[]
+): Promise<void> {
+    if (files.length === 0) return;
+    const bytes = await attachments.attachmentBytes(userId, files);
+    for (const command of attachments.attachmentCommands(workdirFor(session), bytes)) {
+        await steer(session.id, command, "The attached files did not reach the session");
+    }
 }
 
 /**
@@ -813,11 +863,21 @@ export async function promptSession(sessionId: string, text: string): Promise<vo
  * polling. Failure is written into the transcript, because the person who typed
  * it has already been told the session started.
  */
-export async function deliverFirstPrompt(sessionId: string, text: string): Promise<void> {
+export async function deliverFirstPrompt(
+    sessionId: string,
+    text: string,
+    files: {
+        session: SessionView;
+        userId: string;
+        files: readonly attachments.SessionAttachment[];
+    } | null = null
+): Promise<void> {
     try {
         if (!(await waitForAgent(sessionId))) {
             throw new Error("its agent never opened a terminal to type into");
         }
+        // Once the agent is up, the checkout is there to write into.
+        if (files) await placeAttachments(files.session, files.userId, files.files);
         await promptSession(sessionId, text);
     } catch (error) {
         await addSessionMessage(

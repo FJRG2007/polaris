@@ -56,7 +56,6 @@ import {
     SquareCheck,
     SquarePen,
     Trash2,
-    Code2,
     Copy,
     ExternalLink,
     Users,
@@ -107,6 +106,8 @@ import {
 } from "@/components/polar/polar-sharing";
 import type { PolarProjectRow, PolarThreadRow } from "@/lib/polar/shared";
 import { StateDot, type PolarCodeHistory } from "@/components/polar/polar-code";
+import type { PolarCodeRow } from "@/lib/polar/code";
+import { filterCodeRows } from "@/lib/polar/code-history";
 import dynamic from "next/dynamic";
 import {
     actedOn,
@@ -130,9 +131,12 @@ export interface PolarThreadsCode {
     /** The session on screen, or null when Code is not. */
     readonly activeId: string | null;
     readonly onOpen: (id: string) => void;
-    /** Whether Code is on screen: its sessions lead the list, and say when
-     *  there are none. */
+    /** Whether Code is on screen: then the list is its sessions, and only
+     *  them; otherwise it is the chats, and only them. */
     readonly first: boolean;
+    /** Whether a session can be renamed here: that needs the right to manage
+     *  Agents, since the new name shows there too. */
+    readonly canRename: boolean;
 }
 
 export type ThreadRow = PolarThreadRow;
@@ -196,6 +200,9 @@ export function PolarThreads({
     const [deleting, setDeleting] = useState<PolarThreadRow | null>(null);
     const [sharing, setSharing] = useState<PolarThreadRow | null>(null);
     const [searching, setSearching] = useState(false);
+    /** The words the Code list is narrowed to, or null while its field is shut. */
+    const [codeQuery, setCodeQuery] = useState<string | null>(null);
+    const codeShown = Boolean(code?.first);
     const [managingShares, setManagingShares] = useState(false);
     /** The project dialog: a new one (optionally for a chat to move into it),
      *  or an existing one to edit. */
@@ -276,6 +283,8 @@ export function PolarThreads({
     /** The keys the list hears: Ctrl+A, Escape, the arrows, Delete. A key typed
      *  into a field (renaming) or a menu is left alone. */
     const onListKey = (event: KeyboardEvent<HTMLDivElement>) => {
+        // The Code list has no selection: these keys walk the chats.
+        if (codeShown) return;
         const target = event.target as HTMLElement;
         if (target.closest("input, textarea, [role='menu'], [role='dialog']")) return;
         const focused = target.closest<HTMLElement>("[data-thread-id]")?.dataset.threadId ?? null;
@@ -338,7 +347,6 @@ export function PolarThreads({
             />
         );
     };
-    const codeSection = code ? <CodeSection code={code} /> : null;
 
     return (
         <nav aria-label={t("history.title")} className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -346,14 +354,39 @@ export function PolarThreads({
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
                     {t("page.title")}
                 </span>
-                <IconButton label={t("history.search")} onClick={() => setSearching(true)}>
+                <IconButton
+                    label={t("history.search")}
+                    onClick={() =>
+                        codeShown
+                            ? setCodeQuery((current) => (current === null ? "" : null))
+                            : setSearching(true)
+                    }
+                >
                     <Search className="size-4" />
                 </IconButton>
                 <IconButton label={hide.label} onClick={hide.onClick}>
                     <HideIcon className="size-4" />
                 </IconButton>
             </div>
-            {chosen.length > 0 ? (
+            {codeShown && codeQuery !== null ? (
+                <div className="shrink-0 px-2 pb-1">
+                    <Input
+                        autoFocus
+                        value={codeQuery}
+                        aria-label={t("code.search")}
+                        placeholder={t("code.search")}
+                        onChange={(event) => setCodeQuery(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                                event.preventDefault();
+                                setCodeQuery(null);
+                            }
+                        }}
+                        className="h-8"
+                    />
+                </div>
+            ) : null}
+            {!codeShown && chosen.length > 0 ? (
                 <SelectionBar count={chosen.length} actions={chosenActions} />
             ) : null}
             <div
@@ -364,28 +397,24 @@ export function PolarThreads({
                 <NavRow icon={SquarePen} onClick={() => onNew(null)}>
                     {newLabel ?? t("actions.new")}
                 </NavRow>
-                <NavRow icon={Link2} onClick={() => setManagingShares(true)}>
-                    {t("sharing.links")}
-                </NavRow>
-                {rows === null ? (
-                    <div className="space-y-2 p-2">
-                        {[0, 1, 2].map((key) => (
-                            <div
-                                key={key}
-                                className="h-6 rounded bg-muted motion-safe:animate-pulse"
-                            />
-                        ))}
-                    </div>
+                {code && codeShown ? (
+                    <CodeList code={code} query={codeQuery ?? ""} />
+                ) : null}
+                {codeShown ? null : (
+                    <NavRow icon={Link2} onClick={() => setManagingShares(true)}>
+                        {t("sharing.links")}
+                    </NavRow>
+                )}
+                {codeShown ? null : rows === null ? (
+                    <ListSkeleton />
                 ) : (
                     <>
-                        {code?.first ? codeSection : null}
                         {sections.pinned.length > 0 ? (
                             <Section id="polar-pinned" label={t("history.pinned")}>
                                 {sections.pinned.map(item)}
                                 <MoreButton sidebar={sidebar} list="pinned" />
                             </Section>
                         ) : null}
-                        {code && !code.first ? codeSection : null}
                         <Section id="polar-projects" label={t("history.projects")}>
                             <NavRow
                                 icon={FolderPlus}
@@ -650,48 +679,60 @@ function Section({ id, label, children }: { id: string; label: string; children:
     );
 }
 
-/** The person's Code sessions, in the rows chats are drawn in, each marked as
- *  code. Hidden beside the chats until there is one; with Code on screen it
- *  says when there are none. */
-function CodeSection({ code }: { code: PolarThreadsCode }) {
-    const t = useTranslations("polar");
-    const { rows, more, loadingMore, loadMore } = code.history;
-    if (rows === null) return null;
-    if (rows.length === 0 && !code.first) return null;
+/** Rows still on their way, in the shape they will take. */
+function ListSkeleton() {
     return (
-        <Section id="polar-code" label={t("code.history")}>
-            {rows.length === 0 ? (
+        <div className="space-y-2 p-2">
+            {[0, 1, 2].map((key) => (
+                <div key={key} className="h-6 rounded bg-muted motion-safe:animate-pulse" />
+            ))}
+        </div>
+    );
+}
+
+/** The person's Code sessions, drawn the way the chats are: grouped by day,
+ *  each row with the same menu, and Delete behind the same dialog. */
+function CodeList({ code, query }: { code: PolarThreadsCode; query: string }) {
+    const t = useTranslations("polar");
+    const toast = useToast();
+    const [deleting, setDeleting] = useState<PolarCodeRow | null>(null);
+    const { rows, more, loadingMore, loadMore } = code.history;
+    if (rows === null) return <ListSkeleton />;
+    const narrowed = query.trim() !== "";
+    const shown = filterCodeRows(rows, query);
+    const groups = polarShared.groupThreads(shown.map((row) => ({ ...row, updatedAt: row.createdAt })));
+    const rename = (row: PolarCodeRow, title: string) =>
+        void code.history.rename(row.id, title).then((ok) => {
+            if (!ok) toast.show({ title: t("history.renameFailed") });
+        });
+    return (
+        <Section id="polar-code" label={t("history.recents")}>
+            {shown.length === 0 ? (
                 <p className="px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground">
-                    {t("code.empty")}
+                    {narrowed ? t("history.searchEmpty") : t("code.empty")}
                 </p>
             ) : (
-                rows.map((row) => {
-                    const active = row.id === code.activeId;
-                    return (
-                        <button
-                            key={row.id}
-                            type="button"
-                            onClick={() => code.onOpen(row.id)}
-                            aria-current={active ? "page" : undefined}
-                            title={`${row.title} (${row.stateLabel}, ${row.repo || t("code.workspace")})`}
-                            className={cn(
-                                "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                active
-                                    ? "bg-primary/15 font-medium text-foreground"
-                                    : "hover:bg-card-hover"
-                            )}
+                groups.map(({ group, rows: list }) => (
+                    <div key={group} role="group" aria-labelledby={`polar-code-group-${group}`}>
+                        <p
+                            id={`polar-code-group-${group}`}
+                            className="px-2 pb-1 pt-2 text-[0.6875rem] text-foreground-subtle"
                         >
-                            <Code2
-                                className="size-3.5 shrink-0 text-foreground-subtle"
-                                aria-hidden
+                            {t(`history.groups.${group}`)}
+                        </p>
+                        {list.map((row) => (
+                            <CodeItem
+                                key={row.id}
+                                row={row}
+                                active={row.id === code.activeId}
+                                canRename={code.canRename}
+                                onOpen={() => code.onOpen(row.id)}
+                                onRename={(title) => rename(row, title)}
+                                onDelete={() => setDeleting(row)}
                             />
-                            <span className="sr-only">{t("code.session")}</span>
-                            <span className="min-w-0 flex-1 truncate">{row.title}</span>
-                            <StateDot state={row.state} />
-                            <span className="sr-only">{row.stateLabel}</span>
-                        </button>
-                    );
-                })
+                        ))}
+                    </div>
+                ))
             )}
             {more ? (
                 <button
@@ -710,9 +751,191 @@ function CodeSection({ code }: { code: PolarThreadsCode }) {
                 <ExternalLink className="size-3.5 shrink-0 text-foreground-subtle" />
                 <span className="min-w-0 truncate">{t("code.allSessions")}</span>
             </a>
+            {deleting ? (
+                <ConfirmDeleteDialog
+                    open
+                    onOpenChange={(open) => (open ? undefined : setDeleting(null))}
+                    name={deleting.title}
+                    requireTyping={false}
+                    kind={t("code.session")}
+                    title={t("code.deleteTitle")}
+                    question={t("code.deleteQuestion", { title: deleting.title })}
+                    confirmLabel={t("history.deleteConfirm")}
+                    onConfirm={() => {
+                        const id = deleting.id;
+                        setDeleting(null);
+                        void code.history.remove(id).then((ok) => {
+                            if (!ok) toast.show({ title: t("code.deleteFailed") });
+                        });
+                    }}
+                />
+            ) : null}
         </Section>
     );
 }
+
+/** One Code session, in a chat's row: the same shape, the same "..." menu and
+ *  right-click menu, the same rename in place. A session still running cannot
+ *  be deleted, and its menu says why. */
+function CodeItem({
+    row,
+    active,
+    canRename,
+    onOpen,
+    onRename,
+    onDelete
+}: {
+    row: PolarCodeRow;
+    active: boolean;
+    canRename: boolean;
+    onOpen: () => void;
+    onRename: (title: string) => void;
+    onDelete: () => void;
+}) {
+    const t = useTranslations("polar");
+    const [renaming, setRenaming] = useState(false);
+    const [draft, setDraft] = useState(row.title);
+    const chose = useRef(false);
+    const field = useDeferredFocus<HTMLInputElement>(renaming);
+    const take = (action: () => void) => () => {
+        chose.current = true;
+        action();
+    };
+    const closeFocus = (event: Event) => {
+        if (chose.current) keepFocusOnClose(event);
+        chose.current = false;
+    };
+    const finish = (save: boolean) => {
+        setRenaming(false);
+        if (!save) return;
+        const title = draft.trim().replace(/\s+/g, " ").slice(0, CODE_TITLE_MAX);
+        if (title !== "" && title !== row.title) onRename(title);
+    };
+    const items = ({ Item, Separator }: MenuParts) => (
+        <>
+            <Item onSelect={onOpen}>
+                <MessageSquare />
+                {t("history.open")}
+            </Item>
+            <Item asChild>
+                <a
+                    href={`/apps/agents/sessions/${encodeURIComponent(row.id)}`}
+                    target="_blank"
+                    rel="noopener"
+                >
+                    <ExternalLink />
+                    {t("history.openNewTab")}
+                </a>
+            </Item>
+            {canRename ? (
+                <>
+                    <Separator />
+                    <Item
+                        onSelect={take(() => {
+                            setDraft(row.title);
+                            setRenaming(true);
+                        })}
+                    >
+                        <Pencil />
+                        {t("history.rename")}
+                    </Item>
+                </>
+            ) : null}
+            <Separator />
+            <Item variant="danger" disabled={row.live} onSelect={take(onDelete)}>
+                <Trash2 />
+                {row.live ? t("code.deleteLive") : t("history.delete")}
+            </Item>
+        </>
+    );
+
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger asChild disabled={renaming}>
+                <div
+                    data-code-id={row.id}
+                    className={cn(
+                        "group/row flex min-w-0 items-center rounded-md",
+                        active ? "bg-primary/15" : "hover:bg-card-hover focus-within:bg-card-hover"
+                    )}
+                >
+                    {renaming ? (
+                        <Input
+                            ref={field}
+                            value={draft}
+                            maxLength={CODE_TITLE_MAX}
+                            aria-label={t("history.name")}
+                            onChange={(event) => setDraft(event.target.value)}
+                            onBlur={() => finish(true)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    finish(true);
+                                } else if (event.key === "Escape") {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    finish(false);
+                                }
+                            }}
+                            className="h-8 min-w-0 flex-1"
+                        />
+                    ) : (
+                        <>
+                            {/* Where a chat's row has its selection box. */}
+                            <span
+                                aria-hidden
+                                className="w-6 shrink-0 [@media(hover:none)]:hidden [@media(pointer:coarse)]:w-10"
+                            />
+                            <button
+                                type="button"
+                                onClick={onOpen}
+                                aria-current={active ? "page" : undefined}
+                                title={`${row.title} (${row.stateLabel}, ${row.repo || t("code.workspace")})`}
+                                className={cn(
+                                    "min-w-0 flex-1 truncate py-1.5 pl-1 pr-2 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none [@media(hover:none)]:pl-2",
+                                    active && "font-medium text-foreground"
+                                )}
+                            >
+                                {row.title}
+                            </button>
+                            <span
+                                role="img"
+                                aria-label={row.stateLabel}
+                                title={row.stateLabel}
+                                className="flex shrink-0 items-center px-1"
+                            >
+                                <StateDot state={row.state} />
+                            </span>
+                            <span className="mr-1 flex shrink-0 items-center">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button
+                                            type="button"
+                                            aria-label={t("history.options")}
+                                            title={t("history.options")}
+                                            className={cn(ROW_ACTION, active && "opacity-100")}
+                                        >
+                                            <MoreHorizontal className="size-4" />
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" onCloseAutoFocus={closeFocus}>
+                                        {items(DROPDOWN_PARTS)}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </span>
+                        </>
+                    )}
+                </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent onCloseAutoFocus={closeFocus}>
+                {items(CONTEXT_PARTS)}
+            </ContextMenuContent>
+        </ContextMenu>
+    );
+}
+
+/** A session's longest name, as the Agents schema takes it. */
+const CODE_TITLE_MAX = 80;
 
 /** "Show more" under a list the server has another page of. */
 function MoreButton({ sidebar, list }: { sidebar: PolarSidebar; list: string }) {

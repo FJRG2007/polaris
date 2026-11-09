@@ -28,6 +28,12 @@ import {
 import { Bot, CircleDot, Loader2, Play, Server, Square } from "lucide-react";
 import { ServerPicker } from "@/components/server-picker";
 import { PagedPicker } from "@/components/paged-picker";
+import type { ModelChoice } from "@/lib/polar/shared";
+import {
+    firstModel,
+    ModelSelector,
+    type ModelSelectorProvider
+} from "@/components/polar/elements/model-selector";
 import type { RepoOption } from "@/lib/agents/repo-options";
 import { repoOptionsAction, startSessionAction, stopSessionAction } from "./actions";
 import type { GithubInstallGap } from "@/lib/github-app-reach";
@@ -241,6 +247,10 @@ function StartDialog({ onClose }: { onClose: () => void }) {
     // Null until somebody moves it, so a session records that nobody chose
     // rather than recording the default as a decision.
     const [unattended, setUnattended] = useState<boolean | null>(null);
+    /** Chat's providers and models, read the first time a tool that takes one
+     *  is picked; null until then. */
+    const [providers, setProviders] = useState<ModelSelectorProvider[] | null>(null);
+    const [picked, setPicked] = useState<ModelChoice | null>(null);
     const [error, setError] = useState<string | null>(null);
     // The GitHub App is why the chosen repository cannot be cloned: drawn as
     // the install button instead of a sentence.
@@ -261,6 +271,27 @@ function StartDialog({ onClose }: { onClose: () => void }) {
     // No repository named. Everything a checkout implies - a branch, a task, a
     // clone - goes with it.
     const workspace = repoId === NO_REPO;
+    // A tool that takes its model from Polaris signs in with that provider's
+    // key, picked here the way a chat picks one, instead of its own sign-in.
+    const takesModel = core.MODEL_CHOICE_AGENT_CLIS.includes(agentOf(cli));
+    const model = takesModel ? (picked ?? firstModel(providers)) : null;
+    const noModel = takesModel && model === null && providers !== null;
+
+    useEffect(() => {
+        if (!takesModel || providers !== null) return;
+        let live = true;
+        fetch("/api/polar/models")
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data: { providers?: ModelSelectorProvider[] } | null) => {
+                if (live) setProviders(data?.providers ?? []);
+            })
+            .catch(() => {
+                if (live) setProviders([]);
+            });
+        return () => {
+            live = false;
+        };
+    }, [takesModel, providers]);
 
     const submit = () => {
         setGap(null);
@@ -271,8 +302,11 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                         repoId: workspace ? null : repoId,
                         title,
                         cli: agentOf(cli),
-                        accountId: accountOf(cli),
-                        useMachineLogin: machineOf(cli),
+                        accountId: takesModel ? null : accountOf(cli),
+                        useMachineLogin: takesModel ? false : machineOf(cli),
+                        modelChoice: model
+                            ? { provider: model.provider, model: model.model, payer: model.payer }
+                            : undefined,
                         command: agentOf(cli) === core.CUSTOM_AGENT_CLI ? command : undefined,
                         place,
                         sharedHome: place === "local" && sharedHome,
@@ -307,8 +341,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
     // the picker and disables Start - the server refuses this too, and would say
     // the same thing, but finding out after the click is finding out too late to
     // do anything about it without losing the form.
-    const unlinked =
-        agents.find((agent) => agent.key === cli && agent.readiness === "missing") ?? null;
+    const unlinked = takesModel
+        ? null
+        : (agents.find((agent) => agent.key === cli && agent.readiness === "missing") ?? null);
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -384,6 +419,34 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     </label>
 
                     {unlinked ? <SignInNotice agent={unlinked} /> : null}
+
+                    {takesModel ? (
+                        <div className="space-y-1">
+                            <span className="block text-xs text-muted-foreground">
+                                {t("sessions.form.model")}
+                            </span>
+                            {providers === null ? (
+                                <div className="h-9 rounded-md bg-muted motion-safe:animate-pulse" />
+                            ) : noModel ? (
+                                <p className="text-xs text-muted-foreground">
+                                    {t("sessions.form.noModel")}{" "}
+                                    <Link
+                                        href="/account/ai-keys"
+                                        className="text-primary hover:underline"
+                                    >
+                                        {t("sessions.form.addKey")}
+                                    </Link>
+                                </p>
+                            ) : (
+                                <ModelSelector
+                                    providers={providers}
+                                    choice={model}
+                                    onChoice={setPicked}
+                                    forCode
+                                />
+                            )}
+                        </div>
+                    ) : null}
 
                     {cli === core.CUSTOM_AGENT_CLI ? (
                         <label className="block space-y-1">
@@ -517,7 +580,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     </Button>
                     <Button
                         onClick={submit}
-                        disabled={busy || !title || !repoId || unlinked !== null}
+                        disabled={busy || !title || !repoId || unlinked !== null || (takesModel && model === null)}
                     >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         {t("sessions.form.submit")}
