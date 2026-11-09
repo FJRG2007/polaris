@@ -477,6 +477,31 @@ dialog.pdfSlick-dialog .dialogButton {
     animation: polaris-twinkle 3s ease-in-out infinite;
 }
 
+/*
+ * The ring round a face that is calling you.
+ *
+ * Not Tailwind's ping, which doubles in size: round a face that already fills
+ * most of the stage it reached past the stage and was cut off at the top and
+ * the bottom. This one grows by a fifth and fades, so it stays inside the
+ * padding `call-stage` leaves for it.
+ */
+@keyframes polaris-call-ring {
+    0% {
+        opacity: 0.7;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.2);
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .call-ring-pulse {
+        animation: polaris-call-ring 1.4s ease-out infinite;
+    }
+}
+
 /* A ring breathing. Same rule: it comes back to where it began. */
 @keyframes polaris-pulse {
     0%,

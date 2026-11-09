@@ -20,8 +20,11 @@ import { BellOff, ChevronUp, PhoneCall, Video, X } from "lucide-react";
 import { PersonName, PersonRow } from "@/components/person-name";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { SeatMenu, type RosterModeration } from "./call-moderation-menu";
+import { FACE_MAX } from "./call-grid";
 
-const AVATAR_SIZE = 80;
+/** The size a face is in the call itself, so ringing and answering are the same
+ *  picture rather than a big one that shrinks the moment somebody picks up. */
+const AVATAR_SIZE = FACE_MAX;
 
 /** The face of the person ringing, before the roster has been read. */
 export interface StageCaller {
@@ -119,7 +122,10 @@ export function CallStage({
                 </button>
             </div>
 
-            <ul className="flex min-h-0 flex-1 flex-wrap content-center items-start justify-center gap-x-6 gap-y-4 overflow-y-auto overscroll-contain">
+            {/* Padded by the reach of the ringing pulse below: the list scrolls, so
+                anything drawn past its edge is cut off, and the pulse is drawn
+                outside the face on purpose. */}
+            <ul className="flex min-h-0 flex-1 flex-wrap content-center items-start justify-center gap-x-6 gap-y-4 overflow-y-auto overscroll-contain p-4">
                 {faces.map((face) => {
                     const pulsing = caller !== null && face.id === caller.id;
                     const avatar = (
@@ -135,7 +141,7 @@ export function CallStage({
                                     />
                                     <span
                                         aria-hidden
-                                        className="absolute -inset-1.5 rounded-full ring-2 ring-white/50 motion-safe:animate-ping"
+                                        className="call-ring-pulse absolute -inset-1.5 rounded-full ring-2 ring-white/50"
                                     />
                                 </>
                             )}
