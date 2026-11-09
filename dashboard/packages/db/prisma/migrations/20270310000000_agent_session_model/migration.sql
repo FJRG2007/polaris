@@ -5,3 +5,7 @@
 ALTER TABLE "AgentSession" ADD COLUMN IF NOT EXISTS "modelProvider" TEXT;
 ALTER TABLE "AgentSession" ADD COLUMN IF NOT EXISTS "model" TEXT;
 ALTER TABLE "AgentSession" ADD COLUMN IF NOT EXISTS "modelPayer" TEXT;
+
+-- When the person who started a session took it out of Polar's Code history.
+-- The session itself stays - it is a record of work, still listed in Agents.
+ALTER TABLE "AgentSession" ADD COLUMN IF NOT EXISTS "polarHiddenAt" TIMESTAMP(3);

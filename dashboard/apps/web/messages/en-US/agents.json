@@ -233,6 +233,9 @@
         "cancelQueued": "Cancel",
         "stop": "Stop",
         "form": {
+            "model": "Model",
+            "noModel": "Add an AI key to pick a model for OpenCode.",
+            "addKey": "Add a key",
             "title": "What is it working on",
             "titlePlaceholder": "Fix the login redirect",
             "repository": "Repository",

@@ -52,6 +52,21 @@ export interface ModelSelectorProvider {
     }>;
 }
 
+/** The first model on offer, for an agent that needs one and has none yet. */
+export function firstModel(providers: readonly ModelSelectorProvider[] | null): ModelChoice | null {
+    const provider = providers?.find((entry) => entry.models.length > 0);
+    const model = provider?.models[0];
+    return model
+        ? {
+              kind: "language",
+              provider: model.provider,
+              model: model.model,
+              intelligence: "balanced",
+              payer: null
+          }
+        : null;
+}
+
 type ModelEntry = ModelSelectorProvider["models"][number] & { providerName: string };
 
 /** How loose a match may be: enough for a typo or a dropped letter, not so

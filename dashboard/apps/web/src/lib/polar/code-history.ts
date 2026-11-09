@@ -10,6 +10,7 @@
  * the browser's merge of several pages agree on what one task is.
  */
 
+import { z } from "zod";
 import type { PolarCodeRow } from "@/lib/polar/code";
 
 type HistoryRow = Pick<PolarCodeRow, "id" | "title" | "repo" | "branch" | "live" | "createdAt">;
@@ -52,3 +53,29 @@ export function mergeCodeRows<T extends HistoryRow>(
 ): T[] {
     return dedupeCodeRows([...fresh, ...(current ?? [])]);
 }
+
+/** The Code sessions that match the words typed, every word somewhere in the
+ *  title or the repository. */
+export function filterCodeRows<T extends Pick<PolarCodeRow, "title" | "repo">>(
+    rows: readonly T[],
+    query: string
+): T[] {
+    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return [...rows];
+    return rows.filter((row) => {
+        const text = `${row.title} ${row.repo}`.toLowerCase();
+        return words.every((word) => text.includes(word));
+    });
+}
+
+/** A change to one row of the Code history, as the sidebar sends it. */
+export const polarCodeEditSchema = z.discriminatedUnion("action", [
+    z.object({ action: z.literal("delete"), sessionId: z.string().trim().uuid() }).strict(),
+    z
+        .object({
+            action: z.literal("rename"),
+            sessionId: z.string().trim().uuid(),
+            title: z.string().trim().min(1).max(80)
+        })
+        .strict()
+]);

@@ -26,9 +26,10 @@ import {
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { userHasManage, type SessionUser } from "@/lib/session";
 import { sessionCursor } from "@/lib/agents/session-cursor";
-import { dedupeCodeRows, POLAR_CODE_PAGE } from "@/lib/polar/code-history";
+import { dedupeCodeRows, POLAR_CODE_PAGE, polarCodeEditSchema } from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
 import * as repoOptions from "@/lib/agents/repo-options";
+import { hideSessionFromPolar, renameSession } from "@/lib/agents/session-service";
 import {
     listSessionsAction,
     promptSessionAction,
@@ -123,7 +124,11 @@ export async function polarCodeOverview(
     if (access === "none") return { access, sessions: [], next: null };
     // One more than a page, to know whether there is another.
     const [list, t] = await Promise.all([
-        listSessionsAction(POLAR_CODE_PAGE + 1, { mine: true, ...(after ? { after } : {}) }),
+        listSessionsAction(POLAR_CODE_PAGE + 1, {
+            mine: true,
+            polar: true,
+            ...(after ? { after } : {})
+        }),
         getTranslations("agents")
     ]);
     const page = list.slice(0, POLAR_CODE_PAGE);
@@ -285,4 +290,23 @@ export async function polarCodePrompt(
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
     return promptSessionAction(input);
+}
+
+/**
+ * Take a session out of the person's Code history, or rename it. Taking one
+ * out needs only to be able to read it - it is their own list - and works only
+ * once the session has finished; renaming changes the session for Agents too,
+ * so it needs the right to manage. False when nothing changed.
+ */
+export async function polarCodeEdit(user: SessionUser, body: unknown): Promise<{ ok: boolean }> {
+    const parsed = polarCodeEditSchema.safeParse(body);
+    if (!parsed.success) return { ok: false };
+    const access = await accessOf(user);
+    const edit = parsed.data;
+    if (edit.action === "delete") {
+        if (access === "none") return { ok: false };
+        return { ok: await hideSessionFromPolar(edit.sessionId, user.id) };
+    }
+    if (access !== "manage") return { ok: false };
+    return { ok: await renameSession(edit.sessionId, user.id, edit.title) };
 }

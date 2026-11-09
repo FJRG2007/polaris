@@ -2127,6 +2127,7 @@ export function PolarChat({
                     : {
                           history: code.history,
                           activeId: chatMode ? null : code.selected,
+                          canRename: code.access === "manage",
                           first: !chatMode,
                           onOpen: (id) => {
                               code.open(id);

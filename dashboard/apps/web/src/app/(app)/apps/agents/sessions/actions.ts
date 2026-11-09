@@ -99,12 +99,16 @@ export async function repoOptionsAction(
 }
 
 const listPage = z
-    .object({ mine: z.boolean().optional(), after: sessionCursorSchema.optional() })
+    .object({
+        mine: z.boolean().optional(),
+        after: sessionCursorSchema.optional(),
+        polar: z.boolean().optional()
+    })
     .strict();
 
 export async function listSessionsAction(
     limit?: number,
-    page?: { mine?: boolean; after?: string }
+    page?: { mine?: boolean; after?: string; polar?: boolean }
 ): Promise<sessions.SessionView[]> {
     const user = await requirePermission("agents.read");
     const take = z.number().int().positive().optional().safeParse(limit);

@@ -233,6 +233,9 @@
         "cancelQueued": "Cancelar",
         "stop": "Detener",
         "form": {
+            "model": "Modelo",
+            "noModel": "Añade una clave de IA para elegir modelo.",
+            "addKey": "Añadir clave",
             "title": "En qué trabaja",
             "titlePlaceholder": "Arreglar la redirección",
             "repository": "Repositorio",

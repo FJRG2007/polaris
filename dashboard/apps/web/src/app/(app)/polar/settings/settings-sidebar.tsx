@@ -58,6 +58,7 @@ export function SettingsWithSidebar({ children }: { children: ReactNode }) {
                     : {
                           history: code.history,
                           activeId: null,
+                          canRename: code.access === "manage",
                           first: codeMode,
                           onOpen: (id) => router.push(`/polar?session=${encodeURIComponent(id)}`)
                       }

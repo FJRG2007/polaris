@@ -8961,6 +8961,9 @@ model AgentSession {
     modelProvider String?
     model         String?
     modelPayer    String?
+    // When the person who started it took it out of Polar's Code history. The
+    // session stays, listed in Agents: it is a record of work that happened.
+    polarHiddenAt DateTime?
     hostId      String?   @db.Uuid
     // starting | working | waiting | idle | stopped | failed. Derived from the
     // events below and stored so a list does not have to replay every session it

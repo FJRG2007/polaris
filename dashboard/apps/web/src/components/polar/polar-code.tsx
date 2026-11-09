@@ -24,7 +24,7 @@
 import Link from "next/link";
 import { runAction } from "@/lib/run-action";
 import { fromWire } from "@/lib/app-bundles/wire";
-import { readPoll, useUnmountSignal } from "@/lib/poll-fetch";
+import { readPoll, sendAction, useUnmountSignal } from "@/lib/poll-fetch";
 import { mergeCodeRows } from "@/lib/polar/code-history";
 import { readStored, writeStored } from "@/lib/polar/stored";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
@@ -53,7 +53,11 @@ import * as core from "@polaris/core";
 import type { ModelChoice } from "@/lib/polar/shared";
 import { usePolarUploads } from "@/components/polar/polar-uploads";
 import { POLAR_ATTACHMENT_MOST, POLAR_ATTACHMENT_TYPES } from "@/lib/polar/shared";
-import { ModelSelector, type ModelSelectorProvider } from "@/components/polar/elements/model-selector";
+import {
+    firstModel,
+    ModelSelector,
+    type ModelSelectorProvider
+} from "@/components/polar/elements/model-selector";
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
 import {
     AgentPicker,
@@ -134,6 +138,11 @@ export interface PolarCodeHistory {
     readonly more: boolean;
     readonly loadingMore: boolean;
     readonly loadMore: () => void;
+    /** Takes a finished session out of the list at once, and puts it back
+     *  when the server refuses. False when it was put back. */
+    readonly remove: (id: string) => Promise<boolean>;
+    /** Renames a session at once, and puts the old name back on a refusal. */
+    readonly rename: (id: string, title: string) => Promise<boolean>;
 }
 
 export interface PolarCodeState {
@@ -206,6 +215,47 @@ export function usePolarCode({ enabled = true }: { enabled?: boolean } = {}): Po
             .finally(() => setLoadingMore(false));
     }, [next, loadingMore, signal]);
 
+    const edit = useCallback(
+        (body: { action: "delete" | "rename"; sessionId: string; title?: string }) =>
+            sendAction<{ ok: boolean }>("/api/polar/code/edit", body, signal())
+                .then((answer) => answer.ok)
+                .catch(() => false),
+        [signal]
+    );
+
+    const remove = useCallback(
+        async (id: string) => {
+            const row = rows?.find((each) => each.id === id);
+            if (!row) return false;
+            setRows((current) => current?.filter((each) => each.id !== id) ?? null);
+            setSelected((current) => (current === id ? null : current));
+            const ok = await edit({ action: "delete", sessionId: id });
+            if (!ok) setRows((current) => mergeCodeRows(current, [row]));
+            // The cached first page must not bring it back on the next visit.
+            else refresh();
+            return ok;
+        },
+        [rows, edit, refresh]
+    );
+
+    const rename = useCallback(
+        async (id: string, title: string) => {
+            const before = rows?.find((each) => each.id === id)?.title;
+            if (before === undefined || before === title) return true;
+            const retitle = (value: string) =>
+                setRows(
+                    (current) =>
+                        current?.map((each) => (each.id === id ? { ...each, title: value } : each)) ??
+                        null
+                );
+            retitle(title);
+            const ok = await edit({ action: "rename", sessionId: id, title });
+            if (!ok) retitle(before);
+            return ok;
+        },
+        [rows, edit]
+    );
+
     const mode: PolarMode = picked === "code" && access !== "none" ? "code" : "chat";
 
     useEffect(() => {
@@ -230,8 +280,8 @@ export function usePolarCode({ enabled = true }: { enabled?: boolean } = {}): Po
     );
 
     const history = useMemo(
-        () => ({ rows, more: next !== null, loadingMore, loadMore }),
-        [rows, next, loadingMore, loadMore]
+        () => ({ rows, more: next !== null, loadingMore, loadMore, remove, rename }),
+        [rows, next, loadingMore, loadMore, remove, rename]
     );
 
     return useMemo(
@@ -476,21 +526,6 @@ function useCodeComposerParts(busy: boolean) {
         },
         voiceMode: { refusal: t("code.noVoice") }
     };
-}
-
-/** The first model on offer, for an agent that needs one and has none yet. */
-function firstModel(providers: readonly ModelSelectorProvider[] | null): ModelChoice | null {
-    const provider = providers?.find((entry) => entry.models.length > 0);
-    const model = provider?.models[0];
-    return model
-        ? {
-              kind: "language",
-              provider: model.provider,
-              model: model.model,
-              intelligence: "balanced",
-              payer: null
-          }
-        : null;
 }
 
 /** A new task: Chat's composer, with the agent where Chat has its model. */

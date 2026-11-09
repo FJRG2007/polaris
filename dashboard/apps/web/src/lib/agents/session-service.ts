@@ -347,6 +347,8 @@ export async function listSessions(
         /** `sessionCursor` of the last session of the previous page: the list
          *  goes on after it, even once that session is gone. */
         after?: string;
+        /** Leave out what the person took out of Polar's Code history. */
+        polar?: boolean;
     } = {}
 ): Promise<SessionView[]> {
     const after = options.after === undefined ? null : readSessionCursor(options.after);
@@ -355,6 +357,7 @@ export async function listSessions(
         where: {
             OR: [{ repo: { ownerId } }, { repoId: null, startedById: ownerId }],
             ...(options.mine ? { startedById: ownerId } : {}),
+            ...(options.polar ? { polarHiddenAt: null } : {}),
             ...(options.repoId ? { repoId: options.repoId } : {}),
             ...(options.live ? { state: { notIn: ["stopped", "failed"] } } : {}),
             ...(after
@@ -923,4 +926,34 @@ export async function resolveSessionEnigma(sessionId: string): Promise<core.Reso
         byScope(GENERAL_SCOPE),
         platformEnigma
     );
+}
+
+/** Sessions that can still be told something: taking one out of a history
+ *  would hide work that is still going on. */
+const FINISHED_STATES = ["stopped", "failed"];
+
+/**
+ * Take a session out of its starter's Polar Code history. Only the person who
+ * started it, and only once it has finished; the session itself stays, listed
+ * in Agents. False when nothing was taken out.
+ */
+export async function hideSessionFromPolar(sessionId: string, userId: string): Promise<boolean> {
+    const { count } = await prisma.agentSession.updateMany({
+        where: { id: sessionId, startedById: userId, state: { in: FINISHED_STATES } },
+        data: { polarHiddenAt: new Date() }
+    });
+    return count > 0;
+}
+
+/** Rename a session its starter started. False when it is not theirs. */
+export async function renameSession(
+    sessionId: string,
+    userId: string,
+    title: string
+): Promise<boolean> {
+    const { count } = await prisma.agentSession.updateMany({
+        where: { id: sessionId, startedById: userId },
+        data: { title }
+    });
+    return count > 0;
 }
