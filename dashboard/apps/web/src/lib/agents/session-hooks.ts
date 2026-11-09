@@ -119,18 +119,32 @@ export function hookScript(ingestUrl: string, token: string): string {
         // way, and this is what puts them back in order. See applySessionEvents.
         "seq=$(date +%s%N 2>/dev/null || true)",
         'payload="$(cat)"',
+        // Copilot CLI does not name the event in its payload, so its hook
+        // configuration names it in the environment and it is added here.
+        'event="${POLARIS_HOOK_EVENT:-}"',
+        'case "$event" in *[!A-Za-z]*) event="" ;; esac',
+        'if [ -n "$event" ]; then',
+        "  inner=\"${payload#\\{}\"",
+        "  case \"$inner\" in",
+        "    *[!}[:space:]]*) payload=\"{\\\"hook_event_name\\\":\\\"$event\\\",$inner\" ;;",
+        "    *) payload=\"{\\\"hook_event_name\\\":\\\"$event\\\"}\" ;;",
+        "  esac",
+        "fi",
         // The agent's own id for the conversation, kept beside this script, so a
         // machine that restarts under the session reopens that conversation
         // rather than a blank one (see LAUNCH_SCRIPT). The first match is the
         // payload's own: every hook puts it before anything the agent said.
         // Only a hint for the reboot - Polaris stores what it parses itself.
-        `id="$(printf %s "$payload" | grep -o '"session_id" *: *"[A-Za-z0-9_-]*"' | head -n 1 | cut -d '"' -f 4)"`,
+        `id="$(printf %s "$payload" | grep -o '"session_\\{0,1\\}[iI]d" *: *"[A-Za-z0-9_-]*"' | head -n 1 | cut -d '"' -f 4)"`,
         'if [ -n "$id" ]; then printf %s "$id" > "$(dirname "$0")/agent-session-id" 2>/dev/null || true; fi',
         `printf %s "$payload" | curl -sS -m 4 -X POST ${shellQuote(ingestUrl)} \\`,
         '  -H "X-Polaris-Seq: $seq" \\',
         `  -H ${shellQuote(`Authorization: Bearer ${token}`)} \\`,
         '  -H "Content-Type: application/json" \\',
         "  --data-binary @- >/dev/null 2>&1",
+        // Codex and Gemini CLI read a hook's output as JSON; this one decides
+        // nothing, so it says so.
+        'printf "{}"',
         "exit 0",
         ""
     ].join("\n");
@@ -211,7 +225,25 @@ const CLAUDE_EVENT_KINDS: Record<string, AgentSessionEventKind> = {
     StopFailure: "turn.failed",
     SubagentStop: "subagent.end",
     PostCompact: "compact",
-    SessionEnd: "session.end"
+    SessionEnd: "session.end",
+    // Codex uses Claude Code's names; these are the ones it adds.
+    Interrupt: "turn.end",
+    // Gemini CLI.
+    BeforeAgent: "prompt",
+    BeforeTool: "tool.start",
+    AfterTool: "tool.end",
+    AfterAgent: "turn.end",
+    PreCompress: "compact",
+    // Copilot CLI, camelCase.
+    sessionStart: "session.start",
+    userPromptSubmitted: "prompt",
+    preToolUse: "tool.start",
+    postToolUse: "tool.end",
+    permissionRequest: "permission",
+    notification: "question",
+    agentStop: "turn.end",
+    errorOccurred: "turn.failed",
+    sessionEnd: "session.end"
 };
 
 export interface NormalizedHookEvent {
@@ -259,6 +291,27 @@ function toolDetail(tool: string, input: Record<string, unknown>): string {
     }
 }
 
+/** A tool call's arguments, as an object or as the JSON string Copilot CLI sends. */
+function toolInput(value: unknown): Record<string, unknown> {
+    if (typeof value === "string") {
+        try {
+            value = JSON.parse(value);
+        } catch {
+            return {};
+        }
+    }
+    return value && typeof value === "object" && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : {};
+}
+
+/** An error as text, whether it came as a string or as `{ message }`. */
+function errorText(value: unknown): unknown {
+    if (value && typeof value === "object" && "message" in value)
+        return (value as { message: unknown }).message;
+    return value;
+}
+
 /**
  * Turn what a machine posted into an event, or null.
  *
@@ -274,11 +327,22 @@ export function normalizeHookEvent(payload: unknown): NormalizedHookEvent | null
     const kind = CLAUDE_EVENT_KINDS[name];
     if (!kind) return null;
 
-    const tool = typeof record.tool_name === "string" ? record.tool_name : "";
-    const input =
-        record.tool_input && typeof record.tool_input === "object"
-            ? (record.tool_input as Record<string, unknown>)
-            : {};
+    const tool =
+        typeof record.tool_name === "string"
+            ? record.tool_name
+            : typeof record.toolName === "string"
+              ? record.toolName
+              : "";
+    const input = toolInput(record.tool_input ?? record.toolArgs);
+
+    // Gemini CLI tells an approval prompt apart from any other notice only by
+    // its type.
+    if (name === "Notification" && record.notification_type === "ToolPermission")
+        return {
+            kind: "permission",
+            detail: clip(typeof record.message === "string" ? record.message : tool),
+            subject: tool
+        };
 
     // The 60-second "still waiting for your input" nudge fires after a turn
     // has already ended. It says nothing Stop did not, and reading it as a
@@ -291,7 +355,7 @@ export function normalizeHookEvent(payload: unknown): NormalizedHookEvent | null
     if (kind === "session.end" && (record.reason === "clear" || record.reason === "resume"))
         return { kind: "session.clear", detail: "", subject: "" };
     if (kind === "turn.failed") {
-        const said = [record.error, record.error_details]
+        const said = [errorText(record.error), record.error_details]
             .filter((part): part is string => typeof part === "string" && part.trim() !== "")
             .join(": ");
         return { kind, detail: clip(said || "The turn stopped on an error"), subject: "" };
@@ -352,7 +416,11 @@ export function hookConversation(payload: unknown): HookConversation {
         return { vendorSessionId: null, transcriptPath: null };
     const record = payload as Record<string, unknown>;
     return {
-        vendorSessionId: isVendorSessionId(record.session_id) ? record.session_id : null,
+        vendorSessionId: isVendorSessionId(record.session_id)
+            ? record.session_id
+            : isVendorSessionId(record.sessionId)
+              ? record.sessionId
+              : null,
         transcriptPath: isTranscriptPath(record.transcript_path) ? record.transcript_path : null
     };
 }

@@ -54,6 +54,9 @@ export interface SigninDialogActions {
     /** Whose account it turned out to be, asked while the container is still
      *  there. Empty for a tool that will not say. */
     identity: (input: unknown) => Promise<SigninIdentity>;
+    /** The credential file the login wrote, for a tool that keeps its login in
+     *  a file. Absent on a screen that offers only pasted tokens. */
+    capture?: (input: unknown) => Promise<{ value?: string; error?: string }>;
     save: (secret: string, identity: SigninIdentity, name: string) => Promise<{ error?: string }>;
 }
 
@@ -147,6 +150,12 @@ export function SigninDialog({
         });
     };
 
+    // A tool that keeps its login in a file has nothing to copy off the screen:
+    // the file is read from the machine instead, once the person says they are
+    // through. Never read on a timer - a file half written by a login still in
+    // progress is exactly what must not be kept.
+    const capture = signin.file ? actions.capture : undefined;
+
     const save = () => {
         setBusy(true);
         // The identity is read before the container goes, because after that
@@ -156,8 +165,20 @@ export function SigninDialog({
             const identity = id
                 ? await actions.identity({ id, env: signin.env }).catch(() => ({}))
                 : {};
+            let value = secret.trim();
+            if (capture) {
+                const captured = id
+                    ? await runAction(() => capture({ id, env: signin.env }), setError)
+                    : null;
+                if (!captured?.value) {
+                    setBusy(false);
+                    if (captured?.error) setError(captured.error);
+                    return;
+                }
+                value = captured.value;
+            }
             const result = await runAction(
-                () => actions.save(secret.trim(), identity, name.trim() || defaultName(identity)),
+                () => actions.save(value, identity, name.trim() || defaultName(identity)),
                 setError
             );
             setBusy(false);
@@ -264,17 +285,21 @@ export function SigninDialog({
                         />
                     </label>
 
-                    <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">
-                            {t("signinDialog.copyIn", { what: signin.label.toLowerCase() })}
-                        </span>
-                        <Input
-                            type="password"
-                            value={secret}
-                            onChange={(event) => setSecret(event.target.value)}
-                            placeholder={signin.label}
-                        />
-                    </label>
+                    {capture ? (
+                        <p className="text-xs text-muted-foreground">{t("signinDialog.fileHint")}</p>
+                    ) : (
+                        <label className="block space-y-1">
+                            <span className="text-xs text-muted-foreground">
+                                {t("signinDialog.copyIn", { what: signin.label.toLowerCase() })}
+                            </span>
+                            <Input
+                                type="password"
+                                value={secret}
+                                onChange={(event) => setSecret(event.target.value)}
+                                placeholder={signin.label}
+                            />
+                        </label>
+                    )}
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
@@ -283,7 +308,7 @@ export function SigninDialog({
                     <Button variant="ghost" onClick={close}>
                         {tcommon("actions.cancel")}
                     </Button>
-                    <Button onClick={save} disabled={busy || secret.trim().length === 0}>
+                    <Button onClick={save} disabled={busy || (capture ? !ready : secret.trim().length === 0)}>
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         {t("signinDialog.link")}
                     </Button>

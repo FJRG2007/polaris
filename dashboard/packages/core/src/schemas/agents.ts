@@ -228,13 +228,27 @@ export const modelProviderSlugSchema = z
     .regex(/^[a-z0-9][a-z0-9-]*$/, "Pick a provider");
 
 /**
+ * How long a provider key may be, and how long an agent sign-in may be.
+ *
+ * Apart because a sign-in can be a whole credential file - Codex's auth.json,
+ * Gemini CLI's oauth_creds.json - kept as base64, and those run to kilobytes. A
+ * provider's key never does, so it keeps the short bound.
+ */
+export const PROVIDER_KEY_MAX = 500;
+const MODEL_KEY_SECRET_MAX = 12_000;
+
+/**
  * The secret itself.
  *
  * Providers do not agree on a shape, so this checks that something was pasted
  * rather than what it is. What proves a key works is the provider being asked,
  * which happens before it is stored, and after that a run.
  */
-export const modelKeySecretSchema = z.string().trim().min(8, "Paste the key").max(500);
+export const modelKeySecretSchema = z
+    .string()
+    .trim()
+    .min(8, "Paste the key")
+    .max(MODEL_KEY_SECRET_MAX, "That is longer than a key");
 
 /** A gateway needs more than a key: an endpoint, a model, and the two limits an
  *  OpenAI-compatible endpoint publishes no catalogue for. */
@@ -302,7 +316,10 @@ export const createModelKeySchema = z.object({
         })
         .optional(),
     expiresAt: modelKeyExpirySchema
-});
+}).refine(
+    (input) => input.provider.startsWith("agent-signin-") || input.secret.length <= PROVIDER_KEY_MAX,
+    { message: "That is longer than a key", path: ["secret"] }
+);
 
 export type CreateModelKeyInput = z.infer<typeof createModelKeySchema>;
 

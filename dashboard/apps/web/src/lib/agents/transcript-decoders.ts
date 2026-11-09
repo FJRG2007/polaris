@@ -56,7 +56,10 @@ export type TranscriptDecoder = (line: string) => HistoryRow[];
  * yet; its decoder belongs here once something does.
  */
 export function transcriptDecoder(cli: string): TranscriptDecoder | null {
-    return cli === "claude" ? decodeClaudeLine : null;
+    if (cli === "claude") return decodeClaudeLine;
+    if (cli === "codex") return decodeCodexLine;
+    if (cli === "gemini") return decodeGeminiLine;
+    return null;
 }
 
 function clip(text: string, max: number): string {
@@ -273,5 +276,255 @@ export function decodeClaudeLine(line: string): HistoryRow[] {
         }
         // thinking, redacted_thinking, image and anything newer: not kept.
     });
+    return rows;
+}
+// ---------------------------------------------------------------------------
+// Codex: the rollout file, `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`
+// ---------------------------------------------------------------------------
+
+/**
+ * A stable id for a line that carries none of its own.
+ *
+ * Codex's rollout lines have no id, and the history is stored once per id, so
+ * the id has to come out the same every time the same line is read. The line's
+ * own hash does that; two lines with the same bytes are the same line.
+ */
+function lineId(prefix: string, line: string): string {
+    // Two FNV-1a passes with different seeds, in plain code rather than
+    // node:crypto: this module is also imported by the browser for `promptKey`.
+    const fnv = (seed: number): string => {
+        let hash = seed >>> 0;
+        for (let index = 0; index < line.length; index++) {
+            hash ^= line.charCodeAt(index);
+            hash = Math.imul(hash, 0x01000193) >>> 0;
+        }
+        return hash.toString(16).padStart(8, "0");
+    };
+    return `${prefix}${fnv(0x811c9dc5)}${fnv(0x9e3779b9)}${line.length.toString(16)}`;
+}
+
+const codexLineSchema = z.object({
+    timestamp: z.string().max(64).optional(),
+    type: z.string(),
+    payload: z.record(z.string(), z.unknown()).optional()
+});
+
+/** What Codex writes into a user turn that the person never typed. */
+const CODEX_INJECTED = /^(<[a-z_]+>|# AGENTS\.md instructions)/;
+
+function codexText(content: unknown): string {
+    if (typeof content === "string") return content;
+    if (!Array.isArray(content)) return "";
+    return content
+        .map((item) =>
+            item && typeof item === "object" && typeof (item as { text?: unknown }).text === "string"
+                ? (item as { text: string }).text
+                : ""
+        )
+        .filter(Boolean)
+        .join("\n");
+}
+
+function codexOutput(output: unknown): string {
+    if (typeof output === "string") return output;
+    if (output && typeof output === "object" && !Array.isArray(output)) {
+        const content = (output as { content?: unknown }).content;
+        return typeof content === "string" ? content : codexText(content);
+    }
+    return codexText(output);
+}
+
+function codexArguments(value: unknown): unknown {
+    if (typeof value !== "string") return value;
+    try {
+        return JSON.parse(value);
+    } catch {
+        return value;
+    }
+}
+
+function asString(value: unknown, max: number): string {
+    return typeof value === "string" ? value.slice(0, max) : "";
+}
+
+/**
+ * One line of a Codex rollout: `{ timestamp, type, payload }`, where the turns
+ * are `response_item` lines - messages, tool calls and their outputs - and the
+ * rest is metadata, except a compaction and an aborted turn.
+ */
+export function decodeCodexLine(line: string): HistoryRow[] {
+    let raw: unknown;
+    try {
+        raw = JSON.parse(line);
+    } catch {
+        return [];
+    }
+    const parsed = codexLineSchema.safeParse(raw);
+    if (!parsed.success) return [];
+    const { type, payload = {}, timestamp } = parsed.data;
+    const stamped = timestamp ? Date.parse(timestamp) : Number.NaN;
+    const at = Number.isFinite(stamped) ? stamped : null;
+    const vendorId = lineId("cx:", line);
+    const row = (partial: Omit<HistoryRow, "vendorId" | "at">): HistoryRow[] => [
+        { vendorId, at, ...partial }
+    ];
+
+    if (type === "compacted")
+        return row({ role: "system", kind: "marker", subject: "compacted", ref: "", body: "" });
+    if (type === "event_msg")
+        return payload.type === "turn_aborted"
+            ? row({ role: "system", kind: "marker", subject: "interrupted", ref: "", body: "" })
+            : [];
+    if (type !== "response_item") return [];
+
+    switch (payload.type) {
+        case "message": {
+            const text = codexText(payload.content).trim();
+            if (!text) return [];
+            if (payload.role === "user") {
+                if (CODEX_INJECTED.test(text)) return [];
+                return row({
+                    role: "user",
+                    kind: "text",
+                    subject: "",
+                    ref: "",
+                    body: clip(text, MAX_TEXT_CHARS)
+                });
+            }
+            if (payload.role !== "assistant") return [];
+            return row({
+                role: "agent",
+                kind: "text",
+                subject: "",
+                ref: "",
+                body: clip(text, MAX_TEXT_CHARS)
+            });
+        }
+        case "function_call":
+        case "custom_tool_call": {
+            const name = asString(payload.name, 200);
+            if (!name) return [];
+            const input =
+                payload.type === "function_call"
+                    ? codexArguments(payload.arguments)
+                    : payload.input;
+            return row({
+                role: "agent",
+                kind: "tool",
+                subject: name,
+                ref: asString(payload.call_id, MAX_ID_CHARS),
+                body: toolInputSummary(input)
+            });
+        }
+        case "function_call_output":
+        case "custom_tool_call_output":
+            return row({
+                role: "agent",
+                kind: "result",
+                subject: "",
+                ref: asString(payload.call_id, MAX_ID_CHARS),
+                body: clip(codexOutput(payload.output).trim(), MAX_TOOL_RESULT_CHARS)
+            });
+        default:
+            return [];
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Gemini CLI: `~/.gemini/tmp/<project>/chats/session-*.jsonl`
+// ---------------------------------------------------------------------------
+
+const geminiToolSchema = z.object({
+    id: idSchema,
+    name: z.string().max(200),
+    args: z.unknown().optional(),
+    result: z.unknown().optional(),
+    status: z.string().optional(),
+    displayName: z.string().max(200).optional()
+});
+
+const geminiLineSchema = z.object({
+    id: idSchema,
+    timestamp: z.string().max(64).optional(),
+    type: z.string().optional(),
+    content: z.unknown().optional(),
+    toolCalls: z.array(z.unknown()).optional()
+});
+
+/** Text out of Gemini's part lists: a string, `{ text }`, or a list of either. */
+function geminiText(content: unknown): string {
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) return content.map(geminiText).filter(Boolean).join("\n");
+    if (!content || typeof content !== "object") return "";
+    const record = content as Record<string, unknown>;
+    if (typeof record.text === "string") return record.text;
+    const response = (record.functionResponse as { response?: unknown } | undefined)?.response;
+    const output =
+        response && typeof response === "object"
+            ? (response as { output?: unknown }).output
+            : undefined;
+    return typeof output === "string" ? output : "";
+}
+
+/**
+ * One line of a Gemini CLI conversation file.
+ *
+ * The file is appended to, not rewritten: the first line is the conversation's
+ * own metadata (no message id, so nothing here), each message is a line, and a
+ * message that changes later - a tool call that finished - is appended again
+ * under the same id. The text keeps the id it was first stored under, and each
+ * tool call and its result carry ids of their own, so a later copy of the same
+ * message adds only what is new.
+ */
+export function decodeGeminiLine(line: string): HistoryRow[] {
+    let raw: unknown;
+    try {
+        raw = JSON.parse(line);
+    } catch {
+        return [];
+    }
+    const parsed = geminiLineSchema.safeParse(raw);
+    if (!parsed.success) return [];
+    const record = parsed.data;
+    const stamped = record.timestamp ? Date.parse(record.timestamp) : Number.NaN;
+    const at = Number.isFinite(stamped) ? stamped : null;
+    const rows: HistoryRow[] = [];
+
+    const text = geminiText(record.content).trim();
+    if (text && (record.type === "user" || record.type === "gemini")) {
+        rows.push({
+            vendorId: `${record.id}:text`,
+            role: record.type === "user" ? "user" : "agent",
+            kind: "text",
+            subject: "",
+            ref: "",
+            body: clip(text, MAX_TEXT_CHARS),
+            at
+        });
+    }
+    for (const item of record.toolCalls ?? []) {
+        const tool = geminiToolSchema.safeParse(item);
+        if (!tool.success) continue;
+        const call = tool.data;
+        rows.push({
+            vendorId: `${record.id}:tool:${call.id}`,
+            role: "agent",
+            kind: "tool",
+            subject: clip(call.displayName ?? call.name, 200),
+            ref: call.id,
+            body: toolInputSummary(call.args),
+            at
+        });
+        if (call.result === undefined || call.result === null) continue;
+        rows.push({
+            vendorId: `${record.id}:result:${call.id}`,
+            role: "agent",
+            kind: "result",
+            subject: call.status === "error" ? "error" : "",
+            ref: call.id,
+            body: clip(geminiText(call.result).trim(), MAX_TOOL_RESULT_CHARS),
+            at
+        });
+    }
     return rows;
 }

@@ -72,28 +72,82 @@ function containerName(id: string): string {
  * exactly the screen that exists today - a credential Polaris cannot walk
  * somebody through is still a credential they can paste.
  */
-const LOGIN_COMMANDS: Readonly<
-    Record<string, { cli: string; install: string; command: string; whoami?: string }>
-> = {
+export interface LoginCommand {
+    /** Which catalogue entry this login is of. Named rather than looked up by
+     *  credential: an environment variable belongs to as many tools as declare
+     *  it - ANTHROPIC_API_KEY to seven of them - so the tool is the only thing a
+     *  credential's first-run answers can honestly come from. */
+    readonly cli: string;
+    /** The install line, when it is not the catalogue's own. */
+    readonly install?: string;
+    readonly command: string;
+    /** Asked once, after the login, in the same container: the only way a stored
+     *  credential can say whose it is. */
+    readonly whoami?: string;
+    /** First-run answers this login needs on top of the tool's own. */
+    readonly firstRun?: readonly core.AgentFirstRunAnswer[];
+}
+
+export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
     CLAUDE_CODE_OAUTH_TOKEN: {
-        // Which catalogue entry this login is of. Named rather than looked up
-        // by credential: an environment variable belongs to as many tools as
-        // declare it - ANTHROPIC_API_KEY to seven of them - so the tool is the
-        // only thing a credential's first-run answers can honestly come from.
         cli: "claude",
-        // The same install line the catalogue uses, --allow-scripts and all:
-        // npm now declines a package's postinstall unless it is named, and this
-        // one's postinstall is what puts the binary on the PATH.
+        // --allow-scripts and all: npm now declines a package's postinstall
+        // unless it is named, and this one's postinstall is what puts the binary
+        // on the PATH.
         install:
             "npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code",
         command: "claude setup-token",
-        // Asked once, after the login, in the same container. It is the only way
-        // a stored credential can say whose it is - and without that, an account
-        // holding two of them has two rows called the same thing and no way to
-        // tell which subscription is behind either.
         whoami: "claude auth status --json"
+    },
+    // `codex login --device-auth` prints a URL and a one-time code and waits for
+    // the browser (developers.openai.com/codex/auth). The store is pinned to the
+    // file because that file is the thing captured: a keyring login would leave
+    // nothing in the home to keep.
+    CODEX_CHATGPT_AUTH: {
+        cli: "codex",
+        command: "codex -c 'cli_auth_credentials_store=\"file\"' login --device-auth"
+    },
+    // Gemini CLI has no login subcommand. Started with Google sign-in selected
+    // and NO_BROWSER set, it prints the consent URL and reads the authorization
+    // code from the terminal (packages/core/src/code_assist/oauth2.ts), then
+    // caches it in ~/.gemini/oauth_creds.json. The selection is asserted because
+    // the person is choosing Google sign-in right now, and without it an
+    // interactive start opens a picker instead of the login.
+    GEMINI_GOOGLE_AUTH: {
+        cli: "gemini",
+        command: "NO_BROWSER=true gemini",
+        firstRun: [
+            {
+                file: ".gemini/settings.json",
+                assert: { security: { auth: { selectedType: "oauth-personal" } } }
+            }
+        ]
+    },
+    // `copilot login --device-code`, from GitHub's authenticate-copilot-cli
+    // page. With no system keychain, which this container has none of, it asks
+    // to keep the token in ~/.copilot/config.json - answered on the screen.
+    COPILOT_DEVICE_AUTH: {
+        cli: "copilot",
+        command: "copilot login --device-code"
     }
 };
+
+function cliOf(env: string): core.AgentCli | undefined {
+    return core.AGENT_CLIS.find((one) => one.id === LOGIN_COMMANDS[env]?.cli);
+}
+
+/** The install line a login runs: its own, or the catalogue's. */
+export function signinInstall(env: string): string {
+    return LOGIN_COMMANDS[env]?.install ?? cliOf(env)?.install ?? "";
+}
+
+/**
+ * The file a login leaves its credential in, relative to the home, or null for
+ * one that prints a token to copy instead.
+ */
+export function signinCredentialFile(env: string): string | null {
+    return cliOf(env)?.credentials.find((one) => one.env === env)?.file ?? null;
+}
 
 /**
  * The first-run answers for the tool this login runs.
@@ -104,8 +158,7 @@ const LOGIN_COMMANDS: Readonly<
  * "nothing sourced" answer as everywhere else.
  */
 export function signinFirstRun(env: string): readonly core.AgentFirstRunAnswer[] {
-    const cli = core.AGENT_CLIS.find((one) => one.id === LOGIN_COMMANDS[env]?.cli);
-    return cli?.firstRun ?? [];
+    return [...(cliOf(env)?.firstRun ?? []), ...(LOGIN_COMMANDS[env]?.firstRun ?? [])];
 }
 
 function firstRunFor(env: string): string {
@@ -215,7 +268,7 @@ export async function beginSignin(userId: string, env: string): Promise<SigninAt
                             POLARIS_TMUX: TMUX,
                             POLARIS_COLS: String(commands.SIGNIN_COLS),
                             POLARIS_ROWS: String(commands.SIGNIN_ROWS),
-                            POLARIS_INSTALL: login.install,
+                            POLARIS_INSTALL: signinInstall(attempt.env),
                             POLARIS_FIRST_RUN: firstRunFor(attempt.env),
                             POLARIS_LOGIN: login.command,
                             POLARIS_RUNAS: commands.CONTAINER_USER,
@@ -453,4 +506,56 @@ export async function identifySignin(
     } catch {
         return {};
     }
+}
+
+// ---------------------------------------------------------------------------
+// A login that leaves a file rather than a line to copy
+// ---------------------------------------------------------------------------
+
+/** The largest credential file kept. These are a few kilobytes of JSON; the
+ *  bound keeps a runaway file from becoming a row, and it sits well under the
+ *  sixteen kilobytes a command's output is cut at. */
+export const CREDENTIAL_FILE_MAX = 8192;
+
+/**
+ * Print a credential file as one line of base64, as the agent, or nothing.
+ *
+ * The path is a catalogue value, never anything typed, and it is quoted all the
+ * same. As the agent, so a file only the agent can read is still read; the
+ * home is the one the attempt mounted.
+ */
+export function credentialFileScript(file: string): string {
+    return whoamiScript(`f="$POLARIS_HOME"/${shellQuote(file)}; [ -s "$f" ] && base64 -w0 "$f" || true`);
+}
+
+/**
+ * What a capture read, checked before anything is kept.
+ *
+ * Pure. The value stored is the file's base64, the same shape the session boot
+ * decodes back into the home. It has to decode to a JSON object no larger than
+ * the bound: anything else - an empty answer, a file cut short, a login still
+ * half way - is "not signed in yet", never a credential stored broken.
+ */
+export function parseCredentialFile(output: string): string | null {
+    const value = output.trim();
+    if (!value || !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) return null;
+    const text = Buffer.from(value, "base64").toString("utf8");
+    if (!text || text.length > CREDENTIAL_FILE_MAX) return null;
+    try {
+        const parsed: unknown = JSON.parse(text);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    } catch {
+        return null;
+    }
+    return value;
+}
+
+/**
+ * The credential file an open login wrote, ready to be kept, or null while the
+ * login has not finished. Throws only when the attempt is not this person's.
+ */
+export async function captureSignin(userId: string, id: string, env: string): Promise<string | null> {
+    const file = signinCredentialFile(env);
+    if (!file || !(env in LOGIN_COMMANDS)) return null;
+    return parseCredentialFile(await runIn(userId, id, credentialFileScript(file)));
 }

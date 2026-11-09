@@ -417,8 +417,11 @@ describe("the tool's own first-run wizard", () => {
         // The same rule as `credentials`: an empty list is an answer. A guessed
         // key is written, silently ignored, and leaves the session in front of
         // the wizard with nothing anywhere saying why.
+        // Claude Code, Codex, Gemini CLI and Copilot CLI have sourced answers
+        // (the wizard, and the hooks that report their turns to Polaris).
+        const sourced = new Set(["claude", "codex", "gemini", "copilot"]);
         for (const cli of core.AGENT_CLIS) {
-            if (cli.id === "claude") continue;
+            if (sourced.has(cli.id)) continue;
             expect(cli.firstRun, cli.id).toEqual([]);
         }
         expect(core.customAgentCli("whatever").firstRun).toEqual([]);
@@ -895,7 +898,11 @@ describe("a session whose machine restarted under it", () => {
         expect(spawnSync("git", ["init", "-q", workdir]).status).toBe(0);
         writeFileSync(join(workdir, "work.txt"), "not committed yet");
         if (options.id) writeFileSync(join(stateDir, "agent-session-id"), options.id);
-        const result = spawnSync("sh", ["-c", commands.SESSION_SETUP], {
+        // From a file, not `sh -c`: Git for Windows' sh drops an argument over
+        // about 8 KB, and the script is past that. A container has no such limit.
+        const script = join(stateDir, "setup.sh");
+        writeFileSync(script, commands.SESSION_SETUP);
+        const result = spawnSync("sh", [script.replace(/\\/g, "/")], {
             encoding: "utf8",
             input: "",
             env: {

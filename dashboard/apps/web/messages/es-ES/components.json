@@ -1059,6 +1059,7 @@
         "nameHint": "Cómo llamar aquí a esta cuenta. Déjalo vacío y Polaris la nombrará según a quién pertenezca.",
         "namePlaceholder": "Suscripción de trabajo",
         "copyIn": "Cuando muestre el {what}, cópialo aquí. Polaris no lo lee de la pantalla por ti: guardar la línea equivocada no se notaría hasta que una sesión no pudiera iniciar sesión.",
+        "fileHint": "Cuando el terminal diga que has iniciado sesión, pulsa Vincular. Polaris guarda cifrado el acceso que dejó la herramienta y lo repone en cada sesión que lo necesite.",
         "link": "Vincular"
     },
     "providerSelect": {
