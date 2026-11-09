@@ -81,6 +81,44 @@ export async function queuePosition(sessionId: string): Promise<number | null> {
     return ahead + 1;
 }
 
+/**
+ * Where each of these queued sessions stands, in one read: 1 is next, counted
+ * within the account that queued it, as `queuePosition` does for one. Sessions
+ * that are not queued are left out.
+ */
+export async function queuePositions(
+    sessions: readonly { id: string; state: string }[]
+): Promise<Record<string, number>> {
+    const queued = sessions.filter((session) => session.state === "queued").map((s) => s.id);
+    if (queued.length === 0) return {};
+    const own = await prisma.agentSession.findMany({
+        where: { id: { in: queued } },
+        select: { startedById: true }
+    });
+    const accounts = [...new Set(own.map((row) => row.startedById))];
+    const rows = await prisma.agentSession.findMany({
+        where: { state: "queued", startedById: { in: accounts } },
+        select: { id: true, startedById: true },
+        orderBy: { createdAt: "asc" },
+        take: accounts.length * MAX_QUEUED_PER_ACCOUNT
+    });
+    return rankWithinAccount(rows);
+}
+
+/** 1-based rank of each row within its own account, in the order given. */
+export function rankWithinAccount(
+    rows: readonly { id: string; startedById: string | null }[]
+): Record<string, number> {
+    const seen = new Map<string | null, number>();
+    const out: Record<string, number> = {};
+    for (const row of rows) {
+        const next = (seen.get(row.startedById) ?? 0) + 1;
+        seen.set(row.startedById, next);
+        out[row.id] = next;
+    }
+    return out;
+}
+
 /** How many sessions wait at most, per account. A queue is a promise to start
  *  something later, and an unbounded one is a promise nobody can keep. */
 export const MAX_QUEUED_PER_ACCOUNT = 20;

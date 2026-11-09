@@ -61,6 +61,7 @@ const REFRESH_MS = 4000;
 /** What each state looks like, and how loudly. `waiting` is the only one that
  *  gets a colour meant to be noticed across a room. */
 const TONE: Record<core.AgentSessionState, string> = {
+    queued: "text-muted-foreground",
     starting: "text-muted-foreground",
     working: "text-violet-400",
     waiting: "text-warning",
@@ -74,9 +75,10 @@ const ORDER: Record<core.AgentSessionState, number> = {
     waiting: 0,
     working: 1,
     starting: 2,
-    idle: 3,
-    failed: 4,
-    stopped: 5
+    queued: 3,
+    idle: 4,
+    failed: 5,
+    stopped: 6
 };
 
 interface Choices {
@@ -86,7 +88,14 @@ interface Choices {
     sharedWorkspace: boolean;
 }
 
-export function SessionsView({ sessions }: { sessions: SessionView[] }) {
+export function SessionsView({
+    sessions,
+    positions = {}
+}: {
+    sessions: SessionView[];
+    /** Where each queued session stands in its account's line; 1 is next. */
+    positions?: Record<string, number>;
+}) {
     const t = useTranslations("agents");
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -164,16 +173,22 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                                     )}
                                 </span>
                                 <span className={`shrink-0 text-xs ${TONE[session.state]}`}>
-                                    {sessionStateWord(
-                                        t,
-                                        session.state,
-                                        session.lastEventAt !== null
-                                    )}
+                                    {core.isSessionQueued(session.state) && positions[session.id]
+                                        ? t("sessions.queuePosition", {
+                                              position: positions[session.id]!
+                                          })
+                                        : sessionStateWord(
+                                              t,
+                                              session.state,
+                                              session.lastEventAt !== null
+                                          )}
                                 </span>
                                 {core.isSessionOver(session.state) ? null : (
                                     <Button size="sm" variant="ghost" onClick={() => stop(session)}>
                                         <Square className="size-4 shrink-0" />
-                                        {t("sessions.stop")}
+                                        {core.isSessionQueued(session.state)
+                                            ? t("sessions.cancelQueued")
+                                            : t("sessions.stop")}
                                     </Button>
                                 )}
                             </CardBody>

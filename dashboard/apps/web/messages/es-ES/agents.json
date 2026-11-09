@@ -212,6 +212,8 @@
         "workspace": "Un espacio",
         "aServer": "un servidor",
         "thisBox": "este equipo",
+        "queuePosition": "En cola, puesto {position}",
+        "cancelQueued": "Cancelar",
         "stop": "Detener",
         "form": {
             "title": "En qué trabaja",

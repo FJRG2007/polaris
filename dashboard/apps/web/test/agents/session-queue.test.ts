@@ -53,7 +53,7 @@ vi.mock("@/lib/agents/session-runtime", () => ({
     promptSession: vi.fn()
 }));
 
-const { planQueue } = await import("@/lib/agents/session-queue");
+const { planQueue, rankWithinAccount } = await import("@/lib/agents/session-queue");
 const { SESSION_TOOLS } = await import("@/lib/mcp/tools/sessions");
 
 const at = (minute: number) => new Date(Date.UTC(2026, 10, 9, 10, minute));
@@ -138,5 +138,21 @@ describe("agent_session_start over MCP", () => {
             /waiting to start/
         );
         expect(mocks.createSession).not.toHaveBeenCalled();
+    });
+});
+
+describe("rankWithinAccount", () => {
+    it("numbers each account's line on its own, in queue order", () => {
+        // A person reads "number 2 in line" against what they queued, not
+        // against everybody else's.
+        expect(
+            rankWithinAccount([
+                { id: "a1", startedById: "a" },
+                { id: "b1", startedById: "b" },
+                { id: "a2", startedById: "a" },
+                { id: "b2", startedById: "b" },
+                { id: "a3", startedById: "a" }
+            ])
+        ).toEqual({ a1: 1, b1: 1, a2: 2, b2: 2, a3: 3 });
     });
 });

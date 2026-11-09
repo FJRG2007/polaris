@@ -69,6 +69,7 @@ const LIVE_REFRESH_MS = 20000;
 const RESUMABLE_MS = 15000;
 
 const TONE: Record<core.AgentSessionState, string> = {
+    queued: "text-muted-foreground",
     starting: "text-muted-foreground",
     working: "text-violet-400",
     waiting: "text-warning",

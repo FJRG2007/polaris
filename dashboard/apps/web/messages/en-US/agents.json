@@ -212,6 +212,8 @@
         "workspace": "A workspace",
         "aServer": "a server",
         "thisBox": "this box",
+        "queuePosition": "Queued, number {position} in line",
+        "cancelQueued": "Cancel",
         "stop": "Stop",
         "form": {
             "title": "What is it working on",
