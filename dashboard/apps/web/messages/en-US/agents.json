@@ -540,6 +540,10 @@
         "nothing": "Nothing can run this repository yet. Fix one of the reasons below."
     },
     "repoDialog": {
+        "setupPlaceholder": "npm ci",
+        "setup": "Setup script",
+        "setupHint": "Runs in each session's checkout before the agent starts, such as installing dependencies. Its output shows in the session's terminal.",
+        "setupRequired": "Stop the session if it fails",
         "change": "Change",
         "privateOff": "Private repositories are turned off for this account. Turn them back on under Agents settings, or the agent will never run here.",
         "publicOff": "Public repositories are turned off for this account. Turn them back on under Agents settings, or the agent will never run here.",

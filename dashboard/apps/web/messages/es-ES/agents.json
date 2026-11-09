@@ -540,6 +540,10 @@
         "nothing": "Aún no hay nada que pueda ejecutar este repositorio. Resuelve uno de los motivos de abajo."
     },
     "repoDialog": {
+        "setupPlaceholder": "npm ci",
+        "setup": "Preparación",
+        "setupHint": "Se ejecuta en la copia de cada sesión antes de que arranque el agente, por ejemplo para instalar dependencias. Su salida aparece en la terminal de la sesión.",
+        "setupRequired": "Parar la sesión si falla",
         "change": "Cambiar",
         "privateOff": "Los repositorios privados están desactivados para esta cuenta. Vuelve a activarlos en los ajustes de Agentes, o el agente nunca se ejecutará aquí.",
         "publicOff": "Los repositorios públicos están desactivados para esta cuenta. Vuelve a activarlos en los ajustes de Agentes, o el agente nunca se ejecutará aquí.",

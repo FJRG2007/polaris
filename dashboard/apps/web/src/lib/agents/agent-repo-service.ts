@@ -42,6 +42,10 @@ export interface AgentRepoView {
     pullRequests: boolean | null;
     issues: boolean | null;
     gate: string | null;
+    /** Run in a session's checkout before the agent starts. Empty runs nothing. */
+    setupScript: string;
+    /** Whether a failing setup script stops the session. */
+    setupRequired: boolean;
     workflowInstalledAt: Date | null;
     error: string | null;
     automationCount: number;
@@ -74,6 +78,8 @@ export async function listAgentRepos(ownerId: string): Promise<AgentRepoView[]> 
         pullRequests: row.pullRequests,
         issues: row.issues,
         gate: row.gate,
+        setupScript: row.setupScript,
+        setupRequired: row.setupRequired,
         workflowInstalledAt: row.workflowInstalledAt,
         error: row.error,
         automationCount: row._count.automations,

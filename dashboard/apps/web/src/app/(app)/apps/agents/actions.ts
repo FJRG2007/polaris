@@ -306,12 +306,25 @@ export async function enableRepoAction(
     return warningText(error);
 }
 
+/** Longest setup script a repository may keep: a few install lines, not a program. */
+const REPO_SETUP_MAX = 8000;
+
 export async function updateRepoConfigAction(
     input: unknown
 ): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z
-        .object({ repoId: z.string().uuid(), config: agentRepoConfigSchema })
+        .object({
+            repoId: z.string().uuid(),
+            config: agentRepoConfigSchema,
+            // Optional so a caller that predates it changes nothing.
+            setup: z
+                .object({
+                    script: z.string().max(REPO_SETUP_MAX).transform((value) => value.trim()),
+                    required: z.boolean()
+                })
+                .optional()
+        })
         .safeParse(input);
     if (!parsed.success)
         return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkSettings") };
@@ -333,6 +346,15 @@ export async function updateRepoConfigAction(
             isPrivate: existing.isPrivate,
             config: parsed.data.config
         });
+        if (parsed.data.setup) {
+            await prisma.agentRepo.update({
+                where: { id: existing.id },
+                data: {
+                    setupScript: parsed.data.setup.script,
+                    setupRequired: parsed.data.setup.required
+                }
+            });
+        }
     } catch (caught) {
         return { error: await failure(caught, "errors.saveSettings") };
     }
