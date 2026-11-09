@@ -96,6 +96,28 @@ export function answered(ring: Ring, snapshot: model.ClockSnapshot): boolean {
     );
 }
 
+/**
+ * Whether a ring is still owed according to the server, read now. The snapshot
+ * a tab holds can be a minute old - a window in the background reads again only
+ * that often - and a timer deleted or stopped on another device in that minute
+ * must not ring here. A read that fails rings anyway: an alarm that stays quiet
+ * because the network blinked is the worse mistake.
+ */
+export async function stillOwed(ring: Ring, read: () => Promise<Response> = fresh): Promise<boolean> {
+    try {
+        const response = await read();
+        if (!response.ok) return true;
+        const snapshot = (await response.json()) as model.ClockSnapshot;
+        return ringsOf(snapshot).some((entry) => entry.key === ring.key) && !answered(ring, snapshot);
+    } catch {
+        return true;
+    }
+}
+
+function fresh(): Promise<Response> {
+    return fetch("/api/calendar/time", { cache: "no-store" });
+}
+
 /** Claim a ring for this tab: false when another tab of this browser has it. */
 async function claim(key: string): Promise<boolean> {
     const take = (): boolean => {
@@ -134,6 +156,7 @@ export function useRinger(clock: ClockRead): Ringer {
     const heard = useRef(new Set<string>());
     const snapshot = clock.snapshot;
     const skew = clock.skew;
+    const refreshClock = clock.refresh;
 
     // Wait for the next ring, ring what is due, and wait again.
     useEffect(() => {
@@ -146,13 +169,17 @@ export function useRinger(clock: ClockRead): Ringer {
             if (local <= now) {
                 heard.current.add(ring.key);
                 if (now - local > LATE_MS || answered(ring, snapshot)) continue;
-                void claim(ring.key).then((mine) => {
-                    if (mine)
-                        setRings((current) =>
-                            current.some((entry) => entry.key === ring.key)
-                                ? current
-                                : [...current, ring]
-                        );
+                void claim(ring.key).then(async (mine) => {
+                    if (!mine) return;
+                    if (!(await stillOwed(ring))) {
+                        // Changed somewhere else since this tab last read:
+                        // read again, so what it shows catches up as well.
+                        refreshClock();
+                        return;
+                    }
+                    setRings((current) =>
+                        current.some((entry) => entry.key === ring.key) ? current : [...current, ring]
+                    );
                 });
             } else soonest = Math.min(soonest, local);
         }
@@ -162,7 +189,7 @@ export function useRinger(clock: ClockRead): Ringer {
             Math.min(soonest - now, LONGEST_WAIT_MS)
         );
         return () => window.clearTimeout(timer);
-    }, [snapshot, skew, turn, clock.allowed]);
+    }, [snapshot, skew, turn, clock.allowed, refreshClock]);
 
     // A tab that was behind others catches up the moment it is looked at.
     useEffect(() => {

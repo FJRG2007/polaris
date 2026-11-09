@@ -16,7 +16,7 @@ import * as world from "../fixtures/world";
 import { addUser } from "../fixtures/fake-host";
 import * as model from "@polaris-app/calendar/src/lib/clock/model";
 import * as clock from "@polaris-app/calendar/src/lib/clock/service";
-import { answered, ringsOf, type Ring } from "@polaris-app/calendar/src/screens/clock/ringer";
+import { answered, ringsOf, stillOwed, type Ring } from "@polaris-app/calendar/src/screens/clock/ringer";
 
 const ZONE = "Europe/Madrid";
 const at = (iso: string) => new Date(iso);
@@ -115,5 +115,42 @@ describe("a ring answered somewhere stops everywhere", () => {
         await clock.dismissTimer(alice.id, ring.id, at("2026-10-01T08:04:02Z"));
         expect(answered(ring, await clock.clockSnapshot(alice.id))).toBe(true);
         expect(db.rows("clockTimer")[0]!.endsAt).toBeNull();
+    });
+    describe("a screen about to ring asks the server first", () => {
+        const serve = (snapshot: unknown) => async () => Response.json(snapshot);
+
+        it("stays quiet for a timer deleted on another device while its list was old", async () => {
+            await clock.createTimer(
+                alice.id,
+                { label: "Tea", durationMs: 4 * 60_000, sound: "bell", start: true },
+                world.NOW
+            );
+            const ring = await ringing("timer");
+            expect(await stillOwed(ring, serve(await clock.clockSnapshot(alice.id)))).toBe(true);
+            await clock.deleteTimer(alice.id, ring.id);
+            expect(await stillOwed(ring, serve(await clock.clockSnapshot(alice.id)))).toBe(false);
+        });
+
+        it("stays quiet for a timer given more time elsewhere, which rings at its new end", async () => {
+            await clock.createTimer(
+                alice.id,
+                { label: "Tea", durationMs: 4 * 60_000, sound: "bell", start: true },
+                world.NOW
+            );
+            const ring = await ringing("timer");
+            await clock.shiftTimer(alice.id, ring.id, 1, world.NOW);
+            expect(await stillOwed(ring, serve(await clock.clockSnapshot(alice.id)))).toBe(false);
+        });
+
+        it("rings when the server cannot be asked", async () => {
+            await clock.createTimer(
+                alice.id,
+                { label: "Tea", durationMs: 4 * 60_000, sound: "bell", start: true },
+                world.NOW
+            );
+            const ring = await ringing("timer");
+            expect(await stillOwed(ring, async () => new Response("", { status: 502 }))).toBe(true);
+            expect(await stillOwed(ring, async () => Promise.reject(new TypeError("offline")))).toBe(true);
+        });
     });
 });
