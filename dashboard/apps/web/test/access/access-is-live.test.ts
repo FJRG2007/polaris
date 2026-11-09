@@ -123,3 +123,38 @@ describe("every write that moves what somebody reaches raises one", () => {
         });
     }
 });
+
+describe("a write to what access is worked out from", () => {
+    it("raises a change whichever path made it, naming the account when it can", async () => {
+        const { accessWriteOf } = await import("@polaris/db");
+        // An organisation member added, an invitation accepted: no screen called
+        // publishAccessChange for these, and a tab never heard of them.
+        expect(accessWriteOf("OrganizationMember", "create", { data: { orgId: "o", userId: "u1" } })).toEqual({
+            model: "OrganizationMember",
+            userIds: ["u1"]
+        });
+        expect(accessWriteOf("UserRole", "deleteMany", { where: { userId: "u2" } })).toEqual({
+            model: "UserRole",
+            userIds: ["u2"]
+        });
+        expect(accessWriteOf("OrgRole", "update", { where: { id: "r" }, data: { grants: [] } })).toEqual({
+            model: "OrgRole",
+            userIds: []
+        });
+        expect(accessWriteOf("InstalledApp", "upsert", { where: { id: "drive" }, create: {}, update: {} })).toEqual({
+            model: "InstalledApp",
+            userIds: []
+        });
+    });
+
+    it("stays quiet for reads and for writes that change nobody's access", async () => {
+        const { accessWriteOf } = await import("@polaris/db");
+        expect(accessWriteOf("UserRole", "findMany", {})).toBeNull();
+        expect(accessWriteOf("ChatMessage", "create", { data: { userId: "u" } })).toBeNull();
+        expect(accessWriteOf("User", "update", { where: { id: "u" }, data: { lastSeenAt: new Date() } })).toBeNull();
+        expect(accessWriteOf("User", "update", { where: { id: "u" }, data: { isAdmin: true } })).toEqual({
+            model: "User",
+            userIds: ["u"]
+        });
+    });
+});

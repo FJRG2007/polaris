@@ -19,6 +19,8 @@
  * second line rather than the reason this is safe.
  */
 
+import { onAccessWrite } from "@polaris/db";
+
 /** Something that may have changed what somebody reaches. */
 export interface AccessChange {
     /**
@@ -46,7 +48,15 @@ interface Registry {
 
 function registry(): Registry {
     const holder = globalThis as { [REGISTRY]?: Registry };
-    if (!holder[REGISTRY]) holder[REGISTRY] = { listeners: new Set() };
+    if (!holder[REGISTRY]) {
+        holder[REGISTRY] = { listeners: new Set() };
+        // Every write to a table access is worked out from raises a change, so a
+        // path that grants or removes something without calling
+        // `publishAccessChange` - an organisation role, an accepted invitation,
+        // a service written tomorrow - still reaches the open tabs. Subscribed
+        // once, with the registry, for the life of the process.
+        onAccessWrite((write) => publishAccessChange({ userIds: write.userIds }));
+    }
     return holder[REGISTRY];
 }
 

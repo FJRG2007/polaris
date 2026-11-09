@@ -102,10 +102,140 @@ export function hidingBinned(base: PrismaClient): PrismaClient {
     }) as unknown as PrismaClient;
 }
 
+/**
+ * The tables what somebody may reach is worked out from: roles, groups,
+ * policies, direct permissions, grants, organisations and their teams, and the
+ * apps installed. A write to any of them can add an app to somebody's switcher
+ * or take one away.
+ */
+const ACCESS_MODELS = new Set([
+    "Role",
+    "UserRole",
+    "Group",
+    "GroupMember",
+    "AccessGroup",
+    "UserAccessGroup",
+    "Policy",
+    "PolicyAttachment",
+    "UserPermission",
+    "AccessGrant",
+    "ResourceGrant",
+    "InstalledApp",
+    "Organization",
+    "OrganizationMember",
+    "OrgRole",
+    "Team",
+    "TeamMember",
+    "VpnAccess",
+    "PolarToolGrant"
+]);
+/** The columns of an account that change what it may reach. Any other write to
+ *  a user - a name, a last-seen time - is not an access change. */
+const USER_ACCESS_FIELDS = ["isAdmin", "role", "bannedAt", "disabledAt"];
+const WRITES = new Set([
+    "create",
+    "createMany",
+    "createManyAndReturn",
+    "update",
+    "updateMany",
+    "updateManyAndReturn",
+    "upsert",
+    "delete",
+    "deleteMany"
+]);
+
+/** Whose access a write moved: the accounts it names, or none for "anybody's". */
+export interface AccessWrite {
+    readonly model: string;
+    readonly userIds: readonly string[];
+}
+
+type AccessWriteListener = (write: AccessWrite) => void;
+const ACCESS_WRITES = Symbol.for("polaris.db.access-writes");
+
+function accessWriteListeners(): Set<AccessWriteListener> {
+    const holder = globalThis as { [ACCESS_WRITES]?: Set<AccessWriteListener> };
+    holder[ACCESS_WRITES] ??= new Set();
+    return holder[ACCESS_WRITES];
+}
+
+/**
+ * Hear about every write that may have changed what somebody reaches, whichever
+ * screen, job or service made it. The live access channel listens here, so a
+ * permission granted by any path - an administrator's screen, an organisation
+ * role, an accepted invitation, an app installed - reaches the person's open
+ * tabs without each of those paths having to remember to say so.
+ */
+export function onAccessWrite(listener: AccessWriteListener): () => void {
+    const listeners = accessWriteListeners();
+    listeners.add(listener);
+    return () => {
+        listeners.delete(listener);
+    };
+}
+
+/** The one account a write is about, when its `where` or its data names one. */
+function namedUser(model: string, args: unknown): string[] {
+    const shaped = (args ?? {}) as {
+        where?: Record<string, unknown>;
+        data?: unknown;
+        create?: Record<string, unknown>;
+    };
+    const candidates = [
+        shaped.where?.userId,
+        model === "User" ? shaped.where?.id : undefined,
+        Array.isArray(shaped.data) ? undefined : (shaped.data as Record<string, unknown> | undefined)?.userId,
+        shaped.create?.userId
+    ];
+    const found = candidates.find((value): value is string => typeof value === "string");
+    return found ? [found] : [];
+}
+
+function touchesUserAccess(args: unknown): boolean {
+    const shaped = (args ?? {}) as { data?: unknown; update?: unknown };
+    const data = [shaped.data, shaped.update].filter(
+        (value): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value)
+    );
+    return data.some((one) => USER_ACCESS_FIELDS.some((field) => field in one));
+}
+
+/** What a query means for access: null when it cannot change what anybody reaches. */
+export function accessWriteOf(model: string, operation: string, args: unknown): AccessWrite | null {
+    if (!WRITES.has(operation)) return null;
+    if (!ACCESS_MODELS.has(model) && !(model === "User" && touchesUserAccess(args))) return null;
+    return { model, userIds: namedUser(model, args) };
+}
+
+/** Tell the listeners after a write lands. A listener that throws is one dead
+ *  connection and never the write's failure. */
+export function announcingAccessWrites(base: PrismaClient): PrismaClient {
+    return base.$extends({
+        query: {
+            $allModels: {
+                async $allOperations({ model, operation, args, query }) {
+                    const result = await query(args);
+                    const listeners = accessWriteListeners();
+                    if (listeners.size === 0) return result;
+                    const write = accessWriteOf(model, operation, args);
+                    if (!write) return result;
+                    for (const listener of listeners) {
+                        try {
+                            listener(write);
+                        } catch (caught) {
+                            console.error(caught);
+                        }
+                    }
+                    return result;
+                }
+            }
+        }
+    }) as unknown as PrismaClient;
+}
+
 function client(): PrismaClient {
     const url = boundedUrl();
-    return hidingBinned(
-        url ? new PrismaClient({ datasources: { db: { url } } }) : new PrismaClient()
+    return announcingAccessWrites(
+        hidingBinned(url ? new PrismaClient({ datasources: { db: { url } } }) : new PrismaClient())
     );
 }
 
