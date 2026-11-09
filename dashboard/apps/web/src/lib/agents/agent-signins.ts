@@ -83,6 +83,9 @@ export interface AgentSignin {
     readonly url: string;
     readonly howto: string | null;
     readonly subscription: boolean;
+    /** Where the tool keeps this login in its home, relative to it, when it is
+     *  a file the tool writes rather than a value to copy off the screen. */
+    readonly file: string | null;
     /** Which catalogued tools this one signs in. Carries the id as well as the
      *  label so a screen can draw the tool's mark without matching on words. */
     readonly serves: readonly { readonly id: string; readonly label: string }[];
