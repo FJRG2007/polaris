@@ -97,6 +97,14 @@
             "summary": "Convert, resize, optimize, trim and translate - without leaving Polaris.",
             "description": "The jobs people open a random website for, and hand somebody else's server their files to do: turning a PDF into a Word document, an image into another format, a spreadsheet into a CSV. Resize and optimize pictures, read what a file actually contains, trim and mute a video, shorten a link, translate a passage. The files stay on your own machine, and nothing is uploaded anywhere it was not already."
         },
+        "analytics": {
+            "summary": "Who visits the sites you run here, without a cookie banner.",
+            "description": "Visitors, pages, referrers, countries, devices and events for every site deployed here and for Polaris itself, counted from the traffic that already reaches your edge and, if you want more, a small script. No cookies and nothing sent anywhere else. Compare periods, filter by anything, follow a visit page by page, build funnels and goals, and share a site with the people who need its numbers."
+        },
+        "telemetry": {
+            "summary": "What broke in your apps and in Polaris, with the stack trace.",
+            "description": "Point any Sentry SDK at Polaris and every exception lands here, grouped into issues with the stack trace, the release, the runtime, the operating system and the browser it happened on. Resolve, ignore and share a project with the people who fix it. The errors stay on your own server."
+        },
         "calendar": {
             "summary": "Your calendars and the ones you link, with invitations and booking pages.",
             "description": "Keep calendars in Polaris and see Google, Outlook, iCloud and any CalDAV calendar beside them, synced both ways. Day, week, month, year and agenda views, repeating events, reminders, invitations people answer from their inbox, finding a time that suits everybody, sharing with people and teams, public links, and booking pages for anybody outside Polaris."

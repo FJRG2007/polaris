@@ -14,6 +14,8 @@
 import { TelemetryView } from "./telemetry-view";
 import { requireTelemetryReader } from "@/lib/telemetry/reader";
 import { getTranslations } from "@/lib/i18n/request";
+import { requireInstalledApp } from "@/lib/apps/require-installed";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +30,7 @@ export default async function TelemetryPage({
     }>;
 }) {
     await requireTelemetryReader();
+    await requireInstalledApp("telemetry", await requireUser());
     const { project, issue, status, section } = await searchParams;
     const t = await getTranslations("telemetry");
 

@@ -16,7 +16,9 @@ import { DNS_BLOCKER_KEYWORDS, GAME_SERVERS_BASE, INSTALLED_BASE, VPN_KEYWORDS }
 import { NATIVE_APPS, isNativeApp } from "@/lib/apps/native-apps";
 import {
     Bot,
+    Bug,
     CalendarDays,
+    ChartColumn,
     Gamepad2,
     Handshake,
     Joystick,
@@ -379,6 +381,42 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         summary: "Public pages that show whether your services are up.",
         description:
             "Publish a page that shows whether your services are up, with 90 days of uptime from HTTP, TCP, DNS and latency checks Polaris runs itself. Post incidents as they unfold and schedule maintenance ahead. Point checks at your own deployed apps or any address. Uninstalling stops the checks and keeps every page.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Visitors to the sites deployed here, and to Polaris itself, read from
+        // the edge log and an optional script. Part of every Polaris until it
+        // became something to install; installing runs nothing, and an instance
+        // that already had it kept it (see `optional-app-carry`).
+        id: "analytics",
+        name: "Analytics",
+        category: "Tools",
+        icon: ChartColumn,
+        opensAt: "/apps/analytics",
+        summary: "Who visits the sites you run here, without a cookie banner.",
+        description:
+            "Visitors, pages, referrers, countries, devices and events for every site deployed here and for Polaris itself, counted from the traffic that already reaches your edge and, if you want more, a small script. No cookies and nothing sent anywhere else. Compare periods, filter by anything, follow a visit page by page, build funnels and goals, and share a site with the people who need its numbers.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Errors from the apps deployed here and from Polaris, sent by any
+        // Sentry SDK. The same story as Analytics: installing runs nothing.
+        id: "telemetry",
+        name: "Telemetry",
+        category: "Tools",
+        icon: Bug,
+        opensAt: "/apps/telemetry",
+        summary: "What broke in your apps and in Polaris, with the stack trace.",
+        description:
+            "Point any Sentry SDK at Polaris and every exception lands here, grouped into issues with the stack trace, the release, the runtime, the operating system and the browser it happened on. Resolve, ignore and share a project with the people who fix it. The errors stay on your own server.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",
@@ -1704,13 +1742,13 @@ function isConsentField(app: AppManifest, field: TemplateEnvVar): boolean {
 }
 
 const CATEGORY_ORDER: readonly AppCategory[] = [
-    "Messaging",
     "Productivity",
-    "AI",
-    "Games",
-    "Game servers",
     "Home",
-    "Tools"
+    "Game servers",
+    "Games",
+    "AI",
+    "Tools",
+    "Messaging"
 ];
 
 /** Marketplace grouping, in a stable display order. */

@@ -1567,6 +1567,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Analytics", // i18n-ignore
             href: "/apps/analytics",
             needs: "deploy.manage",
+            requiresApp: "analytics",
             icon: ChartColumn,
             keywords: ["visitors", "traffic", "pageviews", "referrers", "metrics", "umami"],
             group: OBSERVABILITY_GROUP
@@ -1575,6 +1576,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Telemetry", // i18n-ignore
             href: "/apps/telemetry",
             needs: "deploy.manage",
+            requiresApp: "telemetry",
             icon: Bug,
             keywords: [
                 "errors",

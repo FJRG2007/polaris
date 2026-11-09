@@ -12,6 +12,7 @@
  */
 
 import { pruneAnalytics, ingestEdgeVisits } from "@/lib/analytics-ingest";
+import { isAppInstalled } from "@/lib/apps/install-presence";
 
 /** Frequent enough that the realtime panel is honest about what it shows. */
 const TICK_MS = 30_000;
@@ -29,7 +30,9 @@ export function startAnalyticsCollector(): void {
 
     const tick = async () => {
         try {
-            await ingestEdgeVisits();
+            // Analytics is an app to install: without it nothing new is recorded,
+            // and what was recorded before still ages out below.
+            if (await isAppInstalled("analytics")) await ingestEdgeVisits();
             if (ticks % MAINTENANCE_EVERY_TICKS === 0) await pruneAnalytics();
         } catch (error) {
             console.error("polaris: the analytics collector tick failed:", error);

@@ -158,6 +158,25 @@ export async function register(): Promise<void> {
         console.error("polaris: could not prepare the call server key:", error)
     );
 
+    // Analytics and Telemetry used to come with every Polaris; one that was
+    // already running keeps them installed (see `optional-app-carry`).
+    const { carryFormerlyBuiltInApps } = await import("./lib/apps/optional-app-carry");
+    await carryFormerlyBuiltInApps().catch((error) =>
+        console.error("polaris: could not keep Analytics and Telemetry installed:", error)
+    );
+
+    // The ready-made access policies, as this version writes them: an update
+    // that changes one reaches everybody it is attached to without anybody
+    // opening Policies first.
+    const { syncPolicyTemplates } = await import("@polaris/auth");
+    void syncPolicyTemplates()
+        .then(async (changed) => {
+            if (!changed) return;
+            const { publishAccessChange } = await import("./lib/access-live");
+            publishAccessChange();
+        })
+        .catch((error) => console.error("polaris: could not store the ready-made policies:", error));
+
     // The certificate contact chosen in Domains, put back where the edge reads it
     // when it starts, for a volume that was recreated or restored since.
     const { syncAcmeEmailFile } = await import("./lib/tls/acme-edge");

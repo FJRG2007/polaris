@@ -97,6 +97,14 @@
             "summary": "Convierte, redimensiona, optimiza, recorta y traduce sin salir de Polaris.",
             "description": "Los trabajos para los que se abre una web cualquiera y se le dan los archivos al servidor de otro: pasar un PDF a documento de Word, una imagen a otro formato, una hoja de cálculo a CSV. Redimensiona y optimiza imágenes, mira qué contiene de verdad un archivo, recorta y silencia un vídeo, acorta un enlace, traduce un texto. Los archivos se quedan en tu propio equipo y no se suben a ningún sitio donde no estuvieran ya."
         },
+        "analytics": {
+            "summary": "Quién visita los sitios que tienes aquí, sin aviso de cookies.",
+            "description": "Visitantes, páginas, referencias, países, dispositivos y eventos de cada sitio desplegado aquí y de Polaris, contados con el tráfico que ya llega a tu edge y, si quieres más, un pequeño script. Sin cookies y sin enviar nada fuera. Compara periodos, filtra por lo que sea, sigue una visita página a página, crea embudos y objetivos, y comparte un sitio con quien necesite sus cifras."
+        },
+        "telemetry": {
+            "summary": "Qué falló en tus apps y en Polaris, con la traza.",
+            "description": "Apunta cualquier SDK de Sentry a Polaris y cada excepción llega aquí, agrupada en incidencias con la traza, la versión, el entorno, el sistema operativo y el navegador donde ocurrió. Resuelve, ignora y comparte un proyecto con quien lo arregla. Los errores se quedan en tu servidor."
+        },
         "calendar": {
             "summary": "Tus calendarios y los que enlaces, con invitaciones y páginas de reserva.",
             "description": "Ten calendarios en Polaris y ve a su lado los de Google, Outlook, iCloud y cualquier CalDAV, sincronizados en ambos sentidos. Vistas de día, semana, mes, año y agenda, eventos que se repiten, recordatorios, invitaciones que se responden desde el correo, encontrar una hora que convenga a todos, compartir con personas y equipos, enlaces públicos y páginas de reserva para quien no está en Polaris."

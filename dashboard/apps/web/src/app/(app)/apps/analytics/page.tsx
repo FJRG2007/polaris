@@ -16,6 +16,7 @@
 import { AnalyticsView } from "./analytics-view";
 import { userHasManage } from "@/lib/session";
 import { requireAnalyticsReader } from "./reader";
+import { requireInstalledApp } from "@/lib/apps/require-installed";
 import { visitRangeSchema, type VisitRange } from "@polaris/core";
 import { isAnalyticsScope, type AnalyticsScope } from "./site-catalog";
 
@@ -28,6 +29,7 @@ export default async function AnalyticsPage({
 }) {
     const { scope, id, range } = await searchParams;
     const { user } = await requireAnalyticsReader();
+    await requireInstalledApp("analytics", user);
     const canOperate = await userHasManage(user, "system.manage");
 
     // An unknown scope in the URL is a stale link, not a 404. Polaris's own traffic is
