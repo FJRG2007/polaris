@@ -2840,6 +2840,13 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 ]
             },
             {
+                label: "Orchestration", // i18n-ignore
+                href: "/apps/agents/orchestration",
+                needs: "agents.read",
+                icon: Network,
+                keywords: ["runs", "tasks", "coordinator", "approve", "compare", "fan out", "needs you"]
+            },
+            {
                 label: "Runs", // i18n-ignore
                 href: "/apps/agents/runs",
                 needs: "agents.read",

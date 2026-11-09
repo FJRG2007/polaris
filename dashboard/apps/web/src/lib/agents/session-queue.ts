@@ -95,7 +95,9 @@ export async function queuePositions(
         where: { id: { in: queued } },
         select: { startedById: true }
     });
-    const accounts = [...new Set(own.map((row) => row.startedById))];
+    const accounts = [
+        ...new Set(own.map((row) => row.startedById).filter((id): id is string => id !== null))
+    ];
     const rows = await prisma.agentSession.findMany({
         where: { state: "queued", startedById: { in: accounts } },
         select: { id: true, startedById: true },

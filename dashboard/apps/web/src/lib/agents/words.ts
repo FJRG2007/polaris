@@ -69,6 +69,14 @@ export function agentWord(
  */
 const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
     "Cancelled before it started.": "text.queueCancelled",
+    "That task is not waiting on a decision.": "text.runGateGone",
+    "That question has been answered.": "text.runAnswered",
+    "No question with that id in this run.": "text.runAnswered",
+    "That task is not one of several variants.": "text.runNotVariant",
+    "The session ended before it reported.": "text.runSessionEnded",
+    "Rejected at its gate.": "text.runRejected",
+    "The run was cancelled.": "text.runCancelled",
+    "Polaris could not start a session for it.": "text.runNoSession",
     "Pick a repository": "text.pickRepository",
     "Not a repository name": "text.notRepository",
     "Pick a model": "text.pickModel",
@@ -188,6 +196,12 @@ const SHAPED: readonly (readonly [RegExp, NamespaceKey<"agents">, readonly strin
         "text.queueFull",
         ["count"]
     ],
+    [
+        /^You already have (\d+) runs going, which is as many as one account may have at once\. Finish or cancel one first\.$/,
+        "text.runsFull",
+        ["count"]
+    ],
+    [/^Pick between 2 and (\d+) agents to compare\.$/, "text.runVariants", ["max"]],
     [/^Polaris no longer knows an agent called (.+)\.$/, "text.unknownAgent", ["cli"]],
     [/^GitHub returned (\d+) starting the workflow$/, "text.githubStart", ["status"]],
     [/^GitHub returned (\d+) reading the repository$/, "text.githubRead", ["status"]],

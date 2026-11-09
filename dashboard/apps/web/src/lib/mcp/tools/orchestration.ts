@@ -51,6 +51,13 @@ const createInput = z.object({
         .default([])
         .describe("Ids of tasks in this run that must complete first."),
     agent: core.agentCliIdSchema.optional().describe("The agent to run it on. Default: the run's."),
+    compareAgents: z
+        .array(core.agentCliIdSchema)
+        .max(8)
+        .optional()
+        .describe(
+            "Two or more agents to run the same task on side by side; a person compares the results on the run's page and keeps one. Overrides agent."
+        ),
     gate: z
         .string()
         .trim()
@@ -73,6 +80,21 @@ const createTaskTool: McpTool<z.infer<typeof createInput>> = {
     destructive: false,
     async run(input, caller) {
         const run = await coordinatedRun(caller, input.runId);
+        if (input.compareAgents && input.compareAgents.length > 1) {
+            const ids = await refusing(() =>
+                orchestration.fanOut(
+                    run.id,
+                    {
+                        title: input.title,
+                        spec: input.spec,
+                        dependsOn: input.dependsOn,
+                        gateQuestion: input.gate || null
+                    },
+                    input.compareAgents!
+                )
+            );
+            return { text: `Created ${ids.length} variants: ${ids.join(", ")}.`, structured: { ids } };
+        }
         const [id] = await refusing(() =>
             orchestration.addTasks(run.id, [
                 {

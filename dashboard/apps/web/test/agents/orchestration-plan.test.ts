@@ -131,3 +131,40 @@ describe("runIsDone", () => {
         expect(plan.runIsDone([{ status: "blocked", blockedBy: "gate" }])).toBe(false);
     });
 });
+
+describe("needsYou", () => {
+    const base = {
+        runId: "r",
+        status: "pending",
+        blockedBy: null,
+        gateQuestion: null,
+        gateResolution: null,
+        groupId: null,
+        chosen: false
+    };
+
+    it("lists an unanswered gate, and not one somebody answered", () => {
+        const open = { ...base, id: "t1", title: "Ship", status: "blocked", blockedBy: "gate", gateQuestion: "Deploy?" };
+        const answered = { ...open, id: "t2", gateResolution: "approve" };
+        expect(plan.needsYou([open, answered], [])).toEqual([
+            { kind: "gate", runId: "r", taskId: "t1", title: "Ship", question: "Deploy?" }
+        ]);
+    });
+
+    it("asks to compare only once every variant has settled and none is kept", () => {
+        const a = { ...base, id: "a", title: "Fix (claude)", groupId: "g", status: "completed" };
+        const b = { ...base, id: "b", title: "Fix (codex)", groupId: "g", status: "dispatched" };
+        expect(plan.needsYou([a, b], [])).toEqual([]);
+        const settled = [a, { ...b, status: "failed" }];
+        expect(plan.needsYou(settled, [])).toEqual([
+            { kind: "compare", runId: "r", groupId: "g", title: "Fix", count: 2 }
+        ]);
+        expect(plan.needsYou([{ ...a, chosen: true }, { ...b, status: "completed" }], [])).toEqual([]);
+    });
+
+    it("passes questions through", () => {
+        expect(plan.needsYou([], [{ id: "m", runId: "r", taskId: null, body: "Which DB?" }])).toEqual([
+            { kind: "question", runId: "r", messageId: "m", taskId: null, body: "Which DB?" }
+        ]);
+    });
+});

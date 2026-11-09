@@ -203,3 +203,70 @@ export function coordinatorPreamble(run: {
         "A task with a gate waits for a person to approve it on the run's page."
     ].join("\n");
 }
+
+/** One thing in a run waiting on a person, for the needs-you queue. */
+export type NeedsYou =
+    | { kind: "gate"; runId: string; taskId: string; title: string; question: string }
+    | { kind: "question"; runId: string; messageId: string; taskId: string | null; body: string }
+    | { kind: "compare"; runId: string; groupId: string; title: string; count: number };
+
+/**
+ * What in these runs is waiting on a person: a gate nobody has answered, a
+ * question or escalation nobody has answered, and a set of variants that have
+ * all finished with none kept yet. Oldest first, so the queue reads in the
+ * order things started waiting.
+ */
+export function needsYou(
+    tasks: readonly {
+        id: string;
+        runId: string;
+        title: string;
+        status: string;
+        blockedBy: string | null;
+        gateQuestion: string | null;
+        gateResolution: string | null;
+        groupId: string | null;
+        chosen: boolean;
+    }[],
+    questions: readonly { id: string; runId: string; taskId: string | null; body: string }[]
+): NeedsYou[] {
+    const out: NeedsYou[] = [];
+    for (const task of tasks) {
+        if (task.status === "blocked" && task.blockedBy === "gate" && task.gateResolution === null) {
+            out.push({
+                kind: "gate",
+                runId: task.runId,
+                taskId: task.id,
+                title: task.title,
+                question: task.gateQuestion ?? ""
+            });
+        }
+    }
+    for (const question of questions) {
+        out.push({
+            kind: "question",
+            runId: question.runId,
+            messageId: question.id,
+            taskId: question.taskId,
+            body: question.body
+        });
+    }
+    const groups = new Map<string, typeof tasks>();
+    for (const task of tasks) {
+        if (!task.groupId) continue;
+        groups.set(task.groupId, [...(groups.get(task.groupId) ?? []), task]);
+    }
+    for (const [groupId, variants] of groups) {
+        const settled = variants.every((v) => v.status === "completed" || v.status === "failed");
+        const anyDone = variants.some((v) => v.status === "completed");
+        if (!settled || !anyDone || variants.some((v) => v.chosen)) continue;
+        out.push({
+            kind: "compare",
+            runId: variants[0]!.runId,
+            groupId,
+            title: variants[0]!.title.replace(/ \([^)]*\)$/, ""),
+            count: variants.length
+        });
+    }
+    return out;
+}

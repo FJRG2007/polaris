@@ -563,3 +563,108 @@ export function runTasks(runId: string) {
         take: plan.RUN_BOUNDS.maxTasks * plan.RUN_BOUNDS.maxVariants
     });
 }
+
+/** Whether this account owns the run. Every screen action checks it first. */
+export async function ownsRun(runId: string, ownerId: string): Promise<boolean> {
+    return (await prisma.agentOrchestrationRun.count({ where: { id: runId, ownerId } })) === 1;
+}
+
+/** How many runs the page shows. Older ones are history nobody is acting on. */
+const RUNS_SHOWN = 20;
+
+/**
+ * Everything the runs page draws, in a fixed number of reads: the latest runs
+ * with their tasks, the questions nobody has answered, and the sessions of this
+ * account that are waiting on it whether or not they belong to a run.
+ */
+export async function runsOverview(ownerId: string) {
+    const runs = await prisma.agentOrchestrationRun.findMany({
+        where: { ownerId },
+        orderBy: { createdAt: "desc" },
+        take: RUNS_SHOWN,
+        select: {
+            id: true,
+            objective: true,
+            status: true,
+            cli: true,
+            coordinatorSessionId: true,
+            createdAt: true,
+            finishedAt: true
+        }
+    });
+    const ids = runs.map((run) => run.id);
+    const [tasks, questions, waiting] = await Promise.all([
+        prisma.agentOrchestrationTask.findMany({
+            where: { runId: { in: ids } },
+            select: { ...TASK_SELECT, runId: true },
+            orderBy: { createdAt: "asc" },
+            take: ids.length * plan.RUN_BOUNDS.maxTasks * plan.RUN_BOUNDS.maxVariants
+        }),
+        prisma.agentOrchestrationMessage.findMany({
+            where: {
+                runId: { in: ids },
+                kind: { in: ["question", "escalation"] },
+                answeredAt: null
+            },
+            select: { id: true, runId: true, taskId: true, body: true, createdAt: true },
+            orderBy: { createdAt: "asc" },
+            take: 50
+        }),
+        prisma.agentSession.findMany({
+            where: { startedById: ownerId, state: "waiting" },
+            select: { id: true, title: true, detail: true },
+            orderBy: { updatedAt: "asc" },
+            take: 20
+        })
+    ]);
+    const sessionIds = tasks.map((task) => task.sessionId).filter((id): id is string => !!id);
+    const states = sessionIds.length
+        ? await prisma.agentSession.findMany({
+              where: { id: { in: sessionIds } },
+              select: { id: true, state: true }
+          })
+        : [];
+    const stateOf = new Map(states.map((row) => [row.id, row.state]));
+    return {
+        runs: runs.map((run) => ({
+            ...run,
+            createdAt: run.createdAt.toISOString(),
+            finishedAt: run.finishedAt?.toISOString() ?? null,
+            tasks: tasks
+                .filter((task) => task.runId === run.id)
+                .map((task) => ({
+                    id: task.id,
+                    title: task.title,
+                    status: task.status,
+                    blockedBy: task.blockedBy,
+                    dependsOn: task.dependsOn,
+                    depth: task.depth,
+                    cli: task.cli,
+                    sessionId: task.sessionId,
+                    sessionState: task.sessionId ? (stateOf.get(task.sessionId) ?? null) : null,
+                    result: task.result,
+                    groupId: task.groupId,
+                    chosen: task.chosen,
+                    gateQuestion: task.gateQuestion
+                }))
+        })),
+        needs: plan.needsYou(
+            tasks.map((task) => ({ ...task, runId: task.runId })),
+            questions
+        ),
+        waiting
+    };
+}
+
+export type RunsOverview = Awaited<ReturnType<typeof runsOverview>>;
+
+/** The variants of one fan-out, for the compare screen. */
+export async function variantGroup(groupId: string, ownerId: string) {
+    const tasks = await prisma.agentOrchestrationTask.findMany({
+        where: { groupId, run: { ownerId } },
+        select: { id: true, runId: true, title: true, cli: true, status: true, sessionId: true, chosen: true, result: true },
+        orderBy: { createdAt: "asc" },
+        take: plan.RUN_BOUNDS.maxVariants
+    });
+    return tasks;
+}
