@@ -185,7 +185,7 @@ export function ImagesView() {
                     {t("images.drop")}
                 </button>
             ) : (
-                <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_18rem]">
                     <div className="flex min-w-0 flex-col gap-3">
                         <div className="relative flex min-h-56 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface/40 p-2">
                             {made ? (

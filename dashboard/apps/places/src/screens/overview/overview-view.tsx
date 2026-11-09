@@ -213,7 +213,7 @@ export function OverviewView({
                         {t("placeOverview.rooms.title")}
                     </h2>
                     {rooms === null ? (
-                        <div className="grid gap-3 sm:grid-cols-2" aria-busy="true">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-busy="true">
                             <RoomSkeleton />
                             <RoomSkeleton />
                         </div>
@@ -237,7 +237,7 @@ export function OverviewView({
                             ) : null}
                         </Card>
                     ) : (
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             {rooms.map((room) => (
                                 <RoomCard
                                     key={room.name || "unplaced"}

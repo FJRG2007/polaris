@@ -127,7 +127,7 @@ export function UpsSettingsPanel({
                 <h3 id="ups-settings-energy" className="text-sm font-medium">
                     {t("ups.settings.energy")}
                 </h3>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <label className="flex min-w-0 flex-col gap-1 text-sm">
                         {t("ups.settings.currency")} *
                         <Input
@@ -166,7 +166,7 @@ export function UpsSettingsPanel({
                     {t("ups.settings.notify")}
                 </h3>
                 <p className="text-sm text-muted-foreground">{t("ups.settings.notifyIntro")}</p>
-                <div className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
                     {upsEvents.UPS_EVENT_KINDS.map((kind) => (
                         <label key={kind} className="flex min-w-0 items-center gap-2 text-sm">
                             <Checkbox

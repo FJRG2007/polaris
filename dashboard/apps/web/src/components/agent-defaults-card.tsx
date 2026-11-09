@@ -192,7 +192,7 @@ export function AgentDefaultsCard({
                     {t("defaultsCard.intro", { from: inheritedFrom })}
                 </p>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Field label={t("defaultsCard.publicRepos")}>
                         <BoolSelect
                             value={tier.publicRepos}
@@ -250,7 +250,7 @@ export function AgentDefaultsCard({
                     />
                 </Field>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     {/* The rest of Enigma. The gate above is the field with a
                         minutes-per-run cost on it and keeps its own place; these
                         two are what an operator changes when they are debugging
@@ -298,7 +298,7 @@ export function AgentDefaultsCard({
                     </Field>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Field label={t("repos.runsOn")}>
                         <Select
                             value={tier.execution ?? INHERIT}

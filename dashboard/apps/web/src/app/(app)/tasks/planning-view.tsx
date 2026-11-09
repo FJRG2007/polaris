@@ -439,7 +439,7 @@ export function GoalsView({
                 />
             )}
 
-            <ul className="grid gap-3 md:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {goals.map((goal) => (
                     <li key={goal.id}>
                         <Card>

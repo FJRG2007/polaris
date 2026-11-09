@@ -769,7 +769,7 @@ function Legend() {
         { key: "task", style: { border: `1px solid ${sample}`, borderLeftWidth: 3 } }
     ];
     return (
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {rows.map((row) => (
                 <li key={row.key} className="flex min-w-0 items-center gap-3">
                     <span

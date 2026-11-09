@@ -12,15 +12,15 @@
 import Link from "next/link";
 import { Fragment } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle, cn } from "@polaris/ui";
 import { factText, type EvidenceFact, type EvidenceSection } from "@/lib/compliance/evidence";
 
 /** A value, with the flag that says it is worth a second look. */
 function FactValue({ fact, formatDate }: { fact: EvidenceFact; formatDate: (iso: string) => string }) {
     const t = useTranslations("admin");
     return (
-        <span className="inline-flex flex-wrap items-center gap-1.5">
-            <span className={fact.attention ? "text-warning-ink" : undefined}>{factText(fact, formatDate)}</span>
+        <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
+            <span className={cn("min-w-0 [overflow-wrap:anywhere]", fact.attention && "text-warning-ink")}>{factText(fact, formatDate)}</span>
             {fact.attention ? <Badge variant="warning">{t("evidence.review")}</Badge> : null}
         </span>
     );

@@ -466,7 +466,7 @@ function CronForm({
                         </button>
                     ))}
                 </div>
-                <div className="grid gap-2 sm:grid-cols-[1fr_12rem]">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_12rem]">
                     <Input
                         value={draft.schedule}
                         onChange={(event) => set("schedule", event.target.value)}
@@ -515,7 +515,7 @@ function CronForm({
                     <span className="text-xs text-muted-foreground">{t("cron.commandHint")}</span>
                 )}
             </label>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <NumberField
                     label={t("cron.timeout")}
                     value={draft.timeoutSeconds}

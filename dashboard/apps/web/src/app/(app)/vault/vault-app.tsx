@@ -547,7 +547,7 @@ export function VaultApp() {
                 stays put beside it. Searching and filtering belong over the list
                 they narrow rather than over the whole screen, since neither has
                 anything to do with the item on the right. */}
-            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
                 <Card className="lg:sticky lg:top-4">
                     <CardBody className="flex flex-col gap-2 p-2">
                         <div className="relative">

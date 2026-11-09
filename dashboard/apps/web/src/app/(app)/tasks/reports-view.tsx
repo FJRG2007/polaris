@@ -119,7 +119,7 @@ export function ReportsView({
                 </CardBody>
             </Card>
 
-            <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 <Card>
                     <CardBody className="flex flex-col gap-3 p-4">
                         <h2 className="text-sm font-medium">{t("reports.completed30")}</h2>

@@ -196,7 +196,7 @@ function UsageSkeleton() {
                 ))}
             </div>
             <Skeleton className="h-40 w-full rounded-lg" />
-            <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
                 <Skeleton className="h-48 w-full rounded-lg" />
                 <Skeleton className="h-48 w-full rounded-lg" />
             </div>
@@ -271,7 +271,7 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
 
             <CallsChart usage={usage} />
 
-            <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
                 <section className="flex min-w-0 flex-col gap-2">
                     <h2 className="text-sm font-semibold">{t("apiKeys.usage.byRoute")}</h2>
                     <div className="overflow-x-auto rounded-lg border border-border">

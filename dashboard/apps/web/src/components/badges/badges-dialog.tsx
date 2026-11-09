@@ -267,7 +267,7 @@ export function BadgesDialog({
                     <DialogTitle>{t("yourBadges")}</DialogTitle>
                     <DialogDescription>{t("pickOne")}</DialogDescription>
                 </DialogHeader>
-                <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
+                <div className="grid grid-cols-1 min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
                     <div className="flex max-h-[60vh] min-w-0 flex-col gap-3 overflow-y-auto overscroll-contain">
                         <section className="flex flex-col gap-1">
                             <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">

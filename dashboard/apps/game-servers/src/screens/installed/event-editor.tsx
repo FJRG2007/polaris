@@ -1305,7 +1305,7 @@ export function EventEditor({
                         <DialogTitle>{kindLabel(t, draft.kind)}</DialogTitle>
                         <DialogDescription>{kindSummary(t, draft.kind)}</DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_8rem]">
                         <Field
                             label={t("editor.name")}
                             hint={t("editor.whatPlayersSeeInTitles")}
@@ -1414,7 +1414,7 @@ export function EventEditor({
                             <p className="text-xs text-muted-foreground">
                                 {t("editor.givenWhenItEndsAnybody")}
                             </p>
-                            <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                 <RewardEditor
                                     label={t("editor.firstPlace")}
                                     hint={t("editor.tiesShareAPlace")}

@@ -167,7 +167,7 @@ export function LimitsFields({
                     </label>
                     {value.limited ? (
                         <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
-                            <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <Field label={t("share.fromDay")} htmlFor={id("from-day")}>
                                     <DateInput
                                         mode="date"
@@ -208,7 +208,7 @@ export function LimitsFields({
                                 days={value.days}
                                 onChange={(days) => set({ days })}
                             />
-                            <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <Field label={t("share.fromHour")} htmlFor={id("from-hour")}>
                                     <DateInput
                                         mode="time"

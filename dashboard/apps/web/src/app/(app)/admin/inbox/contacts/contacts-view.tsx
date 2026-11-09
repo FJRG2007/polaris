@@ -169,7 +169,7 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
                 </Card>
             )}
 
-            <div className="grid min-h-0 gap-4 lg:grid-cols-[20rem_1fr]">
+            <div className="grid grid-cols-1 min-h-0 gap-4 lg:grid-cols-[20rem_1fr]">
                 <Card className="flex max-h-[calc(100dvh-16rem-var(--notice-height))] flex-col overflow-hidden">
                     <div className="border-b border-border p-2">
                         <div className="flex items-center gap-2 rounded-md border border-border px-2">
@@ -329,7 +329,7 @@ function ContactDetail({
                     </Button>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("inbox.connect.name")}</span>
                         <Input value={name} onChange={(event) => setName(event.target.value)} />

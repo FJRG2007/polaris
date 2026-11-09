@@ -64,7 +64,7 @@ export function LineCharts({ admin }: { admin: boolean }) {
                         {t("connectivity.line.description")}
                     </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
                     {report?.now ? <LineNow now={report.now} /> : null}
                     <SegmentedControl
                         aria-label={t("connectivity.line.range")}

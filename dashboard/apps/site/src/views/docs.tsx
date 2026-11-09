@@ -136,7 +136,7 @@ export function DocsIndexView({ locale }: { locale: SiteLocale }) {
             {docSections(locale).map((section) => (
                 <section key={section.label} className="flex flex-col gap-3">
                     <h2 className="text-lg font-semibold tracking-tight">{section.label}</h2>
-                    <ul className="grid gap-3 sm:grid-cols-2">
+                    <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {section.slugs.map((slug) => {
                             const page = pages.get(slug);
                             return page ? (
@@ -300,7 +300,7 @@ export function DocView({ locale, page }: { locale: SiteLocale; page: DocPage })
                     {t.source}
                 </a>
                 {previous || next ? (
-                    <nav className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
+                    <nav className="grid grid-cols-1 gap-3 border-t border-border pt-4 sm:grid-cols-2">
                         {previous ? (
                             <Neighbor locale={locale} slug={previous} label={t.previous} />
                         ) : null}

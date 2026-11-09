@@ -193,7 +193,7 @@ export function SecurityView({
                 </Card>
             ) : null}
 
-            <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-start">
                 <div className="flex flex-col gap-4">
                     <SettingCard
                         title={t("view.password.title")}
@@ -334,7 +334,7 @@ export function SecurityView({
                                 <h2 className="text-sm font-medium">{t("view.limits.title")}</h2>
                                 <p className="text-xs text-muted-foreground">{t("view.limits.description")}</p>
                             </div>
-                            <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
                                     {t("view.limits.idleLock")}
                                     <Select

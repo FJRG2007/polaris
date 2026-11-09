@@ -522,7 +522,7 @@ export function NodeFields({
         case "core.chat":
             return (
                 <div className="space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field label={t("fields.preset")}>
                             <Select
                                 value={config.preset}
@@ -554,7 +554,7 @@ export function NodeFields({
                             onChange={(event) => set({ text: event.target.value })}
                         />
                     </Field>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field label={t("fields.link")}>
                             <RefInput
                                 value={config.link ?? ""}
@@ -583,7 +583,7 @@ export function NodeFields({
             const body = (config.body ?? { kind: "none" }) as Config;
             return (
                 <div className="space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[8rem_1fr]">
                         <Field label={t("fields.method")}>
                             <Select
                                 value={config.method}
@@ -625,7 +625,7 @@ export function NodeFields({
                             onChange={(event) => set({ url: event.target.value })}
                         />
                     )}
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field label={t("fields.auth")}>
                             <Select
                                 value={auth.kind}
@@ -717,7 +717,7 @@ export function NodeFields({
                             ) : null}
                         </>
                     ) : null}
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field label={t("fields.timeout")}>
                             <Input
                                 type="number"

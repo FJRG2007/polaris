@@ -229,7 +229,7 @@ export function ZonesDialog({
                     <DialogDescription>{t("zones.intro")}</DialogDescription>
                 </DialogHeader>
 
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_20rem]">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_20rem]">
                     <div className="flex flex-col gap-2">
                         <div
                             ref={frameRef}

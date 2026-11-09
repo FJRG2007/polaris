@@ -473,7 +473,7 @@ export function PolarToggle() {
             aria-pressed={open}
             title={t("toggle.title", { keys: shortcut("Mod+J") })}
             onClick={() => setOpen(!open)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground transition-colors duration-fast hover:bg-card-hover hover:text-foreground aria-pressed:bg-card-hover aria-pressed:text-foreground"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm text-muted-foreground transition-colors duration-fast hover:bg-card-hover sm:px-2 hover:text-foreground aria-pressed:bg-card-hover aria-pressed:text-foreground"
         >
             <PolarAvatar size={20} state={avatarStateFor({ open, online, busy: false })} />
             <span className="hidden lg:inline">{t("toggle.label")}</span>

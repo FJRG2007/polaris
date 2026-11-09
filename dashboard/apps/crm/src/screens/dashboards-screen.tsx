@@ -208,7 +208,7 @@ export function DashboardsScreen() {
         );
     } else if (!data) {
         body = (
-            <div className="grid gap-3 md:grid-cols-2" aria-busy="true">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2" aria-busy="true">
                 {[0, 1, 2, 3].map((index) => (
                     <div key={index} className="h-48 rounded-lg border border-border bg-card p-4">
                         <Block className="h-4 w-32" />
@@ -251,7 +251,7 @@ export function DashboardsScreen() {
         );
     } else {
         body = (
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {current.widgets.map((widget, index) => (
                     <WidgetCard
                         key={widget.id}

@@ -150,7 +150,7 @@ export function ThresholdFields({
         <div className="space-y-3">
             <p className="text-xs text-muted-foreground">{t("nodeHints.threshold")}</p>
             {error ? <p className="text-xs text-danger-ink">{error}</p> : null}
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Labeled label={t("threshold.watch")} state={kindId ? "ok" : "required"} invalid="">
                     <Select
                         value={kindId}
@@ -207,7 +207,7 @@ export function ThresholdFields({
                     aria-label={t("threshold.reading")}
                 />
             </Labeled>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Labeled label={t("threshold.comparison")} state={states.comparator} invalid="">
                     <Select
                         value={typeof config.comparator === "string" ? config.comparator : "gt"}

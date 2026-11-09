@@ -200,7 +200,7 @@ function ContainerNow({ card }: { card: WatchCard }) {
     const t = useTranslations("servers");
     const none = t("machines.notMeasured");
     return (
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <Reading label={t("machines.status")} value={card.stateLabel} />
             <Reading
                 label={t("machines.cpu")}
@@ -219,7 +219,7 @@ function DomainNow({ domain }: { domain: DomainDevice }) {
     const display = useDisplayFormat();
     const none = t("machines.unknown");
     return (
-        <div className="grid gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
             <Reading
                 label={t("machines.status")}
                 value={t(`machines.${domain.status ?? "unknown"}`)}

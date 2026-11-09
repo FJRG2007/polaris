@@ -358,7 +358,7 @@ export function MinecraftXray({
                         <Skeleton className="h-24 w-full" />
                     ) : !loaded ? null : (
                         <>
-                            <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="font-medium">
                                         {t("xray.honeypotsAroundEachPlayer")}
@@ -428,7 +428,7 @@ export function MinecraftXray({
                             )}
 
                             {draft.action === "warn-and-ban" && (
-                                <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <label className="flex flex-col gap-1 text-sm">
                                         <span className="font-medium">
                                             {t("xray.banAfterThisManyHoneypots")}

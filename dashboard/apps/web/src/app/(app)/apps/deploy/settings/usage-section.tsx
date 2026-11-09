@@ -75,7 +75,7 @@ export function UsageSection({ projectId }: { projectId: string }) {
                     </div>
                 ) : (
                     <>
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <Stat label={t("usage.services")} value={String(usage?.totals.services ?? 0)} hint={t("usage.running", { count: usage?.totals.running ?? 0 })} />
                             <Stat
                                 label={t("usage.cpu")}

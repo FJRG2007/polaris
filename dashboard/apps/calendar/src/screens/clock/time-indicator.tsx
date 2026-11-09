@@ -67,10 +67,10 @@ export function TimeIndicator() {
         pill = (
             <Link
                 href="/calendar/time?tab=timers"
-                className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-surface px-2 text-[0.8125rem] font-medium tabular-nums text-foreground transition-colors hover:bg-muted"
+                className="flex h-8 items-center gap-1.5 rounded-md px-1.5 text-[0.8125rem] font-medium tabular-nums text-primary transition-colors hover:bg-muted sm:h-9 sm:border sm:border-border sm:bg-surface sm:px-2 sm:text-foreground"
                 title={label}
             >
-                <Timer aria-hidden className="size-4 shrink-0 text-primary" />
+                <Timer aria-hidden className="hidden size-4 shrink-0 text-primary sm:block" />
                 <span>{model.formatCountdown(left)}</span>
                 {running.length > 1 ? (
                     <span className="rounded bg-muted px-1 text-[0.6875rem] text-muted-foreground">
@@ -85,10 +85,10 @@ export function TimeIndicator() {
         pill = (
             <Link
                 href="/calendar/time?tab=stopwatch"
-                className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-surface px-2 text-[0.8125rem] font-medium tabular-nums text-foreground transition-colors hover:bg-muted"
+                className="flex h-8 items-center gap-1.5 rounded-md px-1.5 text-[0.8125rem] font-medium tabular-nums text-primary transition-colors hover:bg-muted sm:h-9 sm:border sm:border-border sm:bg-surface sm:px-2 sm:text-foreground"
                 title={label}
             >
-                <Watch aria-hidden className="size-4 shrink-0 text-primary" />
+                <Watch aria-hidden className="hidden size-4 shrink-0 text-primary sm:block" />
                 <span>{reading}</span>
             </Link>
         );

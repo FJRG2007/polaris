@@ -123,7 +123,7 @@ export function MinecraftSeasonal({
                 </div>
                 {status && <p className="text-xs text-muted-foreground">{status}</p>}
                 {view && view.on && !view.blocked && (
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <MobChoice
                             id={`${installedAppId}-night-spawns`}
                             label={t("seasonal.nightSpawns")}
@@ -252,7 +252,7 @@ function WinterChoices({
                 <p className="text-sm font-medium">{t("seasonal.winterTitle")}</p>
                 <p className="text-xs text-muted-foreground">{t("seasonal.winterHint")}</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {winter.WINTER_AMOUNTS.map((key) => (
                     <MobChoice
                         key={key}
@@ -268,7 +268,7 @@ function WinterChoices({
                     />
                 ))}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {winter.WINTER_SWITCHES.map((key) => (
                     <div key={key} className="flex items-start justify-between gap-3">
                         <div className="min-w-0">

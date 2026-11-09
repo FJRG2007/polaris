@@ -152,7 +152,7 @@ export function KeepCommandDialog({
                         })}
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
+                <div className="grid grid-cols-1 min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
                     <div className="flex min-w-0 flex-col gap-3">
                         <label className="flex flex-col gap-1">
                             <span className="text-sm font-medium">{t("console.command")}</span>

@@ -352,7 +352,7 @@ export function LoginForm({
                 </CardHeader>
                 {/* The QR sits beside the form from the `sm` breakpoint up, and is
                     left out below it - a phone cannot scan its own screen. */}
-                <CardBody className="grid gap-6 sm:grid-cols-2">
+                <CardBody className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div className="min-w-0">
                         {chooser.length > 0 ? <AccountChooser accounts={chooser} /> : null}
                         {add?.full ? (

@@ -21,7 +21,7 @@ export function AgentsOverview({ repos, runs }: { repos: AgentRepoView[]; runs: 
     if (repos.length === 0) return <Empty />;
 
     return (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>
                 <CardHeader>
                     <CardTitle>{t("overview.repositories")}</CardTitle>

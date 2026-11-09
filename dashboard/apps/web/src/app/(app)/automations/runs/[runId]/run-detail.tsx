@@ -81,7 +81,7 @@ export function RunDetailView({ runId }: { runId: string }) {
             ) : !run ? (
                 <>
                     <Skeleton className="h-7 w-64" />
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
                         <Skeleton className="h-[28rem] w-full" />
                         <RowsSkeleton rows={5} />
                     </div>
@@ -217,7 +217,7 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
             <div className="flex flex-col gap-4">
                 {run.error ? <p className="text-sm text-danger">{words(run.error)}</p> : null}
                 {run.canSeeData && run.episode ? <AlarmEpisodeCard episode={run.episode} /> : null}
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
                     <div className="h-[60vh] min-h-[22rem] min-w-0">
                         {graph ? (
                             <CanvasBoard

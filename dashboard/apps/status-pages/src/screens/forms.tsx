@@ -530,7 +530,7 @@ export function CheckDialog({
                         )}
                     </Field>
                     {values.kind === "http" ? (
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <Field
                                 label={t("check.expectStatus")}
                                 error={errors.expectStatus}
@@ -584,7 +584,7 @@ export function CheckDialog({
                         </Field>
                     ) : null}
                     {values.kind === "dns" ? (
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <Field label={t("check.dnsType")} required>
                                 {(id) => (
                                     <Select
@@ -614,7 +614,7 @@ export function CheckDialog({
                             </Field>
                         </div>
                     ) : null}
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field
                             label={t("check.interval")}
                             required
@@ -767,7 +767,7 @@ export function IncidentDialog({
                             />
                         )}
                     </Field>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field label={t("incident.impact")} required>
                             {(id) => (
                                 <Select
@@ -976,7 +976,7 @@ export function MaintenanceDialog({
                             />
                         )}
                     </Field>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field label={t("maintenance.starts")} required>
                             {(id) => (
                                 <DateInput

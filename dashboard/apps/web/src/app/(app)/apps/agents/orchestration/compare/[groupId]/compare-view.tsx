@@ -53,7 +53,7 @@ export function CompareView({ variants }: { variants: Variant[] }) {
                 {t("orchestration.back")}
             </Link>
             {error ? <p className="text-sm text-danger">{error}</p> : null}
-            <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
                 {variants.map((variant) => (
                     <Card key={variant.id} className={variant.chosen ? "ring-1 ring-success" : ""}>
                         <CardBody className="min-w-0 space-y-3">

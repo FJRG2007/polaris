@@ -132,7 +132,7 @@ export function FeedForm({
                     onBlur={() => setTouched((held) => ({ ...held, url: true }))}
                 />
             </FieldRow>
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
                 <FieldRow
                     label={`${t("accounts.feed.name")} *`}
                     htmlFor={`${id}-name`}
@@ -277,7 +277,7 @@ export function CalDavForm({ onAdded }: { onAdded: () => void }) {
 
     return (
         <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3" noValidate>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <FieldRow label={t("accounts.caldav.service")}>
                     <Select
                         value={preset}
@@ -309,7 +309,7 @@ export function CalDavForm({ onAdded }: { onAdded: () => void }) {
                     </FieldRow>
                 ) : null}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <FieldRow
                     label={`${t("accounts.caldav.username")} *`}
                     htmlFor={`${id}-user`}

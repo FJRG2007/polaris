@@ -509,7 +509,7 @@ export function PlaceTargetField<T extends AreaBlock>({
                 />
             )}
             {value && (
-                <div className="grid min-w-0 gap-3 sm:col-span-2 sm:grid-cols-2">
+                <div className="grid grid-cols-1 min-w-0 gap-3 sm:col-span-2 sm:grid-cols-2">
                     <Field label={t("automations.fields.alsoArea")} path={[...path, "targets"]}>
                         {(fieldId) => (
                             <div className="grid min-w-0 gap-1.5">

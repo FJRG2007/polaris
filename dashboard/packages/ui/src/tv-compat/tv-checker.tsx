@@ -118,7 +118,7 @@ function TierBadge({ tier }: { tier: tv.TvTier }) {
 function TierCards() {
     const t = useTranslations("tvCompat");
     return (
-        <ul className="grid gap-3 sm:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {tv.TV_TIERS.map((tier) => (
                 <li
                     key={tier}
@@ -189,7 +189,7 @@ export function TvMissing({ links }: { links: Links }) {
                 {t("missing.title")}
             </h3>
             <p className="text-sm text-muted-foreground">{t("missing.intro")}</p>
-            <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
+            <div className="grid grid-cols-1 min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
                 <label className="flex min-w-0 flex-col gap-1 text-sm">
                     {t("missing.platform")}
                     <Select
@@ -327,7 +327,7 @@ export function TvChecker({
                     {t("search.count", { count: found.length })}
                 </p>
                 {found.length ? (
-                    <ul className="grid min-w-0 gap-2 lg:grid-cols-2">
+                    <ul className="grid grid-cols-1 min-w-0 gap-2 lg:grid-cols-2">
                         {found.slice(0, shown).map((model) => (
                             <ModelRow key={model.id} model={model} links={links} />
                         ))}

@@ -350,7 +350,7 @@ export function RunCommandDialog({
                             {/* Each column is its choice and the fields that choice
                                 asks for, so on a phone they read top to bottom in
                                 the order they are answered. */}
-                            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 min-w-0 gap-3 sm:grid-cols-2">
                                 <div className="flex min-w-0 flex-col gap-2">
                                     <div className="flex min-w-0 flex-col gap-1">
                                         <span className="text-sm font-medium">

@@ -185,7 +185,7 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                 </p>
             ) : null}
 
-            <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <div className="grid grid-cols-1 min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
                 <ui.Card className="min-w-0 p-3">
                     <WorldMap
                         places={places}

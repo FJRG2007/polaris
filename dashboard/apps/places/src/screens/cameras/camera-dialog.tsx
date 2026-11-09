@@ -640,7 +640,7 @@ export function CameraDialog({
                                 })}
                             </p>
                         ) : null}
-                        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
                             <Field label={t("dialog.address")} required>
                                 <Input
                                     value={form.address}
@@ -670,7 +670,7 @@ export function CameraDialog({
                                 failed={t("network.failed")}
                             />
                         ) : null}
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             {usesRtsp ? (
                                 <Field label={t("dialog.account")}>
                                     <Input
@@ -777,7 +777,7 @@ export function CameraDialog({
                             </div>
                         )}
                         {usesRtsp ? (
-                            <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <Field label={t("dialog.mainPath")} hint={t("dialog.mainPathHint")}>
                                     <Input
                                         value={form.mainPath}

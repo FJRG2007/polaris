@@ -84,7 +84,7 @@ export function TimersPanel({
 
     return (
         <section aria-label={t("time.tabs.timers")} className="flex flex-col gap-4">
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <NewTimer disabled={full} recent={recent} onCreate={create} />
                 <FocusCard
                     key={JSON.stringify(pomodoro)}
@@ -116,7 +116,7 @@ export function TimersPanel({
                         </Button>
                     </div>
                 ) : (
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-hidden>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-hidden>
                         {[0, 1].map((index) => (
                             <Skeleton key={index} className="h-40 w-full" />
                         ))}
@@ -129,7 +129,7 @@ export function TimersPanel({
                     description={t("time.timers.emptyBody")}
                 />
             ) : (
-                <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {timers.map((timer) => (
                         <TimerCard
                             key={timer.id}
@@ -442,7 +442,7 @@ function NewTimer({
                     </Button>
                 ))}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-1 text-[0.8125rem]">
                     <span>{t("time.label")}</span>
                     <Input

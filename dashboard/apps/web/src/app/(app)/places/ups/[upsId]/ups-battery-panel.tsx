@@ -244,7 +244,7 @@ export function UpsBatteryPanel({
                 ) : charts.empty ? (
                     <p className="text-sm text-muted-foreground">{t("ups.chart.empty")}</p>
                 ) : (
-                    <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                         <MultiSeriesChart
                             label={t("ups.chart.runtime")}
                             series={charts.runtime}

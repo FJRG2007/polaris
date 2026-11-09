@@ -194,7 +194,7 @@ export function ConditionEditor({
                 ) : (
                     <div
                         key={index}
-                        className="grid min-w-0 gap-2 sm:grid-cols-[1fr_10rem_1fr_auto]"
+                        className="grid grid-cols-1 min-w-0 gap-2 sm:grid-cols-[1fr_10rem_1fr_auto]"
                     >
                         <RefInput
                             aria-label={t("fields.left")}
@@ -291,7 +291,7 @@ function Pairs({
         <div className="space-y-2" role="group" aria-label={label}>
             <p className="text-sm">{label}</p>
             {value.map((pair, index) => (
-                <div key={index} className="grid min-w-0 gap-2 sm:grid-cols-[12rem_1fr_auto]">
+                <div key={index} className="grid grid-cols-1 min-w-0 gap-2 sm:grid-cols-[12rem_1fr_auto]">
                     <Input
                         aria-label={t("flow.valueName")}
                         placeholder={t("flow.valueName")}
@@ -345,7 +345,7 @@ function Duration({
         { value: "days", label: t("fields.days") }
     ];
     return (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <NumberInput
                 label={label}
                 value={value.amount}
@@ -458,7 +458,7 @@ export function FlowNodeFields({
                     {inputs.map((input, index) => (
                         <div
                             key={index}
-                            className="grid min-w-0 gap-2 sm:grid-cols-[1fr_9rem_auto_auto]"
+                            className="grid grid-cols-1 min-w-0 gap-2 sm:grid-cols-[1fr_9rem_auto_auto]"
                         >
                             <Input
                                 aria-label={t("flow.valueName")}
@@ -1096,7 +1096,7 @@ export function FailureFields({
                 {t("flow.retry")}
             </label>
             {retry ? (
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <NumberInput
                         label={t("flow.tries")}
                         value={retry.tries}
@@ -1148,7 +1148,7 @@ export function WhenFields({
     const minutes = when.kind === "any" ? 5 : Math.max(1, Math.round(when.windowSeconds / 60));
     const windowSeconds = (value: number) => value * 60;
     return (
-        <fieldset disabled={readOnly} className="grid gap-2 sm:grid-cols-3">
+        <fieldset disabled={readOnly} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <Field label={t("flow.combine")}>
                 <Select
                     value={when.kind}

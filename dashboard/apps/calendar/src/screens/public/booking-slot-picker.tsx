@@ -144,7 +144,7 @@ export function SlotPicker({
                 ) : null}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                         <span className="inline-block font-medium first-letter:uppercase">

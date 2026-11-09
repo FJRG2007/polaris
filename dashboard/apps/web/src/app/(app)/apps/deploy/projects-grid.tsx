@@ -315,7 +315,7 @@ export function ProjectsGrid({
                     {t("projects.noMatch", { search })}
                 </p>
             ) : layout === "grid" ? (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {filtered.map((project) => (
                         <ProjectMenu
                             key={project.id}

@@ -192,7 +192,7 @@ function ProviderForm({
                 <CardTitle>{provider ? provider.name : t("sso.form.newTitle")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field
                         label={`${t("sso.form.name")} *`}
                         error={touched(draft.name) ? issueFor("name") : null}
@@ -302,7 +302,7 @@ function ProviderForm({
                 )}
                 <div className="flex flex-col gap-2">
                     <span className="text-sm font-medium">{t("sso.form.mapping")}</span>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field
                             label={`${t("sso.form.mapEmail")} *`}
                             error={touched(draft.email) ? issueFor("mapping.email") : null}
@@ -453,7 +453,7 @@ function ProviderCard({
                     <div className="flex flex-col gap-2">
                         <p className="text-sm">{t("sso.card.recordsIntro")}</p>
                         {provider.records.map((record) => (
-                            <div key={record.name} className="grid gap-2 sm:grid-cols-2">
+                            <div key={record.name} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                 <Copyable label={t("sso.card.recordName")} value={record.name} />
                                 <Copyable label={t("sso.card.recordValue")} value={record.value} />
                             </div>

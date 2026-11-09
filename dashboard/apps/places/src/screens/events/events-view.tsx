@@ -395,7 +395,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                 />
             ) : (
                 <>
-                    <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         {events.map((event) => (
                             <li
                                 key={event.id}
@@ -605,7 +605,7 @@ function MomentDialog({
 
 function FeedSkeleton() {
     return (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((index) => (
                 <div
                     key={index}

@@ -102,7 +102,7 @@ export async function IdentityCard({ userId }: { userId: string }) {
                     <Avatar person={{ id: userId, name: user.name }} size={72} status={false} />
                 </div>
 
-                <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 min-w-0 flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <Fact label={t("usersDetail.identity.name")}>{user.name}</Fact>
                     {fullName && fullName !== user.name && (
                         <Fact label={t("usersDetail.identity.fullName")}>{fullName}</Fact>

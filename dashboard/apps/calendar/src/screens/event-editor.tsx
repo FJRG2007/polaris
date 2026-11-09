@@ -597,7 +597,7 @@ function EditForm({
                 onChange={(event) => set({ summary: event.target.value })}
             />
 
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
                 <div className="flex min-w-0 flex-col gap-4">
                     <section className="flex flex-col gap-2" aria-labelledby={`${ids}-when`}>
                         <GroupHeading>
@@ -629,7 +629,7 @@ function EditForm({
                                 </Button>
                             ) : null}
                         </div>
-                        <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                             <FieldRow
                                 label={t("editor.starts")}
                                 htmlFor={`${ids}-start`}

@@ -149,7 +149,7 @@ export function DnsRecordDialog({
                         save();
                     }}
                 >
-                    <div className="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
                         <FormField label={t("dialog.type")}>
                             <Select
                                 value={type}
@@ -191,7 +191,7 @@ export function DnsRecordDialog({
                     )}
 
                     {(type === "MX" || type === "SRV") && (
-                        <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                             {numberField("priority", t("dialog.priority"))}
                             {type === "SRV" && numberField("weight", t("dialog.weight"))}
                             {type === "SRV" && numberField("port", t("dialog.port"))}
@@ -199,7 +199,7 @@ export function DnsRecordDialog({
                     )}
 
                     {type === "CAA" && (
-                        <div className="grid gap-3 sm:grid-cols-[5rem_8rem_minmax(0,1fr)]">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[5rem_8rem_minmax(0,1fr)]">
                             {numberField("flags", t("dialog.flags"))}
                             <FormField label={t("dialog.tag")} problem={shown("tag")}>
                                 <Select
@@ -215,7 +215,7 @@ export function DnsRecordDialog({
                         </div>
                     )}
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <FormField label={t("dialog.ttl")} problem={shown("ttl")}>
                             <Select
                                 value={draft.proxied && proxiable ? String(dns.TTL_AUTO) : draft.ttl}

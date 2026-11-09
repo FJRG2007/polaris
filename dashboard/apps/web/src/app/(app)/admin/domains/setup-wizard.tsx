@@ -246,7 +246,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                             <Skeleton className="h-4 w-56" />
                             <Skeleton className="h-3 w-4/5" />
                         </div>
-                        <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                             {ENVIRONMENT_CHOICES.map((option) => (
                                 <Skeleton key={option} className="h-16" />
                             ))}
@@ -494,7 +494,7 @@ function EnvironmentStep({
                         : t("domainsSetup.environment.hint")
                 }
             />
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {ENVIRONMENT_CHOICES.map((option) => {
                     const meta = environmentWords(tc, option);
                     return (
@@ -579,7 +579,7 @@ function StrategyStep({
                     title={t("domainsSetup.strategy.title")}
                     hint={t("domainsSetup.strategy.hint")}
                 />
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {approaches.options.map((option) => {
                         const active = approach === option.id;
                         return (
@@ -846,7 +846,7 @@ function DomainStep({
             />
 
             {strategy === "duckdns" ? (
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <label className="flex flex-col gap-1 text-sm">
                         {t("domainsSetup.domain.duckSubdomain")}
                         <Input

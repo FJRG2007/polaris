@@ -242,7 +242,7 @@ export function MinecraftSidebar({
 
     const refused = state.sidebarRefusal;
     return (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div className="flex min-w-0 flex-col gap-4">
                 <Card>
                     <CardBody className="flex flex-col gap-4">
@@ -598,7 +598,7 @@ function RotatingDialog({
                     </span>
                 </div>
                 <ul
-                    className="grid max-h-72 select-none gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2"
+                    className="grid grid-cols-1 max-h-72 select-none gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2"
                     onKeyDown={selection.onKeyDown}
                     aria-label={t("sidebar.leaderboards")}
                 >

@@ -2213,7 +2213,7 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
             {loading ? (
                 <Loading />
             ) : data?.state ? (
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Meter label={t("metrics.cpu")} value={data.cpuPercent} />
                     <Meter
                         label={t("metrics.memory")}

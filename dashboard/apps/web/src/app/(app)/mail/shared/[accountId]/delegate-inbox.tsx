@@ -472,7 +472,7 @@ export function DelegateInbox({
                 </form>
             ) : null}
 
-            <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+            <div className="grid grid-cols-1 min-w-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
                 <section aria-label={t("delegate.inbox")} className="min-w-0">
                     {shown.length === 0 ? (
                         <p className="text-sm text-muted-foreground">{t("delegate.empty")}</p>

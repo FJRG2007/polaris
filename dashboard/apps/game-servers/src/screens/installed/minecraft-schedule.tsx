@@ -187,7 +187,7 @@ export function MinecraftSchedule({
 
                 {schedule.enabled && (
                     <>
-                        <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <Field label={t("schedule.timeZone")}>
                                 <Select
                                     value={schedule.timezone}

@@ -426,7 +426,7 @@ export function ContainerView({
 
             {running ? <Usage samples={samples} /> : null}
 
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <RunsOn connection={connection} host={host} networks={detail?.networks ?? null} />
                 <Storage detail={detail} sizes={sizes} />
             </div>
@@ -505,7 +505,7 @@ function Usage({ samples }: { samples: Sample[] }) {
     }));
 
     return (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>
                 <CardBody>
                     <TimeSeriesChart

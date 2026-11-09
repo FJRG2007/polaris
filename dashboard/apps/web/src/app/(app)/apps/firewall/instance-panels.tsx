@@ -351,7 +351,7 @@ function TrafficPanel({
                             label={t("panels.blocked")}
                             formatTime={(at) => format.dateTime(at)}
                         />
-                        <div className="grid gap-4 md:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <TopList
                                 title={t("panels.topAddresses")}
                                 entries={traffic.topAddresses}
@@ -1353,7 +1353,7 @@ function AddressDialog({
                             </div>
                         ) : null}
 
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             {activity.topPaths.length > 0 ? (
                                 <div className="min-w-0">
                                     <div className="mb-1 text-xs font-medium text-muted-foreground">

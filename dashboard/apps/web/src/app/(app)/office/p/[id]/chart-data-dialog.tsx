@@ -207,7 +207,7 @@ export function ChartDataDialog({
                             </span>
                         ) : null}
                     </div>
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
                         <div className="max-h-[45vh] min-w-0 overflow-auto overscroll-contain rounded-md border border-border">
                             <table className="w-max min-w-full border-collapse text-[13px]">
                                 <thead>

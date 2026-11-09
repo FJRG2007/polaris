@@ -360,7 +360,7 @@ function MetricsTab({ volume, usage }: { volume: VolumeDetail; usage: Usage }) {
     const usedBytes = usage.bytes;
     return (
         <div className="flex flex-col gap-4">
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Stat
                     label={t("volume.metrics.inUse")}
                     // The last size stands while a fresh measurement runs: a number

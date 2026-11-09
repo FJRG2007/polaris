@@ -105,7 +105,7 @@ export function GameRooms({ game: { id: game } }: { game: RoomGame }) {
 
     return (
         <div className="flex min-w-0 flex-col gap-4">
-            <div className="grid min-w-0 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 min-w-0 gap-4 md:grid-cols-2">
                 <form
                     className="flex min-w-0 flex-col gap-3 rounded-lg border p-4"
                     onSubmit={(event) => {

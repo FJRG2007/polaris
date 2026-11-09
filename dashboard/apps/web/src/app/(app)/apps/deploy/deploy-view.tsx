@@ -297,7 +297,7 @@ export function EnvironmentServices({
                     </div>
                 </div>
             ) : (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {environment.applications.map((app) => (
                         <AppCard
                             key={app.id}
@@ -813,7 +813,7 @@ function DatabaseConnectionDialog({
                                 <CopyRow value={connection.readUri} secret={!revealed} />
                             </Field>
                         )}
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <Field label={t("view.connection.host")}>
                                 <CopyRow value={connection.host} />
                             </Field>

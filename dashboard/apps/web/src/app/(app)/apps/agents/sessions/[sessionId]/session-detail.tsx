@@ -554,7 +554,7 @@ export function SessionDetail({
                     </Card>
                 ) : null}
 
-                <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
                     <Card>
                         <CardHeader>
                             <CardTitle>{t("session.conversation")}</CardTitle>

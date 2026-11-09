@@ -134,7 +134,7 @@ export function RatesCard({ rates, onChange }: { rates: BillingRates | null; onC
                     />
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     {BILLING_RATE_KEYS.map((key) => {
                         const message = problem(key);
                         const id = `rate-${key}`;

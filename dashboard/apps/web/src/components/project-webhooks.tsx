@@ -280,7 +280,7 @@ function AddWebhookForm({
 
     return (
         <div className="flex flex-col gap-3 rounded-md border border-border/60 p-3">
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <label className="flex flex-col gap-1.5">
                     <span className="text-xs font-medium text-muted-foreground">{t("modelKeys.name")}</span>
                     <Input

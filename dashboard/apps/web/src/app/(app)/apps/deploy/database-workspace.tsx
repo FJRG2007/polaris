@@ -359,7 +359,7 @@ function StatsView({ databaseId, engine }: { databaseId: string; engine: string 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
 
             {!report ? (
-                <div className="grid gap-3 sm:grid-cols-3" aria-hidden="true">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-hidden="true">
                     <Skeleton className="h-20" />
                     <Skeleton className="h-20" />
                     <Skeleton className="h-20" />
@@ -367,7 +367,7 @@ function StatsView({ databaseId, engine }: { databaseId: string; engine: string 
                 </div>
             ) : (
                 <>
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         {report.connections ? (
                             <Tile label={t("workspace.stats.connections")}>
                                 <span className="text-xl font-semibold tabular-nums">
@@ -894,7 +894,7 @@ function ConfigView({
                         <Skeleton className="h-24 w-full" />
                     )
                 ) : (
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Labelled label={t("workspace.config.username")}>
                             <CopyRow value={info.connection.username || "-"} />
                         </Labelled>
@@ -1249,7 +1249,7 @@ function ConnectView({
                     <p className="text-xs text-muted-foreground">
                         {t("workspace.connect.referenceHint", { name: info.slug })}
                     </p>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Labelled label={t("workspace.connect.host")}>
                             <CopyRow value={connection.host} />
                         </Labelled>

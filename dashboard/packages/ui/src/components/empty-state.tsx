@@ -44,7 +44,7 @@ export function EmptyState({
             {description ? (
                 <p className="max-w-sm text-[0.8125rem] leading-relaxed text-muted-foreground">{description}</p>
             ) : null}
-            {action ? <div className="mt-2 flex items-center gap-2">{action}</div> : null}
+            {action ? <div className="mt-2 flex max-w-full flex-wrap items-center justify-center gap-2 [&>*]:min-w-0 [&>*]:max-w-full">{action}</div> : null}
         </div>
     );
 }

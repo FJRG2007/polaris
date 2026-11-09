@@ -309,7 +309,7 @@ export function DeviceDialog({
                     )}
 
                     {placeId && making && (
-                        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 min-w-0 gap-3 sm:grid-cols-2">
                             <label className="flex min-w-0 flex-col gap-1.5">
                                 <span className="text-xs text-muted-foreground">
                                     {t("deviceDialog.roomName")}{" "}

@@ -529,7 +529,7 @@ function UpsHistory({ answer, hours }: { answer: UpsDetailAnswer | null; hours: 
     const to = Date.now();
     const from = to - hours * 3_600_000;
     return (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <MultiSeriesChart
                 label={t("ups.chart.percent")}
                 series={charts.percent}

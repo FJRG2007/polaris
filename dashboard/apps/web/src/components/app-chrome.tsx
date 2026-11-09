@@ -413,7 +413,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                                 aria-label={t(
                                                                                                     "shell.overview"
                                                                                                 )}
-                                                                                                className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                                                                className="hidden shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:block"
                                                                                             >
                                                                                                 <span className="flex items-center gap-1.5">
                                                                                                     <PolarisMark nameClassName="hidden sm:inline" />

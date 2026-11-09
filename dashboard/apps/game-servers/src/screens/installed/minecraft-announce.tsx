@@ -404,7 +404,7 @@ export function MinecraftAnnounce({
     const java = edition !== "bedrock";
 
     return (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div className="flex min-w-0 flex-col gap-4">
                 <Card>
                     <CardBody className="flex flex-col gap-4">
@@ -667,7 +667,7 @@ export function MinecraftAnnounce({
 
                         <div className="flex flex-col gap-1 text-sm">
                             <span className="font-medium">{t("announce.staysOnScreen")}</span>
-                            <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                 <Select
                                     value={draft.hold}
                                     onValueChange={(value) =>

@@ -1542,7 +1542,7 @@ export function MinecraftEvents({
                         <ui.Skeleton className="h-28 w-full" />
                     ) : (
                         <>
-                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="font-medium">
                                         {t("events.playersPlayingAtLeast")}
@@ -1676,7 +1676,7 @@ export function MinecraftEvents({
                                             />
                                             {t("events.anyTimeOfDay")}
                                         </label>
-                                        <div className="grid gap-3 sm:grid-cols-4">
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                                             {settings.random.from !== settings.random.to && (
                                                 <>
                                                     <label className="flex flex-col gap-1 text-sm">

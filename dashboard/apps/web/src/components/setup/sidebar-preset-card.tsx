@@ -80,7 +80,7 @@ export function SidebarPresetCard() {
                     role="radiogroup"
                     aria-label={t("presets.title")}
                     onKeyDown={onKeyDown}
-                    className="grid gap-2 sm:grid-cols-2"
+                    className="grid grid-cols-1 gap-2 sm:grid-cols-2"
                 >
                     {SIDEBAR_PRESET_IDS.map((id) => {
                         const chosen = id === current;

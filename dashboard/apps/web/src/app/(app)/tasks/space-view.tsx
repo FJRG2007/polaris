@@ -210,7 +210,7 @@ function OverviewTab({ lists }: { lists: readonly ListSummary[] }) {
         );
     }
     return (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {lists.map((list) => {
                 const done = list.totalCount - list.openCount;
                 const percent =

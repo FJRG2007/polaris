@@ -72,7 +72,7 @@ function rankedName(rank: Rank, player: string): MotdSpan[] {
 function RankPreview({ rank, player, message }: { rank: Rank; player: string; message: string }) {
     const t = useGameText("minecraft");
     return (
-        <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 min-w-0 gap-2 sm:grid-cols-2">
             <div className="min-w-0">
                 <p className="mb-1 text-xs text-muted-foreground">{t("ranks.previewChat")}</p>
                 <div className="truncate rounded-md bg-[#101010]/90 px-3 py-2 font-mono text-sm">
@@ -645,7 +645,7 @@ function RankEditor({
 
     return (
         <div className="flex flex-col gap-4 border-t pt-3">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field
                     label={t("ranks.name")}
                     error={rank.name.trim() ? text(issues.name) : undefined}

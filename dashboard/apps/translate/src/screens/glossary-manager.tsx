@@ -560,7 +560,7 @@ function GlossaryEditor({
                             onChange={(event) => setValue({ ...value, name: event.target.value })}
                         />
                     </label>
-                    <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 min-w-0 gap-2 sm:grid-cols-2">
                         <SearchableSelect
                             className="w-full min-w-0"
                             aria-label={t("lang.from")}

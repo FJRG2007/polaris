@@ -67,7 +67,7 @@ export function CloudConnectionsSection(props: CloudConnectionsProps) {
                     description={t("accounts.emptyHint")}
                 />
             ) : (
-                <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {accounts.map((account) => (
                         <li
                             key={account.id}

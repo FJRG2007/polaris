@@ -406,7 +406,7 @@ function NasHistory({ answer, range }: { answer: NasAnswer | null; range: nasVie
         return <p className="text-sm text-muted-foreground">{t("nas.chart.empty")}</p>;
     return (
         <>
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <MultiSeriesChart
                     label={t("nas.chart.temperature")}
                     series={charts.temperature}

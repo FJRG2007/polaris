@@ -109,7 +109,7 @@ function Group({
     children: React.ReactNode;
 }) {
     return (
-        <section className="grid gap-3 border-t border-border pt-4 first:border-t-0 first:pt-0 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-6">
+        <section className="grid grid-cols-1 gap-3 border-t border-border pt-4 first:border-t-0 first:pt-0 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-6">
             <div className="min-w-0">
                 <p className="text-sm font-medium">{title}</p>
                 <p className="text-xs text-muted-foreground">{hint}</p>
@@ -631,7 +631,7 @@ export function MinecraftChallenges({
                                     <ui.Skeleton className="mt-1 h-4 w-72" />
                                 )}
                             </div>
-                            <div className="grid gap-4 lg:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                 <div className="flex flex-col gap-2">
                                     <p className="text-xs font-medium text-muted-foreground">
                                         {t("season.card")}
@@ -930,7 +930,7 @@ export function MinecraftChallenges({
                                                 key={goal.id}
                                                 className="flex flex-col gap-3 rounded-md border border-border p-3"
                                             >
-                                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                                                     <label className="flex flex-col gap-1 text-sm lg:col-span-2">
                                                         <span className="font-medium">
                                                             {t("goals.challenge")}
@@ -1057,7 +1057,7 @@ export function MinecraftChallenges({
                                                 <p className="text-xs font-medium text-muted-foreground">
                                                     {t("goals.tiers")}
                                                 </p>
-                                                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                                                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                                                     {goal.rewards.map((reward, tier) => (
                                                         <parts.PayoutEditor
                                                             key={tier}
@@ -1305,7 +1305,7 @@ function SettingsFields({
     return (
         <>
             <Group {...g("schedule")}>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("settings.language")}</span>
                         <ui.Select
@@ -1400,7 +1400,7 @@ function SettingsFields({
             </Group>
 
             <Group {...g("difficulty")}>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <NumberField
                         label={t("settings.multiplier")}
                         value={settings.multiplier}
@@ -1437,7 +1437,7 @@ function SettingsFields({
             </Group>
 
             <Group {...g("who")}>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <NumberField
                         label={t("settings.minMinutes")}
                         value={settings.eligibility.minMinutes}
@@ -1484,7 +1484,7 @@ function SettingsFields({
                     onChange={(afk) => nested("antiExploit", { afk })}
                 />
                 {settings.antiExploit.afk && (
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <NumberField
                             label={t("settings.afkMinutes")}
                             value={settings.antiExploit.afkMinutes}
@@ -1510,7 +1510,7 @@ function SettingsFields({
             </Group>
 
             <Group {...g("season")}>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <NumberField
                         label={t("settings.weeks")}
                         value={settings.season.weeks}
@@ -1618,7 +1618,7 @@ function RewardFields({
     return (
         <>
             <Group {...g("daily")}>
-                <div className="grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
                     {catalog.DIFFICULTIES.map((tier) => (
                         <parts.PayoutEditor
                             key={tier}
@@ -1632,7 +1632,7 @@ function RewardFields({
                 </div>
             </Group>
             <Group {...g("weekly")}>
-                <div className="grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
                     {catalog.DIFFICULTIES.map((tier) => (
                         <parts.PayoutEditor
                             key={tier}
@@ -1648,7 +1648,7 @@ function RewardFields({
                 </div>
             </Group>
             <Group {...g("bonus")}>
-                <div className="grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
                     <parts.PayoutEditor
                         label={t("rewards.sweepDaily")}
                         value={rewards.dailySweep}
@@ -1687,7 +1687,7 @@ function RewardFields({
                 </div>
             </Group>
             <Group {...g("streak")}>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {rewards.streak.map((value, index) => (
                         <NumberField
                             key={index}

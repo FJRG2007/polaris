@@ -286,7 +286,7 @@ function DeviceRow({
             {editing !== null && parsed?.success === false && editing !== "" ? (
                 <p className="text-xs text-danger">{t("devices.badName")}</p>
             ) : null}
-            <dl className="grid min-w-0 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
+            <dl className="grid grid-cols-1 min-w-0 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
                 {isAdmin ? (
                     <div className="min-w-0">
                         <dt className="text-xs text-muted-foreground">{t("devices.owner")}</dt>

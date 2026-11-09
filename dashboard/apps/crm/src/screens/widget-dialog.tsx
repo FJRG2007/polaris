@@ -159,7 +159,7 @@ export function WidgetDialog({
                             onChange={(event) => change({ title: event.target.value })}
                         />
                     </Labeled>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Labeled label={t("dashboards.dialog.object")}>
                             <Select
                                 aria-label={t("dashboards.dialog.object")}
@@ -200,7 +200,7 @@ export function WidgetDialog({
                             }))}
                         />
                     </Labeled>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Labeled label={t("dashboards.dialog.measure")}>
                             <Select
                                 aria-label={t("dashboards.dialog.measure")}
@@ -245,7 +245,7 @@ export function WidgetDialog({
                         ) : null}
                     </div>
                     {draft.chart !== "number" ? (
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <Labeled label={t("dashboards.dialog.groupBy")}>
                                 <Select
                                     aria-label={t("dashboards.dialog.groupBy")}

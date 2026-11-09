@@ -159,7 +159,7 @@ export function ForecastScreen() {
     } else if (!data || !total) {
         body = (
             <div className="flex flex-col gap-3" aria-busy="true">
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     {[0, 1, 2].map((index) => (
                         <div key={index} className="rounded-lg border border-border bg-card p-4">
                             <Block className="h-3 w-20" />
@@ -200,7 +200,7 @@ export function ForecastScreen() {
                         {t("forecast.capped")}
                     </p>
                 ) : null}
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <Figure
                         label={t("forecast.expected")}
                         value={money(total.expected)}

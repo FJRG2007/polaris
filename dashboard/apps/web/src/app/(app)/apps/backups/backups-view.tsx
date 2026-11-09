@@ -171,7 +171,7 @@ function SummaryStrip({ overview, failed }: { overview: BackupOverview | null; f
     // is on its way, and it is not.
     const missing = failed ? "-" : null;
     return (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Stat
                 label={t("summary.protected")}
                 value={summary ? String(summary.protectedCount) : missing}

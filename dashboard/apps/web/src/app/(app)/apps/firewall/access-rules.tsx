@@ -66,7 +66,7 @@ export function AddressRulesPage({
             <PageHeader title={t("access.addressesTitle")} onBack={onBack} />
 
             <Section title={t("addresses.title")} hint={t("addresses.hint")}>
-                <div className="grid gap-5 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2 text-sm font-medium">
                             <ShieldCheck

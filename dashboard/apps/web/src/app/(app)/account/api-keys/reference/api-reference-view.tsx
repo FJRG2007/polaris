@@ -99,7 +99,7 @@ export function ApiReferenceView({
                 </div>
             </section>
 
-            <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
                 <nav
                     aria-label={t("apiKeys.reference.contents")}
                     className="lg:sticky lg:top-4 lg:self-start"

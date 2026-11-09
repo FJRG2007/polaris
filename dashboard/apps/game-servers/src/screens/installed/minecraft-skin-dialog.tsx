@@ -369,7 +369,7 @@ export function SkinDialog({
                         )}
                     </div>
                 ) : (
-                    <div className="grid min-w-0 gap-4 sm:grid-cols-[auto_minmax(0,1fr)]">
+                    <div className="grid grid-cols-1 min-w-0 gap-4 sm:grid-cols-[auto_minmax(0,1fr)]">
                         <div className="flex min-w-0 flex-col items-center gap-2">
                             {reading ? (
                                 <Skeleton
