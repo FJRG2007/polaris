@@ -49,6 +49,11 @@ import {
 import type { GithubAppGap } from "@/lib/github-app-reach";
 import type { VoiceNotice } from "@/components/polar/polar-voice";
 import { GithubAppGapNotice } from "@/components/github-app-gap";
+import * as core from "@polaris/core";
+import type { ModelChoice } from "@/lib/polar/shared";
+import { usePolarUploads } from "@/components/polar/polar-uploads";
+import { POLAR_ATTACHMENT_MOST, POLAR_ATTACHMENT_TYPES } from "@/lib/polar/shared";
+import { ModelSelector, type ModelSelectorProvider } from "@/components/polar/elements/model-selector";
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
 import {
     AgentPicker,
@@ -334,7 +339,8 @@ export function PolarCodeView({
     code,
     fullPage,
     avatar,
-    voiceKit
+    voiceKit,
+    providers
 }: {
     code: PolarCodeState;
     fullPage: boolean;
@@ -342,6 +348,8 @@ export function PolarCodeView({
     avatar: ReactNode;
     /** Chat's microphone, so dictation works here exactly as it does there. */
     voiceKit: PolarVoiceKit;
+    /** Chat's providers and models, for an agent that takes one. */
+    providers: ModelSelectorProvider[] | null;
 }) {
     const t = useTranslations("polar");
     const canStart = code.access === "manage";
@@ -390,6 +398,7 @@ export function PolarCodeView({
             agentKey={picks.agentKey}
             onAgent={picks.setAgentKey}
             voiceKit={voiceKit}
+            providers={providers}
             onStarted={started}
         />
     );
@@ -444,17 +453,44 @@ function Notice({ error, children }: { error?: boolean; children: ReactNode }) {
     );
 }
 
-/** Chat's composer as Code takes it: no files and no voice conversation for an
- *  agent session (said on the buttons), the same microphone. */
-function useCodeComposerParts() {
+/** Chat's composer as Code takes it: the same files (copied into the session's
+ *  working directory) and the same microphone; no voice conversation for an
+ *  agent session (said on the button). */
+function useCodeComposerParts(busy: boolean) {
     const t = useTranslations("polar");
     const [notice, setNotice] = useState<VoiceNotice | null>(null);
+    const uploads = usePolarUploads();
     return {
         notice,
         setNotice,
-        attach: { refusal: t("code.noFiles") },
+        uploads,
+        attach: {
+            files: uploads.files,
+            error: uploads.error,
+            accept: POLAR_ATTACHMENT_TYPES,
+            disabled: busy || uploads.files.length >= POLAR_ATTACHMENT_MOST,
+            onFiles: uploads.add,
+            onFailed: uploads.setError,
+            onRemove: uploads.remove,
+            onRetry: uploads.retry
+        },
         voiceMode: { refusal: t("code.noVoice") }
     };
+}
+
+/** The first model on offer, for an agent that needs one and has none yet. */
+function firstModel(providers: readonly ModelSelectorProvider[] | null): ModelChoice | null {
+    const provider = providers?.find((entry) => entry.models.length > 0);
+    const model = provider?.models[0];
+    return model
+        ? {
+              kind: "language",
+              provider: model.provider,
+              model: model.model,
+              intelligence: "balanced",
+              payer: null
+          }
+        : null;
 }
 
 /** A new task: Chat's composer, with the agent where Chat has its model. */
@@ -469,6 +505,7 @@ function CodeStart({
     agentKey,
     onAgent,
     voiceKit,
+    providers,
     onStarted
 }: {
     canStart: boolean;
@@ -481,22 +518,37 @@ function CodeStart({
     agentKey: string;
     onAgent: (key: string) => void;
     voiceKit: PolarVoiceKit;
+    /** Chat's own list of providers and models, for an agent that takes one. */
+    providers: ModelSelectorProvider[] | null;
     onStarted: (id: string) => void;
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
-    const parts = useCodeComposerParts();
     const [prompt, setPrompt] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [gap, setGap] = useState<GithubAppGap | null>(null);
     const [busy, startTransition] = useTransition();
+    const parts = useCodeComposerParts(busy);
+    const [picked, setPicked] = useState<ModelChoice | null>(null);
 
     const agent: AgentOption | null =
         choices?.agents.find((option) => option.key === agentKey) ?? null;
     const workspace = repoId === NO_REPO;
-    const unlinked = agent?.readiness === "missing" ? agent : null;
+    // A tool that takes its model from Polaris signs in with that provider's
+    // key, so its own sign-in does not matter.
+    const takesModel = agent !== null && core.MODEL_CHOICE_AGENT_CLIS.includes(agent.cli);
+    const model = takesModel ? (picked ?? firstModel(providers)) : null;
+    const unlinked = agent?.readiness === "missing" && !takesModel ? agent : null;
+    const noModel = takesModel && model === null && providers !== null;
     const ready =
-        canStart && choices !== null && agent !== null && !unlinked && prompt.trim().length > 0;
+        canStart &&
+        choices !== null &&
+        agent !== null &&
+        !unlinked &&
+        (!takesModel || model !== null) &&
+        !parts.uploads.uploading &&
+        !parts.uploads.failed &&
+        prompt.trim().length > 0;
 
     const submit = () => {
         if (!ready || busy || !agent) return;
@@ -512,8 +564,12 @@ function CodeStart({
                             repoId: workspace ? null : repoId,
                             title: titleFromPrompt(text),
                             cli: agent.cli,
-                            accountId: agent.accountId,
-                            useMachineLogin: agent.machine,
+                            accountId: takesModel ? null : agent.accountId,
+                            useMachineLogin: takesModel ? false : agent.machine,
+                            modelChoice: model
+                                ? { provider: model.provider, model: model.model, payer: model.payer }
+                                : null,
+                            attachments: parts.uploads.ids,
                             place: "local",
                             sharedHome: false,
                             hostId: null,
@@ -532,6 +588,7 @@ function CodeStart({
                 // Created but not started still opens: the reason is on it.
                 if (result.id) {
                     setPrompt("");
+                    parts.uploads.clear();
                     onStarted(result.id);
                 }
                 if (result.githubGap) setGap(result.githubGap);
@@ -557,12 +614,22 @@ function CodeStart({
                 onSubmit={submit}
                 picker={
                     canStart ? (
-                        <AgentPicker
-                            agents={choices?.agents ?? null}
-                            value={agentKey}
-                            onChange={onAgent}
-                            disabled={busy}
-                        />
+                        <>
+                            <AgentPicker
+                                agents={choices?.agents ?? null}
+                                value={agentKey}
+                                onChange={onAgent}
+                                disabled={busy}
+                            />
+                            {takesModel ? (
+                                <ModelSelector
+                                    providers={providers ?? []}
+                                    choice={model}
+                                    onChoice={setPicked}
+                                    forCode
+                                />
+                            ) : null}
+                        </>
                     ) : null
                 }
                 attach={parts.attach}
@@ -586,6 +653,14 @@ function CodeStart({
                 </div>
             ) : null}
             {!canStart && !pending ? <Notice>{t("code.readOnly")}</Notice> : null}
+            {noModel ? (
+                <Notice>
+                    {t("code.noModel")}{" "}
+                    <Link href="/account/ai-keys" className="text-primary hover:underline">
+                        {t("code.addKey")}
+                    </Link>
+                </Notice>
+            ) : null}
             {unlinked ? (
                 <Notice>
                     {t("code.signIn", { agent: unlinked.label })}{" "}
@@ -622,13 +697,13 @@ function CodeThread({
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
-    const parts = useCodeComposerParts();
     // Undefined while the first answer is on its way; null when it is not there.
     const [thread, setThread] = useState<PolarCodeThread | null | undefined>(undefined);
     const [failed, setFailed] = useState(false);
     const [reply, setReply] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [busy, startTransition] = useTransition();
+    const parts = useCodeComposerParts(busy);
     const signal = useUnmountSignal();
 
     const read = useCallback(() => {
@@ -653,16 +728,24 @@ function CodeThread({
 
     const send = () => {
         const text = reply.trim();
-        if (!text || busy) return;
+        if (!text || busy || parts.uploads.uploading || parts.uploads.failed) return;
+        const attachments = parts.uploads.ids;
         setError(null);
         startTransition(() => {
             void runAction(
-                () => postCode<{ error?: string }>("/api/polar/code/prompt", { sessionId, text }),
+                () => postCode<{ error?: string }>("/api/polar/code/prompt", {
+                        sessionId,
+                        text,
+                        attachments
+                    }),
                 setError
             ).then((result) => {
                 if (!result) return;
                 if (result.error) setError(result.error);
-                else setReply("");
+                else {
+                    setReply("");
+                    parts.uploads.clear();
+                }
                 read();
             });
         });
@@ -694,7 +777,8 @@ function CodeThread({
                 voiceMode={parts.voiceMode}
                 submit={{
                     busy: false,
-                    disabled: !reply.trim() || busy,
+                    disabled:
+                        !reply.trim() || busy || parts.uploads.uploading || parts.uploads.failed,
                     sendLabel: t("code.send"),
                     stopLabel: t("code.send"),
                     onStop: () => undefined

@@ -107,7 +107,8 @@ export function ModelSelector({
     choice,
     onChoice,
     open,
-    onOpenChange
+    onOpenChange,
+    forCode = false
 }: {
     providers: ModelSelectorProvider[];
     choice: ModelChoice | null;
@@ -115,6 +116,9 @@ export function ModelSelector({
     /** Opened from outside as well as by its own button, when given. */
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
+    /** For an agent session: no Automatic and no intelligence, which only a
+     *  chat turn has. */
+    forCode?: boolean;
 }) {
     const t = useTranslations("polar");
     const provider = providers.find((entry) => entry.provider === choice?.provider);
@@ -167,7 +171,7 @@ export function ModelSelector({
                         {t("picker.noMatch")}
                     </p>
                 ) : null}
-                {providers.length > 0 && !searching ? (
+                {providers.length > 0 && !searching && !forCode ? (
                     <>
                         <DropdownMenuItem
                             onSelect={() => onChoice(automaticChoice(choice?.intelligence))}
@@ -217,8 +221,10 @@ export function ModelSelector({
                 {choice && !searching ? (
                     <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuLabel>{t("picker.intelligence")}</DropdownMenuLabel>
-                        {INTELLIGENCE_LEVELS.map((level) => (
+                        {forCode ? null : (
+                            <DropdownMenuLabel>{t("picker.intelligence")}</DropdownMenuLabel>
+                        )}
+                        {(forCode ? [] : INTELLIGENCE_LEVELS).map((level) => (
                             <DropdownMenuItem
                                 key={level}
                                 disabled={!leveled}

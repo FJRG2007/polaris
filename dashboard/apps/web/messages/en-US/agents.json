@@ -204,6 +204,11 @@
             "noSharedMachine": "This Polaris does not offer a shared machine.",
             "serverNotYours": "That server is not one of yours.",
             "signInHost": "Nothing here signs {agent} in. Either sign it in on that server yourself, or add {ways} under AI keys.",
+            "noModelKey": "There is no key for the model you picked. Add one under AI keys, or pick another model.",
+            "files": {
+                "missing": "One of the files is gone. Attach it again.",
+                "tooLarge": "The files add up to more than 10 MB. Send fewer."
+            },
             "signInLocal": "Nothing here signs {agent} in, so it would start and sit at its own login prompt. Add {ways} under AI keys.",
             "or": "or",
             "taskUnreachable": "That task is not one you can reach.",

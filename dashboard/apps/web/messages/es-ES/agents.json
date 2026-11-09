@@ -204,6 +204,11 @@
             "noSharedMachine": "Este Polaris no ofrece una máquina compartida.",
             "serverNotYours": "Ese servidor no es tuyo.",
             "signInHost": "Nada de aquí inicia sesión en {agent}. Inicia sesión tú en ese servidor o añade {ways} en Claves de IA.",
+            "noModelKey": "No hay clave para el modelo elegido. Añade una en Claves de IA o elige otro.",
+            "files": {
+                "missing": "Falta uno de los archivos. Adjúntalo otra vez.",
+                "tooLarge": "Los archivos pasan de 10 MB. Envía menos."
+            },
             "signInLocal": "Nada de aquí inicia sesión en {agent}, así que arrancaría y se quedaría en su propia pantalla de inicio de sesión. Añade {ways} en Claves de IA.",
             "or": "o",
             "taskUnreachable": "No tienes acceso a esa tarea.",

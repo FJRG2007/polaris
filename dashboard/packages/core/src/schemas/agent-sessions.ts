@@ -63,6 +63,35 @@ export const enigmaSettingsSchema = z.object({
         .default(null)
 });
 
+/** As many files as one prompt carries into a session, the same as a chat turn. */
+export const SESSION_ATTACHMENTS_MOST = 6;
+
+/**
+ * Files attached to a prompt: ids of the person's own uploads (Polar's
+ * attachment store). The server reads them back as that person, so an id that
+ * is somebody else's is simply not found.
+ */
+export const sessionAttachmentsSchema = z
+    .array(z.string().uuid())
+    .max(SESSION_ATTACHMENTS_MOST, "Too many files")
+    .default([]);
+
+/**
+ * The provider and model a multi-provider agent works with, from the same list
+ * Polar's chat picks from. `payer` narrows whose key pays, as in the chat.
+ */
+export const sessionModelChoiceSchema = z.object({
+    provider: z.string().trim().min(1).max(64),
+    model: z.string().trim().min(1).max(200),
+    payer: z.enum(["own", "instance"]).nullable().default(null)
+});
+
+export type SessionModelChoice = z.infer<typeof sessionModelChoiceSchema>;
+
+/** The tools that can take a provider and model from Polaris rather than from
+ *  their own login. */
+export const MODEL_CHOICE_AGENT_CLIS: readonly string[] = ["opencode"];
+
 /**
  * Starting a session.
  *
@@ -138,7 +167,11 @@ export const startAgentSessionSchema = z
          * other people's logins.
          */
         sharedHome: z.boolean().default(false),
-        enigma: enigmaSettingsSchema.optional()
+        enigma: enigmaSettingsSchema.optional(),
+        /** The provider and model, for a tool that takes them from Polaris. */
+        modelChoice: sessionModelChoiceSchema.nullable().default(null),
+        /** Files for the first prompt, placed in the working directory. */
+        attachments: sessionAttachmentsSchema
     })
     .refine((value) => value.cli !== CUSTOM_AGENT_CLI || Boolean(value.command), {
         message: "Enter the command that starts the agent",
@@ -173,6 +206,16 @@ export const startAgentSessionSchema = z
     .refine((value) => !value.useMachineLogin || !value.accountId, {
         message: "Pick an account or the machine's own login, not both",
         path: ["accountId"]
+    })
+    // A model is a thing only some tools take from outside; Claude Code and the
+    // rest sign in their own way, and a model sent with them would be ignored.
+    .refine((value) => !value.modelChoice || MODEL_CHOICE_AGENT_CLIS.includes(value.cli), {
+        message: "This agent picks its own model",
+        path: ["modelChoice"]
+    })
+    .refine((value) => value.attachments.length === 0 || Boolean(value.prompt), {
+        message: "Say something with the files",
+        path: ["prompt"]
     });
 
 export type StartAgentSessionInput = z.infer<typeof startAgentSessionSchema>;
@@ -187,7 +230,8 @@ export type StartAgentSessionInput = z.infer<typeof startAgentSessionSchema>;
  */
 export const agentSessionPromptSchema = z.object({
     sessionId: z.string().uuid(),
-    text: z.string().trim().min(1, "Say something").max(20_000)
+    text: z.string().trim().min(1, "Say something").max(20_000),
+    attachments: sessionAttachmentsSchema
 });
 
 export type AgentSessionPromptInput = z.infer<typeof agentSessionPromptSchema>;

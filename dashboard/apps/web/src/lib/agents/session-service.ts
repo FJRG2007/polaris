@@ -104,6 +104,8 @@ export interface SessionView {
      *  login answer. Distinct from a null `accountId`, which is "whichever of
      *  mine resolves". */
     readonly useMachineLogin: boolean;
+    /** The provider and model a multi-provider tool works with, or null. */
+    readonly modelChoice: core.SessionModelChoice | null;
     readonly hostId: string | null;
     readonly hostName: string | null;
     readonly state: core.AgentSessionState;
@@ -189,6 +191,9 @@ const VIEW_SELECT = {
     unattended: true,
     accountId: true,
     useMachineLogin: true,
+    modelProvider: true,
+    model: true,
+    modelPayer: true,
     hostId: true,
     state: true,
     detail: true,
@@ -229,6 +234,9 @@ type SessionRecord = {
     unattended: boolean | null;
     accountId: string | null;
     useMachineLogin: boolean;
+    modelProvider: string | null;
+    model: string | null;
+    modelPayer: string | null;
     hostId: string | null;
     state: string;
     detail: string;
@@ -278,6 +286,17 @@ function toView(record: SessionRecord): SessionView {
         unattended: record.unattended,
         accountId: record.accountId,
         useMachineLogin: record.useMachineLogin,
+        modelChoice:
+            record.modelProvider && record.model
+                ? {
+                      provider: record.modelProvider,
+                      model: record.model,
+                      payer:
+                          record.modelPayer === "own" || record.modelPayer === "instance"
+                              ? record.modelPayer
+                              : null
+                  }
+                : null,
         hostId: record.hostId,
         hostName: record.host?.name ?? null,
         state: readState(record.state),
@@ -406,6 +425,8 @@ export interface SessionCreateInput {
     readonly accountId: string | null;
     /** Sign it in with nothing, and let the machine's own login answer. */
     readonly useMachineLogin: boolean;
+    /** The provider and model, for a tool that takes them from Polaris. */
+    readonly modelChoice?: core.SessionModelChoice | null;
     readonly hostId: string | null;
     readonly baseRef: string;
     readonly taskId: string | null;
@@ -445,6 +466,9 @@ export async function createSession(
             unattended: input.unattended,
             accountId: input.accountId,
             useMachineLogin: input.useMachineLogin,
+            modelProvider: input.modelChoice?.provider ?? null,
+            model: input.modelChoice?.model ?? null,
+            modelPayer: input.modelChoice?.payer ?? null,
             hostId: input.hostId,
             baseRef: input.baseRef,
             branch: core.sessionBranchName(id, input.title),

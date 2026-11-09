@@ -15,6 +15,7 @@
 import * as core from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { prisma } from "@polaris/db";
+import { polarCredentialFor } from "@/lib/polar/access";
 import {
     githubApiToken,
     githubAppInstallationToken,
@@ -255,6 +256,24 @@ export async function polarCodeStart(
 ): Promise<{ id?: string; error?: string }> {
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
+    // A model picked here is Polar's list, so Polar's rule on whose keys this
+    // person may spend holds: the deployment's only where the policy says so.
+    const choice = core.sessionModelChoiceSchema.nullable().safeParse(
+        (input as { modelChoice?: unknown } | null)?.modelChoice ?? null
+    );
+    if (choice.success && choice.data) {
+        const credential = await polarCredentialFor(
+            user.id,
+            choice.data.provider,
+            choice.data.payer
+        );
+        if (!credential) return { error: (await getTranslations("agents"))("sessions.errors.noModelKey") };
+        // Pinned to the key Polar resolved, so the session spends that one.
+        return startSessionAction({
+            ...(input as object),
+            modelChoice: { ...choice.data, payer: credential.source }
+        });
+    }
     return startSessionAction(input);
 }
 
