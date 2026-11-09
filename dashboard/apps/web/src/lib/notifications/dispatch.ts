@@ -44,6 +44,7 @@ import {
 } from "@polaris/core";
 import { recipientShelf } from "@/lib/workspace-scope";
 import { deliveryText } from "./delivery-words";
+import { pushToUser, type PushPayload } from "./web-push";
 
 /** One thing worth telling somebody about. */
 export interface NotifyInput {
@@ -98,6 +99,13 @@ export interface NotifyInput {
      * ceiling.
      */
     dedupKey?: string | null;
+    /**
+     * Also send it to the account's subscribed devices (Web Push), drawn with
+     * these extras. Only while the bell rule is on and nothing holds it back -
+     * a mute, the event's schedule, quiet hours - and never to somebody who has
+     * the page it points at open.
+     */
+    push?: Omit<PushPayload, "title" | "body" | "href">;
 }
 
 /**
@@ -474,11 +482,12 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
     // still recorded, read, so it rings nothing and badges nothing - Slack's
     // behaviour. Quiet hours leave the bell alone, as they always have.
     const extras = input.bellOnly ? { ...rule, email: false, destinations: [] } : rule;
+    const pushing = Boolean(input.push) && rule.inapp && !input.bellOnly;
     const held = await heldNow(
         input.userId,
         input.event,
         event.critical === true,
-        extras.email || extras.destinations.length > 0
+        extras.email || extras.destinations.length > 0 || pushing
     );
     const silenced = held === MUTED || held === OUTSIDE_SCHEDULE;
 
@@ -565,6 +574,15 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
         });
     }
 
+    if (pushing && !held && !watching) {
+        void pushToUser(input.userId, {
+            ...input.push,
+            title: input.title,
+            body: input.body ?? null,
+            href: input.href ?? null
+        });
+    }
+
     void fanOut(input, level, extras, event.critical === true, held).catch((error) => {
         console.error("polaris: notification fan-out failed:", error);
     });
@@ -588,6 +606,37 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
     if (extras.destinations.length > 0) handedOff.push("destination");
     const inapp = !rule.inapp ? "off" : watching || silenced ? "read" : "sent";
     return handedOff.length > 0 ? { inapp, handedOff } : { inapp };
+}
+
+/**
+ * Send a push about an alert already on the bell, without writing another row:
+ * for a follow-up the device should show in place of the first one (same tag),
+ * such as the buttons that answer a prompt. Follows the same rule and holds as
+ * `push` on `notify`. Resolves to whether anything was sent.
+ */
+export async function pushNotice(
+    input: Pick<NotifyInput, "userId" | "event" | "title" | "body" | "href"> & {
+        push: NonNullable<NotifyInput["push"]>;
+    }
+): Promise<boolean> {
+    const event = notificationEvent(input.event);
+    if (!event) return false;
+    try {
+        const rule = resolveRule(await getNotificationPreferences(input.userId), input.event);
+        if (!rule.inapp) return false;
+        if (await heldNow(input.userId, input.event, event.critical === true, true)) return false;
+        if (!event.critical && isViewing(input.userId, input.href)) return false;
+        const sent = await pushToUser(input.userId, {
+            ...input.push,
+            title: input.title,
+            body: input.body ?? null,
+            href: input.href ?? null
+        });
+        return sent > 0;
+    } catch (error) {
+        console.error("polaris: push notice failed:", error);
+        return false;
+    }
 }
 
 /**

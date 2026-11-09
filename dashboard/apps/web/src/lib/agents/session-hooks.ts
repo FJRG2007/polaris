@@ -59,6 +59,13 @@ export const CLAUDE_HOOK_EVENTS = [
  *  answer must show up as missing events rather than as a slow agent. */
 const HOOK_TIMEOUT_SECONDS = 5;
 
+/** The permission prompt is the one hook that waits on purpose: for an answer
+ *  from the session page or a phone (see session-permissions). Longer than the
+ *  script's own curl, which is longer than the server's wait, so it is always
+ *  Polaris that gives up first and the agent falls back to its own prompt. */
+export const PERMISSION_HOOK_TIMEOUT_SECONDS = 130;
+const PERMISSION_CURL_SECONDS = 125;
+
 /**
  * The settings file that registers the hooks, as an object.
  *
@@ -68,9 +75,16 @@ const HOOK_TIMEOUT_SECONDS = 5;
  * configuration nobody meant to give it.
  */
 export function claudeHookSettings(scriptPath: string): Record<string, unknown> {
-    const hook = { type: "command", command: scriptPath, timeout: HOOK_TIMEOUT_SECONDS };
     const hooks: Record<string, unknown[]> = {};
     for (const { event, matcher } of CLAUDE_HOOK_EVENTS) {
+        const hook = {
+            type: "command",
+            command: scriptPath,
+            timeout:
+                event === "PermissionRequest"
+                    ? PERMISSION_HOOK_TIMEOUT_SECONDS
+                    : HOOK_TIMEOUT_SECONDS
+        };
         hooks[event] = [matcher ? { matcher, hooks: [hook] } : { hooks: [hook] }];
     }
     return { hooks };
@@ -111,7 +125,7 @@ export function mcpConfig(url: string, token: string): Record<string, unknown> {
  * and Polaris being unreachable must never be a reason for somebody's agent to
  * change what it was doing.
  */
-export function hookScript(ingestUrl: string, token: string): string {
+export function hookScript(ingestUrl: string, token: string, askUrl?: string): string {
     return [
         "#!/bin/sh",
         "# Written by Polaris. Reports this session's lifecycle events.",
@@ -142,9 +156,23 @@ export function hookScript(ingestUrl: string, token: string): string {
         `  -H ${shellQuote(`Authorization: Bearer ${token}`)} \\`,
         '  -H "Content-Type: application/json" \\',
         "  --data-binary @- >/dev/null 2>&1",
-        // Codex and Gemini CLI read a hook's output as JSON; this one decides
-        // nothing, so it says so.
-        'printf "{}"',
+        // A permission prompt is then handed to Polaris to answer. Whatever it
+        // prints is the hook's decision; `-f` keeps an error page off standard
+        // output. No answer is `{}`: Codex and Gemini CLI read a hook's output
+        // as JSON, and an empty object decides nothing, so the agent asks in
+        // its terminal.
+        'answer=""',
+        ...(askUrl
+            ? [
+                  `if printf %s "$payload" | grep -q '"hook_event_name" *: *"PermissionRequest"'; then`,
+                  `    answer=$(printf %s "$payload" | curl -sf -m ${PERMISSION_CURL_SECONDS} -X POST ${shellQuote(askUrl)} \\`,
+                  `      -H ${shellQuote(`Authorization: Bearer ${token}`)} \\`,
+                  '      -H "Content-Type: application/json" \\',
+                  "      --data-binary @- 2>/dev/null || true)",
+                  "fi"
+              ]
+            : []),
+        'if [ -n "$answer" ]; then printf %s "$answer"; else printf "{}"; fi',
         "exit 0",
         ""
     ].join("\n");

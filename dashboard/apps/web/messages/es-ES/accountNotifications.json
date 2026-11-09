@@ -769,5 +769,18 @@
         "call": "Estás en una llamada.",
         "meeting": "Estás en una reunión.",
         "critical": "Todo sigue llegando a la campana, sin sonidos ni avisos. Las alertas críticas, como las de seguridad, sí llegan."
+    },
+    "push": {
+        "title": "Avisos en este dispositivo",
+        "description": "Agentes y alertas llegan aquí aunque Polaris esté cerrado.",
+        "turnOn": "Activar",
+        "turnOff": "Desactivar",
+        "failed": "No se pudo suscribir este dispositivo. Inténtalo de nuevo.",
+        "standing": {
+            "on": "Activado en este dispositivo.",
+            "off": "Desactivado en este dispositivo.",
+            "denied": "{clientKind, select, desktop {El sistema bloquea los avisos de Polaris. Permítelos en la configuración del sistema.} other {Este navegador bloquea los avisos de Polaris. Permítelos en su configuración del sitio.}}",
+            "unsupported": "{clientKind, select, desktop {Esta app no puede recibir avisos con Polaris cerrado.} other {Este navegador no puede recibir avisos con Polaris cerrado.}}"
+        }
     }
 }

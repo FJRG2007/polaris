@@ -9,7 +9,9 @@
  */
 
 import { z } from "zod";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import * as webPush from "@/lib/notifications/web-push";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
@@ -328,4 +330,35 @@ export async function setNotificationScheduleAction(
         return { ...current, schedules };
     });
     return { holds };
+}
+
+/** The instance's public push key, made on first use, for a device to subscribe with. */
+export async function pushKeyAction(): Promise<{ key?: string; error?: string }> {
+    await requireUser();
+    try {
+        return { key: (await webPush.vapidKeys()).publicKey };
+    } catch (error) {
+        console.error("polaris: push key unavailable:", error);
+        return { error: (await getTranslations("accountNotifications"))("push.failed") };
+    }
+}
+
+/** Keep this device's push subscription for the signed-in account. */
+export async function subscribePushAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const t = await getTranslations("accountNotifications");
+    const parsed = webPush.pushSubscriptionSchema.safeParse(input);
+    if (!parsed.success) return { error: t("push.failed") };
+    const agent = (await headers()).get("user-agent") ?? "";
+    await webPush.savePushSubscription(user.id, parsed.data, agent);
+    return {};
+}
+
+/** Forget this device's push subscription. */
+export async function unsubscribePushAction(endpoint: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = z.string().trim().url().max(2048).safeParse(endpoint);
+    if (!parsed.success) return {};
+    await webPush.removePushSubscription(user.id, parsed.data);
+    return {};
 }

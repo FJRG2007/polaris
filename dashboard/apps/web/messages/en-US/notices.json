@@ -470,7 +470,11 @@
         "silentBody": "The machine running this session stopped reporting, so Polaris closed it.",
         "exitedBody": "The agent exited on its own. Start a new session to carry on.",
         "workKeptTitle": "The work in {session} was not pushed",
-        "workKeptBody": "Polaris could not push {branch}, so it kept the session's machine and its work. Open the session to try again or discard it."
+        "workKeptBody": "Polaris could not push {branch}, so it kept the session's machine and its work. Open the session to try again or discard it.",
+        "permissionTitle": "{session} asks for permission",
+        "permissionAllow": "Allow",
+        "permissionDeny": "Deny",
+        "permissionAlways": "Always allow this"
     },
     "cloudLeft": {
         "title": "{name} may still be running in CloudAMQP",

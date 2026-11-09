@@ -15,11 +15,15 @@ import { describe, expect, it, vi } from "vitest";
 
 const SOURCE = readFileSync(join(__dirname, "../../public/sw.js"), "utf8");
 
-function worker(windows: { focused: boolean; told: unknown[] }[]) {
+function worker(
+    windows: { focused: boolean; told: unknown[] }[],
+    reply: () => Response = () => new Response(null, { status: 204 })
+) {
     const listeners = new Map<string, (event: unknown) => void>();
     const fetched: { url: string; init: RequestInit }[] = [];
     const opened: string[] = [];
     const focused: number[] = [];
+    const shown: { title: string; options: Record<string, unknown> }[] = [];
     const self = {
         addEventListener: (name: string, handler: (event: unknown) => void) =>
             listeners.set(name, handler),
@@ -38,6 +42,11 @@ function worker(windows: { focused: boolean; told: unknown[] }[]) {
             },
             claim: async () => undefined
         },
+        registration: {
+            showNotification: async (title: string, options: Record<string, unknown>) => {
+                shown.push({ title, options });
+            }
+        },
         skipWaiting: async () => undefined
     };
     runInNewContext(SOURCE, {
@@ -45,7 +54,7 @@ function worker(windows: { focused: boolean; told: unknown[] }[]) {
         caches: {},
         fetch: async (url: string, init: RequestInit) => {
             fetched.push({ url, init });
-            return new Response(null, { status: 204 });
+            return reply();
         },
         Response,
         Request,
@@ -64,7 +73,15 @@ function worker(windows: { focused: boolean; told: unknown[] }[]) {
         await Promise.all(waits);
         return close;
     };
-    return { click, fetched, opened, focused };
+    const push = async (payload: unknown) => {
+        const waits: Promise<unknown>[] = [];
+        listeners.get("push")?.({
+            data: { json: () => payload },
+            waitUntil: (promise: Promise<unknown>) => waits.push(promise)
+        });
+        await Promise.all(waits);
+    };
+    return { click, push, fetched, opened, focused, shown };
 }
 
 const READ = {
@@ -105,5 +122,49 @@ describe("a press on a notice the service worker drew", () => {
         const sw = worker([]);
         await sw.click("", { href: "/chat/c/c1/m1", actions: [READ] });
         expect(sw.opened).toEqual(["/chat/c/c1/m1"]);
+    });
+});
+
+const PROMPT = {
+    title: "Fix the build asks for permission",
+    body: "Bash: npm test",
+    href: "/apps/agents/sessions/s1",
+    tag: "agent-session:s1",
+    requireInteraction: true,
+    actions: ["allow", "deny", "always"].map((choice) => ({
+        action: choice,
+        title: choice,
+        request: { url: "/api/agents/sessions/permission", body: { requestId: "r1", choice } }
+    }))
+};
+
+describe("a pushed agent permission prompt", () => {
+    it("draws as many buttons as the device has room for, each with its request", async () => {
+        const sw = worker([]);
+        await sw.push(PROMPT);
+        const options = sw.shown[0]!.options as {
+            actions: { action: string }[];
+            data: { href: string; actions: { id: string }[] };
+        };
+        expect(options.actions.map((one) => one.action)).toEqual(["allow", "deny"]);
+        expect(options.data.href).toBe("/apps/agents/sessions/s1");
+        expect(options.data.actions.map((one) => one.id)).toEqual(["allow", "deny"]);
+    });
+
+    it("answers the prompt from the button with no tab open", async () => {
+        const sw = worker([], () => Response.json({ value: { status: "allow" } }));
+        await sw.push(PROMPT);
+        const data = (sw.shown[0]!.options as { data: unknown }).data;
+        await sw.click("allow", data);
+        expect(sw.fetched[0]!.url).toBe("/api/agents/sessions/permission");
+        expect(sw.fetched[0]!.init.body).toBe(JSON.stringify({ requestId: "r1", choice: "allow" }));
+        expect(sw.opened).toEqual([]);
+    });
+
+    it("opens the session when the answer was turned down", async () => {
+        const sw = worker([], () => Response.json({ value: { error: "Already answered" } }));
+        await sw.push(PROMPT);
+        await sw.click("deny", (sw.shown[0]!.options as { data: unknown }).data);
+        expect(sw.opened).toEqual(["/apps/agents/sessions/s1"]);
     });
 });

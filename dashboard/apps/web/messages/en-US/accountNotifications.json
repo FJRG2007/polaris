@@ -769,5 +769,18 @@
         "call": "You are in a call.",
         "meeting": "You are in a meeting.",
         "critical": "Everything still lands in the bell, without sounds or notices. Critical alerts, such as security ones, still come through."
+    },
+    "push": {
+        "title": "Notices on this device",
+        "description": "Agents and alerts reach this device even with Polaris closed.",
+        "turnOn": "Turn on",
+        "turnOff": "Turn off",
+        "failed": "This device could not be subscribed. Try again.",
+        "standing": {
+            "on": "On for this device.",
+            "off": "Off for this device.",
+            "denied": "{clientKind, select, desktop {The system blocks notices from Polaris. Allow them in the system settings.} other {This browser blocks notices from Polaris. Allow them in its site settings.}}",
+            "unsupported": "{clientKind, select, desktop {This app cannot receive notices with Polaris closed.} other {This browser cannot receive notices with Polaris closed.}}"
+        }
     }
 }

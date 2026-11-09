@@ -197,7 +197,9 @@
             "ended": "Esa sesión ha terminado.",
             "noAnswer": "La máquina que ejecuta esta sesión no respondió.",
             "notResumable": "Esta sesión aún no tiene una conversación que reabrir.",
-            "stillRunning": "El agente sigue en marcha, así que no hay nada que reanudar."
+            "stillRunning": "El agente sigue en marcha, así que no hay nada que reanudar.",
+            "permissionGone": "Esa petición ya no espera respuesta.",
+            "permissionAnswered": "Esa petición ya tiene respuesta."
         },
         "taskNote": "Entregada a un agente. Está trabajando en `{branch}` en {repo}: [la sesión]({href}).",
         "start": "Iniciar una sesión",
@@ -386,6 +388,13 @@
             "errors": {
                 "invalid": "Esa petición del historial no es válida."
             }
+        },
+        "permission": {
+            "title": "El agente pide permiso",
+            "allow": "Permitir",
+            "always": "Permitir siempre",
+            "deny": "Denegar",
+            "hint": "\"Siempre\" dura hasta que acabe la sesión. Sin respuesta, el agente vuelve a preguntar en su terminal."
         }
     },
     "rules": {

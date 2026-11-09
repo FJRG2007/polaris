@@ -19,6 +19,7 @@ import * as taskAccess from "@/lib/tasks/access";
 import { requirePermission } from "@/lib/session";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
+import * as permissions from "@/lib/agents/session-permissions";
 import * as work from "@/lib/agents/session-work";
 import * as repoOptions from "@/lib/agents/repo-options";
 import { sessionCursorSchema } from "@/lib/agents/session-cursor";
@@ -655,4 +656,35 @@ export async function sessionHistoryAction(input: unknown): Promise<{
     if (!session) return { error: t("sessions.errors.gone") };
     if (!before) await history.syncSessionHistory(sessionId);
     return history.historyPage(sessionId, { before });
+}
+
+/**
+ * Answer the permission prompt a Claude session handed to Polaris: from the
+ * session page, or from the buttons on a pushed notification (through the
+ * route that wraps this). Only somebody who may steer the session - the same
+ * check prompting it uses - and idempotent: the same answer twice is one.
+ */
+export async function answerPermissionAction(
+    input: unknown
+): Promise<{ status?: string; error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = permissions.permissionAnswerSchema.safeParse(input);
+    if (!parsed.success) return { error: t("sessions.errors.permissionGone") };
+    const outcome = await permissions.answerPermission(
+        parsed.data.requestId,
+        parsed.data.choice,
+        user.id,
+        async (sessionId) => {
+            const session = await sessions.getSession(sessionId, user.id);
+            return session !== null && !core.isSessionOver(session.state);
+        }
+    );
+    if (outcome.ok) return { status: outcome.status };
+    return {
+        error:
+            outcome.reason === "answered"
+                ? t("sessions.errors.permissionAnswered")
+                : t("sessions.errors.permissionGone")
+    };
 }
