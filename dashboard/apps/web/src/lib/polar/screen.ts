@@ -44,6 +44,7 @@ export const SCREEN_RECORDS: readonly ScreenRecord[] = [
     { route: "/admin/users/[id]/sessions", kind: "user", id: "id" },
     { route: "/admin/users/[id]", kind: "user", id: "id" },
     { route: "/announcements/[id]", kind: "announcement", id: "id" },
+    { route: "/apps/agents/orchestration/compare/[groupId]", kind: "agent comparison", id: "groupId" },
     { route: "/apps/agents/sessions/[sessionId]", kind: "agent session", id: "sessionId" },
     { route: "/apps/backups/[resourceId]", kind: "backup resource", id: "resourceId" },
     { route: "/apps/code/[owner]/[repo]/[number]", kind: "pull request", id: "number" },
