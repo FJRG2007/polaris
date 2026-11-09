@@ -119,6 +119,9 @@
         "runNoSession": "Polaris no pudo iniciar una sesión para ella.",
         "runsFull": "Ya tienes {count} ejecuciones en marcha, el máximo por cuenta a la vez. Termina o cancela una primero.",
         "runVariants": "Elige entre 2 y {max} agentes para comparar.",
+        "runOver": "Esa ejecución ya no está en marcha.",
+        "runTasksFull": "Esta ejecución ya tiene {count} tareas, y se creó para tener como mucho {max}.",
+        "runTooDeep": "Eso pondría la tarea {depth} pasos por debajo en una cadena de dependencias, y esta ejecución permite {max}.",
         "pickRepository": "Elige un repositorio",
         "notRepository": "No es un repositorio",
         "pickModel": "Elige un modelo",
@@ -545,7 +548,7 @@
         "compareReady": "{count} versiones de {title} listas para comparar",
         "compare": "Comparar",
         "coordinator": "Coordinador",
-        "addTask": "Añadir tarea",
+        "addTask": "Nueva tarea",
         "cancelRun": "Cancelar ejecución",
         "planning": "El coordinador está planificando las tareas.",
         "noTasks": "Aún no hay tareas. Añade una para empezar.",
@@ -585,7 +588,7 @@
             "agentsHint": "Elige dos o más para hacer la misma tarea en cada uno y quedarte con la mejor.",
             "gate": "Pregunta de aprobación",
             "gatePlaceholder": "Opcional: preguntar antes de que empiece",
-            "add": "Añadir tarea",
+            "add": "Nueva tarea",
             "addCompare": "Añadir y comparar"
         },
         "errors": {

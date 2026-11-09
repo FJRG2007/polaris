@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { recommendExecution } from "@polaris/core";
 import { translatorFor } from "@/lib/i18n/translate";
+import { placeNewTask } from "@/lib/agents/orchestration-plan";
 import {
     agentText,
     AGENT_WORD_GROUPS,
@@ -100,5 +101,29 @@ describe("a session that cannot check its repository out", () => {
     it("is said in Spanish", () => {
         for (const refusal of refusals) expect(agentText(spanish, refusal)).not.toBe(refusal);
         expect(agentText(spanish, refusals[1]!)).toContain("acme/web");
+    });
+});
+
+describe("an orchestration run that refuses", () => {
+    const run = { maxTasks: 1, maxDepth: 1 };
+    const placed = [
+        placeNewTask(run, [{ id: "a", depth: 0 }], []),
+        placeNewTask({ maxTasks: 5, maxDepth: 1 }, [{ id: "a", depth: 0 }], ["a"])
+    ];
+    const refusals = [
+        ...placed.map((result) => ("error" in result ? result.error : "")),
+        "That run is not going any more.",
+        "Pick between 2 and 4 agents to compare.",
+        "That task is not waiting on a decision."
+    ];
+
+    it("is said back in English as it went in", () => {
+        for (const refusal of refusals) expect(agentText(english, refusal)).toBe(refusal);
+    });
+
+    it("is said in Spanish, with its numbers", () => {
+        for (const refusal of refusals) expect(agentText(spanish, refusal)).not.toBe(refusal);
+        expect(agentText(spanish, refusals[0]!)).toContain("1 tareas");
+        expect(agentText(spanish, refusals[1]!)).toContain("2 pasos");
     });
 });
