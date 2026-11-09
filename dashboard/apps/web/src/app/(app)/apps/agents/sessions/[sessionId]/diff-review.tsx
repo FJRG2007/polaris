@@ -26,8 +26,8 @@ function anchorOf(line: DiffLine): { side: "new" | "old"; line: number } | null 
 }
 
 const LINE_TONE: Record<DiffLine["kind"], string> = {
-    add: "bg-success/10",
-    remove: "bg-danger/10",
+    add: "bg-success-soft",
+    remove: "bg-danger-soft",
     context: "",
     hunk: "bg-muted text-muted-foreground",
     meta: "text-muted-foreground"

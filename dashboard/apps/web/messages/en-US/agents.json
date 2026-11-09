@@ -479,7 +479,7 @@
             }
         },
         "fork": {
-            "action": "Fork",
+            "action": "Fork session",
             "hint": "Start a new session on this work, carrying the conversation where the agent can.",
             "noRepo": "A workspace has no branch to fork from.",
             "from": "Forked from",
