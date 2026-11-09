@@ -283,6 +283,8 @@ export function PolarThreads({
     /** The keys the list hears: Ctrl+A, Escape, the arrows, Delete. A key typed
      *  into a field (renaming) or a menu is left alone. */
     const onListKey = (event: KeyboardEvent<HTMLDivElement>) => {
+        // The Code list has no selection: these keys walk the chats.
+        if (codeShown) return;
         const target = event.target as HTMLElement;
         if (target.closest("input, textarea, [role='menu'], [role='dialog']")) return;
         const focused = target.closest<HTMLElement>("[data-thread-id]")?.dataset.threadId ?? null;

@@ -179,7 +179,6 @@ import {
     isAutomatic,
     MAX_QUEUE,
     polarAttachmentId,
-    POLAR_ATTACHMENT_MAX_BYTES,
     POLAR_ATTACHMENT_MOST,
     POLAR_ATTACHMENT_TYPES,
     type ModelChoice,

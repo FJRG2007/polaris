@@ -158,9 +158,9 @@ describe("Code's composer is Chat's", () => {
 
         const box = await openCode();
         const codeButtons = composerButtons(box);
-        // The microphone is the very same; attach and voice stay, refused.
+        // The microphone and attach are the very same; voice stays, refused.
         expect(codeButtons).toEqual([
-            "An agent session can't take attached files yet",
+            "Attach files",
             "Dictate",
             "Microphone and model",
             "Agent: Claude Code - This machine's own login",
@@ -169,8 +169,8 @@ describe("Code's composer is Chat's", () => {
         const form = box.closest("form") as HTMLFormElement;
         const dictate = within(form).getByRole("button", { name: "Dictate" });
         expect((dictate as HTMLButtonElement).disabled).toBe(false);
-        const attach = within(form).getByRole("button", { name: /attached files/ });
-        expect(attach.getAttribute("aria-disabled")).toBe("true");
+        const attach = within(form).getByRole("button", { name: "Attach files" });
+        expect(attach.getAttribute("aria-disabled")).not.toBe("true");
         const voice = within(form).getByRole("button", { name: /not to an agent/ });
         expect(voice.getAttribute("aria-disabled")).toBe("true");
         // Neither picker sits in the composer twice, and the repository is not in it.

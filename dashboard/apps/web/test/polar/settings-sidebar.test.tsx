@@ -137,14 +137,23 @@ describe("the settings page's conversation list", () => {
         expect(kept.get("polar.thread")).toBe("");
     });
 
-    it("lists the Code sessions and opens one on Polar's page", () => {
+    it("lists the Code sessions in Code and opens one on Polar's page", () => {
+        codeState.mode = "code";
         draw();
+        expect(screen.queryByText("Trip to Lisbon")).toBeNull();
         fireEvent.click(screen.getByText("Fix the login page"));
         expect(pushed).toEqual(["/polar?session=s1"]);
     });
 
+    it("lists only the chats in Chat", () => {
+        draw();
+        expect(screen.getByText("Trip to Lisbon")).toBeTruthy();
+        expect(screen.queryByText("Fix the login page")).toBeNull();
+    });
+
     it("leaves Code sessions out for an account Code is closed to", () => {
         codeState.access = "none";
+        codeState.mode = "code";
         draw();
         expect(screen.queryByText("Fix the login page")).toBeNull();
     });
