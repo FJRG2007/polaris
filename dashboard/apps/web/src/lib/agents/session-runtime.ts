@@ -141,6 +141,10 @@ interface Bootstrap {
     readonly cloneHeader: string;
     /** The credential helper script, or empty for a workspace. */
     readonly gitCredential: string;
+    /** The repository's own setup script, encoded, or empty for none. */
+    readonly repoSetup: string;
+    /** Whether a failing setup script stops the session before the agent starts. */
+    readonly repoSetupRequired: boolean;
     /** What signs the agent in, narrowed to the variables its own tool reads.
      *  Empty on a machine where the tool is already signed in, and empty for a
      *  tool Polaris holds no sourced credential for. */
@@ -238,6 +242,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     // no token. Refusing to start one because an organization has not connected
     // GitHub would be refusing over a repository nobody named.
     const githubToken = session.repoFullName ? await cloneToken(session.repoFullName) : "";
+    const setup = session.repoId ? await repoSetupFor(session.repoId) : null;
 
     const base = (await appBaseUrl()).replace(/\/+$/, "");
     const ingest = `${base}/api/agents/sessions/${session.id}/events`;
@@ -312,6 +317,8 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // Not a token: a script that asks for one. The agent's environment holds
         // no GitHub credential at all.
         gitCredential: session.repoFullName ? gitCredentialScript(credential, token) : "",
+        repoSetup: setup?.setupScript.trim() ? asFile(setup.setupScript) : "",
+        repoSetupRequired: setup?.setupRequired ?? false,
         // The account the person picked wins over whatever would have resolved.
         // Somebody holding three subscriptions chose one of them on the form,
         // and a session that quietly used the first is a session doing the work
@@ -372,6 +379,17 @@ async function cloneToken(repoFullName: string): Promise<string> {
         );
     }
     return token;
+}
+
+/** The repository's setup script and whether it may fail. Null for a repository
+ *  that is gone, which runs nothing rather than refusing the session. */
+async function repoSetupFor(
+    repoId: string
+): Promise<{ setupScript: string; setupRequired: boolean } | null> {
+    return prisma.agentRepo.findUnique({
+        where: { id: repoId },
+        select: { setupScript: true, setupRequired: true }
+    });
 }
 
 /**
@@ -435,6 +453,8 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_CREDENTIAL_FILES: boot.credentialFiles,
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),
         POLARIS_GIT_CREDENTIAL: boot.gitCredential ? asFile(boot.gitCredential) : "",
+        POLARIS_REPO_SETUP: boot.repoSetup,
+        POLARIS_REPO_SETUP_REQUIRED: boot.repoSetupRequired ? "yes" : "",
         ...boot.autonomyEnv,
         ...boot.credentials
     });
