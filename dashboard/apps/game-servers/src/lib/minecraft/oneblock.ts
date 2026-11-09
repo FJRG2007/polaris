@@ -33,8 +33,17 @@ export const ONEBLOCK_BLUEPRINT_IDS: readonly string[] = [
     ONEBLOCK_CLASSIC_BLUEPRINT_ID
 ];
 
-/** The plugin's settings file, inside the server's data directory. */
-export const ONEBLOCK_CONFIG_PATH = "/data/plugins/OneBlock/config.yml";
+/**
+ * Where the plugin keeps its files, in the order they are looked for. The folder
+ * is named after the plugin, and the release Modrinth serves calls itself
+ * `Oneblock` - not the `OneBlock` of its project page - so a path spelled the
+ * second way, on a case-sensitive disk, is a file that never appears. Both are
+ * tried, so a release that changes the spelling again is still found.
+ */
+export const ONEBLOCK_DIRS: readonly string[] = ["/data/plugins/Oneblock", "/data/plugins/OneBlock"];
+
+/** The plugin's settings file, inside its folder. */
+export const ONEBLOCK_CONFIG_FILE = "config.yml";
 
 /** Install config key recording that the plugin has been seen set up, so the walk
  *  stops opening the server to look. */

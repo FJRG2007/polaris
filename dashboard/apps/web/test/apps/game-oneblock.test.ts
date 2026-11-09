@@ -52,8 +52,13 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
         })
 }));
 
+/** The folder the plugin really writes to: its plugin.yml name, `Oneblock`. A
+ *  read anywhere else finds nothing, as it does on the server's disk. */
+const PLUGIN_DIR = "/data/plugins/Oneblock";
+
 vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
-    readContainerFile: async () => file,
+    readContainerFile: async (_server: unknown, path: string) =>
+        path === `${PLUGIN_DIR}/config.yml` ? file : null,
     writeContainerFile: async (_server: unknown, path: string, content: string) => {
         if (writeFails) throw new Error("container went away");
         written.set(path, content);
@@ -274,7 +279,7 @@ describe("the classic phases", () => {
 
         file = BUNDLED;
         await applyOneBlockSetup("owner", "app", install.config);
-        expect(written.get(phases.ONEBLOCK_BLOCKS_PATH)).toBe(
+        expect(written.get(`${PLUGIN_DIR}/${phases.ONEBLOCK_BLOCKS_FILE}`)).toBe(
             phases.phasesFile(phases.phasesFor("26.3"))
         );
         expect(sent).toEqual([["ob reload"], oneblock.setupLines("world")]);

@@ -17,6 +17,7 @@ import { BLUEPRINT_KEY } from "../games-create";
 import { withServerContainer } from "./service";
 import { levelOf } from "./mod-announcements-service";
 import { readContainerFile, writeContainerFile } from "../container-files";
+import type { FileReader } from "../container-files";
 
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 
@@ -46,9 +47,10 @@ export async function applyOneBlockSetup(
     const previous = stored[oneblock.ONEBLOCK_WORLD_KEY];
     const outcome = await withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.running) return null;
-        const file = await readContainerFile(server, oneblock.ONEBLOCK_CONFIG_PATH);
+        const plugin = await readPluginConfig(server);
         // Not there yet: the plugin writes it the first time it loads.
-        if (file === null) return null;
+        if (plugin === null) return null;
+        const file = plugin.config;
         const level = await levelOf(server);
         if (!level) return null;
         if (oneblock.isSetUp(file, level, typeof previous === "string" ? previous : null))
@@ -88,14 +90,15 @@ export async function applyOneBlockSetup(
 async function applyClassicPhases(ownerId: string, installedAppId: string): Promise<void> {
     const written = await withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.running) return false;
-        if ((await readContainerFile(server, oneblock.ONEBLOCK_CONFIG_PATH)) === null) return false;
+        const plugin = await readPluginConfig(server);
+        if (plugin === null) return false;
         // The release it started as, so the ladder holds only what it has; a log
         // that does not say yet is read again on the next pass.
         const version = await serverVersion(server);
         if (!version) return false;
         await writeContainerFile(
             server,
-            phases.ONEBLOCK_BLOCKS_PATH,
+            `${plugin.dir}/${phases.ONEBLOCK_BLOCKS_FILE}`,
             phases.phasesFile(phases.phasesFor(version))
         );
         await server.sayAll(["ob reload"]);
@@ -105,4 +108,13 @@ async function applyClassicPhases(ownerId: string, installedAppId: string): Prom
         await patchInstallConfig(installedAppId, {
             [phases.ONEBLOCK_PHASES_KEY]: phases.CLASSIC_PHASES
         });
+}
+
+/** The plugin's folder and its settings file, or null before it has written one. */
+async function readPluginConfig(server: FileReader): Promise<{ dir: string; config: string } | null> {
+    for (const dir of oneblock.ONEBLOCK_DIRS) {
+        const config = await readContainerFile(server, `${dir}/${oneblock.ONEBLOCK_CONFIG_FILE}`);
+        if (config !== null) return { dir, config };
+    }
+    return null;
 }

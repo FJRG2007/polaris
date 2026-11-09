@@ -33,8 +33,8 @@
 
 import { versionAtLeast } from "./version-compare";
 
-/** The plugin's levels file, inside the server's data directory. */
-export const ONEBLOCK_BLOCKS_PATH = "/data/plugins/OneBlock/blocks.yml";
+/** The plugin's levels file, inside its folder (see `ONEBLOCK_DIRS`). */
+export const ONEBLOCK_BLOCKS_FILE = "blocks.yml";
 
 /** Install config key recording which phase set Polaris wrote onto the server,
  *  so it is written once and an operator's later edits are never overwritten. */
