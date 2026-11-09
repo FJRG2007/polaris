@@ -178,7 +178,13 @@ export function MarketplaceView({
         [all, query, category, sort, locale]
     );
     const browsing = !query.trim() && category === "all";
-    const featured = useMemo(() => (browsing ? featuredApps(all) : []), [all, browsing]);
+    // An app somebody already has is not advertised to them: its card is in the
+    // grid below, and a second one would be the same card, menu and all, twice.
+    const featured = useMemo(() => {
+        if (!browsing) return [];
+        const have = new Set(installed.map((item) => item.catalogId));
+        return featuredApps(all.filter((app) => !have.has(app.id)));
+    }, [all, browsing, installed]);
 
     // The apps every Polaris comes with, as cards in the same grid as the ones an
     // administrator switches on, found by the same search. Their categories are

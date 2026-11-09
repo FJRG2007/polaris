@@ -186,7 +186,7 @@ const nextConfig = {
     redirects: async () => [
         // What Next did itself before `skipTrailingSlashRedirect`, everywhere but
         // a session's preview.
-        { source: "/:path((?!api/agents/preview/).+)/", destination: "/:path", permanent: true },
+        { source: "/:path((?!api/agents/preview/).+)/", destination: "/:path", permanent: false },
         { source: "/notifications", destination: "/account/notifications", permanent: false },
         // Signed webhooks moved into Automations; deploy hooks went to each
         // service's settings in Deploy.

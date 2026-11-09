@@ -36,7 +36,7 @@ const updateMany = vi.fn(
     }
 );
 
-vi.mock("@polaris/db", () => ({ prisma: { user: { findUnique, update, updateMany } } }));
+vi.mock("@polaris/db", () => ({ prisma: { user: { findUnique, update, updateMany } }, onAccessWrite: () => undefined }));
 vi.mock("next/headers", () => ({
     cookies: async () => ({
         get: (name: string) => (name === "polaris-locale" && cookie ? { value: cookie } : undefined)

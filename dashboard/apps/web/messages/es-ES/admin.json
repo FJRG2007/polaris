@@ -2746,7 +2746,7 @@
         },
         "templates": {
             "drive-user": {
-                "name": "Usuario de Drive",
+                "name": "Usuario Drive",
                 "description": "Sus archivos, compartirlos y pedir archivos. No puede añadir un NAS ni una cuenta en la nube."
             },
             "drive-viewer": {
@@ -2758,7 +2758,7 @@
                 "description": "No puede añadir almacenamiento, cámaras ni servidores de correo."
             },
             "workspace-user": {
-                "name": "Usuario de oficina",
+                "name": "Usuario Office",
                 "description": "Correo, calendario, documentos, notas, chat, tareas y archivos."
             },
             "read-only": {
@@ -2774,11 +2774,11 @@
                 "description": "Ve proyectos, despliegues y registros. No despliega ni cambia nada."
             },
             "developer": {
-                "name": "Desarrollador",
+                "name": "Programador",
                 "description": "Despliega proyectos, usa agentes de código y crea automatizaciones."
             },
             "game-moderator": {
-                "name": "Moderador de juegos",
+                "name": "Moderador de juego",
                 "description": "Modera jugadores y usa la consola. No crea ni elimina servidores."
             },
             "home-resident": {

@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import config from "../../next.config.mjs";
-import { POLARIS_APPS } from "@/lib/apps";
+import { APP_SECTIONS, POLARIS_APPS } from "@/lib/apps";
 import { isNativeApp } from "@/lib/apps/native-apps";
 import { POLARIS_APP_CATALOG, installedAppHref } from "@/lib/apps/catalog";
 
@@ -77,9 +77,17 @@ describe("official apps", () => {
     });
 
     it("open at a top-level address from the catalog too", () => {
-        // Security scans and Cloud servers are sections of Servers, not apps of their own.
+        // Security scans and Cloud servers are sections of Servers, not apps of their
+        // own, and an app that only unlocks a section of an official app (Analytics,
+        // Telemetry) opens where that section always was.
+        const unlocked = new Set(
+            Object.values(APP_SECTIONS).flat()
+                .filter((section) => section.requiresApp)
+                .map((section) => `${section.requiresApp} ${section.href}`)
+        );
         const under = POLARIS_APP_CATALOG.filter(
-            ({ id, opensAt }) => !isNativeApp(id) && opensAt?.startsWith("/apps")
+            ({ id, opensAt }) =>
+                !isNativeApp(id) && opensAt?.startsWith("/apps") && !unlocked.has(`${id} ${opensAt}`)
         );
         expect(under).toEqual([]);
     });

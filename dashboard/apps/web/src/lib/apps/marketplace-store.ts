@@ -50,7 +50,9 @@ export const ADDED_ON: Readonly<Record<string, string>> = {
     "dns-blocker": "2026-10-18",
     arcade: "2026-10-24",
     vpn: "2026-10-29",
-    translate: "2026-11-03"
+    translate: "2026-11-03",
+    analytics: "2026-11-09",
+    telemetry: "2026-11-09"
 };
 
 /**
@@ -211,7 +213,6 @@ export function storeScope(app: AppManifest): StoreScope {
     return storeShelf(app) === "polaris" ? "polaris" : "deployable";
 }
 
-/** Everything the two marketplaces list: the catalog's offered apps, then Deploy's templates. */
 /**
  * The store's own order: what most deployments install first, first. The
  * catalog's array order is where an app's manifest happens to live, not a
@@ -251,6 +252,7 @@ function storeRank(app: AppManifest): number {
     return at === -1 ? STORE_RANK.length : at;
 }
 
+/** Everything the two marketplaces list: the catalog's offered apps, then Deploy's templates. */
 export function storeApps(): AppManifest[] {
     const apps = [...appsByCategory().flatMap((group) => group.apps), ...templateApps()];
     // Stable, so everything without a rank keeps the catalog's order.
