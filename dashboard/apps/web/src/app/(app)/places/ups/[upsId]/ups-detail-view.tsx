@@ -218,7 +218,9 @@ export function UpsDetailView({
                 }
             />
 
-            <div className="mb-4 overflow-x-auto">
+            {/* Eight tabs: on a phone the strip scrolls (SegmentedControl is a
+                ScrollRow) and keeps the open one in view. */}
+            <div className="mb-4">
                 <SegmentedControl<Tab>
                     size="sm"
                     aria-label={t("ups.tabs.label")}

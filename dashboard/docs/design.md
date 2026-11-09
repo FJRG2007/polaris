@@ -126,6 +126,37 @@ on the dark theme and invisible on the light one - there the page is 97% and the
 card over it is white. A filled button carries a hairline top edge, which is
 what stops a solid fill from reading as a rectangle pasted onto the page.
 
+## Tab strips
+
+A row of tabs or segments is read on a phone too, and at 360px eight labels do
+not fit side by side. The UPS screen in Places showed what happens when a strip
+shares the width out anyway: every option was `min-w-0 flex-1 truncate`, so each
+got an eighth of the row and came out as "O...", "E...", "P..." - a row nobody
+could read. Underline strips drawn as a plain `flex` row failed the other way:
+the last tabs ran off the side of the screen, or a two-word label broke onto
+two lines. The write-up is
+`docs/bugs/tab-strips-crushed-their-labels-on-a-phone.md`.
+
+- **A set of options is `SegmentedControl`** from `@polaris/ui`. It is a
+  `ScrollRow`: on a wide screen its options share the width (`flex-1
+  basis-auto`) as before; when they do not fit, the track scrolls sideways
+  (wheel, faded ends) and keeps the chosen option in view.
+- **An underline strip or any other hand-drawn tab row is a `ScrollRow`** - or
+  at least `overflow-x-auto`, or a row that wraps - and every tab in it is
+  `shrink-0 whitespace-nowrap`. A tab is never narrower than its label.
+- `ScrollRow` brings the chosen child into view by itself: whichever child
+  carries `aria-current`, `aria-selected="true"` or `aria-checked="true"`. Mark
+  the open tab with one of those and nothing else is needed.
+- A label is never cut to make a strip fit. Truncating is for a name in a list
+  row, not for one of a handful of choices that all have to be readable.
+- A strip does not need its own `overflow-x-auto` wrapper around a
+  `SegmentedControl`; the control already scrolls.
+
+`apps/web/test/design/tab-strips.test.tsx` renders `SegmentedControl` and fails
+if it loses the scroll or lets an option shrink, and scans every app for a
+`tablist`, a `role="tab"`, an underline tab or a hand-drawn option that is
+`flex-1 truncate` in a row that neither scrolls nor wraps.
+
 ## Empty states
 
 `EmptyState` from `@polaris/ui`: an optional icon, a short statement of what is

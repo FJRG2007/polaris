@@ -9,7 +9,7 @@
 import type { NotificationHolds, QuietHours } from "@polaris/core";
 import { useState } from "react";
 import { Bell, SlidersHorizontal } from "lucide-react";
-import { cn } from "@polaris/ui";
+import { cn, ScrollRow } from "@polaris/ui";
 import type { NotificationRule } from "@polaris/core";
 import type { DeliveryView } from "@/lib/notification-service";
 import type { DestinationView } from "@/lib/notifications/destinations";
@@ -82,14 +82,15 @@ export function NotificationsPageView({
                     </p>
                 </div>
             ) : null}
-            <div className="flex gap-1 border-b border-border">
+            <ScrollRow className="no-scrollbar flex gap-1 border-b border-border">
                 {tabs.map((entry) => (
                     <button
                         key={entry.id}
                         type="button"
                         onClick={() => setTab(entry.id)}
+                        aria-current={tab === entry.id ? "page" : undefined}
                         className={cn(
-                            "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors",
+                            "-mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors",
                             tab === entry.id
                                 ? "border-primary text-foreground"
                                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -99,7 +100,7 @@ export function NotificationsPageView({
                         {entry.label}
                     </button>
                 ))}
-            </div>
+            </ScrollRow>
 
             {tab === "history" ? <NotificationsView /> : null}
             {tab === "settings" ? (

@@ -48,7 +48,8 @@ import {
     DialogContent,
     DialogFooter,
     DialogHeader,
-    DialogTitle
+    DialogTitle,
+    ScrollRow
 } from "@polaris/ui";
 
 /** The same cadence the table polls at - a server going down is worth noticing
@@ -196,7 +197,7 @@ export function ServerDetail({
                 </div>
             </div>
 
-            <div className="flex gap-1 border-b border-border/60">
+            <ScrollRow className="no-scrollbar flex gap-1 border-b border-border/60">
                 {TABS.filter(
                     (entry) =>
                         (!("needsHost" in entry) || server.hostId) &&
@@ -208,7 +209,7 @@ export function ServerDetail({
                         onClick={() => setTab(entry.id)}
                         aria-current={tab === entry.id ? "page" : undefined}
                         className={cn(
-                            "-mb-px border-b-2 px-3 py-1.5 text-sm transition-colors",
+                            "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-1.5 text-sm transition-colors",
                             tab === entry.id
                                 ? "border-primary font-medium text-foreground"
                                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -217,7 +218,7 @@ export function ServerDetail({
                         {t(`detail.tabs.${entry.id}`)}
                     </button>
                 ))}
-            </div>
+            </ScrollRow>
 
             {tab === "notes" && server.hostId ? (
                 <ServerNotesPanel hostId={server.hostId} />

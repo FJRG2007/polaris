@@ -43,7 +43,8 @@ import {
     DialogContent,
     DialogTitle,
     Switch,
-    cn
+    cn,
+    ScrollRow
 } from "@polaris/ui";
 import {
     Database,
@@ -245,7 +246,7 @@ export function VolumeDetailDialog({
                     </button>
                 </div>
 
-                <div className="flex items-center gap-1 border-b border-border/60 px-5 text-sm">
+                <ScrollRow className="no-scrollbar flex items-center gap-1 border-b border-border/60 px-5 text-sm">
                     {TABS.map((entry) => (
                         <button
                             key={entry}
@@ -253,7 +254,7 @@ export function VolumeDetailDialog({
                             onClick={() => setTab(entry)}
                             aria-current={tab === entry ? "page" : undefined}
                             className={cn(
-                                "-mb-px whitespace-nowrap border-b-2 px-3 py-2 transition-colors",
+                                "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 transition-colors",
                                 tab === entry
                                     ? "border-primary text-foreground"
                                     : "border-transparent text-muted-foreground hover:text-foreground"
@@ -262,7 +263,7 @@ export function VolumeDetailDialog({
                             {t(TAB_LABEL[entry])}
                         </button>
                     ))}
-                </div>
+                </ScrollRow>
 
                 <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">
                     {error && <p className="text-sm text-danger">{error}</p>}

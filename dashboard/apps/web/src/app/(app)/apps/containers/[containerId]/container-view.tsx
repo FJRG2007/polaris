@@ -441,7 +441,7 @@ export function ContainerView({
                             aria-selected={tab === entry.id}
                             onClick={() => setTab(entry.id)}
                             className={cn(
-                                "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-muted",
+                                "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-muted",
                                 tab === entry.id ? "bg-muted font-medium" : "text-muted-foreground"
                             )}
                         >

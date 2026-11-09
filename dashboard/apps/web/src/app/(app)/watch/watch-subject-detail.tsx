@@ -10,7 +10,7 @@
  */
 
 import Link from "next/link";
-import { Button, cn } from "@polaris/ui";
+import { Button, cn, ScrollRow } from "@polaris/ui";
 import { useMemo, useState } from "react";
 import type { AlarmView } from "@/lib/watch-service";
 import { ArrowLeft, Bell, ExternalLink } from "lucide-react";
@@ -124,7 +124,7 @@ export function WatchSubjectDetail({
                 )}
             </div>
 
-            <div className="flex gap-1 border-b border-border/60">
+            <ScrollRow className="no-scrollbar flex gap-1 border-b border-border/60">
                 {tabs.map((entry) => (
                     <button
                         key={entry.id}
@@ -132,7 +132,7 @@ export function WatchSubjectDetail({
                         onClick={() => setTab(entry.id)}
                         aria-current={tab === entry.id ? "page" : undefined}
                         className={cn(
-                            "-mb-px border-b-2 px-3 py-1.5 text-sm transition-colors",
+                            "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-1.5 text-sm transition-colors",
                             tab === entry.id
                                 ? "border-primary font-medium text-foreground"
                                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -141,7 +141,7 @@ export function WatchSubjectDetail({
                         {entry.label}
                     </button>
                 ))}
-            </div>
+            </ScrollRow>
 
             {tab === "metrics" && (
                 <div className="flex flex-col gap-2">
