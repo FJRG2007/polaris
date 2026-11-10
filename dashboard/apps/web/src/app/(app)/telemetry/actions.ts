@@ -22,8 +22,13 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { slugify } from "@polaris/deploy";
 import { appBaseUrl } from "@/lib/domain-service";
-import { requirePermission } from "@/lib/session";
-import { dropGrantsFor } from "@/lib/access/grants";
+import { requirePermission, requireUser, sessionCan } from "@/lib/session";
+import { findPeople } from "@/lib/people-search";
+import * as q from "@/lib/telemetry/issue-query";
+import * as workflow from "@/lib/telemetry/workflow-service";
+import * as taskAccess from "@/lib/tasks/access";
+import * as tasks from "@/lib/tasks/task-service";
+import { dropGrantsFor, grantedSubjects } from "@/lib/access/grants";
 import { requireTelemetryReader } from "@/lib/telemetry/reader";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as report from "@/lib/telemetry/report-service";
@@ -90,71 +95,74 @@ async function failure(caught: unknown, fallback: TelemetryKey): Promise<{ error
 }
 
 export interface TelemetryOverview {
+    /** The project the screen is open on, when it is one this reader may see.
+     *  Every list of projects and issues is read in pages through its own route. */
     readonly projects: readonly (projects.ProjectSummary & { dsn: string })[];
-    readonly issues: readonly report.IssueRow[];
     readonly counts: Readonly<Record<string, number>>;
     readonly windowDays: number;
+    readonly hasReleases: boolean;
 }
 
-/**
- * Everything the list needs, in one call.
- *
- * The projects come with their DSN already built, because the address is the
- * only thing anybody has to copy out of this app and making the screen ask for
- * it separately would be a second round trip for a string.
- */
 export async function telemetryOverviewAction(input: {
     projectId?: string | null;
-    status?: string;
-    query?: string;
 }): Promise<{ data?: TelemetryOverview; error?: string }> {
     const { actor: caller, lent, editable } = await requireTelemetryReader();
     try {
-        const orgId = await scopeOrgIdFor(caller.id);
-        const [rows, origin] = await Promise.all([
-            projects.listProjects(caller, orgId, lent, editable),
-            appBaseUrl()
-        ]);
-        const withDsn = rows.map((row) => ({ ...row, dsn: projects.dsnFor(row, origin) }));
-
-        const chosen = withDsn.find((row) => row.id === input.projectId) ?? withDsn[0];
-        if (!chosen) {
+        const wanted = q.projectRefSchema.safeParse({ projectId: input.projectId });
+        if (!wanted.success) {
             return {
                 data: {
-                    projects: withDsn,
-                    issues: [],
+                    projects: [],
                     counts: {},
-                    windowDays: report.TELEMETRY_WINDOW_DAYS
+                    windowDays: report.TELEMETRY_WINDOW_DAYS,
+                    hasReleases: false
                 }
             };
         }
-        await projects.requireProject(caller, chosen.id, lent);
-
-        const [issues, counts] = await Promise.all([
-            report.listIssues(chosen.id, {
-                status: input.status ?? "unresolved",
-                query: input.query
-            }),
-            report.issueCounts(chosen.id)
+        const [rows, origin] = await Promise.all([
+            readableProjects(caller, lent, editable, wanted.data.projectId),
+            appBaseUrl()
+        ]);
+        const chosen = rows[0];
+        if (!chosen) {
+            await projects.requireProject(caller, wanted.data.projectId, lent);
+            return await failure(new projects.TelemetryAccessError(), "errors.readProjects");
+        }
+        const [counts, releases] = await Promise.all([
+            report.issueCounts(chosen.id),
+            workflow.hasReleases(chosen.id)
         ]);
         return {
-            data: { projects: withDsn, issues, counts, windowDays: report.TELEMETRY_WINDOW_DAYS }
+            data: {
+                projects: [{ ...chosen, dsn: projects.dsnFor(chosen, origin) }],
+                counts,
+                windowDays: report.TELEMETRY_WINDOW_DAYS,
+                hasReleases: releases
+            }
         };
     } catch (caught) {
         return await failure(caught, "errors.readProjects");
     }
 }
 
+export type OpenIssue = report.IssueDetail & {
+    readonly assignee: workflow.PersonLabel | null;
+    readonly resolvedInRelease: string | null;
+};
+
 export async function openIssueAction(
     projectId: string,
     issueId: string
-): Promise<{ issue?: report.IssueDetail; error?: string }> {
+): Promise<{ issue?: OpenIssue; error?: string }> {
     const { actor: caller, lent } = await requireTelemetryReader();
     try {
         await projects.requireProject(caller, projectId, lent);
-        const issue = await report.getIssue(projectId, issueId);
-        if (!issue) return { error: await say("errors.issueGone") };
-        return { issue };
+        const [issue, meta] = await Promise.all([
+            report.getIssue(projectId, issueId),
+            workflow.issueMeta(projectId, issueId)
+        ]);
+        if (!issue || !meta) return { error: await say("errors.issueGone") };
+        return { issue: { ...issue, ...meta } };
     } catch (caught) {
         return await failure(caught, "errors.readIssue");
     }
@@ -171,7 +179,10 @@ export async function setIssueStatusAction(
     }
     try {
         await requireEditable(caller, projectId, editable, manages);
-        await report.setIssueStatus(projectId, issueId, status as core.TelemetryStatus, caller.id);
+        const found = (await workflow.issuesByIds([String(issueId)])).filter(
+            (issue) => issue.projectId === projectId
+        );
+        await workflow.setStatusMany(found, status as core.TelemetryStatus, caller.id);
         revalidatePath(PATH);
         return {};
     } catch (caught) {
@@ -338,5 +349,332 @@ export async function clearTelemetryRefusalsAction(projectId: string): Promise<{
         return {};
     } catch (caught) {
         return await failure(caught, "errors.clear");
+    }
+}
+// ---------------------------------------------------------------------------
+// The issue workflow: search, pages, bulk changes, assignment, tasks, comments.
+// Reads are answered through routes (see telemetry-polls.ts); every input is
+// parsed with the schemas in lib/telemetry/issue-query before it is used.
+// ---------------------------------------------------------------------------
+
+/** The projects a reader may see, or the one a screen is open on. */
+async function readableProjects(
+    caller: projects.TelemetryActor,
+    lent: ReadonlySet<string>,
+    editable: ReadonlySet<string>,
+    only?: string | null
+): Promise<projects.ProjectSummary[]> {
+    const orgId = await scopeOrgIdFor(caller.id);
+    return projects.listProjects(caller, orgId, lent, editable, only ? { ids: [only] } : {});
+}
+
+/** Whether the reader may change every project these issues sit in. */
+async function requireEditableAll(
+    caller: projects.TelemetryActor,
+    projectIds: readonly string[],
+    editable: ReadonlySet<string>,
+    manages: boolean
+): Promise<void> {
+    for (const projectId of new Set(projectIds)) {
+        await requireEditable(caller, projectId, editable, manages);
+    }
+}
+
+export interface IssuePage extends workflow.Page<workflow.IssueListRow> {
+    /** The projects on this page the reader may change, so a row offers only
+     *  what the server will do. */
+    readonly editable: readonly string[];
+}
+
+export async function searchIssuesAction(
+    input: unknown
+): Promise<{ data?: IssuePage; error?: string }> {
+    const parsed = q.issueSearchSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.readIssues") };
+    const { actor: caller, lent, editable } = await requireTelemetryReader();
+    try {
+        const visible = await readableProjects(caller, lent, editable, parsed.data.projectId);
+        if (parsed.data.projectId && visible.length === 0) {
+            await projects.requireProject(caller, parsed.data.projectId, lent);
+        }
+        const query = q.parseIssueQuery(parsed.data.query);
+        const named = query.project?.toLowerCase();
+        const chosen = named
+            ? visible.filter(
+                  (project) =>
+                      project.slug.toLowerCase() === named ||
+                      project.name.toLowerCase() === named ||
+                      project.id === named
+              )
+            : visible;
+        const page = await workflow.searchIssues({
+            projects: chosen,
+            query,
+            sort: parsed.data.sort,
+            cursor: parsed.data.cursor,
+            viewerId: caller.id
+        });
+        return {
+            data: {
+                ...page,
+                editable: chosen
+                    .filter((project) => project.access !== "view")
+                    .map((project) => project.id)
+            }
+        };
+    } catch (caught) {
+        return await failure(caught, "errors.readIssues");
+    }
+}
+
+export async function eventsPageAction(
+    input: unknown
+): Promise<{ data?: workflow.Page<workflow.EventRow>; error?: string }> {
+    const parsed = q.eventPageSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.readEvents") };
+    const { actor: caller, lent } = await requireTelemetryReader();
+    try {
+        await projects.requireProject(caller, parsed.data.projectId, lent);
+        return { data: await workflow.listEventsPage(parsed.data) };
+    } catch (caught) {
+        return await failure(caught, "errors.readEvents");
+    }
+}
+
+export async function openEventAction(
+    input: unknown
+): Promise<{ event?: report.EventDetail & { issueId: string }; error?: string }> {
+    const parsed = q.eventRefSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.readEvents") };
+    const { actor: caller, lent } = await requireTelemetryReader();
+    try {
+        await projects.requireProject(caller, parsed.data.projectId, lent);
+        const event = await workflow.getEvent(parsed.data.projectId, parsed.data.eventId);
+        return event ? { event } : { error: await say("errors.eventGone") };
+    } catch (caught) {
+        return await failure(caught, "errors.readEvents");
+    }
+}
+
+export async function projectsPageAction(
+    input: unknown
+): Promise<{ data?: workflow.Page<projects.ProjectSummary & { dsn: string }>; error?: string }> {
+    const parsed = q.projectPageSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.readProjects") };
+    const { actor: caller, lent, editable } = await requireTelemetryReader();
+    try {
+        const orgId = await scopeOrgIdFor(caller.id);
+        const [rows, origin] = await Promise.all([
+            projects.listProjects(caller, orgId, lent, editable, {
+                query: parsed.data.query || undefined,
+                ...q.pageArgs(parsed.data.cursor, q.PAGE_SIZE)
+            }),
+            appBaseUrl()
+        ]);
+        const page = q.pageOf(rows, q.PAGE_SIZE);
+        return {
+            data: {
+                next: page.next,
+                items: page.items.map((row) => ({ ...row, dsn: projects.dsnFor(row, origin) }))
+            }
+        };
+    } catch (caught) {
+        return await failure(caught, "errors.readProjects");
+    }
+}
+
+export async function releasesAction(
+    input: unknown
+): Promise<{ releases?: workflow.ReleaseRow[]; error?: string }> {
+    const parsed = q.projectRefSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.readReleases") };
+    const { actor: caller, lent } = await requireTelemetryReader();
+    try {
+        await projects.requireProject(caller, parsed.data.projectId, lent);
+        return { releases: await workflow.listReleases(parsed.data.projectId) };
+    } catch (caught) {
+        return await failure(caught, "errors.readReleases");
+    }
+}
+
+export async function bulkStatusAction(input: unknown): Promise<{ error?: string }> {
+    const parsed = q.bulkStatusSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.badStatus") };
+    const { caller, editable, manages } = await editor();
+    try {
+        const found = await workflow.issuesByIds(parsed.data.issueIds);
+        if (found.length === 0) return { error: await say("errors.issueGone") };
+        await requireEditableAll(
+            caller,
+            found.map((issue) => issue.projectId),
+            editable,
+            manages
+        );
+        await workflow.setStatusMany(found, parsed.data.status, caller.id, parsed.data.mode);
+        revalidatePath(PATH);
+        return {};
+    } catch (caught) {
+        return await failure(caught, "errors.changeIssue");
+    }
+}
+
+export async function assignIssuesAction(input: unknown): Promise<{ error?: string }> {
+    const parsed = q.assignSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.assign") };
+    const { caller, editable, manages } = await editor();
+    try {
+        const found = await workflow.issuesByIds(parsed.data.issueIds);
+        if (found.length === 0) return { error: await say("errors.issueGone") };
+        const projectIds = found.map((issue) => issue.projectId);
+        await requireEditableAll(caller, projectIds, editable, manages);
+        const assignee = parsed.data.assigneeId;
+        if (assignee) {
+            const held = await grantedSubjects(assignee, "telemetry.project");
+            if (!(await workflow.mayRead(assignee, projectIds, new Set(held.keys())))) {
+                return { error: await say("errors.assigneeCannotSee") };
+            }
+        }
+        await workflow.assignMany(found, assignee, caller.id);
+        if (assignee) {
+            // The assignment stands whether or not the bell could be rung.
+            await workflow
+                .notifyAssigned(found, assignee, caller.id)
+                .catch((error) => console.error("polaris: could not notify an assignee:", error));
+        }
+        return {};
+    } catch (caught) {
+        return await failure(caught, "errors.assign");
+    }
+}
+
+/** Who an issue can be handed to: anybody the people search finds, greyed out
+ *  with the reason when they could not open the project. */
+export async function searchAssigneesAction(
+    projectId: string,
+    query: string
+): Promise<{ results?: { id: string; name: string; unavailable?: string }[] }> {
+    const parsed = q.projectRefSchema.safeParse({ projectId });
+    if (!parsed.success) return { results: [] };
+    const { actor: caller, lent } = await requireTelemetryReader();
+    const user = await requireUser();
+    try {
+        await projects.requireProject(caller, parsed.data.projectId, lent);
+        const found = await findPeople(user, String(query ?? "").slice(0, 80), {
+            reachableOnly: false,
+            limit: 10
+        });
+        const cannot = await say("assign.cannotSee");
+        const results = await Promise.all(
+            found.people.map(async (person) => {
+                const held = await grantedSubjects(person.id, "telemetry.project");
+                const may = await workflow.mayRead(
+                    person.id,
+                    [parsed.data.projectId],
+                    new Set(held.keys())
+                );
+                return may ? person : { ...person, unavailable: cannot };
+            })
+        );
+        return { results };
+    } catch (caught) {
+        console.error("polaris: a telemetry assignee search failed:", caught);
+        return { results: [] };
+    }
+}
+
+/** The lists a task can be made in, for an account that may make tasks. */
+export async function taskListsAction(
+    query: string
+): Promise<{ lists?: workflow.TaskListOption[]; error?: string }> {
+    const user = await requireUser();
+    if (!(await sessionCan(user, "tasks.manage"))) return { error: await say("errors.noTasks") };
+    try {
+        return {
+            lists: await workflow.findTaskLists(
+                { id: user.id, isAdmin: user.isAdmin },
+                String(query ?? "").slice(0, 80)
+            )
+        };
+    } catch (caught) {
+        console.error("polaris: reading task lists for telemetry failed:", caught);
+        return { error: await say("errors.readLists") };
+    }
+}
+
+/**
+ * Make a task from an issue, in a list the caller may add to, and note it on
+ * the issue so the next person to open it sees the work already exists.
+ */
+export async function createIssueTaskAction(
+    input: unknown
+): Promise<{ id?: string; reference?: string; error?: string }> {
+    const parsed = q.issueTaskSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.taskInput") };
+    const { actor: caller, lent } = await requireTelemetryReader();
+    const user = await requireUser();
+    if (!(await sessionCan(user, "tasks.manage"))) return { error: await say("errors.noTasks") };
+    try {
+        await projects.requireProject(caller, parsed.data.projectId, lent);
+        const meta = await workflow.issueMeta(parsed.data.projectId, parsed.data.issueId);
+        if (!meta) return { error: await say("errors.issueGone") };
+        const { spaceId } = await taskAccess.requireList(caller, parsed.data.listId, "member");
+        const created = await tasks.createTask(
+            caller.id,
+            spaceId,
+            core.taskCreateSchema.parse({
+                listId: parsed.data.listId,
+                name: parsed.data.name,
+                description: parsed.data.description,
+                assigneeIds: parsed.data.assign ? [meta.assignee?.id ?? caller.id] : []
+            })
+        );
+        await workflow.addActivity({
+            projectId: parsed.data.projectId,
+            issueId: parsed.data.issueId,
+            actorId: caller.id,
+            kind: "task",
+            body: `${created.reference} ${parsed.data.name}`.slice(0, 300),
+            ref: created.id
+        });
+        return created;
+    } catch (caught) {
+        if (caught instanceof taskAccess.TaskAccessError) {
+            return { error: await say("errors.listRefused") };
+        }
+        return await failure(caught, "errors.makeTask");
+    }
+}
+
+export async function issueActivityAction(
+    input: unknown
+): Promise<{ data?: workflow.Page<workflow.ActivityRow>; error?: string }> {
+    const parsed = q.activityPageSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.readActivity") };
+    const { actor: caller, lent } = await requireTelemetryReader();
+    try {
+        await projects.requireProject(caller, parsed.data.projectId, lent);
+        if (!(await workflow.issueMeta(parsed.data.projectId, parsed.data.issueId))) {
+            return { error: await say("errors.issueGone") };
+        }
+        return { data: await workflow.listActivity(parsed.data.issueId, parsed.data.cursor) };
+    } catch (caught) {
+        return await failure(caught, "errors.readActivity");
+    }
+}
+
+/** A comment on an issue. Anybody who can read the issue may say something about it. */
+export async function commentIssueAction(input: unknown): Promise<{ error?: string }> {
+    const parsed = q.commentSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.comment") };
+    const { actor: caller, lent } = await requireTelemetryReader();
+    try {
+        await projects.requireProject(caller, parsed.data.projectId, lent);
+        if (!(await workflow.issueMeta(parsed.data.projectId, parsed.data.issueId))) {
+            return { error: await say("errors.issueGone") };
+        }
+        await workflow.addActivity({ ...parsed.data, actorId: caller.id, kind: "comment" });
+        return {};
+    } catch (caught) {
+        return await failure(caught, "errors.comment");
     }
 }

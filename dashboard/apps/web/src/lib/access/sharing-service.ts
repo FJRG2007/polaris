@@ -266,6 +266,13 @@ export async function requireMayShare(
             return;
         }
         case "analytics.site": {
+            // A site run elsewhere is shared by whoever added it, or an administrator.
+            const { externalSiteOwner } = await import("@/lib/analytics-service");
+            const owner = externalSiteOwner(subjectId);
+            if (owner) {
+                if (owner !== user.id.toLowerCase() && !user.isAdmin) throw new GrantError("You cannot share that");
+                return;
+            }
             // Whoever may configure a service decides who else reads its numbers.
             const configurable = await requireApplicationAccess(
                 subjectId,
@@ -604,9 +611,9 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
         case "dns.filter":
             return "/network-filter";
         case "telemetry.project":
-            return `/telemetry?project=${encodeURIComponent(subjectId)}`;
+            return `/telemetry/${encodeURIComponent(subjectId)}`;
         case "analytics.site":
-            return `/analytics?scope=application&id=${encodeURIComponent(subjectId)}`;
+            return `/analytics?scope=${/^[0-9a-f-]{36}:[0-9a-f]{12}$/i.test(subjectId) ? "external" : "application"}&id=${encodeURIComponent(subjectId)}`;
         case "automation.automation":
             return `/automations/${subjectId}`;
         case "office.document":

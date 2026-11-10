@@ -179,12 +179,29 @@ export async function listProjects(
     actor: TelemetryActor,
     orgId: string | null,
     lent: ReadonlySet<string> = new Set(),
-    editable: ReadonlySet<string> = new Set()
+    editable: ReadonlySet<string> = new Set(),
+    page: {
+        /** Only these projects - the one a screen is open on. */
+        ids?: readonly string[];
+        /** Names containing this, for the project picker. */
+        query?: string;
+        /** Prisma cursor arguments; see `pageArgs` in issue-query. */
+        take?: number;
+        skip?: number;
+        cursor?: { id: string };
+    } = {}
 ): Promise<ProjectSummary[]> {
     const own = actor.isAdmin ? { orgId } : { ownerId: actor.id, orgId };
+    const readable = lent.size > 0 ? { OR: [own, { id: { in: [...lent] } }] } : own;
+    const narrowed = [
+        ...(page.ids ? [{ id: { in: [...page.ids] } }] : []),
+        ...(page.query ? [{ name: { contains: page.query, mode: "insensitive" as const } }] : [])
+    ];
     const rows = await prisma.telemetryProject.findMany({
-        where: lent.size > 0 ? { OR: [own, { id: { in: [...lent] } }] } : own,
-        orderBy: [{ system: "desc" }, { name: "asc" }],
+        where: narrowed.length > 0 ? { AND: [readable, ...narrowed] } : readable,
+        orderBy: [{ system: "desc" }, { name: "asc" }, { id: "asc" }],
+        take: page.take ?? 500,
+        ...(page.cursor ? { cursor: page.cursor, skip: page.skip ?? 1 } : {}),
         select: {
             id: true,
             ownerId: true,
@@ -210,11 +227,16 @@ export async function listProjects(
             refusedIp: true,
             refusedAgent: true,
             refusedReason: true,
+            // The newest open issue for "last seen", and a count for the rest:
+            // reading every open issue to count them was a project's whole
+            // backlog on every render of the grid.
             issues: {
                 where: { status: "unresolved" },
                 select: { lastSeen: true },
-                orderBy: { lastSeen: "desc" }
-            }
+                orderBy: { lastSeen: "desc" },
+                take: 1
+            },
+            _count: { select: { issues: { where: { status: "unresolved" } } } }
         }
     });
     return rows.map((row) => {
@@ -237,7 +259,7 @@ export async function listProjects(
             orgId: row.orgId,
             shared,
             access,
-            openIssues: row.issues.length,
+            openIssues: row._count.issues,
             lastSeen: row.issues[0]?.lastSeen.toISOString() ?? null,
             rules: hidden
                 ? rulesOf({

@@ -13,7 +13,7 @@
  * is a thing you go into, so it has an inside.
  */
 
-import { Bug, KeyRound, Settings, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Activity, Bug, KeyRound, Settings, ShieldCheck, Tag, type LucideIcon } from "lucide-react";
 
 export interface Section {
     /** What it is called in the URL. Short and stable: it ends up in links
@@ -23,11 +23,28 @@ export interface Section {
     readonly label: string;
     readonly icon: LucideIcon;
     readonly hint: string;
+    /** Open to somebody the project was shared with to read: the faults and
+     *  what they say, never the settings. */
+    readonly readOnly?: boolean;
 }
 
 export const SECTIONS: readonly Section[] = [
     // i18n-ignore these labels and hints are drawn as telemetry.sections.<key>
-    { key: "issues", label: "Issues", icon: Bug, hint: "What is failing, and how often" },
+    { key: "issues", label: "Issues", icon: Bug, hint: "What is failing, and how often", readOnly: true },
+    {
+        key: "events",
+        label: "Events", // i18n-ignore
+        icon: Activity,
+        hint: "Every report as it arrived, newest first", // i18n-ignore
+        readOnly: true
+    },
+    {
+        key: "releases",
+        label: "Releases", // i18n-ignore
+        icon: Tag,
+        hint: "The builds that reported, and their issues", // i18n-ignore
+        readOnly: true
+    },
     {
         key: "client",
         label: "Client", // i18n-ignore

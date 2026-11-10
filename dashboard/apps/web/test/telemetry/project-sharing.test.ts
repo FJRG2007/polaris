@@ -42,7 +42,8 @@ const row = {
     refusedIp: "203.0.113.9",
     refusedAgent: "curl",
     refusedReason: null,
-    issues: []
+    issues: [],
+    _count: { issues: 0 }
 };
 
 vi.mock("@polaris/db", () => ({
@@ -77,6 +78,14 @@ vi.mock("@/lib/telemetry/report-service", () => ({
     getIssue: vi.fn(async () => ({ id: "i1" })),
     setIssueStatus: vi.fn(),
     deleteIssue: vi.fn()
+}));
+vi.mock("@/lib/telemetry/workflow-service", () => ({
+    hasReleases: vi.fn(async () => false),
+    issueMeta: vi.fn(async () => ({ assignee: null, resolvedInRelease: null })),
+    issuesByIds: vi.fn(async () => [
+        { id: "i1", projectId: "0192f0aa-0000-7000-8000-0000000000d1", lastRelease: null, title: "" }
+    ]),
+    setStatusMany: vi.fn()
 }));
 vi.mock("@/lib/domain-service", () => ({
     appBaseUrl: vi.fn(async () => "https://polaris.example.test")
@@ -123,8 +132,9 @@ describe("a shared telemetry project", () => {
 
     it("turns away somebody it was not shared with, even one who runs services", async () => {
         state.manages = true;
-        const { data } = await actions.telemetryOverviewAction({ projectId: PROJECT });
-        expect(data?.projects).toEqual([]);
+        expect(await actions.telemetryOverviewAction({ projectId: PROJECT })).toEqual({
+            error: "errors.noAccess"
+        });
         expect(await actions.openIssueAction(PROJECT, "i1")).toEqual({ error: "errors.noAccess" });
         expect(await actions.setIssueStatusAction(PROJECT, "i1", "resolved")).toEqual({
             error: "errors.noAccess"
@@ -135,7 +145,7 @@ describe("a shared telemetry project", () => {
         state.granted = new Map([[PROJECT, "view"]]);
         const { data } = await actions.telemetryOverviewAction({ projectId: PROJECT });
         expect(state.where).toMatchObject({
-            OR: [{ ownerId: "reader" }, { id: { in: [PROJECT] } }]
+            AND: [{ OR: [{ ownerId: "reader" }, { id: { in: [PROJECT] } }] }, { id: { in: [PROJECT] } }]
         });
         expect(data?.projects[0]).toMatchObject({
             shared: true,
@@ -143,8 +153,10 @@ describe("a shared telemetry project", () => {
             refused: { ip: null, agent: null }
         });
         expect(data?.projects[0]?.rules.allowedCidrs).toEqual([]);
-        expect(data?.issues).toEqual([{ id: "i1" }]);
-        expect(await actions.openIssueAction(PROJECT, "i1")).toEqual({ issue: { id: "i1" } });
+        expect(data?.hasReleases).toBe(false);
+        expect(await actions.openIssueAction(PROJECT, "i1")).toEqual({
+            issue: { id: "i1", assignee: null, resolvedInRelease: null }
+        });
     });
 
     it("refuses a grantee every change", async () => {

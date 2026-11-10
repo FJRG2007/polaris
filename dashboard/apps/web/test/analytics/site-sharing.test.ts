@@ -56,7 +56,10 @@ vi.mock("@/lib/analytics-service", () => ({
     ),
     readAnalytics: vi.fn(async () => ({ online: 0 })),
     recentVisits: vi.fn(async () => []),
-    getAnalyticsSettings: vi.fn(async () => ({}))
+    getAnalyticsSettings: vi.fn(async () => ({})),
+    ownedExternalSites: vi.fn(async () => []),
+    findExternalSite: vi.fn(async () => null),
+    externalSiteOwner: vi.fn(() => null)
 }));
 vi.mock("@/lib/analytics-reports", () => ({
     listReports: vi.fn(async () => []),

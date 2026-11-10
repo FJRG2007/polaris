@@ -76,6 +76,9 @@ describe("the screen that reads the numbers", () => {
     it("tells an empty account apart from a list that has not arrived", () => {
         // The failure this replaced: a dropdown saying "no services yet" to
         // somebody who has forty, for as long as the query took.
-        expect(panel).toContain("services !== null && services.length === 0");
+        // A list still on its way draws a placeholder; only an arrived, empty one
+        // says there is nothing to measure.
+        expect(panel).toContain("choices === null ? (");
+        expect(panel).toContain("choices.length > 0 ? (");
     });
 });

@@ -14,7 +14,7 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useConfirm } from "@/components/confirm-dialog";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowDown, ArrowUp, ChevronRight, Download, Filter, Plus, Trash2, X } from "lucide-react";
@@ -49,7 +49,9 @@ import {
 } from "./actions";
 import type { SiteLevel } from "./site-access";
 import type { AnalyticsScope } from "./site-catalog";
-import { ANALYTICS_TABS, type AnalyticsTab } from "./analytics-tabs";
+import { REPORT_TABS, type AnalyticsTab } from "./analytics-tabs";
+import { LoadMore } from "./load-more";
+import { RankList } from "./analytics-sections";
 
 
 function grouped(value: number): string {
@@ -71,6 +73,7 @@ function may(level: SiteLevel, needed: SiteLevel): boolean {
 /** The filters live in the URL (`f`, JSON), so a narrowed view is a link. */
 export function useFilterNav() {
     const params = useSearchParams();
+    const pathname = usePathname();
     const router = useRouter();
     const raw = params.get("f") ?? "";
     const filters = useMemo(() => core.parseVisitFilters(raw), [raw]);
@@ -79,9 +82,9 @@ export function useFilterNav() {
             const search = new URLSearchParams(params.toString());
             if (next.length) search.set("f", JSON.stringify(next));
             else search.delete("f");
-            router.replace(`/analytics?${search.toString()}`, { scroll: false });
+            router.replace(`${pathname}?${search.toString()}`, { scroll: false });
         },
-        [params, router]
+        [params, router, pathname]
     );
     const add = useCallback(
         (dimension: core.VisitFilterDimension, value: string, negate = false) => {
@@ -96,7 +99,9 @@ export function useFilterNav() {
 }
 
 /** What a breakdown row calls when it is picked: narrow everything to it. */
-export const FilterPick = createContext<((dimension: core.VisitFilterDimension, value: string) => void) | null>(
+export const FilterPick = createContext<
+    ((dimension: core.VisitFilterDimension, value: string, negate?: boolean) => void) | null
+>(
     null
 );
 export const useFilterPick = () => useContext(FilterPick);
@@ -119,20 +124,20 @@ export const BREAKDOWN_FILTER: Partial<Record<core.VisitDimension, core.VisitFil
     ip: "ip"
 };
 
+/** The saved-report kinds, which share /analytics/reports. Every other section is in the rail. */
 export function SectionTabs({ tab }: { tab: AnalyticsTab }) {
     const t = useTranslations("analytics");
     const params = useSearchParams();
     return (
         <ScrollRow className="no-scrollbar -mx-1 flex gap-1 border-b border-border px-1">
-            {ANALYTICS_TABS.map((value) => {
+            {REPORT_TABS.map((value) => {
                 const next = new URLSearchParams(params.toString());
-                if (value === "overview") next.delete("tab");
-                else next.set("tab", value);
+                next.set("tab", value);
                 const active = value === tab;
                 return (
                     <Link
                         key={value}
-                        href={`/analytics?${next.toString()}`}
+                        href={`/analytics/reports?${next.toString()}`}
                         scroll={false}
                         aria-current={active ? "page" : undefined}
                         className={cn(
@@ -360,7 +365,7 @@ export function FilterBar({
 
 // --- one panel's answer -------------------------------------------------------------
 
-interface PanelProps {
+export interface PanelProps {
     data: AnalyticsOverview;
     scope: AnalyticsScope;
     siteId: string;
@@ -368,7 +373,7 @@ interface PanelProps {
     onSaved: () => void;
 }
 
-function useReport<K extends AnalyticsReportAnswer["kind"]>(
+export function useReport<K extends AnalyticsReportAnswer["kind"]>(
     props: PanelProps,
     request: AnalyticsReportRequest | null,
     /** Anything else that makes the answer stale, such as the saved goals changing. */
@@ -406,7 +411,7 @@ function useReport<K extends AnalyticsReportAnswer["kind"]>(
     return { answer: answer as Extract<AnalyticsReportAnswer, { kind: K }> | null, error, loading };
 }
 
-function Rows({ count = 5 }: { count?: number }) {
+export function Rows({ count = 5 }: { count?: number }) {
     return (
         <div className="flex flex-col gap-2 py-1">
             {Array.from({ length: count }, (_, index) => (
@@ -416,11 +421,11 @@ function Rows({ count = 5 }: { count?: number }) {
     );
 }
 
-function Empty({ children }: { children: React.ReactNode }) {
+export function Empty({ children }: { children: React.ReactNode }) {
     return <p className="px-2 py-6 text-center text-sm text-muted-foreground">{children}</p>;
 }
 
-function Failure({ message }: { message: string | null }) {
+export function Failure({ message }: { message: string | null }) {
     return message ? <p className="text-sm text-danger-ink">{message}</p> : null;
 }
 
@@ -465,6 +470,8 @@ export function ReportPanel(props: PanelProps & { tab: Exclude<AnalyticsTab, "ov
             return <RevenuePanel {...props} />;
         case "site":
             return <SitePanel {...props} />;
+        default:
+            return null;
     }
 }
 
@@ -525,14 +532,11 @@ function SessionsPanel(props: PanelProps) {
                     </ul>
                 )}
                 {answer?.more ? (
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={loading}
-                        onClick={() => setBefore(pages[pages.length - 1]?.lastSeenAt)}
-                    >
-                        {t("sessions.more")}
-                    </Button>
+                    <LoadMore
+                        loading={loading}
+                        label={t("sessions.more")}
+                        onMore={() => setBefore(pages[pages.length - 1]?.lastSeenAt)}
+                    />
                 ) : null}
             </CardBody>
             {open ? <SessionDialog {...props} id={open} onClose={() => setOpen(null)} /> : null}
@@ -625,7 +629,6 @@ function Props({ props }: { props: Record<string, string | number | boolean> }) 
 function EventsPanel(props: PanelProps) {
     const t = useTranslations("analytics");
     const [chosen, setChosen] = useState<string | null>(null);
-    const names = useReport<"events">(props, { kind: "events" });
     const properties = useReport<"properties">(props, chosen ? { kind: "properties", name: chosen } : null);
     const byKey = useMemo(() => {
         const map = new Map<string, { key: string; label: string; value: number }[]>();
@@ -644,31 +647,13 @@ function EventsPanel(props: PanelProps) {
                     <CardTitle className="text-sm">{t("events.title")}</CardTitle>
                 </CardHeader>
                 <CardBody className="pt-0">
-                    <Failure message={names.error} />
-                    {!names.answer ? (
-                        <Rows />
-                    ) : names.answer.rows.length === 0 ? (
-                        <Empty>{t("events.none")}</Empty>
-                    ) : (
-                        <BarList
-                            rows={names.answer.rows.map((row) => ({
-                                key: row.name,
-                                value: row.events,
-                                note: t("events.visitors", { count: grouped(row.visitors) }),
-                                label: (
-                                    <button
-                                        type="button"
-                                        className={cn("truncate text-left hover:underline", chosen === row.name && "font-medium")}
-                                        aria-pressed={chosen === row.name}
-                                        onClick={() => setChosen(row.name)}
-                                        title={row.name}
-                                    >
-                                        {row.name}
-                                    </button>
-                                )
-                            }))}
-                        />
-                    )}
+                    <RankList
+                        props={props}
+                        dimension="event"
+                        empty={t("events.none")}
+                        onPick={setChosen}
+                        picked={chosen}
+                    />
                 </CardBody>
             </Card>
             <Card>

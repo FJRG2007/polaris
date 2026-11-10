@@ -48,7 +48,13 @@ const SALT_KEY = "analytics.salt";
  *  matches what people mean by "one sitting". */
 export const SESSION_IDLE_MS = 30 * 60 * 1000;
 
-export type AnalyticsScopeType = "polaris" | "application";
+/**
+ * `external` is a site that is not served from here at all - somebody's blog on
+ * another host, measured with the tracker alone. Its scope id is
+ * `<creator's user id>:<random>`, which is what makes the creator its owner
+ * without a column of its own (see `externalSiteOwner`).
+ */
+export type AnalyticsScopeType = "polaris" | "application" | "external";
 
 export interface AnalyticsSiteView {
     readonly id: string;
@@ -192,7 +198,7 @@ function toSiteView(site: {
     const hostnames = safeJson(site.hostnames);
     return {
         id: site.id,
-        scopeType: site.scopeType === "polaris" ? "polaris" : "application",
+        scopeType: site.scopeType === "polaris" ? "polaris" : site.scopeType === "external" ? "external" : "application",
         scopeId: site.scopeId,
         name: site.name,
         hostnames: Array.isArray(hostnames) ? hostnames.filter((entry): entry is string => typeof entry === "string") : [],
@@ -200,6 +206,102 @@ function toSiteView(site: {
         trackerEnabled: site.trackerEnabled,
         rules: readRules({ excludedPaths: site.excludedPaths ?? "[]", ignoredIps: site.ignoredIps ?? "[]" })
     };
+}
+
+// --- sites that are not served here -------------------------------------------
+
+/** The account an external site's scope id names as its owner, or null. */
+export function externalSiteOwner(scopeId: string): string | null {
+    const match = /^([0-9a-f-]{36}):[0-9a-f]{12}$/i.exec(scopeId);
+    return match ? match[1]!.toLowerCase() : null;
+}
+
+/** How many external sites one account may hold. A backstop, not a plan limit. */
+export const EXTERNAL_SITE_CAP = 200;
+
+/**
+ * A site somebody runs elsewhere. Created with the tracker already accepting
+ * beats, since the tracker is the only way such a site is ever measured - a
+ * switch that has to be found and turned on before the first visit counts is
+ * exactly the step a guided setup exists to remove.
+ *
+ * The hostname is kept for the screen and for telling the site's own links from
+ * referrals; it is never matched against the edge log, which only ever routes
+ * domains attached to a deployed service.
+ */
+export async function createExternalSite(
+    ownerId: string,
+    name: string,
+    hostname: string
+): Promise<AnalyticsSiteView | null> {
+    const held = await prisma.analyticsSite.count({
+        where: { scopeType: "external", scopeId: { startsWith: `${ownerId}:` } }
+    });
+    if (held >= EXTERNAL_SITE_CAP) return null;
+    const created = await prisma.analyticsSite.create({
+        data: {
+            scopeType: "external",
+            scopeId: `${ownerId}:${randomBytes(6).toString("hex")}`,
+            name,
+            hostnames: JSON.stringify(hostname ? [hostname] : []),
+            publicKey: randomBytes(16).toString("hex"),
+            trackerEnabled: true
+        }
+    });
+    return toSiteView(created);
+}
+
+/** An external site by its scope id, or null. Never creates one. */
+export async function findExternalSite(scopeId: string): Promise<AnalyticsSiteView | null> {
+    const row = await prisma.analyticsSite.findUnique({
+        where: { scopeType_scopeId: { scopeType: "external", scopeId } }
+    });
+    return row ? toSiteView(row) : null;
+}
+
+/** Rename an external site or change its address. Services follow their own. */
+export async function updateExternalSite(siteId: string, name: string, hostname: string): Promise<void> {
+    await prisma.analyticsSite.update({
+        where: { id: siteId },
+        data: { name, hostnames: JSON.stringify(hostname ? [hostname] : []) }
+    });
+}
+
+/** Remove an external site and, by cascade, everything it recorded. */
+export async function deleteExternalSite(siteId: string): Promise<void> {
+    await prisma.analyticsSite.deleteMany({ where: { id: siteId, scopeType: "external" } });
+}
+
+/** The external sites an account owns, newest first, bounded. */
+export async function ownedExternalSites(ownerId: string): Promise<{ scopeId: string; name: string }[]> {
+    return prisma.analyticsSite.findMany({
+        where: { scopeType: "external", scopeId: { startsWith: `${ownerId}:` } },
+        orderBy: { createdAt: "desc" },
+        take: EXTERNAL_SITE_CAP,
+        select: { scopeId: true, name: true }
+    });
+}
+
+/**
+ * The first thing a site recorded, for the "check the installation" step: the
+ * oldest event, and whether any of it came from the tracker rather than the edge
+ * log (the tracker is the only source that sets a screen or a language, or that
+ * sends a custom event).
+ */
+export async function firstRecorded(siteId: string): Promise<{ at: string; path: string; tracker: boolean } | null> {
+    const [first, tracked] = await Promise.all([
+        prisma.analyticsEvent.findFirst({
+            where: { siteId },
+            orderBy: { at: "asc" },
+            select: { at: true, path: true }
+        }),
+        prisma.analyticsSession.findFirst({
+            where: { siteId, OR: [{ screen: { not: null } }, { language: { not: null } }] },
+            select: { id: true }
+        })
+    ]);
+    if (!first) return null;
+    return { at: first.at.toISOString(), path: first.path, tracker: tracked !== null };
 }
 
 // --- recording --------------------------------------------------------------

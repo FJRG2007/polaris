@@ -15,6 +15,14 @@
         "settings": {
             "label": "Ajustes",
             "hint": "Cuánto se guardan los eventos"
+        },
+        "events": {
+            "label": "Eventos",
+            "hint": "Cada informe según llegó, el más nuevo primero"
+        },
+        "releases": {
+            "label": "Versiones",
+            "hint": "Las compilaciones que informaron, y sus fallos"
         }
     },
     "view": {
@@ -32,7 +40,9 @@
         "find": "Buscar un fallo",
         "newProject": "Nuevo proyecto",
         "name": "Nombre",
-        "sharedToEdit": "Compartido para editar"
+        "sharedToEdit": "Compartido para editar",
+        "ownerOnly": "Solo lo ve quien puede cambiar este proyecto.",
+        "sections": "Secciones"
     },
     "settings": {
         "keepFor": "Guardar eventos",
@@ -57,7 +67,10 @@
         "none": "Aquí no hay nada.",
         "noneHint": "Ningún fallo de este proyecto coincide con lo que estás mirando.",
         "noStack": "Sin traza",
-        "howOften": "Frecuencia en los últimos {days} días"
+        "howOften": "Frecuencia en los últimos {days} días",
+        "issue": "Fallo",
+        "graph": "Últimos {days} días",
+        "events": "Eventos"
     },
     "issue": {
         "back": "Volver a la lista",
@@ -74,7 +87,10 @@
         "pruned": "La retención del proyecto ha eliminado todas sus apariciones. Se conserva cuántas veces ocurrió.",
         "kind": "fallo",
         "deleteBody": "Se van todas sus apariciones. Si vuelve a ocurrir, aparece como un fallo nuevo.",
-        "deleteConfirm": "Eliminar"
+        "deleteConfirm": "Eliminar",
+        "resolvedIn": "Resuelta tras {release}",
+        "latestTab": "Último evento",
+        "eventsTab": "{count, plural, one {Un evento} other {# eventos}}"
     },
     "errors": {
         "readProjects": "No se pudieron leer los proyectos",
@@ -97,7 +113,20 @@
         "readRules": "No se pudieron leer esas reglas",
         "makeKey": "No se pudo crear esa clave",
         "removeKey": "No se pudo quitar esa clave",
-        "clear": "No se pudo borrar"
+        "clear": "No se pudo borrar",
+        "readIssues": "No se pudieron leer las incidencias. Reinténtalo.",
+        "readEvents": "No se pudieron leer los eventos. Reinténtalo.",
+        "eventGone": "Ese evento ya no se conserva.",
+        "readReleases": "No se pudieron leer las versiones. Reinténtalo.",
+        "assign": "No se pudo guardar la asignación. Reinténtalo.",
+        "assigneeCannotSee": "Esa persona no puede abrir el proyecto. Compártelo antes.",
+        "noTasks": "Tu cuenta no puede crear tareas.",
+        "readLists": "No se pudieron leer las listas. Reinténtalo.",
+        "taskInput": "Pon un nombre a la tarea y elige una lista.",
+        "listRefused": "No puedes añadir tareas a esa lista.",
+        "makeTask": "No se pudo crear la tarea. Reinténtalo.",
+        "readActivity": "No se pudo leer la actividad. Reinténtalo.",
+        "comment": "No se pudo guardar el comentario. Reinténtalo."
     },
     "grid": {
         "count": "{count, plural, one {Un proyecto} other {# proyectos}}",
@@ -132,7 +161,9 @@
     },
     "page": {
         "title": "Telemetría",
-        "description": "Lo que informan tus aplicaciones cuando fallan, y lo que Polaris informa de sí mismo. Abre un proyecto para ver sus fallos y la dirección a la que apuntar un cliente de Sentry."
+        "description": "Lo que informan tus aplicaciones cuando fallan, y lo que Polaris informa de sí mismo. Abre un proyecto para ver sus fallos y la dirección a la que apuntar un cliente de Sentry.",
+        "issuesTitle": "Incidencias",
+        "issuesDescription": "Lo que falla en todos los proyectos que ves."
     },
     "rules": {
         "policies": {
@@ -169,5 +200,124 @@
         "keyHint": "Un segundo valor que el informador tiene que enviar, como cabecera <header></header> o como token bearer normal. Un cliente de Sentry que permita definir cabeceras de transporte puede llevarlo; uno que no, no puede, y por eso está desactivado salvo que lo actives.",
         "copyKey": "Copiar la clave",
         "keyInUse": "Hay en uso una clave que termina en {tail}. Se guarda como resumen y no se puede volver a mostrar: desactiva esto y actívalo para crear otra."
+    },
+    "assign": {
+        "title": "{count, plural, one {Asignar incidencia} other {Asignar # incidencias}}",
+        "hint": "Quien elijas la verá en Asignadas a mí.",
+        "find": "Buscar persona",
+        "me": "Yo",
+        "toMe": "Asignarme",
+        "nobody": "Desasignar",
+        "cancel": "Cancelar",
+        "confirm": "Asignar",
+        "cannotSee": "No puede abrir este proyecto"
+    },
+    "task": {
+        "where": "En {culprit}",
+        "seen": "{level}, visto {count} veces, primero {first}, último {last}",
+        "release": "Visto por última vez en {release}",
+        "title": "Crear tarea",
+        "hint": "Una tarea en Tareas con el error y un enlace a esta incidencia.",
+        "made": "Tarea {reference} creada.",
+        "open": "Abrir tarea",
+        "list": "Lista",
+        "findList": "Buscar lista o espacio",
+        "loadingLists": "Leyendo listas...",
+        "noLists": "Ninguna lista coincide.",
+        "name": "Nombre",
+        "description": "Descripción",
+        "assign": "Asignarla a quien lleva la incidencia, o a mí",
+        "close": "Cerrar",
+        "pickList": "Elige una lista",
+        "create": "Crear tarea"
+    },
+    "search": {
+        "within": "últimos {amount} {unit}",
+        "olderThan": "hace más de {amount} {unit}",
+        "units": {
+            "m": "min",
+            "h": "h",
+            "d": "días",
+            "w": "semanas"
+        },
+        "assigned": {
+            "me": "Asignadas a mí",
+            "none": "Sin asignar",
+            "any": "Asignadas",
+            "someone": "Asignadas a alguien"
+        },
+        "levels": {
+            "fatal": "Fatal",
+            "error": "Error",
+            "warning": "Aviso",
+            "info": "Info",
+            "debug": "Debug"
+        },
+        "environmentIs": "Entorno: {value}",
+        "releaseIs": "Versión: {value}",
+        "projectIs": "Proyecto: {value}",
+        "firstSeen": "Primera vez",
+        "lastSeen": "Última vez",
+        "placeholder": "is:unresolved assigned:me level:error env:production",
+        "label": "Buscar fallos",
+        "status": "Estado",
+        "assignee": "Asignado",
+        "level": "Nivel",
+        "seen": "Visto",
+        "sorts": {
+            "lastSeen": "Última vez",
+            "firstSeen": "Primera vez",
+            "events": "Eventos"
+        },
+        "active": "Filtros activos",
+        "remove": "Quitar {filter}",
+        "clearAll": "Quitar todo"
+    },
+    "bulk": {
+        "label": "Seleccionadas",
+        "selected": "{count} elegidas",
+        "readOnly": "Solo puedes leer este proyecto",
+        "oneProject": "Elige incidencias de un solo proyecto",
+        "clear": "Quitar selección",
+        "all": "Elegir todas",
+        "pick": "Elegir {title}"
+    },
+    "menu": {
+        "unresolve": "Reabrir",
+        "assign": "Asignar...",
+        "copied": "Enlace copiado",
+        "open": "Abrir",
+        "copyLink": "Copiar URL",
+        "resolveNext": "Resolver en otra versión",
+        "resolveNextHint": "Los eventos de {release} no la reabrirán",
+        "unignore": "Dejar de ignorar",
+        "createTask": "Crear tarea"
+    },
+    "events": {
+        "none": "No hay eventos",
+        "noneHint": "Los informes aparecen aquí al llegar.",
+        "openIssue": "Abrir fallo"
+    },
+    "releases": {
+        "none": "Sin versiones",
+        "noneHint": "Envía la versión con tus eventos para verlas aquí.",
+        "events": "{count, plural, one {Un evento} other {# eventos}}"
+    },
+    "activity": {
+        "title": "Actividad",
+        "status": "Marcada como {status}",
+        "resolvedNextRelease": "resuelta en la próxima versión",
+        "assigned": "Asignada a {name}",
+        "unassigned": "Quitó la asignación",
+        "task": "Creó la tarea",
+        "placeholder": "Añadir comentario",
+        "send": "Comentar",
+        "none": "Aún no hay nada.",
+        "someone": "Alguien",
+        "more": "Ver más"
+    },
+    "notify": {
+        "assignedOne": "{name} te asignó una incidencia",
+        "assignedMany": "{name} te asignó {count} incidencias"
     }
 }

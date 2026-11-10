@@ -53,7 +53,7 @@ const GUARD =
 
 /** A screen that only hands the request to another surface, or to a shared
  *  screen that runs the check itself. */
-const DELEGATES = /\b(InstalledAppScreen|renderAppPage)\b|^\s*redirect\(/m;
+const DELEGATES = /\b(InstalledAppScreen|renderAppPage|renderAnalyticsPage|telemetryScreen)\b|^\s*redirect\(/m;
 
 function walk(directory: string): string[] {
     return readdirSync(directory).flatMap((entry) => {

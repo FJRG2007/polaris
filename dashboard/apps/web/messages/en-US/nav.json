@@ -416,7 +416,15 @@
         "Connect": "Connect",
         "Join a network": "Join a network",
         "Network devices": "Network devices",
-        "Translate": "Translate"
+        "Translate": "Translate",
+        "Realtime": "Realtime",
+        "Pages": "Pages",
+        "Sources": "Sources",
+        "Geography": "Geography",
+        "Reports": "Reports",
+        "Websites": "Websites",
+        "Projects": "Projects",
+        "All issues": "All issues"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

@@ -64,6 +64,9 @@ vi.mock("@/lib/analytics-service", () => ({
     recentVisits: vi.fn(async () => []),
     getAnalyticsSettings: vi.fn(async () => ({})),
     setAnalyticsSettings: vi.fn(),
+    ownedExternalSites: vi.fn(async () => []),
+    findExternalSite: vi.fn(async () => null),
+    externalSiteOwner: vi.fn(() => null),
     ...service
 }));
 vi.mock("@/lib/analytics-reports", () => ({ ...reports, sessionWhere: () => ({}) }));

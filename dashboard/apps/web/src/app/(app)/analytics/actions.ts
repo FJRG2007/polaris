@@ -30,6 +30,15 @@ import {
     type AnalyticsSiteView
 } from "@/lib/analytics-service";
 import * as reports from "@/lib/analytics-reports";
+import * as lists from "@/lib/analytics-lists";
+import { externalSiteSchema } from "./site-input";
+import {
+    createExternalSite,
+    deleteExternalSite,
+    firstRecorded,
+    ownedExternalSites,
+    updateExternalSite
+} from "@/lib/analytics-service";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
@@ -41,7 +50,7 @@ async function say(key: NamespaceKey<"analytics">): Promise<string> {
 const ANALYTICS_PATH = "/analytics";
 
 const scopeSchema = z.object({
-    scopeType: z.enum(["application", "polaris"]),
+    scopeType: z.enum(["application", "polaris", "external"]),
     scopeId: z.string().max(64)
 });
 
@@ -106,7 +115,8 @@ export async function listAnalyticsSitesAction(): Promise<{ sites: SiteOption[] 
             }
         }
     }
-    const extra = [...held].filter((id) => !seen.has(id)).slice(0, 500);
+    const external = await externalSiteOptions(user.id, held);
+    const extra = [...held].filter((id) => !seen.has(id) && !id.includes(":")).slice(0, 500);
     if (extra.length) {
         const rows = await prisma.application.findMany({
             where: { id: { in: extra } },
@@ -115,7 +125,165 @@ export async function listAnalyticsSitesAction(): Promise<{ sites: SiteOption[] 
         });
         for (const row of rows) sites.push({ id: row.id, label: row.name });
     }
-    return { sites };
+    return { sites: [...sites, ...external] };
+}
+
+/** The sites run elsewhere this account owns, and the ones shared with it. */
+async function externalSiteOptions(userId: string, held: ReadonlySet<string>): Promise<SiteOption[]> {
+    const owned = await ownedExternalSites(userId);
+    const ownedIds = new Set(owned.map((site) => site.scopeId));
+    const lentIds = [...held].filter((id) => id.includes(":") && !ownedIds.has(id)).slice(0, 500);
+    const lent = lentIds.length
+        ? await prisma.analyticsSite.findMany({
+              where: { scopeType: "external", scopeId: { in: lentIds } },
+              orderBy: { name: "asc" },
+              select: { scopeId: true, name: true }
+          })
+        : [];
+    return [...owned, ...lent].map((site) => ({ id: site.scopeId, label: site.name, scope: "external" as const }));
+}
+
+const sitePageSchema = z.object({
+    cursor: z.string().max(400).nullish(),
+    query: z.string().trim().max(120).optional()
+});
+
+/**
+ * Every site this reader can open, a page at a time, for the Websites list: the
+ * same reach as the picker, and Polaris itself for an operator.
+ */
+export async function pageAnalyticsSitesAction(
+    input: unknown
+): Promise<lists.Page<lists.SiteListRow> | { error: string }> {
+    const parsed = sitePageSchema.safeParse(input ?? {});
+    if (!parsed.success) return { error: await say("errors.notMeasured") };
+    const { user } = await requireAnalyticsReader();
+    const { sites } = await listAnalyticsSitesAction();
+    const rows: lists.SiteListRow[] = sites.map((site) => ({
+        id: site.id,
+        label: site.label,
+        scope: site.scope ?? "application"
+    }));
+    // i18n-ignore the product's name
+    if (await userHasManage(user, "system.manage")) rows.push({ id: "", label: "Polaris", scope: "polaris" });
+    return lists.pageSites(rows, { cursor: parsed.data.cursor, query: parsed.data.query });
+}
+
+/** A deployed service, as the guided setup offers it: what it answers on. */
+export interface HostedService {
+    readonly id: string;
+    readonly label: string;
+    readonly domains: readonly string[];
+}
+
+/**
+ * The services this account can measure, with the domains each answers on, a page
+ * at a time. A service without a domain is listed too - the setup says it needs
+ * one before the edge log has anything to count.
+ */
+export async function pageHostedServicesAction(
+    input: unknown
+): Promise<lists.Page<HostedService> | { error: string }> {
+    const parsed = sitePageSchema.safeParse(input ?? {});
+    if (!parsed.success) return { error: await say("errors.notMeasured") };
+    const { lent } = await requireAnalyticsReader();
+    if (lent) return { rows: [], next: null };
+    const { sites } = await listAnalyticsSitesAction();
+    const services = sites.filter((site) => (site.scope ?? "application") === "application");
+    const page = lists.pageSites(
+        services.map((site) => ({ id: site.id, label: site.label, scope: "application" as const })),
+        { cursor: parsed.data.cursor, query: parsed.data.query, limit: 25 }
+    );
+    const domains = page.rows.length
+        ? await prisma.domain.findMany({
+              where: { applicationId: { in: page.rows.map((row) => row.id) }, enabled: true },
+              select: { applicationId: true, hostname: true },
+              take: 500
+          })
+        : [];
+    return {
+        next: page.next,
+        rows: page.rows.map((row) => ({
+            id: row.id,
+            label: row.label,
+            domains: domains.filter((domain) => domain.applicationId === row.id).map((domain) => domain.hostname)
+        }))
+    };
+}
+
+/** Add a site that is not served from here, measured by the tracker. */
+export async function createExternalSiteAction(
+    input: unknown
+): Promise<{ error: string } | { scopeId: string; publicKey: string; name: string; hostname: string }> {
+    const { user, lent } = await requireAnalyticsReader();
+    // Somebody who only reads what was shared with them adds nothing of their own.
+    if (lent) return { error: await say("errors.notYoursToChange") };
+    const parsed = externalSiteSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.siteInput") };
+    const site = await createExternalSite(user.id, parsed.data.name, parsed.data.hostname);
+    if (!site) return { error: await say("errors.tooManySites") };
+    await recordAudit({
+        actorId: user.id,
+        action: "analytics.site.create",
+        targetType: "analytics",
+        targetId: site.id
+    });
+    revalidatePath(ANALYTICS_PATH);
+    return { scopeId: site.scopeId, publicKey: site.publicKey, name: site.name, hostname: parsed.data.hostname };
+}
+
+/** Rename a site run elsewhere, or move it to another address. */
+export async function updateExternalSiteAction(input: {
+    scopeType: string;
+    scopeId: string;
+    site: unknown;
+}): Promise<{ error?: string }> {
+    const reached = await reach(input, "own");
+    if ("error" in reached) return reached;
+    if (reached.access.site.scopeType !== "external") return { error: await say("errors.notYoursToChange") };
+    const parsed = externalSiteSchema.safeParse(input.site);
+    if (!parsed.success) return { error: await say("errors.siteInput") };
+    await updateExternalSite(reached.access.site.id, parsed.data.name, parsed.data.hostname);
+    await recordAudit({
+        actorId: reached.userId,
+        action: "analytics.site.update",
+        targetType: "analytics",
+        targetId: reached.access.site.id
+    });
+    revalidatePath(ANALYTICS_PATH);
+    return {};
+}
+
+/** Remove a site run elsewhere, with everything it recorded. */
+export async function deleteExternalSiteAction(input: {
+    scopeType: string;
+    scopeId: string;
+}): Promise<{ error?: string }> {
+    const reached = await reach(input, "own");
+    if ("error" in reached) return reached;
+    if (reached.access.site.scopeType !== "external") return { error: await say("errors.notYoursToChange") };
+    await deleteExternalSite(reached.access.site.id);
+    await recordAudit({
+        actorId: reached.userId,
+        action: "analytics.site.delete",
+        targetType: "analytics",
+        targetId: reached.access.site.id
+    });
+    revalidatePath(ANALYTICS_PATH);
+    return {};
+}
+
+/**
+ * The guided setup's last step: has anything arrived yet, and is the tracker the
+ * one sending it. Asked again by the screen until it has.
+ */
+export async function checkInstallationAction(input: {
+    scopeType: string;
+    scopeId: string;
+}): Promise<{ error: string } | { trackerEnabled: boolean; first: Awaited<ReturnType<typeof firstRecorded>> }> {
+    const reached = await reach(input, "view");
+    if ("error" in reached) return reached;
+    return { trackerEnabled: reached.access.site.trackerEnabled, first: await firstRecorded(reached.access.site.id) };
 }
 
 export async function getAnalyticsOverviewAction(input: {
@@ -169,7 +337,14 @@ const reportRequestSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("goals") }),
     z.object({ kind: z.literal("retention") }),
     z.object({ kind: z.literal("sessions"), before: z.string().datetime().optional() }),
-    z.object({ kind: z.literal("session"), id: z.string().trim().min(8).max(128) })
+    z.object({ kind: z.literal("session"), id: z.string().trim().min(8).max(128) }),
+    z.object({
+        kind: z.literal("breakdown"),
+        dimension: z.enum(core.VISIT_DIMENSIONS),
+        cursor: z.string().max(2048).nullish(),
+        limit: z.number().int().min(1).max(200).optional()
+    }),
+    z.object({ kind: z.literal("realtime") })
 ]);
 export type AnalyticsReportRequest = z.infer<typeof reportRequestSchema>;
 
@@ -182,7 +357,9 @@ export type AnalyticsReportAnswer =
     | { kind: "goals"; total: number; results: (reports.GoalResult & { name: string; goal: core.GoalDefinition })[] }
     | { kind: "retention"; cells: reports.RetentionCell[] }
     | { kind: "sessions"; rows: Awaited<ReturnType<typeof recentVisits>>; more: boolean }
-    | { kind: "session"; session: NonNullable<Awaited<ReturnType<typeof reports.sessionJourney>>> | null };
+    | { kind: "session"; session: NonNullable<Awaited<ReturnType<typeof reports.sessionJourney>>> | null }
+    | ({ kind: "breakdown"; dimension: core.VisitDimension } & lists.RankedList)
+    | ({ kind: "realtime" } & lists.RealtimeSnapshot);
 
 const SESSIONS_PAGE = 50;
 
@@ -252,6 +429,14 @@ export async function runAnalyticsReportAction(input: {
         }
         case "session":
             return { kind: "session", session: await reports.sessionJourney(siteId, ask.id) };
+        case "breakdown":
+            return {
+                kind: "breakdown",
+                dimension: ask.dimension,
+                ...(await lists.rankedPage(window, ask.dimension, ask.cursor, ask.limit))
+            };
+        case "realtime":
+            return { kind: "realtime", ...(await lists.realtimeSnapshot(siteId, window.filters, to)) };
     }
 }
 

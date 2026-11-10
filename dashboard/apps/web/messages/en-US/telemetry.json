@@ -15,6 +15,14 @@
         "settings": {
             "label": "Settings",
             "hint": "How long events are kept"
+        },
+        "events": {
+            "label": "Events",
+            "hint": "Every report as it arrived, newest first"
+        },
+        "releases": {
+            "label": "Releases",
+            "hint": "The builds that reported, and their issues"
         }
     },
     "view": {
@@ -32,7 +40,9 @@
         "find": "Find a fault",
         "newProject": "New project",
         "name": "Name",
-        "sharedToEdit": "Shared with you to edit"
+        "sharedToEdit": "Shared with you to edit",
+        "ownerOnly": "Only people who can change this project see this.",
+        "sections": "Project sections"
     },
     "settings": {
         "keepFor": "Keep events for",
@@ -57,7 +67,10 @@
         "none": "Nothing here.",
         "noneHint": "No fault in this project matches what you are looking at.",
         "noStack": "No stack",
-        "howOften": "How often over the last {days} days"
+        "howOften": "How often over the last {days} days",
+        "issue": "Issue",
+        "graph": "Last {days} days",
+        "events": "Events"
     },
     "issue": {
         "back": "Back to the list",
@@ -74,7 +87,10 @@
         "pruned": "Every occurrence of this has been removed by the project's retention. How often it happened is kept.",
         "kind": "fault",
         "deleteBody": "Every occurrence goes with it. If it happens again it comes back as a new fault.",
-        "deleteConfirm": "Delete"
+        "deleteConfirm": "Delete",
+        "resolvedIn": "Resolved after {release}",
+        "latestTab": "Latest event",
+        "eventsTab": "{count, plural, one {One event} other {# events}}"
     },
     "errors": {
         "readProjects": "Those projects could not be read",
@@ -97,7 +113,20 @@
         "readRules": "Those rules could not be read",
         "makeKey": "That key could not be made",
         "removeKey": "That key could not be removed",
-        "clear": "That could not be cleared"
+        "clear": "That could not be cleared",
+        "readIssues": "The issues could not be read. Try again.",
+        "readEvents": "The events could not be read. Try again.",
+        "eventGone": "That event is no longer kept.",
+        "readReleases": "The releases could not be read. Try again.",
+        "assign": "That assignment could not be saved. Try again.",
+        "assigneeCannotSee": "That person cannot open this project. Share it with them first.",
+        "noTasks": "Your account cannot create tasks.",
+        "readLists": "The task lists could not be read. Try again.",
+        "taskInput": "Give the task a name and pick a list.",
+        "listRefused": "You cannot add tasks to that list.",
+        "makeTask": "The task could not be created. Try again.",
+        "readActivity": "The activity could not be read. Try again.",
+        "comment": "That comment could not be saved. Try again."
     },
     "grid": {
         "count": "{count, plural, one {One project} other {# projects}}",
@@ -132,7 +161,9 @@
     },
     "page": {
         "title": "Telemetry",
-        "description": "What your applications report when they break, and what Polaris reports about itself. Open a project for its faults and the address to point a Sentry client at."
+        "description": "What your applications report when they break, and what Polaris reports about itself. Open a project for its faults and the address to point a Sentry client at.",
+        "issuesTitle": "All issues",
+        "issuesDescription": "What is failing across every project you can see."
     },
     "rules": {
         "policies": {
@@ -169,5 +200,124 @@
         "keyHint": "A second value the reporter has to send, as an <header></header> header or an ordinary bearer token. A Sentry client that lets you set transport headers can carry it; one that does not cannot, which is why this is off unless you turn it on.",
         "copyKey": "Copy the key",
         "keyInUse": "A key ending {tail} is in use. It is stored as a digest and cannot be shown again - turn this off and on to make another."
+    },
+    "assign": {
+        "title": "{count, plural, one {Assign issue} other {Assign # issues}}",
+        "hint": "The person you pick sees it under Assigned to me.",
+        "find": "Find a person",
+        "me": "Me",
+        "toMe": "Assign to me",
+        "nobody": "Unassign",
+        "cancel": "Cancel",
+        "confirm": "Assign",
+        "cannotSee": "Cannot open this project"
+    },
+    "task": {
+        "where": "In {culprit}",
+        "seen": "{level}, seen {count} times, first {first}, last {last}",
+        "release": "Last seen in release {release}",
+        "title": "Create task",
+        "hint": "A task in Tasks with the error and a link back to this issue.",
+        "made": "Task {reference} created.",
+        "open": "Open task",
+        "list": "List",
+        "findList": "Find a list or space",
+        "loadingLists": "Reading lists...",
+        "noLists": "No list matches.",
+        "name": "Name",
+        "description": "Description",
+        "assign": "Assign it to whoever has this issue, or to me",
+        "close": "Close",
+        "pickList": "Pick a list first",
+        "create": "Create task"
+    },
+    "search": {
+        "within": "last {amount} {unit}",
+        "olderThan": "over {amount} {unit} ago",
+        "units": {
+            "m": "min",
+            "h": "h",
+            "d": "days",
+            "w": "weeks"
+        },
+        "assigned": {
+            "me": "Assigned to me",
+            "none": "Unassigned",
+            "any": "Assigned",
+            "someone": "Assigned to someone"
+        },
+        "levels": {
+            "fatal": "Fatal",
+            "error": "Error",
+            "warning": "Warning",
+            "info": "Info",
+            "debug": "Debug"
+        },
+        "environmentIs": "Environment: {value}",
+        "releaseIs": "Release: {value}",
+        "projectIs": "Project: {value}",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen",
+        "placeholder": "is:unresolved assigned:me level:error env:production",
+        "label": "Search issues",
+        "status": "Status",
+        "assignee": "Assignee",
+        "level": "Level",
+        "seen": "Seen",
+        "sorts": {
+            "lastSeen": "Last seen",
+            "firstSeen": "First seen",
+            "events": "Events"
+        },
+        "active": "Active filters",
+        "remove": "Remove {filter}",
+        "clearAll": "Clear all"
+    },
+    "bulk": {
+        "label": "Selected issues",
+        "selected": "{count} selected",
+        "readOnly": "You can only read this project",
+        "oneProject": "Pick issues from one project to assign",
+        "clear": "Clear selection",
+        "all": "Select all",
+        "pick": "Select {title}"
+    },
+    "menu": {
+        "unresolve": "Unresolve",
+        "assign": "Assign...",
+        "copied": "Link copied",
+        "open": "Open",
+        "copyLink": "Copy link",
+        "resolveNext": "Resolve in next release",
+        "resolveNextHint": "Events from {release} will not reopen it",
+        "unignore": "Stop ignoring",
+        "createTask": "Create task"
+    },
+    "events": {
+        "none": "No events kept",
+        "noneHint": "Reports appear here as they arrive.",
+        "openIssue": "Open issue"
+    },
+    "releases": {
+        "none": "No releases yet",
+        "noneHint": "Send a release with your events to see them here.",
+        "events": "{count, plural, one {One event} other {# events}}"
+    },
+    "activity": {
+        "title": "Activity",
+        "status": "Marked as {status}",
+        "resolvedNextRelease": "resolved in the next release",
+        "assigned": "Assigned to {name}",
+        "unassigned": "Removed the assignee",
+        "task": "Created task",
+        "placeholder": "Add a comment",
+        "send": "Comment",
+        "none": "Nothing here yet.",
+        "someone": "Someone",
+        "more": "Show older"
+    },
+    "notify": {
+        "assignedOne": "{name} assigned you an issue",
+        "assignedMany": "{name} assigned you {count} issues"
     }
 }

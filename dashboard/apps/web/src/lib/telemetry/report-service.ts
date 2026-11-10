@@ -126,10 +126,32 @@ export async function listIssues(
     });
     if (issues.length === 0) return [];
 
+    const daily = await dailyCounts(
+        issues.map((issue) => issue.id),
+        now
+    );
+    return issues.map((issue) => ({
+        ...issue,
+        firstSeen: issue.firstSeen.toISOString(),
+        lastSeen: issue.lastSeen.toISOString(),
+        daily: daily.get(issue.id) ?? []
+    }));
+}
+
+/**
+ * Each issue's count per day over the window, oldest first, in one read for a
+ * whole page of issues - the sparkline every list row draws.
+ */
+export async function dailyCounts(
+    issueIds: readonly string[],
+    now: Date = new Date()
+): Promise<Map<string, number[]>> {
     const days = windowDays(now, TELEMETRY_WINDOW_DAYS);
+    const result = new Map<string, number[]>();
+    if (issueIds.length === 0) return result;
     const since = new Date(`${days[0]!}T00:00:00.000Z`);
     const counts = await prisma.telemetryDay.findMany({
-        where: { issueId: { in: issues.map((issue) => issue.id) }, day: { gte: since } },
+        where: { issueId: { in: [...issueIds] }, day: { gte: since } },
         select: { issueId: true, day: true, count: true }
     });
 
@@ -140,13 +162,13 @@ export async function listIssues(
         bucket.set(key, (bucket.get(key) ?? 0) + row.count);
         byIssue.set(row.issueId, bucket);
     }
-
-    return issues.map((issue) => ({
-        ...issue,
-        firstSeen: issue.firstSeen.toISOString(),
-        lastSeen: issue.lastSeen.toISOString(),
-        daily: days.map((day) => byIssue.get(issue.id)?.get(day) ?? 0)
-    }));
+    for (const id of issueIds) {
+        result.set(
+            id,
+            days.map((day) => byIssue.get(id)?.get(day) ?? 0)
+        );
+    }
+    return result;
 }
 
 /** How many of each status there are, for the tabs - counted rather than
@@ -162,7 +184,7 @@ export async function issueCounts(projectId: string): Promise<Record<string, num
     return counts;
 }
 
-function detailOf(event: {
+export function detailOf(event: {
     id: string;
     eventId: string | null;
     level: string;

@@ -1,41 +1,47 @@
 "use client";
 
 /**
- * What broke, and one of them in full.
+ * The Telemetry screens: every project, every issue across them, and a
+ * project's own inside - its issues, its event stream, its releases and its
+ * setup - each a real address under /telemetry (see `paths.ts`).
  *
- * Two states of the same screen rather than two routes: a list of faults, and a
- * fault opened. Which one is in the URL, so a link to a crash is a link to that
- * crash rather than to "the telemetry app, go and find it".
- *
- * The list is ordered by when each fault was last seen, because the question
- * somebody opens this with is what is happening now. Everything else - how often,
- * since when, in which release - is on the row, so the answer to "is this the one
- * I fixed on Tuesday" does not need a click.
+ * Each shell renders at once and the lists arrive into it a page at a time:
+ * the heading, the section rail and the search bar never wait on the database.
  */
 
+import Link from "next/link";
+import * as paths from "./paths";
 import * as actions from "./actions";
+import * as polls from "./telemetry-polls";
 import { useRouter } from "next/navigation";
-import { ReporterRules } from "./reporter-rules";
-import { ProjectsGrid } from "./projects-grid";
-import { DEFAULT_SECTION, SECTIONS, sectionFor } from "./project-sections";
-import { runAction } from "@/lib/run-action";
-import { useShelfScope } from "@/components/shelf-scope";
-import { CopyButton } from "@/components/copy-button";
-import { RelativeTime } from "@/components/relative-time";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { EventPanel } from "./event-detail";
-import { useDebounced } from "./use-debounced";
-import type { IssueDetail, IssueRow } from "@/lib/telemetry/report-service";
+import { runAction } from "@/lib/run-action";
+import { IssueStream } from "./issue-stream";
+import { ProjectsGrid } from "./projects-grid";
+import { ReporterRules } from "./reporter-rules";
+import { IssueActivity } from "./issue-activity";
+import { useCursorList } from "./use-cursor-list";
+import { CopyButton } from "@/components/copy-button";
+import { useShelfScope } from "@/components/shelf-scope";
+import { useCallback, useEffect, useState } from "react";
+import { SECTIONS, sectionFor } from "./project-sections";
+import { RelativeTime } from "@/components/relative-time";
+import type { PickedPerson } from "@/components/people-picker";
+import { AssignDialog, CreateTaskDialog } from "./issue-dialogs";
+import { EventStream, EventView, ReleaseList } from "./event-stream";
+import { withFilter, type IssueSort } from "@/lib/telemetry/issue-query";
 import {
     ArrowLeft,
     Bug,
     CircleCheck,
+    CircleDot,
     CircleSlash,
+    ListTodo,
     Plus,
     RotateCcw,
-    Search,
     Share2,
-    Trash2
+    Trash2,
+    UserPlus
 } from "lucide-react";
 import { ShareDialog } from "@/components/access/share-dialog";
 import {
@@ -46,142 +52,162 @@ import {
     EmptyState,
     Input,
     ScrollRow,
-    SegmentedControl,
     Skeleton,
     sameValue,
     Checkbox
 } from "@polaris/ui";
-import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
-import * as polls from "./telemetry-polls";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 type Overview = actions.TelemetryOverview;
+type Project = Overview["projects"][number];
 
-const STATUS_TABS = ["unresolved", "resolved", "ignored", "all"] as const;
+export interface Viewer {
+    readonly id: string;
+    readonly name: string;
+}
 
-/** What a level looks like. Colour rather than a word, because the word is
- *  already in the title of half the rows. */
-const LEVEL_TONE: Record<string, string> = {
-    fatal: "bg-danger",
-    error: "bg-danger/70",
-    warning: "bg-warning",
-    info: "bg-primary/60",
-    debug: "bg-muted-foreground/50"
-};
+/** Every project, a page at a time. */
+export function ProjectsHome({ mayCreate }: { mayCreate: boolean }) {
+    const t = useTranslations("telemetry");
+    const on = useShelfScope();
+    const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null);
+    const list = useCursorList<Project>(
+        (cursor, signal) => polls.telemetryProjects({ query: "", cursor }, signal),
+        `${on}`
+    );
+    useEffect(() => {
+        if (!sentinel || !list.more) return;
+        const watcher = new IntersectionObserver((entries) => {
+            if (entries.some((entry) => entry.isIntersecting)) list.loadMore();
+        });
+        watcher.observe(sentinel);
+        return () => watcher.disconnect();
+    }, [sentinel, list]);
+
+    const action = mayCreate ? <NewProject onDone={async () => list.reload()} /> : null;
+    if (list.items === null) {
+        return (
+            <div className="flex flex-col gap-3" aria-busy="true">
+                <div className="flex items-center justify-between gap-2">
+                    <Skeleton className="h-4 w-24" />
+                    {action}
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                </div>
+            </div>
+        );
+    }
+    if (list.items.length === 0) {
+        return (
+            <>
+                <EmptyState
+                    icon={<Bug />}
+                    title={t("view.none")}
+                    description={t("view.noneHint")}
+                    action={action ?? undefined}
+                />
+                {list.error && <p className="mt-3 text-sm text-danger">{list.error}</p>}
+            </>
+        );
+    }
+    return (
+        <div className="flex flex-col gap-4">
+            <ProjectsGrid projects={list.items} hrefFor={(id) => paths.projectHref(id)} action={action} />
+            {list.error && <p role="alert" className="text-sm text-danger">{list.error}</p>}
+            {list.more && (
+                <div ref={setSentinel} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+                    <Skeleton className="h-24 w-full" />
+                </div>
+            )}
+        </div>
+    );
+}
+
+/** A search's address: the screen it is on, with the search and the order in it. */
+function searchHref(base: string, query: string, sort: IssueSort): string {
+    const params = new URLSearchParams();
+    params.set("query", query);
+    if (sort !== "lastSeen") params.set("sort", sort);
+    return `${base}?${params.toString()}`;
+}
+
+/** Every issue across the projects this reader can see. */
+export function IssuesHome({
+    query,
+    sort,
+    viewer,
+    mayTask
+}: {
+    query: string;
+    sort: IssueSort;
+    viewer: Viewer;
+    mayTask: boolean;
+}) {
+    const router = useRouter();
+    return (
+        <IssueStream
+            projectId={null}
+            query={query}
+            sort={sort}
+            viewerId={viewer.id}
+            mayTask={mayTask}
+            windowDays={30}
+            onSearch={(next, order) => router.replace(searchHref(paths.ISSUES_HREF, next, order))}
+        />
+    );
+}
 
 export function TelemetryView({
     projectId,
-    issueId,
-    status,
     section,
-    mayCreate
+    itemId,
+    query,
+    sort,
+    viewer,
+    mayTask
 }: {
-    projectId: string | null;
-    issueId: string | null;
-    status: string;
-    /** Which part of the project is open. Only read once a project is. */
+    projectId: string;
     section: string;
-    /** Whether this account may make a project: somebody reading only what was
-     *  shared with them is not offered a button the server would refuse. */
-    mayCreate: boolean;
+    /** The issue or the event a section is open on. */
+    itemId: string | null;
+    query: string;
+    sort: IssueSort;
+    viewer: Viewer;
+    mayTask: boolean;
 }) {
     const t = useTranslations("telemetry");
     const router = useRouter();
     const [data, setData] = useState<Overview | null>(null);
-    const [issue, setIssue] = useState<IssueDetail | null>(null);
-    const [query, setQuery] = useState("");
-    const search = useDebounced(query, 250);
     const on = useShelfScope();
     const [error, setError] = useState("");
-    const [busy, setBusy] = useState(false);
     const [sharing, setSharing] = useState(false);
 
-    // Through `runAction` rather than awaited bare. An action that rejects rather
-    // than returning `{ error }` - the server threw, or this tab is holding action
-    // ids from a build that has been replaced - used to leave the screen on its
-    // skeleton with nothing said and nothing to press.
     const load = useCallback(async () => {
-        const result = await runAction(
-            () => polls.telemetryOverview({ projectId, status, query: search }),
-            setError
-        );
+        void on;
+        const result = await runAction(() => polls.telemetryOverview({ projectId }), setError);
         if (!result) return;
         if (result.error) {
             setError(result.error);
             return;
         }
         setData(result.data ?? null);
-        // `on` is not read here: the projects are narrowed by the shelf on the
-        // server, from the cookie. It is in the dependencies because that is
-        // what re-runs this when somebody switches shelves - without it the
-        // switch changed what the server rendered and this screen went on
-        // showing the other shelf's projects.
-    }, [on, projectId, status, search]);
+    }, [on, projectId]);
 
     useEffect(() => {
         void load();
     }, [load]);
 
-    // Only what the link actually names. It used to fall back to the first
-    // project, which is what made "the telemetry app" a screen rather than a
-    // shelf: there was no state in which nothing was open, so there was nowhere
-    // to put a list of projects.
-    const project = useMemo(
-        () => data?.projects.find((entry) => entry.id === projectId) ?? null,
-        [data, projectId]
-    );
+    const project = data?.projects[0] ?? null;
+    const readOnly = project?.access === "view";
     const open = sectionFor(section);
-
-    useEffect(() => {
-        if (!issueId || !project) {
-            setIssue(null);
-            return;
-        }
-        let live = true;
-        // The same rule as the list above, and this is the call it was written
-        // for: opening a fault from a tab whose build had been replaced refused
-        // silently, so the row was pressed and the screen did not move.
-        void runAction(() => polls.telemetryIssue(project.id, issueId), setError).then((result) => {
-            if (!live) return;
-            if (!result) return;
-            if (result.error) setError(result.error);
-            setIssue(result.issue ?? null);
-        });
-        return () => {
-            live = false;
-        };
-    }, [issueId, project]);
-
-    const go = (next: {
-        project?: string | null;
-        issue?: string | null;
-        status?: string;
-        section?: string;
-    }) => {
-        const params = new URLSearchParams();
-        const chosen = next.project === undefined ? project?.id : next.project;
-        if (chosen) params.set("project", chosen);
-        const wanted = next.issue === undefined ? issueId : next.issue;
-        if (wanted) params.set("issue", wanted);
-        params.set("status", next.status ?? status);
-        const wantedSection = next.section ?? open;
-        if (wantedSection !== DEFAULT_SECTION) params.set("section", wantedSection);
-        router.push(`/telemetry?${params.toString()}`);
-    };
-
-    /** A link straight into a project, for the cards. */
-    const hrefFor = (id: string) => `/telemetry?project=${encodeURIComponent(id)}`;
-
-    const act = async (run: () => Promise<{ error?: string }>) => {
-        setBusy(true);
-        const result = await runAction(run, setError);
-        setBusy(false);
-        if (!result?.error) {
-            await load();
-            router.refresh();
-        }
-        return result;
-    };
+    const visible = SECTIONS.filter(
+        (entry) =>
+            (!readOnly || entry.readOnly) && (entry.key !== "releases" || data?.hasReleases || open === "releases")
+    );
 
     const failure = error && (
         <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
@@ -189,71 +215,25 @@ export function TelemetryView({
         </p>
     );
 
-    // Still reading, and no project named: the shelf's own frame, with the
-    // button that makes a project already there. Only the count and the cards
-    // wait, since they are the only part of it the read decides.
-    if (!data && !projectId) {
-        return (
-            <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between gap-2">
-                        <Skeleton className="h-4 w-24" />
-                        {mayCreate && <NewProject onDone={load} />}
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        <Skeleton className="h-24 w-full" />
-                        <Skeleton className="h-24 w-full" />
-                        <Skeleton className="h-24 w-full" />
-                    </div>
-                </div>
-                {failure}
-            </div>
-        );
-    }
-
-    if (data && data.projects.length === 0) {
-        return (
-            <>
-                <EmptyState
-                    icon={<Bug />}
-                    title={t("view.none")}
-                    description={t("view.noneHint")}
-                    action={mayCreate ? <NewProject onDone={load} /> : undefined}
-                />
-                {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-            </>
-        );
-    }
-
-    // Nothing chosen: the shelf. A project is a thing you go into, so the app
-    // opens on the list of them with the state of each on its face, rather than
-    // on one of them picked arbitrarily by a dropdown.
     if (data && !project) {
         return (
-            <div className="flex flex-col gap-4">
-                <ProjectsGrid
-                    projects={data.projects}
-                    hrefFor={hrefFor}
-                    action={mayCreate ? <NewProject onDone={load} /> : null}
-                />
+            <div className="flex flex-col gap-3">
+                <Link href={paths.PROJECTS_HREF} className="text-sm text-primary hover:underline">
+                    {t("view.projects")}
+                </Link>
                 {failure}
             </div>
         );
     }
 
-    // From here a project is named. Until the read answers, `project` is null
-    // and only its name and its content wait: the way back, the search box and
-    // the rail are the same whichever project it turns out to be.
     return (
-        <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-2">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => go({ project: null, issue: null })}
-                >
-                    <ArrowLeft className="size-3.5" />
-                    {t("view.projects")}
+        <div className="flex min-w-0 flex-col gap-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <Button variant="ghost" size="sm" asChild>
+                    <Link href={paths.PROJECTS_HREF}>
+                        <ArrowLeft className="size-3.5" />
+                        {t("view.projects")}
+                    </Link>
                 </Button>
                 <span className="text-muted-foreground/40">/</span>
                 {project ? (
@@ -263,9 +243,7 @@ export function TelemetryView({
                 )}
                 {project?.shared ? (
                     <Badge variant="neutral">
-                        {project.access === "edit"
-                            ? t("view.sharedToEdit")
-                            : t("view.sharedWithYou")}
+                        {project.access === "edit" ? t("view.sharedToEdit") : t("view.sharedWithYou")}
                     </Badge>
                 ) : null}
                 {project?.access === "owner" ? (
@@ -290,94 +268,75 @@ export function TelemetryView({
                         name={project.name}
                     />
                 ) : null}
-                {open === "issues" && (
-                    <div className="relative w-full sm:ml-auto sm:w-auto">
-                        <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                        <input
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            placeholder={t("view.find")}
-                            aria-label={t("view.find")}
-                            className="h-8 w-full rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
-                        />
-                    </div>
-                )}
             </div>
 
             {failure}
 
-            <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-                <SectionNav
-                    open={project?.access === "view" ? "issues" : open}
-                    only={project?.access === "view" ? "issues" : null}
-                    onOpen={(key) => go({ section: key, issue: null })}
-                />
+            <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:gap-6">
+                <SectionNav projectId={projectId} open={open} sections={visible} counts={data?.counts ?? null} />
                 <div className="min-w-0 flex-1">
-                    {!data || !project ? (
-                        <div className="flex flex-col gap-3">
+                    {open === "issues" &&
+                        (itemId ? (
+                            <IssueScreen
+                                projectId={projectId}
+                                issueId={itemId}
+                                readOnly={readOnly || !project}
+                                viewer={viewer}
+                                mayTask={mayTask}
+                                onChanged={load}
+                            />
+                        ) : (
+                            <IssueStream
+                                projectId={projectId}
+                                query={query}
+                                sort={sort}
+                                viewerId={viewer.id}
+                                mayTask={mayTask}
+                                windowDays={data?.windowDays ?? 30}
+                                onSearch={(next, order) =>
+                                    router.replace(searchHref(paths.projectHref(projectId), next, order))
+                                }
+                            />
+                        ))}
+                    {open === "events" &&
+                        (itemId ? (
+                            <EventView
+                                projectId={projectId}
+                                eventId={itemId}
+                                backHref={paths.projectHref(projectId, "events")}
+                                issueHref={(issueId) => paths.issueHref(projectId, issueId)}
+                            />
+                        ) : (
+                            <EventStream
+                                projectId={projectId}
+                                hrefFor={(event) => paths.projectHref(projectId, "events", event.id)}
+                            />
+                        ))}
+                    {open === "releases" && (
+                        <ReleaseList
+                            projectId={projectId}
+                            issuesHref={(release) =>
+                                searchHref(
+                                    paths.projectHref(projectId),
+                                    withFilter("", { release }),
+                                    "lastSeen"
+                                )
+                            }
+                        />
+                    )}
+                    {!project && open !== "issues" && open !== "events" && open !== "releases" && (
+                        <div className="flex flex-col gap-3" aria-busy="true">
                             <Skeleton className="h-8 w-72 max-w-full" />
-                            <Skeleton className="h-64 w-full" />
+                            <Skeleton className="h-40 w-full" />
                         </div>
-                    ) : (
-                        <>
-                            {open === "client" && project.access !== "view" && (
-                                <ProjectAddress project={project} onDone={load} />
-                            )}
-                            {open === "reporters" && project.access !== "view" && (
-                                <ReporterRules project={project} onDone={load} />
-                            )}
-                            {open === "settings" && project.access !== "view" && (
-                                <ProjectSettings project={project} onDone={load} />
-                            )}
-                            {(open === "issues" || project.access === "view") &&
-                                (issue ? (
-                                    <IssuePanel
-                                        issue={issue}
-                                        busy={busy}
-                                        readOnly={project.access === "view"}
-                                        onBack={() => go({ issue: null })}
-                                        onStatus={(next) =>
-                                            act(() =>
-                                                actions.setIssueStatusAction(
-                                                    project.id,
-                                                    issue.id,
-                                                    next
-                                                )
-                                            )
-                                        }
-                                        onDelete={async () => {
-                                            const result = await act(() =>
-                                                actions.deleteIssueAction(project.id, issue.id)
-                                            );
-                                            if (!result?.error) go({ issue: null });
-                                        }}
-                                    />
-                                ) : (
-                                    <div className="flex flex-col gap-3">
-                                        <SegmentedControl
-                                            value={status}
-                                            onValueChange={(value) =>
-                                                go({ status: value, issue: null })
-                                            }
-                                            options={STATUS_TABS.map((tab) => {
-                                                const label = t(`view.statuses.${tab}`);
-                                                return {
-                                                    value: tab,
-                                                    label:
-                                                        data.counts[tab] === undefined
-                                                            ? label
-                                                            : `${label} ${data.counts[tab]}`
-                                                };
-                                            })}
-                                        />
-                                        <IssueList
-                                            issues={data.issues}
-                                            windowDays={data.windowDays}
-                                            onOpen={(id) => go({ issue: id })}
-                                        />
-                                    </div>
-                                ))}
-                        </>
+                    )}
+                    {project && !readOnly && open === "client" && <ProjectAddress project={project} onDone={load} />}
+                    {project && !readOnly && open === "reporters" && <ReporterRules project={project} onDone={load} />}
+                    {project && !readOnly && open === "settings" && (
+                        <ProjectSettings project={project} onDone={load} />
+                    )}
+                    {project && readOnly && !SECTIONS.find((entry) => entry.key === open)?.readOnly && (
+                        <p className="text-sm text-muted-foreground">{t("view.ownerOnly")}</p>
                     )}
                 </div>
             </div>
@@ -385,61 +344,323 @@ export function TelemetryView({
     );
 }
 
-/**
- * The rail down the side of a project.
- *
- * A column beside the content on a wide screen and a scrolling row above it on a
- * narrow one, which is the shape Deploy uses for the same thing - a vertical
- * rail on a phone costs more height than the content it introduces.
- */
+/** The project's own rail: each section is an address, so a link lands on it. */
 function SectionNav({
+    projectId,
     open,
-    only,
-    onOpen
+    sections,
+    counts
 }: {
+    projectId: string;
     open: string;
-    /** The one section a project shared with the reader shows; null for all. */
-    only: string | null;
-    onOpen: (key: string) => void;
+    sections: typeof SECTIONS;
+    counts: Readonly<Record<string, number>> | null;
 }) {
     const t = useTranslations("telemetry");
     return (
-        <nav className="lg:w-48 lg:shrink-0">
+        <nav className="lg:w-48 lg:shrink-0" aria-label={t("view.sections")}>
             <ScrollRow
                 as="ul"
                 className="-mx-1 flex gap-1 px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0"
             >
-                {SECTIONS.filter((section) => only === null || section.key === only).map(
-                    (section) => {
-                        const active = section.key === open;
-                        const Icon = section.icon;
-                        return (
-                            <li key={section.key} className="shrink-0 lg:shrink">
-                                <button
-                                    type="button"
-                                    title={t(
-                                        `sections.${section.key}.hint` as NamespaceKey<"telemetry">
-                                    )}
-                                    aria-current={active ? "page" : undefined}
-                                    onClick={() => onOpen(section.key)}
-                                    className={cn(
-                                        "flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-muted",
-                                        active
-                                            ? "bg-muted font-medium text-foreground"
-                                            : "text-muted-foreground"
-                                    )}
-                                >
-                                    <Icon className="size-3.5 shrink-0" />
-                                    {t(
-                                        `sections.${section.key}.label` as NamespaceKey<"telemetry">
-                                    )}
-                                </button>
-                            </li>
-                        );
-                    }
-                )}
+                {sections.map((section) => {
+                    const active = section.key === open;
+                    const Icon = section.icon;
+                    return (
+                        <li key={section.key} className="shrink-0 lg:shrink">
+                            <Link
+                                href={paths.projectHref(projectId, section.key)}
+                                title={t(`sections.${section.key}.hint` as NamespaceKey<"telemetry">)}
+                                aria-current={active ? "page" : undefined}
+                                className={cn(
+                                    "flex w-full min-w-0 items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-muted",
+                                    active ? "bg-muted font-medium text-foreground" : "text-muted-foreground"
+                                )}
+                            >
+                                <Icon className="size-3.5 shrink-0" />
+                                <span className="truncate">
+                                    {t(`sections.${section.key}.label` as NamespaceKey<"telemetry">)}
+                                </span>
+                                {section.key === "issues" && counts?.unresolved !== undefined && (
+                                    <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+                                        {counts.unresolved}
+                                    </span>
+                                )}
+                            </Link>
+                        </li>
+                    );
+                })}
             </ScrollRow>
         </nav>
+    );
+}
+
+/** One issue: what it is, who has it, what was done about it, and its events. */
+function IssueScreen({
+    projectId,
+    issueId,
+    readOnly,
+    viewer,
+    mayTask,
+    onChanged
+}: {
+    projectId: string;
+    issueId: string;
+    readOnly: boolean;
+    viewer: Viewer;
+    mayTask: boolean;
+    onChanged: () => Promise<void>;
+}) {
+    const t = useTranslations("telemetry");
+    const router = useRouter();
+    const [issue, setIssue] = useState<actions.OpenIssue | null>(null);
+    const [error, setError] = useState("");
+    const [removing, setRemoving] = useState(false);
+    const [assigning, setAssigning] = useState(false);
+    const [tasking, setTasking] = useState(false);
+    const [tab, setTab] = useState<"latest" | "events">("latest");
+    const [version, setVersion] = useState(0);
+
+    useEffect(() => {
+        let live = true;
+        setIssue(null);
+        void runAction(() => polls.telemetryIssue(projectId, issueId), setError).then((result) => {
+            if (!live || !result) return;
+            if (result.error) setError(result.error);
+            setIssue(result.issue ?? null);
+        });
+        return () => {
+            live = false;
+        };
+    }, [projectId, issueId]);
+
+    /** Show the change now, and put it back if the server says no. */
+    const change = async (
+        next: Partial<actions.OpenIssue>,
+        send: () => Promise<{ error?: string }>
+    ) => {
+        if (!issue) return;
+        const before = issue;
+        setIssue({ ...issue, ...next });
+        const result = await runAction(send, setError);
+        if (!result || result.error) {
+            setIssue(before);
+            if (result?.error) setError(result.error);
+            return;
+        }
+        setError("");
+        setVersion((value) => value + 1);
+        await onChanged();
+    };
+
+    const status = (value: string, mode?: "now" | "nextRelease") =>
+        change(
+            {
+                status: value,
+                resolvedInRelease: value === "resolved" && mode === "nextRelease" ? issue?.lastRelease ?? null : null
+            },
+            () => actions.bulkStatusAction({ issueIds: [issueId], status: value, ...(mode ? { mode } : {}) })
+        );
+    const assign = (person: PickedPerson | null) =>
+        change({ assignee: person }, () =>
+            actions.assignIssuesAction({ issueIds: [issueId], assigneeId: person?.id ?? null })
+        );
+
+    const back = paths.projectHref(projectId);
+    if (!issue) {
+        return (
+            <div className="flex flex-col gap-4" aria-busy={!error}>
+                <div className="flex items-center gap-2">
+                    <Link
+                        href={back}
+                        aria-label={t("issue.back")}
+                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        <ArrowLeft className="size-4" />
+                    </Link>
+                    {error ? (
+                        <p role="alert" className="text-sm text-danger">
+                            {error}
+                        </p>
+                    ) : (
+                        <Skeleton className="h-5 w-72 max-w-full" />
+                    )}
+                </div>
+                {!error && (
+                    <>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            <Skeleton className="h-14 w-full" />
+                            <Skeleton className="h-14 w-full" />
+                            <Skeleton className="h-14 w-full" />
+                            <Skeleton className="h-14 w-full" />
+                        </div>
+                        <Skeleton className="h-64 w-full" />
+                    </>
+                )}
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex min-w-0 flex-col gap-4">
+            <div className="flex min-w-0 flex-wrap items-start gap-2">
+                <Link
+                    href={back}
+                    aria-label={t("issue.back")}
+                    className="mt-0.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                    <ArrowLeft className="size-4" />
+                </Link>
+                <div className="min-w-0 flex-1">
+                    <h2 className="line-clamp-3 break-words text-base font-semibold" title={issue.title}>
+                        {issue.title}
+                    </h2>
+                    <p className="break-all text-xs text-muted-foreground">{issue.culprit}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2" title={readOnly ? t("bulk.readOnly") : undefined}>
+                    {issue.status === "resolved" ? (
+                        <Button size="sm" variant="secondary" disabled={readOnly} onClick={() => status("unresolved")}>
+                            <CircleDot className="size-4" />
+                            {issue.resolvedInRelease
+                                ? t("issue.resolvedIn", { release: issue.resolvedInRelease })
+                                : t("issue.resolved")}
+                        </Button>
+                    ) : (
+                        <>
+                            <Button size="sm" disabled={readOnly} onClick={() => status("resolved", "now")}>
+                                <CircleCheck className="size-4" />
+                                {t("issue.resolve")}
+                            </Button>
+                            {issue.lastRelease && (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={readOnly}
+                                    title={t("menu.resolveNextHint", { release: issue.lastRelease })}
+                                    onClick={() => status("resolved", "nextRelease")}
+                                >
+                                    {t("menu.resolveNext")}
+                                </Button>
+                            )}
+                        </>
+                    )}
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={readOnly}
+                        onClick={() => status(issue.status === "ignored" ? "unresolved" : "ignored")}
+                    >
+                        <CircleSlash className="size-4" />
+                        {issue.status === "ignored" ? t("issue.ignored") : t("issue.ignore")}
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={readOnly} onClick={() => setAssigning(true)}>
+                        <UserPlus className="size-4" />
+                        <span className="max-w-32 truncate">{issue.assignee?.name ?? t("menu.assign")}</span>
+                    </Button>
+                    {mayTask && (
+                        <Button size="sm" variant="ghost" onClick={() => setTasking(true)}>
+                            <ListTodo className="size-4" />
+                            {t("menu.createTask")}
+                        </Button>
+                    )}
+                    {!readOnly && (
+                        <button
+                            type="button"
+                            title={t("issue.delete")}
+                            aria-label={t("issue.delete")}
+                            onClick={() => setRemoving(true)}
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                        >
+                            <Trash2 className="size-4" />
+                        </button>
+                    )}
+                </div>
+            </div>
+            {error && (
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                    {error}
+                </p>
+            )}
+
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Fact label={t("issue.timesSeen")} value={String(issue.timesSeen)} />
+                <Fact label={t("issue.firstSeen")} value={<RelativeTime iso={issue.firstSeen} />} />
+                <Fact label={t("issue.lastSeen")} value={<RelativeTime iso={issue.lastSeen} />} />
+                <Fact
+                    label={t("issue.where")}
+                    value={issue.environments.join(", ") || issue.lastRelease || t("issue.notStated")}
+                />
+            </dl>
+
+            <div className="flex gap-1 overflow-x-auto border-b border-border" role="tablist">
+                {(["latest", "events"] as const).map((key) => (
+                    <button
+                        key={key}
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === key}
+                        onClick={() => setTab(key)}
+                        className={cn(
+                            "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-1.5 text-sm transition-colors",
+                            tab === key
+                                ? "border-primary font-medium text-foreground"
+                                : "border-transparent text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        {key === "latest" ? t("issue.latestTab") : t("issue.eventsTab", { count: issue.kept })}
+                    </button>
+                ))}
+            </div>
+            {tab === "latest" ? (
+                issue.latest ? (
+                    <EventPanel event={issue.latest} kept={issue.kept} />
+                ) : (
+                    <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+                        {t("issue.pruned")}
+                    </p>
+                )
+            ) : (
+                <EventStream
+                    projectId={projectId}
+                    issueId={issueId}
+                    hrefFor={(event) => paths.projectHref(projectId, "events", event.id)}
+                />
+            )}
+
+            <IssueActivity projectId={projectId} issueId={issueId} viewer={viewer} version={version} />
+
+            <AssignDialog
+                open={assigning}
+                onOpenChange={setAssigning}
+                projectId={projectId}
+                current={issue.assignee}
+                count={1}
+                viewerId={viewer.id}
+                onAssign={(person) => void assign(person)}
+            />
+            <CreateTaskDialog
+                issue={tasking ? { ...issue, projectId } : null}
+                onOpenChange={setTasking}
+                onCreated={() => setVersion((value) => value + 1)}
+            />
+            <ConfirmDeleteDialog
+                open={removing}
+                onOpenChange={setRemoving}
+                name={issue.title}
+                kind={t("issue.kind")}
+                requireTyping={false}
+                description={t("issue.deleteBody")}
+                confirmLabel={t("issue.deleteConfirm")}
+                onConfirm={async () => {
+                    setRemoving(false);
+                    const result = await runAction(() => actions.deleteIssueAction(projectId, issueId), setError);
+                    if (!result?.error) {
+                        await onChanged();
+                        router.push(back);
+                    }
+                }}
+            />
+        </div>
     );
 }
 
@@ -641,200 +862,6 @@ function ProjectAddress({
                     );
                     setRemoving(false);
                     await onDone();
-                }}
-            />
-        </div>
-    );
-}
-
-function IssueList({
-    issues,
-    windowDays,
-    onOpen
-}: {
-    issues: readonly IssueRow[];
-    windowDays: number;
-    onOpen: (id: string) => void;
-}) {
-    const t = useTranslations("telemetry");
-    if (issues.length === 0) {
-        return (
-            <EmptyState
-                icon={<CircleCheck />}
-                title={t("issues.none")}
-                description={t("issues.noneHint")}
-            />
-        );
-    }
-    return (
-        <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-            {issues.map((issue) => (
-                <li key={issue.id}>
-                    <button
-                        type="button"
-                        onClick={() => onOpen(issue.id)}
-                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted"
-                    >
-                        <span
-                            aria-hidden="true"
-                            className={cn(
-                                "size-2 shrink-0 rounded-full",
-                                LEVEL_TONE[issue.level] ?? LEVEL_TONE.error
-                            )}
-                        />
-                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                            <span className="truncate text-sm font-medium" title={issue.title}>
-                                {issue.title}
-                            </span>
-                            <span className="truncate text-xs text-muted-foreground">
-                                {issue.culprit || t("issues.noStack")}
-                                {issue.lastRelease ? ` - ${issue.lastRelease}` : ""}
-                            </span>
-                        </span>
-                        <Sparkline daily={issue.daily} days={windowDays} />
-                        <span className="w-16 shrink-0 text-right text-sm tabular-nums">
-                            {issue.timesSeen}
-                        </span>
-                        <span className="hidden w-28 shrink-0 text-right text-xs text-muted-foreground sm:block">
-                            <RelativeTime iso={issue.lastSeen} />
-                        </span>
-                    </button>
-                </li>
-            ))}
-        </ul>
-    );
-}
-
-/** How often, over the window. Bars rather than a line: what somebody reads off
- *  this is "every day" against "once, last Tuesday", and a line between two
- *  points invents the days in between. */
-function Sparkline({ daily, days }: { daily: readonly number[]; days: number }) {
-    const t = useTranslations("telemetry");
-    const peak = Math.max(1, ...daily);
-    return (
-        <span
-            className="hidden h-7 shrink-0 items-end gap-px sm:flex"
-            aria-label={t("issues.howOften", { days })}
-        >
-            {daily.map((count, at) => (
-                <span
-                    // The window is a fixed run of days, so the position is the
-                    // identity: there is nothing else to key on and nothing moves.
-                    key={at}
-                    className={cn("w-1 rounded-sm", count > 0 ? "bg-primary/70" : "bg-muted")}
-                    style={{ height: `${Math.max(6, (count / peak) * 100)}%` }}
-                />
-            ))}
-        </span>
-    );
-}
-
-function IssuePanel({
-    issue,
-    busy,
-    onBack,
-    onStatus,
-    onDelete,
-    readOnly
-}: {
-    issue: IssueDetail;
-    busy: boolean;
-    /** Shared with the reader to view: nothing here is theirs to change. */
-    readOnly: boolean;
-    onBack: () => void;
-    onStatus: (status: string) => void;
-    onDelete: () => void;
-}) {
-    const t = useTranslations("telemetry");
-    const [removing, setRemoving] = useState(false);
-    return (
-        <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-start gap-2">
-                <button
-                    type="button"
-                    onClick={onBack}
-                    aria-label={t("issue.back")}
-                    className="mt-0.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                    <ArrowLeft className="size-4" />
-                </button>
-                <div className="min-w-0 flex-1">
-                    <h2
-                        className="line-clamp-3 break-words text-base font-semibold"
-                        title={issue.title}
-                    >
-                        {issue.title}
-                    </h2>
-                    <p className="break-all text-xs text-muted-foreground">{issue.culprit}</p>
-                </div>
-                {!readOnly && (
-                    <div className="flex items-center gap-2">
-                        <Button
-                            size="sm"
-                            variant={issue.status === "resolved" ? "secondary" : "primary"}
-                            disabled={busy}
-                            onClick={() =>
-                                onStatus(issue.status === "resolved" ? "unresolved" : "resolved")
-                            }
-                        >
-                            <CircleCheck className="size-4" />
-                            {issue.status === "resolved" ? t("issue.resolved") : t("issue.resolve")}
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() =>
-                                onStatus(issue.status === "ignored" ? "unresolved" : "ignored")
-                            }
-                        >
-                            <CircleSlash className="size-4" />
-                            {issue.status === "ignored" ? t("issue.ignored") : t("issue.ignore")}
-                        </Button>
-                        <button
-                            type="button"
-                            title={t("issue.delete")}
-                            aria-label={t("issue.delete")}
-                            onClick={() => setRemoving(true)}
-                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                        >
-                            <Trash2 className="size-4" />
-                        </button>
-                    </div>
-                )}
-            </div>
-
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Fact label={t("issue.timesSeen")} value={String(issue.timesSeen)} />
-                <Fact label={t("issue.firstSeen")} value={<RelativeTime iso={issue.firstSeen} />} />
-                <Fact label={t("issue.lastSeen")} value={<RelativeTime iso={issue.lastSeen} />} />
-                <Fact
-                    label={t("issue.where")}
-                    value={
-                        issue.environments.join(", ") || issue.lastRelease || t("issue.notStated")
-                    }
-                />
-            </dl>
-
-            {issue.latest ? (
-                <EventPanel event={issue.latest} kept={issue.kept} />
-            ) : (
-                <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                    {t("issue.pruned")}
-                </p>
-            )}
-
-            <ConfirmDeleteDialog
-                open={removing}
-                onOpenChange={setRemoving}
-                name={issue.title}
-                kind={t("issue.kind")}
-                requireTyping={false}
-                description={t("issue.deleteBody")}
-                confirmLabel={t("issue.deleteConfirm")}
-                onConfirm={() => {
-                    setRemoving(false);
-                    onDelete();
                 }}
             />
         </div>

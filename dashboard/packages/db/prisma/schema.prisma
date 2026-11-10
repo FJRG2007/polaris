@@ -12673,10 +12673,15 @@ model TelemetryIssue {
     assignedTo User?            @relation("TelemetryAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
     events     TelemetryEvent[]
     days       TelemetryDay[]
+    activity   TelemetryActivity[]
 
     @@unique([projectId, fingerprint])
     @@index([projectId, status, lastSeen])
     @@index([projectId, lastSeen])
+    // The other orders the issue search offers, and "assigned to me".
+    @@index([projectId, status, firstSeen])
+    @@index([projectId, status, timesSeen])
+    @@index([projectId, assignedToId, lastSeen])
 }
 
 // One occurrence, kept whole so somebody can read the stack that mattered.
@@ -12711,6 +12716,32 @@ model TelemetryEvent {
 
     @@index([issueId, at])
     @@index([projectId, at])
+    // The search's environment: and release: filters, and a project's releases.
+    @@index([issueId, environment])
+    @@index([issueId, release])
+    @@index([projectId, release])
+}
+
+// What people did to an issue: a comment, a status change, an assignment, a
+// task made from it. A log, never edited; the issue's own columns stay the
+// current state. `actorId` is not a relation so the log outlives the account
+// and the User model carries nothing for it.
+model TelemetryActivity {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    projectId String   @db.Uuid
+    issueId   String   @db.Uuid
+    actorId   String?  @db.Uuid
+    // comment | status | assign | task - see TELEMETRY_ACTIVITY_KINDS.
+    kind      String
+    // The comment's text, the status or assignee it moved to, the task's name.
+    body      String   @default("")
+    // What it points at, when it points at something: the task's id.
+    ref       String?
+    at        DateTime @default(now())
+
+    issue TelemetryIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+    @@index([issueId, at])
 }
 
 // How many times an issue happened on a day.

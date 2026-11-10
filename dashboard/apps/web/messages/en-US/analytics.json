@@ -1,7 +1,8 @@
 {
     "scopes": {
         "application": "Service",
-        "polaris": "Polaris"
+        "polaris": "Polaris",
+        "external": "Website"
     },
     "ranges": {
         "r24h": "Last 24 hours",
@@ -19,7 +20,8 @@
         "whatToMeasure": "What to measure",
         "noServicesShort": "No services yet.",
         "traffic": "Traffic",
-        "fromDaily": "From daily totals - one bar is a day"
+        "fromDaily": "From daily totals - one bar is a day",
+        "noWebsites": "No websites yet. Add one and paste its tag to start counting."
     },
     "cards": {
         "dailyVisitors": "Daily visitors",
@@ -102,7 +104,9 @@
         "settings": "Those settings are not valid.",
         "report": "That report is not valid.",
         "rules": "Those ignore rules are not valid.",
-        "tooMany": "This site has too many saved reports."
+        "tooMany": "This site has too many saved reports.",
+        "siteInput": "Give it a name and an address like example.com.",
+        "tooManySites": "You have reached the limit of websites for one account."
     },
     "tabs": {
         "overview": "Overview",
@@ -253,5 +257,106 @@
         "apiSearch": "On the script tag: drop the query string from pages.",
         "apiBefore": "On the script tag: a function that sees each beat and can drop it.",
         "apiOptOut": "Run in a browser to stop counting your own visits there."
+    },
+    "sections": {
+        "overview": "Overview",
+        "realtime": "Realtime",
+        "pages": "Pages",
+        "sources": "Sources",
+        "geography": "Geography",
+        "sessions": "Sessions",
+        "events": "Events",
+        "reports": "Reports",
+        "site": "Settings",
+        "sites": "Websites"
+    },
+    "lists": {
+        "item": "Name",
+        "visitors": "Visitors",
+        "views": "Views",
+        "events": "Events",
+        "filterTo": "Filter to this",
+        "exclude": "Exclude this",
+        "copy": "Copy",
+        "capped": "Showing the top 500.",
+        "environment": "Environment"
+    },
+    "map": {
+        "title": "Visitors by country",
+        "visitors": "{count} visitors",
+        "hint": "Read from each visitor's time zone. Pick a country to filter.",
+        "fewer": "Fewer",
+        "more": "More"
+    },
+    "realtime": {
+        "online": "Online now",
+        "visitors": "Visitors, last 30 min",
+        "views": "Views, last 30 min",
+        "perMinute": "Views per minute",
+        "feed": "Activity",
+        "none": "Nobody in the last 30 minutes.",
+        "event": "Event: {name}"
+    },
+    "sites": {
+        "add": "Add website",
+        "search": "Search websites",
+        "none": "Nothing to measure yet.",
+        "noMatch": "No website matches that.",
+        "remove": "Remove",
+        "removeTitle": "Remove {name}?",
+        "removeBody": "Its recorded visits go with it. Its tag stops counting."
+    },
+    "add": {
+        "title": "Add a website",
+        "intro": "Measure a service deployed here, or a site served anywhere else.",
+        "stepKind": "Kind",
+        "stepPick": "Service",
+        "stepDetails": "Details",
+        "stepInstall": "Install",
+        "hostedTitle": "Deployed on Polaris",
+        "hostedBody": "Counted from the edge with nothing to install. Add the tag for more detail.",
+        "externalTitle": "Hosted elsewhere",
+        "externalBody": "Any site on another host. Paste one tag and visits start arriving.",
+        "pickTitle": "Pick the service",
+        "noServices": "No deployed services found.",
+        "noDomain": "No domain yet: give it one so visits can reach it.",
+        "back": "Back",
+        "detailsTitle": "About the site",
+        "name": "Name",
+        "namePlaceholder": "My blog",
+        "hostname": "Address",
+        "hostnameHint": "The domain it is served on, without https://",
+        "hostnameBad": "That is not a domain. Try something like example.com.",
+        "create": "Create website",
+        "edgeReady": "{name} is already counted from the edge log. Nothing to install.",
+        "trackerOptional": "Optional: adds visit length, screens, countries and custom events.",
+        "snippetTitle": "Add the tag to your site",
+        "framework": "Kind of project",
+        "frameworks": {
+            "html": "Plain HTML",
+            "nextjs": "Next.js",
+            "react": "React (Vite, CRA)",
+            "vue": "Vue",
+            "astro": "Astro",
+            "wordpress": "WordPress",
+            "gtm": "Tag Manager"
+        },
+        "where": {
+            "html": "Paste it into the page head, on every page.",
+            "nextjs": "Add it once to the root layout.",
+            "react": "Paste it into the head of index.html.",
+            "vue": "Paste it into the head of index.html.",
+            "astro": "Add it to the layout every page uses.",
+            "wordpress": "Add it to your theme or a snippets plugin.",
+            "gtm": "Create a Custom HTML tag that fires on all pages."
+        },
+        "checkTitle": "Check the installation",
+        "checking": "Checking...",
+        "waitingTracker": "Waiting for the first visit. Open your site in a browser.",
+        "waitingEdge": "Waiting for the first visit to this service.",
+        "arrived": "First visit recorded, on {path}.",
+        "arrivedTracker": "The tag works: first visit recorded on {path}.",
+        "open": "Open its numbers",
+        "toSites": "All websites"
     }
 }

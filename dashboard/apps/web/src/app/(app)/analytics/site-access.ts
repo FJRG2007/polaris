@@ -14,13 +14,22 @@
  *
  * Polaris's own traffic is an operator's alone: it includes who is reaching the
  * dashboard, which is not a project member's to read.
+ *
+ * A site somebody runs elsewhere (`external`) is owned by whoever added it, and
+ * by an operator; anybody else reaches it only when it was shared with them.
  */
 
 import { prisma } from "@polaris/db";
 import { grantedSubjects } from "@/lib/access/grants";
 import { visibleApplication } from "@/lib/deploy-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
-import { ensureAnalyticsSite, type AnalyticsScopeType, type AnalyticsSiteView } from "@/lib/analytics-service";
+import {
+    ensureAnalyticsSite,
+    externalSiteOwner,
+    findExternalSite,
+    type AnalyticsScopeType,
+    type AnalyticsSiteView
+} from "@/lib/analytics-service";
 
 export type SiteLevel = "view" | "edit" | "own";
 
@@ -55,6 +64,19 @@ export async function siteAccess(
             hosts.map((host) => host.toLowerCase())
         );
         return { site, level: "own", shared: false };
+    }
+
+    if (scopeType === "external") {
+        const owner = externalSiteOwner(scopeId);
+        if (!owner) return null;
+        const mine = owner === userId.toLowerCase() || isOperator;
+        const held = mine
+            ? null
+            : await grantedSubjects(userId, "analytics.site").then((map) => map.get(scopeId) ?? null);
+        if (!mine && !held) return null;
+        const site = await findExternalSite(scopeId);
+        if (!site) return null;
+        return { site, level: mine ? "own" : held === "edit" ? "edit" : "view", shared: !mine };
     }
 
     const [visible, held, configurable] = await Promise.all([

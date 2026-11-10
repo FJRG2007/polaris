@@ -325,8 +325,11 @@ function alternativeFor(entry: AppEntry, item: ReplacedProduct): BuiltInAlternat
         .flat()
         .find((candidate) => candidate.href === item.section);
     if (!section) return undefined;
+    // A section that is the app's own landing page ("Overview") is named after
+    // the app, which is what the card is pointing somebody to.
+    const app = POLARIS_APPS.find((candidate) => candidate.href === section.href);
     return {
-        label: section.label,
+        label: app?.label ?? section.label,
         href: section.href,
         permission: section.needs ?? entry.permission
     };

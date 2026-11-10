@@ -416,7 +416,15 @@
         "Connect": "Conectar",
         "Join a network": "Unirse a una red",
         "Network devices": "Dispositivos de red",
-        "Translate": "Traductor"
+        "Translate": "Traductor",
+        "Realtime": "En directo",
+        "Pages": "Páginas",
+        "Sources": "Fuentes",
+        "Geography": "Geografía",
+        "Reports": "Informes",
+        "Websites": "Sitios web",
+        "Projects": "Proyectos",
+        "All issues": "Incidencias"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

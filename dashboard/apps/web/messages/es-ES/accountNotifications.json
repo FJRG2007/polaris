@@ -325,6 +325,10 @@
             "label": "Alarma activa",
             "description": "Un servicio, dominio o recurso vigilado ha incumplido su condición."
         },
+        "telemetryAssigned": {
+            "label": "Incidencia asignada",
+            "description": "Alguien te ha asignado un error para revisar en Telemetry."
+        },
         "watchOk": {
             "label": "Alarma resuelta",
             "description": "Un objetivo vigilado vuelve a cumplir su condición."

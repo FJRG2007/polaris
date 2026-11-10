@@ -17,7 +17,7 @@
 import Link from "next/link";
 import { useAppUrl } from "@/components/app-url";
 import { HeaderPortal } from "@/components/header-portal";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { ShareDialog } from "@/components/access/share-dialog";
@@ -79,7 +79,16 @@ import {
     useFilterNav,
     useFilterPick
 } from "./analytics-reports";
-import type { AnalyticsTab } from "./analytics-tabs";
+import { ANALYTICS_SITE_COOKIE, isReportTab, type AnalyticsTab } from "./analytics-tabs";
+import {
+    GeographySection,
+    PagesSection,
+    RealtimeSection,
+    SourcesSection,
+    WorldMap,
+    sectionTitleKey
+} from "./analytics-sections";
+import { Plus } from "lucide-react";
 
 /** Thousands separators without a locale: the browser's separator disagrees with the
  *  server on the first render, and it is not the reader's chosen format either. */
@@ -107,15 +116,19 @@ export function AnalyticsView({
     siteId,
     range,
     canOperate,
+    canAdd = false,
     tab = "overview"
 }: {
     scope: AnalyticsScope;
     siteId: string;
     range: VisitRange;
     canOperate: boolean;
+    /** Whether this reader may add a site of their own. */
+    canAdd?: boolean;
     tab?: AnalyticsTab;
 }) {
     const t = useTranslations("analytics");
+    const pathname = usePathname();
     const { filters, filtersParam, set: setFilters, add: addFilter } = useFilterNav();
     const router = useRouter();
     const [data, setData] = useState<AnalyticsOverview | null>(null);
@@ -146,13 +159,19 @@ export function AnalyticsView({
 
     // Landing on Analytics with no service named. The first one is chosen once the
     // list is known, and written into the address so the page stays linkable.
+    const choices = services?.filter((service) => (service.scope ?? "application") === scope) ?? null;
     useEffect(() => {
-        if (!scopeNeedsTarget(scope) || siteId || !services || services.length === 0) return;
-        const first = services[0]!.id;
-        router.replace(
-            `/analytics?scope=${scope}&id=${encodeURIComponent(first)}&range=${range}`
-        );
-    }, [scope, siteId, services, range, router]);
+        if (!scopeNeedsTarget(scope) || siteId || !choices || choices.length === 0) return;
+        const first = choices[0]!.id;
+        router.replace(`${pathname}?scope=${scope}&id=${encodeURIComponent(first)}&range=${range}`);
+    }, [scope, siteId, choices, range, router, pathname]);
+
+    // The rail links at bare routes; remember what is open so the next section
+    // opened from it lands on the same site (read back in `analytics-page`).
+    useEffect(() => {
+        if (scopeNeedsTarget(scope) && !siteId) return;
+        document.cookie = `${ANALYTICS_SITE_COOKIE}=${encodeURIComponent(`${scope}:${siteId}`)}; path=/analytics; max-age=31536000; samesite=lax`;
+    }, [scope, siteId]);
 
     const load = useCallback(() => {
         // Nothing to ask about yet: the address names no service and the list that
@@ -203,14 +222,14 @@ export function AnalyticsView({
         [load]
     );
 
-    const nothingToMeasure = scopeNeedsTarget(scope) && services !== null && services.length === 0;
+    const nothingToMeasure = scopeNeedsTarget(scope) && choices !== null && choices.length === 0;
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
             <div className="flex flex-col gap-3">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-2">
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">
-                        {t("view.title")}
+                        {t(sectionTitleKey(isReportTab(tab) ? "reports" : tab))}
                     </h1>
                     {data ? (
                         <span className="hidden min-w-0 truncate text-sm text-muted-foreground md:inline">
@@ -223,6 +242,14 @@ export function AnalyticsView({
                             {t("view.online", { count: grouped(data.view.online) })}
                         </span>
                     ) : null}
+                    {canAdd ? (
+                        <Button asChild size="sm" variant="outline" className="ml-auto shrink-0">
+                            <Link href="/analytics/sites/new">
+                                <Plus aria-hidden="true" />
+                                {t("sites.add")}
+                            </Link>
+                        </Button>
+                    ) : null}
                 </div>
                 {data?.shared ? <Badge variant="neutral">{t("view.sharedWithYou")}</Badge> : null}
                 <SitePicker
@@ -231,7 +258,7 @@ export function AnalyticsView({
                     services={services}
                     canOperate={canOperate}
                 />
-                {data?.canShare && scope === "application" && siteId ? (
+                {data?.canShare && scopeNeedsTarget(scope) && siteId ? (
                     <Button
                         variant="ghost"
                         size="icon-sm"
@@ -262,7 +289,7 @@ export function AnalyticsView({
                     siteId={siteId}
                     onSaved={load}
                 />
-                <SectionTabs tab={tab} />
+                {isReportTab(tab) ? <SectionTabs tab={tab} /> : null}
             </div>
 
             {failure ? (
@@ -273,7 +300,7 @@ export function AnalyticsView({
 
             {nothingToMeasure ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                    {t("view.noServices")}
+                    {scope === "external" ? t("view.noWebsites") : t("view.noServices")}
                 </p>
             ) : (
                 <FilterPick.Provider value={addFilter}>
@@ -281,8 +308,34 @@ export function AnalyticsView({
                         <>
                             <Overview data={data} range={range} />
                             <Breakdowns data={data} />
+                            <Card className="min-w-0">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center gap-2 text-sm">
+                                        <Globe className="size-4 text-muted-foreground" aria-hidden />
+                                        {t("map.title")}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardBody className="pt-0">
+                                    <WorldMap
+                                        rows={data?.view.breakdowns.country ?? null}
+                                        unavailable={data?.view.unavailable.includes("country") ?? false}
+                                    />
+                                </CardBody>
+                            </Card>
                             <Recent data={data} />
                         </>
+                    ) : tab === "realtime" || tab === "pages" || tab === "sources" || tab === "geography" ? (
+                        data ? (
+                            (() => {
+                                const panel = { data, scope, siteId, filtersParam, onSaved: load };
+                                if (tab === "realtime") return <RealtimeSection {...panel} />;
+                                if (tab === "pages") return <PagesSection {...panel} />;
+                                if (tab === "sources") return <SourcesSection {...panel} />;
+                                return <GeographySection {...panel} />;
+                            })()
+                        ) : (
+                            <Skeleton className="h-48 w-full" />
+                        )
                     ) : data ? (
                         <ReportPanel
                             tab={tab}
@@ -323,15 +376,21 @@ function SitePicker({
 }) {
     const t = useTranslations("analytics");
     const router = useRouter();
+    const pathname = usePathname();
     const params = useSearchParams();
     const scopes = ANALYTICS_SCOPES.filter((entry) => canOperate || entry.value !== "polaris");
+    const ofScope = (kind: AnalyticsScope) =>
+        services?.filter((service) => (service.scope ?? "application") === kind) ?? null;
+    const choices = ofScope(scope);
 
     function go(nextScope: AnalyticsScope, nextId: string) {
         const next = new URLSearchParams(params.toString());
         next.set("scope", nextScope);
         if (nextId) next.set("id", nextId);
         else next.delete("id");
-        router.push(`/analytics?${next.toString()}`);
+        // Filters name pages and referrers of the site they were set on.
+        next.delete("f");
+        router.push(`${pathname}?${next.toString()}`);
     }
 
     const scopeSelect = (
@@ -345,21 +404,21 @@ function SitePicker({
             }))}
             onValueChange={(value) => {
                 const next = value as AnalyticsScope;
-                go(next, next === "application" ? (services?.[0]?.id ?? "") : "");
+                go(next, scopeNeedsTarget(next) ? (ofScope(next)?.[0]?.id ?? "") : "");
             }}
         />
     );
 
-    const siteSelect = !scopeNeedsTarget(scope) ? null : services === null ? (
+    const siteSelect = !scopeNeedsTarget(scope) ? null : choices === null ? (
         // The shape of the control that is coming, rather than a gap the header
         // closes up and then reopens.
         <Skeleton className="h-8 min-w-0 flex-1 md:w-60 md:min-w-[15rem] md:flex-none" />
-    ) : services.length > 0 ? (
+    ) : choices.length > 0 ? (
         <Select
-            value={siteId || (services[0]?.id ?? "")}
-            aria-label={t("scopes.application")}
+            value={siteId || (choices[0]?.id ?? "")}
+            aria-label={t(`scopes.${scope}` as NamespaceKey<"analytics">)}
             className="h-8 min-w-0 flex-1 md:w-60 md:min-w-[15rem] md:flex-none"
-            options={services.map((service) => ({ value: service.id, label: service.label }))}
+            options={choices.map((service) => ({ value: service.id, label: service.label }))}
             onValueChange={(value) => go(scope, value)}
         />
     ) : (
@@ -389,6 +448,7 @@ function SitePicker({
 function RangeTabs({ range }: { range: VisitRange }) {
     const t = useTranslations("analytics");
     const params = useSearchParams();
+    const pathname = usePathname();
     return (
         <ScrollRow className="no-scrollbar -mx-1 flex gap-1 px-1">
             {RANGES.map((value) => {
@@ -398,7 +458,7 @@ function RangeTabs({ range }: { range: VisitRange }) {
                 return (
                     <Link
                         key={value}
-                        href={`/analytics?${next.toString()}`}
+                        href={`${pathname}?${next.toString()}`}
                         scroll={false}
                         aria-current={active ? "page" : undefined}
                         className={cn(

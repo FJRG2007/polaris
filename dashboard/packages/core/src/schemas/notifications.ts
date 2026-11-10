@@ -367,6 +367,14 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "telemetry.assigned",
+        group: "watch",
+        label: "Issue assigned to you",
+        description: "Somebody handed you an error to look into in Telemetry.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "watch.ok",
         group: "watch",
         label: "Alarm cleared",

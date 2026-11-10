@@ -713,7 +713,13 @@ vi.mock("@/app/(app)/telemetry/telemetry-polls", () => ({
         () => import("@/app/(app)/telemetry/actions"),
         "openIssueAction",
         2
-    )
+    ),
+    telemetryIssues: forward(() => import("@/app/(app)/telemetry/actions"), "searchIssuesAction", 1),
+    telemetryEvents: forward(() => import("@/app/(app)/telemetry/actions"), "eventsPageAction", 1),
+    telemetryEvent: forward(() => import("@/app/(app)/telemetry/actions"), "openEventAction", 1),
+    telemetryProjects: forward(() => import("@/app/(app)/telemetry/actions"), "projectsPageAction", 1),
+    telemetryActivity: forward(() => import("@/app/(app)/telemetry/actions"), "issueActivityAction", 1),
+    telemetryReleases: forward(() => import("@/app/(app)/telemetry/actions"), "releasesAction", 1)
 }));
 
 vi.mock("@/app/(app)/apps/agents/repos/repos-polls", () => ({

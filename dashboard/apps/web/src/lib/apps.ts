@@ -35,12 +35,15 @@ import {
     Database,
     Download,
     EyeOff,
+    Earth,
     FileText,
+    Filter,
     Columns3,
     Presentation,
     Table2,
     FileStack,
     FolderGit2,
+    FolderKanban,
     FolderOpen,
     Gamepad2,
     Gauge,
@@ -73,6 +76,7 @@ import {
     Network,
     NotebookPen,
     PartyPopper,
+    MousePointerClick,
     Radio,
     Rocket,
     ScanFace,
@@ -2665,29 +2669,129 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         }
     ],
+    // Umami's layout: the site's sections down the rail, the site itself picked in
+    // the header. Each is a route of its own under /analytics.
     analytics: [
         {
-            // Out of the rail: the app is this one screen. Kept so search finds it.
-            label: "Analytics", // i18n-ignore
+            label: "Overview", // i18n-ignore
             href: "/analytics",
             needs: "deploy.manage",
             requiresApp: "analytics",
+            // Somebody a single site was shared with reads every section of it.
             reachedBy: "analytics.site",
             icon: ChartColumn,
-            hidden: true,
-            keywords: ["visitors", "traffic", "pageviews", "referrers", "metrics", "umami"]
+            keywords: ["visitors", "traffic", "pageviews", "metrics", "umami"]
+        },
+        {
+            label: "Realtime", // i18n-ignore
+            href: "/analytics/realtime",
+            needs: "deploy.manage",
+            requiresApp: "analytics",
+            // Somebody a single site was shared with reads every section of it.
+            reachedBy: "analytics.site",
+            icon: Radio,
+            keywords: ["live", "online", "now"]
+        },
+        {
+            label: "Pages", // i18n-ignore
+            href: "/analytics/pages",
+            needs: "deploy.manage",
+            requiresApp: "analytics",
+            // Somebody a single site was shared with reads every section of it.
+            reachedBy: "analytics.site",
+            icon: FileText,
+            keywords: ["paths", "entry", "exit", "browsers", "devices"]
+        },
+        {
+            label: "Sources", // i18n-ignore
+            href: "/analytics/sources",
+            needs: "deploy.manage",
+            requiresApp: "analytics",
+            // Somebody a single site was shared with reads every section of it.
+            reachedBy: "analytics.site",
+            icon: Link2,
+            keywords: ["referrers", "channels", "campaigns", "utm"]
+        },
+        {
+            label: "Geography", // i18n-ignore
+            href: "/analytics/geography",
+            needs: "deploy.manage",
+            requiresApp: "analytics",
+            // Somebody a single site was shared with reads every section of it.
+            reachedBy: "analytics.site",
+            icon: Earth,
+            keywords: ["map", "countries", "languages"]
+        },
+        {
+            label: "Sessions", // i18n-ignore
+            href: "/analytics/sessions",
+            needs: "deploy.manage",
+            requiresApp: "analytics",
+            // Somebody a single site was shared with reads every section of it.
+            reachedBy: "analytics.site",
+            icon: UsersRound,
+            keywords: ["visits", "visitors"]
+        },
+        {
+            label: "Events", // i18n-ignore
+            href: "/analytics/events",
+            needs: "deploy.manage",
+            requiresApp: "analytics",
+            // Somebody a single site was shared with reads every section of it.
+            reachedBy: "analytics.site",
+            icon: MousePointerClick,
+            keywords: ["custom events", "properties"]
+        },
+        {
+            label: "Reports", // i18n-ignore
+            href: "/analytics/reports",
+            needs: "deploy.manage",
+            requiresApp: "analytics",
+            // Somebody a single site was shared with reads every section of it.
+            reachedBy: "analytics.site",
+            icon: Filter,
+            keywords: ["funnels", "journeys", "goals", "retention", "revenue"]
+        },
+        {
+            label: "Settings", // i18n-ignore
+            href: "/analytics/settings",
+            needs: "deploy.manage",
+            requiresApp: "analytics",
+            // Somebody a single site was shared with reads every section of it.
+            reachedBy: "analytics.site",
+            icon: SlidersHorizontal,
+            keywords: ["tracker", "script", "ignore"]
+        },
+        {
+            label: "Websites", // i18n-ignore
+            href: "/analytics/sites",
+            needs: "deploy.manage",
+            requiresApp: "analytics",
+            // Somebody a single site was shared with reads every section of it.
+            reachedBy: "analytics.site",
+            icon: Globe,
+            keywords: ["sites", "add site", "new website"]
         }
     ],
     telemetry: [
         {
-            label: "Telemetry", // i18n-ignore
+            // The projects; each one's own sections are its rail inside the page.
+            label: "Projects", // i18n-ignore
             href: "/telemetry",
             needs: "deploy.manage",
             requiresApp: "telemetry",
             // A project shared with somebody who runs nothing else here.
             reachedBy: "telemetry.project",
+            icon: FolderKanban,
+            keywords: ["dsn", "sentry", "projects", "setup"]
+        },
+        {
+            label: "All issues", // i18n-ignore
+            href: "/telemetry/issues",
+            needs: "deploy.manage",
+            requiresApp: "telemetry",
+            reachedBy: "telemetry.project",
             icon: Bug,
-            hidden: true,
             keywords: [
                 "errors",
                 "exceptions",

@@ -325,6 +325,10 @@
             "label": "Alarm fired",
             "description": "A watched service, domain or resource breached its condition."
         },
+        "telemetryAssigned": {
+            "label": "Issue assigned to you",
+            "description": "Somebody handed you an error to look into in Telemetry."
+        },
         "watchOk": {
             "label": "Alarm cleared",
             "description": "A watched target came back within its condition."

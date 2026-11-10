@@ -1,7 +1,8 @@
 {
     "scopes": {
         "application": "Servicio",
-        "polaris": "Polaris"
+        "polaris": "Polaris",
+        "external": "Sitio web"
     },
     "ranges": {
         "r24h": "Últimas 24 horas",
@@ -19,7 +20,8 @@
         "whatToMeasure": "Qué medir",
         "noServicesShort": "Aún no hay servicios.",
         "traffic": "Tráfico",
-        "fromDaily": "De los totales diarios - una barra es un día"
+        "fromDaily": "De los totales diarios - una barra es un día",
+        "noWebsites": "Aún no hay sitios web. Añade uno y pega su etiqueta para contar."
     },
     "cards": {
         "dailyVisitors": "Visitantes diarios",
@@ -102,7 +104,9 @@
         "settings": "Esos ajustes no son válidos.",
         "report": "Ese informe no es válido.",
         "rules": "Esas reglas no son válidas.",
-        "tooMany": "Este sitio tiene demasiados informes."
+        "tooMany": "Este sitio tiene demasiados informes.",
+        "siteInput": "Ponle un nombre y una dirección como example.com.",
+        "tooManySites": "Has llegado al límite de sitios web para una cuenta."
     },
     "tabs": {
         "overview": "Resumen",
@@ -253,5 +257,106 @@
         "apiSearch": "En el script: quita la consulta de las páginas.",
         "apiBefore": "En el script: una función que ve cada envío y puede anularlo.",
         "apiOptOut": "Ejecútalo en un navegador para no contar tus visitas."
+    },
+    "sections": {
+        "overview": "Resumen",
+        "realtime": "En directo",
+        "pages": "Páginas",
+        "sources": "Fuentes",
+        "geography": "Geografía",
+        "sessions": "Sesiones",
+        "events": "Eventos",
+        "reports": "Informes",
+        "site": "Ajustes",
+        "sites": "Sitios web"
+    },
+    "lists": {
+        "item": "Nombre",
+        "visitors": "Visitas",
+        "views": "Vistas",
+        "events": "Eventos",
+        "filterTo": "Filtrar por esto",
+        "exclude": "Excluir esto",
+        "copy": "Copiar",
+        "capped": "Se muestran los 500 primeros.",
+        "environment": "Entorno"
+    },
+    "map": {
+        "title": "Visitas por país",
+        "visitors": "{count} visitas",
+        "hint": "Se lee de la zona horaria de cada visita. Elige un país para filtrar.",
+        "fewer": "Menos",
+        "more": "Más"
+    },
+    "realtime": {
+        "online": "En línea",
+        "visitors": "Visitas, últimos 30 min",
+        "views": "Vistas, últimos 30 min",
+        "perMinute": "Vistas por minuto",
+        "feed": "Actividad",
+        "none": "Nadie en los últimos 30 minutos.",
+        "event": "Evento: {name}"
+    },
+    "sites": {
+        "add": "Añadir sitio",
+        "search": "Buscar sitios",
+        "none": "Aún no hay nada que medir.",
+        "noMatch": "Ningún sitio coincide.",
+        "remove": "Quitar",
+        "removeTitle": "¿Quitar {name}?",
+        "removeBody": "Sus visitas se borran con él. Su etiqueta deja de contar."
+    },
+    "add": {
+        "title": "Nuevo sitio web",
+        "intro": "Mide un servicio desplegado aquí o un sitio servido en otro lugar.",
+        "stepKind": "Tipo",
+        "stepPick": "Servicio",
+        "stepDetails": "Datos",
+        "stepInstall": "Instalar",
+        "hostedTitle": "Desplegado en Polaris",
+        "hostedBody": "Se cuenta desde el borde sin instalar nada. Añade la etiqueta para más detalle.",
+        "externalTitle": "En otro host",
+        "externalBody": "Cualquier sitio en otro host. Pega una etiqueta y llegan las visitas.",
+        "pickTitle": "Elige el servicio",
+        "noServices": "No hay servicios desplegados.",
+        "noDomain": "Sin dominio: asígnale uno para que lleguen visitas.",
+        "back": "Atrás",
+        "detailsTitle": "Sobre el sitio",
+        "name": "Nombre",
+        "namePlaceholder": "Mi blog",
+        "hostname": "Dirección",
+        "hostnameHint": "El dominio donde se sirve, sin https://",
+        "hostnameBad": "Eso no es un dominio. Prueba algo como example.com.",
+        "create": "Crear sitio",
+        "edgeReady": "{name} ya se cuenta desde el registro del borde. Nada que instalar.",
+        "trackerOptional": "Opcional: añade duración, pantallas, países y eventos propios.",
+        "snippetTitle": "Añade la etiqueta a tu sitio",
+        "framework": "Tipo de proyecto",
+        "frameworks": {
+            "html": "HTML simple",
+            "nextjs": "Next.js",
+            "react": "React (Vite, CRA)",
+            "vue": "Vue",
+            "astro": "Astro",
+            "wordpress": "WordPress",
+            "gtm": "Tag Manager"
+        },
+        "where": {
+            "html": "Pégala en el head de cada página.",
+            "nextjs": "Añádela una vez en el layout raíz.",
+            "react": "Pégala en el head de index.html.",
+            "vue": "Pégala en el head de index.html.",
+            "astro": "Añádela al layout que usan todas las páginas.",
+            "wordpress": "Añádela a tu tema o a un plugin de fragmentos.",
+            "gtm": "Crea una etiqueta HTML propia para todas las páginas."
+        },
+        "checkTitle": "Comprobar la instalación",
+        "checking": "Comprobando...",
+        "waitingTracker": "Esperando la primera visita. Abre tu sitio en un navegador.",
+        "waitingEdge": "Esperando la primera visita a este servicio.",
+        "arrived": "Primera visita registrada, en {path}.",
+        "arrivedTracker": "La etiqueta funciona: primera visita en {path}.",
+        "open": "Ver sus datos",
+        "toSites": "Ver sitios"
     }
 }

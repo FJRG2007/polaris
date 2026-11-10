@@ -26,3 +26,28 @@ export const telemetryIssue = (projectId: string, issueId: string, signal?: Abor
         { projectId, issueId },
         signal
     );
+
+/** The routes that answer one parsed input, each the action of the same name. */
+function inputPoll<F extends (input: unknown) => Promise<unknown>>(path: string) {
+    return (input: Parameters<F>[0], signal?: AbortSignal) =>
+        readPoll<Answer<F>>(path, { input: JSON.stringify(input) }, signal);
+}
+
+export const telemetryIssues = inputPoll<typeof telemetryActionsModule.searchIssuesAction>(
+    "/api/telemetry/issues"
+);
+export const telemetryEvents = inputPoll<typeof telemetryActionsModule.eventsPageAction>(
+    "/api/telemetry/events"
+);
+export const telemetryEvent = inputPoll<typeof telemetryActionsModule.openEventAction>(
+    "/api/telemetry/event"
+);
+export const telemetryProjects = inputPoll<typeof telemetryActionsModule.projectsPageAction>(
+    "/api/telemetry/projects"
+);
+export const telemetryActivity = inputPoll<typeof telemetryActionsModule.issueActivityAction>(
+    "/api/telemetry/activity"
+);
+export const telemetryReleases = inputPoll<typeof telemetryActionsModule.releasesAction>(
+    "/api/telemetry/releases"
+);

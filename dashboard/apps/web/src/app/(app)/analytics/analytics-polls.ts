@@ -36,3 +36,12 @@ export const analyticsReport = (
         input,
         signal
     );
+
+export const analyticsSiteList = (input: Record<string, string>, signal?: AbortSignal) =>
+    readPoll<Answer<typeof analyticsActionsModule.pageAnalyticsSitesAction>>("/api/analytics/site-list", input, signal);
+
+export const analyticsHosted = (input: Record<string, string>, signal?: AbortSignal) =>
+    readPoll<Answer<typeof analyticsActionsModule.pageHostedServicesAction>>("/api/analytics/hosted", input, signal);
+
+export const analyticsInstallation = (input: { scopeType: string; scopeId: string }, signal?: AbortSignal) =>
+    readPoll<Answer<typeof analyticsActionsModule.checkInstallationAction>>("/api/analytics/installation", input, signal);

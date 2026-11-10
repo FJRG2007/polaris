@@ -24,7 +24,8 @@ const EXPORT_ROWS = 10_000;
 
 const querySchema = z.object({
     subject: z.enum(core.GRANT_SUBJECTS),
-    subjectId: z.string().uuid(),
+    // A service id, or an external analytics site (`<owner id>:<random>`).
+    subjectId: z.string().regex(/^[0-9a-f-]{36}(:[0-9a-f]{12})?$/i),
     grant: z.string().uuid().optional(),
     outcome: z.enum(GRANT_USE_OUTCOMES).optional(),
     from: z.string().datetime().optional(),
