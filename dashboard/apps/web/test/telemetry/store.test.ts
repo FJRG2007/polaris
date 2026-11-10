@@ -42,6 +42,9 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
+// The alert rules run after the event is stored; they have their own tests.
+vi.mock("@/lib/telemetry/alerts", () => ({ evaluateAlerts: async () => 0 }));
+
 const store = await import("../../src/lib/telemetry/store");
 
 const AT = new Date("2026-09-04T13:20:00.000Z");

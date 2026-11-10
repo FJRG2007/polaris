@@ -12631,6 +12631,8 @@ model TelemetryProject {
     issues        TelemetryIssue[]
     events        TelemetryEvent[]
     days          TelemetryDay[]
+    alertRules    TelemetryAlertRule[]
+    alertFires    TelemetryAlertFire[]
 
     @@unique([ownerId, slug])
     @@index([orgId])
@@ -12667,6 +12669,10 @@ model TelemetryIssue {
     // saying so is the one thing a list of resolved issues is for.
     resolvedInRelease String?
     assignedToId String?  @db.Uuid
+    // How many different people hit it, as their user contexts said: one row in
+    // TelemetryIssueUser per person, and this the count of them, kept on the
+    // issue so the list can sort by it without counting.
+    userCount   Int       @default(0)
 
     project    TelemetryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
     resolvedBy User?            @relation("TelemetryResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
@@ -12674,6 +12680,8 @@ model TelemetryIssue {
     events     TelemetryEvent[]
     days       TelemetryDay[]
     activity   TelemetryActivity[]
+    users      TelemetryIssueUser[]
+    alertFires TelemetryAlertFire[]
 
     @@unique([projectId, fingerprint])
     @@index([projectId, status, lastSeen])
@@ -12682,6 +12690,78 @@ model TelemetryIssue {
     @@index([projectId, status, firstSeen])
     @@index([projectId, status, timesSeen])
     @@index([projectId, assignedToId, lastSeen])
+    // The "users" order of the issue search.
+    @@index([projectId, status, userCount])
+}
+
+// One person who hit an issue, so "users affected" counts each of them once.
+//
+// A SHA-256 of what the event's user context named them by (its id, else its
+// email, else its address), never the value: the count is the point, and a
+// table of who crashed where is not something to keep in the clear. One row
+// per person per issue, gone with the issue.
+model TelemetryIssueUser {
+    issueId  String   @db.Uuid
+    userHash String
+    at       DateTime @default(now())
+
+    issue TelemetryIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+    @@id([issueId, userHash])
+}
+
+// An alert rule of a project, Sentry's "issue alert": when something happens to
+// one of its issues, tell somebody.
+//
+// trigger: new (an issue is created) | frequency (seen more than `threshold`
+// times in `windowMinutes`) | regression (a resolved issue came back). The
+// level and environment filters narrow it to the events that match; empty is
+// any. Who hears: the people named in `recipients` (JSON string array of user
+// ids) and, with `notifyMembers`, everybody who can open the project. It fires
+// at most once per issue per `throttleMinutes`.
+model TelemetryAlertRule {
+    id              String    @id @default(uuid(7)) @db.Uuid
+    projectId       String    @db.Uuid
+    name            String
+    enabled         Boolean   @default(true)
+    trigger         String
+    threshold       Int       @default(0)
+    windowMinutes   Int       @default(0)
+    // JSON string array of TELEMETRY_LEVELS; empty means any level.
+    levels          String    @default("[]")
+    environment     String?
+    recipients      String    @default("[]")
+    notifyMembers   Boolean   @default(true)
+    throttleMinutes Int       @default(60)
+    createdById     String?   @db.Uuid
+    lastFiredAt     DateTime?
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    project TelemetryProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    fires   TelemetryAlertFire[]
+
+    @@index([projectId, createdAt])
+}
+
+// One time a rule fired, for the project's alert history and the throttle.
+model TelemetryAlertFire {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    projectId String   @db.Uuid
+    ruleId    String   @db.Uuid
+    issueId   String   @db.Uuid
+    // new | frequency | regression - the rule's trigger at the time.
+    trigger   String
+    // How many people it was sent to.
+    notified  Int      @default(0)
+    at        DateTime @default(now())
+
+    project TelemetryProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    rule    TelemetryAlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+    issue   TelemetryIssue     @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+    @@index([ruleId, issueId, at])
+    @@index([projectId, at])
 }
 
 // One occurrence, kept whole so somebody can read the stack that mattered.

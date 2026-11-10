@@ -23,6 +23,10 @@
         "releases": {
             "label": "Releases",
             "hint": "The builds that reported, and their issues"
+        },
+        "alerts": {
+            "label": "Alerts",
+            "hint": "Who hears about new, frequent and returning issues"
         }
     },
     "view": {
@@ -70,7 +74,8 @@
         "howOften": "How often over the last {days} days",
         "issue": "Issue",
         "graph": "Last {days} days",
-        "events": "Events"
+        "events": "Events",
+        "users": "Users"
     },
     "issue": {
         "back": "Back to the list",
@@ -90,7 +95,8 @@
         "deleteConfirm": "Delete",
         "resolvedIn": "Resolved after {release}",
         "latestTab": "Latest event",
-        "eventsTab": "{count, plural, one {One event} other {# events}}"
+        "eventsTab": "{count, plural, one {One event} other {# events}}",
+        "users": "Users affected"
     },
     "errors": {
         "readProjects": "Those projects could not be read",
@@ -267,7 +273,8 @@
         "sorts": {
             "lastSeen": "Last seen",
             "firstSeen": "First seen",
-            "events": "Events"
+            "events": "Events",
+            "users": "Users"
         },
         "active": "Active filters",
         "remove": "Remove {filter}",
@@ -314,10 +321,81 @@
         "send": "Comment",
         "none": "Nothing here yet.",
         "someone": "Someone",
-        "more": "Show older"
+        "more": "Show older",
+        "retry": "Try again"
     },
     "notify": {
         "assignedOne": "{name} assigned you an issue",
-        "assignedMany": "{name} assigned you {count} issues"
+        "assignedMany": "{name} assigned you {count} issues",
+        "alertNew": "New issue: {rule}",
+        "alertFrequency": "Issue seen over {count} times in {minutes} min: {rule}",
+        "alertRegression": "Resolved issue came back: {rule}"
+    },
+    "alerts": {
+        "title": "Alert rules",
+        "hint": "Tell people when an issue is new, happens often, or comes back.",
+        "add": "New rule",
+        "none": "No alert rules yet",
+        "noneHint": "Nobody is told when something breaks here. Add a rule to change that.",
+        "kind": "alert rule",
+        "edit": "Edit rule",
+        "delete": "Delete rule",
+        "deleteBody": "Its history goes with it. Nobody is told about this again.",
+        "deleteConfirm": "Delete",
+        "enabled": "Rule on",
+        "members": "Project members",
+        "nobody": "nobody",
+        "notifies": "Notifies {who}",
+        "lastFired": "Last fired",
+        "neverFired": "Has not fired yet",
+        "triggers": {
+            "new": "A new issue is created",
+            "frequency": "An issue is seen often",
+            "regression": "A resolved issue comes back"
+        },
+        "summary": {
+            "new": "When a new issue is created",
+            "frequency": "When an issue is seen more than {count} times in {minutes} min",
+            "regression": "When a resolved issue comes back"
+        },
+        "form": {
+            "newTitle": "New alert rule",
+            "editTitle": "Edit alert rule",
+            "hint": "Pick what to watch for and who to tell.",
+            "name": "Name",
+            "namePlaceholder": "Checkout errors",
+            "when": "When",
+            "threshold": "More than (events)",
+            "window": "Within (minutes)",
+            "levels": "Levels",
+            "levelsHint": "None picked means any level.",
+            "environment": "Environment",
+            "environmentPlaceholder": "Any environment",
+            "notify": "Notify",
+            "members": "Everyone with access to this project",
+            "findPeople": "Add people",
+            "throttle": "At most once per issue every (minutes)",
+            "throttleHint": "Quiet time after a rule fires for an issue.",
+            "cancel": "Cancel",
+            "save": "Save rule"
+        },
+        "history": {
+            "title": "Alert history",
+            "none": "No rule has fired yet.",
+            "notified": "{count, plural, =0 {Sent to nobody} one {Sent to one person} other {Sent to # people}}"
+        },
+        "errors": {
+            "read": "Could not read the alert rules.",
+            "save": "Could not save the rule.",
+            "delete": "Could not delete the rule.",
+            "invalid": "Check the rule's fields.",
+            "threshold": "Enter a whole number of at least 1.",
+            "window": "Enter a number of minutes of at least 1.",
+            "throttle": "Enter between 1 and 10080 minutes.",
+            "nobody": "Pick someone to notify.",
+            "recipientCannotSee": "Someone you picked cannot open this project.",
+            "gone": "That rule no longer exists.",
+            "limit": "This project has as many rules as it can hold."
+        }
     }
 }

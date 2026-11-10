@@ -148,6 +148,11 @@ export interface CapturedEvent {
     /** Who hit it, as a label and never as an identity: whatever the reporter
      *  chose to send. It is shown, never matched on. */
     readonly user: string | null;
+    /** Who hit it, as something to count distinct people by and never to show:
+     *  the reporter's `user.id`, else its `user.email`, else its
+     *  `user.ip_address`. Hashed before it is stored. Null when the event names
+     *  nobody. */
+    readonly userKey: string | null;
     readonly tags: Readonly<Record<string, string>>;
     readonly frames: readonly StackFrame[];
     readonly breadcrumbs: readonly Breadcrumb[];
@@ -630,6 +635,7 @@ export function readEvent(payload: unknown, now: Date): CapturedEvent | null {
         // address on its own: an IP with nothing beside it identifies somebody
         // who never agreed to be identified here.
         user: asString(user.username ?? user.email ?? user.id, MAX_TAG) || null,
+        userKey: userKeyOf(user),
         tags: tagsOf(event.tags),
         frames,
         breadcrumbs: breadcrumbsOf(event.breadcrumbs),
@@ -647,6 +653,24 @@ export function readEvent(payload: unknown, now: Date): CapturedEvent | null {
     };
 
     return { ...read, fingerprint: fingerprintOf(read, event.fingerprint) };
+}
+
+/**
+ * The identity an event's user context counts as, for "how many people hit
+ * this": the id the application gave them, else their email, else their
+ * address. Typed so `7` and `"7"` are the same person, and so an id never
+ * collides with an email or an address that happens to spell the same thing.
+ */
+export function userKeyOf(user: Record<string, unknown>): string | null {
+    const id = asString(user.id, MAX_TAG).trim();
+    if (id) return `id:${id}`;
+    const email = asString(user.email, MAX_TAG).trim().toLowerCase();
+    if (email) return `email:${email}`;
+    const ip = asString(user.ip_address, 60).trim();
+    // "{{auto}}" is the SDKs' request for the server to fill in the address,
+    // not an address, and counting it would make every browser one person.
+    if (ip && ip !== "{{auto}}") return `ip:${ip}`;
+    return null;
 }
 
 // ---------------------------------------------------------------------------

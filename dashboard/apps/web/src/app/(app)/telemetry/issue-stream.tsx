@@ -272,6 +272,7 @@ export function IssueStream({
                         <span className="min-w-0 flex-1 truncate">{t("issues.issue")}</span>
                         <span className="hidden w-28 md:block">{t("issues.graph", { days: windowDays })}</span>
                         <span className="w-14 text-right">{t("issues.events")}</span>
+                        <span className="hidden w-14 text-right sm:block">{t("issues.users")}</span>
                         <span className="hidden w-24 text-right sm:block">{t("issue.lastSeen")}</span>
                     </div>
                     <div
@@ -438,6 +439,7 @@ function IssueRowItem({
                         <Sparkline daily={row.daily} days={windowDays} />
                     </span>
                     <span className="w-14 shrink-0 text-right text-sm tabular-nums">{row.timesSeen}</span>
+                    <span className="hidden w-14 shrink-0 text-right text-sm tabular-nums sm:block">{row.userCount}</span>
                     <span className="hidden w-24 shrink-0 text-right text-xs text-muted-foreground sm:block">
                         <RelativeTime iso={row.lastSeen} />
                     </span>

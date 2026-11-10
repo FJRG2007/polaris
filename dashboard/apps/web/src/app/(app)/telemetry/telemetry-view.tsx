@@ -18,6 +18,7 @@ import { EventPanel } from "./event-detail";
 import { runAction } from "@/lib/run-action";
 import { IssueStream } from "./issue-stream";
 import { ProjectsGrid } from "./projects-grid";
+import { AlertRules } from "./alert-rules";
 import { ReporterRules } from "./reporter-rules";
 import { IssueActivity } from "./issue-activity";
 import { useCursorList } from "./use-cursor-list";
@@ -332,6 +333,9 @@ export function TelemetryView({
                     )}
                     {project && !readOnly && open === "client" && <ProjectAddress project={project} onDone={load} />}
                     {project && !readOnly && open === "reporters" && <ReporterRules project={project} onDone={load} />}
+                    {project && !readOnly && open === "alerts" && (
+                        <AlertRules projectId={project.id} />
+                    )}
                     {project && !readOnly && open === "settings" && (
                         <ProjectSettings project={project} onDone={load} />
                     )}
@@ -582,8 +586,9 @@ function IssueScreen({
                 </p>
             )}
 
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
                 <Fact label={t("issue.timesSeen")} value={String(issue.timesSeen)} />
+                <Fact label={t("issue.users")} value={String(issue.userCount)} />
                 <Fact label={t("issue.firstSeen")} value={<RelativeTime iso={issue.firstSeen} />} />
                 <Fact label={t("issue.lastSeen")} value={<RelativeTime iso={issue.lastSeen} />} />
                 <Fact

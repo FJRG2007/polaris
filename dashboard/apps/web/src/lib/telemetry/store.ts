@@ -17,6 +17,7 @@
  * for, and leaving it to be noticed is how a fixed bug quietly stops being fixed.
  */
 
+import { createHash } from "node:crypto";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 
@@ -50,9 +51,9 @@ export async function captureEvent(project: IngestProject, event: core.CapturedE
             select: { id: true, status: true, resolvedInRelease: true, lastSeen: true }
         });
 
-        const issueId = existing
-            ? await touchIssue(existing, event, title)
-            : await openIssue(project.id, event, title);
+        const { issueId, isNew, regressed } = existing
+            ? { ...(await touchIssue(existing, event, title)), isNew: false }
+            : { ...(await openIssue(project.id, event, title)), regressed: false };
 
         await prisma.telemetryEvent.create({
             data: {
@@ -95,6 +96,25 @@ export async function captureEvent(project: IngestProject, event: core.CapturedE
             update: { count: { increment: 1 } }
         });
 
+        await countUser(issueId, event.userKey);
+
+        // Alert rules run after the event is stored and are not waited on: the
+        // client is answered now, and a slow notification never holds it.
+        // Loaded on first use, so the notification machinery stays out of the
+        // module graph of Polaris' own exception handler.
+        const signal = {
+            projectId: project.id,
+            issueId,
+            title,
+            isNew,
+            regressed,
+            level: event.level,
+            environment: event.environment
+        };
+        void import("@/lib/telemetry/alerts")
+            .then((alerts) => alerts.evaluateAlerts(signal))
+            .catch((error: unknown) => console.error("polaris: could not evaluate telemetry alerts:", error));
+
         // The first event names the platform, and nothing after it changes it: a
         // project reports from one runtime, and a stray browser event from a
         // server project should not relabel the whole thing.
@@ -108,7 +128,33 @@ export async function captureEvent(project: IngestProject, event: core.CapturedE
     }
 }
 
-async function openIssue(projectId: string, event: core.CapturedEvent, title: string): Promise<string> {
+/** The stored form of a user key: what a person was called never leaves the
+ *  event, only that they were somebody. */
+export function userHash(key: string): string {
+    return createHash("sha256").update(key, "utf8").digest("hex");
+}
+
+/**
+ * Count the person an event names against its issue, once. The row is the
+ * memory of who was already counted, and the counter only moves when the row is
+ * new - two events from one person at once insert one row between them.
+ */
+async function countUser(issueId: string, key: string | null | undefined): Promise<void> {
+    if (!key) return;
+    const { count } = await prisma.telemetryIssueUser.createMany({
+        data: [{ issueId, userHash: userHash(key) }],
+        skipDuplicates: true
+    });
+    if (count > 0) {
+        await prisma.telemetryIssue.update({ where: { id: issueId }, data: { userCount: { increment: count } } });
+    }
+}
+
+async function openIssue(
+    projectId: string,
+    event: core.CapturedEvent,
+    title: string
+): Promise<{ issueId: string; isNew: boolean }> {
     const issue = await prisma.telemetryIssue.upsert({
         // Two events of a brand-new fault can arrive at the same instant, which
         // on a crash loop is the normal case rather than the rare one. The loser
@@ -127,16 +173,17 @@ async function openIssue(projectId: string, event: core.CapturedEvent, title: st
             timesSeen: 1
         },
         update: { timesSeen: { increment: 1 }, lastSeen: event.at },
-        select: { id: true }
+        select: { id: true, timesSeen: true }
     });
-    return issue.id;
+    // The loser of the race above saw the winner's row and counts as seen again.
+    return { issueId: issue.id, isNew: issue.timesSeen === 1 };
 }
 
 async function touchIssue(
     existing: { id: string; status: string; resolvedInRelease: string | null; lastSeen: Date },
     event: core.CapturedEvent,
     title: string
-): Promise<string> {
+): Promise<{ issueId: string; regressed: boolean }> {
     // Seen again after being resolved. In the release it was resolved in it is
     // an event from before the fix shipped and is left alone; in any other, the
     // fix did not hold.
@@ -157,7 +204,7 @@ async function touchIssue(
             ...(regressed ? { status: "unresolved", resolvedAt: null, resolvedInRelease: null } : {})
         }
     });
-    return existing.id;
+    return { issueId: existing.id, regressed };
 }
 
 /**

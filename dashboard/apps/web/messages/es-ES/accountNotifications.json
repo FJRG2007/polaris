@@ -329,6 +329,18 @@
             "label": "Incidencia asignada",
             "description": "Alguien te ha asignado un error para revisar en Telemetry."
         },
+        "telemetryNewIssue": {
+            "label": "Nueva incidencia",
+            "description": "Una regla de alerta vio un fallo que el proyecto no había enviado nunca."
+        },
+        "telemetryIssueSpike": {
+            "label": "Incidencia muy repetida",
+            "description": "Una regla de alerta vio un fallo enviado más veces de las que permite."
+        },
+        "telemetryRegression": {
+            "label": "Volvió una incidencia",
+            "description": "Una regla de alerta vio repetirse un fallo marcado como resuelto."
+        },
         "watchOk": {
             "label": "Alarma resuelta",
             "description": "Un objetivo vigilado vuelve a cumplir su condición."

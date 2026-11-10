@@ -233,6 +233,7 @@ export async function captureInternal(
             url: null,
             method: null,
             user: null,
+            userKey: null,
             tags: { ...where.tags, source: "polaris" },
             frames,
             breadcrumbs: [],

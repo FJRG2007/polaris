@@ -375,6 +375,30 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "telemetry.newIssue",
+        group: "watch",
+        label: "New issue in Telemetry",
+        description: "An alert rule saw a fault a project had never reported before.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "telemetry.issueSpike",
+        group: "watch",
+        label: "Issue happening often",
+        description: "An alert rule saw a fault reported more times than it allows.",
+        level: "danger",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "telemetry.regression",
+        group: "watch",
+        label: "Resolved issue came back",
+        description: "An alert rule saw a fault marked resolved happen again.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "watch.ok",
         group: "watch",
         label: "Alarm cleared",

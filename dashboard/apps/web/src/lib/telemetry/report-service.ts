@@ -23,6 +23,8 @@ export interface IssueRow {
     readonly level: string;
     readonly status: string;
     readonly timesSeen: number;
+    /** How many different people hit it, as their user contexts said. */
+    readonly userCount: number;
     readonly firstSeen: string;
     readonly lastSeen: string;
     readonly lastRelease: string | null;
@@ -119,6 +121,7 @@ export async function listIssues(
             level: true,
             status: true,
             timesSeen: true,
+            userCount: true,
             firstSeen: true,
             lastSeen: true,
             lastRelease: true
@@ -228,6 +231,7 @@ export async function getIssue(
             level: true,
             status: true,
             timesSeen: true,
+            userCount: true,
             firstSeen: true,
             lastSeen: true,
             lastRelease: true

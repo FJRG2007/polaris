@@ -3,11 +3,12 @@
 /**
  * An issue's log: what people said about it and what they did to it, newest
  * first, with a box to add to it. A comment shows at once and is taken back if
- * the server refuses it.
+ * the server refuses it. Older entries arrive as the end of the log scrolls
+ * into view, through the same cursor walk every other Telemetry list uses.
  */
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as actions from "./actions";
 import * as polls from "./telemetry-polls";
 import { runAction } from "@/lib/run-action";
@@ -32,10 +33,26 @@ export function IssueActivity({
     const t = useTranslations("telemetry");
     const [body, setBody] = useState("");
     const [error, setError] = useState("");
+    const [sentinel, setSentinel] = useState<HTMLLIElement | null>(null);
     const list = useCursorList<ActivityRow>(
         (cursor, signal) => polls.telemetryActivity({ projectId, issueId, cursor }, signal),
         `${projectId}|${issueId}|${version}`
     );
+    const { more, loadMore } = list;
+
+    // The next page is asked for when the end of the log comes into view, a
+    // little before it, so scrolling down never stops on an empty edge.
+    useEffect(() => {
+        if (!sentinel || !more) return;
+        const watcher = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) loadMore();
+            },
+            { rootMargin: "200px 0px" }
+        );
+        watcher.observe(sentinel);
+        return () => watcher.disconnect();
+    }, [sentinel, more, loadMore]);
 
     const say = (row: ActivityRow): React.ReactNode => {
         switch (row.kind) {
@@ -132,7 +149,7 @@ export function IssueActivity({
                     <Skeleton className="h-10 w-full" />
                 </div>
             ) : list.items.length === 0 ? (
-                <p className="text-xs text-muted-foreground">{t("activity.none")}</p>
+                <p className="text-xs text-muted-foreground">{list.error || t("activity.none")}</p>
             ) : (
                 <ol className="flex flex-col gap-2">
                     {list.items.map((row) => (
@@ -146,13 +163,21 @@ export function IssueActivity({
                             <div className="min-w-0 text-sm">{say(row)}</div>
                         </li>
                     ))}
-                    {list.more && (
-                        <li>
-                            <Button size="sm" variant="ghost" disabled={list.paging} onClick={list.loadMore}>
-                                {t("activity.more")}
-                            </Button>
-                        </li>
-                    )}
+                    {list.more &&
+                        (list.error && !list.paging ? (
+                            <li className="flex items-center justify-between gap-2">
+                                <p role="alert" className="min-w-0 text-xs text-danger">
+                                    {list.error}
+                                </p>
+                                <Button size="sm" variant="ghost" onClick={list.loadMore}>
+                                    {t("activity.retry")}
+                                </Button>
+                            </li>
+                        ) : (
+                            <li ref={setSentinel} aria-busy="true" aria-label={t("activity.more")}>
+                                <Skeleton className="h-10 w-full" />
+                            </li>
+                        ))}
                 </ol>
             )}
         </section>

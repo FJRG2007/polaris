@@ -329,6 +329,18 @@
             "label": "Issue assigned to you",
             "description": "Somebody handed you an error to look into in Telemetry."
         },
+        "telemetryNewIssue": {
+            "label": "New issue in Telemetry",
+            "description": "An alert rule saw a fault a project had never reported before."
+        },
+        "telemetryIssueSpike": {
+            "label": "Issue happening often",
+            "description": "An alert rule saw a fault reported more times than it allows."
+        },
+        "telemetryRegression": {
+            "label": "Resolved issue came back",
+            "description": "An alert rule saw a fault marked resolved happen again."
+        },
         "watchOk": {
             "label": "Alarm cleared",
             "description": "A watched target came back within its condition."

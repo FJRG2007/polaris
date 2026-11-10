@@ -48,6 +48,12 @@ export const telemetryProjects = inputPoll<typeof telemetryActionsModule.project
 export const telemetryActivity = inputPoll<typeof telemetryActionsModule.issueActivityAction>(
     "/api/telemetry/activity"
 );
+export const telemetryAlertRules = inputPoll<typeof telemetryActionsModule.alertRulesAction>(
+    "/api/telemetry/alert-rules"
+);
+export const telemetryAlertHistory = inputPoll<typeof telemetryActionsModule.alertHistoryAction>(
+    "/api/telemetry/alert-history"
+);
 export const telemetryReleases = inputPoll<typeof telemetryActionsModule.releasesAction>(
     "/api/telemetry/releases"
 );

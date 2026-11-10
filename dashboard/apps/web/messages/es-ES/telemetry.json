@@ -23,6 +23,10 @@
         "releases": {
             "label": "Versiones",
             "hint": "Las compilaciones que informaron, y sus fallos"
+        },
+        "alerts": {
+            "label": "Alertas",
+            "hint": "Quién se entera de incidencias nuevas, frecuentes o que vuelven"
         }
     },
     "view": {
@@ -70,7 +74,8 @@
         "howOften": "Frecuencia en los últimos {days} días",
         "issue": "Fallo",
         "graph": "Últimos {days} días",
-        "events": "Eventos"
+        "events": "Eventos",
+        "users": "Usuarios"
     },
     "issue": {
         "back": "Volver a la lista",
@@ -90,7 +95,8 @@
         "deleteConfirm": "Eliminar",
         "resolvedIn": "Resuelta tras {release}",
         "latestTab": "Último evento",
-        "eventsTab": "{count, plural, one {Un evento} other {# eventos}}"
+        "eventsTab": "{count, plural, one {Un evento} other {# eventos}}",
+        "users": "Afectados"
     },
     "errors": {
         "readProjects": "No se pudieron leer los proyectos",
@@ -267,7 +273,8 @@
         "sorts": {
             "lastSeen": "Última vez",
             "firstSeen": "Primera vez",
-            "events": "Eventos"
+            "events": "Eventos",
+            "users": "Usuarios"
         },
         "active": "Filtros activos",
         "remove": "Quitar {filter}",
@@ -314,10 +321,81 @@
         "send": "Comentar",
         "none": "Aún no hay nada.",
         "someone": "Alguien",
-        "more": "Ver más"
+        "more": "Ver más",
+        "retry": "Reintentar"
     },
     "notify": {
         "assignedOne": "{name} te asignó una incidencia",
-        "assignedMany": "{name} te asignó {count} incidencias"
+        "assignedMany": "{name} te asignó {count} incidencias",
+        "alertNew": "Nueva incidencia: {rule}",
+        "alertFrequency": "Incidencia vista más de {count} veces en {minutes} min: {rule}",
+        "alertRegression": "Volvió una incidencia resuelta: {rule}"
+    },
+    "alerts": {
+        "title": "Alertas",
+        "hint": "Avisa cuando una incidencia es nueva, se repite o vuelve.",
+        "add": "Nueva regla",
+        "none": "Aún no hay reglas",
+        "noneHint": "Nadie se entera cuando algo falla aquí. Añade una regla para cambiarlo.",
+        "kind": "alerta",
+        "edit": "Editar regla",
+        "delete": "Borrar regla",
+        "deleteBody": "Su historial se va con ella. Nadie volverá a recibir este aviso.",
+        "deleteConfirm": "Borrar",
+        "enabled": "Activa",
+        "members": "Miembros",
+        "nobody": "nadie",
+        "notifies": "Avisa a {who}",
+        "lastFired": "Último aviso",
+        "neverFired": "Aún no ha saltado",
+        "triggers": {
+            "new": "Se crea una incidencia",
+            "frequency": "Una incidencia se repite",
+            "regression": "Vuelve una incidencia resuelta"
+        },
+        "summary": {
+            "new": "Cuando se crea una incidencia",
+            "frequency": "Cuando una incidencia se ve más de {count} veces en {minutes} min",
+            "regression": "Cuando vuelve una incidencia resuelta"
+        },
+        "form": {
+            "newTitle": "Nueva regla",
+            "editTitle": "Editar regla",
+            "hint": "Elige qué vigilar y a quién avisar.",
+            "name": "Nombre",
+            "namePlaceholder": "Errores de pago",
+            "when": "Cuándo",
+            "threshold": "Más de (eventos)",
+            "window": "En (minutos)",
+            "levels": "Niveles",
+            "levelsHint": "Sin ninguno, vale cualquier nivel.",
+            "environment": "Entorno",
+            "environmentPlaceholder": "Cualquier entorno",
+            "notify": "Avisar a",
+            "members": "Todos los que ven este proyecto",
+            "findPeople": "Añadir más",
+            "throttle": "Como mucho una vez por incidencia cada (min)",
+            "throttleHint": "Pausa tras avisar de una incidencia.",
+            "cancel": "Cancelar",
+            "save": "Guardar"
+        },
+        "history": {
+            "title": "Historial",
+            "none": "Ninguna regla ha saltado aún.",
+            "notified": "{count, plural, =0 {No se avisó a nadie} one {Enviado a una persona} other {Enviado a # personas}}"
+        },
+        "errors": {
+            "read": "No se pudieron leer las reglas.",
+            "save": "No se pudo guardar la regla.",
+            "delete": "No se pudo borrar la regla.",
+            "invalid": "Revisa los campos de la regla.",
+            "threshold": "Pon un número entero de al menos 1.",
+            "window": "Pon un número de minutos de al menos 1.",
+            "throttle": "Pon entre 1 y 10080 minutos.",
+            "nobody": "Elige a quién avisar.",
+            "recipientCannotSee": "Alguien que elegiste no puede abrir este proyecto.",
+            "gone": "Esa regla ya no existe.",
+            "limit": "Este proyecto ya tiene todas las reglas que admite."
+        }
     }
 }

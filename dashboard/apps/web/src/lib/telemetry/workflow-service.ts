@@ -126,6 +126,7 @@ export async function searchIssues(input: {
             level: true,
             status: true,
             timesSeen: true,
+            userCount: true,
             firstSeen: true,
             lastSeen: true,
             lastRelease: true,

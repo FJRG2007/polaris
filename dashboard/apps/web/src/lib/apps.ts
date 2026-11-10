@@ -2783,7 +2783,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             // A project shared with somebody who runs nothing else here.
             reachedBy: "telemetry.project",
             icon: FolderKanban,
-            keywords: ["dsn", "sentry", "projects", "setup"]
+            keywords: ["dsn", "sentry", "projects", "setup", "alerts"]
         },
         {
             label: "All issues", // i18n-ignore

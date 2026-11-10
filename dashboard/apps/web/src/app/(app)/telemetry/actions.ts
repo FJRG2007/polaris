@@ -26,6 +26,8 @@ import { requirePermission, requireUser, sessionCan } from "@/lib/session";
 import { findPeople } from "@/lib/people-search";
 import * as q from "@/lib/telemetry/issue-query";
 import * as workflow from "@/lib/telemetry/workflow-service";
+import * as alerts from "@/lib/telemetry/alerts";
+import * as alertSchema from "@/lib/telemetry/alert-schema";
 import * as taskAccess from "@/lib/tasks/access";
 import * as tasks from "@/lib/tasks/task-service";
 import { dropGrantsFor, grantedSubjects } from "@/lib/access/grants";
@@ -676,5 +678,96 @@ export async function commentIssueAction(input: unknown): Promise<{ error?: stri
         return {};
     } catch (caught) {
         return await failure(caught, "errors.comment");
+    }
+}
+
+/** The words for a rule the form let through and the schema did not. */
+const RULE_WORDS: Readonly<Record<string, TelemetryKey>> = {
+    threshold: "alerts.errors.threshold",
+    window: "alerts.errors.window",
+    nobody: "alerts.errors.nobody"
+};
+
+/** A project's alert rules. Rules decide who is told about a project, so they
+ *  are read and changed by whoever may change the project. */
+export async function alertRulesAction(
+    input: unknown
+): Promise<{ data?: alerts.AlertRuleView[]; error?: string }> {
+    const parsed = q.projectRefSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("alerts.errors.read") };
+    const { caller, editable, manages } = await editor();
+    try {
+        await requireEditable(caller, parsed.data.projectId, editable, manages);
+        return { data: await alerts.listRules(parsed.data.projectId) };
+    } catch (caught) {
+        return await failure(caught, "alerts.errors.read");
+    }
+}
+
+/** One page of when a project's rules fired, newest first. */
+export async function alertHistoryAction(
+    input: unknown
+): Promise<{ data?: workflow.Page<alerts.AlertFireRow>; error?: string }> {
+    const parsed = alertSchema.firesPageSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("alerts.errors.read") };
+    const { caller, editable, manages } = await editor();
+    try {
+        await requireEditable(caller, parsed.data.projectId, editable, manages);
+        return { data: await alerts.listFires(parsed.data.projectId, parsed.data.cursor) };
+    } catch (caught) {
+        return await failure(caught, "alerts.errors.read");
+    }
+}
+
+/** Create a rule, or change one. Everybody it names must be able to open the
+ *  project: a rule never sends somebody a link they would be refused. */
+export async function saveAlertRuleAction(input: unknown): Promise<{ error?: string }> {
+    const parsed = alertSchema.saveRuleSchema.safeParse(input);
+    if (!parsed.success) {
+        const said = parsed.error.issues.map((issue) => RULE_WORDS[issue.message]).find(Boolean);
+        return { error: await say(said ?? "alerts.errors.invalid") };
+    }
+    const { projectId, ruleId, rule } = parsed.data;
+    const { caller, editable, manages } = await editor();
+    try {
+        await requireEditable(caller, projectId, editable, manages);
+        for (const person of rule.recipients) {
+            const held = await grantedSubjects(person, "telemetry.project");
+            if (!(await workflow.mayRead(person, [projectId], new Set(held.keys())))) {
+                return { error: await say("alerts.errors.recipientCannotSee") };
+            }
+        }
+        const saved = await alerts.saveRule(projectId, ruleId, rule, caller.id);
+        if (!saved) return { error: await say("alerts.errors.gone") };
+        return {};
+    } catch (caught) {
+        if (caught instanceof alerts.AlertLimitError) return { error: await say("alerts.errors.limit") };
+        return await failure(caught, "alerts.errors.save");
+    }
+}
+
+export async function setAlertRuleEnabledAction(input: unknown): Promise<{ error?: string }> {
+    const parsed = alertSchema.toggleRuleSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("alerts.errors.save") };
+    const { caller, editable, manages } = await editor();
+    try {
+        await requireEditable(caller, parsed.data.projectId, editable, manages);
+        const changed = await alerts.setRuleEnabled(parsed.data.projectId, parsed.data.ruleId, parsed.data.enabled);
+        return changed ? {} : { error: await say("alerts.errors.gone") };
+    } catch (caught) {
+        return await failure(caught, "alerts.errors.save");
+    }
+}
+
+export async function deleteAlertRuleAction(input: unknown): Promise<{ error?: string }> {
+    const parsed = alertSchema.ruleRefSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("alerts.errors.delete") };
+    const { caller, editable, manages } = await editor();
+    try {
+        await requireEditable(caller, parsed.data.projectId, editable, manages);
+        await alerts.deleteRule(parsed.data.projectId, parsed.data.ruleId);
+        return {};
+    } catch (caught) {
+        return await failure(caught, "alerts.errors.delete");
     }
 }

@@ -16,7 +16,7 @@ export const ISSUE_STATUS_FILTERS = ["unresolved", "resolved", "ignored"] as con
 export type IssueStatusFilter = (typeof ISSUE_STATUS_FILTERS)[number];
 
 /** How a list can be ordered. "events" is how many times it happened. */
-export const ISSUE_SORTS = ["lastSeen", "firstSeen", "events"] as const;
+export const ISSUE_SORTS = ["lastSeen", "firstSeen", "events", "users"] as const;
 export type IssueSort = (typeof ISSUE_SORTS)[number];
 
 /** Rows per page of every Telemetry list. */
@@ -202,7 +202,7 @@ export function rangeWhere(range: SeenRange, now: Date): { gte: Date } | { lt: D
 export function issueOrder(
     sort: IssueSort
 ): [Record<string, "desc">, { id: "desc" }] {
-    const column = sort === "events" ? "timesSeen" : sort;
+    const column = sort === "events" ? "timesSeen" : sort === "users" ? "userCount" : sort;
     return [{ [column]: "desc" }, { id: "desc" }];
 }
 
