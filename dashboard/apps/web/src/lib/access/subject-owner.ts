@@ -90,17 +90,22 @@ const READERS: Partial<Record<core.GrantSubject, OwnerReader>> = {
     "analytics.site": async (ids) => [
         ...(
             await prisma.application.findMany({
-                where: { id: { in: ids.filter((id) => !id.includes(":")) } },
+                where: { id: { in: ids } },
                 select: {
                     id: true,
                     environment: { select: { project: { select: { ownerId: true } } } }
                 }
             })
         ).map((row) => [row.id, row.environment?.project?.ownerId ?? null] as const),
-        // A site run elsewhere names its owner in its own id (see `externalSiteOwner`).
-        ...ids
-            .filter((id) => id.includes(":"))
-            .map((id) => [id, /^([0-9a-f-]{36}):/i.exec(id)?.[1] ?? null] as const)
+        // Polaris itself and a site run elsewhere are shared under their record's
+        // id. A site run elsewhere names its owner in its scope id (see
+        // `externalSiteOwner`); Polaris's own belongs to the instance.
+        ...(
+            await prisma.analyticsSite.findMany({
+                where: { id: { in: ids }, scopeType: { in: ["external", "polaris"] } },
+                select: { id: true, scopeId: true }
+            })
+        ).map((row) => [row.id, /^([0-9a-f-]{36}):/i.exec(row.scopeId)?.[1] ?? null] as const)
     ],
     // A workspace is its repository owner's, or whoever started it.
     "agents.session": async (ids) =>

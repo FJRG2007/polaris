@@ -394,17 +394,54 @@ export async function retention(window: ReportWindow): Promise<RetentionCell[]> 
 
 // --- visits, one by one -----------------------------------------------------------
 
+/** The most of one session's activity a profile draws. */
+const JOURNEY_CAP = 500;
+
+/**
+ * How long a session may sit idle before its next hit starts a new visit: the
+ * half hour every analytics tool settled on (Umami, Google Analytics, Matomo).
+ */
+export const VISIT_GAP_MS = 30 * 60 * 1000;
+
+/** The same gap, as SQL. A constant, so it is spliced rather than bound. */
+const visitGapSql = () => Prisma.raw("interval '30 minutes'");
+
+/** Which visit each hit belongs to, from hit times in ascending order. */
+export function visitIndexes(times: readonly number[]): number[] {
+    let visit = 0;
+    return times.map((at, index) => {
+        if (index > 0 && at - times[index - 1]! > VISIT_GAP_MS) visit += 1;
+        return visit;
+    });
+}
+
 /** One visit, in full: what it was, and everything it did in order. */
 export async function sessionJourney(siteId: string, sessionId: string) {
     const session = await prisma.analyticsSession.findFirst({ where: { id: sessionId, siteId } });
     if (!session) return null;
-    const events = await prisma.analyticsEvent.findMany({
-        where: { siteId, sessionId },
-        orderBy: { at: "asc" },
-        take: 500,
-        select: { at: true, kind: true, name: true, path: true, rawPath: true, props: true }
-    });
+    const [events, counts, linked] = await Promise.all([
+        prisma.analyticsEvent.findMany({
+            where: { siteId, sessionId },
+            orderBy: { at: "asc" },
+            take: JOURNEY_CAP,
+            select: { at: true, kind: true, name: true, path: true, rawPath: true, props: true }
+        }),
+        sessionCounts([sessionId]),
+        session.distinctId
+            ? prisma.analyticsSession.count({ where: { siteId, distinctId: session.distinctId } })
+            : Promise.resolve(0)
+    ]);
+    const visits = visitIndexes(events.map((event) => event.at.getTime()));
+    const count = counts.get(sessionId);
     return {
+        visitCount: count?.visits ?? Math.max(1, (visits[visits.length - 1] ?? 0) + 1),
+        pageviews: count?.views ?? session.views,
+        eventCount: count?.events ?? 0,
+        durationSec: Math.max(0, Math.round((session.lastSeenAt.getTime() - session.startedAt.getTime()) / 1000)),
+        /** Sessions on this site sharing the distinct id, this one included. */
+        linkedSessions: linked,
+        /** The activity was cut at `JOURNEY_CAP`. */
+        truncated: (count ? count.views + count.events : 0) > events.length,
         id: session.id,
         ip: session.ip,
         browser: session.browser,
@@ -422,8 +459,9 @@ export async function sessionJourney(siteId: string, sessionId: string) {
         views: session.views,
         startedAt: session.startedAt.toISOString(),
         lastSeenAt: session.lastSeenAt.toISOString(),
-        events: events.map((event) => ({
+        events: events.map((event, index) => ({
             at: event.at.toISOString(),
+            visit: visits[index] ?? 0,
             kind: event.kind === "event" ? ("event" as const) : ("pageview" as const),
             name: event.name,
             path: event.rawPath ?? event.path,
@@ -441,6 +479,230 @@ export function parseProps(raw: string | null): Record<string, string | number |
     } catch {
         return null;
     }
+}
+
+// --- the sessions screen ------------------------------------------------------------
+
+/** Ranges past this read the daily totals, as `readAnalytics` does. */
+const RAW_MAX_MS = 31 * 86_400_000;
+
+/** Rows per page of the session list. */
+export const SESSION_PAGE = 50;
+
+interface SessionCount {
+    readonly visits: number;
+    readonly views: number;
+    readonly events: number;
+    readonly lastPath: string | null;
+}
+
+/** Visits, pageviews, events and the last page of a page of sessions, in one read. */
+async function sessionCounts(ids: readonly string[]): Promise<Map<string, SessionCount>> {
+    if (ids.length === 0) return new Map();
+    const rows = await prisma.$queryRaw<
+        { sessionId: string; visits: number; views: number; events: number; lastPath: string | null }[]
+    >(Prisma.sql`
+        SELECT g."sessionId",
+               count(*) FILTER (WHERE g.gap IS NULL OR g.gap > ${visitGapSql()})::int AS visits,
+               count(*) FILTER (WHERE g.kind = 'pageview')::int AS views,
+               count(*) FILTER (WHERE g.kind = 'event')::int AS events,
+               (array_agg(g.path ORDER BY g.at DESC) FILTER (WHERE g.kind = 'pageview'))[1] AS "lastPath"
+        FROM (
+            SELECT e."sessionId", e.kind, e.path, e.at,
+                   e.at - lag(e.at) OVER (PARTITION BY e."sessionId" ORDER BY e.at) AS gap
+            FROM "AnalyticsEvent" e
+            WHERE e."sessionId" IN (${Prisma.join([...ids])})
+        ) g
+        GROUP BY g."sessionId"
+    `);
+    return new Map(rows.map((row) => [row.sessionId, row]));
+}
+
+/** A session list cursor: the last row's last-seen time and id, opaque and URL-safe. */
+export function encodeSessionCursor(lastSeenAt: Date, id: string): string {
+    return Buffer.from(JSON.stringify([lastSeenAt.toISOString(), id]), "utf8").toString("base64url");
+}
+
+/** Null for anything this module did not write - which reads as the first page. */
+export function decodeSessionCursor(raw: string | null | undefined): { at: Date; id: string } | null {
+    if (!raw || raw.length > 512) return null;
+    try {
+        const value: unknown = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+        if (!Array.isArray(value) || value.length !== 2) return null;
+        const [at, id] = value as unknown[];
+        if (typeof at !== "string" || typeof id !== "string" || id.length === 0 || id.length > 128) return null;
+        const date = new Date(at);
+        return Number.isNaN(date.getTime()) ? null : { at: date, id };
+    } catch {
+        return null;
+    }
+}
+
+export interface SessionListRow {
+    readonly id: string;
+    readonly ip: string | null;
+    readonly browser: string;
+    readonly os: string;
+    readonly device: string;
+    readonly country: string | null;
+    readonly language: string | null;
+    readonly screen: string | null;
+    readonly distinctId: string | null;
+    readonly visits: number;
+    readonly views: number;
+    readonly events: number;
+    readonly lastPath: string | null;
+    readonly startedAt: string;
+    readonly lastSeenAt: string;
+}
+
+/**
+ * The sessions seen in a window, most recent first, a page at a time. Keyset
+ * paged on (last seen, id) so two sessions last seen in the same millisecond
+ * are neither repeated nor skipped at a page boundary.
+ */
+export async function sessionPage(
+    window: ReportWindow,
+    cursor: string | null | undefined
+): Promise<{ rows: SessionListRow[]; next: string | null }> {
+    const after = decodeSessionCursor(cursor);
+    const sessions = await prisma.$queryRaw<
+        {
+            id: string;
+            ip: string | null;
+            browser: string;
+            os: string;
+            device: string;
+            country: string | null;
+            language: string | null;
+            screen: string | null;
+            distinctId: string | null;
+            views: number;
+            startedAt: Date;
+            lastSeenAt: Date;
+        }[]
+    >(Prisma.sql`
+        SELECT s.id, s.ip, s.browser, s.os, s.device, s.country, s.language, s.screen,
+               s."distinctId", s.views, s."startedAt", s."lastSeenAt"
+        FROM "AnalyticsSession" s
+        WHERE s."siteId" = ${window.siteId}::uuid
+          AND s."lastSeenAt" >= ${new Date(window.from)} AND s."startedAt" < ${new Date(window.to)}${sessionSql(window.filters)}
+          ${after ? Prisma.sql`AND (s."lastSeenAt", s.id) < (${after.at}, ${after.id})` : Prisma.empty}
+        ORDER BY s."lastSeenAt" DESC, s.id DESC
+        LIMIT ${SESSION_PAGE + 1}
+    `);
+    const page = sessions.slice(0, SESSION_PAGE);
+    const counts = await sessionCounts(page.map((session) => session.id));
+    const last = page[page.length - 1];
+    return {
+        rows: page.map((session) => {
+            const count = counts.get(session.id);
+            return {
+                id: session.id,
+                ip: session.ip,
+                browser: session.browser,
+                os: session.os,
+                device: session.device,
+                country: session.country,
+                language: session.language,
+                screen: session.screen,
+                distinctId: session.distinctId,
+                visits: count?.visits ?? 1,
+                views: count?.views ?? session.views,
+                events: count?.events ?? 0,
+                lastPath: count?.lastPath ?? null,
+                startedAt: session.startedAt.toISOString(),
+                lastSeenAt: session.lastSeenAt.toISOString()
+            };
+        }),
+        next: sessions.length > SESSION_PAGE && last ? encodeSessionCursor(last.lastSeenAt, last.id) : null
+    };
+}
+
+export interface SessionStats {
+    readonly visitors: number;
+    /** Null where the window is drawn from daily totals, which keep no visits. */
+    readonly visits: number | null;
+    readonly views: number;
+    readonly countries: number;
+    readonly source: "raw" | "daily";
+}
+
+/** The numbers above the session list: visitors, visits, views and countries. */
+export async function sessionStats(window: ReportWindow): Promise<SessionStats> {
+    if (window.to - window.from > RAW_MAX_MS) {
+        const day = { gte: new Date(core.visitDay(window.from)), lt: new Date(window.to) };
+        const [totals, countries] = await Promise.all([
+            prisma.analyticsDay.aggregate({
+                where: { siteId: window.siteId, dimension: "total", day },
+                _sum: { visitors: true, views: true }
+            }),
+            prisma.analyticsDay.findMany({
+                where: { siteId: window.siteId, dimension: "country", day, visitors: { gt: 0 } },
+                distinct: ["value"],
+                select: { value: true },
+                take: 400
+            })
+        ]);
+        return {
+            visitors: totals._sum.visitors ?? 0,
+            visits: null,
+            views: totals._sum.views ?? 0,
+            countries: countries.filter((row) => row.value !== "").length,
+            source: "daily"
+        };
+    }
+    const [sessions, events] = await Promise.all([
+        prisma.$queryRaw<{ visitors: number; countries: number }[]>(Prisma.sql`
+            SELECT count(*)::int AS visitors, count(DISTINCT s.country)::int AS countries
+            FROM "AnalyticsSession" s
+            WHERE s."siteId" = ${window.siteId}::uuid
+              AND s."lastSeenAt" >= ${new Date(window.from)} AND s."startedAt" < ${new Date(window.to)}${sessionSql(window.filters)}
+        `),
+        prisma.$queryRaw<{ visits: number; views: number }[]>(Prisma.sql`
+            WITH ${eventsCte(window)}
+            SELECT count(*) FILTER (WHERE g.gap IS NULL OR g.gap > ${visitGapSql()})::int AS visits,
+                   count(*) FILTER (WHERE g.kind = 'pageview')::int AS views
+            FROM (SELECT ev.kind, ev.at - lag(ev.at) OVER (PARTITION BY ev."sessionId" ORDER BY ev.at) AS gap FROM ev) g
+        `)
+    ]);
+    return {
+        visitors: sessions[0]?.visitors ?? 0,
+        visits: events[0]?.visits ?? 0,
+        views: events[0]?.views ?? 0,
+        countries: sessions[0]?.countries ?? 0,
+        source: "raw"
+    };
+}
+
+export interface SessionPropertyRow {
+    readonly key: string;
+    readonly value: string;
+    readonly sessions: number;
+}
+
+/**
+ * What `polaris.identify()` said about the window's sessions: every key with
+ * how many sessions carry it, or one key's values when `key` is given.
+ */
+export async function sessionProperties(window: ReportWindow, key?: string): Promise<SessionPropertyRow[]> {
+    const where = Prisma.sql`
+        s."siteId" = ${window.siteId}::uuid AND s.data IS NOT NULL
+        AND s."lastSeenAt" >= ${new Date(window.from)} AND s."startedAt" < ${new Date(window.to)}${sessionSql(window.filters)}`;
+    if (key === undefined) {
+        return prisma.$queryRaw<SessionPropertyRow[]>(Prisma.sql`
+            SELECT kv.key AS key, '' AS value, count(*)::int AS sessions
+            FROM "AnalyticsSession" s, jsonb_each_text(s.data::jsonb) AS kv
+            WHERE ${where}
+            GROUP BY kv.key ORDER BY sessions DESC, key ASC LIMIT ${LIST_CAP}
+        `);
+    }
+    return prisma.$queryRaw<SessionPropertyRow[]>(Prisma.sql`
+        SELECT kv.key AS key, coalesce(kv.value, '') AS value, count(*)::int AS sessions
+        FROM "AnalyticsSession" s, jsonb_each_text(s.data::jsonb) AS kv
+        WHERE ${where} AND kv.key = ${key}
+        GROUP BY kv.key, kv.value ORDER BY sessions DESC, value ASC LIMIT ${LIST_CAP}
+    `);
 }
 
 // --- saved reports ---------------------------------------------------------------

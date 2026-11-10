@@ -13,7 +13,8 @@ const APP = "0192f0aa-0000-7000-8000-0000000000c1";
 const state = vi.hoisted(() => ({
     granted: new Map<string, string>(),
     manages: false,
-    configures: false
+    configures: false,
+    record: null as { scopeType: string; scopeId: string } | null
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -22,7 +23,11 @@ vi.mock("@polaris/db", () => ({
             findUnique: vi.fn(async () => ({ id: APP, name: "shop" })),
             findMany: vi.fn(async () => [{ id: APP, name: "shop" }])
         },
-        domain: { findMany: vi.fn(async () => [{ hostname: "Shop.example.test" }]) }
+        domain: { findMany: vi.fn(async () => [{ hostname: "Shop.example.test" }]) },
+        analyticsSite: {
+            findMany: vi.fn(async () => []),
+            findUnique: vi.fn(async () => state.record)
+        }
     }
 }));
 vi.mock("@/lib/access/grants", () => ({
@@ -59,7 +64,8 @@ vi.mock("@/lib/analytics-service", () => ({
     getAnalyticsSettings: vi.fn(async () => ({})),
     ownedExternalSites: vi.fn(async () => []),
     findExternalSite: vi.fn(async () => null),
-    externalSiteOwner: vi.fn(() => null)
+    externalSiteOwner: vi.fn((scopeId: string) => /^([0-9a-f-]{36}):/i.exec(scopeId)?.[1] ?? null),
+    holdsPolarisSite: vi.fn(async () => false)
 }));
 vi.mock("@/lib/analytics-reports", () => ({
     listReports: vi.fn(async () => []),
@@ -96,6 +102,7 @@ describe("a shared Analytics site", () => {
         state.granted = new Map();
         state.manages = false;
         state.configures = false;
+        state.record = null;
     });
 
     it("lets a grantee in, offering only what was shared", async () => {
@@ -122,5 +129,21 @@ describe("a shared Analytics site", () => {
         await expect(requireMayShare(reader, "analytics.site", APP)).rejects.toThrow();
         state.configures = true;
         await expect(requireMayShare(reader, "analytics.site", APP)).resolves.toBeUndefined();
+    });
+
+    it("shares Polaris's own numbers and a site run elsewhere under the site's record, by who may", async () => {
+        const RECORD = "0192f0aa-0000-7000-8000-0000000000c9";
+        const admin = { id: "admin", isAdmin: true } as Parameters<typeof requireMayShare>[0];
+        state.record = { scopeType: "polaris", scopeId: "" };
+        await expect(requireMayShare(reader, "analytics.site", RECORD)).rejects.toThrow();
+        await expect(requireMayShare(admin, "analytics.site", RECORD)).resolves.toBeUndefined();
+        state.record = { scopeType: "external", scopeId: `0192f0aa-0000-7000-8000-00000000000a:0123456789ab` };
+        await expect(requireMayShare(reader, "analytics.site", RECORD)).rejects.toThrow();
+        const owner = { id: "0192f0aa-0000-7000-8000-00000000000a", isAdmin: false } as Parameters<typeof requireMayShare>[0];
+        await expect(requireMayShare(owner, "analytics.site", RECORD)).resolves.toBeUndefined();
+        // A service's record is never shared under its own id: the service is.
+        state.record = { scopeType: "application", scopeId: APP };
+        state.configures = true;
+        await expect(requireMayShare(reader, "analytics.site", RECORD)).rejects.toThrow();
     });
 });

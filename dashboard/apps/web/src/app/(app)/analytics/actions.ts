@@ -13,7 +13,8 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit-service";
 import { listProjectScopes } from "@/lib/deploy-service";
-import type { SiteOption } from "./site-catalog";
+import { requireApplicationAccess } from "@/lib/deploy-project-access";
+import { type SiteOption } from "./site-catalog";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { grantedSubjects } from "@/lib/access/grants";
 import { requireAnalyticsReader } from "./reader";
@@ -35,7 +36,9 @@ import { externalSiteSchema } from "./site-input";
 import {
     createExternalSite,
     deleteExternalSite,
+    externalSiteOwner,
     firstRecorded,
+    holdsPolarisSite,
     ownedExternalSites,
     updateExternalSite
 } from "@/lib/analytics-service";
@@ -116,7 +119,9 @@ export async function listAnalyticsSitesAction(): Promise<{ sites: SiteOption[] 
         }
     }
     const external = await externalSiteOptions(user.id, held);
-    const extra = [...held].filter((id) => !seen.has(id) && !id.includes(":")).slice(0, 500);
+    const extra = [...held]
+        .filter((id) => !seen.has(id))
+        .slice(0, 500);
     if (extra.length) {
         const rows = await prisma.application.findMany({
             where: { id: { in: extra } },
@@ -132,10 +137,11 @@ export async function listAnalyticsSitesAction(): Promise<{ sites: SiteOption[] 
 async function externalSiteOptions(userId: string, held: ReadonlySet<string>): Promise<SiteOption[]> {
     const owned = await ownedExternalSites(userId);
     const ownedIds = new Set(owned.map((site) => site.scopeId));
-    const lentIds = [...held].filter((id) => id.includes(":") && !ownedIds.has(id)).slice(0, 500);
+    // Shared under the site record's id, which a service id never matches.
+    const lentIds = [...held].slice(0, 500);
     const lent = lentIds.length
         ? await prisma.analyticsSite.findMany({
-              where: { scopeType: "external", scopeId: { in: lentIds } },
+              where: { scopeType: "external", id: { in: lentIds }, scopeId: { notIn: [...ownedIds] } },
               orderBy: { name: "asc" },
               select: { scopeId: true, name: true }
           })
@@ -154,7 +160,7 @@ const sitePageSchema = z.object({
  */
 export async function pageAnalyticsSitesAction(
     input: unknown
-): Promise<lists.Page<lists.SiteListRow> | { error: string }> {
+): Promise<lists.Page<lists.SiteTableRow> | { error: string }> {
     const parsed = sitePageSchema.safeParse(input ?? {});
     if (!parsed.success) return { error: await say("errors.notMeasured") };
     const { user } = await requireAnalyticsReader();
@@ -164,9 +170,110 @@ export async function pageAnalyticsSitesAction(
         label: site.label,
         scope: site.scope ?? "application"
     }));
+    const isOperator = await userHasManage(user, "system.manage");
+    const seesPolaris =
+        isOperator || (await holdsPolarisSite(new Set((await grantedSubjects(user.id, "analytics.site")).keys())));
     // i18n-ignore the product's name
-    if (await userHasManage(user, "system.manage")) rows.push({ id: "", label: "Polaris", scope: "polaris" });
-    return lists.pageSites(rows, { cursor: parsed.data.cursor, query: parsed.data.query });
+    if (seesPolaris) rows.push({ id: "", label: "Polaris", scope: "polaris" });
+    const page = lists.pageSites(rows, { cursor: parsed.data.cursor, query: parsed.data.query });
+    return { next: page.next, rows: await siteTableRows(page.rows, user.id, isOperator) };
+}
+
+/** A site's stored addresses: a JSON list of strings, anything else read as none. */
+function storedHostnames(raw: string): string[] {
+    try {
+        const parsed = z.array(z.string()).safeParse(JSON.parse(raw));
+        return parsed.success ? parsed.data : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * What the Websites table shows about one page of sites, in a fixed number of
+ * queries whatever the page holds: their records, the services' domains, and the
+ * people seen over the last day. Whether a service may be shared is asked per
+ * service on the page, the same check its settings make.
+ */
+async function siteTableRows(
+    page: readonly lists.SiteListRow[],
+    userId: string,
+    isOperator: boolean
+): Promise<lists.SiteTableRow[]> {
+    const services = page.filter((row) => row.scope === "application").map((row) => row.id);
+    const external = page.filter((row) => row.scope === "external").map((row) => row.id);
+    const or = [
+        ...(services.length ? [{ scopeType: "application", scopeId: { in: services } }] : []),
+        ...(external.length ? [{ scopeType: "external", scopeId: { in: external } }] : []),
+        ...(page.some((row) => row.scope === "polaris") ? [{ scopeType: "polaris", scopeId: "" }] : [])
+    ];
+    const [records, domains, configurable] = await Promise.all([
+        or.length
+            ? prisma.analyticsSite.findMany({
+                  where: { OR: or },
+                  select: {
+                      id: true,
+                      scopeType: true,
+                      scopeId: true,
+                      hostnames: true,
+                      trackerEnabled: true,
+                      createdAt: true,
+                      publicKey: true
+                  }
+              })
+            : [],
+        services.length
+            ? prisma.domain.findMany({
+                  where: { applicationId: { in: services }, enabled: true },
+                  select: { applicationId: true, hostname: true },
+                  take: 1000
+              })
+            : [],
+        Promise.all(
+            services.map((id) =>
+                requireApplicationAccess(id, userId, "service.configure").then(
+                    () => id,
+                    () => null
+                )
+            )
+        )
+    ]);
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const seen = records.length
+        ? await prisma.analyticsSession.groupBy({
+              by: ["siteId"],
+              where: { siteId: { in: records.map((record) => record.id) }, lastSeenAt: { gte: since } },
+              _count: { _all: true }
+          })
+        : [];
+    const visitors = new Map(seen.map((row) => [row.siteId, row._count._all]));
+    const owners = new Set(configurable.filter((id): id is string => id !== null));
+    return page.map((row) => {
+        const record = records.find(
+            (one) => one.scopeType === row.scope && one.scopeId === (row.scope === "polaris" ? "" : row.id)
+        );
+        const stored = record ? storedHostnames(record.hostnames) : [];
+        const hostnames =
+            row.scope === "application"
+                ? domains.filter((domain) => domain.applicationId === row.id).map((domain) => domain.hostname)
+                : stored;
+        const ownsExternal =
+            row.scope === "external" && (isOperator || externalSiteOwner(row.id) === userId.toLowerCase());
+        return {
+            ...row,
+            hostnames,
+            trackerEnabled: record?.trackerEnabled ?? false,
+            createdAt: record?.createdAt.toISOString() ?? null,
+            visitors: record ? (visitors.get(record.id) ?? 0) : 0,
+            publicKey: record?.publicKey ?? null,
+            canEdit: ownsExternal,
+            canShare:
+                (row.scope === "application" && owners.has(row.id)) ||
+                (row.scope === "external" && ownsExternal && record !== undefined) ||
+                (row.scope === "polaris" && isOperator && record !== undefined),
+            grantId: row.scope === "application" ? row.id : (record?.id ?? null)
+        };
+    });
 }
 
 /** A deployed service, as the guided setup offers it: what it answers on. */
@@ -321,7 +428,9 @@ export async function getAnalyticsOverviewAction(input: {
         reports: saved,
         canOperate,
         level: access.level,
-        canShare: access.level === "own" && access.site.scopeType === "application",
+        // Whoever owns a site may hand it on: a service's configurer, a site's
+        // author, an operator for Polaris's own. A grant is never passed on.
+        canShare: access.level === "own",
         shared: access.shared
     };
 }
@@ -338,6 +447,9 @@ const reportRequestSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("retention") }),
     z.object({ kind: z.literal("sessions"), before: z.string().datetime().optional() }),
     z.object({ kind: z.literal("session"), id: z.string().trim().min(8).max(128) }),
+    z.object({ kind: z.literal("sessionPage"), cursor: z.string().max(512).nullish() }),
+    z.object({ kind: z.literal("sessionStats") }),
+    z.object({ kind: z.literal("sessionProperties"), key: z.string().trim().min(1).max(120).optional() }),
     z.object({
         kind: z.literal("breakdown"),
         dimension: z.enum(core.VISIT_DIMENSIONS),
@@ -358,6 +470,9 @@ export type AnalyticsReportAnswer =
     | { kind: "retention"; cells: reports.RetentionCell[] }
     | { kind: "sessions"; rows: Awaited<ReturnType<typeof recentVisits>>; more: boolean }
     | { kind: "session"; session: NonNullable<Awaited<ReturnType<typeof reports.sessionJourney>>> | null }
+    | { kind: "sessionPage"; rows: reports.SessionListRow[]; next: string | null }
+    | { kind: "sessionStats"; stats: reports.SessionStats }
+    | { kind: "sessionProperties"; key: string | null; rows: reports.SessionPropertyRow[] }
     | ({ kind: "breakdown"; dimension: core.VisitDimension } & lists.RankedList)
     | ({ kind: "realtime" } & lists.RealtimeSnapshot);
 
@@ -429,6 +544,16 @@ export async function runAnalyticsReportAction(input: {
         }
         case "session":
             return { kind: "session", session: await reports.sessionJourney(siteId, ask.id) };
+        case "sessionPage":
+            return { kind: "sessionPage", ...(await reports.sessionPage(window, ask.cursor)) };
+        case "sessionStats":
+            return { kind: "sessionStats", stats: await reports.sessionStats(window) };
+        case "sessionProperties":
+            return {
+                kind: "sessionProperties",
+                key: ask.key ?? null,
+                rows: await reports.sessionProperties(window, ask.key)
+            };
         case "breakdown":
             return {
                 kind: "breakdown",

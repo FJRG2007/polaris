@@ -266,13 +266,28 @@ export async function requireMayShare(
             return;
         }
         case "analytics.site": {
-            // A site run elsewhere is shared by whoever added it, or an administrator.
-            const { externalSiteOwner } = await import("@/lib/analytics-service");
-            const owner = externalSiteOwner(subjectId);
-            if (owner) {
-                if (owner !== user.id.toLowerCase() && !user.isAdmin) throw new GrantError("You cannot share that");
+            // Polaris itself and a site run elsewhere are shared under their
+            // site record's id; a service under its own.
+            const record = /^[0-9a-f-]{36}$/i.test(subjectId)
+                ? await prisma.analyticsSite.findUnique({
+                      where: { id: subjectId },
+                      select: { scopeType: true, scopeId: true }
+                  })
+                : null;
+            // Polaris's own traffic is handed out by an operator only.
+            if (record?.scopeType === "polaris") {
+                const { userHasManage } = await import("@/lib/session");
+                if (!user.isAdmin && !(await userHasManage(user, "system.manage"))) throw new GrantError("You cannot share that");
                 return;
             }
+            // A site run elsewhere is shared by whoever added it, or an administrator.
+            if (record?.scopeType === "external") {
+                const { externalSiteOwner } = await import("@/lib/analytics-service");
+                if (externalSiteOwner(record.scopeId) !== user.id.toLowerCase() && !user.isAdmin)
+                    throw new GrantError("You cannot share that");
+                return;
+            }
+            if (record) throw new GrantError("You cannot share that");
             // Whoever may configure a service decides who else reads its numbers.
             const configurable = await requireApplicationAccess(
                 subjectId,
@@ -613,7 +628,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
         case "telemetry.project":
             return `/telemetry/${encodeURIComponent(subjectId)}`;
         case "analytics.site":
-            return `/analytics?scope=${/^[0-9a-f-]{36}:[0-9a-f]{12}$/i.test(subjectId) ? "external" : "application"}&id=${encodeURIComponent(subjectId)}`;
+            // A service or a site record: the route tells them apart.
+            return `/analytics/shared/${encodeURIComponent(subjectId)}`;
         case "automation.automation":
             return `/automations/${subjectId}`;
         case "office.document":

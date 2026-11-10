@@ -1,6 +1,8 @@
 /**
- * A site's recorded events over a range, as CSV: every page and event with the
- * visit it belongs to, narrowed by the same filters as the screen.
+ * A site's recorded events over a range, as CSV, JSON or a spreadsheet: every
+ * page and event with the visit it belongs to, narrowed by the same filters as
+ * the screen. The report-style PDF is a page of its own (`/analytics/report`),
+ * since a summary is what goes on paper, not half a million rows.
  *
  * Streamed in pages keyed on the event id (time-ordered), so a month of a busy
  * site never sits in memory at once, and capped so one press cannot run for an
@@ -13,7 +15,7 @@ import * as core from "@polaris/core";
 import { Readable } from "node:stream";
 import { NextResponse } from "next/server";
 import { userHasManage } from "@/lib/session";
-import { csvCell } from "@/lib/access/grant-use-csv";
+import * as exporting from "@/lib/analytics-export";
 import { sessionWhere } from "@/lib/analytics-reports";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
 import { siteAccess } from "@/app/(app)/analytics/site-access";
@@ -24,34 +26,16 @@ export const dynamic = "force-dynamic";
 
 const PAGE = 2000;
 const CAP = 500_000;
+/** A workbook is built whole in memory, so it stops well short of the others. */
+const XLSX_CAP = 100_000;
 
 const querySchema = z.object({
-    scopeType: z.enum(["application", "polaris"]),
+    scopeType: z.enum(["application", "polaris", "external"]),
     scopeId: z.string().max(64),
     range: core.visitRangeSchema,
-    filters: z.string().max(4000).optional()
+    filters: z.string().max(4000).optional(),
+    format: z.enum(exporting.EXPORT_FORMATS).default("csv")
 });
-
-const HEADER = [
-    "at",
-    "visit",
-    "kind",
-    "event",
-    "path",
-    "url",
-    "properties",
-    "visitor",
-    "browser",
-    "os",
-    "device",
-    "country",
-    "language",
-    "screen",
-    "channel",
-    "referrer",
-    "campaign",
-    "medium"
-];
 
 export async function GET(request: Request): Promise<Response> {
     const { user } = await requireAnalyticsReader();
@@ -73,51 +57,46 @@ export async function GET(request: Request): Promise<Response> {
         ...(filters.length ? { session: { is: sessionWhere(filters) } } : {})
     };
 
-    async function* rows(): AsyncGenerator<string> {
-        yield `${HEADER.join(",")}\n`;
+    const format = query.data.format;
+    const cap = format === "xlsx" ? XLSX_CAP : CAP;
+
+    async function* events(): AsyncGenerator<exporting.ExportEvent[]> {
         let cursor: string | null = null;
         let sent = 0;
-        while (sent < CAP) {
-            const page: Awaited<ReturnType<typeof readPage>> = await readPage(cursor);
+        while (sent < cap) {
+            const page: Awaited<ReturnType<typeof readPage>> = await readPage(cursor, Math.min(PAGE, cap - sent));
             if (page.length === 0) return;
-            let chunk = "";
-            for (const event of page) {
-                const session = event.session;
-                chunk += `${[
-                    event.at.toISOString(),
-                    event.sessionId,
-                    event.kind,
-                    event.name ?? "",
-                    event.path,
-                    event.rawPath ?? event.path,
-                    event.props ?? "",
-                    session.distinctId ?? "",
-                    session.browser,
-                    session.os,
-                    session.device,
-                    session.country ?? "",
-                    session.language ?? "",
-                    session.screen ?? "",
-                    session.referrerKind,
-                    session.referrerSource ?? "",
-                    session.campaign ?? "",
-                    session.medium ?? ""
-                ]
-                    .map(csvCell)
-                    .join(",")}\n`;
-            }
-            yield chunk;
+            yield page;
             sent += page.length;
             cursor = page[page.length - 1]!.id;
             if (page.length < PAGE) return;
         }
     }
 
-    function readPage(after: string | null) {
+    async function* csv(): AsyncGenerator<string> {
+        yield exporting.csvLine(exporting.EXPORT_COLUMNS);
+        for await (const page of events()) yield page.map((event) => exporting.csvLine(exporting.exportCells(event))).join("");
+    }
+
+    async function* json(): AsyncGenerator<string> {
+        yield "[";
+        let first = true;
+        for await (const page of events()) {
+            let chunk = "";
+            for (const event of page) {
+                chunk += `${first ? "\n" : ",\n"}${JSON.stringify(exporting.exportRecord(event))}`;
+                first = false;
+            }
+            yield chunk;
+        }
+        yield first ? "]\n" : "\n]\n";
+    }
+
+    function readPage(after: string | null, take: number) {
         return prisma.analyticsEvent.findMany({
             where: after ? { ...where, id: { gt: after } } : where,
             orderBy: { id: "asc" },
-            take: PAGE,
+            take,
             select: {
                 id: true,
                 at: true,
@@ -146,14 +125,26 @@ export async function GET(request: Request): Promise<Response> {
         });
     }
 
-    const body = Readable.toWeb(Readable.from(rows(), { objectMode: false })) as ReadableStream<Uint8Array>;
     const stem = access.site.name.replace(/[^a-z0-9._-]+/gi, "-").slice(0, 60) || "site";
-    return new Response(body, {
-        headers: {
-            ...downloadTicketHeaders(request),
-            "content-type": "text/csv; charset=utf-8",
-            "content-disposition": `attachment; filename="${stem}-${query.data.range}.csv"`,
-            "cache-control": "no-store"
-        }
-    });
+    const headers = {
+        ...downloadTicketHeaders(request),
+        "content-type": exporting.EXPORT_CONTENT_TYPE[format],
+        "content-disposition": `attachment; filename="${stem}-${query.data.range}.${format}"`,
+        "cache-control": "no-store"
+    };
+
+    if (format === "xlsx") {
+        const XLSX = await import("xlsx");
+        const rows: string[][] = [[...exporting.EXPORT_COLUMNS]];
+        for await (const page of events()) for (const event of page) rows.push(exporting.xlsxCells(event));
+        const book = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), "Events");
+        const file = XLSX.write(book, { type: "buffer", bookType: "xlsx", compression: true }) as Buffer;
+        return new Response(new Uint8Array(file), { headers });
+    }
+
+    const body = Readable.toWeb(
+        Readable.from(format === "json" ? json() : csv(), { objectMode: false })
+    ) as ReadableStream<Uint8Array>;
+    return new Response(body, { headers });
 }

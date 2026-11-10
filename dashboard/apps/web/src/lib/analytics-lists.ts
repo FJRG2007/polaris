@@ -153,6 +153,26 @@ export interface SiteListRow {
     readonly scope: "application" | "external" | "polaris";
 }
 
+/** A row of the Websites table: the site, and what the table shows about it. */
+export interface SiteTableRow extends SiteListRow {
+    /** The addresses it answers on: a service's domains, an external site's host. */
+    readonly hostnames: readonly string[];
+    readonly trackerEnabled: boolean;
+    /** Null until the site was first opened, which is when its record is made. */
+    readonly createdAt: string | null;
+    /** People seen in the last 24 hours. */
+    readonly visitors: number;
+    /** The tag's key, or null while the site has no record yet. */
+    readonly publicKey: string | null;
+    /** Whether this reader may rename, move or remove the site (external sites only). */
+    readonly canEdit: boolean;
+    /** Whether this reader may share it: they configure the service. */
+    readonly canShare: boolean;
+    /** What a grant on it names: the service, or the site's own record. Null
+     *  while Polaris's own site has no record yet. */
+    readonly grantId: string | null;
+}
+
 /** The key the site list sorts and pages by: the label, then the id. */
 function siteKey(site: SiteListRow): string {
     return `${site.label.toLowerCase()}\u0000${site.id}`;

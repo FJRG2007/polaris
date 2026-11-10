@@ -17,9 +17,11 @@
 import { cookies } from "next/headers";
 import { AnalyticsView } from "./analytics-view";
 import { userHasManage } from "@/lib/session";
+import { grantedSubjects } from "@/lib/access/grants";
 import { requireAnalyticsReader } from "./reader";
 import { requireInstalledApp } from "@/lib/apps/require-installed";
 import { visitRangeSchema, type VisitRange } from "@polaris/core";
+import { holdsPolarisSite } from "@/lib/analytics-service";
 import { isAnalyticsScope, type AnalyticsScope } from "./site-catalog";
 import { ANALYTICS_SITE_COOKIE, parseSiteCookie, type AnalyticsTab } from "./analytics-tabs";
 
@@ -35,6 +37,10 @@ export async function renderAnalyticsPage(searchParams: Promise<AnalyticsSearch>
     const { user, lent } = await requireAnalyticsReader();
     await requireInstalledApp("analytics", user);
     const canOperate = await userHasManage(user, "system.manage");
+    // Polaris's own traffic: an operator's, or handed to this reader by one.
+    const seesPolaris =
+        canOperate ||
+        (await holdsPolarisSite(lent ?? new Set((await grantedSubjects(user.id, "analytics.site")).keys())));
 
     // Nothing named in the address: the site last open, if there was one.
     const remembered = scope ? null : parseSiteCookie((await cookies()).get(ANALYTICS_SITE_COOKIE)?.value);
@@ -44,7 +50,7 @@ export async function renderAnalyticsPage(searchParams: Promise<AnalyticsSearch>
     // the natural landing place for an operator and is not offered to anyone else.
     const requested = isAnalyticsScope(named) ? named : null;
     let kind: AnalyticsScope = requested ?? (canOperate ? "polaris" : "application");
-    if (!canOperate && kind === "polaris") kind = "application";
+    if (!seesPolaris && kind === "polaris") kind = "application";
 
     // Taken as written. An id belonging to somebody else is refused by the read
     // itself - it resolves the site against the person asking - so nothing here
@@ -62,6 +68,7 @@ export async function renderAnalyticsPage(searchParams: Promise<AnalyticsSearch>
             siteId={siteId}
             range={activeRange}
             canOperate={canOperate}
+            seesPolaris={seesPolaris}
             canAdd={lent === null}
             tab={tab}
         />

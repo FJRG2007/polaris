@@ -16,6 +16,7 @@
 
 import Link from "next/link";
 import { useAppUrl } from "@/components/app-url";
+import { CodeView } from "@/components/json-view";
 import { HeaderPortal } from "@/components/header-portal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
@@ -68,6 +69,7 @@ import {
 } from "./actions";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { AnalyticsGuideLink } from "./guide-link";
 import * as polls from "./analytics-polls";
 import {
     BREAKDOWN_FILTER,
@@ -88,26 +90,8 @@ import {
     WorldMap,
     sectionTitleKey
 } from "./analytics-sections";
-import { Plus } from "lucide-react";
-
-/** Thousands separators without a locale: the browser's separator disagrees with the
- *  server on the first render, and it is not the reader's chosen format either. */
-function grouped(value: number): string {
-    return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-
-function percent(value: number | null): string {
-    return value === null ? "-" : `${Math.round(value * 100)}%`;
-}
-
-/** A duration as somebody would say it: "0s", "48s", "3m 12s", "1h 04m". */
-function duration(seconds: number | null): string {
-    if (seconds === null) return "-";
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
-    return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
-}
+import { List, Plus } from "lucide-react";
+import { grouped, percent, duration } from "./analytics-format";
 
 const RANGES: VisitRange[] = ["24h", "7d", "30d", "90d", "12m"];
 
@@ -116,6 +100,7 @@ export function AnalyticsView({
     siteId,
     range,
     canOperate,
+    seesPolaris = canOperate,
     canAdd = false,
     tab = "overview"
 }: {
@@ -123,6 +108,8 @@ export function AnalyticsView({
     siteId: string;
     range: VisitRange;
     canOperate: boolean;
+    /** Whether Polaris's own traffic is offered: an operator, or somebody it was shared with. */
+    seesPolaris?: boolean;
     /** Whether this reader may add a site of their own. */
     canAdd?: boolean;
     tab?: AnalyticsTab;
@@ -227,7 +214,8 @@ export function AnalyticsView({
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
             <div className="flex flex-col gap-3">
-                <div className="flex min-w-0 flex-wrap items-baseline gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                         {t(sectionTitleKey(isReportTab(tab) ? "reports" : tab))}
                     </h1>
@@ -242,33 +230,38 @@ export function AnalyticsView({
                             {t("view.online", { count: grouped(data.view.online) })}
                         </span>
                     ) : null}
-                    {canAdd ? (
-                        <Button asChild size="sm" variant="outline" className="ml-auto shrink-0">
-                            <Link href="/analytics/sites/new">
-                                <Plus aria-hidden="true" />
-                                {t("sites.add")}
-                            </Link>
-                        </Button>
-                    ) : null}
                 </div>
                 {data?.shared ? <Badge variant="neutral">{t("view.sharedWithYou")}</Badge> : null}
+                <div className="flex shrink-0 items-center gap-1">
                 <SitePicker
                     scope={scope}
                     siteId={siteId}
                     services={services}
-                    canOperate={canOperate}
+                    canOperate={seesPolaris}
                 />
-                {data?.canShare && scopeNeedsTarget(scope) && siteId ? (
-                    <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={t("view.share")}
-                        title={t("view.share")}
-                        onClick={() => setSharing(true)}
-                    >
-                        <Share2 aria-hidden="true" />
+                {/* The list of every site, and adding one, belong beside the
+                    picker that moves between sites - not to the site on screen. */}
+                <Button asChild size="sm" variant="ghost" className="shrink-0">
+                    <Link href="/analytics/sites">
+                        <List aria-hidden="true" />
+                        {t("sites.all")}
+                    </Link>
+                </Button>
+                {canAdd ? (
+                    <Button asChild size="icon" variant="ghost" className="shrink-0" title={t("sites.add")}>
+                        <Link href="/analytics/sites/new" aria-label={t("sites.add")}>
+                            <Plus aria-hidden="true" />
+                        </Link>
                     </Button>
                 ) : null}
+                {data?.canShare && (siteId || !scopeNeedsTarget(scope)) ? (
+                    <Button variant="outline" size="sm" className="shrink-0" onClick={() => setSharing(true)}>
+                        <Share2 aria-hidden="true" />
+                        {t("view.share")}
+                    </Button>
+                ) : null}
+                </div>
+                </div>
                 {sharing && data ? (
                     <ShareDialog
                         open
@@ -276,7 +269,7 @@ export function AnalyticsView({
                             if (!open) setSharing(false);
                         }}
                         subject="analytics.site"
-                        subjectId={siteId}
+                        subjectId={scope === "application" ? siteId : data.site.id}
                         name={data.site.name}
                     />
                 ) : null}
@@ -972,7 +965,10 @@ function TrackerPanel({
                 <CardTitle className="text-sm">{t("tracker.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">{t("tracker.intro")}</p>
+                <p className="text-sm text-muted-foreground">
+                    {t(scope === "external" ? "tracker.introExternal" : "tracker.intro")}
+                </p>
+                <AnalyticsGuideLink />
 
                 <label className="flex items-start gap-3">
                     <Switch
@@ -1006,11 +1002,13 @@ function TrackerPanel({
                         <span className="text-xs font-medium text-muted-foreground">
                             {t("tracker.paste")}
                         </span>
-                        <div className="flex items-center gap-2">
-                            <Input
-                                readOnly
+                        <div className="flex flex-wrap items-start gap-2">
+                            <CodeView
                                 value={snippet}
-                                className="min-w-0 flex-1 font-mono text-xs"
+                                language="html"
+                                label={t("tracker.paste")}
+                                copyable={false}
+                                className="min-w-0 flex-1 basis-64"
                             />
                             <Button
                                 type="button"

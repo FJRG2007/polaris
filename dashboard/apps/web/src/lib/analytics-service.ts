@@ -13,8 +13,10 @@
  */
 
 import { prisma } from "@polaris/db";
+import { forgetSubject } from "@/lib/access/forget";
 import { sessionWhere } from "@/lib/analytics-reports";
 import { randomBytes } from "node:crypto";
+import { countryForIp } from "@/lib/analytics-geoip";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     ANALYTICS_DEFAULTS,
@@ -252,6 +254,26 @@ export async function createExternalSite(
 }
 
 /** An external site by its scope id, or null. Never creates one. */
+/**
+ * The record Polaris's own numbers live under, or null until somebody first
+ * opened them. Polaris itself and a site run elsewhere are shared under their
+ * record's id - a grant names a uuid, and neither has a service to name.
+ */
+export async function polarisSiteRecordId(): Promise<string | null> {
+    const row = await prisma.analyticsSite.findUnique({
+        where: { scopeType_scopeId: { scopeType: "polaris", scopeId: "" } },
+        select: { id: true }
+    });
+    return row?.id ?? null;
+}
+
+/** Whether these held grants include Polaris's own numbers. */
+export async function holdsPolarisSite(held: ReadonlySet<string>): Promise<boolean> {
+    if (held.size === 0) return false;
+    const id = await polarisSiteRecordId();
+    return id !== null && held.has(id);
+}
+
 export async function findExternalSite(scopeId: string): Promise<AnalyticsSiteView | null> {
     const row = await prisma.analyticsSite.findUnique({
         where: { scopeType_scopeId: { scopeType: "external", scopeId } }
@@ -269,7 +291,9 @@ export async function updateExternalSite(siteId: string, name: string, hostname:
 
 /** Remove an external site and, by cascade, everything it recorded. */
 export async function deleteExternalSite(siteId: string): Promise<void> {
-    await prisma.analyticsSite.deleteMany({ where: { id: siteId, scopeType: "external" } });
+    const { count } = await prisma.analyticsSite.deleteMany({ where: { id: siteId, scopeType: "external" } });
+    // Shared under its record's id: nobody keeps a grant on a site that is gone.
+    if (count > 0) await forgetSubject("analytics.site", siteId);
 }
 
 /** The external sites an account owns, newest first, bounded. */
@@ -365,7 +389,10 @@ export async function recordVisit(input: VisitInput): Promise<void> {
 
     const at = new Date(input.at);
     const kind = input.kind ?? "pageview";
-    const country = resolveCountry(input.countryHeader ?? null, input.timezone ?? null);
+    // The proxy's own header when there is one, then the address, then - for a
+    // tracker visit on a server that has no geo database yet - the time zone.
+    const country =
+        resolveCountry(input.countryHeader ?? null, null) ?? countryForIp(input.ip) ?? resolveCountry(null, input.timezone ?? null);
     // A duration beat says the visit lasted this long from its start, which is a
     // better last-seen than "now" for a tab that was closed a while ago.
     const lastSeen = input.durationMs && input.durationMs > 0 ? new Date(input.at) : at;

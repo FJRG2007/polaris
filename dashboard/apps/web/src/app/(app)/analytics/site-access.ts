@@ -12,8 +12,10 @@
  * - `own`: also handing the site to somebody else. Whoever configures the
  *   service - a grant is never passed on by the person it was given to.
  *
- * Polaris's own traffic is an operator's alone: it includes who is reaching the
- * dashboard, which is not a project member's to read.
+ * Polaris's own traffic is an operator's: it includes who is reaching the
+ * dashboard, which is not a project member's to read. An operator may still hand
+ * it to somebody (granted under its site record's id), who then reads it at the
+ * level given and can never pass it on.
  *
  * A site somebody runs elsewhere (`external`) is owned by whoever added it, and
  * by an operator; anybody else reaches it only when it was shared with them.
@@ -27,6 +29,7 @@ import {
     ensureAnalyticsSite,
     externalSiteOwner,
     findExternalSite,
+    polarisSiteRecordId,
     type AnalyticsScopeType,
     type AnalyticsSiteView
 } from "@/lib/analytics-service";
@@ -54,7 +57,13 @@ export async function siteAccess(
     scopeId: string
 ): Promise<SiteAccess | null> {
     if (scopeType === "polaris") {
-        if (!isOperator) return null;
+        let held: string | null = null;
+        if (!isOperator) {
+            const recordId = await polarisSiteRecordId();
+            if (!recordId) return null;
+            held = (await grantedSubjects(userId, "analytics.site")).get(recordId) ?? null;
+            if (!held) return null;
+        }
         const { dashboardHosts } = await import("@/lib/domain-edge");
         const hosts = await dashboardHosts().catch(() => [] as string[]);
         const site = await ensureAnalyticsSite(
@@ -63,19 +72,19 @@ export async function siteAccess(
             "Polaris",
             hosts.map((host) => host.toLowerCase())
         );
-        return { site, level: "own", shared: false };
+        return isOperator
+            ? { site, level: "own", shared: false }
+            : { site, level: held === "edit" ? "edit" : "view", shared: true };
     }
 
     if (scopeType === "external") {
         const owner = externalSiteOwner(scopeId);
         if (!owner) return null;
         const mine = owner === userId.toLowerCase() || isOperator;
-        const held = mine
-            ? null
-            : await grantedSubjects(userId, "analytics.site").then((map) => map.get(scopeId) ?? null);
-        if (!mine && !held) return null;
         const site = await findExternalSite(scopeId);
         if (!site) return null;
+        const held = mine ? null : ((await grantedSubjects(userId, "analytics.site")).get(site.id) ?? null);
+        if (!mine && !held) return null;
         return { site, level: mine ? "own" : held === "edit" ? "edit" : "view", shared: !mine };
     }
 

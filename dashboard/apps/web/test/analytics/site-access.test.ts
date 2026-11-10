@@ -9,8 +9,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const APP = "0192f0aa-0000-7000-8000-0000000000d1";
 const REPORT = "0192f0aa-0000-7000-8000-0000000000e1";
+/** The record Polaris's own numbers live under, which a grant on them names. */
+const POLARIS_RECORD = "0192f0aa-0000-7000-8000-0000000000a1";
 
-const state = vi.hoisted(() => ({ granted: new Map<string, string>(), configures: false, manages: false }));
+const state = vi.hoisted(() => ({ granted: new Map<string, string>(), configures: false, manages: false, operator: false }));
 const service = vi.hoisted(() => ({
     setTrackerEnabled: vi.fn(async () => undefined),
     rotateTrackerKey: vi.fn(async () => "new-key"),
@@ -31,7 +33,8 @@ vi.mock("@polaris/db", () => ({
             findUnique: vi.fn(async () => ({ id: APP, name: "shop" })),
             findMany: vi.fn(async () => [{ id: APP, name: "shop" }])
         },
-        domain: { findMany: vi.fn(async () => []) }
+        domain: { findMany: vi.fn(async () => []) },
+        analyticsSite: { findMany: vi.fn(async () => []) }
     }
 }));
 vi.mock("@/lib/access/grants", () => ({
@@ -40,7 +43,7 @@ vi.mock("@/lib/access/grants", () => ({
 vi.mock("@/lib/session", () => ({
     requireUser: vi.fn(async () => ({ id: "reader", isAdmin: false })),
     sessionCan: vi.fn(async () => state.manages),
-    userHasManage: vi.fn(async () => false),
+    userHasManage: vi.fn(async () => state.operator),
     requirePermission: vi.fn(async () => {
         throw new Error("denied");
     })
@@ -67,9 +70,12 @@ vi.mock("@/lib/analytics-service", () => ({
     ownedExternalSites: vi.fn(async () => []),
     findExternalSite: vi.fn(async () => null),
     externalSiteOwner: vi.fn(() => null),
+    polarisSiteRecordId: vi.fn(async () => POLARIS_RECORD),
+    holdsPolarisSite: vi.fn(async (held: ReadonlySet<string>) => held.has(POLARIS_RECORD)),
     ...service
 }));
 vi.mock("@/lib/analytics-reports", () => ({ ...reports, sessionWhere: () => ({}) }));
+vi.mock("@/lib/domain-edge", () => ({ dashboardHosts: async () => ["polaris.test"] }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
@@ -107,6 +113,7 @@ beforeEach(() => {
     state.granted = new Map();
     state.configures = false;
     state.manages = false;
+    state.operator = false;
 });
 
 describe("analytics per-site access", () => {
@@ -183,5 +190,41 @@ describe("analytics per-site access", () => {
     it("lists a site shared with somebody", async () => {
         state.granted = new Map([[APP, "edit"]]);
         expect((await actions.listAnalyticsSitesAction()).sites).toEqual([{ id: APP, label: "shop" }]);
+    });
+
+    it("lets an operator hand Polaris's own traffic to somebody, who reads it and cannot pass it on", async () => {
+        const polaris = { scopeType: "polaris", scopeId: "", range: "24h" };
+        state.granted = new Map([[APP, "edit"]]);
+        expect(await actions.getAnalyticsOverviewAction(polaris)).toEqual({ error: "errors.notYoursToSee" });
+
+        state.granted = new Map([[POLARIS_RECORD, "view"]]);
+        expect(await actions.getAnalyticsOverviewAction(polaris)).toMatchObject({
+            level: "view",
+            shared: true,
+            canShare: false
+        });
+
+        state.granted = new Map();
+        state.operator = true;
+        state.manages = true;
+        expect(await actions.getAnalyticsOverviewAction(polaris)).toMatchObject({ level: "own", canShare: true, shared: false });
+    });
+
+    it("never lists Polaris's own record as a service", async () => {
+        state.granted = new Map([[POLARIS_RECORD, "view"], [APP, "view"]]);
+        const { prisma } = await import("@polaris/db");
+        vi.mocked(prisma.application.findMany).mockResolvedValueOnce([{ id: APP, name: "shop" }] as never);
+        expect((await actions.listAnalyticsSitesAction()).sites).toEqual([{ id: APP, label: "shop" }]);
+    });
+
+    it("exports a site run elsewhere, not only services and Polaris", async () => {
+        state.granted = new Map([[APP, "view"]]);
+        const { GET } = await import("@/app/api/analytics/export/route");
+        const external = "0192f0aa-0000-7000-8000-0000000000f1:0123456789ab";
+        const response = await GET(
+            new Request(`https://polaris.test/api/analytics/export?scopeType=external&scopeId=${external}&range=24h`)
+        );
+        // Asked of the site's access like any other, not refused as a malformed request.
+        expect(response.status).toBe(404);
     });
 });

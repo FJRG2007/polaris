@@ -18,9 +18,11 @@ import { useAppUrl } from "@/components/app-url";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { CodeView } from "@/components/json-view";
+import { AnalyticsGuideLink } from "@/app/(app)/analytics/guide-link";
 import { Check, CheckCircle2, Copy, Globe, Loader2, Server } from "lucide-react";
 import { createExternalSiteAction, setTrackerEnabledAction, type HostedService } from "@/app/(app)/analytics/actions";
-import { TRACKER_FRAMEWORKS, externalSiteSchema, trackerSnippet, type TrackerFramework } from "@/app/(app)/analytics/site-input";
+import { TRACKER_FRAMEWORKS, TRACKER_LANGUAGE, externalSiteSchema, trackerSnippet, type TrackerFramework } from "@/app/(app)/analytics/site-input";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
 
 type Road = "hosted" | "external";
@@ -396,8 +398,9 @@ function Install({ site, onChange }: { site: Created; onChange: (site: Created) 
                         <p className="text-xs text-muted-foreground">
                             {t(`add.where.${framework}` as NamespaceKey<"analytics">)}
                         </p>
+                        <AnalyticsGuideLink />
                         {snippet ? (
-                            <pre className="max-w-full overflow-x-auto rounded-md bg-muted/50 p-3 font-mono text-xs">{snippet}</pre>
+                            <CodeView value={snippet} language={TRACKER_LANGUAGE[framework]} label={t("add.snippetTitle")} copyable={false} className="max-w-full" />
                         ) : (
                             <Skeleton className="h-16 w-full" />
                         )}

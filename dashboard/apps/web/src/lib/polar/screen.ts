@@ -38,6 +38,7 @@ export const SCREEN_RECORDS: readonly ScreenRecord[] = [
     { route: "/account/organizations/[slug]/[[...section]]", kind: "organization", id: "slug" },
     { route: "/admin/apps/[appId]/settings", kind: "marketplace app", id: "appId" },
     { route: "/admin/apps/[appId]", kind: "marketplace app", id: "appId" },
+    { route: "/analytics/shared/[id]", kind: "analytics site", id: "id" },
     { route: "/admin/users/[id]/access", kind: "user", id: "id" },
     { route: "/admin/users/[id]/danger", kind: "user", id: "id" },
     { route: "/admin/users/[id]/security", kind: "user", id: "id" },

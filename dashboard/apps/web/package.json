@@ -107,6 +107,7 @@
         "mailparser": "3.9.40",
         "mammoth": "1.13.0",
         "marked": "12.0.2",
+        "mmdb-lib": "3.0.3",
         "mongodb": "6.12.0",
         "mysql2": "3.24.6",
         "next": "15.5.28",

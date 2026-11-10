@@ -13,6 +13,7 @@
 
 import { pruneAnalytics, ingestEdgeVisits } from "@/lib/analytics-ingest";
 import { isAppInstalled } from "@/lib/apps/install-presence";
+import { backfillVisitCountries } from "@/lib/analytics-geo-backfill";
 
 /** Frequent enough that the realtime panel is honest about what it shows. */
 const TICK_MS = 30_000;
@@ -32,8 +33,12 @@ export function startAnalyticsCollector(): void {
         try {
             // Analytics is an app to install: without it nothing new is recorded,
             // and what was recorded before still ages out below.
-            if (await isAppInstalled("analytics")) await ingestEdgeVisits();
+            const installed = await isAppInstalled("analytics");
+            if (installed) await ingestEdgeVisits();
             if (ticks % MAINTENANCE_EVERY_TICKS === 0) await pruneAnalytics();
+            // Places the visits recorded before the geo database arrived, a week of
+            // history per tick; once done it costs one settings read.
+            if (installed) await backfillVisitCountries();
         } catch (error) {
             console.error("polaris: the analytics collector tick failed:", error);
         } finally {

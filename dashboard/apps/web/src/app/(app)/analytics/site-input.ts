@@ -32,6 +32,17 @@ export type ExternalSiteInput = z.input<typeof externalSiteSchema>;
 export const TRACKER_FRAMEWORKS = ["html", "nextjs", "react", "vue", "astro", "wordpress", "gtm"] as const;
 export type TrackerFramework = (typeof TRACKER_FRAMEWORKS)[number];
 
+/** The grammar each variant of the tag is painted in. */
+export const TRACKER_LANGUAGE: Record<TrackerFramework, string> = {
+    html: "html",
+    nextjs: "javascript",
+    react: "html",
+    vue: "html",
+    astro: "html",
+    wordpress: "php",
+    gtm: "html"
+};
+
 /**
  * The tag, written the way each kind of project expects it. Every variant loads
  * the same script with the same key; only where it goes and how it is spelled

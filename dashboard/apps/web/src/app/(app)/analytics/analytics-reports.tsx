@@ -14,28 +14,29 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useConfirm } from "@/components/confirm-dialog";
+import { CodeLine } from "@/components/json-view";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
+import { IgnoredTraffic } from "./ignored-traffic";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { ArrowDown, ArrowUp, ChevronRight, Download, Filter, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Download, Filter, Plus, Trash2, X } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useTransition } from "react";
 import {
-    Badge,
     Button,
     Card,
     CardBody,
     CardHeader,
     CardTitle,
     cn,
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
     Input,
     ScrollRow,
     Select,
-    Skeleton,
-    Textarea
+    Skeleton
 } from "@polaris/ui";
 import * as polls from "./analytics-polls";
 import {
@@ -50,13 +51,10 @@ import {
 import type { SiteLevel } from "./site-access";
 import type { AnalyticsScope } from "./site-catalog";
 import { REPORT_TABS, type AnalyticsTab } from "./analytics-tabs";
-import { LoadMore } from "./load-more";
 import { RankList } from "./analytics-sections";
+import { SessionsPanel } from "./sessions-panel";
+import { grouped } from "./analytics-format";
 
-
-function grouped(value: number): string {
-    return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
 
 function share(part: number, whole: number): string {
     return whole > 0 ? `${Math.round((part / whole) * 1000) / 10}%` : "-";
@@ -430,7 +428,7 @@ export function Failure({ message }: { message: string | null }) {
 }
 
 /** A bar list: the shape every ranked answer here takes. */
-function BarList({ rows }: { rows: readonly { key: string; label: React.ReactNode; value: number; note?: string }[] }) {
+export function BarList({ rows }: { rows: readonly { key: string; label: React.ReactNode; value: number; note?: string }[] }) {
     const top = rows.reduce((best, row) => Math.max(best, row.value), 0);
     return (
         <ul className="flex flex-col">
@@ -473,155 +471,6 @@ export function ReportPanel(props: PanelProps & { tab: Exclude<AnalyticsTab, "ov
         default:
             return null;
     }
-}
-
-// --- visits ------------------------------------------------------------------------
-
-type SessionRow = Extract<AnalyticsReportAnswer, { kind: "sessions" }>["rows"][number];
-
-function SessionsPanel(props: PanelProps) {
-    const t = useTranslations("analytics");
-    const format = useDisplayFormat();
-    const [before, setBefore] = useState<string | undefined>(undefined);
-    const [pages, setPages] = useState<SessionRow[]>([]);
-    const [open, setOpen] = useState<string | null>(null);
-    const { answer, error, loading } = useReport<"sessions">(props, { kind: "sessions", before });
-
-    useEffect(() => setPages([]), [props.filtersParam, props.data.range]);
-    useEffect(() => {
-        if (!answer) return;
-        setPages((current) => (before ? [...current, ...answer.rows.filter((row) => !current.some((one) => one.id === row.id))] : answer.rows));
-    }, [answer, before]);
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-sm">{t("sessions.title")}</CardTitle>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-2 pt-0">
-                <Failure message={error} />
-                {!answer && loading ? (
-                    <Rows />
-                ) : pages.length === 0 ? (
-                    <Empty>{t("sessions.none")}</Empty>
-                ) : (
-                    <ul className="flex flex-col divide-y divide-border">
-                        {pages.map((row) => (
-                            <li key={row.id}>
-                                <button
-                                    type="button"
-                                    onClick={() => setOpen(row.id)}
-                                    className="flex w-full min-w-0 flex-col gap-0.5 py-2 text-left text-sm hover:bg-muted/40 sm:flex-row sm:items-center sm:gap-3"
-                                >
-                                    <span className="min-w-0 flex-1 truncate font-medium">
-                                        {row.country ? `${core.countryFlag(row.country)} ` : ""}
-                                        {row.distinctId ?? `${row.browser} / ${row.os}`}
-                                    </span>
-                                    <span className="min-w-0 truncate text-xs text-muted-foreground sm:max-w-[14rem]" title={row.lastPath ?? ""}>
-                                        {row.lastPath ?? "-"}
-                                    </span>
-                                    <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                                        {t("sessions.pages", { count: grouped(row.views) })}
-                                    </span>
-                                    <span className="shrink-0 text-xs text-muted-foreground">
-                                        {format.dateTime(new Date(row.lastSeenAt).getTime())}
-                                    </span>
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-                {answer?.more ? (
-                    <LoadMore
-                        loading={loading}
-                        label={t("sessions.more")}
-                        onMore={() => setBefore(pages[pages.length - 1]?.lastSeenAt)}
-                    />
-                ) : null}
-            </CardBody>
-            {open ? <SessionDialog {...props} id={open} onClose={() => setOpen(null)} /> : null}
-        </Card>
-    );
-}
-
-function SessionDialog(props: PanelProps & { id: string; onClose: () => void }) {
-    const t = useTranslations("analytics");
-    const format = useDisplayFormat();
-    const { answer, error, loading } = useReport<"session">(props, { kind: "session", id: props.id });
-    const session = answer?.session ?? null;
-    const facts: [string, string | null][] = session
-        ? [
-              [t("filters.dims.distinctId"), session.distinctId],
-              [t("filters.dims.country"), session.country ? core.countryName(session.country) : null],
-              [t("filters.dims.browser"), `${session.browser} / ${session.os} / ${session.device}`],
-              [t("filters.dims.screen"), session.screen],
-              [t("filters.dims.language"), session.language],
-              [t("filters.dims.referrer"), session.referrerSource ?? session.referrerKind],
-              [t("filters.dims.campaign"), session.campaign],
-              [t("filters.dims.ip"), session.ip]
-          ]
-        : [];
-    return (
-        <Dialog open onOpenChange={(next) => (next ? undefined : props.onClose())}>
-            <DialogContent className="flex max-h-[85vh] w-[min(100vw-2rem,40rem)] max-w-none flex-col gap-4 overflow-hidden">
-                <DialogHeader>
-                    <DialogTitle>{t("sessions.journey")}</DialogTitle>
-                </DialogHeader>
-                <Failure message={error} />
-                {loading && !session ? (
-                    <Rows />
-                ) : !session ? (
-                    <Empty>{t("sessions.gone")}</Empty>
-                ) : (
-                    <div className="flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain">
-                        <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
-                            {facts
-                                .filter((fact): fact is [string, string] => Boolean(fact[1]))
-                                .map(([label, value]) => (
-                                    <div key={label} className="flex min-w-0 gap-2">
-                                        <dt className="shrink-0 text-muted-foreground">{label}</dt>
-                                        <dd className="min-w-0 truncate" title={value}>
-                                            {value}
-                                        </dd>
-                                    </div>
-                                ))}
-                        </dl>
-                        {session.data ? <Props props={session.data} /> : null}
-                        <ol className="flex flex-col gap-2 border-l border-border pl-4">
-                            {session.events.map((event, index) => (
-                                <li key={`${event.at}:${index}`} className="flex min-w-0 flex-col text-sm">
-                                    <span className="text-xs text-muted-foreground">
-                                        {format.dateTime(new Date(event.at).getTime())}
-                                    </span>
-                                    <span className="min-w-0 truncate" title={event.path}>
-                                        {event.kind === "event" ? (
-                                            <Badge variant="neutral" className="mr-1">
-                                                {event.name}
-                                            </Badge>
-                                        ) : null}
-                                        {event.path}
-                                    </span>
-                                    {event.props ? <Props props={event.props} /> : null}
-                                </li>
-                            ))}
-                        </ol>
-                    </div>
-                )}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function Props({ props }: { props: Record<string, string | number | boolean> }) {
-    return (
-        <div className="flex flex-wrap gap-1">
-            {Object.entries(props).map(([key, value]) => (
-                <span key={key} className="max-w-full truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs" title={`${key}: ${String(value)}`}>
-                    {key}: {String(value)}
-                </span>
-            ))}
-        </div>
-    );
 }
 
 // --- events ------------------------------------------------------------------------
@@ -1234,84 +1083,32 @@ function RevenuePanel(props: PanelProps) {
 
 // --- the site itself ---------------------------------------------------------------
 
-function lines(text: string): string[] {
-    return text
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
-}
-
 function SitePanel(props: PanelProps) {
     const t = useTranslations("analytics");
     const rules = props.data.site.rules;
-    const [paths, setPaths] = useState(rules.excludedPaths.join("\n"));
-    const [ips, setIps] = useState(rules.ignoredIps.join("\n"));
     const [failure, setFailure] = useState<string | null>(null);
-    const [saved, setSaved] = useState(false);
-    const [saving, startSave] = useTransition();
     const [confirm, confirmDialog] = useConfirm();
     const canEdit = may(props.data.level, "edit");
-    const next = { excludedPaths: lines(paths), ignoredIps: lines(ips) };
-    const parsed = core.analyticsSiteSettingsSchema.safeParse(next);
-    const badPath = next.excludedPaths.find((one) => !core.analyticsSiteSettingsSchema.shape.excludedPaths.element.safeParse(one).success);
-    const badIp = next.ignoredIps.find((one) => !core.analyticsSiteSettingsSchema.shape.ignoredIps.element.safeParse(one).success);
-    const dirty = JSON.stringify(next) !== JSON.stringify(rules);
-    const exportHref = `/api/analytics/export?${new URLSearchParams({
+    const exportQuery = new URLSearchParams({
         scopeType: props.scope,
         scopeId: props.siteId,
         range: props.data.range,
         ...(props.filtersParam ? { filters: props.filtersParam } : {})
-    }).toString()}`;
+    }).toString();
+    const exportHref = (format: "csv" | "json" | "xlsx") => `/api/analytics/export?${exportQuery}&format=${format}`;
 
     return (
         <div className="flex flex-col gap-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-sm">{t("site.ignoreTitle")}</CardTitle>
-                </CardHeader>
-                <CardBody className="flex flex-col gap-4 pt-0">
-                    <p className="text-sm text-muted-foreground">{t("site.ignoreIntro")}</p>
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{t("site.paths")}</span>
-                        <Textarea value={paths} onChange={(event) => setPaths(event.target.value)} rows={4} placeholder={"/admin*\n/health"} disabled={!canEdit} aria-invalid={badPath ? true : undefined} className="font-mono text-xs" />
-                        <span className={cn("text-xs", badPath ? "text-danger-ink" : "text-muted-foreground")}>
-                            {badPath ? t("site.badPath", { value: badPath }) : t("site.pathsHint")}
-                        </span>
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{t("site.ips")}</span>
-                        <Textarea value={ips} onChange={(event) => setIps(event.target.value)} rows={3} placeholder={"203.0.113.7\n198.51.100.0/24"} disabled={!canEdit} aria-invalid={badIp ? true : undefined} className="font-mono text-xs" />
-                        <span className={cn("text-xs", badIp ? "text-danger-ink" : "text-muted-foreground")}>
-                            {badIp ? t("site.badIp", { value: badIp }) : t("site.ipsHint")}
-                        </span>
-                    </label>
-                    {canEdit ? (
-                        <div className="flex items-center gap-3">
-                            <Button
-                                size="sm"
-                                disabled={!dirty || !parsed.success || saving}
-                                aria-disabled={!dirty || !parsed.success || saving}
-                                onClick={() =>
-                                    parsed.success &&
-                                    startSave(async () => {
-                                        const result = await setSiteRulesAction({ scopeType: props.scope, scopeId: props.siteId, rules: parsed.data });
-                                        if (result.error) return setFailure(result.error);
-                                        setFailure(null);
-                                        setSaved(true);
-                                        props.onSaved();
-                                    })
-                                }
-                            >
-                                {t("site.save")}
-                            </Button>
-                            {saved && !dirty ? <span className="text-xs text-muted-foreground">{t("site.saved")}</span> : null}
-                        </div>
-                    ) : (
-                        <p className="text-xs text-muted-foreground">{t("site.viewOnly")}</p>
-                    )}
-                    <Failure message={failure} />
-                </CardBody>
-            </Card>
+            <IgnoredTraffic
+                rules={rules}
+                canEdit={canEdit}
+                save={async (next) => {
+                    const result = await setSiteRulesAction({ scopeType: props.scope, scopeId: props.siteId, rules: next });
+                    if (result.error) return result.error;
+                    props.onSaved();
+                    return null;
+                }}
+            />
 
             <Card>
                 <CardHeader>
@@ -1320,9 +1117,41 @@ function SitePanel(props: PanelProps) {
                 <CardBody className="flex flex-col gap-3 pt-0">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-sm text-muted-foreground">{t("site.exportHint")}</p>
-                        <a href={exportHref} download className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted">
-                            <Download className="size-4" aria-hidden /> {t("site.export")}
-                        </a>
+                        {/* Plain anchors, never a router Link: a prefetch would start the download. */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="outline" className="shrink-0 self-start">
+                                    <Download aria-hidden /> {t("site.export")}
+                                    <ChevronDown aria-hidden />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                                {(
+                                    [
+                                        ["csv", "site.exportCsv"],
+                                        ["json", "site.exportJson"],
+                                        ["xlsx", "site.exportXlsx"]
+                                    ] as const
+                                ).map(([format, label]) => (
+                                    <DropdownMenuItem key={format} asChild>
+                                        <a href={exportHref(format)} download className="no-underline">
+                                            {t(label)}
+                                        </a>
+                                    </DropdownMenuItem>
+                                ))}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild>
+                                    <a
+                                        href={`/analytics/report?${exportQuery}`}
+                                        target="_blank"
+                                        rel="noopener"
+                                        className="no-underline"
+                                    >
+                                        {t("site.exportPdf")}
+                                    </a>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                     {canEdit ? (
                         <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1348,6 +1177,7 @@ function SitePanel(props: PanelProps) {
                             </Button>
                         </div>
                     ) : null}
+                    <Failure message={failure} />
                 </CardBody>
             </Card>
 
@@ -1371,7 +1201,14 @@ function SitePanel(props: PanelProps) {
                         ] as const
                     ).map(([code, key]) => (
                         <div key={key} className="flex min-w-0 flex-col gap-0.5">
-                            <code className="max-w-full overflow-x-auto whitespace-nowrap rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{code}</code>
+                            <CodeLine
+                                value={code}
+                                // A tag is HTML. A lone attribute has no tag for the HTML
+                                // grammar to find it in, so it is painted as the
+                                // script grammar paints a name and its quoted value.
+                                language={code.startsWith("<") ? "html" : "javascript"}
+                                className="max-w-full overflow-x-auto whitespace-nowrap rounded bg-muted px-1.5 py-0.5 text-xs"
+                            />
                             <span className="text-xs text-muted-foreground">{t(key as NamespaceKey<"analytics">)}</span>
                         </div>
                     ))}
