@@ -15,7 +15,19 @@ import * as model from "../../lib/clock/model";
 import { hostUi } from "@polaris/app-host/client";
 import * as clockActions from "../../actions/clock";
 import { mutate, useServerNow, type ClockRead } from "./store";
-import { Button, cn, EmptyState, Input, Skeleton, Switch, useToast } from "@polaris/ui";
+import { ItemMenu, RenameDialog, SendCopyDialog } from "./item-actions";
+import {
+    Button,
+    cn,
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    EmptyState,
+    Input,
+    Skeleton,
+    Switch,
+    useToast
+} from "@polaris/ui";
 import {
     Brain,
     Pause,
@@ -24,11 +36,17 @@ import {
     RotateCcw,
     Settings2,
     SkipForward,
-    Timer,
-    Trash2
+    Timer
 } from "lucide-react";
 
 const PRESET_MINUTES = [1, 3, 5, 10, 15, 30, 60] as const;
+
+/** What the edit and rename dialogs change on a timer. */
+interface TimerEdit {
+    readonly label: string;
+    readonly sound?: model.ClockSound;
+    readonly durationMs?: number;
+}
 
 export function TimersPanel({
     clock,
@@ -47,6 +65,10 @@ export function TimersPanel({
     const failed = (message: string) =>
         toast.show({ key: "calendar-time", title: message || t("screen.failed") });
     const full = timers !== null && timers.length >= model.MAX_TIMERS;
+    const [dialog, setDialog] = useState<{
+        kind: "edit" | "rename" | "send";
+        timer: model.TimerView;
+    } | null>(null);
 
     const recent = useMemo(() => {
         const seen = new Set<number>(PRESET_MINUTES.map((minutes) => minutes * 60_000));
@@ -65,19 +87,53 @@ export function TimersPanel({
 
     const change = (
         timer: model.TimerView,
-        change: "start" | "pause" | "reset" | "addMinute" | "skip" | "delete"
-    ) =>
+        change: "start" | "pause" | "reset" | "addMinute" | "skip" | "delete" | "duplicate"
+    ) => {
+        // The time of the press, read now. The ticker above stands still while
+        // nothing counts, so a Start drawn from it ended in the past and the
+        // card painted "Done" and "Start over" until the server answered.
+        const at = Date.now() + clock.skew;
         void mutate(
             clock,
             () => clockActions.changeTimerAction({ id: timer.id, change }),
+            change === "duplicate"
+                ? null
+                : (snapshot) => ({
+                      ...snapshot,
+                      timers:
+                          change === "delete"
+                              ? snapshot.timers.filter((entry) => entry.id !== timer.id)
+                              : snapshot.timers.map((entry) =>
+                                    entry.id === timer.id ? optimistic(entry, change, at) : entry
+                                )
+                  }),
+            failed
+        );
+    };
+
+    const edit = (timer: model.TimerView, input: TimerEdit) =>
+        mutate(
+            clock,
+            () => clockActions.editTimerAction({ id: timer.id, ...input }),
             (snapshot) => ({
                 ...snapshot,
-                timers:
-                    change === "delete"
-                        ? snapshot.timers.filter((entry) => entry.id !== timer.id)
-                        : snapshot.timers.map((entry) =>
-                              entry.id === timer.id ? optimistic(entry, change, now) : entry
-                          )
+                timers: snapshot.timers.map((entry) =>
+                    entry.id !== timer.id
+                        ? entry
+                        : input.durationMs !== undefined &&
+                            input.durationMs !== entry.durationMs &&
+                            !entry.pomodoro
+                          ? {
+                                ...entry,
+                                label: input.label,
+                                sound: input.sound ?? entry.sound,
+                                durationMs: input.durationMs,
+                                endsAt: null,
+                                remainingMs: null,
+                                firedAt: null
+                            }
+                          : { ...entry, label: input.label, sound: input.sound ?? entry.sound }
+                )
             }),
             failed
         );
@@ -135,11 +191,35 @@ export function TimersPanel({
                             key={timer.id}
                             timer={timer}
                             now={now}
+                            canDuplicate={!full}
                             onChange={(kind) => change(timer, kind)}
+                            onEdit={() => setDialog({ kind: "edit", timer })}
+                            onRename={() => setDialog({ kind: "rename", timer })}
+                            onSend={() => setDialog({ kind: "send", timer })}
                         />
                     ))}
                 </ul>
             )}
+            {dialog?.kind === "edit" ? (
+                <TimerDialog
+                    timer={dialog.timer}
+                    onClose={() => setDialog(null)}
+                    onSave={(input) => edit(dialog.timer, input)}
+                />
+            ) : dialog?.kind === "rename" ? (
+                <RenameDialog
+                    value={dialog.timer.label}
+                    onClose={() => setDialog(null)}
+                    onSave={(label) => edit(dialog.timer, { label })}
+                />
+            ) : dialog?.kind === "send" ? (
+                <SendCopyDialog
+                    clock={clock}
+                    kind="timer"
+                    id={dialog.timer.id}
+                    onClose={() => setDialog(null)}
+                />
+            ) : null}
         </section>
     );
 }
@@ -188,11 +268,21 @@ function optimistic(
 function TimerCard({
     timer,
     now,
-    onChange
+    canDuplicate,
+    onChange,
+    onEdit,
+    onRename,
+    onSend
 }: {
     timer: model.TimerView;
     now: number;
-    onChange: (change: "start" | "pause" | "reset" | "addMinute" | "skip" | "delete") => void;
+    canDuplicate: boolean;
+    onChange: (
+        change: "start" | "pause" | "reset" | "addMinute" | "skip" | "delete" | "duplicate"
+    ) => void;
+    onEdit: () => void;
+    onRename: () => void;
+    onSend: () => void;
 }) {
     const t = useCalendarT();
     const [confirm, confirmElement] = hostUi.confirmDialog.useConfirm();
@@ -233,27 +323,28 @@ function TimerCard({
                                 : t("time.timers.ready")}
                     </p>
                 </div>
-                <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={t("time.delete")}
-                    title={t("time.delete")}
-                    onClick={async () => {
-                        if (
-                            state === "running" &&
-                            !(await confirm({
-                                title: t("time.timers.deleteTitle"),
-                                description: t("time.timers.deleteBody"),
-                                confirmLabel: t("time.delete"),
-                                danger: true
-                            }))
-                        )
-                            return;
-                        onChange("delete");
+                <ItemMenu
+                    canDuplicate={canDuplicate}
+                    actions={{
+                        onEdit,
+                        onRename,
+                        onSend,
+                        onDuplicate: () => onChange("duplicate"),
+                        onDelete: async () => {
+                            const counting = state === "running" && !done;
+                            if (
+                                !(await confirm({
+                                    title: t("time.timers.deleteTitle"),
+                                    description: counting ? t("time.timers.deleteBody") : undefined,
+                                    confirmLabel: t("time.delete"),
+                                    danger: true
+                                }))
+                            )
+                                return;
+                            onChange("delete");
+                        }
                     }}
-                >
-                    <Trash2 />
-                </Button>
+                />
             </div>
 
             <div
@@ -583,5 +674,134 @@ function FocusCard({
                 {t("time.focus.start")}
             </Button>
         </div>
+    );
+}
+
+/** Split a length into the three fields a person types it in. */
+function lengthParts(ms: number) {
+    const seconds = Math.round(ms / 1000);
+    return {
+        hours: String(Math.floor(seconds / 3600)),
+        minutes: String(Math.floor((seconds % 3600) / 60)),
+        seconds: String(seconds % 60)
+    };
+}
+
+/** A timer's name, sound and - for a plain timer - its length. */
+function TimerDialog({
+    timer,
+    onClose,
+    onSave
+}: {
+    timer: model.TimerView;
+    onClose: () => void;
+    onSave: (input: TimerEdit) => Promise<boolean>;
+}) {
+    const t = useCalendarT();
+    const cycle = timer.pomodoro !== null;
+    const [parts, setParts] = useState(() => lengthParts(timer.durationMs));
+    const [label, setLabel] = useState(timer.label);
+    const [sound, setSound] = useState<model.ClockSound>(timer.sound);
+    const [busy, setBusy] = useState(false);
+    const number = (text: string) => (/^\d{1,3}$/.test(text.trim()) ? Number(text.trim()) : NaN);
+    const durationMs =
+        ((number(parts.hours || "0") * 60 + number(parts.minutes || "0")) * 60 +
+            number(parts.seconds || "0")) *
+        1000;
+    const check = model.timerInputSchema.safeParse({
+        label,
+        durationMs: cycle ? timer.durationMs : durationMs,
+        sound,
+        start: false
+    });
+    const unchanged =
+        label.trim() === timer.label &&
+        sound === timer.sound &&
+        (cycle || durationMs === timer.durationMs);
+    const relength = !cycle && check.success && durationMs !== timer.durationMs;
+    const counting = model.timerState(timer) !== "idle";
+
+    const field = (key: "hours" | "minutes" | "seconds", max: number, text: string) => {
+        const value = number(parts[key] || "0");
+        return (
+            <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted-foreground">
+                <span>{text}</span>
+                <Input
+                    inputMode="numeric"
+                    value={parts[key]}
+                    aria-invalid={Number.isNaN(value) || value > max || undefined}
+                    onChange={(event) =>
+                        setParts({
+                            ...parts,
+                            [key]: event.target.value.replace(/[^\d]/g, "").slice(0, 3)
+                        })
+                    }
+                    onFocus={(event) => event.currentTarget.select()}
+                    className="text-center text-lg tabular-nums"
+                />
+            </label>
+        );
+    };
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogTitle>{t("time.timerEdit.title")}</DialogTitle>
+                <form
+                    className="flex flex-col gap-4"
+                    onSubmit={async (event) => {
+                        event.preventDefault();
+                        if (!check.success || busy || unchanged) return;
+                        setBusy(true);
+                        const ok = await onSave({
+                            label: check.data.label,
+                            sound: check.data.sound,
+                            ...(cycle ? {} : { durationMs: check.data.durationMs })
+                        });
+                        setBusy(false);
+                        if (ok) onClose();
+                    }}
+                >
+                    {cycle ? null : (
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex gap-2">
+                                {field("hours", 99, t("time.timers.hours"))}
+                                {field("minutes", 59, t("time.timers.minutesField"))}
+                                {field("seconds", 59, t("time.timers.secondsField"))}
+                            </div>
+                            {durationMs > model.CLOCK_TIMER_MAX_MS ? (
+                                <p className="text-xs text-danger">{t("time.timers.tooLong")}</p>
+                            ) : relength && counting ? (
+                                <p className="text-xs text-muted-foreground">
+                                    {t("time.timerEdit.restarts")}
+                                </p>
+                            ) : null}
+                        </div>
+                    )}
+                    <label className="flex flex-col gap-1 text-[0.8125rem]">
+                        <span>{t("time.label")}</span>
+                        <Input
+                            value={label}
+                            maxLength={model.CLOCK_LABEL_MAX}
+                            placeholder={t("time.timers.labelHint")}
+                            onChange={(event) => setLabel(event.target.value)}
+                        />
+                    </label>
+                    <SoundField value={sound} onChange={setSound} />
+                    <div className="flex items-center justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
+                            {t("time.cancel")}
+                        </Button>
+                        <Button
+                            type="submit"
+                            aria-disabled={!check.success || unchanged || busy}
+                            disabled={busy}
+                        >
+                            {t("time.save")}
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }

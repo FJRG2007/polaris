@@ -39,7 +39,7 @@ const { ShareDialog } = hostUi.accessShareDialog;
 
 const LEVELS: readonly ShareLevel[] = ["freebusy", "read", "write", "manage"];
 
-type Target =
+export type Target =
     | { kind: "user"; id: string; name: string; detail: string }
     | { kind: "team"; id: string; name: string; detail: string };
 
@@ -318,13 +318,18 @@ function SharePanel({
     );
 }
 
-/** A field that finds people and teams, with the matches as a listbox under it. */
-function TargetSearch({
+/** A field that finds people and teams, with the matches as a listbox under it.
+ *  `peopleOnly` leaves the teams out, for something only a person can receive. */
+export function TargetSearch({
     value,
-    onChange
+    onChange,
+    peopleOnly = false,
+    label
 }: {
     value: Target | null;
     onChange: (target: Target | null) => void;
+    peopleOnly?: boolean;
+    label?: string;
 }) {
     const t = useCalendarT();
     const listId = useId();
@@ -360,7 +365,7 @@ function TargetSearch({
                             name: person.name,
                             detail: person.username ? `@${person.username}` : ""
                         })),
-                        ...answer.teams.map((team): Target => ({
+                        ...(peopleOnly ? [] : answer.teams).map((team): Target => ({
                             kind: "team",
                             id: team.id,
                             name: team.name,
@@ -371,7 +376,7 @@ function TargetSearch({
                 });
         }, 250);
         return () => clearTimeout(timer);
-    }, [query, open, value, t]);
+    }, [query, open, value, t, peopleOnly]);
 
     function pick(target: Target): void {
         onChange(target);
@@ -385,7 +390,7 @@ function TargetSearch({
                 htmlFor={`${listId}-input`}
                 className="text-xs font-medium text-muted-foreground"
             >
-                {t("shareDialog.searchLabel")}
+                {label ?? t("shareDialog.searchLabel")}
             </label>
             <Input
                 id={`${listId}-input`}
@@ -422,7 +427,7 @@ function TargetSearch({
                 <ul
                     id={listId}
                     role="listbox"
-                    aria-label={t("shareDialog.searchLabel")}
+                    aria-label={label ?? t("shareDialog.searchLabel")}
                     className="max-h-56 overflow-y-auto rounded-md border border-border bg-card py-1"
                 >
                     {searching && results.length === 0 ? (

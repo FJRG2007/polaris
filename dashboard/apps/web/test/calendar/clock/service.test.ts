@@ -582,6 +582,116 @@ describe("the Time area on the server", () => {
         });
     });
 
+    describe("renaming, editing, copying and sending", () => {
+        it("renames and duplicates only its owner's alarm, the copy switched off", async () => {
+            await clock.saveAlarm(alice.id, null, alarm({ label: "Gym" }), ZONE, world.NOW);
+            const id = db.rows("clockAlarm")[0]!.id as string;
+            await expect(clock.renameAlarm(bob.id, id, "Mine")).rejects.toBeInstanceOf(
+                CalendarRefusal
+            );
+            await expect(clock.duplicateAlarm(bob.id, id)).rejects.toBeInstanceOf(CalendarRefusal);
+            await clock.renameAlarm(alice.id, id, "Run");
+            await clock.duplicateAlarm(alice.id, id);
+            const alarms = (await clock.clockSnapshot(alice.id)).alarms;
+            expect(alarms.map((entry) => [entry.label, entry.enabled])).toEqual([
+                ["Run", true],
+                ["Run", false]
+            ]);
+            expect(alarms[1]!.nextFireAt).toBeNull();
+        });
+
+        it("starts a timer over when its length changes, and keeps it counting otherwise", async () => {
+            const id = await clock.createTimer(
+                alice.id,
+                { label: "Tea", durationMs: 60_000, sound: "chime", start: true },
+                world.NOW
+            );
+            await clock.editTimer(alice.id, id, { label: "Green tea", sound: "bell" });
+            let [timer] = (await clock.clockSnapshot(alice.id)).timers;
+            expect(timer).toMatchObject({ label: "Green tea", sound: "bell" });
+            expect(timer!.endsAt).not.toBeNull();
+            await clock.editTimer(alice.id, id, { label: "Green tea", durationMs: 120_000 });
+            [timer] = (await clock.clockSnapshot(alice.id)).timers;
+            expect(timer).toMatchObject({ durationMs: 120_000, endsAt: null, remainingMs: null });
+            await expect(clock.editTimer(bob.id, id, { label: "Mine" })).rejects.toBeInstanceOf(
+                CalendarRefusal
+            );
+        });
+
+        it("duplicates a running timer as one that has not started", async () => {
+            const id = await clock.createTimer(
+                alice.id,
+                { label: "Tea", durationMs: 60_000, sound: "chime", start: true },
+                world.NOW
+            );
+            await clock.duplicateTimer(alice.id, id);
+            const timers = (await clock.clockSnapshot(alice.id)).timers;
+            expect(timers).toHaveLength(2);
+            expect(timers[1]).toMatchObject({ label: "Tea", durationMs: 60_000, endsAt: null });
+        });
+
+        it("sends somebody their own copy, which never changes the sender's", async () => {
+            const id = await clock.createTimer(
+                alice.id,
+                { label: "Tea", durationMs: 60_000, sound: "chime", start: true },
+                world.NOW
+            );
+            await expect(clock.sendCopy(alice, "timer", id, alice.id)).rejects.toBeInstanceOf(
+                CalendarRefusal
+            );
+            await expect(clock.sendCopy(alice, "timer", id, "nobody")).rejects.toBeInstanceOf(
+                CalendarRefusal
+            );
+            // Somebody else's timer cannot be sent by its id.
+            await expect(clock.sendCopy(bob, "timer", id, alice.id)).rejects.toBeInstanceOf(
+                CalendarRefusal
+            );
+            await clock.sendCopy(alice, "timer", id, bob.id);
+            const theirs = (await clock.clockSnapshot(bob.id)).timers;
+            expect(theirs).toEqual([
+                expect.objectContaining({ label: "Tea", durationMs: 60_000, endsAt: null })
+            ]);
+            expect((await clock.clockSnapshot(alice.id)).timers).toHaveLength(1);
+            expect(fake.notices.at(-1)).toMatchObject({
+                userId: bob.id,
+                title: world.en("time.share.gotTimer", { name: "Alice" }),
+                href: "/calendar/time?tab=timers"
+            });
+
+            await clock.saveAlarm(alice.id, null, alarm({ label: "Gym" }), ZONE, world.NOW);
+            const alarmId = db.rows("clockAlarm")[0]!.id as string;
+            await clock.sendCopy(alice, "alarm", alarmId, bob.id);
+            expect((await clock.clockSnapshot(bob.id)).alarms).toEqual([
+                expect.objectContaining({ label: "Gym", enabled: false, nextFireAt: null })
+            ]);
+        });
+
+        it("validates what the actions are sent", async () => {
+            signIn(alice);
+            expect((await actions.editTimerAction({ id: "not-a-uuid", label: "x" })).ok).toBe(
+                false
+            );
+            expect(
+                (
+                    await actions.sendClockCopyAction({
+                        kind: "stopwatch",
+                        id: crypto.randomUUID(),
+                        to: bob.id
+                    })
+                ).ok
+            ).toBe(false);
+            expect(
+                (
+                    await actions.changeAlarmAction({
+                        id: crypto.randomUUID(),
+                        change: "rename",
+                        label: 5
+                    })
+                ).ok
+            ).toBe(false);
+        });
+    });
+
     it("reads the planner's hand-off from the calendar's address", () => {
         expect(parseCalendarPath(["new", "2026-10-02T14:00Z"]).newAt?.toISOString()).toBe(
             "2026-10-02T14:00:00.000Z"

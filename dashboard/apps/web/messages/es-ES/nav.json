@@ -422,9 +422,12 @@
         "Sources": "Fuentes",
         "Geography": "Geografía",
         "Reports": "Informes",
-        "Websites": "Sitios web",
         "Projects": "Proyectos",
-        "All issues": "Incidencias"
+        "All issues": "Incidencias",
+        "Time": "Hora",
+        "Timers & focus": "Temporizadores",
+        "Stopwatch": "Cronómetro",
+        "World clock": "Reloj mundial"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

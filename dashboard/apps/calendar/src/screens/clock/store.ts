@@ -210,5 +210,13 @@ export function useServerNow(skew: number, everyMs: number, active = true): numb
         const timer = window.setInterval(() => setNow(Date.now() + skew), everyMs);
         return () => window.clearInterval(timer);
     }, [skew, everyMs, active]);
+    // A clock that stood still while nothing counted is behind by however long
+    // it stood. The first frame after something starts counting reads the time
+    // itself rather than paint that old reading - which drew a just-started
+    // timer with minutes too many left until the effect above caught up.
+    if (active) {
+        const fresh = Date.now() + skew;
+        if (fresh - now > everyMs) return fresh;
+    }
     return now;
 }

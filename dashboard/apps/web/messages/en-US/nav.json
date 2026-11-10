@@ -422,9 +422,12 @@
         "Sources": "Sources",
         "Geography": "Geography",
         "Reports": "Reports",
-        "Websites": "Websites",
         "Projects": "Projects",
-        "All issues": "All issues"
+        "All issues": "All issues",
+        "Time": "Time",
+        "Timers & focus": "Timers & focus",
+        "Stopwatch": "Stopwatch",
+        "World clock": "World clock"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

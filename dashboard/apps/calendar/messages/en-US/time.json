@@ -183,6 +183,27 @@
             "tooManyTimers": "You have 30 timers, the most there can be. Delete one to add another.",
             "tooManyLaps": "The stopwatch keeps 500 laps at most. Reset it to start again.",
             "notACommand": "Write it like \"timer 10m\", \"alarm 7:30\" or \"stopwatch\"."
+        },
+        "duplicate": "Duplicate",
+        "rename": "Edit name",
+        "renameTitle": "Edit the name",
+        "sendCopy": "Send someone a copy",
+        "share": {
+            "title": "Send somebody a copy",
+            "alarmBody": "They get their own copy, switched off until they turn it on. Changes to yours do not reach theirs.",
+            "timerBody": "They get their own copy, not started. Changes to yours do not reach theirs.",
+            "to": "Send it to",
+            "send": "Send copy",
+            "sent": "A copy is on its way to {name}.",
+            "self": "That is you. Pick somebody else.",
+            "unknown": "You cannot send to that person from here.",
+            "full": "Their list is full, so the copy was not sent.",
+            "gotAlarm": "{name} sent you a copy of an alarm",
+            "gotTimer": "{name} sent you a copy of a timer"
+        },
+        "timerEdit": {
+            "title": "Change the timer's settings",
+            "restarts": "Changing the length starts it over."
         }
     }
 }

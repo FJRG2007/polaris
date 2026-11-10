@@ -17,6 +17,7 @@
 
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
+import { isKnownZone } from "../schemas";
 import { CalendarRefusal } from "../errors";
 import { calendarTFor, type CalendarTranslator } from "../i18n";
 import * as model from "./model";
@@ -608,6 +609,151 @@ export async function changeStopwatch(
         data
     });
     if (changed.count === 0) await refusal(userId, "time.errors.changed");
+}
+
+// ---------------------------------------------------------------------------
+// Renames, edits, copies, and a copy sent to somebody else
+
+export async function renameAlarm(userId: string, id: string, label: string): Promise<void> {
+    const changed = await prisma.clockAlarm.updateMany({ where: { id, userId }, data: { label } });
+    if (changed.count === 0) await refusal(userId, "time.errors.gone");
+}
+
+/** An alarm's copy for `owner`, switched off: two alarms ringing at the same
+ *  minute help nobody, and a copy somebody else sent must not ring until its
+ *  new owner says so. */
+function alarmCopy(owner: string, alarm: AlarmRow, zone: string) {
+    return {
+        userId: owner,
+        time: alarm.time,
+        days: alarm.days,
+        label: alarm.label,
+        sound: alarm.sound,
+        snoozeMinutes: alarm.snoozeMinutes,
+        enabled: false,
+        zone,
+        snoozed: false,
+        nextFireAt: null
+    };
+}
+
+/** A timer's copy for `owner`, not started: a focus cycle back on its first
+ *  focus phase, a plain timer at its full length. */
+function timerCopy(owner: string, timer: TimerRow) {
+    const cycle = model.readPomodoro(timer.pomodoro);
+    const state = cycle ? model.startPomodoro(cycle) : null;
+    return {
+        userId: owner,
+        label: timer.label,
+        sound: timer.sound,
+        durationMs: state ? model.phaseMs(state, "focus") : timer.durationMs,
+        pomodoro: state ? JSON.stringify(state) : null
+    };
+}
+
+export async function duplicateAlarm(userId: string, id: string): Promise<void> {
+    const alarm = await ownAlarm(userId, id);
+    if ((await prisma.clockAlarm.count({ where: { userId } })) >= model.MAX_ALARMS)
+        await refusal(userId, "time.errors.tooManyAlarms");
+    await prisma.clockAlarm.create({ data: alarmCopy(userId, alarm, alarm.zone) });
+}
+
+export async function duplicateTimer(userId: string, id: string): Promise<void> {
+    const timer = await ownTimer(userId, id);
+    await roomForTimer(userId);
+    await prisma.clockTimer.create({ data: timerCopy(userId, timer) });
+    tellDecks(userId);
+}
+
+export interface TimerEdit {
+    readonly label: string;
+    readonly sound?: model.ClockSound;
+    /** A new length starts the timer over; a focus cycle's phases keep theirs. */
+    readonly durationMs?: number;
+}
+
+/** Rename a timer, change its sound, or give it a new length. */
+export async function editTimer(
+    userId: string,
+    id: string,
+    edit: TimerEdit,
+    now = new Date()
+): Promise<void> {
+    const timer = await ownTimer(userId, id);
+    const data: Partial<Omit<TimerRow, "id">> = { label: edit.label };
+    if (edit.sound) data.sound = edit.sound;
+    const relength =
+        edit.durationMs !== undefined && edit.durationMs !== timer.durationMs && !timer.pomodoro;
+    if (relength)
+        Object.assign(data, {
+            durationMs: edit.durationMs,
+            endsAt: null,
+            remainingMs: null,
+            firedAt: null
+        });
+    if (!(await writeTimer(userId, timer, data))) await refusal(userId, "time.errors.changed");
+    tellDecks(userId);
+    if (!relength) return;
+    // Starting it over answers a ring it was still sounding, as a reset does.
+    const ringing =
+        timer.firedAt ??
+        (timer.endsAt !== null && timer.endsAt.getTime() <= now.getTime() ? timer.endsAt : null);
+    if (ringing) await noteStopped("timer", userId, id, ringing);
+}
+
+/** The zone a copied alarm rings in for its new owner: theirs, when it reads. */
+async function zoneOf(userId: string, fallback: string): Promise<string> {
+    const zone = await host.calendarHost.displayTimeZone(userId).catch(() => null);
+    return zone && isKnownZone(zone) ? zone : fallback;
+}
+
+/**
+ * Send a copy of an alarm or a timer to somebody this person could pick in any
+ * other picker. It is a copy, not a link: it arrives switched off (an alarm) or
+ * not started (a timer), is theirs to change or delete, and nothing either of
+ * them does to theirs reaches the other. They are told in their notifications.
+ */
+export async function sendCopy(
+    actor: { readonly id: string; readonly isAdmin: boolean; readonly name: string },
+    kind: "alarm" | "timer",
+    id: string,
+    to: string
+): Promise<void> {
+    if (to === actor.id) return refusal(actor.id, "time.share.self");
+    const reach = await host.calendarHost.peopleInReach({ id: actor.id, isAdmin: actor.isAdmin }, [
+        to
+    ]);
+    if (!reach.includes(to)) return refusal(actor.id, "time.share.unknown");
+    let label: string;
+    if (kind === "alarm") {
+        const alarm = await ownAlarm(actor.id, id);
+        if ((await prisma.clockAlarm.count({ where: { userId: to } })) >= model.MAX_ALARMS)
+            await refusal(actor.id, "time.share.full");
+        await prisma.clockAlarm.create({
+            data: alarmCopy(to, alarm, await zoneOf(to, alarm.zone))
+        });
+        label = alarm.label || alarm.time;
+    } else {
+        const timer = await ownTimer(actor.id, id);
+        if ((await prisma.clockTimer.count({ where: { userId: to } })) >= model.MAX_TIMERS)
+            await refusal(actor.id, "time.share.full");
+        await prisma.clockTimer.create({ data: timerCopy(to, timer) });
+        tellDecks(to);
+        label = timer.label || model.formatClockMs(timer.durationMs);
+    }
+    // The copy is there whether or not the word about it arrives.
+    await tell(
+        to,
+        (t) => ({
+            title: t(kind === "alarm" ? "time.share.gotAlarm" : "time.share.gotTimer", {
+                name: actor.name
+            }),
+            body: label
+        }),
+        kind === "alarm" ? "alarms" : "timers"
+    ).catch((caught: unknown) => {
+        console.error("polaris: telling somebody about a copied clock failed:", caught);
+    });
 }
 
 // ---------------------------------------------------------------------------

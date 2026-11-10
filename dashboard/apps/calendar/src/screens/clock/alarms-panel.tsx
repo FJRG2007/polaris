@@ -14,25 +14,15 @@ import * as model from "../../lib/clock/model";
 import { hostUi } from "@polaris/app-host/client";
 import * as clockActions from "../../actions/clock";
 import { mutate, useServerNow, type ClockRead } from "./store";
-import {
-    AlarmClock,
-    MoreHorizontal,
-    Pencil,
-    Plus,
-    SkipForward,
-    Trash2,
-    Volume2
-} from "lucide-react";
+import { ItemMenu, RenameDialog, SendCopyDialog } from "./item-actions";
+import { AlarmClock, Plus, SkipForward, Trash2, Volume2 } from "lucide-react";
 import {
     Button,
     cn,
     Dialog,
     DialogContent,
     DialogTitle,
-    DropdownMenu,
-    DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuTrigger,
     EmptyState,
     Input,
     Select,
@@ -69,6 +59,8 @@ export function AlarmsPanel({
     const format = hostUi.displayFormat.useDisplayFormat();
     const [confirm, confirmElement] = hostUi.confirmDialog.useConfirm();
     const [draft, setDraft] = useState<Draft | null>(null);
+    const [renaming, setRenaming] = useState<model.AlarmView | null>(null);
+    const [sending, setSending] = useState<string | null>(null);
     const now = useServerNow(clock.skew, 30_000);
     const alarms = clock.snapshot?.alarms ?? null;
     const failed = (message: string) =>
@@ -226,23 +218,22 @@ export function AlarmsPanel({
                                         )
                                     }
                                 />
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            size="icon-sm"
-                                            variant="ghost"
-                                            aria-label={t("time.more")}
-                                            title={t("time.more")}
-                                        >
-                                            <MoreHorizontal />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onSelect={() => setDraft({ ...alarm })}>
-                                            <Pencil />
-                                            {t("time.edit")}
-                                        </DropdownMenuItem>
-                                        {alarm.enabled && alarm.days !== 0 && next !== null ? (
+                                <ItemMenu
+                                    canDuplicate={alarms.length < model.MAX_ALARMS}
+                                    actions={{
+                                        onEdit: () => setDraft({ ...alarm }),
+                                        onRename: () => setRenaming(alarm),
+                                        onDuplicate: () =>
+                                            change(
+                                                alarm,
+                                                { id: alarm.id, change: "duplicate" },
+                                                (entry) => entry
+                                            ),
+                                        onSend: () => setSending(alarm.id),
+                                        onDelete: () => void remove(alarm)
+                                    }}
+                                    extra={
+                                        alarm.enabled && alarm.days !== 0 && next !== null ? (
                                             <DropdownMenuItem
                                                 onSelect={() =>
                                                     change(
@@ -264,13 +255,9 @@ export function AlarmsPanel({
                                                 <SkipForward />
                                                 {t("time.alarms.skip")}
                                             </DropdownMenuItem>
-                                        ) : null}
-                                        <DropdownMenuItem onSelect={() => void remove(alarm)}>
-                                            <Trash2 />
-                                            {t("time.delete")}
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                        ) : null
+                                    }
+                                />
                             </li>
                         );
                     })}
@@ -301,6 +288,38 @@ export function AlarmsPanel({
                         );
                         if (ok) setDraft(null);
                     }}
+                />
+            ) : null}
+            {renaming ? (
+                <RenameDialog
+                    value={renaming.label}
+                    onClose={() => setRenaming(null)}
+                    onSave={(label) =>
+                        mutate(
+                            clock,
+                            () =>
+                                clockActions.changeAlarmAction({
+                                    id: renaming.id,
+                                    change: "rename",
+                                    label
+                                }),
+                            (snapshot) => ({
+                                ...snapshot,
+                                alarms: snapshot.alarms.map((entry) =>
+                                    entry.id === renaming.id ? { ...entry, label } : entry
+                                )
+                            }),
+                            failed
+                        )
+                    }
+                />
+            ) : null}
+            {sending ? (
+                <SendCopyDialog
+                    clock={clock}
+                    kind="alarm"
+                    id={sending}
+                    onClose={() => setSending(null)}
                 />
             ) : null}
             {confirmElement}

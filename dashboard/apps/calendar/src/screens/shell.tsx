@@ -7,13 +7,23 @@
  * No hooks and no state: drawn by the server, with its words handed in.
  */
 
+import Link from "next/link";
 import { cn } from "@polaris/ui";
+import { AlarmClock, ChevronDown, Plus, Settings } from "lucide-react";
 
 export interface ShellWords {
     readonly today: string;
     readonly newEvent: string;
     readonly loading: string;
+    /** The static chrome, drawn as itself rather than as a placeholder: none of
+     *  it waits for data, so a pulsing block there read as "still loading". */
+    readonly add: string;
+    readonly time: string;
+    readonly settings: string;
 }
+
+const ICON_LINK =
+    "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground [&_svg]:size-4";
 
 function Block({ className }: { className?: string }) {
     return <span aria-hidden className={cn("block animate-pulse rounded bg-muted", className)} />;
@@ -30,11 +40,40 @@ export function CalendarShell({ words }: { words: ShellWords }) {
                 <span className="ml-auto inline-flex h-7 items-center rounded-md bg-primary px-2.5 text-[0.8125rem] font-medium text-primary-foreground opacity-60">
                     {words.newEvent}
                 </span>
+                <Link
+                    href="/calendar/time"
+                    aria-label={words.time}
+                    title={words.time}
+                    className={ICON_LINK}
+                >
+                    <AlarmClock aria-hidden />
+                </Link>
+                <Link
+                    href="/calendar/settings"
+                    aria-label={words.settings}
+                    title={words.settings}
+                    className={ICON_LINK}
+                >
+                    <Settings aria-hidden />
+                </Link>
             </div>
             <div className="flex min-h-0 flex-1">
                 <div className="hidden w-64 shrink-0 flex-col gap-3 border-r border-border bg-surface p-3 lg:flex">
                     <Block className="h-40 w-full" />
-                    <Block className="h-4 w-24" />
+                    {/* Opens a menu once the screen is up; until then it is
+                        drawn where it will be, not as a block. */}
+                    <span className="inline-flex h-8 w-full items-center gap-2 rounded-md border border-border px-3 text-[0.8125rem] [&_svg]:size-4">
+                        <Plus aria-hidden />
+                        <span className="min-w-0 flex-1 truncate">{words.add}</span>
+                        <ChevronDown aria-hidden className="text-foreground-subtle" />
+                    </span>
+                    <Link
+                        href="/calendar/time"
+                        className="-mt-2 inline-flex h-8 w-full items-center gap-2 rounded-md px-3 text-[0.8125rem] hover:bg-card-hover [&_svg]:size-4"
+                    >
+                        <AlarmClock aria-hidden />
+                        <span className="min-w-0 flex-1 truncate">{words.time}</span>
+                    </Link>
                     <Block className="h-4 w-full" />
                     <Block className="h-4 w-4/5" />
                 </div>

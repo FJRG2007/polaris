@@ -47,7 +47,9 @@ const alarmChangeSchema = z.discriminatedUnion("change", [
     z.object({ id, change: z.literal("delete") }),
     z.object({ id, change: z.literal("skip") }),
     z.object({ id, change: z.literal("snooze"), due: z.string().datetime().optional() }),
-    z.object({ id, change: z.literal("dismiss"), due: z.string().datetime() })
+    z.object({ id, change: z.literal("dismiss"), due: z.string().datetime() }),
+    z.object({ id, change: z.literal("rename"), label: model.alarmInputSchema.shape.label }),
+    z.object({ id, change: z.literal("duplicate") })
 ]);
 
 export async function changeAlarmAction(input: unknown): Promise<Snapshot> {
@@ -71,6 +73,10 @@ export async function changeAlarmAction(input: unknown): Promise<Snapshot> {
                 );
             case "dismiss":
                 return clock.dismissAlarm(userId, request.id, new Date(request.due));
+            case "rename":
+                return clock.renameAlarm(userId, request.id, request.label);
+            case "duplicate":
+                return clock.duplicateAlarm(userId, request.id);
         }
     });
 }
@@ -96,7 +102,16 @@ export async function startFocusAction(input: unknown): Promise<Snapshot> {
 
 const timerChangeSchema = z.object({
     id,
-    change: z.enum(["start", "pause", "reset", "addMinute", "skip", "delete", "dismiss"]),
+    change: z.enum([
+        "start",
+        "pause",
+        "reset",
+        "addMinute",
+        "skip",
+        "delete",
+        "dismiss",
+        "duplicate"
+    ]),
     /** The ring a "dismiss" stops, by when it was due. */
     due: z.string().datetime().optional()
 });
@@ -108,10 +123,45 @@ export async function changeTimerAction(input: unknown): Promise<Snapshot> {
     return answer((userId) =>
         change === "delete"
             ? clock.deleteTimer(userId, timerId)
-            : change === "dismiss"
-              ? clock.dismissTimer(userId, timerId, new Date(), due ? new Date(due) : undefined)
-              : clock.changeTimer(userId, timerId, change)
+            : change === "duplicate"
+              ? clock.duplicateTimer(userId, timerId)
+              : change === "dismiss"
+                ? clock.dismissTimer(userId, timerId, new Date(), due ? new Date(due) : undefined)
+                : clock.changeTimer(userId, timerId, change)
     );
+}
+
+const editTimerSchema = z.object({
+    id,
+    label: model.timerInputSchema.shape.label,
+    sound: model.timerInputSchema.shape.sound.optional(),
+    durationMs: model.timerInputSchema.shape.durationMs.optional()
+});
+
+/** Rename a timer, change its sound or its length. */
+export async function editTimerAction(input: unknown): Promise<Snapshot> {
+    const parsed = editTimerSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error.issues);
+    const { id: timerId, ...edit } = parsed.data;
+    return answer((userId) => clock.editTimer(userId, timerId, edit));
+}
+
+const sendCopySchema = z.object({
+    kind: z.enum(["alarm", "timer"]),
+    id,
+    to: z.string().trim().min(1).max(64)
+});
+
+/** Send a copy of an alarm or a timer to another person here. */
+export async function sendClockCopyAction(input: unknown): Promise<Snapshot> {
+    const parsed = sendCopySchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error.issues);
+    const { kind, id: itemId, to } = parsed.data;
+    return outcome(async () => {
+        const user = await requireCalendarUser();
+        await clock.sendCopy(user, kind, itemId, to);
+        return { snapshot: await clock.clockSnapshot(user.id) };
+    });
 }
 
 const stopwatchSchema = z.object({ change: z.enum(["start", "pause", "reset", "lap"]) });

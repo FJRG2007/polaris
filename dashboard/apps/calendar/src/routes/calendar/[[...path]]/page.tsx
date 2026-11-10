@@ -33,7 +33,10 @@ export default async function CalendarPage({
                     words={{
                         today: t("header.today"),
                         newEvent: t("header.newEvent"),
-                        loading: t("grid.loading")
+                        loading: t("grid.loading"),
+                        add: t("sidebar.add"),
+                        time: t("sidebar.time"),
+                        settings: t("header.settings")
                     }}
                 />
             </div>

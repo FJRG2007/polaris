@@ -183,6 +183,27 @@
             "tooManyTimers": "Tienes 30 temporizadores, el máximo. Elimina uno para añadir otro.",
             "tooManyLaps": "El cronómetro guarda 500 vueltas como máximo. Reinícialo para empezar de nuevo.",
             "notACommand": "Escríbelo como \"temporizador 10m\", \"alarma 7:30\" o \"cronómetro\"."
+        },
+        "duplicate": "Duplicar",
+        "rename": "Renombrar",
+        "renameTitle": "Editar nombre",
+        "sendCopy": "Enviar una copia",
+        "share": {
+            "title": "Enviar una copia",
+            "alarmBody": "Recibe su propia copia, apagada hasta que la active. Lo que cambies en la tuya no le llega.",
+            "timerBody": "Recibe su propia copia, sin iniciar. Lo que cambies en la tuya no le llega.",
+            "to": "Enviar a",
+            "send": "Enviar",
+            "sent": "Copia enviada a {name}.",
+            "self": "Eres tú. Elige a otra persona.",
+            "unknown": "No puedes enviar a esa persona aquí.",
+            "full": "Su lista está llena; no se envió la copia.",
+            "gotAlarm": "{name} te envió una alarma",
+            "gotTimer": "{name} te envió un temporizador"
+        },
+        "timerEdit": {
+            "title": "Editar el temporizador",
+            "restarts": "Cambiar la duración lo reinicia."
         }
     }
 }

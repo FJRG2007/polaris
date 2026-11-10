@@ -20,6 +20,27 @@ describe("navigationEntries", () => {
         expect(hrefs.length).toBe(new Set(hrefs).size);
     });
 
+    it("finds Calendar's Time area and each of its tabs, only with Calendar", () => {
+        const hrefs = navigationEntries(false, ["calendar"]).map((entry) => entry.href);
+        expect(hrefs).toEqual(
+            expect.arrayContaining([
+                "/calendar",
+                "/calendar/time",
+                "/calendar/time?tab=alarms",
+                "/calendar/time?tab=timers",
+                "/calendar/time?tab=stopwatch",
+                "/calendar/time?tab=world"
+            ])
+        );
+        const timers = navigationEntries(false, ["calendar"]).find(
+            (entry) => entry.href === "/calendar/time?tab=timers"
+        );
+        expect(timers?.keywords).toContain("pomodoro");
+        expect(
+            navigationEntries(false, ["drive"]).some((entry) => entry.href.startsWith("/calendar"))
+        ).toBe(false);
+    });
+
     it("withholds the admin app and its pages from a normal user", () => {
         const hrefs = navigationEntries(false, ALL_APPS).map((entry) => entry.href);
         expect(hrefs).not.toContain("/admin");

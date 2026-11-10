@@ -9,6 +9,7 @@
 
 import type { GrantSubject, OrgPermission, Permission } from "@polaris/core";
 import {
+    AlarmClock,
     BatteryCharging,
     Activity,
     Languages,
@@ -109,6 +110,7 @@ import {
     UsersRound,
     Video,
     Wallet,
+    Watch,
     Webhook,
     Wifi,
     Workflow,
@@ -2000,6 +2002,47 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["out of office", "vacation", "holiday", "auto reply", "autoresponder"]
         }
     ],
+    /**
+     * Calendar draws its own sidebar, so it has no rail: these are hidden and
+     * exist so the search finds the Time area and each of its tabs by name.
+     */
+    calendar: [
+        {
+            label: "Time", // i18n-ignore
+            href: "/calendar/time",
+            icon: Clock,
+            hidden: true,
+            keywords: ["clock", "alarm", "timer", "stopwatch", "hora", "reloj"]
+        },
+        {
+            label: "Alarms", // i18n-ignore
+            href: "/calendar/time?tab=alarms",
+            icon: AlarmClock,
+            hidden: true,
+            keywords: ["alarm", "wake up", "alarma", "despertador"]
+        },
+        {
+            label: "Timers & focus", // i18n-ignore
+            href: "/calendar/time?tab=timers",
+            icon: Timer,
+            hidden: true,
+            keywords: ["timer", "countdown", "pomodoro", "focus", "temporizador"]
+        },
+        {
+            label: "Stopwatch", // i18n-ignore
+            href: "/calendar/time?tab=stopwatch",
+            icon: Watch,
+            hidden: true,
+            keywords: ["laps", "chronometer", "cronometro", "vueltas"]
+        },
+        {
+            label: "World clock", // i18n-ignore
+            href: "/calendar/time?tab=world",
+            icon: Earth,
+            hidden: true,
+            keywords: ["time zones", "meeting planner", "reloj mundial", "zonas horarias"]
+        }
+    ],
     crm: [
         {
             label: "Companies", // i18n-ignore
@@ -2125,7 +2168,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         // from its approval card, each with Revoke.
         {
             label: "Polar permissions", // i18n-ignore
-            href: "/polar/settings?section=permissions",
+            href: "/polar/settings/permissions",
             icon: ShieldCheck,
             hidden: true,
             keywords: ["polar", "always allow", "approvals", "permissions", "assistant"]
@@ -2761,17 +2804,9 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             reachedBy: "analytics.site",
             icon: SlidersHorizontal,
             keywords: ["tracker", "script", "ignore"]
-        },
-        {
-            label: "Websites", // i18n-ignore
-            href: "/analytics/sites",
-            needs: "deploy.manage",
-            requiresApp: "analytics",
-            // Somebody a single site was shared with reads every section of it.
-            reachedBy: "analytics.site",
-            icon: Globe,
-            keywords: ["sites", "add site", "new website"]
         }
+        // The list of every website is a level above any one site: it is reached
+        // from the site picker, not listed among a site's own sections.
     ],
     telemetry: [
         {
