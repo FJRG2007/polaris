@@ -37,11 +37,16 @@ export async function swapSetting(
     value: string
 ): Promise<boolean> {
     if (expected === null) {
-        const { count } = await prisma.setting.createMany({
-            data: [{ key, value, scope: "global" }],
-            skipDuplicates: true
-        });
-        return count === 1;
+        // A plain create and its unique-key refusal, rather than `createMany` with
+        // `skipDuplicates`: SQLite, which a local Polaris runs on, has no such
+        // option and refuses the whole call, so every first claim failed there.
+        try {
+            await prisma.setting.create({ data: { key, value, scope: "global" }, select: { key: true } });
+            return true;
+        } catch (caught) {
+            if ((caught as { code?: string } | null)?.code === "P2002") return false;
+            throw caught;
+        }
     }
     const { count } = await prisma.setting.updateMany({
         where: { key, value: expected },
