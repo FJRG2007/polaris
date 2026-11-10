@@ -6,6 +6,7 @@
  */
 
 export { cn } from "./lib/cn";
+export { PUBLIC_DOCS, publicDocHref } from "./lib/public-docs";
 export { OverlayPortal, useOverlayRoot } from "./lib/overlay-root";
 export { applePlatform, formatShortcut } from "./lib/shortcut";
 export { KeyNamesProvider, useKeyNames } from "./lib/key-names";

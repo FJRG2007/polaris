@@ -37,6 +37,7 @@ import {
     CircleCheck,
     CircleDot,
     CircleSlash,
+    ExternalLink,
     ListTodo,
     Plus,
     RotateCcw,
@@ -55,10 +56,11 @@ import {
     ScrollRow,
     Skeleton,
     sameValue,
-    Checkbox
+    Checkbox,
+    publicDocHref
 } from "@polaris/ui";
 import type { NamespaceKey } from "@/lib/i18n/types";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 
 type Overview = actions.TelemetryOverview;
 type Project = Overview["projects"][number];
@@ -248,14 +250,9 @@ export function TelemetryView({
                     </Badge>
                 ) : null}
                 {project?.access === "owner" ? (
-                    <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={t("view.share")}
-                        title={t("view.share")}
-                        onClick={() => setSharing(true)}
-                    >
+                    <Button variant="outline" size="sm" className="shrink-0" onClick={() => setSharing(true)}>
                         <Share2 aria-hidden="true" />
+                        {t("view.share")}
                     </Button>
                 ) : null}
                 {sharing && project ? (
@@ -798,6 +795,7 @@ function ProjectAddress({
     onDone: () => Promise<void>;
 }) {
     const t = useTranslations("telemetry");
+    const locale = useLocale();
     const [dsn, setDsn] = useState(project.dsn);
     const [error, setError] = useState("");
     const [removing, setRemoving] = useState(false);
@@ -850,6 +848,15 @@ function ProjectAddress({
             <p className="text-xs text-muted-foreground">
                 {t("client.hint", { days: project.retentionDays })}
             </p>
+            <a
+                href={publicDocHref(locale, "telemetry")}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-1 self-start text-xs text-muted-foreground hover:text-foreground"
+            >
+                {t("client.guide")}
+                <ExternalLink className="size-3 shrink-0" aria-hidden />
+            </a>
             {error && <p className="text-xs text-danger">{error}</p>}
 
             <ConfirmDeleteDialog

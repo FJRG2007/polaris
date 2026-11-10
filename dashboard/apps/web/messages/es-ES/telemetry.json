@@ -65,7 +65,8 @@
         "hint": "Ponla como DSN de cualquier cliente de Sentry. Los eventos de más de {days} días se eliminan; se conserva cuántas veces ocurrió cada fallo.",
         "kind": "proyecto",
         "deleteBody": "Se van todos los fallos que registró, y la dirección deja de aceptarse.",
-        "deleteConfirm": "Eliminar proyecto"
+        "deleteConfirm": "Eliminar proyecto",
+        "guide": "Cómo integrarlo"
     },
     "issues": {
         "none": "Aquí no hay nada.",

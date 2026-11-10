@@ -29,6 +29,7 @@ import * as core from "@polaris/core";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { captureEvent } from "@/lib/telemetry/store";
+import { readIngestBody } from "@/lib/telemetry/ingest-body";
 import { projectForIngest, recordRefusal, secretAccepted } from "@/lib/telemetry/project-service";
 
 export const runtime = "nodejs";
@@ -111,8 +112,10 @@ export async function POST(
     const length = Number.parseInt(request.headers.get("content-length") ?? "0", 10);
     if (Number.isFinite(length) && length > MAX_BYTES) return accepted();
 
-    const body = await request.text().catch(() => "");
-    if (!body || body.length > MAX_BYTES) return accepted();
+    // Decoded: SDKs gzip (Python always, Node past 32 KiB), and a compressed report
+    // read as text is a report silently lost.
+    const body = await readIngestBody(request, MAX_BYTES);
+    if (!body) return accepted();
 
     const url = new URL(request.url);
     // An envelope names its own DSN in the header, which is the third of the

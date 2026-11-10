@@ -70,6 +70,10 @@ flight is tracked in [`../../dashboard/ROADMAP.md`](../../dashboard/ROADMAP.md).
 Adding an MCP tool, a `polaris_search` provider or a scope category:
 [`mcp.md`](mcp.md).
 
+Reporting into Polaris from your own code: the visit tracker in
+[`analytics.md`](analytics.md), and Sentry SDKs pointed at Telemetry in
+[`telemetry.md`](telemetry.md).
+
 ## Rust (host daemon)
 
 ```sh

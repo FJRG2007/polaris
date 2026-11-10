@@ -65,7 +65,8 @@
         "hint": "Set it as the DSN of any Sentry client. Events older than {days} days are removed; how often each fault happened is kept.",
         "kind": "project",
         "deleteBody": "Every fault it recorded goes with it, and the address stops being accepted.",
-        "deleteConfirm": "Delete project"
+        "deleteConfirm": "Delete project",
+        "guide": "Integration guide"
     },
     "issues": {
         "none": "Nothing here.",
