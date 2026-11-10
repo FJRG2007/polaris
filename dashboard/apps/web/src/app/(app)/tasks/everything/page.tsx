@@ -46,6 +46,7 @@ export default async function EverythingPage({
     // its statuses the tasks from that branch would have no column to sit in.
     // The work itself stays narrowed to the branch.
     const spaceIds = scopeSpaceIds(scope);
+    const grantees = await spaces.spaceGrantees(spaceIds);
 
     const [tree, tasks, statuses, tags, fields, lists, people] = await Promise.all([
         spaces.listSpaceTree(user.id, scope, user.isAdmin),
@@ -88,8 +89,9 @@ export default async function EverythingPage({
             where: {
                 OR: [
                     { taskSpaces: { some: { id: { in: spaceIds } } } },
-                    { taskSpaceMemberships: { some: { spaceId: { in: spaceIds } } } },
-                    { taskFolderMemberships: { some: { folder: { spaceId: { in: spaceIds } } } } }
+                    // Everybody those spaces were handed to, by person, team or
+                    // role, from the grants the share dialog writes.
+                    ...(grantees.length > 0 ? [{ id: { in: grantees } }] : [])
                 ]
             },
             select: { id: true, name: true }

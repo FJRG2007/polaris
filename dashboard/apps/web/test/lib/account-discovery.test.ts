@@ -105,6 +105,8 @@ vi.mock("@/lib/tasks/access", () => ({
     scopeSpaceIds: () => ["space"]
 }));
 vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
+// Somebody the reader's space was handed to in the share dialog.
+vi.mock("@/lib/tasks/space-service", () => ({ spaceGrantees: async () => ["colleague"] }));
 vi.mock("@/lib/contact-names", () => ({ nicknamesFor: async () => new Map() }));
 vi.mock("@/lib/chat/access", () => ({ conversationAudience: async () => null }));
 vi.mock("@polaris/db", () => ({
@@ -117,8 +119,6 @@ vi.mock("@polaris/db", () => ({
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .slice(0, take)
         },
-        taskSpaceMember: { findMany: async () => [{ userId: "colleague" }] },
-        taskFolderMember: { findMany: async () => [] },
         organizationMember: { findMany: async () => [] }
     }
 }));

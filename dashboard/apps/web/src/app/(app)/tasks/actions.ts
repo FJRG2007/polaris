@@ -243,86 +243,49 @@ export async function deleteSpaceAction(spaceId: string): Promise<{ error?: stri
 }
 
 /**
- * Who is on a space, for the dialog that opens on a right-click.
+ * What the access dialog says around the share dialog for one space or folder:
+ * its current name, the path to it and - for a folder - the grants made further up that already reach it.
  *
- * The settings screen reads this on the server, where it is already holding the
- * space. The dialog cannot: it is opened from a tree that has only a name and an
- * id, and it opens for whichever row was clicked.
- *
- * Reading it is `guest`, the same as the folder one: seeing who else is here is
- * part of being here, and hiding the list from the people in it only means they
- * ask in chat instead. Changing it still takes `admin`.
+ * Who it is handed to is read and written by the share dialog itself
+ * (`app/(app)/access-actions.ts`, subject `task.space` / `task.folder`), which
+ * is the one place Tasks keeps that. Reading this is `guest`: seeing who else is
+ * here is part of being here.
  */
-export async function listSpaceMembersAction(spaceId: string): Promise<{
-    space?: { id: string; name: string };
-    members?: spaces.SpaceMemberView[];
-    canManage?: boolean;
+export async function accessDetailAction(
+    kind: "space" | "folder",
+    id: string
+): Promise<{
+    name?: string;
+    path?: string;
+    inherited?: spaces.InheritedGrantView[];
     error?: string;
 }> {
     const caller = await actor("tasks.read");
     try {
-        const role = await access.requireSpace(caller, spaceId, "guest");
-        const [space, members] = await Promise.all([
-            spaces.getSpace(spaceId),
-            spaces.listSpaceMembers(spaceId, caller)
+        if (kind === "space") {
+            await access.requireSpace(caller, String(id), "guest");
+            const space = await spaces.getSpace(String(id));
+            if (!space) return { error: await errorText("errors.spaceGone") };
+            return {
+                name: space.name,
+                path: "",
+                inherited: []
+            };
+        }
+        const { spaceId } = await access.requireFolder(caller, String(id), "guest");
+        const [folder, space] = await Promise.all([
+            spaces.getFolder(String(id)),
+            spaces.getSpace(spaceId)
         ]);
-        const canManage = role === "owner" || role === "admin";
-        return space
-            ? { space, members, canManage }
-            : { error: await errorText("errors.spaceGone") };
+        if (!folder) return { error: await errorText("errors.folderGone") };
+        const inherited = await spaces.inheritedFolderGrants(folder, space?.name ?? "");
+        return {
+            name: folder.name,
+            path: folder.path.map((entry) => entry.name).join(" / "),
+            inherited
+        };
     } catch (caught) {
         return failure(caught, "errors.readAccess");
-    }
-}
-
-export async function addSpaceMemberAction(
-    spaceId: string,
-    identifier: string,
-    role: core.SpaceRole
-): Promise<{ error?: string }> {
-    const caller = await actor();
-    if (!(core.SPACE_ROLES as readonly string[]).includes(role))
-        return { error: await errorText("errors.pickRole") };
-    try {
-        await access.requireSpace(caller, spaceId, "admin");
-        await spaces.addSpaceMember(spaceId, identifier, role);
-        refresh(caller, spaceId);
-        return {};
-    } catch (caught) {
-        return failure(caught, "errors.addPerson");
-    }
-}
-
-export async function setSpaceMemberRoleAction(
-    spaceId: string,
-    userId: string,
-    role: core.SpaceRole
-): Promise<{ error?: string }> {
-    const caller = await actor();
-    if (!(core.SPACE_ROLES as readonly string[]).includes(role))
-        return { error: await errorText("errors.pickRole") };
-    try {
-        await access.requireSpace(caller, spaceId, "admin");
-        await spaces.setSpaceMemberRole(spaceId, userId, role);
-        refresh(caller, spaceId);
-        return {};
-    } catch (caught) {
-        return failure(caught, "errors.changeRole");
-    }
-}
-
-export async function removeSpaceMemberAction(
-    spaceId: string,
-    userId: string
-): Promise<{ error?: string }> {
-    const caller = await actor();
-    try {
-        await access.requireSpace(caller, spaceId, "admin");
-        await spaces.removeSpaceMember(spaceId, userId);
-        refresh(caller, spaceId);
-        return {};
-    } catch (caught) {
-        return failure(caught, "errors.removePerson");
     }
 }
 
@@ -417,89 +380,6 @@ export async function moveListAction(listId: string, move: unknown): Promise<{ e
     }
 }
 
-// ---------------------------------------------------------------------------
-// Folder members
-// ---------------------------------------------------------------------------
-
-export async function listFolderMembersAction(folderId: string): Promise<{
-    folder?: spaces.FolderDetail;
-    members?: spaces.FolderMemberView[];
-    canManage?: boolean;
-    error?: string;
-}> {
-    const caller = await actor("tasks.read");
-    try {
-        const { role } = await access.requireFolder(caller, folderId, "guest");
-        const [folder, members] = await Promise.all([
-            spaces.getFolder(folderId),
-            spaces.listFolderMembers(folderId, caller)
-        ]);
-        const canManage = role === "owner" || role === "admin";
-        return folder
-            ? { folder, members, canManage }
-            : { error: await errorText("errors.folderGone") };
-    } catch (caught) {
-        return failure(caught, "errors.readAccess");
-    }
-}
-
-export async function addFolderMemberAction(
-    folderId: string,
-    identifier: string,
-    role: core.SpaceRole
-): Promise<{ error?: string }> {
-    const caller = await actor();
-    if (!(core.SPACE_ROLES as readonly string[]).includes(role))
-        return { error: await errorText("errors.pickRole") };
-    try {
-        const { spaceId } = await access.requireFolder(caller, folderId, "admin");
-        await spaces.addFolderMember(folderId, identifier, role);
-        await recordAudit({
-            actorId: caller.id,
-            action: "tasks.folder.invite",
-            targetType: "folder",
-            targetId: folderId
-        });
-        refresh(caller, spaceId);
-        return {};
-    } catch (caught) {
-        return failure(caught, "errors.addPerson");
-    }
-}
-
-export async function setFolderMemberRoleAction(
-    folderId: string,
-    userId: string,
-    role: core.SpaceRole
-): Promise<{ error?: string }> {
-    const caller = await actor();
-    if (!(core.SPACE_ROLES as readonly string[]).includes(role))
-        return { error: await errorText("errors.pickRole") };
-    try {
-        const { spaceId } = await access.requireFolder(caller, folderId, "admin");
-        await spaces.setFolderMemberRole(folderId, userId, role);
-        refresh(caller, spaceId);
-        return {};
-    } catch (caught) {
-        return failure(caught, "errors.changeRole");
-    }
-}
-
-export async function removeFolderMemberAction(
-    folderId: string,
-    userId: string
-): Promise<{ error?: string }> {
-    const caller = await actor();
-    try {
-        const { spaceId } = await access.requireFolder(caller, folderId, "admin");
-        await spaces.removeFolderMember(folderId, userId);
-        refresh(caller, spaceId);
-        return {};
-    } catch (caught) {
-        return failure(caught, "errors.removePerson");
-    }
-}
-
 /** Who a new space could belong to besides the person making it. Fetched when
  *  the create form opens rather than sent with every page, because most people
  *  are in no organization at all and the form then asks nothing extra. */
@@ -532,134 +412,6 @@ export async function spaceOwnerOptionsAction(): Promise<{
         };
     } catch (caught) {
         return failure(caught, "errors.readOrganizations");
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Team grants
-// ---------------------------------------------------------------------------
-
-/**
- * Hand a whole space to a team, or change the role it carries there.
- *
- * Both ends are checked. Administering the space is what lets somebody give it
- * away, and the team has to belong to the organization that owns the space -
- * otherwise a space admin could grant their work to a team on somebody else's
- * roster, which is an invitation nobody in that organization agreed to.
- */
-export async function grantSpaceTeamAction(
-    spaceId: string,
-    teamId: string,
-    role: core.SpaceRole
-): Promise<{ error?: string }> {
-    const caller = await actor();
-    if (!(core.SPACE_ROLES as readonly string[]).includes(role))
-        return { error: await errorText("errors.pickRole") };
-    try {
-        await access.requireSpace(caller, spaceId, "admin");
-        const eligible = await orgs.teamsForSpace(spaceId);
-        if (!eligible.some((team) => team.id === teamId)) {
-            return { error: await errorText("errors.teamOutsideOrg") };
-        }
-        await orgs.grantTeamSpace(teamId, spaceId, role);
-        refresh(caller, spaceId);
-        return {};
-    } catch (caught) {
-        return failure(caught, "errors.grantTeam");
-    }
-}
-
-export async function revokeSpaceTeamAction(
-    spaceId: string,
-    teamId: string
-): Promise<{ error?: string }> {
-    const caller = await actor();
-    try {
-        await access.requireSpace(caller, spaceId, "admin");
-        await orgs.revokeTeamSpace(teamId, spaceId);
-        refresh(caller, spaceId);
-        return {};
-    } catch (caught) {
-        return failure(caught, "errors.revokeTeam");
-    }
-}
-
-/** The same for one branch, so a project inside a shared space goes to the team
- *  that works it without opening the rest. */
-export async function grantFolderTeamAction(
-    folderId: string,
-    teamId: string,
-    role: core.SpaceRole
-): Promise<{ error?: string }> {
-    const caller = await actor();
-    if (!(core.SPACE_ROLES as readonly string[]).includes(role))
-        return { error: await errorText("errors.pickRole") };
-    try {
-        const { spaceId } = await access.requireFolder(caller, folderId, "admin");
-        const eligible = await orgs.teamsForSpace(spaceId);
-        if (!eligible.some((team) => team.id === teamId)) {
-            return { error: await errorText("errors.teamOutsideOrg") };
-        }
-        await orgs.grantTeamFolder(teamId, folderId, role);
-        refresh(caller, spaceId);
-        return {};
-    } catch (caught) {
-        return failure(caught, "errors.grantTeam");
-    }
-}
-
-export async function revokeFolderTeamAction(
-    folderId: string,
-    teamId: string
-): Promise<{ error?: string }> {
-    const caller = await actor();
-    try {
-        const { spaceId } = await access.requireFolder(caller, folderId, "admin");
-        await orgs.revokeTeamFolder(teamId, folderId);
-        refresh(caller, spaceId);
-        return {};
-    } catch (caught) {
-        return failure(caught, "errors.revokeTeam");
-    }
-}
-
-/** Which teams hold this space and which could, so the access panel can be
- *  drawn in one round trip. Empty for a personal space, which is what makes the
- *  panel explain itself rather than show an empty picker. */
-export async function spaceTeamsAction(spaceId: string): Promise<{
-    granted?: { teamId: string; teamName: string; role: core.SpaceRole }[];
-    available?: { id: string; name: string }[];
-    error?: string;
-}> {
-    const caller = await actor("tasks.read");
-    try {
-        await access.requireSpace(caller, spaceId, "guest");
-        const [granted, available] = await Promise.all([
-            orgs.spaceTeamGrants(spaceId),
-            orgs.teamsForSpace(spaceId)
-        ]);
-        return { granted, available };
-    } catch (caught) {
-        return failure(caught, "errors.readTeams");
-    }
-}
-
-/** The same, for one folder's access dialog. */
-export async function folderTeamsAction(folderId: string): Promise<{
-    granted?: { teamId: string; teamName: string; role: core.SpaceRole }[];
-    available?: { id: string; name: string }[];
-    error?: string;
-}> {
-    const caller = await actor("tasks.read");
-    try {
-        const { spaceId } = await access.requireFolder(caller, folderId, "guest");
-        const [granted, available] = await Promise.all([
-            orgs.folderTeamGrants(folderId),
-            orgs.teamsForSpace(spaceId)
-        ]);
-        return { granted, available };
-    } catch (caught) {
-        return failure(caught, "errors.readTeams");
     }
 }
 

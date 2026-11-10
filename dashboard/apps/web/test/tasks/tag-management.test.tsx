@@ -28,6 +28,7 @@ vi.mock("next/navigation", () => ({
     usePathname: () => "/tasks"
 }));
 vi.mock("@/app/(app)/tasks/actions", () => ({}));
+vi.mock("@/app/(app)/access-actions", () => ({}));
 vi.mock("@/app/(app)/mention-actions", () => ({
     searchMentionsAction: async () => ({ results: [] }),
     resolveReferencesAction: async () => ({ labels: {} })

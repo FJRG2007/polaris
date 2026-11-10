@@ -733,10 +733,10 @@ export async function listOrgSpaces(orgId: string): Promise<OrgSpaceView[]> {
             color: true,
             visibility: true,
             archived: true,
-            teamGrants: { select: { team: { select: { name: true } } } },
             _count: { select: { tasks: true } }
         }
     });
+    const teamsOn = await spaceTeamNames(spaces.map((space) => space.id));
     return spaces.map((space) => ({
         id: space.id,
         name: space.name,
@@ -745,10 +745,35 @@ export async function listOrgSpaces(orgId: string): Promise<OrgSpaceView[]> {
         visibility: space.visibility,
         archived: space.archived,
         taskCount: space._count.tasks,
-        teams: space.teamGrants
-            .map((grant) => grant.team.name)
-            .sort((left, right) => left.localeCompare(right))
+        teams: (teamsOn.get(space.id) ?? []).sort((left, right) => left.localeCompare(right))
     }));
+}
+
+/**
+ * The teams each space was handed to, named. Read from AccessGrant, which is
+ * where the share dialog writes a team's access; the older TaskSpaceTeam rows
+ * were copied there (migration 20270326000000_task_access_grants) and are not
+ * read, so a team taken off in the dialog stops being listed here too.
+ */
+async function spaceTeamNames(spaceIds: string[]): Promise<Map<string, string[]>> {
+    const named = new Map<string, string[]>();
+    if (spaceIds.length === 0) return named;
+    const grants = await prisma.accessGrant.findMany({
+        where: { subjectType: "task.space", subjectId: { in: spaceIds }, principalType: "team" },
+        select: { subjectId: true, principalId: true }
+    });
+    if (grants.length === 0) return named;
+    const teams = await prisma.team.findMany({
+        where: { id: { in: [...new Set(grants.map((grant) => grant.principalId))] } },
+        select: { id: true, name: true }
+    });
+    const names = new Map(teams.map((team) => [team.id, team.name]));
+    for (const grant of grants) {
+        const name = names.get(grant.principalId);
+        if (!name) continue;
+        named.set(grant.subjectId, [...(named.get(grant.subjectId) ?? []), name]);
+    }
+    return named;
 }
 
 export interface TeamView {
@@ -770,17 +795,34 @@ export async function listTeams(orgId: string): Promise<TeamView[]> {
             slug: true,
             name: true,
             description: true,
-            _count: { select: { members: true, spaceGrants: true, folderGrants: true } }
+            _count: { select: { members: true } }
         }
     });
+    // What each team was handed, counted from the grants the share dialog
+    // writes rather than the older team tables (see `spaceTeamNames`).
+    const held =
+        teams.length === 0
+            ? []
+            : await prisma.accessGrant.groupBy({
+                  by: ["principalId", "subjectType"],
+                  where: {
+                      principalType: "team",
+                      principalId: { in: teams.map((team) => team.id) },
+                      subjectType: { in: ["task.space", "task.folder"] }
+                  },
+                  _count: { _all: true }
+              });
+    const count = (teamId: string, subject: string) =>
+        held.find((row) => row.principalId === teamId && row.subjectType === subject)?._count
+            ._all ?? 0;
     return teams.map((team) => ({
         id: team.id,
         slug: team.slug,
         name: team.name,
         description: team.description,
         memberCount: team._count.members,
-        spaceCount: team._count.spaceGrants,
-        folderCount: team._count.folderGrants
+        spaceCount: count(team.id, "task.space"),
+        folderCount: count(team.id, "task.folder")
     }));
 }
 
@@ -826,38 +868,62 @@ export interface TeamGrantView {
 /** Everything a team can reach, whole spaces and single branches together, so
  *  one screen answers "what does joining this team give me". */
 export async function listTeamGrants(teamId: string): Promise<TeamGrantView[]> {
+    // Read from the grants the share dialog writes; see `spaceTeamNames`.
+    const grants = await prisma.accessGrant.findMany({
+        where: {
+            principalType: "team",
+            principalId: teamId,
+            subjectType: { in: ["task.space", "task.folder"] }
+        },
+        take: core.MAX_GRANTS_PER_SUBJECT,
+        select: { subjectType: true, subjectId: true, capability: true }
+    });
+    const of = (subject: string) =>
+        grants.filter((grant) => grant.subjectType === subject).map((grant) => grant.subjectId);
     const [spaces, folders] = await Promise.all([
-        prisma.taskSpaceTeam.findMany({
-            where: { teamId },
-            select: { role: true, space: { select: { id: true, name: true } } }
+        prisma.taskSpace.findMany({
+            where: { id: { in: of("task.space") } },
+            select: { id: true, name: true }
         }),
-        prisma.taskFolderTeam.findMany({
-            where: { teamId },
-            select: {
-                role: true,
-                folder: {
-                    select: { id: true, name: true, space: { select: { id: true, name: true } } }
-                }
-            }
+        prisma.taskFolder.findMany({
+            where: { id: { in: of("task.folder") } },
+            select: { id: true, name: true, space: { select: { id: true, name: true } } }
         })
     ]);
+    const spaceById = new Map(spaces.map((space) => [space.id, space]));
+    const folderById = new Map(folders.map((folder) => [folder.id, folder]));
 
-    return [
-        ...spaces.map((grant) => ({
-            spaceId: grant.space.id,
-            spaceName: grant.space.name,
-            role: grant.role as core.SpaceRole,
-            folderId: null,
-            folderName: null
-        })),
-        ...folders.map((grant) => ({
-            spaceId: grant.folder.space.id,
-            spaceName: grant.folder.space.name,
-            role: grant.role as core.SpaceRole,
-            folderId: grant.folder.id,
-            folderName: grant.folder.name
-        }))
-    ].sort((left, right) => left.spaceName.localeCompare(right.spaceName));
+    return grants
+        .flatMap((grant): TeamGrantView[] => {
+            if (!core.isSpaceRole(grant.capability)) return [];
+            if (grant.subjectType === "task.space") {
+                const space = spaceById.get(grant.subjectId);
+                return space
+                    ? [
+                          {
+                              spaceId: space.id,
+                              spaceName: space.name,
+                              role: grant.capability,
+                              folderId: null,
+                              folderName: null
+                          }
+                      ]
+                    : [];
+            }
+            const folder = folderById.get(grant.subjectId);
+            return folder
+                ? [
+                      {
+                          spaceId: folder.space.id,
+                          spaceName: folder.space.name,
+                          role: grant.capability,
+                          folderId: folder.id,
+                          folderName: folder.name
+                      }
+                  ]
+                : [];
+        })
+        .sort((left, right) => left.spaceName.localeCompare(right.spaceName));
 }
 
 // ---------------------------------------------------------------------------
@@ -1173,90 +1239,3 @@ export async function removeTeamMember(teamId: string, userId: string): Promise<
     await prisma.teamMember.deleteMany({ where: { teamId, userId } });
 }
 
-// ---------------------------------------------------------------------------
-// Team grants over work
-// ---------------------------------------------------------------------------
-
-/** Grant, or re-grant at a different role, a team's access to a whole space. */
-export async function grantTeamSpace(
-    teamId: string,
-    spaceId: string,
-    role: core.SpaceRole
-): Promise<void> {
-    await prisma.taskSpaceTeam.upsert({
-        where: { spaceId_teamId: { spaceId, teamId } },
-        update: { role },
-        create: { spaceId, teamId, role }
-    });
-}
-
-export async function revokeTeamSpace(teamId: string, spaceId: string): Promise<void> {
-    await prisma.taskSpaceTeam.deleteMany({ where: { teamId, spaceId } });
-}
-
-export async function grantTeamFolder(
-    teamId: string,
-    folderId: string,
-    role: core.SpaceRole
-): Promise<void> {
-    await prisma.taskFolderTeam.upsert({
-        where: { folderId_teamId: { folderId, teamId } },
-        update: { role },
-        create: { folderId, teamId, role }
-    });
-}
-
-export async function revokeTeamFolder(teamId: string, folderId: string): Promise<void> {
-    await prisma.taskFolderTeam.deleteMany({ where: { teamId, folderId } });
-}
-
-/** The teams a space can be granted to: the ones belonging to the organization
- *  that owns it. A personal space has none, which is what makes the picker say
- *  so rather than offering somebody else's teams. */
-export async function teamsForSpace(spaceId: string): Promise<{ id: string; name: string }[]> {
-    const space = await prisma.taskSpace.findUnique({
-        where: { id: spaceId },
-        select: { orgId: true }
-    });
-    if (!space?.orgId) return [];
-    return prisma.team.findMany({
-        where: { orgId: space.orgId },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true }
-    });
-}
-
-/** The teams currently granted a space, for the space's own access screen. */
-export async function spaceTeamGrants(
-    spaceId: string
-): Promise<{ teamId: string; teamName: string; role: core.SpaceRole }[]> {
-    const grants = await prisma.taskSpaceTeam.findMany({
-        where: { spaceId },
-        select: { teamId: true, role: true, team: { select: { name: true } } }
-    });
-    return grants
-        .map((grant) => ({
-            teamId: grant.teamId,
-            teamName: grant.team.name,
-            role: grant.role as core.SpaceRole
-        }))
-        .sort((left, right) => left.teamName.localeCompare(right.teamName));
-}
-
-/** The same for one folder, so a branch can be handed to a team without opening
- *  the space around it. */
-export async function folderTeamGrants(
-    folderId: string
-): Promise<{ teamId: string; teamName: string; role: core.SpaceRole }[]> {
-    const grants = await prisma.taskFolderTeam.findMany({
-        where: { folderId },
-        select: { teamId: true, role: true, team: { select: { name: true } } }
-    });
-    return grants
-        .map((grant) => ({
-            teamId: grant.teamId,
-            teamName: grant.team.name,
-            role: grant.role as core.SpaceRole
-        }))
-        .sort((left, right) => left.teamName.localeCompare(right.teamName));
-}

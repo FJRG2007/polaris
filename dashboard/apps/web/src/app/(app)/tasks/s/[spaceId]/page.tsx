@@ -55,7 +55,7 @@ export default async function SpacePage({
     if (!space) redirect("/tasks");
 
     const canManage = mayManage && (role === "owner" || role === "admin");
-    const [tree, statuses, fields, tags, members, automations, forms, baseUrl] = await Promise.all([
+    const [tree, statuses, fields, tags, people, automations, forms, baseUrl] = await Promise.all([
         // The tree follows the shelf; the space being opened is put back into it
         // when the shelf would have taken it out, so a link always opens and the
         // sidebar never loses the space you are standing in.
@@ -63,7 +63,7 @@ export default async function SpacePage({
         spaces.listStatuses(spaceId),
         spaces.listCustomFields(spaceId),
         spaces.listTags(spaceId),
-        spaces.listSpaceMembers(spaceId, { id: user.id, isAdmin: user.isAdmin }),
+        spaces.spacePeople(spaceId),
         listAutomations(spaceId),
         listForms(spaceId),
         // A form is filled in by somebody outside Polaris, so its link is built on the
@@ -90,10 +90,9 @@ export default async function SpacePage({
                 statuses={statuses}
                 fields={fields}
                 tags={tags}
-                members={members}
                 automations={automations}
                 forms={forms}
-                people={members.map((member) => ({ id: member.userId, name: member.name }))}
+                people={people}
                 canManage={canManage}
                 baseUrl={baseUrl}
                 initialTab={tab}

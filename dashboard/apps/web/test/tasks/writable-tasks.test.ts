@@ -18,12 +18,17 @@ const listFindMany = vi.fn(
 );
 const spaceFindUnique = vi.fn(async (_args: unknown) => null as unknown);
 const folderFindMany = vi.fn(async () => [] as { id: string; parentId: string | null }[]);
-const folderMemberFindMany = vi.fn(
-    async () => [] as { folderId: string; role: string; folder?: { spaceId: string } }[]
-);
-const folderTeamFindMany = vi.fn(
-    async () => [] as { folderId: string; role: string; folder?: { spaceId: string } }[]
-);
+// What the share dialog handed the reader, per space and per folder. The older
+// membership tables are not read any more: a grant is the only way a person or
+// a team is given a space or one branch of it.
+const spaceGrants = new Map<string, string>();
+const folderGrants = new Map<string, string>();
+vi.mock("@/lib/access/grants", () => ({
+    grantedCapability: async (_user: string, _subject: string, id: string) =>
+        spaceGrants.get(id) ?? null,
+    grantedSubjects: async (_user: string, subject: string) =>
+        subject === "task.folder" ? new Map(folderGrants) : new Map(spaceGrants)
+}));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -37,9 +42,7 @@ vi.mock("@polaris/db", () => ({
         task: { findMany: taskFindMany },
         taskList: { findMany: listFindMany },
         taskSpace: { findUnique: spaceFindUnique },
-        taskFolder: { findMany: folderFindMany },
-        taskFolderMember: { findMany: folderMemberFindMany },
-        taskFolderTeam: { findMany: folderTeamFindMany }
+        taskFolder: { findMany: folderFindMany }
     }
 }));
 
@@ -63,30 +66,32 @@ function showing(lists: { id: string; spaceId: string; folderId?: string | null 
     );
 }
 
-/** A personal space, which is what these cases are about: no organization, and
- *  no team holding it. The two empty lists are what the query selects. */
-function space(visibility: string, members: { role: string }[], ownerId = "someone-else") {
-    return { ownerId, visibility, members, orgId: null, teamGrants: [], org: null };
+/** A personal space, which is what these cases are about: no organization.
+ *  `role` is what the share dialog handed the reader on it, if anything. */
+function space(visibility: string, role: string | null, ownerId = "someone-else", id = SPACE) {
+    if (role) spaceGrants.set(id, role);
+    else spaceGrants.delete(id);
+    return { ownerId, visibility, orgId: null, org: null };
 }
 
 describe("the tasks in a set somebody may write", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         folderFindMany.mockResolvedValue([]);
-        folderMemberFindMany.mockResolvedValue([]);
-        folderTeamFindMany.mockResolvedValue([]);
+        spaceGrants.clear();
+        folderGrants.clear();
     });
 
     it("refuses a reader who only reaches the space because it is internal", async () => {
         showing([{ id: "l1", spaceId: SPACE }]);
-        spaceFindUnique.mockResolvedValue(space("internal", []));
+        spaceFindUnique.mockResolvedValue(space("internal", null));
 
         expect(await writableTasks(READER, ["t-l1"], "member")).toEqual([]);
     });
 
     it("clears a member of the space", async () => {
         showing([{ id: "l1", spaceId: SPACE }]);
-        spaceFindUnique.mockResolvedValue(space("internal", [{ role: "member" }]));
+        spaceFindUnique.mockResolvedValue(space("internal", "member"));
 
         expect(await writableTasks(READER, ["t-l1"], "member")).toEqual([
             { id: "t-l1", spaceId: SPACE }
@@ -101,8 +106,8 @@ describe("the tasks in a set somebody may write", () => {
         spaceFindUnique.mockImplementation(async (args: unknown) => {
             const { where } = args as { where: { id: string } };
             return where.id === SPACE
-                ? space("private", [{ role: "member" }])
-                : space("internal", []);
+                ? space("private", "member")
+                : space("internal", null, "someone-else", OTHER);
         });
 
         expect(await writableTasks(READER, ["t-l1", "t-l2"], "member")).toEqual([
@@ -111,14 +116,14 @@ describe("the tasks in a set somebody may write", () => {
     });
 
     it("counts a folder grant that reaches the list, and only up to what it gives", async () => {
-        spaceFindUnique.mockResolvedValue(space("private", []));
+        spaceFindUnique.mockResolvedValue(space("private", null));
         folderFindMany.mockResolvedValue([{ id: "f1", parentId: null }]);
-        folderMemberFindMany.mockResolvedValue([{ folderId: "f1", role: "guest" }]);
+        folderGrants.set("f1", "guest");
 
         showing([{ id: "l1", spaceId: SPACE, folderId: "f1" }]);
         expect(await writableTasks(READER, ["t-l1"], "member")).toEqual([]);
 
-        folderMemberFindMany.mockResolvedValue([{ folderId: "f1", role: "member" }]);
+        folderGrants.set("f1", "member");
         showing([{ id: "l1", spaceId: SPACE, folderId: "f1" }]);
         expect(await writableTasks(READER, ["t-l1"], "member")).toEqual([
             { id: "t-l1", spaceId: SPACE }

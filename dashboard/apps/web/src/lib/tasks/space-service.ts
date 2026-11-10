@@ -11,7 +11,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import type { SpaceAccess, TaskScope } from "./access";
-import { contactLines } from "@/lib/privacy-service";
+import { grantedSubjects } from "@/lib/access/grants";
 import { TaskRefusal, folderMoveRefusal } from "./refusal";
 
 // ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ export async function listSpaceTree(
     const partialSpaces = new Set(scope.partialSpaceIds);
     const grantedListIds = new Set(scope.listIds);
 
-    const [spaces, lists, counts, occupied] = await Promise.all([
+    const [spaces, lists, counts, occupied, granted] = await Promise.all([
         prisma.taskSpace.findMany({
             where: { id: { in: spaceIds } },
             orderBy: [{ order: "asc" }, { createdAt: "asc" }],
@@ -90,7 +90,6 @@ export async function listSpaceTree(
                 color: true,
                 visibility: true,
                 ownerId: true,
-                members: { where: { userId }, select: { role: true } },
                 folders: {
                     where: { archived: false },
                     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
@@ -115,7 +114,10 @@ export async function listSpaceTree(
             by: ["listId"],
             where: { spaceId: { in: spaceIds } },
             _count: { _all: true }
-        })
+        }),
+        // The role a space was handed to this reader with, as a person, on a
+        // team or in a role - the same grants `resolveSpaceRole` reads.
+        grantedSubjects(userId, "task.space")
     ]);
 
     const finishedStatusIds = await finishedStatuses(spaceIds);
@@ -153,7 +155,7 @@ export async function listSpaceTree(
         const spaceRole: SpaceAccess =
             space.ownerId === userId || isAdmin
                 ? "owner"
-                : ((space.members[0]?.role as core.SpaceRole) ?? "guest");
+                : ((granted.get(space.id) as core.SpaceRole | undefined) ?? "guest");
         // In a partial space the space role means nothing - what the reader may
         // do is whatever their strongest grant gives them.
         const role: SpaceAccess = partial
@@ -322,15 +324,6 @@ export async function deleteSpace(spaceId: string): Promise<void> {
 // Members
 // ---------------------------------------------------------------------------
 
-export interface SpaceMemberView {
-    readonly userId: string;
-    readonly name: string;
-    /** Their address if they show it to whoever is looking, their handle
-     *  otherwise. Never the address itself - see `contactLines`. */
-    readonly contact: string;
-    readonly role: core.SpaceRole | "owner";
-}
-
 /** A space's own name and id, for a dialog opened from a tree that has neither
  *  in a shape it can trust - the row's label is whatever was last typed into it,
  *  and a rename in another tab does not reach it. */
@@ -341,165 +334,120 @@ export async function getSpace(spaceId: string): Promise<{ id: string; name: str
     });
 }
 
-export async function listSpaceMembers(
-    spaceId: string,
-    viewer: { id: string; isAdmin: boolean }
-): Promise<SpaceMemberView[]> {
-    const space = await prisma.taskSpace.findUnique({
-        where: { id: spaceId },
-        select: {
-            owner: { select: { id: true, name: true, email: true, username: true } },
-            members: {
-                orderBy: { createdAt: "asc" },
-                select: {
-                    role: true,
-                    user: {
-                        select: { id: true, name: true, email: true, username: true }
-                    }
-                }
-            }
-        }
-    });
-    if (!space) return [];
-
-    const people = [space.owner, ...space.members.map((member) => member.user)];
-    const contacts = await contactLines(viewer, people);
-    return [
-        {
-            userId: space.owner.id,
-            name: space.owner.name,
-            contact: contacts.get(space.owner.id) ?? "",
-            role: "owner" as const
-        },
-        ...space.members.map((member) => ({
-            userId: member.user.id,
-            name: member.user.name,
-            contact: contacts.get(member.user.id) ?? "",
-            role: member.role as core.SpaceRole
-        }))
-    ];
-}
-
-/** Add somebody by email or username, which is what the operator has in front
- *  of them rather than an id. */
-export async function addSpaceMember(
-    spaceId: string,
-    identifier: string,
-    role: core.SpaceRole
-): Promise<void> {
-    const needle = identifier.trim().toLowerCase();
-    const user = await prisma.user.findFirst({
-        where: { OR: [{ email: needle }, { username: needle }] },
+/**
+ * Everybody a set of spaces has been handed to, as account ids: the people its
+ * grants name, whoever is on a team they name and whoever holds a role they name
+ * - on the space itself and on every folder inside it, since a task in a
+ * client's folder has to be assignable to that client.
+ *
+ * Grants only. Who may reach a space is written by the share dialog into
+ * AccessGrant, and the older TaskSpaceMember / TaskFolderMember / TaskSpaceTeam /
+ * TaskFolderTeam rows were copied there by migration
+ * 20270326000000_task_access_grants and are no longer read anywhere: reading
+ * them here would keep offering somebody the dialog already took off.
+ *
+ * Bounded at `limit` people, which is more than any picker draws.
+ */
+export async function spaceGrantees(spaceIds: readonly string[], limit = 2_000): Promise<string[]> {
+    if (spaceIds.length === 0) return [];
+    const folders = await prisma.taskFolder.findMany({
+        where: { spaceId: { in: [...spaceIds] } },
         select: { id: true }
     });
-    if (!user) throw new TaskRefusal("refusals.noAccountMatch");
-
-    const space = await prisma.taskSpace.findUnique({
-        where: { id: spaceId },
-        select: { ownerId: true }
+    const rows = await prisma.accessGrant.findMany({
+        where: {
+            principalType: { in: ["user", "team", "role"] },
+            OR: [
+                { subjectType: "task.space", subjectId: { in: [...spaceIds] } },
+                ...(folders.length > 0
+                    ? [
+                          {
+                              subjectType: "task.folder",
+                              subjectId: { in: folders.map((folder) => folder.id) }
+                          }
+                      ]
+                    : [])
+            ]
+        },
+        select: { principalType: true, principalId: true }
     });
-    if (space?.ownerId === user.id) throw new TaskRefusal("refusals.alreadyOwner");
-
-    await prisma.taskSpaceMember.upsert({
-        where: { spaceId_userId: { spaceId, userId: user.id } },
-        update: { role },
-        create: { spaceId, userId: user.id, role }
-    });
-}
-
-export async function setSpaceMemberRole(
-    spaceId: string,
-    userId: string,
-    role: core.SpaceRole
-): Promise<void> {
-    await prisma.taskSpaceMember.update({
-        where: { spaceId_userId: { spaceId, userId } },
-        data: { role }
-    });
-}
-
-export async function removeSpaceMember(spaceId: string, userId: string): Promise<void> {
-    await prisma.taskSpaceMember.deleteMany({ where: { spaceId, userId } });
+    const of = (kind: string) => [
+        ...new Set(rows.filter((row) => row.principalType === kind).map((row) => row.principalId))
+    ];
+    const teamIds = of("team");
+    const roleIds = of("role");
+    const [teamMembers, roles] = await Promise.all([
+        teamIds.length === 0
+            ? []
+            : prisma.teamMember.findMany({
+                  where: { teamId: { in: teamIds } },
+                  take: limit,
+                  select: { userId: true }
+              }),
+        roleIds.length === 0
+            ? []
+            : prisma.orgRole.findMany({
+                  where: { id: { in: roleIds } },
+                  select: { orgId: true, slug: true }
+              })
+    ]);
+    const roleHolders =
+        roles.length === 0
+            ? []
+            : await prisma.organizationMember.findMany({
+                  where: { OR: roles.map((role) => ({ orgId: role.orgId, role: role.slug })) },
+                  take: limit,
+                  select: { userId: true }
+              });
+    return [
+        ...new Set([
+            ...of("user"),
+            ...teamMembers.map((row) => row.userId),
+            ...roleHolders.map((row) => row.userId)
+        ])
+    ].slice(0, limit);
 }
 
 /**
  * The people a picker can offer for a space.
  *
- * Everyone who can reach it, however they reach it: its owner and members,
- * anyone invited to a folder inside it - a task in a client's folder has to be
- * assignable to that client - and everybody on a team the space or one of its
- * folders was given, since a team grant is exactly as real a way in as a
- * personal one and work nobody can be assigned is work the team cannot run.
+ * Everyone who can reach it by being handed it: its owner, and everybody its
+ * grants reach on the space or on any folder inside it (`spaceGrantees`) -
+ * people, teams and roles alike, since a team grant is exactly as real a way in
+ * as a personal one and work nobody can be assigned is work the team cannot run.
  */
 export async function spacePeople(spaceId: string): Promise<{ id: string; name: string }[]> {
-    const [space, grantees, spaceTeams, folderTeams] = await Promise.all([
-        // Its own read rather than `listSpaceMembers`: a picker needs a name and
-        // a face, and asking for the roster would work out what each of them is
-        // willing to show for a line this never draws.
+    const [space, granted] = await Promise.all([
         prisma.taskSpace.findUnique({
             where: { id: spaceId },
-            select: {
-                owner: { select: { id: true, name: true } },
-                members: { select: { user: { select: { id: true, name: true } } } }
-            }
+            select: { owner: { select: { id: true, name: true } } }
         }),
-        prisma.taskFolderMember.findMany({
-            where: { folder: { spaceId } },
-            select: { user: { select: { id: true, name: true } } }
-        }),
-        prisma.taskSpaceTeam.findMany({
-            where: { spaceId },
-            select: {
-                team: {
-                    select: {
-                        members: {
-                            select: { user: { select: { id: true, name: true } } }
-                        }
-                    }
-                }
-            }
-        }),
-        prisma.taskFolderTeam.findMany({
-            where: { folder: { spaceId } },
-            select: {
-                team: {
-                    select: {
-                        members: {
-                            select: { user: { select: { id: true, name: true } } }
-                        }
-                    }
-                }
-            }
-        })
+        spaceGrantees([spaceId])
     ]);
-    const roster = space ? [space.owner, ...space.members.map((member) => member.user)] : [];
-    const people = new Map(roster.map((person) => [person.id, person]));
-    for (const grant of grantees) {
-        if (!people.has(grant.user.id)) people.set(grant.user.id, grant.user);
-    }
-    for (const grant of [...spaceTeams, ...folderTeams]) {
-        for (const member of grant.team.members) {
-            if (!people.has(member.user.id)) people.set(member.user.id, member.user);
-        }
-    }
-    return [...people.values()];
+    const others = granted.filter((id) => id !== space?.owner.id);
+    const users =
+        others.length === 0
+            ? []
+            : await prisma.user.findMany({
+                  where: { id: { in: others } },
+                  select: { id: true, name: true }
+              });
+    return [...(space ? [space.owner] : []), ...users];
 }
 
 // ---------------------------------------------------------------------------
-// Folder members
+// Folders
 // ---------------------------------------------------------------------------
 
-export interface FolderMemberView {
-    readonly userId: string;
+/** One grant made further up than the folder being shared, for the read-only
+ *  "through" list under the share dialog. */
+export interface InheritedGrantView {
+    readonly principalType: string;
+    readonly principalId: string;
     readonly name: string;
-    /** As on a space: their address only if they show it to whoever is looking. */
-    readonly contact: string;
-    readonly role: core.SpaceRole;
-    /** The folder the grant was actually made on. Equal to the folder being
-     *  looked at, or an ancestor when the access is inherited. */
-    readonly folderId: string;
-    readonly folderName: string;
-    readonly inherited: boolean;
+    readonly capability: core.SpaceRole;
+    /** The folder or the space it was made on. */
+    readonly through: string;
 }
 
 export interface FolderDetail {
@@ -533,92 +481,81 @@ export async function getFolder(folderId: string): Promise<FolderDetail | null> 
 }
 
 /**
- * Who reaches this folder through a grant - the ones made on it, and the ones
- * made further up that it inherits. Showing the inherited rows is the point:
- * without them somebody reads an empty list and re-invites a person who is
- * already there through the client above.
+ * Who reaches this folder through a grant made further up: on a folder it sits
+ * in, or on the space itself. The grants made on the folder are the share
+ * dialog's own list; these are the ones it cannot change from here and has to
+ * show anyway, because without them somebody reads an empty list and re-invites
+ * a person who is already there through the client above.
  */
-export async function listFolderMembers(
-    folderId: string,
-    viewer: { id: string; isAdmin: boolean }
-): Promise<FolderMemberView[]> {
-    const folder = await prisma.taskFolder.findUnique({
-        where: { id: folderId },
-        select: { spaceId: true }
-    });
-    if (!folder) return [];
-    const folders = await prisma.taskFolder.findMany({
-        where: { spaceId: folder.spaceId },
-        select: { id: true, parentId: true, name: true }
-    });
-    const chain = core.folderAncestors(folders, folderId);
-    const grants = await prisma.taskFolderMember.findMany({
-        where: { folderId: { in: chain.map((entry) => entry.id) } },
-        orderBy: { createdAt: "asc" },
+export async function inheritedFolderGrants(
+    folder: FolderDetail,
+    spaceName: string
+): Promise<InheritedGrantView[]> {
+    const above = folder.path.filter((entry) => entry.id !== folder.id);
+    const names = new Map(above.map((entry) => [entry.id, entry.name]));
+    const rows = await prisma.accessGrant.findMany({
+        where: {
+            principalType: { in: ["user", "team", "role"] },
+            OR: [
+                { subjectType: "task.space", subjectId: folder.spaceId },
+                ...(above.length > 0
+                    ? [
+                          {
+                              subjectType: "task.folder",
+                              subjectId: { in: above.map((entry) => entry.id) }
+                          }
+                      ]
+                    : [])
+            ]
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: core.MAX_GRANTS_PER_SUBJECT,
         select: {
-            folderId: true,
-            role: true,
-            user: { select: { id: true, name: true, email: true, username: true } }
+            subjectType: true,
+            subjectId: true,
+            principalType: true,
+            principalId: true,
+            capability: true
         }
     });
-    const names = new Map(chain.map((entry) => [entry.id, entry.name]));
-    const contacts = await contactLines(
-        viewer,
-        grants.map((grant) => grant.user)
-    );
-    return grants.map((grant) => ({
-        userId: grant.user.id,
-        name: grant.user.name,
-        contact: contacts.get(grant.user.id) ?? "",
-        role: grant.role as core.SpaceRole,
-        folderId: grant.folderId,
-        folderName: names.get(grant.folderId) ?? "",
-        inherited: grant.folderId !== folderId
-    }));
-}
-
-/** Invite somebody to one branch by email or username, which is what the person
- *  doing the inviting has in front of them rather than an id. */
-export async function addFolderMember(
-    folderId: string,
-    identifier: string,
-    role: core.SpaceRole
-): Promise<void> {
-    const needle = identifier.trim().toLowerCase();
-    const user = await prisma.user.findFirst({
-        where: { OR: [{ email: needle }, { username: needle }] },
-        select: { id: true }
-    });
-    if (!user) throw new TaskRefusal("refusals.noAccountMatch");
-
-    const folder = await prisma.taskFolder.findUnique({
-        where: { id: folderId },
-        select: { space: { select: { ownerId: true } } }
-    });
-    if (folder?.space.ownerId === user.id) throw new TaskRefusal("refusals.alreadyOwner");
-
-    await prisma.taskFolderMember.upsert({
-        where: { folderId_userId: { folderId, userId: user.id } },
-        update: { role },
-        create: { folderId, userId: user.id, role }
+    const ids = (kind: string) =>
+        rows.filter((row) => row.principalType === kind).map((row) => row.principalId);
+    const [users, teams, roles] = await Promise.all([
+        prisma.user.findMany({
+            where: { id: { in: ids("user") } },
+            select: { id: true, name: true, username: true }
+        }),
+        prisma.team.findMany({
+            where: { id: { in: ids("team") } },
+            select: { id: true, name: true }
+        }),
+        prisma.orgRole.findMany({
+            where: { id: { in: ids("role") } },
+            select: { id: true, name: true }
+        })
+    ]);
+    const named = new Map<string, string>();
+    for (const user of users) named.set(`user:${user.id}`, user.name || user.username || "");
+    for (const team of teams) named.set(`team:${team.id}`, team.name);
+    for (const role of roles) named.set(`role:${role.id}`, role.name);
+    // A grant whose principal is gone reaches nobody, so it is not drawn.
+    return rows.flatMap((row) => {
+        const name = named.get(`${row.principalType}:${row.principalId}`);
+        if (!name || !core.isSpaceRole(row.capability)) return [];
+        return [
+            {
+                principalType: row.principalType,
+                principalId: row.principalId,
+                name,
+                capability: row.capability,
+                through:
+                    row.subjectType === "task.space"
+                        ? spaceName
+                        : (names.get(row.subjectId) ?? spaceName)
+            }
+        ];
     });
 }
-
-export async function setFolderMemberRole(
-    folderId: string,
-    userId: string,
-    role: core.SpaceRole
-): Promise<void> {
-    await prisma.taskFolderMember.update({
-        where: { folderId_userId: { folderId, userId } },
-        data: { role }
-    });
-}
-
-export async function removeFolderMember(folderId: string, userId: string): Promise<void> {
-    await prisma.taskFolderMember.deleteMany({ where: { folderId, userId } });
-}
-
 // ---------------------------------------------------------------------------
 // Folders and lists
 // ---------------------------------------------------------------------------

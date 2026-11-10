@@ -81,11 +81,6 @@ export async function resolveSpaceRole(
             ownerId: true,
             visibility: true,
             orgId: true,
-            members: { where: { userId: actor.id }, select: { role: true } },
-            teamGrants: {
-                where: { team: { members: { some: { userId: actor.id } } } },
-                select: { role: true }
-            },
             org: {
                 select: {
                     ownerId: true,
@@ -110,22 +105,19 @@ export async function resolveSpaceRole(
         if (orgRoleGrants(space.org, "spaces.manage")) return "admin";
     }
 
-    let role: core.SpaceRole | null =
-        (space.members[0]?.role as core.SpaceRole | undefined) ?? null;
-    for (const grant of space.teamGrants) {
-        const granted = grant.role as core.SpaceRole;
-        role = role ? core.strongerRole(role, granted) : granted;
-    }
+    let role: core.SpaceRole | null = null;
     // A fifth way in, and the only one written for one space without a roster of
     // any kind: access given to this account directly. Folded through the same
     // strongest-wins rule rather than short-circuiting, so it can widen what a
     // membership already gave and never narrow it.
     const written = await spaceGrantRole(actor, spaceId);
     if (written) role = role ? core.strongerRole(role, written) : written;
-    // And a sixth: the space handed to one of the organization's roles, or to a
-    // team, or to a person, by name rather than by permission. `teamGrants`
-    // above is the older table and still the one a team grant is written into;
-    // this is what carries a grant to a role, which teams have no way to say.
+    // And a sixth: the space handed to a person, a team or one of the
+    // organization's roles through the share dialog. This is the only place a
+    // membership is read from: the older TaskSpaceMember / TaskSpaceTeam rows
+    // were copied into grants (migration 20270326000000_task_access_grants) and
+    // are deliberately not consulted, so removing somebody in the dialog takes
+    // their access away instead of leaving a stale row that still opens it.
     const shared = await grantedCapability(actor.id, "task.space", spaceId);
     if (core.isSpaceRole(shared)) role = role ? core.strongerRole(role, shared) : shared;
     if (role) return role;
@@ -217,19 +209,12 @@ async function grantedFolders(
     actor: TaskActor,
     spaceId: string
 ): Promise<Map<string, core.SpaceRole>> {
-    const [folders, personal, team, shared] = await Promise.all([
+    // Grants only - to a person, a team or a role alike, with the inheritance
+    // and the strongest-wins rule below. The older TaskFolderMember /
+    // TaskFolderTeam rows were copied into grants and are not read, for the
+    // same reason as on a space.
+    const [folders, shared] = await Promise.all([
         prisma.taskFolder.findMany({ where: { spaceId }, select: { id: true, parentId: true } }),
-        prisma.taskFolderMember.findMany({
-            where: { userId: actor.id, folder: { spaceId } },
-            select: { folderId: true, role: true }
-        }),
-        // A branch handed to a team reads exactly like one handed to a person,
-        // including the inheritance and the strongest-wins rule below.
-        prisma.taskFolderTeam.findMany({
-            where: { team: { members: { some: { userId: actor.id } } }, folder: { spaceId } },
-            select: { folderId: true, role: true }
-        }),
-        // And one handed to a role, which a team grant has no way to say.
         grantedSubjects(actor.id, "task.folder")
     ]);
     const known = new Set(folders.map((folder) => folder.id));
@@ -240,7 +225,7 @@ async function grantedFolders(
         .map(([folderId, role]) => ({ folderId, role: role as core.SpaceRole }));
 
     const reachable = new Map<string, core.SpaceRole>();
-    for (const grant of [...personal, ...team, ...sharedHere]) {
+    for (const grant of sharedHere) {
         const role = grant.role as core.SpaceRole;
         for (const id of core.folderBranch(folders, grant.folderId)) {
             const existing = reachable.get(id);
@@ -462,41 +447,26 @@ export async function visibleScope(actor: TaskActor): Promise<TaskScope> {
     ]);
     const sharedSpaceIds = [...shared.keys()];
 
-    const [full, personalGrants, teamGrants] = await Promise.all([
-        prisma.taskSpace.findMany({
-            where: {
-                archived: false,
-                OR: [
-                    { ownerId: actor.id },
-                    { members: { some: { userId: actor.id } } },
-                    { teamGrants: { some: { team: { members: { some: { userId: actor.id } } } } } },
-                    { orgId: { in: administered } },
-                    // An internal space with no organization is the instance-wide
-                    // case this had before organizations existed; one with an
-                    // organization is internal to that roster only.
-                    { visibility: "internal", orgId: null },
-                    { visibility: "internal", orgId: { in: onRoster } },
-                    // Written for one space, rather than through a roster.
-                    ...(written.ids.length > 0 ? [{ id: { in: written.ids } }] : []),
-                    // Shared with a team or a role of the organization that owns
-                    // it, which is the same thing said about a group of people.
-                    ...(sharedSpaceIds.length > 0 ? [{ id: { in: sharedSpaceIds } }] : [])
-                ]
-            },
-            select: { id: true }
-        }),
-        prisma.taskFolderMember.findMany({
-            where: { userId: actor.id, folder: { space: { archived: false } } },
-            select: { folderId: true, role: true, folder: { select: { spaceId: true } } }
-        }),
-        prisma.taskFolderTeam.findMany({
-            where: {
-                team: { members: { some: { userId: actor.id } } },
-                folder: { space: { archived: false } }
-            },
-            select: { folderId: true, role: true, folder: { select: { spaceId: true } } }
-        })
-    ]);
+    const full = await prisma.taskSpace.findMany({
+        where: {
+            archived: false,
+            OR: [
+                { ownerId: actor.id },
+                { orgId: { in: administered } },
+                // An internal space with no organization is the instance-wide
+                // case this had before organizations existed; one with an
+                // organization is internal to that roster only.
+                { visibility: "internal", orgId: null },
+                { visibility: "internal", orgId: { in: onRoster } },
+                // Written for one space, rather than through a roster.
+                ...(written.ids.length > 0 ? [{ id: { in: written.ids } }] : []),
+                // Shared with a team or a role of the organization that owns
+                // it, which is the same thing said about a group of people.
+                ...(sharedSpaceIds.length > 0 ? [{ id: { in: sharedSpaceIds } }] : [])
+            ]
+        },
+        select: { id: true }
+    });
 
     // A branch handed to a team or a role reads exactly as one handed to a
     // person: the folder, the role it carries, and the space it is in.
@@ -518,7 +488,7 @@ export async function visibleScope(actor: TaskActor): Promise<TaskScope> {
                       : [];
               });
 
-    const grants = [...personalGrants, ...teamGrants, ...sharedBranches];
+    const grants = sharedBranches;
     const spaceIds = full.map((space) => space.id);
     // A grant inside a space the actor already reaches in full adds nothing, and
     // listing it as partial would narrow them instead of widening them.

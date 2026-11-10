@@ -21,11 +21,11 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ProgressBar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
 import type { FormView } from "@/lib/tasks/form-service";
-import { PersonName, PersonRow } from "@/components/person-name";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AutomationsPanel, FormsPanel } from "./automations-panel";
 import type { AutomationView } from "@/lib/tasks/automation-service";
-import { ChevronDown, ChevronUp, Hash, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Hash, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
+import { AccessDialog } from "./access-dialog";
 import {
     Button,
     Card,
@@ -40,7 +40,6 @@ import {
 import type {
     CustomFieldView,
     ListSummary,
-    SpaceMemberView,
     StatusView,
     TagView
 } from "@/lib/tasks/space-service";
@@ -61,7 +60,6 @@ export interface SpaceScreenProps {
     readonly statuses: readonly StatusView[];
     readonly fields: readonly CustomFieldView[];
     readonly tags: readonly TagView[];
-    readonly members: readonly SpaceMemberView[];
     readonly automations: readonly AutomationView[];
     readonly forms: readonly FormView[];
     readonly people: readonly PersonRef[];
@@ -177,12 +175,7 @@ export function SpaceScreen(props: SpaceScreenProps) {
                 />
             )}
             {tab === "People" && (
-                <PeopleTab
-                    spaceId={props.spaceId}
-                    members={props.members}
-                    canManage={props.canManage}
-                    onError={setError}
-                />
+                <PeopleTab spaceId={props.spaceId} canManage={props.canManage} />
             )}
             {tab === "Automations" && (
                 <AutomationsPanel automations={props.automations} context={ruleContext} />
@@ -858,303 +851,28 @@ function TagsTab({
     );
 }
 
-function PeopleTab({
-    spaceId,
-    members,
-    canManage,
-    onError
-}: {
-    spaceId: string;
-    members: readonly SpaceMemberView[];
-    canManage: boolean;
-    onError: (message: string) => void;
-}) {
+/**
+ * Who reaches this space, handed over in the same share dialog as everything
+ * else in Polaris (see `access-dialog.tsx`) rather than a roster of its own: a
+ * second screen writing access somewhere else is how a person removed in one
+ * place keeps their way in through the other.
+ */
+function PeopleTab({ spaceId, canManage }: { spaceId: string; canManage: boolean }) {
     const t = useTranslations("tasks");
-    const [identifier, setIdentifier] = useState("");
-    const [role, setRole] = useState<core.SpaceRole>("member");
-
+    const [open, setOpen] = useState(false);
     return (
         <section className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">{t("space.people.hint")}</p>
-            <ul className="divide-y divide-border rounded-lg border border-border">
-                {members.map((member) => (
-                    <PersonRow
-                        as="li"
-                        key={member.userId}
-                        personId={member.userId}
-                        className="flex flex-wrap items-center gap-3 px-3 py-2"
-                    >
-                        <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm" title={member.name}>
-                                <PersonName id={member.userId} name={member.name} />
-                            </p>
-                            <p
-                                className="truncate text-xs text-muted-foreground"
-                                title={member.contact}
-                            >
-                                {member.contact}
-                            </p>
-                        </div>
-                        {member.role === "owner" ? (
-                            <span className="text-xs text-muted-foreground">
-                                {t("access.owner")}
-                            </span>
-                        ) : canManage ? (
-                            <>
-                                <Select
-                                    value={member.role}
-                                    onValueChange={async (next) => {
-                                        const result = await runAction(
-                                            () =>
-                                                actions.setSpaceMemberRoleAction(
-                                                    spaceId,
-                                                    member.userId,
-                                                    next as core.SpaceRole
-                                                ),
-                                            onError
-                                        );
-                                        if (result?.error) onError(result.error);
-                                    }}
-                                    options={core.SPACE_ROLES.map((entry) => ({
-                                        value: entry,
-                                        label: optionLabel(t, "spaceRole", entry)
-                                    }))}
-                                    aria-label={t("access.roleFor", { name: member.name })}
-                                    className="h-8 w-32 text-xs"
-                                />
-                                <button
-                                    type="button"
-                                    aria-label={t("pickers.remove", { name: member.name })}
-                                    title={t("space.people.remove")}
-                                    onClick={async () => {
-                                        const result = await runAction(
-                                            () =>
-                                                actions.removeSpaceMemberAction(
-                                                    spaceId,
-                                                    member.userId
-                                                ),
-                                            onError
-                                        );
-                                        if (result?.error) onError(result.error);
-                                    }}
-                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                                >
-                                    <Trash2 className="size-3.5" />
-                                </button>
-                            </>
-                        ) : (
-                            <span className="text-xs text-muted-foreground">
-                                {optionLabel(t, "spaceRole", member.role)}
-                            </span>
-                        )}
-                    </PersonRow>
-                ))}
-            </ul>
-
-            {canManage && (
-                <div className="flex flex-wrap items-center gap-2">
-                    <Input
-                        value={identifier}
-                        placeholder={t("access.identifier")}
-                        aria-label={t("space.people.add")}
-                        onChange={(event) => setIdentifier(event.target.value)}
-                        className="h-8 w-56 text-sm"
-                    />
-                    <Select
-                        value={role}
-                        onValueChange={(value) => setRole(value as core.SpaceRole)}
-                        options={core.SPACE_ROLES.map((entry) => ({
-                            value: entry,
-                            label: optionLabel(t, "spaceRole", entry)
-                        }))}
-                        aria-label={t("access.role")}
-                        className="h-8 w-32 text-xs"
-                    />
-                    <Button
-                        size="sm"
-                        disabled={!identifier.trim()}
-                        onClick={async () => {
-                            const result = await runAction(
-                                () =>
-                                    actions.addSpaceMemberAction(spaceId, identifier.trim(), role),
-                                onError
-                            );
-                            if (result?.error) onError(result.error);
-                            else setIdentifier("");
-                        }}
-                    >
-                        <Plus className="size-3.5" /> {t("goals.add")}
-                    </Button>
-                    <p className="w-full text-xs text-muted-foreground">
-                        {optionLabel(t, "spaceRoleHint", role)}
-                    </p>
-                </div>
-            )}
-
-            <SpaceTeams spaceId={spaceId} canManage={canManage} onError={onError} />
-        </section>
-    );
-}
-
-/**
- * The teams that hold this space.
- *
- * Loaded when the tab opens rather than sent with the page, because a personal
- * space has no teams to show and most spaces are personal. When there are none
- * to offer it says why instead of rendering an empty picker somebody has to
- * work out the meaning of.
- */
-function SpaceTeams({
-    spaceId,
-    canManage,
-    onError
-}: {
-    spaceId: string;
-    canManage: boolean;
-    onError: (message: string) => void;
-}) {
-    const [granted, setGranted] = useState<
-        { teamId: string; teamName: string; role: core.SpaceRole }[]
-    >([]);
-    const t = useTranslations("tasks");
-    const [available, setAvailable] = useState<{ id: string; name: string }[]>([]);
-    const [loaded, setLoaded] = useState(false);
-    const [pick, setPick] = useState("");
-    const [role, setRole] = useState<core.SpaceRole>("member");
-
-    const reload = useCallback(async () => {
-        const result = await runAction(() => actions.spaceTeamsAction(spaceId), onError);
-        if (result?.error) onError(result.error);
-        setGranted(result?.granted ?? []);
-        setAvailable(result?.available ?? []);
-        setLoaded(true);
-    }, [spaceId, onError]);
-
-    useEffect(() => {
-        void reload();
-    }, [reload]);
-
-    // Nothing to say on a personal space: no teams exist to give it to, and an
-    // empty section would only raise a question the screen cannot answer.
-    if (!loaded || (available.length === 0 && granted.length === 0)) return null;
-
-    const ungranted = available.filter(
-        (team) => !granted.some((grant) => grant.teamId === team.id)
-    );
-
-    return (
-        <section className="flex flex-col gap-3 border-t border-border pt-4">
-            <div>
-                <h2 className="text-sm font-medium">{t("access.teams")}</h2>
-                <p className="text-xs text-muted-foreground">{t("space.teams.hint")}</p>
-            </div>
-
-            {granted.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                    {t("space.teams.empty")}
-                </p>
-            ) : (
-                <ul className="divide-y divide-border rounded-lg border border-border">
-                    {granted.map((grant) => (
-                        <li
-                            key={grant.teamId}
-                            className="flex flex-wrap items-center gap-3 px-3 py-2"
-                        >
-                            <p className="min-w-0 flex-1 truncate text-sm" title={grant.teamName}>
-                                {grant.teamName}
-                            </p>
-                            {canManage ? (
-                                <>
-                                    <Select
-                                        value={grant.role}
-                                        onValueChange={async (next) => {
-                                            const result = await runAction(
-                                                () =>
-                                                    actions.grantSpaceTeamAction(
-                                                        spaceId,
-                                                        grant.teamId,
-                                                        next as core.SpaceRole
-                                                    ),
-                                                onError
-                                            );
-                                            if (result?.error) onError(result.error);
-                                            await reload();
-                                        }}
-                                        options={core.SPACE_ROLES.map((entry) => ({
-                                            value: entry,
-                                            label: optionLabel(t, "spaceRole", entry)
-                                        }))}
-                                        aria-label={t("access.roleFor", { name: grant.teamName })}
-                                        className="h-8 w-32 text-xs"
-                                    />
-                                    <button
-                                        type="button"
-                                        aria-label={t("pickers.remove", { name: grant.teamName })}
-                                        title={t("space.people.remove")}
-                                        onClick={async () => {
-                                            const result = await runAction(
-                                                () =>
-                                                    actions.revokeSpaceTeamAction(
-                                                        spaceId,
-                                                        grant.teamId
-                                                    ),
-                                                onError
-                                            );
-                                            if (result?.error) onError(result.error);
-                                            await reload();
-                                        }}
-                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                                    >
-                                        <Trash2 className="size-3.5" />
-                                    </button>
-                                </>
-                            ) : (
-                                <span className="text-xs text-muted-foreground">
-                                    {optionLabel(t, "spaceRole", grant.role)}
-                                </span>
-                            )}
-                        </li>
-                    ))}
-                </ul>
-            )}
-
-            {canManage && ungranted.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                    <Select
-                        value={pick}
-                        onValueChange={setPick}
-                        placeholder={t("access.chooseTeam")}
-                        options={ungranted.map((team) => ({ value: team.id, label: team.name }))}
-                        aria-label={t("access.teamToAdd")}
-                        className="h-8 w-56 text-sm"
-                    />
-                    <Select
-                        value={role}
-                        onValueChange={(value) => setRole(value as core.SpaceRole)}
-                        options={core.SPACE_ROLES.map((entry) => ({
-                            value: entry,
-                            label: optionLabel(t, "spaceRole", entry)
-                        }))}
-                        aria-label={t("access.teamRole")}
-                        className="h-8 w-32 text-xs"
-                    />
-                    <Button
-                        size="sm"
-                        disabled={!pick}
-                        onClick={async () => {
-                            const result = await runAction(
-                                () => actions.grantSpaceTeamAction(spaceId, pick, role),
-                                onError
-                            );
-                            if (result?.error) onError(result.error);
-                            else setPick("");
-                            await reload();
-                        }}
-                    >
-                        <Plus className="size-3.5" /> {t("access.give")}
-                    </Button>
-                </div>
-            )}
+            {canManage ? (
+                <Button type="button" className="self-start" onClick={() => setOpen(true)}>
+                    <UserPlus className="size-4 shrink-0" aria-hidden />
+                    {t("space.people.open")}
+                </Button>
+            ) : null}
+            <AccessDialog
+                target={open ? { scope: { kind: "space", id: spaceId } } : null}
+                onClose={() => setOpen(false)}
+            />
         </section>
     );
 }

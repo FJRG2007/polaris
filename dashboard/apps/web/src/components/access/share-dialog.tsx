@@ -139,6 +139,7 @@ export function ShareDialog({
     name,
     bounded = false,
     principals = core.subjectPrincipals(subject),
+    notice,
     extra
 }: {
     open: boolean;
@@ -152,6 +153,9 @@ export function ShareDialog({
     bounded?: boolean;
     /** Who it may be shared with, where the app keeps the others itself. */
     principals?: readonly core.GrantPrincipal[];
+    /** What has to be read before anything is changed, under the title: what
+     *  sharing this reaches, when that is more than its name says. */
+    notice?: ReactNode;
     /** Anything the thing being shared has of its own, under the grants. */
     extra?: ReactNode;
 }) {
@@ -569,6 +573,11 @@ export function ShareDialog({
                         {bounded ? t("share.introBounded") : t("share.intro")}
                     </DialogDescription>
                 </DialogHeader>
+                {notice ? (
+                    <div className="flex min-w-0 flex-col gap-1 text-[13px] text-muted-foreground">
+                        {notice}
+                    </div>
+                ) : null}
 
                 {history ? (
                     <div className="flex min-w-0 flex-col gap-3">

@@ -17,6 +17,7 @@ import { blockedBy } from "@/lib/blocks";
 import type { Prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import * as access from "@/lib/tasks/access";
+import { spaceGrantees } from "@/lib/tasks/space-service";
 import { allowedBy } from "@/lib/privacy-service";
 import { friendIds } from "@/lib/friends-service";
 import { nicknamesFor } from "@/lib/contact-names";
@@ -380,15 +381,11 @@ async function reachablePeople(actor: access.TaskActor): Promise<string[]> {
     const scope = await access.visibleScope(actor);
     const spaceIds = access.scopeSpaceIds(scope);
     const orgIds = await memberOrgIds(actor.id);
-    const [members, folderGrants, roster] = await Promise.all([
-        prisma.taskSpaceMember.findMany({
-            where: { spaceId: { in: spaceIds } },
-            select: { userId: true }
-        }),
-        prisma.taskFolderMember.findMany({
-            where: { folder: { spaceId: { in: spaceIds } } },
-            select: { userId: true }
-        }),
+    const [granted, roster] = await Promise.all([
+        // Whoever the spaces in reach were handed to - people, teams and roles,
+        // on the space or a folder in it - read from the grants the share dialog
+        // writes, which is the only place Tasks keeps that now.
+        spaceGrantees(spaceIds),
         // A restricted member is on the roster for whoever runs it, and on
         // nobody else's - so not somebody the rest of it can name either.
         prisma.organizationMember.findMany({
@@ -398,8 +395,7 @@ async function reachablePeople(actor: access.TaskActor): Promise<string[]> {
     ]);
     return [
         actor.id,
-        ...members.map((row) => row.userId),
-        ...folderGrants.map((row) => row.userId),
+        ...granted,
         ...roster.map((row) => row.userId)
     ];
 }

@@ -33,9 +33,19 @@ vi.mock("@polaris/db", () => ({
 // Access written for one space alone is a fifth way in, resolved in @polaris/auth
 // against tables these cases do not set up. Answering "none" keeps each case about
 // the way in it is actually pinning: membership, a team, or the organization.
+const written = { reads: false };
 vi.mock("@polaris/auth", () => ({
-    canOn: async () => false,
+    canOn: async (_user: string, permission: string) => written.reads && permission === "tasks.read",
     grantedResourceIds: async () => ({ ids: [], everyOne: false })
+}));
+
+// What the share dialog handed this reader - as a person, on a team or in a
+// role - already folded to the strongest by `grantedCapability`. The older
+// membership tables are not read any more, so this is the one way a team in.
+const shared = { capability: null as string | null };
+vi.mock("@/lib/access/grants", () => ({
+    grantedCapability: async () => shared.capability,
+    grantedSubjects: async () => new Map()
 }));
 
 const { resolveSpaceRole } = await import("../../src/lib/tasks/access");
@@ -46,8 +56,6 @@ function space(options: {
     visibility?: string;
     ownerId?: string;
     orgId?: string | null;
-    members?: { role: string }[];
-    teamGrants?: { role: string }[];
     org?: {
         ownerId: string;
         members: { role: string }[];
@@ -58,8 +66,6 @@ function space(options: {
         ownerId: options.ownerId ?? "someone-else",
         visibility: options.visibility ?? "private",
         orgId: options.orgId ?? null,
-        members: options.members ?? [],
-        teamGrants: options.teamGrants ?? [],
         // An organization with no role rows is the migrated case: the slugs on
         // its memberships still mean what Polaris seeds them as.
         org: options.org ? { roles: [], ...options.org } : null
@@ -67,7 +73,11 @@ function space(options: {
 }
 
 describe("what an organization's space gives somebody", () => {
-    beforeEach(() => vi.clearAllMocks());
+    beforeEach(() => {
+        vi.clearAllMocks();
+        shared.capability = null;
+        written.reads = false;
+    });
 
     it("gives a plain member of the organization nothing", async () => {
         spaceFindUnique.mockResolvedValue(
@@ -121,27 +131,21 @@ describe("what an organization's space gives somebody", () => {
     });
 
     it("gives a team's people the role the team was granted", async () => {
+        shared.capability = "member";
         spaceFindUnique.mockResolvedValue(
-            space({
-                orgId: "o1",
-                teamGrants: [{ role: "member" }],
-                org: { ownerId: "someone-else", members: [{ role: "member" }] }
-            })
+            space({ orgId: "o1", org: { ownerId: "someone-else", members: [{ role: "member" }] } })
         );
 
         expect(await resolveSpaceRole(READER, "s1")).toBe("member");
     });
 
-    it("adds a team grant to a personal membership rather than replacing it", async () => {
-        // Guest as a person, member through a team: the answer has to be the
-        // stronger of the two, whichever order they were read in.
+    it("adds a team grant to access written for the space alone rather than replacing it", async () => {
+        // Guest by a written permission, admin through a team: the answer has
+        // to be the stronger of the two, whichever order they were read in.
+        written.reads = true;
+        shared.capability = "admin";
         spaceFindUnique.mockResolvedValue(
-            space({
-                orgId: "o1",
-                members: [{ role: "guest" }],
-                teamGrants: [{ role: "admin" }],
-                org: { ownerId: "someone-else", members: [{ role: "member" }] }
-            })
+            space({ orgId: "o1", org: { ownerId: "someone-else", members: [{ role: "member" }] } })
         );
 
         expect(await resolveSpaceRole(READER, "s1")).toBe("admin");
