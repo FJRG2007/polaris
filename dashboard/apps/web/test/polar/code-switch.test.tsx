@@ -63,6 +63,16 @@ const KIT = {
 let thread: unknown = null;
 
 /** The switch, the history's rows as the sidebar offers them, and the side on screen. */
+const PROVIDERS = [
+    {
+        provider: "anthropic",
+        name: "Anthropic",
+        payers: ["own" as const],
+        models: [{ provider: "anthropic", model: "claude-sonnet", name: "Claude Sonnet", reasoning: true }]
+    }
+];
+const polarTasks: unknown[] = [];
+
 function Harness() {
     const code = usePolarCode();
     return (
@@ -78,7 +88,14 @@ function Harness() {
                 ))}
             </ul>
             {code.mode === "code" ? (
-                <PolarCodeView code={code} fullPage={false} avatar={null} voiceKit={KIT} />
+                <PolarCodeView
+                    code={code}
+                    fullPage={false}
+                    avatar={null}
+                    voiceKit={KIT}
+                    providers={PROVIDERS}
+                    onPolarTask={(task) => polarTasks.push(task)}
+                />
             ) : (
                 <p>chat-view</p>
             )}
@@ -101,6 +118,8 @@ beforeEach(() => {
             clear: () => stored.clear()
         });
     }
+    // These follow a coding agent's session; Polar's own answers are tested on their own.
+    window.localStorage.setItem("polar.code.agent", "claude");
     vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string, init?: RequestInit) => {
@@ -170,6 +189,31 @@ describe("the Chat / Code switch", () => {
                     )
             ).toBe(true)
         );
+    });
+
+    it("answers with Polar's own models by default, about the picked repository, starting nothing", async () => {
+        access = "manage";
+        polarTasks.length = 0;
+        window.localStorage.removeItem("polar.code.agent");
+        render(<Harness />, { wrapper: MessagesWrapper });
+        const codeOption = await screen.findByRole("radio", { name: /code/i });
+        await waitFor(() => expect((codeOption as HTMLButtonElement).disabled).toBe(false));
+        fireEvent.click(codeOption);
+        const box = await screen.findByRole("textbox", { name: "Task for the agent" });
+        await screen.findByRole("button", { name: /^Agent: Polar/ });
+        await screen.findByRole("button", { name: /^Where the agent works: acme\/web/ });
+        fireEvent.change(box, { target: { value: "What does the login form validate?" } });
+        const send = screen.getByRole("button", { name: "Send (Enter)" }) as HTMLButtonElement;
+        await waitFor(() => expect(send.disabled).toBe(false));
+        fireEvent.click(send);
+        expect(polarTasks).toEqual([
+            {
+                text: "What does the login form validate?",
+                choice: expect.objectContaining({ provider: "anthropic", model: "claude-sonnet" }),
+                code: { repo: "acme/web", branch: "" }
+            }
+        ]);
+        expect(started).toHaveLength(0);
     });
 
     it("lets a reader follow sessions but not start one", async () => {

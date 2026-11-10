@@ -34,7 +34,8 @@ import {
     FolderGit2,
     GitBranch,
     Plus,
-    RefreshCw
+    RefreshCw,
+    Sparkles
 } from "lucide-react";
 import {
     cn,
@@ -50,6 +51,9 @@ import {
 
 /** The repository picker's "none": a workspace with nothing checked out. */
 export const NO_REPO = "workspace";
+
+/** The picker's row for Polar itself, answering on the chat's own models. */
+export const POLAR_ENGINE = "polar";
 
 /** The bar's row, drawn the same for a new task and a session. */
 function BarRow({ fullPage, children }: { fullPage: boolean; children: ReactNode }) {
@@ -189,7 +193,7 @@ function useRepoList(choices: PolarCodeChoices | null, query: string) {
 
 /** The name of a chosen repository no list on screen holds - one past the
  *  first page - read once by its id. */
-function useRepoName(repoId: string, known: readonly RepoEntry[]): string | null {
+export function useRepoName(repoId: string, known: readonly RepoEntry[]): string | null {
     const [named, setNamed] = useState<RepoEntry | null>(null);
     const missing =
         repoId !== "" && repoId !== NO_REPO && !known.some((entry) => entry.id === repoId);
@@ -571,7 +575,8 @@ export function AgentPicker({
 }) {
     const t = useTranslations("polar");
     const [query, setQuery] = useState("");
-    const picked = agents?.find((option) => option.key === value) ?? null;
+    const polar = value === POLAR_ENGINE;
+    const picked = polar ? null : (agents?.find((option) => option.key === value) ?? null);
     const shown = (agents ?? []).filter((option) =>
         menuSearchMatches(agentName(option, t), query)
     );
@@ -581,11 +586,13 @@ export function AgentPicker({
             <DropdownMenuTrigger asChild disabled={disabled || agents === null}>
                 <button
                     type="button"
-                    title={picked ? agentName(picked, t) : t("code.agent")}
-                    aria-label={`${t("code.agent")}: ${picked ? agentName(picked, t) : ""}`}
+                    title={polar ? t("code.polarEngine") : picked ? agentName(picked, t) : t("code.agent")}
+                    aria-label={`${t("code.agent")}: ${polar ? t("code.polarEngine") : picked ? agentName(picked, t) : ""}`}
                     className={cn(MODEL_TRIGGER, "disabled:opacity-60")}
                 >
-                    {picked ? (
+                    {polar ? (
+                        <Sparkles className="size-3.5 shrink-0" aria-hidden />
+                    ) : picked ? (
                         <AgentLogo
                             id={picked.cli}
                             label={picked.label}
@@ -595,7 +602,7 @@ export function AgentPicker({
                         <Bot className="size-3.5 shrink-0" aria-hidden />
                     )}
                     <span className="truncate text-foreground">
-                        {picked?.label ?? t("code.agent")}
+                        {polar ? t("code.polarEngine") : (picked?.label ?? t("code.agent"))}
                     </span>
                     {picked?.account ? (
                         <span className="min-w-0 truncate" title={picked.account}>
@@ -616,6 +623,18 @@ export function AgentPicker({
                     />
                 ) : null}
                 <DropdownMenuLabel>{t("code.agent")}</DropdownMenuLabel>
+                {menuSearchMatches(t("code.polarEngine"), query) ? (
+                    <DropdownMenuItem onSelect={() => onChange(POLAR_ENGINE)} className="items-start">
+                        <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                        <span className="flex min-w-0 flex-col">
+                            <span className="truncate">{t("code.polarEngine")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("code.polarEngineHint")}
+                            </span>
+                        </span>
+                        <Mark on={polar} />
+                    </DropdownMenuItem>
+                ) : null}
                 {shown.map((option) => (
                     <DropdownMenuItem
                         key={option.key}

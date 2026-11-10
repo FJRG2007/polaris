@@ -60,6 +60,7 @@ import { polarRepoTools } from "@/lib/polar/code-host-tools";
 import { BROWSER_TOOL, isBrowserTool } from "@/lib/polar/browser-steps";
 import { browserApprovalFor, polarBrowserTools } from "@/lib/polar/browser-tools";
 import { aboutRepository } from "@/lib/polar/code-host";
+import { codeTaskPrompt, polarCodeTaskSchema } from "@/lib/polar/code-task";
 import {
     NATIVE_SEARCH_STAND_INS,
     WEB_APPROVAL,
@@ -160,7 +161,9 @@ const bodySchema = z.object({
     /** Whether the person left their connectors on for this turn. */
     connectors: z.boolean().default(true),
     /** A skill being tried before it is added: honoured in a temporary chat only. */
-    trialSkill: trialSkillSchema.nullable().default(null)
+    trialSkill: trialSkillSchema.nullable().default(null),
+    /** A Code task answered by Polar itself: the repository it is about. */
+    code: polarCodeTaskSchema.nullable().default(null)
 });
 
 function refuse(code: string, status: number): NextResponse {
@@ -354,7 +357,8 @@ export async function POST(request: Request): Promise<Response> {
     const webTools = web ? polarWebTools(resolved.credential.provider, resolved.option.model) : {};
     // Reading a repository is reading the web, under the same switch. Always
     // registered; sent while the page shared or the conversation names one.
-    const repoOffered = web && aboutRepository(body.data.context?.site?.url, messages);
+    const repoOffered =
+        web && (body.data.code !== null || aboutRepository(body.data.context?.site?.url, messages));
     // The person's own browser, under the same switch: one tool, in every
     // turn, so Polar never answers that it has no way to scroll a page. With
     // no extension connected it answers with the step that connects one.
@@ -487,6 +491,7 @@ export async function POST(request: Request): Promise<Response> {
             role: "system",
             content: [
                 polarSystemPrompt(user.name, instructions, memories, web),
+                codeTaskPrompt(body.data.code),
                 skillsPrompt(skills),
                 fenceSummary(compacted.summary),
                 // Only on a turn asked again from an answer's row: that turn's

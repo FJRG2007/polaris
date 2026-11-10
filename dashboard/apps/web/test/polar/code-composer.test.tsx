@@ -79,6 +79,8 @@ beforeEach(() => {
             clear: () => stored.clear()
         });
     }
+    // These follow a coding agent's session; Polar's own answers are tested on their own.
+    window.localStorage.setItem("polar.code.agent", "claude");
     vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) => {

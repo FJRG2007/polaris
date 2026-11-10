@@ -91,6 +91,7 @@ import * as goals from "@/lib/polar/goals";
 import { PolarThreads } from "@/components/polar/polar-threads";
 import * as toolPrefs from "@/components/polar/tool-prefs";
 import { PolarCodeView, PolarModeSwitch, usePolarCode } from "@/components/polar/polar-code";
+import type { PolarCodeTask } from "@/lib/polar/code-task";
 import { refusalOf, UPLOAD_ERRORS, uploadFile, type UploadError } from "@/components/polar/polar-uploads";
 
 export { refusalOf };
@@ -783,6 +784,11 @@ export function PolarChat({
     const [voiceNotice, setVoiceNotice] = useState<VoiceNotice | null>(null);
     const [inCall, setInCall] = useState(false);
     const [choice, setChoice] = useState<ModelChoice | null>(null);
+    /** The repository a Code task answered here is about, until another
+     *  conversation opens. */
+    const [codeTask, setCodeTask] = useState<PolarCodeTask | null>(null);
+    /** A Code task's first message, sent once the new conversation is on screen. */
+    const codeOpening = useRef<string | null>(null);
     const [input, setInput] = useState("");
     const [quote, setQuote] = useState<string | null>(null);
     /** "/page" with the page switched off in settings: the page goes with the
@@ -932,7 +938,8 @@ export function PolarChat({
         toolsOff,
         serversOff,
         connectorsOn,
-        trialSkill
+        trialSkill,
+        codeTask
     });
     live.current = {
         threadId,
@@ -947,7 +954,8 @@ export function PolarChat({
         toolsOff,
         serversOff,
         connectorsOn,
-        trialSkill
+        trialSkill,
+        codeTask
     };
 
     /** The page as it goes with the next turn: null with sharing off. */
@@ -985,6 +993,7 @@ export function PolarChat({
                                 ? (live.current.trialSkill?.trial ?? null)
                                 : null,
                             refine: refining,
+                            code: live.current.codeTask,
                             parentId:
                                 messages.length > 1
                                     ? (messages[messages.length - 2]?.id ?? null)
@@ -1321,6 +1330,7 @@ export function PolarChat({
     }, [discardTemporary]);
 
     const openThread = async (id: string) => {
+        setCodeTask(null);
         const response = await fetch(`/api/polar/threads/${id}`).catch(() => null);
         // A remembered chat that was deleted, or belongs to another account.
         if (response?.status === 404 && readStored(threadKey) === id) writeStored(threadKey, "");
@@ -1449,6 +1459,7 @@ export function PolarChat({
         setComparison(null);
         discardTemporary();
         setNewProject(projectId);
+        setCodeTask(null);
         if (projectId) sidebar.openProject(projectId);
         tree.current = new Map();
         setOpening([]);
@@ -1927,6 +1938,29 @@ export function PolarChat({
         void sendWithRoom(message);
     };
 
+    /**
+     * A Code task Polar answers itself: a new conversation on the model picked
+     * for it, about the repository picked for it. Nothing is started on a
+     * machine, so it answers as fast as a chat does.
+     */
+    const startCodeChat = (task: { text: string; choice: ModelChoice; code: PolarCodeTask | null }) => {
+        startNew();
+        setChoice(task.choice);
+        setCodeTask(task.code);
+        codeOpening.current = task.text;
+        code.setMode("chat");
+    };
+    // Sent once the new conversation and its model are what the request reads.
+    useEffect(() => {
+        const text = codeOpening.current;
+        if (text === null || code.mode !== "chat" || chat.messages.length > 0) return;
+        if (live.current.choice === null) return;
+        codeOpening.current = null;
+        turnChoice.current = null;
+        setLastApproved(false);
+        void sendWithRoom({ text });
+    });
+
     /** What was said in voice mode, sent as the next message of this thread. */
     const sendSpoken = async (text: string) => {
         if (!live.current.choice) return;
@@ -2306,6 +2340,15 @@ export function PolarChat({
                 onSubmit={submit}
                 header={
                     <>
+                        {codeTask ? (
+                            <Chip
+                                label={t("code.taskOn", {
+                                    repo: codeTask.branch ? `${codeTask.repo}@${codeTask.branch}` : codeTask.repo
+                                })}
+                                removeLabel={t("code.taskClear")}
+                                onRemove={() => setCodeTask(null)}
+                            />
+                        ) : null}
                         {quote ? (
                             <Chip
                                 label={`${t("reply.to")} "${quote}"`}
@@ -2635,6 +2678,7 @@ export function PolarChat({
                             avatar={<PolarAvatar state={avatarState} size={64} />}
                             voiceKit={voiceKit}
                             providers={providers}
+                            onPolarTask={startCodeChat}
                         />
                     </div>
                 )}

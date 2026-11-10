@@ -23,7 +23,6 @@
 
 import Link from "next/link";
 import { runAction } from "@/lib/run-action";
-import { preferredAgent } from "@/lib/polar/code-agent";
 import { fromWire } from "@/lib/app-bundles/wire";
 import { readPoll, sendAction, useUnmountSignal } from "@/lib/poll-fetch";
 import { mergeCodeRows } from "@/lib/polar/code-history";
@@ -66,8 +65,11 @@ import {
     CodeRepoBar,
     CodeSessionBar,
     NO_REPO,
-    readRepo
+    POLAR_ENGINE,
+    readRepo,
+    useRepoName
 } from "@/components/polar/polar-code-context";
+import type { PolarCodeTask } from "@/lib/polar/code-task";
 import type {
     PolarCodeAccess,
     PolarCodeChoices,
@@ -109,8 +111,18 @@ const SessionTools = dynamic(
 
 export type PolarMode = "chat" | "code";
 
+/** A Code task Polar answers itself, handed to Chat: what to send, on which
+ *  model, about which repository (none for an empty workspace). */
+export interface PolarTask {
+    text: string;
+    choice: ModelChoice;
+    code: PolarCodeTask | null;
+}
+
 const MODE_KEY = "polar.mode";
 const OVERVIEW_KEY = "polar.code.overview.v2";
+/** The agent this browser last started a task with. */
+const AGENT_KEY = "polar.code.agent";
 /** How often the history is asked again while Code is on screen. */
 const LIST_MS = 10_000;
 /** How often a live session's thread is asked again. */
@@ -416,11 +428,13 @@ function useCodeChoices(canStart: boolean) {
                             if (!found) setRepoId((now) => (now === current ? fallback : now));
                         })
                         .catch(() => undefined);
-                const ready = preferredAgent(loaded.agents);
+                // The one picked last; else Polar, which needs nothing started
+                // and so answers at once.
+                const known = (key: string) =>
+                    key === POLAR_ENGINE || loaded.agents.some((agent) => agent.key === key);
+                const remembered = readStored(AGENT_KEY) ?? "";
                 setAgentKey((current) =>
-                    loaded.agents.some((agent) => agent.key === current)
-                        ? current
-                        : (ready?.key ?? "")
+                    known(current) ? current : known(remembered) ? remembered : POLAR_ENGINE
                 );
             })
             .finally(() => setRefreshing(false));
@@ -430,7 +444,12 @@ function useCodeChoices(canStart: boolean) {
         if (canStart) load();
     }, [canStart, load]);
 
-    return { choices, error, refreshing, load, repoId, setRepoId, agentKey, setAgentKey };
+    const pickAgent = useCallback((key: string) => {
+        setAgentKey(key);
+        writeStored(AGENT_KEY, key);
+    }, []);
+
+    return { choices, error, refreshing, load, repoId, setRepoId, agentKey, setAgentKey: pickAgent };
 }
 
 /**
@@ -444,7 +463,8 @@ export function PolarCodeView({
     fullPage,
     avatar,
     voiceKit,
-    providers
+    providers,
+    onPolarTask
 }: {
     code: PolarCodeState;
     fullPage: boolean;
@@ -454,6 +474,8 @@ export function PolarCodeView({
     voiceKit: PolarVoiceKit;
     /** Chat's providers and models, for an agent that takes one. */
     providers: ModelSelectorProvider[] | null;
+    /** A task Polar answers itself, handed to Chat with its repository. */
+    onPolarTask: (task: PolarTask) => void;
 }) {
     const t = useTranslations("polar");
     const canStart = code.access === "manage";
@@ -511,6 +533,7 @@ export function PolarCodeView({
             voiceKit={voiceKit}
             providers={providers}
             onStarted={started}
+            onPolarTask={onPolarTask}
         />
     );
     if (fullPage)
@@ -602,7 +625,8 @@ function CodeStart({
     onAgent,
     voiceKit,
     providers,
-    onStarted
+    onStarted,
+    onPolarTask
 }: {
     canStart: boolean;
     pending: boolean;
@@ -617,6 +641,7 @@ function CodeStart({
     /** Chat's own list of providers and models, for an agent that takes one. */
     providers: ModelSelectorProvider[] | null;
     onStarted: (id: string, text: string) => void;
+    onPolarTask: (task: PolarTask) => void;
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
@@ -633,27 +658,43 @@ function CodeStart({
     // Again after a send: the next session gets a spare of its own.
     useSpareWarmup(sent === null);
 
-    const agent: AgentOption | null =
-        choices?.agents.find((option) => option.key === agentKey) ?? null;
+    // Polar itself, on the chat's models: nothing to start, so it answers at once.
+    const polar = agentKey === POLAR_ENGINE;
+    const agent: AgentOption | null = polar
+        ? null
+        : (choices?.agents.find((option) => option.key === agentKey) ?? null);
     const workspace = repoId === NO_REPO;
     // A tool that takes its model from Polaris signs in with that provider's
     // key, so its own sign-in does not matter.
     const takesModel = agent !== null && core.MODEL_CHOICE_AGENT_CLIS.includes(agent.cli);
-    const model = takesModel ? (picked ?? firstModel(providers)) : null;
+    const model = takesModel || polar ? (picked ?? firstModel(providers)) : null;
+    const fetchedName = useRepoName(repoId, choices?.repos ?? []);
+    const repoName = choices?.repos.find((repo) => repo.id === repoId)?.name ?? fetchedName;
     const unlinked = agent?.readiness === "missing" && !takesModel ? agent : null;
-    const noModel = takesModel && model === null && providers !== null;
+    const noModel = (takesModel || polar) && model === null && providers !== null;
     const ready =
         canStart &&
         choices !== null &&
-        agent !== null &&
+        (agent !== null || (polar && (workspace || repoName !== null))) &&
         !unlinked &&
-        (!takesModel || model !== null) &&
+        (!(takesModel || polar) || model !== null) &&
         !parts.uploads.uploading &&
         !parts.uploads.failed &&
         prompt.trim().length > 0;
 
     const submit = () => {
-        if (!ready || busy || !agent) return;
+        if (!ready || busy) return;
+        if (polar && model) {
+            const text = prompt.trim();
+            setPrompt("");
+            onPolarTask({
+                text,
+                choice: model,
+                code: workspace || !repoName ? null : { repo: repoName, branch: baseRef.trim() }
+            });
+            return;
+        }
+        if (!agent) return;
         setError(null);
         setGap(null);
         const text = prompt.trim();
@@ -745,12 +786,12 @@ function CodeStart({
                                 onChange={onAgent}
                                 disabled={busy}
                             />
-                            {takesModel ? (
+                            {takesModel || polar ? (
                                 <ModelSelector
                                     providers={providers ?? []}
                                     choice={model}
                                     onChoice={setPicked}
-                                    forCode
+                                    forCode={!polar}
                                 />
                             ) : null}
                         </>
@@ -761,7 +802,7 @@ function CodeStart({
                 submit={{
                     busy: false,
                     disabled: !ready || busy,
-                    sendLabel: t("code.start"),
+                    sendLabel: polar ? t("actions.send") : t("code.start"),
                     stopLabel: t("code.start"),
                     onStop: () => undefined
                 }}
