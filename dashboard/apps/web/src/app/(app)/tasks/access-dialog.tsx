@@ -30,7 +30,8 @@ import { optionLabel } from "./option-label";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { GrantView } from "@/lib/access/grants";
-import { Loader2, Trash2, UserPlus } from "lucide-react";
+import { Avatar } from "@/components/avatar";
+import { Shield, Trash2, UserPlus, Users } from "lucide-react";
 import { PersonName, PersonRow } from "@/components/person-name";
 import type { GrantCandidate } from "@/lib/access/sharing-service";
 import { listGrantsAction, revokeShareAction, shareAction } from "@/app/(app)/access-actions";
@@ -42,8 +43,12 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    Skeleton
 } from "@polaris/ui";
+
+/** The role menu's value for taking somebody off, as in the share dialog. */
+const REMOVE = "__remove";
 
 function roleOptions(t: NamespaceTranslator<"tasks">) {
     return core.SPACE_ROLES.map((role) => ({
@@ -206,11 +211,101 @@ export function AccessDialog({
     const whole = scopeKind === "space";
     const reach = whole ? t("access.reachSpace") : t("access.reachFolder");
 
+    const changeMemberRole = async (member: AccessMember, next: string) => {
+        if (next === REMOVE) {
+            await runAction(
+                () =>
+                    whole
+                        ? actions.removeSpaceMemberAction(scopeId, member.userId)
+                        : actions.removeFolderMemberAction(scopeId, member.userId),
+                setError
+            );
+        } else {
+            await runAction(
+                () =>
+                    whole
+                        ? actions.setSpaceMemberRoleAction(
+                              scopeId,
+                              member.userId,
+                              next as core.SpaceRole
+                          )
+                        : actions.setFolderMemberRoleAction(
+                              scopeId,
+                              member.userId,
+                              next as core.SpaceRole
+                          ),
+                setError
+            );
+        }
+        await reload();
+    };
+
+    const changeTeamRole = async (teamId: string, next: string) => {
+        if (!scopeId) return;
+        if (next === REMOVE) {
+            await runAction(
+                () =>
+                    whole
+                        ? actions.revokeSpaceTeamAction(scopeId, teamId)
+                        : actions.revokeFolderTeamAction(scopeId, teamId),
+                setError
+            );
+        } else {
+            await runAction(
+                () =>
+                    whole
+                        ? actions.grantSpaceTeamAction(scopeId, teamId, next as core.SpaceRole)
+                        : actions.grantFolderTeamAction(scopeId, teamId, next as core.SpaceRole),
+                setError
+            );
+        }
+        await reloadTeams();
+    };
+
+    const invite = async () => {
+        if (!scopeId || !identifier.trim()) return;
+        setError("");
+        const result = await runAction(
+            () =>
+                whole
+                    ? actions.addSpaceMemberAction(scopeId, identifier.trim(), role)
+                    : actions.addFolderMemberAction(scopeId, identifier.trim(), role),
+            setError
+        );
+        if (result?.error) {
+            setError(result.error);
+            return;
+        }
+        setIdentifier("");
+        await reload();
+    };
+
+    const giveTeam = async () => {
+        if (!scopeId || !teamPick) return;
+        const result = await runAction(
+            () =>
+                whole
+                    ? actions.grantSpaceTeamAction(scopeId, teamPick, teamRole)
+                    : actions.grantFolderTeamAction(scopeId, teamPick, teamRole),
+            setError
+        );
+        if (result?.error) {
+            setError(result.error);
+            return;
+        }
+        setTeamPick("");
+        await reloadTeams();
+    };
+
+    const teamsOffered = available.filter(
+        (team) => !granted.some((grant) => grant.teamId === team.id)
+    );
+
     return (
         <Dialog open={target !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>
+                    <DialogTitle className="min-w-0 truncate" title={name || undefined}>
                         {name
                             ? t("access.title", { name })
                             : whole
@@ -218,361 +313,290 @@ export function AccessDialog({
                               : t("access.titleFolder")}
                     </DialogTitle>
                     <DialogDescription>
-                        {path && <span className="font-mono text-xs">{path}</span>}
-                        {path && <br />}
+                        {path && (
+                            <span className="block truncate font-mono text-xs" title={path}>
+                                {path}
+                            </span>
+                        )}
                         {/* Named before the reach, because somebody who came
                             here from a list has to read that they are about to
                             change something larger before they read what it
                             does. */}
                         {target?.asked && (
-                            <>
-                                <span>
-                                    {t.rich("access.inherited", {
-                                        kind: target.asked.kind,
-                                        scope: whole ? "space" : "folder",
-                                        name: target.asked.name,
-                                        strong: (chunks) => (
-                                            <strong key="name" className="font-medium">
-                                                {chunks}
-                                            </strong>
-                                        )
-                                    })}
-                                </span>
-                                <br />
-                            </>
+                            <span className="block">
+                                {t.rich("access.inherited", {
+                                    kind: target.asked.kind,
+                                    scope: whole ? "space" : "folder",
+                                    name: target.asked.name,
+                                    strong: (chunks) => (
+                                        <strong key="name" className="font-medium">
+                                            {chunks}
+                                        </strong>
+                                    )
+                                })}
+                            </span>
                         )}
                         {reach}
                     </DialogDescription>
                 </DialogHeader>
 
-                {loading && (
-                    <div className="flex h-24 items-center justify-center text-muted-foreground">
-                        <Loader2 className="size-5 animate-spin" />
-                    </div>
-                )}
-
-                {error && (
-                    <p
-                        role="alert"
-                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                    >
-                        {error}
-                    </p>
-                )}
-
-                {!loading && (
-                    <ul className="flex flex-col gap-1">
-                        {members.length === 0 && (
-                            <li className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-                                {whole ? t("access.nobodySpace") : t("access.nobodyFolder")}
-                            </li>
-                        )}
-                        {members.map((member) => {
-                            // The owner is not a grant and cannot be one: taking
-                            // the role off them would leave the space with none.
-                            const fixed = member.inherited || member.role === "owner" || !canManage;
-                            return (
-                                <PersonRow
-                                    as="li"
-                                    key={member.userId}
-                                    personId={member.userId}
-                                    className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
-                                >
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm" title={member.name}>
-                                            <PersonName id={member.userId} name={member.name} />
-                                        </p>
-                                        <p className="truncate text-xs text-muted-foreground">
-                                            {member.through
-                                                ? t("access.through", { name: member.through })
-                                                : member.contact}
-                                        </p>
-                                    </div>
-                                    {fixed ? (
-                                        <span className="text-xs text-muted-foreground">
-                                            {member.role === "owner"
-                                                ? t("access.owner")
-                                                : optionLabel(t, "spaceRole", member.role)}
-                                        </span>
-                                    ) : (
-                                        <>
-                                            <Select
-                                                value={member.role}
-                                                options={ROLE_OPTIONS}
-                                                aria-label={t("access.roleFor", {
-                                                    name: member.name
-                                                })}
-                                                className="h-8 w-28 text-xs"
-                                                onValueChange={async (next) => {
-                                                    await runAction(
-                                                        () =>
-                                                            whole
-                                                                ? actions.setSpaceMemberRoleAction(
-                                                                      scopeId,
-                                                                      member.userId,
-                                                                      next as core.SpaceRole
-                                                                  )
-                                                                : actions.setFolderMemberRoleAction(
-                                                                      scopeId,
-                                                                      member.userId,
-                                                                      next as core.SpaceRole
-                                                                  ),
-                                                        setError
-                                                    );
-                                                    await reload();
-                                                }}
-                                            />
-                                            <button
-                                                type="button"
-                                                aria-label={t("pickers.remove", {
-                                                    name: member.name
-                                                })}
-                                                title={t("access.remove")}
-                                                onClick={async () => {
-                                                    await runAction(
-                                                        () =>
-                                                            whole
-                                                                ? actions.removeSpaceMemberAction(
-                                                                      scopeId,
-                                                                      member.userId
-                                                                  )
-                                                                : actions.removeFolderMemberAction(
-                                                                      scopeId,
-                                                                      member.userId
-                                                                  ),
-                                                        setError
-                                                    );
-                                                    await reload();
-                                                }}
-                                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
-                                            >
-                                                <Trash2 className="size-4 shrink-0" />
-                                            </button>
-                                        </>
-                                    )}
-                                </PersonRow>
-                            );
-                        })}
-                    </ul>
-                )}
-
-                {canManage && !loading && (
-                    <form
-                        className="mt-2 flex flex-wrap items-end gap-2 border-t border-border pt-3"
-                        onSubmit={async (event) => {
-                            event.preventDefault();
-                            if (!scopeId || !identifier.trim()) return;
-                            setError("");
-                            const result = await runAction(
-                                () =>
-                                    whole
-                                        ? actions.addSpaceMemberAction(
-                                              scopeId,
-                                              identifier.trim(),
-                                              role
-                                          )
-                                        : actions.addFolderMemberAction(
-                                              scopeId,
-                                              identifier.trim(),
-                                              role
-                                          ),
-                                setError
-                            );
-                            if (result?.error) {
-                                setError(result.error);
-                                return;
-                            }
-                            setIdentifier("");
-                            await reload();
-                        }}
-                    >
-                        <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-muted-foreground">
-                            {t("access.identifier")}
-                            <Input
-                                value={identifier}
-                                placeholder="client@example.com"
-                                onChange={(event) => setIdentifier(event.target.value)}
-                                className="h-9"
-                            />
-                        </label>
-                        <Select
-                            value={role}
-                            options={ROLE_OPTIONS}
-                            aria-label={t("access.role")}
-                            className="h-9 w-32"
-                            onValueChange={(next) => setRole(next as core.SpaceRole)}
-                        />
-                        <Button type="submit" size="sm" disabled={!identifier.trim()}>
-                            <UserPlus className="size-4 shrink-0" /> {t("access.invite")}
-                        </Button>
-                        <p className="w-full text-xs text-muted-foreground">
-                            {optionLabel(t, "spaceRoleHint", role)}
+                <div className="flex min-w-0 flex-col gap-5">
+                    {error && (
+                        <p
+                            role="alert"
+                            className="rounded-md bg-danger-soft px-3 py-2 text-[13px] text-danger-ink"
+                        >
+                            {error}
                         </p>
-                    </form>
-                )}
+                    )}
 
-                {!loading && (granted.length > 0 || available.length > 0) && (
-                    <div className="flex flex-col gap-2 border-t border-border pt-3">
-                        <p className="text-xs font-medium">{t("access.teams")}</p>
-                        {granted.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">
-                                {whole ? t("access.noTeamSpace") : t("access.noTeamFolder")}
+                    {/* The one box: who to add, what they may do, and the button. */}
+                    {canManage && !loading && (
+                        <form
+                            className="flex min-w-0 flex-col gap-2"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                void invite();
+                            }}
+                        >
+                            <label className="sr-only" htmlFor="task-access-add">
+                                {t("access.identifier")}
+                            </label>
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                <Input
+                                    id="task-access-add"
+                                    className="min-w-48 flex-1"
+                                    autoComplete="off"
+                                    value={identifier}
+                                    placeholder={t("access.identifier")}
+                                    onChange={(event) => setIdentifier(event.target.value)}
+                                />
+                                <Select
+                                    value={role}
+                                    options={ROLE_OPTIONS}
+                                    aria-label={t("access.role")}
+                                    className="w-auto shrink-0"
+                                    onValueChange={(next) => setRole(next as core.SpaceRole)}
+                                />
+                                <Button
+                                    type="submit"
+                                    className="shrink-0"
+                                    disabled={!identifier.trim()}
+                                    aria-disabled={!identifier.trim()}
+                                >
+                                    <UserPlus className="size-4 shrink-0" aria-hidden />
+                                    {t("access.invite")}
+                                </Button>
+                            </div>
+                            <p className="text-[12px] text-muted-foreground">
+                                {optionLabel(t, "spaceRoleHint", role)}
+                            </p>
+                        </form>
+                    )}
+
+                    <section
+                        className="flex min-w-0 flex-col gap-2"
+                        aria-label={t("access.peopleWithAccess")}
+                    >
+                        <h3 className="truncate text-[13px] font-medium text-foreground">
+                            {t("access.peopleWithAccess")}
+                        </h3>
+                        {loading ? (
+                            <>
+                                <Skeleton className="h-12 w-full" />
+                                <Skeleton className="h-12 w-full" />
+                            </>
+                        ) : members.length === 0 ? (
+                            <p className="px-1 text-[13px] text-muted-foreground">
+                                {whole ? t("access.nobodySpace") : t("access.nobodyFolder")}
                             </p>
                         ) : (
-                            <ul className="flex flex-col gap-1">
-                                {granted.map((grant) => (
-                                    <li
-                                        key={grant.teamId}
-                                        className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
-                                    >
-                                        <p
-                                            className="min-w-0 flex-1 truncate text-sm"
-                                            title={grant.teamName}
+                            <ul className="flex max-h-72 min-w-0 flex-col overflow-y-auto overscroll-contain">
+                                {members.map((member) => {
+                                    // The owner is not a grant and cannot be one:
+                                    // taking the role off them would leave the
+                                    // space with none.
+                                    const fixed =
+                                        member.inherited || member.role === "owner" || !canManage;
+                                    const line = member.through
+                                        ? t("access.through", { name: member.through })
+                                        : member.contact;
+                                    return (
+                                        <PersonRow
+                                            as="li"
+                                            key={member.userId}
+                                            personId={member.userId}
+                                            className="flex min-h-14 min-w-0 items-center gap-3 px-1 py-1"
                                         >
-                                            {grant.teamName}
-                                        </p>
-                                        {canManage ? (
-                                            <>
+                                            <Avatar
+                                                person={{ id: member.userId, name: member.name }}
+                                                size={32}
+                                                status={false}
+                                                lazy
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <p
+                                                    className="truncate text-[13px] text-foreground"
+                                                    title={member.name}
+                                                >
+                                                    <PersonName
+                                                        id={member.userId}
+                                                        name={member.name}
+                                                    />
+                                                </p>
+                                                {line ? (
+                                                    <p
+                                                        className="truncate text-[12px] text-muted-foreground"
+                                                        title={line}
+                                                    >
+                                                        {line}
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                            {fixed ? (
+                                                <span className="shrink-0 text-[12px] text-muted-foreground">
+                                                    {member.role === "owner"
+                                                        ? t("access.owner")
+                                                        : optionLabel(t, "spaceRole", member.role)}
+                                                </span>
+                                            ) : (
+                                                <Select
+                                                    value={member.role}
+                                                    options={[
+                                                        ...ROLE_OPTIONS,
+                                                        {
+                                                            value: REMOVE,
+                                                            label: t("access.removeAccess")
+                                                        }
+                                                    ]}
+                                                    aria-label={t("access.roleFor", {
+                                                        name: member.name
+                                                    })}
+                                                    className="w-auto shrink-0"
+                                                    onValueChange={(next) =>
+                                                        void changeMemberRole(member, next)
+                                                    }
+                                                />
+                                            )}
+                                        </PersonRow>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </section>
+
+                    {!loading && (granted.length > 0 || available.length > 0) && (
+                        <section
+                            className="flex min-w-0 flex-col gap-2"
+                            aria-label={t("access.teams")}
+                        >
+                            <h3 className="text-[13px] font-medium text-foreground">
+                                {t("access.teams")}
+                            </h3>
+                            {granted.length === 0 ? (
+                                <p className="px-1 text-[13px] text-muted-foreground">
+                                    {whole ? t("access.noTeamSpace") : t("access.noTeamFolder")}
+                                </p>
+                            ) : (
+                                <ul className="flex min-w-0 flex-col">
+                                    {granted.map((grant) => (
+                                        <li
+                                            key={grant.teamId}
+                                            className="flex min-h-14 min-w-0 items-center gap-3 px-1 py-1"
+                                        >
+                                            <GroupFace icon={Users} />
+                                            <p
+                                                className="min-w-0 flex-1 truncate text-[13px] text-foreground"
+                                                title={grant.teamName}
+                                            >
+                                                {grant.teamName}
+                                            </p>
+                                            {canManage ? (
                                                 <Select
                                                     value={grant.role}
-                                                    options={ROLE_OPTIONS}
+                                                    options={[
+                                                        ...ROLE_OPTIONS,
+                                                        {
+                                                            value: REMOVE,
+                                                            label: t("access.removeAccess")
+                                                        }
+                                                    ]}
                                                     aria-label={t("access.roleFor", {
                                                         name: grant.teamName
                                                     })}
-                                                    className="h-8 w-28 text-xs"
-                                                    onValueChange={async (next) => {
-                                                        if (!scopeId) return;
-                                                        await runAction(
-                                                            () =>
-                                                                whole
-                                                                    ? actions.grantSpaceTeamAction(
-                                                                          scopeId,
-                                                                          grant.teamId,
-                                                                          next as core.SpaceRole
-                                                                      )
-                                                                    : actions.grantFolderTeamAction(
-                                                                          scopeId,
-                                                                          grant.teamId,
-                                                                          next as core.SpaceRole
-                                                                      ),
-                                                            setError
-                                                        );
-                                                        await reloadTeams();
-                                                    }}
+                                                    className="w-auto shrink-0"
+                                                    onValueChange={(next) =>
+                                                        void changeTeamRole(grant.teamId, next)
+                                                    }
                                                 />
-                                                <button
-                                                    type="button"
-                                                    aria-label={t("pickers.remove", {
-                                                        name: grant.teamName
-                                                    })}
-                                                    title={t("access.remove")}
-                                                    onClick={async () => {
-                                                        if (!scopeId) return;
-                                                        await runAction(
-                                                            () =>
-                                                                whole
-                                                                    ? actions.revokeSpaceTeamAction(
-                                                                          scopeId,
-                                                                          grant.teamId
-                                                                      )
-                                                                    : actions.revokeFolderTeamAction(
-                                                                          scopeId,
-                                                                          grant.teamId
-                                                                      ),
-                                                            setError
-                                                        );
-                                                        await reloadTeams();
-                                                    }}
-                                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
-                                                >
-                                                    <Trash2 className="size-4 shrink-0" />
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground">
-                                                {optionLabel(t, "spaceRole", grant.role)}
-                                            </span>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
+                                            ) : (
+                                                <span className="shrink-0 text-[12px] text-muted-foreground">
+                                                    {optionLabel(t, "spaceRole", grant.role)}
+                                                </span>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
 
-                        {canManage &&
-                            available.some(
-                                (team) => !granted.some((grant) => grant.teamId === team.id)
-                            ) && (
-                                <div className="flex flex-wrap items-end gap-2">
+                            {canManage && teamsOffered.length > 0 && (
+                                <div className="flex min-w-0 flex-wrap items-center gap-2">
                                     <Select
                                         value={teamPick}
                                         placeholder={t("access.chooseTeam")}
                                         aria-label={t("access.teamToAdd")}
-                                        className="h-9 min-w-48 flex-1"
-                                        options={available
-                                            .filter(
-                                                (team) =>
-                                                    !granted.some(
-                                                        (grant) => grant.teamId === team.id
-                                                    )
-                                            )
-                                            .map((team) => ({ value: team.id, label: team.name }))}
+                                        className="min-w-48 flex-1"
+                                        options={teamsOffered.map((team) => ({
+                                            value: team.id,
+                                            label: team.name
+                                        }))}
                                         onValueChange={setTeamPick}
                                     />
                                     <Select
                                         value={teamRole}
                                         options={ROLE_OPTIONS}
                                         aria-label={t("access.teamRole")}
-                                        className="h-9 w-32"
+                                        className="w-auto shrink-0"
                                         onValueChange={(next) =>
                                             setTeamRole(next as core.SpaceRole)
                                         }
                                     />
                                     <Button
                                         type="button"
-                                        size="sm"
+                                        className="shrink-0"
                                         disabled={!teamPick}
-                                        onClick={async () => {
-                                            if (!scopeId || !teamPick) return;
-                                            const result = await runAction(
-                                                () =>
-                                                    whole
-                                                        ? actions.grantSpaceTeamAction(
-                                                              scopeId,
-                                                              teamPick,
-                                                              teamRole
-                                                          )
-                                                        : actions.grantFolderTeamAction(
-                                                              scopeId,
-                                                              teamPick,
-                                                              teamRole
-                                                          ),
-                                                setError
-                                            );
-                                            if (result?.error) {
-                                                setError(result.error);
-                                                return;
-                                            }
-                                            setTeamPick("");
-                                            await reloadTeams();
-                                        }}
+                                        aria-disabled={!teamPick}
+                                        onClick={() => void giveTeam()}
                                     >
-                                        <UserPlus className="size-4 shrink-0" /> {t("access.give")}
+                                        <UserPlus className="size-4 shrink-0" aria-hidden />
+                                        {t("access.give")}
                                     </Button>
                                 </div>
                             )}
-                    </div>
-                )}
+                        </section>
+                    )}
 
-                {!loading && scopeId ? (
-                    <RoleGrants
-                        subject={whole ? "task.space" : "task.folder"}
-                        subjectId={scopeId}
-                        canManage={canManage}
-                        whole={whole}
-                    />
-                ) : null}
+                    {!loading && scopeId ? (
+                        <RoleGrants
+                            subject={whole ? "task.space" : "task.folder"}
+                            subjectId={scopeId}
+                            canManage={canManage}
+                            whole={whole}
+                        />
+                    ) : null}
+                </div>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** A team's or a role's face: the same 32px disc a person's avatar takes, so
+ *  every row of the dialog lines up. */
+function GroupFace({ icon: Icon }: { icon: typeof Users }) {
+    return (
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-foreground-subtle">
+            <Icon className="size-4 shrink-0" aria-hidden />
+        </span>
     );
 }
 
@@ -623,32 +647,37 @@ function RoleGrants({
     if (grants.length === 0 && offered.length === 0) return null;
 
     return (
-        <div className="flex flex-col gap-2 border-t border-border pt-3">
-            <p className="text-xs font-medium">{t("access.roles")}</p>
+        <section className="flex min-w-0 flex-col gap-2" aria-label={t("access.roles")}>
+            <h3 className="text-[13px] font-medium text-foreground">{t("access.roles")}</h3>
             {grants.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
+                <p className="px-1 text-[13px] text-muted-foreground">
                     {whole ? t("access.noRoleSpace") : t("access.noRoleFolder")}
                 </p>
             ) : (
-                <ul className="flex flex-col gap-1">
+                <ul className="flex min-w-0 flex-col">
                     {grants.map((grant) => (
                         <li
                             key={grant.id}
-                            className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
+                            className="flex min-h-14 min-w-0 items-center gap-3 px-1 py-1"
                         >
-                            <p
-                                className="min-w-0 flex-1 truncate text-sm"
-                                title={grant.principalName}
-                            >
-                                {grant.principalName}
+                            <GroupFace icon={Shield} />
+                            <div className="min-w-0 flex-1">
+                                <p
+                                    className="truncate text-[13px] text-foreground"
+                                    title={grant.principalName}
+                                >
+                                    {grant.principalName}
+                                </p>
                                 {grant.orgName ? (
-                                    <span className="text-muted-foreground">
-                                        {" "}
-                                        - {grant.orgName}
-                                    </span>
+                                    <p
+                                        className="truncate text-[12px] text-muted-foreground"
+                                        title={grant.orgName}
+                                    >
+                                        {grant.orgName}
+                                    </p>
                                 ) : null}
-                            </p>
-                            <span className="shrink-0 text-xs text-muted-foreground">
+                            </div>
+                            <span className="shrink-0 text-[12px] text-muted-foreground">
                                 {(core.SPACE_ROLES as readonly string[]).includes(grant.capability)
                                     ? optionLabel(t, "spaceRole", grant.capability)
                                     : grant.capability}
@@ -657,6 +686,7 @@ function RoleGrants({
                                 <Button
                                     variant="ghost"
                                     size="icon"
+                                    className="shrink-0"
                                     disabled={busy}
                                     aria-label={t("access.takeOff", { name: grant.principalName })}
                                     title={t("access.takeRoleOff")}
@@ -675,7 +705,7 @@ function RoleGrants({
                                         await load();
                                     }}
                                 >
-                                    <Trash2 className="size-4 shrink-0" />
+                                    <Trash2 className="size-4 shrink-0" aria-hidden />
                                 </Button>
                             ) : null}
                         </li>
@@ -684,10 +714,10 @@ function RoleGrants({
             )}
 
             {canManage && offered.length > 0 ? (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <Select
                         aria-label={t("access.whichRole")}
-                        className="min-w-40 flex-1"
+                        className="min-w-48 flex-1"
                         value={pick}
                         onValueChange={setPick}
                         placeholder={t("access.pickRole")}
@@ -698,6 +728,7 @@ function RoleGrants({
                     />
                     <Select
                         aria-label={t("access.roleCapability")}
+                        className="w-auto shrink-0"
                         value={role}
                         onValueChange={(next) => setRole(next as core.SpaceRole)}
                         options={core.SPACE_ROLES.map((one) => ({
@@ -706,7 +737,7 @@ function RoleGrants({
                         }))}
                     />
                     <Button
-                        size="sm"
+                        className="shrink-0"
                         disabled={busy || !pick}
                         aria-disabled={busy || !pick}
                         onClick={async () => {
@@ -725,16 +756,17 @@ function RoleGrants({
                             await load();
                         }}
                     >
-                        <UserPlus className="size-4 shrink-0" /> {t("access.give")}
+                        <UserPlus className="size-4 shrink-0" aria-hidden />
+                        {t("access.give")}
                     </Button>
                 </div>
             ) : null}
 
             {error ? (
-                <p role="alert" className="text-xs text-danger">
+                <p role="alert" className="text-[12px] text-danger-ink">
                     {error}
                 </p>
             ) : null}
-        </div>
+        </section>
     );
 }

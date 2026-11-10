@@ -161,10 +161,11 @@ describe("who may change it", () => {
         render(<AccessDialog target={{ scope: { kind: "space", id: "s1" } }} onClose={() => {}} />, { wrapper: MessagesWrapper });
 
         await screen.findByText("Ada");
-        // Bo can be removed; the owner is not a grant and cannot be one - taking
-        // the role off them would leave the space with nobody who owns it.
-        expect(screen.getByLabelText("Remove Bo")).toBeTruthy();
-        expect(screen.queryByLabelText("Remove Ada")).toBeNull();
+        // Bo's role menu carries "Remove access"; the owner is not a grant and
+        // has no menu - taking the role off them would leave the space with
+        // nobody who owns it.
+        expect(screen.getByLabelText("Role for Bo")).toBeTruthy();
+        expect(screen.queryByLabelText("Role for Ada")).toBeNull();
     });
 });
 

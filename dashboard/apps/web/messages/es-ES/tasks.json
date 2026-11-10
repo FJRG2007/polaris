@@ -715,7 +715,9 @@
         "takeRoleOff": "Quitar este rol",
         "whichRole": "Qué rol",
         "pickRole": "Elige un rol",
-        "roleCapability": "Qué puede hacer aquí ese rol"
+        "roleCapability": "Qué puede hacer aquí ese rol",
+        "peopleWithAccess": "Personas con acceso",
+        "removeAccess": "Quitar acceso"
     },
     "automations": {
         "namePlaceholder": "Para qué es esta regla",

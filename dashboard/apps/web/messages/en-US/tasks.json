@@ -715,7 +715,9 @@
         "takeRoleOff": "Take this role off",
         "whichRole": "Which role",
         "pickRole": "Pick a role",
-        "roleCapability": "What that role can do here"
+        "roleCapability": "What that role can do here",
+        "peopleWithAccess": "People with access",
+        "removeAccess": "Remove access"
     },
     "automations": {
         "namePlaceholder": "What this rule is for",
