@@ -113,7 +113,7 @@ describe("startIssueSession", () => {
         expect(state.delivered).toEqual(state.messages);
         expect(state.comments).toHaveLength(1);
         expect(state.comments[0]!.number).toBe(12);
-        expect(state.comments[0]!.body).toContain("https://polaris.example.test/apps/agents/sessions/s-1");
+        expect(state.comments[0]!.body).toContain("https://polaris.example.test/polar?session=s-1");
     });
 
     it("says on the issue that no agent is signed in", async () => {

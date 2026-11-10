@@ -41,7 +41,7 @@ for (const path of [
     "@/lib/audit-service",
     "@/lib/workspace-scope",
     "@/lib/agents/agent-readiness",
-    "@/app/(app)/apps/agents/sessions/actions",
+    "@/components/agents/sessions/actions",
     "@/lib/tasks/task-service",
     "@/lib/tasks/view-service",
     "@/lib/tasks/form-service",

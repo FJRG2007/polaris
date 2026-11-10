@@ -2,7 +2,7 @@
 // not an action: the service worker has no action id to call. See lib/poll-route.
 import { actionRoute } from "@/lib/poll-route";
 import { permissionAnswerSchema } from "@/lib/agents/session-permissions";
-import { answerPermissionAction } from "@/app/(app)/apps/agents/sessions/actions";
+import { answerPermissionAction } from "@/components/agents/sessions/actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

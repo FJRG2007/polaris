@@ -34,7 +34,7 @@ import {
     sendFailingChecksAction,
     sessionChecksAction,
     type SessionChecksView
-} from "../actions";
+} from "./actions";
 
 const REFRESH_MS = 30_000;
 type MergeMethod = "squash" | "merge" | "rebase";

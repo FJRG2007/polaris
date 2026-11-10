@@ -33,9 +33,9 @@ import {
 } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { agentText } from "@/lib/agents/words";
-import * as polls from "../sessions/sessions-polls";
+import * as polls from "@/components/agents/sessions/sessions-polls";
 import { PagedPicker } from "@/components/paged-picker";
-import { repoOptionsAction } from "../sessions/actions";
+import { repoOptionsAction } from "@/components/agents/sessions/actions";
 import type { RepoOption } from "@/lib/agents/repo-options";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -122,7 +122,7 @@ export function OrchestrationView({ overview }: { overview: RunsOverview }) {
                                         </p>
                                     </div>
                                     <Button asChild size="sm" variant="secondary">
-                                        <Link href={`/apps/agents/sessions/${session.id}`}>
+                                        <Link href={`/polar?session=${session.id}`}>
                                             {t("orchestration.open")}
                                         </Link>
                                     </Button>
@@ -297,7 +297,7 @@ function RunCard({ run, onError }: { run: Run; onError: (error: string | null) =
                     <Badge>{t(`orchestration.runStatus.${runStatus as (typeof RUN_STATUSES)[number]}`)}</Badge>
                     {run.coordinatorSessionId ? (
                         <Button asChild size="sm" variant="ghost">
-                            <Link href={`/apps/agents/sessions/${run.coordinatorSessionId}`}>
+                            <Link href={`/polar?session=${run.coordinatorSessionId}`}>
                                 {t("orchestration.coordinator")}
                             </Link>
                         </Button>
@@ -395,7 +395,7 @@ function TaskNode({ task, titleOf }: { task: Task; titleOf: Map<string, string> 
             ) : null}
             {task.sessionId ? (
                 <Link
-                    href={`/apps/agents/sessions/${task.sessionId}`}
+                    href={`/polar?session=${task.sessionId}`}
                     className="text-xs text-muted-foreground underline"
                 >
                     {t("orchestration.openSession")}

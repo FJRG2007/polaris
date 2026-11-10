@@ -14,7 +14,6 @@ import { z } from "zod";
 import { after } from "next/server";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { revalidatePath } from "next/cache";
 import * as taskAccess from "@/lib/tasks/access";
 import { requirePermission } from "@/lib/session";
 import * as runtime from "@/lib/agents/session-runtime";
@@ -57,7 +56,8 @@ import {
     type GithubInstallGap
 } from "@/lib/github-app-reach";
 
-const SESSIONS_PATH = "/apps/agents/sessions";
+/** Where a session is opened: Polar's Code side. */
+const polarSession = (id: string) => `/polar?session=${id}`;
 
 /**
  * The agents Polaris can offer, and where a session could run.
@@ -324,7 +324,6 @@ async function startParsed(
     }
     const { session } = admission;
     if (admission.startError) {
-        revalidatePath(SESSIONS_PATH);
         return {
             id: session.id,
             error: agentText(t, sessions.readableFailure(admission.startError, `starting ${session.id}`))
@@ -354,7 +353,6 @@ async function startParsed(
     }
 
     await noteOnTask(session, user.id);
-    revalidatePath(SESSIONS_PATH);
     return { id: session.id, queuedAt: admission.queuedAt };
 }
 
@@ -428,7 +426,7 @@ async function noteOnTask(session: sessions.SessionView, userId: string): Promis
             body: t("sessions.taskNote", {
                 branch: session.branch ?? "",
                 repo: session.repoFullName ?? "",
-                href: `/apps/agents/sessions/${session.id}`
+                href: polarSession(session.id)
             }),
             parentId: null,
             assignedToId: null
@@ -470,7 +468,6 @@ export async function promptSessionAction(input: unknown): Promise<{ error?: str
     } catch (error) {
         return { error: agentText(t, sessions.readableFailure(error, `prompting ${session.id}`)) };
     }
-    revalidatePath(`${SESSIONS_PATH}/${session.id}`);
     return {};
 }
 
@@ -486,7 +483,6 @@ export async function interruptSessionAction(sessionId: string): Promise<{ error
             error: agentText(t, sessions.readableFailure(error, `interrupting ${sessionId}`))
         };
     }
-    revalidatePath(`${SESSIONS_PATH}/${sessionId}`);
     return {};
 }
 
@@ -500,11 +496,6 @@ export async function stopSessionAction(sessionId: string): Promise<{ error?: st
     // Whatever this freed goes to whoever is waiting, now rather than on the
     // next pass of the timer.
     after(() => queue.sweepSessionQueue().catch(() => 0));
-    revalidatePath(SESSIONS_PATH);
-    // And the session's own page, which is where the button was pressed. Only
-    // the list was revalidated, so the screen somebody was actually looking at
-    // waited for its next poll to notice.
-    revalidatePath(`${SESSIONS_PATH}/${sessionId}`);
     return {};
 }
 
@@ -519,7 +510,6 @@ export async function retrySessionPushAction(sessionId: string): Promise<{ error
     if (!session) return { error: t("sessions.errors.gone") };
     if (session.work?.state !== "kept") return {};
     const outcome = await work.endContainerSession(sessionId);
-    revalidatePath(`${SESSIONS_PATH}/${sessionId}`);
     if (outcome.kind === "kept") return { error: t("session.work.retryFailed") };
     return {};
 }
@@ -532,7 +522,6 @@ export async function discardSessionWorkAction(sessionId: string): Promise<{ err
     if (!session) return { error: t("sessions.errors.gone") };
     if (session.work?.state !== "kept") return {};
     await work.discardSessionWork(sessionId);
-    revalidatePath(`${SESSIONS_PATH}/${sessionId}`);
     return {};
 }
 
@@ -682,7 +671,7 @@ export async function sessionShipAction(
             draft: review.pullRequestDraft({
                 title: session.title,
                 prompt: first?.body ?? null,
-                sessionUrl: `${base.replace(/\/+$/, "")}${SESSIONS_PATH}/${session.id}`,
+                sessionUrl: `${base.replace(/\/+$/, "")}${polarSession(session.id)}`,
                 words: {
                     fallbackTitle: t("session.ship.draftTitle"),
                     asked: t("session.ship.draftAsked"),
@@ -715,7 +704,6 @@ export async function openSessionPullRequestAction(
         await review.sessionPushSetting(session.id),
         { title: parsed.data.title, body: parsed.data.body }
     );
-    revalidatePath(`${SESSIONS_PATH}/${session.id}`);
     if (result.kind === "refused") {
         if (result.reason === "push")
             return { error: t(`session.work.reasons.${result.pushReason ?? "other"}`) };
@@ -778,7 +766,6 @@ export async function resumeSessionAction(input: unknown): Promise<{ error?: str
     } catch (error) {
         return { error: agentText(t, sessions.readableFailure(error, `resuming ${session.id}`)) };
     }
-    revalidatePath(`${SESSIONS_PATH}/${session.id}`);
     return {};
 }
 
@@ -870,7 +857,6 @@ async function sendToAgent(
     } catch (error) {
         return { error: agentText(t, sessions.readableFailure(error, `prompting ${session.id}`)) };
     }
-    revalidatePath(`${SESSIONS_PATH}/${session.id}`);
     return {};
 }
 
@@ -1024,7 +1010,6 @@ export async function mergeSessionPullAction(input: unknown): Promise<{ error?: 
         { method: parsed.data.method },
         token
     );
-    revalidatePath(`${SESSIONS_PATH}/${session.id}`);
     if (result.ok) return {};
     const said = result.message
         ? ` ${t("session.merge.githubSaid", { message: result.message })}`

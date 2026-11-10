@@ -622,7 +622,7 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
         case "mail.mailbox":
             return `/mail/shared/${subjectId}`;
         case "agents.session":
-            return `/apps/agents/sessions/${subjectId}`;
+            return `/polar?session=${subjectId}`;
         case "dns.filter":
             return "/network-filter";
         case "telemetry.project":

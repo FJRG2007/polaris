@@ -66,6 +66,6 @@ describe("a shared agent session", () => {
         await expect(requireMayShare(as, "agents.session", SESSION)).rejects.toThrow();
         state.owned = true;
         await expect(requireMayShare(as, "agents.session", SESSION)).resolves.toBeUndefined();
-        expect(subjectHref("agents.session", SESSION)).toBe(`/apps/agents/sessions/${SESSION}`);
+        expect(subjectHref("agents.session", SESSION)).toBe(`/polar?session=${SESSION}`);
     });
 });

@@ -115,7 +115,7 @@ export async function startIssueSession(input: IssueSessionInput): Promise<strin
     const base = (await appBaseUrl()).replace(/\/+$/, "");
     await say(
         t("issueSessions.started", {
-            url: `${base}/apps/agents/sessions/${session.id}`,
+            url: `${base}/polar?session=${session.id}`,
             branch: session.branch
         })
     );

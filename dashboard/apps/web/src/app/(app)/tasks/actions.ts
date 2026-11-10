@@ -29,7 +29,7 @@ import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { requirePermission, requireUser, sessionCan } from "@/lib/session";
 import { agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
 import * as repoOptions from "@/lib/agents/repo-options";
-import { startSessionAction } from "@/app/(app)/apps/agents/sessions/actions";
+import { startSessionAction } from "@/components/agents/sessions/actions";
 import * as tasks from "@/lib/tasks/task-service";
 import * as views from "@/lib/tasks/view-service";
 import * as forms from "@/lib/tasks/form-service";

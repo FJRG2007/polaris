@@ -160,10 +160,15 @@ describe("the Chat / Code switch", () => {
             prompt: "Fix the login form\nwith tests",
             enigma: { enabled: true }
         });
-        // The new session opens in the thread, a click from its full page.
-        const full = await screen.findByRole("link", { name: "Open the full session" });
-        expect(full.getAttribute("href")).toBe(
-            "/apps/agents/sessions/33333333-3333-4333-8333-333333333333"
+        // The new session opens in the thread, which reads it.
+        await waitFor(() =>
+            expect(
+                vi
+                    .mocked(fetch)
+                    .mock.calls.some(([url]) =>
+                        String(url).includes("33333333-3333-4333-8333-333333333333")
+                    )
+            ).toBe(true)
         );
     });
 

@@ -233,7 +233,7 @@ describe("an agent that needs you", () => {
         expect(waiting).toHaveLength(1);
         expect(waiting[0]![0]).toMatchObject({
             userId: "u1",
-            href: "/apps/agents/sessions/s1",
+            href: "/polar?session=s1",
             actionRequired: true
         });
     });
@@ -358,7 +358,7 @@ describe("stopping a session never loses its work", () => {
         expect(kept).toHaveLength(1);
         expect(kept[0]![0]).toMatchObject({
             actionRequired: true,
-            href: "/apps/agents/sessions/s1"
+            href: "/polar?session=s1"
         });
     });
 

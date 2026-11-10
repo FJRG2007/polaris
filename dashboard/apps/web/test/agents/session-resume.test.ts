@@ -89,7 +89,7 @@ import { SessionRefusal } from "@/lib/agents/session-service";
 import {
     resumeSessionAction,
     sessionResumableAction
-} from "@/app/(app)/apps/agents/sessions/actions";
+} from "@/components/agents/sessions/actions";
 
 const SESSION_ID = "0190a0f0-0000-7000-8000-000000000001";
 const VENDOR_ID = "5f2c9a1e-7d3b-4c2a-9e1f-0a1b2c3d4e5f";

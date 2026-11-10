@@ -256,24 +256,24 @@ vi.mock("@/app/(app)/apps/servers/servers-polls", () => ({
     sharedHost: forward(() => import("@/app/(app)/apps/servers/actions"), "sharedHostAction", 1)
 }));
 
-vi.mock("@/app/(app)/apps/agents/sessions/sessions-polls", () => ({
+vi.mock("@/components/agents/sessions/sessions-polls", () => ({
     sessionScreen: forward(
-        () => import("@/app/(app)/apps/agents/sessions/actions"),
+        () => import("@/components/agents/sessions/actions"),
         "sessionScreenAction",
         1
     ),
     sessionChoices: forward(
-        () => import("@/app/(app)/apps/agents/sessions/actions"),
+        () => import("@/components/agents/sessions/actions"),
         "sessionChoicesAction",
         0
     ),
     sessionChanges: forward(
-        () => import("@/app/(app)/apps/agents/sessions/actions"),
+        () => import("@/components/agents/sessions/actions"),
         "sessionChangesAction",
         1
     ),
     sessionHistory: forward(
-        () => import("@/app/(app)/apps/agents/sessions/actions"),
+        () => import("@/components/agents/sessions/actions"),
         "sessionHistoryAction",
         1
     )

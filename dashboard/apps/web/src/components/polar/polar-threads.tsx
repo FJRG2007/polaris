@@ -744,13 +744,6 @@ function CodeList({ code, query }: { code: PolarThreadsCode; query: string }) {
                     {t("history.more")}
                 </button>
             ) : null}
-            <a
-                href="/apps/agents/sessions"
-                className="mt-1 flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground hover:bg-card-hover hover:text-foreground"
-            >
-                <ExternalLink className="size-3.5 shrink-0 text-foreground-subtle" />
-                <span className="min-w-0 truncate">{t("code.allSessions")}</span>
-            </a>
             {deleting ? (
                 <ConfirmDeleteDialog
                     open
@@ -819,7 +812,7 @@ function CodeItem({
             </Item>
             <Item asChild>
                 <a
-                    href={`/apps/agents/sessions/${encodeURIComponent(row.id)}`}
+                    href={`/polar?session=${encodeURIComponent(row.id)}`}
                     target="_blank"
                     rel="noopener"
                 >

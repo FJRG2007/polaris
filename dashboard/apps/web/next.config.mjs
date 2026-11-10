@@ -324,6 +324,15 @@ const nextConfig = {
             permanent: false
         },
         { source: "/polar/settings", destination: "/polar/settings/memory", permanent: false },
+        // Agent sessions are Polar's Code side now; the Agents app keeps the
+        // repository work (reviews, pull requests, issues). Links to a session
+        // sit in notices, task comments and GitHub issues.
+        { source: "/apps/agents/sessions", destination: "/polar?session=new", permanent: false },
+        {
+            source: "/apps/agents/sessions/:sessionId",
+            destination: "/polar?session=:sessionId",
+            permanent: false
+        },
         // Linear and Jira are connected from Connected accounts, beside every
         // other account. The Tasks menu and bookmarks still name the old screen;
         // the hub shows the section only to whoever can manage tasks.

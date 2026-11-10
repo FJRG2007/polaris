@@ -76,7 +76,8 @@ import type {
     PolarCodeRow,
     PolarCodeThread
 } from "@/lib/polar/code";
-import { Code2, ExternalLink, MessageSquare, PanelRight, TriangleAlert } from "lucide-react";
+import type { SessionView } from "@/lib/agents/session-service";
+import { Code2, MessageSquare, PanelRight, TriangleAlert } from "lucide-react";
 import dynamic from "next/dynamic";
 
 /** Loaded after the thread, not with it: its terminal is not needed to read one. */
@@ -85,11 +86,31 @@ const PolarCodeWorkspace = dynamic(
     { ssr: false }
 );
 
+/** A session's pull request and its Share button, in the Agents app's words.
+ *  Drawn only where somebody can steer the session, so loaded there. */
+const SessionTools = dynamic(
+    () =>
+        Promise.all([
+            import("@/components/agents/sessions/session-pull"),
+            import("@/components/agents/sessions/share-button"),
+            import("@/components/i18n/client-namespaces")
+        ]).then(([pull, share, i18n]) =>
+            function SessionTools({ session }: { session: SessionView }) {
+                return (
+                    <i18n.ClientMessages namespaces={["agents"]} fallback={null}>
+                        {session.pullRequest ? <pull.SessionPull session={session} /> : null}
+                        <share.SessionShareButton sessionId={session.id} title={session.title} />
+                    </i18n.ClientMessages>
+                );
+            }
+        ),
+    { ssr: false }
+);
+
 export type PolarMode = "chat" | "code";
 
 const MODE_KEY = "polar.mode";
 const OVERVIEW_KEY = "polar.code.overview.v2";
-const SESSIONS_PAGE = "/apps/agents/sessions";
 /** How often the history is asked again while Code is on screen. */
 const LIST_MS = 10_000;
 /** How often a live session's thread is asked again. */
@@ -457,6 +478,7 @@ export function PolarCodeView({
                 canPrompt={canStart}
                 fullPage={fullPage}
                 voiceKit={voiceKit}
+                onOpen={code.open}
             />
         );
 
@@ -766,7 +788,7 @@ function CodeStart({
             {unlinked ? (
                 <Notice>
                     {t("code.signIn", { agent: unlinked.label })}{" "}
-                    <Link href="/apps/agents/settings" className="text-primary hover:underline">
+                    <Link href="/account/ai-keys" className="text-primary hover:underline">
                         {t("code.openSettings")}
                     </Link>
                 </Notice>
@@ -791,7 +813,8 @@ function CodeThread({
     firstPrompt,
     canPrompt,
     fullPage,
-    voiceKit
+    voiceKit,
+    onOpen
 }: {
     sessionId: string;
     /** What the task was started with here, shown until the session has it. */
@@ -799,6 +822,9 @@ function CodeThread({
     canPrompt: boolean;
     fullPage: boolean;
     voiceKit: PolarVoiceKit;
+    /** Open another session in this thread's place: the one a stopped session
+     *  is continued in. */
+    onOpen: (sessionId: string) => void;
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
@@ -861,8 +887,34 @@ function CodeThread({
     const session = thread?.session;
     const blocks = useMemo(() => codeBlocks(thread?.entries ?? []), [thread]);
 
+    /** Carry on in a new session on the same branch, with the conversation so
+     *  far where the agent can take it, and open it here. */
+    const carryOn = () => {
+        setError(null);
+        startTransition(() => {
+            void runAction(
+                () => postCode<{ id?: string; error?: string }>("/api/polar/code/continue", { sessionId }),
+                setError
+            ).then((result) => {
+                if (!result) return;
+                if (result.id) onOpen(result.id);
+                else setError(result.error ?? t("code.continueFailed"));
+            });
+        });
+    };
+
     const dock = !thread ? null : !live ? (
-        <Notice>{t("code.ended")}</Notice>
+        <div className="flex min-w-0 flex-col gap-2">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                <Notice>{t("code.ended")}</Notice>
+                {thread.canManage && canPrompt ? (
+                    <Button type="button" size="sm" variant="outline" onClick={carryOn} disabled={busy}>
+                        {t("code.continue")}
+                    </Button>
+                ) : null}
+            </div>
+            {error ? <Notice error>{error}</Notice> : null}
+        </div>
     ) : !canPrompt ? (
         <Notice>{t("code.readOnly")}</Notice>
     ) : (
@@ -919,14 +971,7 @@ function CodeThread({
                         <PanelRight className="size-4" />
                     </button>
                 ) : null}
-                <Link
-                    href={`${SESSIONS_PAGE}/${sessionId}`}
-                    aria-label={t("code.openSession")}
-                    title={t("code.openSession")}
-                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:size-11"
-                >
-                    <ExternalLink className="size-4" />
-                </Link>
+                {thread?.canManage ? <SessionTools session={thread.view} /> : null}
             </CodeSessionBar>
             <PolarThreadFrame fullPage={fullPage} dock={dock}>
                 {thread === undefined && failed ? (

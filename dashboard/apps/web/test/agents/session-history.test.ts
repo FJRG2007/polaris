@@ -184,7 +184,7 @@ vi.mock("@/lib/agents/session-service", () => ({
     sharedSession: vi.fn(async () => (db.shared ? { id: "s-1" } : null))
 }));
 
-import { sessionHistoryAction } from "@/app/(app)/apps/agents/sessions/actions";
+import { sessionHistoryAction } from "@/components/agents/sessions/actions";
 import {
     MAX_ROWS_PER_SYNC,
     SYNC_DEBOUNCE_MS,

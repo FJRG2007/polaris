@@ -654,9 +654,6 @@ export function AgentPicker({
                 <DropdownMenuItem asChild>
                     <Link href="/account/ai-keys">{t("code.apiKeys")}</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                    <Link href="/apps/agents/settings">{t("code.agentSettings")}</Link>
-                </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
     );

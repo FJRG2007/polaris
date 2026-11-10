@@ -15,7 +15,7 @@ import { runAction } from "@/lib/run-action";
 import type { SessionView } from "@/lib/agents/session-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { agentText } from "@/lib/agents/words";
-import { SessionChanges } from "../../../sessions/[sessionId]/session-changes";
+import { SessionChanges } from "@/components/agents/sessions/session-changes";
 import { chooseVariantAction } from "../../actions";
 
 interface Variant {

@@ -48,11 +48,11 @@ describe("a session's notice", () => {
         expect(state.notify.mock.calls[0]?.[0].href).toBe(`/polar?session=${ID}`);
     });
 
-    it("opens the Agents app for somebody who cannot", async () => {
+    it("opens Polar for everybody, since sessions have no other page", async () => {
         state.polar = false;
         const notices = await import("@/lib/agents/agent-notices");
         await notices.noticeSessionEnded(ID, "exited");
-        expect(state.notify.mock.calls[0]?.[0].href).toBe(`/apps/agents/sessions/${ID}`);
+        expect(state.notify.mock.calls[0]?.[0].href).toBe(`/polar?session=${ID}`);
     });
 
     it("is found again under either page when it is answered", async () => {

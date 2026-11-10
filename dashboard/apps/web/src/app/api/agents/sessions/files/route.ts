@@ -1,7 +1,7 @@
 // The files in a session's checkout. A route, not an action: see lib/poll-route.
 import { z } from "zod";
 import { pollRoute } from "@/lib/poll-route";
-import { sessionFilesAction } from "@/app/(app)/apps/agents/sessions/actions";
+import { sessionFilesAction } from "@/components/agents/sessions/actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

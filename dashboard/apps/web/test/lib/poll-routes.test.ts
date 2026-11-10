@@ -225,7 +225,7 @@ vi.mock("@/app/(app)/apps/servers/actions", () => ({
     leftoverAutoRemoveAction: actions.leftoverAutoRemoveAction,
     sharedHostAction: actions.sharedHostAction
 }));
-vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
+vi.mock("@/components/agents/sessions/actions", () => ({
     sessionScreenAction: actions.sessionScreenAction,
     sessionChoicesAction: actions.sessionChoicesAction,
     sessionChangesAction: actions.sessionChangesAction
@@ -789,8 +789,8 @@ const CASES: Case[] = [
         path: "/api/agents/sessions/screen",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/apps/agents/sessions/sessions-polls")>(
-                    "@/app/(app)/apps/agents/sessions/sessions-polls"
+                await actual<typeof import("@/components/agents/sessions/sessions-polls")>(
+                    "@/components/agents/sessions/sessions-polls"
                 )
             ).sessionScreen("session-1"),
         action: "sessionScreenAction",
@@ -2434,8 +2434,8 @@ const CASES: Case[] = [
         path: "/api/agents/sessions/choices",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/apps/agents/sessions/sessions-polls")>(
-                    "@/app/(app)/apps/agents/sessions/sessions-polls"
+                await actual<typeof import("@/components/agents/sessions/sessions-polls")>(
+                    "@/components/agents/sessions/sessions-polls"
                 )
             ).sessionChoices(),
         action: "sessionChoicesAction",
@@ -2446,8 +2446,8 @@ const CASES: Case[] = [
         path: "/api/agents/sessions/changes",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/apps/agents/sessions/sessions-polls")>(
-                    "@/app/(app)/apps/agents/sessions/sessions-polls"
+                await actual<typeof import("@/components/agents/sessions/sessions-polls")>(
+                    "@/components/agents/sessions/sessions-polls"
                 )
             ).sessionChanges({ kind: "sample" }),
         action: "sessionChangesAction",

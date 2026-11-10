@@ -19,10 +19,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ClientMessages } from "@/components/i18n/client-namespaces";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
-import * as polls from "@/app/(app)/apps/agents/sessions/sessions-polls";
+import * as polls from "@/components/agents/sessions/sessions-polls";
 import type { FileAnswer, FilesAnswer } from "@/lib/agents/session-files";
 import type { PreviewPortsAnswer } from "@/lib/agents/session-preview";
-import { SessionChanges } from "@/app/(app)/apps/agents/sessions/[sessionId]/session-changes";
+import { SessionChanges } from "@/components/agents/sessions/session-changes";
 import {
     ExternalLink,
     FileCode2,

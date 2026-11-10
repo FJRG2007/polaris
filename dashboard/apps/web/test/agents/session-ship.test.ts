@@ -74,7 +74,7 @@ import {
     openSessionPullRequestAction,
     sessionChangesAction,
     sessionFileDiffAction
-} from "@/app/(app)/apps/agents/sessions/actions";
+} from "@/components/agents/sessions/actions";
 
 const SESSION_ID = "0190a0f0-0000-7000-8000-000000000001";
 

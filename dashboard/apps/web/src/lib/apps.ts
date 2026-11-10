@@ -3000,22 +3000,6 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 ]
             },
             {
-                label: "Sessions", // i18n-ignore
-                href: "/apps/agents/sessions",
-                needs: "agents.read",
-                icon: MessagesSquare,
-                keywords: [
-                    "live",
-                    "claude code",
-                    "codex",
-                    "terminal",
-                    "worktree",
-                    "steer",
-                    "interactive",
-                    "talk to"
-                ]
-            },
-            {
                 label: "Orchestration", // i18n-ignore
                 href: "/apps/agents/orchestration",
                 needs: "agents.read",

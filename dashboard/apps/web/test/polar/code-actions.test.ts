@@ -41,7 +41,7 @@ vi.mock("@/lib/github-service", () => ({
     githubAppIsPublic: async () => true,
     githubAppVisibilityUrl: async () => "https://github.com/settings/apps/polaris-test/advanced"
 }));
-vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
+vi.mock("@/components/agents/sessions/actions", () => ({
     listSessionsAction: async (limit?: number, page?: unknown) => {
         state.listed += 1;
         state.limit = limit;

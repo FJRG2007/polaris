@@ -51,8 +51,8 @@ import {
     sessionFileDiffAction,
     sessionShipAction,
     type SessionShipView
-} from "../actions";
-import * as polls from "../sessions-polls";
+} from "./actions";
+import * as polls from "./sessions-polls";
 import { DiffReview, commentKey } from "./diff-review";
 import type { LineComment } from "@/lib/agents/session-review-loop";
 

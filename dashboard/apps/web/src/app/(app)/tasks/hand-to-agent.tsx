@@ -130,7 +130,7 @@ function HandOffDialog({
                 setError
             ).then((result) => {
                 if (!result) return;
-                if (result.id) router.push(`/apps/agents/sessions/${result.id}`);
+                if (result.id) router.push(`/polar?session=${encodeURIComponent(result.id)}`);
                 else if (result.error) setError(result.error);
             });
         });

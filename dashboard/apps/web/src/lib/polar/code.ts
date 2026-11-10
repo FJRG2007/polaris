@@ -32,12 +32,13 @@ import * as repoOptions from "@/lib/agents/repo-options";
 import { hideSessionFromPolar, renameSession, type SessionView } from "@/lib/agents/session-service";
 import { keepSpare } from "@/lib/agents/session-spares";
 import {
+    forkSessionAction,
     listSessionsAction,
     promptSessionAction,
     sessionChoicesAction,
     sessionDetailAction,
     startSessionAction
-} from "@/app/(app)/apps/agents/sessions/actions";
+} from "@/components/agents/sessions/actions";
 
 /** What this account may do on the Code side: nothing, read sessions, or start them. */
 export type PolarCodeAccess = "none" | "read" | "manage";
@@ -310,6 +311,22 @@ export async function polarCodePrompt(
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
     return promptSessionAction(input);
+}
+
+/**
+ * Carry on with a session that has ended, in a new one on the same work: its
+ * branch, agent, account and machine, and the conversation so far where the
+ * agent can take it. The Agents app's own fork, with every check a start makes.
+ */
+export async function polarCodeContinue(
+    user: SessionUser,
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    const sessionId = (input as { sessionId?: unknown } | null)?.sessionId;
+    const answer = await forkSessionAction(typeof sessionId === "string" ? sessionId : "");
+    return answer.id ? { id: answer.id } : { error: answer.error };
 }
 
 /**

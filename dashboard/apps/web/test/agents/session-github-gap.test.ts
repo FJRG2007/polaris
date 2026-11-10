@@ -61,7 +61,7 @@ vi.mock("@/lib/tasks/access", () => ({}));
 vi.mock("@/lib/tasks/task-detail-service", () => ({}));
 vi.mock("@/lib/notifications/notice-words", () => ({}));
 
-const { startSessionAction } = await import("@/app/(app)/apps/agents/sessions/actions");
+const { startSessionAction } = await import("@/components/agents/sessions/actions");
 
 beforeEach(() => {
     gap = null;
