@@ -892,7 +892,9 @@ export function Palette({
                                 ? t("picker.presetHint", {
                                       name: catalog.EVENT_PRESETS[item.preset].name
                                   })
-                                : (nodeHint(t, item.type) ?? undefined),
+                                : item.schedule
+                                  ? t(`picker.scheduleHints.${item.schedule}`)
+                                  : (nodeHint(t, item.type) ?? undefined),
                             icon: <NodeIcon type={item.type} />
                         }))
                     };

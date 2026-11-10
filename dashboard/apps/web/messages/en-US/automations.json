@@ -1005,6 +1005,14 @@
             "yearly": "On dates of the year",
             "once": "Once at a date and time",
             "every": "Every few minutes"
+        },
+        "scheduleHints": {
+            "daily": "At one or more times, every day.",
+            "weekdays": "At set times on the weekdays you pick.",
+            "monthly": "On chosen days of each month, or its last day.",
+            "yearly": "On chosen dates every year, like a birthday.",
+            "once": "A single run on a date and time.",
+            "every": "Again and again, every few minutes or hours."
         }
     },
     "code": {
@@ -1109,9 +1117,9 @@
         "hint": "Polar builds a draft in the panel. You approve each change.",
         "send": "Ask Polar",
         "cancel": "Cancel",
-        "shelfPersonal": "my own automations",
+        "shelfPersonal": "my personal space",
         "shelfOrg": "the organization {name} ({id})",
-        "draftCreate": "Create an automation for {shelf}, as a draft: {words}\n(Time zone: {zone})",
+        "draftCreate": "Create an automation in {shelf}, as a draft: {words}\n(Time zone: {zone})",
         "draftNodes": "Add steps to the automation {id}: {words}",
         "draftNodesAt": "Add steps to the automation {id}, on the connection {from} ({port}) to {to}: {words}"
     }

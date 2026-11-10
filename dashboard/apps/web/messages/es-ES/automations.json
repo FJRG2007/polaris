@@ -1005,6 +1005,14 @@
             "yearly": "Algunas fechas del año",
             "once": "Una vez, en fecha y hora",
             "every": "Cada pocos minutos"
+        },
+        "scheduleHints": {
+            "daily": "A una o varias horas, cada día.",
+            "weekdays": "A horas fijas los días que elijas.",
+            "monthly": "Días elegidos de cada mes, o el último.",
+            "yearly": "Fechas elegidas cada año, como un cumple.",
+            "once": "Una sola vez, en una fecha y hora.",
+            "every": "Una y otra vez, cada pocos minutos u horas."
         }
     },
     "code": {
