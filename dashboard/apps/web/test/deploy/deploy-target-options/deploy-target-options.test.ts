@@ -23,6 +23,7 @@ vi.mock("@/lib/deploy-project-access", () => ({
     requireProjectAccess: (...args: unknown[]) => projectAccess(...args)
 }));
 vi.mock("@/lib/deploy-service", () => ({ scopedProjectWhere: async () => ({ OR: [] }) }));
+vi.mock("@/lib/deploy/managed-projects", () => ({ polarisProjectIds: async () => new Set<string>() }));
 vi.unmock("@/app/(app)/deploy-target-options-actions");
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 

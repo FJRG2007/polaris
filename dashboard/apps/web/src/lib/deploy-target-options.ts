@@ -9,6 +9,7 @@
 
 import { prisma, type Prisma } from "@polaris/db";
 import { scopedProjectWhere } from "@/lib/deploy-service";
+import { polarisProjectIds } from "@/lib/deploy/managed-projects";
 import { decodeServerCursor, encodeServerCursor } from "@/lib/server-options";
 import type {
     DeployTargetOption,
@@ -93,7 +94,12 @@ export async function readServiceOptions(
     ownerId: string,
     request: PageRequest & { readonly excludeTargetId?: string }
 ): Promise<OptionsPage<ServiceOption>> {
-    const and: Prisma.ApplicationWhereInput[] = [{ environment: { project: { ownerId } } }];
+    // Polaris's own services (the Marketplace project, the mail server's) are not
+    // the owner's to point a tunnel at.
+    const hidden = [...(await polarisProjectIds())];
+    const and: Prisma.ApplicationWhereInput[] = [
+        { environment: { project: hidden.length ? { ownerId, id: { notIn: hidden } } : { ownerId } } }
+    ];
     if (request.ids) and.push({ id: { in: [...request.ids] } });
     if (request.excludeTargetId) and.push({ targetId: { not: request.excludeTargetId } });
     if (request.query) {
@@ -139,6 +145,9 @@ export async function readTemplateProjectOptions(
     const and: Prisma.ProjectWhereInput[] = [
         (await scopedProjectWhere(userId, orgId)) as Prisma.ProjectWhereInput
     ];
+    // A template never lands in a project Polaris runs for its own apps.
+    const hidden = [...(await polarisProjectIds())];
+    if (hidden.length) and.push({ id: { notIn: hidden } });
     if (request.ids) and.push({ id: { in: [...request.ids] } });
     if (request.query) and.push({ name: { contains: request.query, mode: "insensitive" } });
     and.push(...afterCursor(request.cursor));
