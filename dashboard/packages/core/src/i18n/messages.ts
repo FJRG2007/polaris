@@ -101,15 +101,30 @@ function reportOnce(problem: MessageProblem): void {
     );
 }
 
-/** The message at a dotted path, or undefined when the path does not end on one. */
+/**
+ * The message at a dotted path, or undefined when the path does not end on one.
+ *
+ * A catalog may name an entry after something that has dots of its own - the
+ * subject `task.space`, the command `container.restart` - so a segment the
+ * catalog does not hold is tried joined to the ones after it before the path is
+ * given up on. `share.subjects.task.space` reaches `subjects["task.space"]`.
+ */
 export function lookupMessage(catalog: Catalog | undefined, key: string): string | undefined {
-    let node: string | Catalog | undefined = catalog;
-    for (const part of key.split(".")) {
-        if (node === undefined || typeof node === "string" || !Object.hasOwn(node, part))
-            return undefined;
-        node = node[part];
+    return lookupParts(catalog, key.split("."), 0);
+}
+
+function lookupParts(node: string | Catalog | undefined, parts: readonly string[], from: number): string | undefined {
+    if (from === parts.length) return typeof node === "string" ? node : undefined;
+    if (node === undefined || typeof node === "string") return undefined;
+    let name = parts[from]!;
+    for (let next = from + 1; next <= parts.length; next += 1) {
+        if (Object.hasOwn(node, name)) {
+            const found = lookupParts(node[name], parts, next);
+            if (found !== undefined) return found;
+        }
+        if (next < parts.length) name = `${name}.${parts[next]}`;
     }
-    return typeof node === "string" ? node : undefined;
+    return undefined;
 }
 
 /**

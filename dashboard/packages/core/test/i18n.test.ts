@@ -244,6 +244,20 @@ describe("a translator", () => {
         expect(lookupMessage(catalog, "toString")).toBeUndefined();
         expect(lookupMessage(catalog, "constructor.name")).toBeUndefined();
     });
+
+    it("reaches an entry whose own name has dots in it", () => {
+        const named = {
+            subjects: { "task.space": "space", "task.folder": "folder", task: { title: "Task" } },
+            kinds: { "container.restart": "Restart" }
+        };
+        expect(lookupMessage(named, "subjects.task.space")).toBe("space");
+        expect(lookupMessage(named, "subjects.task.folder")).toBe("folder");
+        expect(lookupMessage(named, "subjects.task.title")).toBe("Task");
+        expect(lookupMessage(named, "kinds.container.restart")).toBe("Restart");
+        expect(lookupMessage(named, "kinds.container")).toBeUndefined();
+        expect(lookupMessage(named, "subjects.task.space.extra")).toBeUndefined();
+        expect(createTranslator("en-US", named)("subjects.task.space" as never)).toBe("space");
+    });
 });
 
 describe("a catalog set", () => {
