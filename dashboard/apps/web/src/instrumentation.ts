@@ -158,11 +158,11 @@ export async function register(): Promise<void> {
         console.error("polaris: could not prepare the call server key:", error)
     );
 
-    // Analytics and Telemetry used to come with every Polaris; one that was
-    // already running keeps them installed (see `optional-app-carry`).
-    const { carryFormerlyBuiltInApps } = await import("./lib/apps/optional-app-carry");
-    await carryFormerlyBuiltInApps().catch((error) =>
-        console.error("polaris: could not keep Analytics and Telemetry installed:", error)
+    // Analytics and Telemetry are apps to install; the installs an earlier
+    // release made on its own are taken back (see `optional-app-carry`).
+    const { undoFormerlyBuiltInCarry } = await import("./lib/apps/optional-app-carry");
+    await undoFormerlyBuiltInCarry().catch((error) =>
+        console.error("polaris: could not take back the automatic app installs:", error)
     );
 
     // The ready-made access policies, as this version writes them: an update

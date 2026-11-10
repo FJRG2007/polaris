@@ -390,8 +390,8 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
     {
         // Visitors to the sites deployed here, and to Polaris itself, read from
         // the edge log and an optional script. Part of every Polaris until it
-        // became something to install; installing runs nothing, and an instance
-        // that already had it kept it (see `optional-app-carry`).
+        // became something to install; installing runs nothing, and its data
+        // stays when it is uninstalled (see `optional-app-carry`).
         id: "analytics",
         name: "Analytics",
         category: "Tools",
