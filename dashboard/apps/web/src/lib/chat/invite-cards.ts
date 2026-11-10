@@ -22,6 +22,9 @@ export interface ChatInviteCard {
     readonly member: boolean;
     readonly members: number;
     readonly online: number;
+    /** Whether this reader may withdraw it: whoever made it, or the space's
+     *  owner or an administrator - the same rule `revokeInvite` applies. */
+    readonly canRevoke: boolean;
 }
 
 /** Seen within this long and not invisible: the window presence uses. */
@@ -43,6 +46,7 @@ export async function inviteCards(
         where: { code: { in: wanted } },
         select: {
             code: true,
+            createdById: true,
             expiresAt: true,
             maxUses: true,
             uses: true,
@@ -61,7 +65,7 @@ export async function inviteCards(
         ? await Promise.all([
               prisma.chatSpaceMember.findMany({
                   where: { spaceId: { in: spaceIds }, userId: actor.id },
-                  select: { spaceId: true }
+                  select: { spaceId: true, role: true }
               }),
               prisma.chatSpaceMember.groupBy({
                   by: ["spaceId"],
@@ -82,6 +86,7 @@ export async function inviteCards(
           ])
         : [[], [], []];
     const joined = new Set(mine.map((row) => row.spaceId));
+    const admin = new Set(mine.filter((row) => row.role === "admin").map((row) => row.spaceId));
     const total = new Map(counts.map((row) => [row.spaceId, row._count._all]));
     const around = new Map(online.map((row) => [row.spaceId, row._count._all]));
 
@@ -98,7 +103,8 @@ export async function inviteCards(
                 usable: false,
                 member: false,
                 members: 0,
-                online: 0
+                online: 0,
+                canRevoke: false
             });
             continue;
         }
@@ -112,7 +118,11 @@ export async function inviteCards(
             member: joined.has(row.space.id) || row.space.ownerId === actor.id,
             // The owner holds no membership row.
             members: (total.get(row.space.id) ?? 0) + 1,
-            online: around.get(row.space.id) ?? 0
+            online: around.get(row.space.id) ?? 0,
+            canRevoke:
+                row.createdById === actor.id ||
+                row.space.ownerId === actor.id ||
+                admin.has(row.space.id)
         });
     }
     return cards;

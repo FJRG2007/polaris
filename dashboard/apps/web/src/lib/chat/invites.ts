@@ -181,6 +181,13 @@ export async function revokeInvite(actor: ChatActor, inviteId: string): Promise<
     });
 }
 
+/** Withdraw one by its code, as an invite card names it. Same rule as by id. */
+export async function revokeInviteByCode(actor: ChatActor, code: string): Promise<void> {
+    const invite = await prisma.chatSpaceInvite.findUnique({ where: { code }, select: { id: true } });
+    if (!invite) throw new ChatAccessError({ key: "errors.invitationGone" });
+    await revokeInvite(actor, invite.id);
+}
+
 /** What a link says it leads to. */
 export async function readInvite(actor: ChatActor, code: string): Promise<ChatInviteOffer | null> {
     const invite = await prisma.chatSpaceInvite.findUnique({

@@ -1567,6 +1567,14 @@ export async function revokeInviteAction(inviteId: string): Promise<{ error?: st
     return guard(() => invites.revokeInvite(me, String(inviteId)));
 }
 
+/** Withdraw the invitation an invite card shows, from the card its sender sees. */
+export async function revokeInviteCardAction(code: string): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = core.inviteCodeSchema.safeParse(code);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.invitationGone") };
+    return guard(() => invites.revokeInviteByCode(me, parsed.data));
+}
+
 /** What a link says it leads to, for the screen that asks somebody to accept. */
 export async function readInviteAction(
     code: string

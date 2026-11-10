@@ -2012,7 +2012,10 @@
         "members": "{count, plural, one {1 member} other {{count} members}}",
         "join": "Join",
         "joined": "Joined",
-        "goTo": "Go to server"
+        "goTo": "Go to server",
+        "revoke": "Revoke",
+        "revokeTitle": "Revoke this invite?",
+        "revokeBody": "The link stops working for everyone who has it, here and anywhere else it was shared."
     },
     "callDoNotDisturb": "{name} is in Do Not Disturb",
     "callDoNotDisturbBody": "They see the call, but it does not ring for them.",

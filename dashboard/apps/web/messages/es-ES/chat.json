@@ -2012,7 +2012,10 @@
         "members": "{count, plural, one {1 miembro} other {{count} miembros}}",
         "join": "Unirse",
         "joined": "Dentro",
-        "goTo": "Ir al servidor"
+        "goTo": "Ir al servidor",
+        "revoke": "Revocar",
+        "revokeTitle": "¿Revocar esta invitación?",
+        "revokeBody": "El enlace deja de funcionar para todos los que lo tengan, aquí y donde se haya compartido."
     },
     "callDoNotDisturb": "{name} está en No molestar",
     "callDoNotDisturbBody": "Ve la llamada, pero no le suena.",

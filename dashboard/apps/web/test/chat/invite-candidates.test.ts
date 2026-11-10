@@ -128,7 +128,8 @@ describe("an invite card for a link that no longer opens", () => {
             usable: false,
             member: false,
             members: 0,
-            online: 0
+            online: 0,
+            canRevoke: false
         });
     });
 });

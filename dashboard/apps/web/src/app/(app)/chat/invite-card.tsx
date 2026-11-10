@@ -14,7 +14,8 @@ import { useState } from "react";
 import { Button } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import { acceptInviteAction } from "./actions";
+import { acceptInviteAction, revokeInviteCardAction } from "./actions";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Loader2, ShieldX } from "lucide-react";
 import { ChatAvatar } from "@/components/chat-avatar";
 import type { ChatInviteCard } from "@/lib/chat/invite-cards";
@@ -48,7 +49,11 @@ export function InviteCard({ card, mine }: { card: ChatInviteCard; mine: boolean
     // back if the server refuses.
     const [joined, setJoined] = useState(card.member);
     const [error, setError] = useState("");
-    const valid = card.spaceId !== null && card.usable;
+    // Optimistic as well: withdrawn reads as an invalid invite at once, and
+    // comes back if the server refuses.
+    const [revoked, setRevoked] = useState(false);
+    const [confirm, confirmDialog] = useConfirm();
+    const valid = card.spaceId !== null && card.usable && !revoked;
 
     const open = (channelId: string | null) => {
         router.push(channelId ? `/chat/c/${channelId}` : "/chat");
@@ -73,8 +78,28 @@ export function InviteCard({ card, mine }: { card: ChatInviteCard; mine: boolean
         open(result.channelId ?? card.channelId);
     };
 
+    const revoke = async () => {
+        const sure = await confirm({
+            title: t("inviteCard.revokeTitle"),
+            description: t("inviteCard.revokeBody"),
+            confirmLabel: t("inviteCard.revoke"),
+            danger: true
+        });
+        if (!sure) return;
+        setError("");
+        setRevoked(true);
+        const result = await runAction(() => revokeInviteCardAction(card.code), setError);
+        if (!result || result.error) {
+            setRevoked(false);
+            if (result?.error) setError(result.error);
+            return;
+        }
+        router.refresh();
+    };
+
     return (
         <div className="flex w-full max-w-md flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3">
+            {confirmDialog}
             <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
                 {valid
                     ? mine
@@ -129,6 +154,16 @@ export function InviteCard({ card, mine }: { card: ChatInviteCard; mine: boolean
                         </span>
                     )}
                 </div>
+                {valid && mine && card.canRevoke ? (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void revoke()}
+                        className="shrink-0"
+                    >
+                        {t("inviteCard.revoke")}
+                    </Button>
+                ) : null}
                 {valid && (
                     <Button
                         size="sm"
