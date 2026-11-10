@@ -59,6 +59,7 @@ const PLAYER_ORIGINS = [
 export const TOKEN_PATH_PREFIXES = [
     "c",
     "cal",
+    "f",
     "forms",
     "k",
     "m",

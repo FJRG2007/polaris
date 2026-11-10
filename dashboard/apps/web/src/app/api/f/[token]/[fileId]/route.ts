@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { untrustedFileHeaders } from "@/lib/mime";
 import { pipeThenDispose } from "@/lib/drive-stream";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
 import { claimDownload, openTransferStorage } from "@/lib/disposable-transfer-service";
@@ -27,7 +28,7 @@ const paramsSchema = z.object({
 });
 
 export async function POST(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ token: string; fileId: string }> }
 ): Promise<Response> {
     const parsed = paramsSchema.safeParse(await params);
@@ -42,12 +43,18 @@ export async function POST(
         });
     }
 
+    // The button is a form post, so a refusal answered with an empty body would be
+    // a blank page. It goes back to the link's own page instead, which says what
+    // happened to the files - expired, used up, or gone.
+    const backToPage = () =>
+        new Response(null, { status: 303, headers: { location: `/f/${encodeURIComponent(parsed.data.token)}` } });
+
     const claim = await claimDownload(parsed.data.token, parsed.data.fileId);
-    if (!claim.ok) return new Response(null, { status: claim.reason === "missing" ? 404 : 410 });
+    if (!claim.ok) return backToPage();
 
     const { file } = claim;
     const driver = await openTransferStorage(file.targetId).catch(() => null);
-    if (!driver) return new Response(null, { status: 503 });
+    if (!driver) return backToPage();
     try {
         const stream = await driver.readStream(file.path);
         return new Response(pipeThenDispose(stream, driver), {
@@ -58,12 +65,13 @@ export async function POST(
                 "content-length": String(file.size),
                 "cache-control": "no-store",
                 "referrer-policy": "no-referrer",
-                "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`
+                "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+                ...downloadTicketHeaders(request)
             }
         });
     } catch (caught) {
         console.error(caught);
         await driver.dispose().catch(() => undefined);
-        return new Response(null, { status: 410 });
+        return backToPage();
     }
 }

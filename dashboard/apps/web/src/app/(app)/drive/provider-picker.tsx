@@ -24,7 +24,7 @@ type Group = "nas" | "cloud" | "protocols" | "server";
 interface ProviderEntry {
     readonly kind: PickerKind;
     readonly group: Group;
-    /** A vendor file under /public/logos/brands, or a plain icon for a protocol. */
+    /** A vendor file under /public/logos (storage, or the brands the store lists), or a plain icon for a protocol. */
     readonly logo?: string;
     /** Whether the mark needs the dark tile (a pale mark that vanishes on white). */
     readonly darkTile?: boolean;
@@ -35,14 +35,14 @@ interface ProviderEntry {
 
 /** Every kind the picker offers, in display order. A new provider is one row. */
 export const PROVIDERS: readonly ProviderEntry[] = [
-    { kind: "unifi-unas", group: "nas", logo: "/logos/brands/ubiquiti.svg", keywords: ["ubiquiti", "unifi", "unas", "nas"] },
-    { kind: "synology", group: "nas", logo: "/logos/brands/synology.svg", darkTile: true, keywords: ["dsm", "nas"] },
-    { kind: "qnap", group: "nas", logo: "/logos/brands/qnap.svg", keywords: ["qts", "nas"] },
-    { kind: "truenas", group: "nas", logo: "/logos/brands/truenas.svg", keywords: ["freenas", "zfs", "nas"] },
+    { kind: "unifi-unas", group: "nas", logo: "/logos/storage/ubiquiti.svg", keywords: ["ubiquiti", "unifi", "unas", "nas"] },
+    { kind: "synology", group: "nas", logo: "/logos/storage/synology.svg", darkTile: true, keywords: ["dsm", "nas"] },
+    { kind: "qnap", group: "nas", logo: "/logos/storage/qnap.svg", keywords: ["qts", "nas"] },
+    { kind: "truenas", group: "nas", logo: "/logos/storage/truenas.svg", keywords: ["freenas", "zfs", "nas"] },
     { kind: "gdrive", group: "cloud", logo: "/logos/brands/google-drive.svg", keywords: ["google", "drive", "cloud"] },
-    { kind: "onedrive", group: "cloud", logo: "/logos/brands/onedrive.svg", keywords: ["microsoft", "office", "cloud"] },
+    { kind: "onedrive", group: "cloud", logo: "/logos/storage/onedrive.svg", keywords: ["microsoft", "office", "cloud"] },
     { kind: "dropbox", group: "cloud", logo: "/logos/brands/dropbox.svg", keywords: ["cloud"] },
-    { kind: "s3", group: "cloud", logo: "/logos/brands/amazon-s3.svg", keywords: ["aws", "amazon", "minio", "r2", "bucket", "b2", "wasabi"] },
+    { kind: "s3", group: "cloud", logo: "/logos/storage/amazon-s3.svg", keywords: ["aws", "amazon", "minio", "r2", "bucket", "b2", "wasabi"] },
     { kind: "sftp", group: "protocols", icon: Terminal, keywords: ["ssh", "scp"] },
     { kind: "smb", group: "protocols", icon: Network, keywords: ["cifs", "samba", "windows", "share"] },
     { kind: "nfs", group: "protocols", icon: Server, keywords: ["export", "unix"] },

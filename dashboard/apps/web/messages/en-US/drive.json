@@ -1245,6 +1245,7 @@
             "expires": "Available until {date}",
             "download": "Download",
             "downloadNamed": "Download {name}",
+            "preparing": "Preparing...",
             "hint": "These files delete themselves after the time or download limit.",
             "goneTitle": "Files no longer available",
             "slowDown": "Too many requests. Wait a minute and try again.",

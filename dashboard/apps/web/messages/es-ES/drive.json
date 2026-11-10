@@ -1245,6 +1245,7 @@
             "expires": "Disponible hasta {date}",
             "download": "Descargar",
             "downloadNamed": "Descargar {name}",
+            "preparing": "Preparando...",
             "hint": "Estos archivos se borran solos al llegar al tiempo o al límite de descargas.",
             "goneTitle": "Archivos ya no disponibles",
             "slowDown": "Demasiadas peticiones. Espera un minuto y reintenta.",

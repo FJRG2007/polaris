@@ -36,12 +36,10 @@ CREATE INDEX IF NOT EXISTS "DisposableTransfer_ownerId_createdAt_idx" ON "Dispos
 CREATE INDEX IF NOT EXISTS "DisposableTransfer_expiresAt_idx" ON "DisposableTransfer"("expiresAt");
 CREATE INDEX IF NOT EXISTS "DisposableFile_transferId_idx" ON "DisposableFile"("transferId");
 
-DO $$ BEGIN
-    ALTER TABLE "DisposableTransfer" ADD CONSTRAINT "DisposableTransfer_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+-- AddForeignKey
+ALTER TABLE "DisposableTransfer" DROP CONSTRAINT IF EXISTS "DisposableTransfer_ownerId_fkey";
+ALTER TABLE "DisposableTransfer" ADD CONSTRAINT "DisposableTransfer_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$ BEGIN
-    ALTER TABLE "DisposableFile" ADD CONSTRAINT "DisposableFile_transferId_fkey" FOREIGN KEY ("transferId") REFERENCES "DisposableTransfer"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+-- AddForeignKey
+ALTER TABLE "DisposableFile" DROP CONSTRAINT IF EXISTS "DisposableFile_transferId_fkey";
+ALTER TABLE "DisposableFile" ADD CONSTRAINT "DisposableFile_transferId_fkey" FOREIGN KEY ("transferId") REFERENCES "DisposableTransfer"("id") ON DELETE CASCADE ON UPDATE CASCADE;

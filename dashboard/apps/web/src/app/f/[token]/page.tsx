@@ -10,7 +10,8 @@
 
 import { getSession } from "@/lib/session";
 import { formatBytes } from "@polaris/core";
-import { Download, FileIcon } from "lucide-react";
+import { FileIcon } from "lucide-react";
+import { QuickSendDownload } from "./download-button";
 import { getTranslations } from "@/lib/i18n/request";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
@@ -20,7 +21,7 @@ import { LinkUnavailable, PublicShell } from "@/components/public-shell";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" };
+export const metadata = { robots: { index: false, follow: false } };
 
 export default async function QuickSendPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
@@ -75,16 +76,12 @@ export default async function QuickSendPage({ params }: { params: Promise<{ toke
                                         : ""}
                                 </p>
                             </div>
-                            <form method="post" action={`/api/f/${encodeURIComponent(token)}/${file.id}`}>
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-                                    aria-label={t("disposable.public.downloadNamed", { name: file.name })}
-                                >
-                                    <Download className="size-4" aria-hidden />
-                                    <span className="hidden sm:inline">{t("disposable.public.download")}</span>
-                                </button>
-                            </form>
+                            <QuickSendDownload
+                                action={`/api/f/${encodeURIComponent(token)}/${file.id}`}
+                                label={t("disposable.public.download")}
+                                namedLabel={t("disposable.public.downloadNamed", { name: file.name })}
+                                preparing={t("disposable.public.preparing")}
+                            />
                         </li>
                     ))}
                 </ul>

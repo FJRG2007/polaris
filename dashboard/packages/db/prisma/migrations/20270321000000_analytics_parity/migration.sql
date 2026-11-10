@@ -25,10 +25,6 @@ CREATE TABLE IF NOT EXISTS "AnalyticsReport" (
 
 CREATE INDEX IF NOT EXISTS "AnalyticsReport_siteId_kind_idx" ON "AnalyticsReport"("siteId", "kind");
 
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'AnalyticsReport_siteId_fkey') THEN
-        ALTER TABLE "AnalyticsReport" ADD CONSTRAINT "AnalyticsReport_siteId_fkey"
-            FOREIGN KEY ("siteId") REFERENCES "AnalyticsSite"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-    END IF;
-END $$;
+-- AddForeignKey
+ALTER TABLE "AnalyticsReport" DROP CONSTRAINT IF EXISTS "AnalyticsReport_siteId_fkey";
+ALTER TABLE "AnalyticsReport" ADD CONSTRAINT "AnalyticsReport_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "AnalyticsSite"("id") ON DELETE CASCADE ON UPDATE CASCADE;
