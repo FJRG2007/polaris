@@ -196,6 +196,9 @@ import type { PolarMark } from "@/lib/polar/answer-feedback";
 import type { PolarRefine } from "@/lib/polar/prompt";
 import * as answerActions from "@/components/polar/polar-answer-actions";
 import { VoiceCall, type VoiceNotice } from "@/components/polar/polar-voice";
+import { SkillTrialBar, trialFromAddress, type SkillTrial } from "@/components/polar/polar-skill-trial";
+import { useAnnounceWrites } from "@/lib/polar/tool-changes";
+import { PolarReachContext } from "@/components/polar/polar-reach";
 
 // ---------------------------------------------------------------------------
 // Page context
@@ -447,7 +450,11 @@ export function PolarProvider({
         }),
         [allowed, open, setOpen, extra, asked, drafted, sendDrafted, ask, takeAsked]
     );
-    return <PolarContext.Provider value={value}>{children}</PolarContext.Provider>;
+    return (
+        <PolarContext.Provider value={value}>
+            <PolarReachContext.Provider value={value}>{children}</PolarReachContext.Provider>
+        </PolarContext.Provider>
+    );
 }
 
 /** Whether this address is Polar's own page, where the side panel has no place:
@@ -821,6 +828,12 @@ export function PolarChat({
     // New chats are temporary while this is on: not listed, no memory, deleted
     // when the chat is left. It stays on for the next new chat, as ChatGPT's does.
     const [temporary, setTemporary] = useState(false);
+    // A skill opened from the Skills settings to try: only ever in a temporary
+    // chat, and let go of once the chat stops being one.
+    const [trialSkill, setTrialSkill] = useState<SkillTrial | null>(null);
+    useEffect(() => {
+        if (!temporary) setTrialSkill(null);
+    }, [temporary]);
     // Web search: the administrator's to allow (`webAllowed`, from the server)
     // and this viewer's to switch off; on unless either did. Taken as allowed
     // until the server says otherwise - it was read as "not allowed" before,
@@ -918,7 +931,8 @@ export function PolarChat({
         web,
         toolsOff,
         serversOff,
-        connectorsOn
+        connectorsOn,
+        trialSkill
     });
     live.current = {
         threadId,
@@ -932,7 +946,8 @@ export function PolarChat({
         web,
         toolsOff,
         serversOff,
-        connectorsOn
+        connectorsOn,
+        trialSkill
     };
 
     /** The page as it goes with the next turn: null with sharing off. */
@@ -966,6 +981,9 @@ export function PolarChat({
                             off: live.current.toolsOff,
                             serversOff: live.current.serversOff,
                             connectors: live.current.connectorsOn,
+                            trialSkill: live.current.temporary
+                                ? (live.current.trialSkill?.trial ?? null)
+                                : null,
                             refine: refining,
                             parentId:
                                 messages.length > 1
@@ -986,6 +1004,8 @@ export function PolarChat({
         // again picks it up where it is (`chat/[id]/stream`).
         resume: true
     });
+    // A screen holding its own copy of what a tool just changed refetches it.
+    useAnnounceWrites(threadId, chat.messages);
     const busy = chat.status === "submitted" || chat.status === "streaming";
     const messagesNow = useRef(0);
     messagesNow.current = chat.messages.length;
@@ -1353,6 +1373,7 @@ export function PolarChat({
         const named = params?.get("thread") ?? null;
         const fresh = params?.get("new") ?? null;
         const session = params?.get("session") ?? null;
+        const trying = trialFromAddress(params?.get("skill") ?? null);
         if (session) {
             window.history.replaceState(null, "", window.location.pathname);
             code.open(session === "new" ? null : session);
@@ -1362,6 +1383,10 @@ export function PolarChat({
         }
         if (fresh) {
             startNew(fresh === "1" ? null : fresh);
+            if (trying) {
+                setTemporary(true);
+                setTrialSkill(trying);
+            }
             setReopened(true);
             return;
         }
@@ -2223,6 +2248,11 @@ export function PolarChat({
                         requestAnimationFrame(() => textarea.current?.focus());
                     }}
                 />
+            ) : null}
+            {temporary && trialSkill ? (
+                <div className="px-3 pb-2">
+                    <SkillTrialBar trial={trialSkill} />
+                </div>
             ) : null}
             <PolarComposer
                 kit={voiceKit}

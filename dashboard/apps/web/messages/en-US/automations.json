@@ -997,6 +997,14 @@
             "mailReceived": "Mail received",
             "driveFileUploaded": "File uploaded to Drive",
             "calendarEventStarting": "Calendar event starting soon"
+        },
+        "schedules": {
+            "daily": "Every day at a time",
+            "weekdays": "On days of the week",
+            "monthly": "On days of the month",
+            "yearly": "On dates of the year",
+            "once": "Once at a date and time",
+            "every": "Every few minutes"
         }
     },
     "code": {
@@ -1012,5 +1020,99 @@
         },
         "hint": "Read items, return a list for the next step. console.log goes to the run. No network, files or secrets; 1 second per run.",
         "tooLong": "The code is longer than a step takes."
+    },
+    "schedule": {
+        "kinds": {
+            "every": "Every few minutes, hours or days",
+            "daily": "Every day or some weekdays",
+            "monthly": "Some days of the month",
+            "yearly": "Some dates of the year",
+            "once": "Once",
+            "cron": "Advanced (cron)"
+        },
+        "times": "Times",
+        "timeN": "Time {n}",
+        "addTime": "Add time",
+        "removeTime": "Remove {time}",
+        "workweek": "Weekdays",
+        "weekend": "Weekend",
+        "monthDays": "Days of the month",
+        "lastDay": "Last day",
+        "shortMonths": "Months without that day skip it. Pick Last day for the end of every month.",
+        "dates": "Dates",
+        "month": "Month",
+        "day": "Day",
+        "addDate": "Add date",
+        "removeDate": "Remove date",
+        "leapDay": "February 29 only runs in leap years.",
+        "onceAt": "Date and time",
+        "nextRuns": "Next runs, in {zone} time",
+        "noNext": "This time has passed, so it will not run.",
+        "fromPublish": "Counted from when you publish it.",
+        "monthDate": "{month} {day}",
+        "fullDate": "{date}, {year}",
+        "summary": {
+            "everyMinutes": "{amount, plural, one {Every minute} other {Every # minutes}}",
+            "everyHours": "{amount, plural, one {Every hour} other {Every # hours}}",
+            "everyDays": "{amount, plural, one {Every day} other {Every # days}}",
+            "daily": "Every day at {times}",
+            "weekdays": "Every {days} at {times}",
+            "monthly": "Every month on day {days} at {times}",
+            "monthlyLast": "Every month on day {days} and the last day at {times}",
+            "lastOnly": "On the last day of every month at {times}",
+            "yearly": "Every year on {dates} at {times}",
+            "once": "Once, on {date} at {time}",
+            "cron": "Cron schedule {expression}",
+            "and": "{head} and {last}"
+        },
+        "errors": {
+            "clockTime": "Each time needs hours and minutes.",
+            "cronInvalid": "That cron expression cannot be read.",
+            "daysRequired": "Pick at least one day.",
+            "datesRequired": "Add at least one date.",
+            "dateInvalid": "That day does not exist in that month.",
+            "dateTimeInvalid": "Pick a date and a time.",
+            "timesRequired": "Add at least one time.",
+            "amountInvalid": "Use a whole number from 1 to 10000.",
+            "invalid": "These settings are not complete yet."
+        },
+        "days": {
+            "0": "Sunday",
+            "1": "Monday",
+            "2": "Tuesday",
+            "3": "Wednesday",
+            "4": "Thursday",
+            "5": "Friday",
+            "6": "Saturday"
+        },
+        "months": {
+            "1": "January",
+            "2": "February",
+            "3": "March",
+            "4": "April",
+            "5": "May",
+            "6": "June",
+            "7": "July",
+            "8": "August",
+            "9": "September",
+            "10": "October",
+            "11": "November",
+            "12": "December"
+        }
+    },
+    "polarAssist": {
+        "open": "Build with Polar",
+        "labelCreate": "What should it do?",
+        "labelNodes": "What should happen here?",
+        "placeholderCreate": "When a website goes down, send me a notice",
+        "placeholderNodes": "Then post the result in the team channel",
+        "hint": "Polar builds a draft in the panel. You approve each change.",
+        "send": "Ask Polar",
+        "cancel": "Cancel",
+        "shelfPersonal": "my own automations",
+        "shelfOrg": "the organization {name} ({id})",
+        "draftCreate": "Create an automation for {shelf}, as a draft: {words}\n(Time zone: {zone})",
+        "draftNodes": "Add steps to the automation {id}: {words}",
+        "draftNodesAt": "Add steps to the automation {id}, on the connection {from} ({port}) to {to}: {words}"
     }
 }

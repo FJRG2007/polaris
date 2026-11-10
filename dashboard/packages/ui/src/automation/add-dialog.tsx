@@ -159,6 +159,7 @@ export function AddBlockDialog({
     blocks,
     targets,
     paste,
+    assist,
     onPick,
     onClose
 }: {
@@ -172,6 +173,8 @@ export function AddBlockDialog({
     targets?: AddTargets;
     /** Offered first when the clipboard holds a block that fits here. */
     paste?: { label: string; description?: string; onPaste: () => void };
+    /** Another way to add, under the lists: the surface's own, such as asking an assistant. */
+    assist?: ReactNode;
     /** `target` is the thing chosen on "By target", when it was picked there. */
     onPick: (value: string, target?: string) => void;
     onClose: () => void;
@@ -511,6 +514,9 @@ export function AddBlockDialog({
                         </ul>
                     )}
                 </div>
+                {assist ? (
+                    <footer className="min-w-0 border-t border-border px-3 py-2">{assist}</footer>
+                ) : null}
             </DialogContent>
         </Dialog>
     );

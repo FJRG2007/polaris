@@ -191,6 +191,7 @@ export function findToolsTool(catalog: readonly CatalogEntry[]): ToolSet {
 const READERS: Readonly<Record<string, { tool: string; input: (id: string) => unknown }>> = {
     task: { tool: "tasks_get", input: (id) => ({ task: id }) },
     note: { tool: "notes_get", input: (id) => ({ noteId: id }) },
+    automation: { tool: "automations_get", input: (id) => ({ automation: id }) },
     "agent session": { tool: "agent_session_get", input: (id) => ({ sessionId: id }) },
     "chat channel": { tool: "chat_messages", input: (id) => ({ conversationId: id }) }
 };

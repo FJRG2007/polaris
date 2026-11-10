@@ -31,6 +31,7 @@ import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
 import { RefInput, RefTextarea } from "./references";
 import { CodeEditor } from "@/components/json-view";
 import { ThresholdFields, useSubjectProbe } from "./threshold-fields";
+import { ScheduleFields } from "./schedule-fields";
 import { NoticeDeliveryFields } from "@/components/automations/notice-delivery-fields";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import {
@@ -330,76 +331,11 @@ export function NodeFields({
         }
         case "core.schedule":
             return (
-                <div className="space-y-3">
-                    <Field label={t("fields.scheduleKind")}>
-                        <Select
-                            value={config.kind}
-                            onValueChange={(kind) =>
-                                setConfig(
-                                    kind === "every"
-                                        ? { kind, amount: 15, unit: "minutes" }
-                                        : kind === "daily"
-                                          ? { kind, times: ["08:00"], days: [] }
-                                          : { kind, expression: "0 8 * * 1-5" }
-                                )
-                            }
-                            options={[
-                                { value: "every", label: t("fields.every") },
-                                { value: "daily", label: t("fields.daily") },
-                                { value: "cron", label: t("fields.cron") }
-                            ]}
-                            aria-label={t("fields.scheduleKind")}
-                        />
-                    </Field>
-                    {config.kind === "every" ? (
-                        <div className="grid grid-cols-2 gap-3">
-                            <Field label={t("fields.amount")}>
-                                <Input
-                                    type="number"
-                                    min={1}
-                                    value={config.amount ?? ""}
-                                    onChange={(event) =>
-                                        set({ amount: event.target.valueAsNumber })
-                                    }
-                                />
-                            </Field>
-                            <Field label={t("fields.unit")}>
-                                <Select
-                                    value={config.unit}
-                                    onValueChange={(unit) => set({ unit })}
-                                    options={units}
-                                    aria-label={t("fields.unit")}
-                                />
-                            </Field>
-                        </div>
-                    ) : config.kind === "daily" ? (
-                        <>
-                            <Field label={t("fields.times")}>
-                                <Input
-                                    value={(config.times ?? []).join(", ")}
-                                    onChange={(event) =>
-                                        set({
-                                            times: event.target.value
-                                                .split(",")
-                                                .map((part) => part.trim())
-                                                .filter(Boolean)
-                                        })
-                                    }
-                                    placeholder="08:00, 18:30"
-                                />
-                            </Field>
-                            <Days value={config.days ?? []} onChange={(days) => set({ days })} />
-                        </>
-                    ) : (
-                        <Field label={t("fields.expression")}>
-                            <Input
-                                value={config.expression ?? ""}
-                                onChange={(event) => set({ expression: event.target.value })}
-                                placeholder="0 8 * * 1-5"
-                            />
-                        </Field>
-                    )}
-                </div>
+                <ScheduleFields
+                    config={config}
+                    setConfig={setConfig}
+                    timeZone={detail.draft.timeZone}
+                />
             );
         case "core.if":
             return (

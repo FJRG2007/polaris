@@ -90,6 +90,10 @@ export function toJsonSchema(schema: z.ZodTypeAny): JsonSchema {
             return described(numberSchema(node));
         case "ZodBoolean":
             return described({ type: "boolean" });
+        // Any JSON value: a field whose shape is checked afterwards by its own
+        // schema, such as an automation node's config by its node type.
+        case "ZodUnknown":
+            return described({});
         case "ZodLiteral":
             return described({ enum: [node.value] });
         case "ZodEnum":

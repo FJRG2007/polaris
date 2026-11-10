@@ -207,6 +207,128 @@ describe("schedules", () => {
     });
 });
 
+describe("schedules by month, by date and once", () => {
+    const due = (config: unknown, after: string, zone = "UTC") =>
+        graph
+            .nextScheduleDue(graph.scheduleConfigSchema.parse(config), new Date(after), zone)
+            ?.toISOString() ?? null;
+
+    it("reads the configs stored before these kinds existed exactly as before", () => {
+        expect(graph.scheduleConfigSchema.parse({ kind: "daily", times: ["08:00"] })).toEqual({
+            kind: "daily",
+            times: ["08:00"],
+            days: []
+        });
+        expect(due({ kind: "daily", times: ["08:00"], days: [1] }, "2026-11-10T09:00:00Z")).toBe(
+            "2026-11-16T08:00:00.000Z"
+        );
+        expect(due({ kind: "every", amount: 15, unit: "minutes" }, "2026-11-10T09:00:00Z")).toBe(
+            "2026-11-10T09:15:00.000Z"
+        );
+        expect(due({ kind: "cron", expression: "0 8 * * 1-5" }, "2026-11-14T09:00:00Z")).toBe(
+            "2026-11-16T08:00:00.000Z"
+        );
+    });
+
+    it("skips a day of the month that a month does not have", () => {
+        expect(due({ kind: "monthly", days: [31], times: ["08:00"] }, "2026-04-01T00:00:00Z")).toBe(
+            "2026-05-31T08:00:00.000Z"
+        );
+    });
+
+    it("runs on the last day of each month, whatever its length", () => {
+        const last = { kind: "monthly", days: ["last"], times: ["09:00"] };
+        expect(due(last, "2026-02-10T00:00:00Z")).toBe("2026-02-28T09:00:00.000Z");
+        expect(due(last, "2028-02-10T00:00:00Z")).toBe("2028-02-29T09:00:00.000Z");
+        expect(due(last, "2026-04-30T09:00:00Z")).toBe("2026-05-31T09:00:00.000Z");
+        expect(due({ ...last, days: [15, "last"] }, "2026-04-15T10:00:00Z")).toBe(
+            "2026-04-30T09:00:00.000Z"
+        );
+    });
+
+    it("keeps the wall clock across daylight saving, and skips a time the clocks jump over", () => {
+        // Madrid moves to summer time on 29 March 2026: 02:30 does not exist that day.
+        expect(
+            due({ kind: "monthly", days: [29], times: ["02:30"] }, "2026-03-01T00:00:00Z", "Europe/Madrid")
+        ).toBe("2026-04-29T00:30:00.000Z");
+        expect(
+            due({ kind: "monthly", days: ["last"], times: ["08:00"] }, "2026-03-01T00:00:00Z", "Europe/Madrid")
+        ).toBe("2026-03-31T06:00:00.000Z");
+        expect(
+            due(
+                { kind: "yearly", dates: [{ month: 12, day: 25 }], times: ["08:00"] },
+                "2026-06-01T00:00:00Z",
+                "Europe/Madrid"
+            )
+        ).toBe("2026-12-25T07:00:00.000Z");
+    });
+
+    it("runs a date of the year, and February 29 only in leap years", () => {
+        expect(
+            due({ kind: "yearly", dates: [{ month: 2, day: 29 }], times: ["08:00"] }, "2026-01-01T00:00:00Z")
+        ).toBe("2028-02-29T08:00:00.000Z");
+        // Days and months together would also allow 1 January; only the dates asked for run.
+        expect(
+            due(
+                {
+                    kind: "yearly",
+                    dates: [
+                        { month: 1, day: 31 },
+                        { month: 2, day: 1 }
+                    ],
+                    times: ["08:00"]
+                },
+                "2025-12-31T12:00:00Z"
+            )
+        ).toBe("2026-01-31T08:00:00.000Z");
+    });
+
+    it("runs once at a time in the automation's zone, and never after it passed", () => {
+        const once = graph.scheduleConfigSchema.parse({ kind: "once", at: "2026-12-01T09:30" });
+        expect(graph.nextScheduleDue(once, new Date("2026-11-10T00:00:00Z"), "Europe/Madrid")?.toISOString()).toBe(
+            "2026-12-01T08:30:00.000Z"
+        );
+        expect(graph.nextScheduleDue(once, new Date("2026-12-01T08:30:00Z"), "Europe/Madrid")).toBeNull();
+        expect(graph.upcomingScheduleRuns(once, new Date("2026-11-10T00:00:00Z"), "Europe/Madrid", 3)).toHaveLength(1);
+    });
+
+    it("lists the next runs in order", () => {
+        const runs = graph.upcomingScheduleRuns(
+            { kind: "daily", times: ["18:00", "08:00"], days: [] },
+            new Date("2026-11-10T09:00:00Z"),
+            "UTC",
+            3
+        );
+        expect(runs.map((run) => run.toISOString())).toEqual([
+            "2026-11-10T18:00:00.000Z",
+            "2026-11-11T08:00:00.000Z",
+            "2026-11-11T18:00:00.000Z"
+        ]);
+    });
+
+    it("refuses dates that cannot exist and empty lists", () => {
+        const bad = [
+            { kind: "yearly", dates: [{ month: 2, day: 30 }], times: ["08:00"] },
+            { kind: "yearly", dates: [{ month: 4, day: 31 }], times: ["08:00"] },
+            { kind: "yearly", dates: [], times: ["08:00"] },
+            { kind: "monthly", days: [], times: ["08:00"] },
+            { kind: "monthly", days: [32], times: ["08:00"] },
+            { kind: "monthly", days: [1], times: [] },
+            { kind: "once", at: "2026-02-30T10:00" },
+            { kind: "once", at: "2026-02-10 10:00" },
+            { kind: "once", at: "" }
+        ];
+        for (const config of bad) expect(graph.scheduleConfigSchema.safeParse(config).success).toBe(false);
+        expect(
+            graph.scheduleConfigSchema.safeParse({
+                kind: "yearly",
+                dates: [{ month: 2, day: 29 }],
+                times: ["08:00"]
+            }).success
+        ).toBe(true);
+    });
+});
+
 describe("stored data", () => {
     it("truncates oversized values with a marker", () => {
         const big = graph.capStored({ text: "x".repeat(5000) }, 1000) as Record<string, unknown>;

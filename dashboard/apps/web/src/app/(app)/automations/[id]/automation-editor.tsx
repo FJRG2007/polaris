@@ -91,6 +91,8 @@ import {
 import { NodeFields, configValid, newNode } from "./node-fields";
 import { FailureFields, WhenFields } from "./flow-fields";
 import { isTriggerType, pickedNode } from "./node-catalog";
+import { AssistPrepare, PolarAssist } from "../polar-assist";
+import { usePolarChanges } from "@/lib/polar/tool-changes";
 
 /** The list it belongs in: narrowed to the app and the thing of it that made it. */
 function listHref(detail: Pick<AutomationDetail, "origin" | "originRef"> | undefined): string {
@@ -298,6 +300,16 @@ function Loaded({
 
     const act = (work: () => Promise<void>) => start(work);
 
+    // Polar changes the saved draft: unsaved edits are saved before it is asked
+    // (`AssistPrepare`), and the canvas refetches once its change lands.
+    usePolarChanges((change) => {
+        if (change.automationId === detail.id) onChanged();
+    });
+    const prepare = useCallback(
+        async () => readOnly || !dirty || (await save()),
+        [readOnly, dirty, save]
+    );
+
     useEffect(() => {
         if (readOnly) return;
         const onKey = (event: KeyboardEvent) => {
@@ -336,387 +348,403 @@ function Loaded({
     );
 
     return (
-        <EditorGraphProvider value={editorGraph}>
-            {naming !== null ? (
-                <form
-                    className="mb-5 flex min-w-0 flex-wrap items-center gap-2"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        if (!nameValid) return;
-                        setNaming(null);
-                        void rename(naming);
-                    }}
-                >
-                    <Input
-                        autoFocus
-                        className="min-w-0 flex-1 sm:max-w-md"
-                        value={naming}
-                        maxLength={core.AUTOMATION_LIMITS.nameLength}
-                        aria-label={t("create.name")}
-                        onChange={(event) => setNaming(event.target.value)}
-                        onKeyDown={(event) => {
-                            if (event.key === "Escape") setNaming(null);
+        <AssistPrepare value={prepare}>
+            <EditorGraphProvider value={editorGraph}>
+                {naming !== null ? (
+                    <form
+                        className="mb-5 flex min-w-0 flex-wrap items-center gap-2"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            if (!nameValid) return;
+                            setNaming(null);
+                            void rename(naming);
                         }}
-                    />
-                    <Button
-                        type="submit"
-                        size="sm"
-                        disabled={!nameValid}
-                        aria-disabled={!nameValid}
                     >
-                        <Check aria-hidden="true" />
-                        {t("editor.renameSave")}
-                    </Button>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => setNaming(null)}>
-                        {t("create.cancel")}
-                    </Button>
-                </form>
-            ) : null}
-            <PageHeader
-                title={name}
-                description={detail.description || undefined}
-                actions={
-                    readOnly ? undefined : (
-                        <div className="flex flex-wrap gap-2">
-                            {naming === null ? (
+                        <Input
+                            autoFocus
+                            className="min-w-0 flex-1 sm:max-w-md"
+                            value={naming}
+                            maxLength={core.AUTOMATION_LIMITS.nameLength}
+                            aria-label={t("create.name")}
+                            onChange={(event) => setNaming(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Escape") setNaming(null);
+                            }}
+                        />
+                        <Button
+                            type="submit"
+                            size="sm"
+                            disabled={!nameValid}
+                            aria-disabled={!nameValid}
+                        >
+                            <Check aria-hidden="true" />
+                            {t("editor.renameSave")}
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setNaming(null)}
+                        >
+                            {t("create.cancel")}
+                        </Button>
+                    </form>
+                ) : null}
+                <PageHeader
+                    title={name}
+                    description={detail.description || undefined}
+                    actions={
+                        readOnly ? undefined : (
+                            <div className="flex flex-wrap gap-2">
+                                {naming === null ? (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        className="self-center"
+                                        aria-label={t("editor.rename")}
+                                        title={t("editor.rename")}
+                                        onClick={() => setNaming(name)}
+                                    >
+                                        <Pencil aria-hidden="true" />
+                                    </Button>
+                                ) : null}
+                                {dirty ? (
+                                    <span className="self-center text-xs text-muted-foreground">
+                                        {t("editor.unsaved")}
+                                    </span>
+                                ) : null}
+                                <Button
+                                    variant="outline"
+                                    disabled={!dirty || pending}
+                                    onClick={() =>
+                                        act(
+                                            async () =>
+                                                void (
+                                                    (await save()) &&
+                                                    toast.show({ title: t("editor.saved") })
+                                                )
+                                        )
+                                    }
+                                >
+                                    {t("editor.save")}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    disabled={pending || testing}
+                                    title={t("canvas.testHint")}
+                                    onClick={() =>
+                                        act(async () => {
+                                            if (dirty && !(await save())) return;
+                                            const answer = await startTestRunAction({
+                                                automationId: detail.id
+                                            });
+                                            if (!answer.ok)
+                                                return void toast.show({ title: answer.error });
+                                            setTestRunId(answer.runId);
+                                            toast.show({ title: t("canvas.testStarted") });
+                                        })
+                                    }
+                                >
+                                    <FlaskConical aria-hidden="true" />
+                                    {testing ? t("canvas.testing") : t("canvas.test")}
+                                </Button>
+                                <Button
+                                    disabled={pending}
+                                    onClick={() =>
+                                        act(async () => {
+                                            if (dirty && !(await save())) return;
+                                            const answer = await publishAction(detail.id);
+                                            toast.show({
+                                                title: answer.ok
+                                                    ? t("editor.published")
+                                                    : answer.error
+                                            });
+                                            if (answer.ok) onChanged();
+                                        })
+                                    }
+                                >
+                                    {t("editor.publish")}
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    disabled={pending || !detail.published || !hasManual}
+                                    title={
+                                        !hasManual
+                                            ? t("editor.noManual")
+                                            : !detail.published
+                                              ? t("list.notPublished")
+                                              : undefined
+                                    }
+                                    onClick={() =>
+                                        act(async () => {
+                                            const answer = await runNowAction(detail.id);
+                                            toast.show({
+                                                title: answer.ok
+                                                    ? t("editor.runStarted")
+                                                    : answer.error
+                                            });
+                                        })
+                                    }
+                                >
+                                    <Play aria-hidden="true" />
+                                    {t("editor.runNow")}
+                                </Button>
                                 <Button
                                     variant="ghost"
-                                    size="icon-sm"
-                                    className="self-center"
-                                    aria-label={t("editor.rename")}
-                                    title={t("editor.rename")}
-                                    onClick={() => setNaming(name)}
+                                    size="icon"
+                                    aria-label={t("editor.delete")}
+                                    title={t("editor.delete")}
+                                    onClick={() => setDeleting(true)}
                                 >
-                                    <Pencil aria-hidden="true" />
+                                    <Trash2 aria-hidden="true" />
                                 </Button>
-                            ) : null}
-                            {dirty ? (
-                                <span className="self-center text-xs text-muted-foreground">
-                                    {t("editor.unsaved")}
-                                </span>
-                            ) : null}
-                            <Button
-                                variant="outline"
-                                disabled={!dirty || pending}
-                                onClick={() =>
-                                    act(
-                                        async () =>
-                                            void (
-                                                (await save()) &&
-                                                toast.show({ title: t("editor.saved") })
-                                            )
-                                    )
-                                }
-                            >
-                                {t("editor.save")}
-                            </Button>
-                            <Button
-                                variant="outline"
-                                disabled={pending || testing}
-                                title={t("canvas.testHint")}
-                                onClick={() =>
-                                    act(async () => {
-                                        if (dirty && !(await save())) return;
-                                        const answer = await startTestRunAction({
-                                            automationId: detail.id
-                                        });
-                                        if (!answer.ok)
-                                            return void toast.show({ title: answer.error });
-                                        setTestRunId(answer.runId);
-                                        toast.show({ title: t("canvas.testStarted") });
-                                    })
-                                }
-                            >
-                                <FlaskConical aria-hidden="true" />
-                                {testing ? t("canvas.testing") : t("canvas.test")}
-                            </Button>
-                            <Button
-                                disabled={pending}
-                                onClick={() =>
-                                    act(async () => {
-                                        if (dirty && !(await save())) return;
-                                        const answer = await publishAction(detail.id);
-                                        toast.show({
-                                            title: answer.ok ? t("editor.published") : answer.error
-                                        });
-                                        if (answer.ok) onChanged();
-                                    })
-                                }
-                            >
-                                {t("editor.publish")}
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                disabled={pending || !detail.published || !hasManual}
-                                title={
-                                    !hasManual
-                                        ? t("editor.noManual")
-                                        : !detail.published
-                                          ? t("list.notPublished")
-                                          : undefined
-                                }
-                                onClick={() =>
-                                    act(async () => {
-                                        const answer = await runNowAction(detail.id);
-                                        toast.show({
-                                            title: answer.ok ? t("editor.runStarted") : answer.error
-                                        });
-                                    })
-                                }
-                            >
-                                <Play aria-hidden="true" />
-                                {t("editor.runNow")}
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label={t("editor.delete")}
-                                title={t("editor.delete")}
-                                onClick={() => setDeleting(true)}
-                            >
-                                <Trash2 aria-hidden="true" />
-                            </Button>
-                        </div>
-                    )
-                }
-            />
-            <div className="flex flex-wrap items-center gap-2">
-                {detail.publishedVersion ? (
-                    <Badge variant={differs ? "warning" : "success"}>
-                        {differs
-                            ? t("versions.draftDiffers", { number: detail.publishedVersion.number })
-                            : t("versions.draftSame", { number: detail.publishedVersion.number })}
-                    </Badge>
-                ) : (
-                    <Badge variant="neutral">{t("versions.notPublished")}</Badge>
-                )}
-                <Button variant="ghost" size="sm" onClick={() => setVersionsOpen(true)}>
-                    <History aria-hidden="true" />
-                    {t("versions.title")}
-                </Button>
-                {testRun ? (
-                    <Link
-                        href={`/automations/runs/${testRun.id}`}
-                        className="inline-flex min-w-0 items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                        <span className="truncate">{t("canvas.lastTest")}</span>
-                        <StatusChip status={testRun.status} />
-                    </Link>
-                ) : null}
-                <SegmentedControl
-                    className="ml-auto"
-                    size="sm"
-                    value={view}
-                    onValueChange={choose}
-                    aria-label={t("canvas.view")}
-                    options={[
-                        { value: "canvas", label: t("canvas.viewCanvas") },
-                        {
-                            value: "list",
-                            label: t("canvas.viewList"),
-                            disabled: !flow,
-                            title: !flow ? t("canvas.listUnavailable") : undefined
-                        }
-                    ]}
-                />
-            </div>
-            {readOnly ? (
-                <p className="text-sm text-muted-foreground">{t("editor.readOnly")}</p>
-            ) : null}
-            {!flow ? (
-                <p className="text-xs text-muted-foreground">{t("canvas.listUnavailable")}</p>
-            ) : null}
-            {view === "canvas" && !wide && !readOnly ? (
-                <p className="text-xs text-muted-foreground">{t("canvas.phoneReadOnly")}</p>
-            ) : null}
-
-            {view === "canvas" ? (
-                <CanvasEditor
-                    graph={graph}
-                    change={draft.change}
-                    undo={draft.undo}
-                    redo={draft.redo}
-                    readOnly={readOnly || !wide}
-                    detail={detail}
-                    secrets={secrets}
-                    samples={samples}
-                    states={states}
-                    onChanged={onChanged}
-                    onAdded={onAdded}
-                    onRunFrom={
-                        readOnly || testing
-                            ? undefined
-                            : (nodeId) =>
-                                  act(async () => {
-                                      if (dirty && !(await save())) return;
-                                      const answer = await startPartialRunAction({
-                                          automationId: detail.id,
-                                          nodeId
-                                      });
-                                      if (!answer.ok) {
-                                          const missing = "missing" in answer ? answer.missing : [];
-                                          const names = missing
-                                              .map((id) =>
-                                                  nodeLabel(
-                                                      t,
-                                                      graph.nodes.find((node) => node.id === id)
-                                                  )
-                                              )
-                                              .join(", ");
-                                          return void toast.show({
-                                              title: answer.error,
-                                              body: names || undefined
-                                          });
-                                      }
-                                      setTestRunId(answer.runId);
-                                      toast.show({
-                                          title: t("canvas.runFromStarted", {
-                                              name: nodeLabel(
-                                                  t,
-                                                  graph.nodes.find((node) => node.id === nodeId)
-                                              )
-                                          })
-                                      });
-                                  })
+                            </div>
+                        )
                     }
                 />
-            ) : flow ? (
-                <div className="mx-auto w-full max-w-4xl space-y-6">
-                    <p className="text-xs text-muted-foreground">
-                        {t("editor.references", { example: "{{trigger.body.name}}" })}
-                    </p>
-                    <Section
-                        title={t("editor.when")}
-                        hint={
-                            flow.when && flow.when.kind !== "any"
-                                ? t("flow.whenCombined")
-                                : t("editor.whenHint")
-                        }
-                    >
-                        <WhenFields
-                            when={flow.when ?? { kind: "any" }}
-                            triggers={flow.triggers.length}
-                            readOnly={!detail.canEdit}
-                            onChange={(when) => update({ when })}
-                        />
-                        <NodeList
-                            nodes={flow.triggers.map((node) => ({ node }))}
-                            onChange={(steps) =>
-                                update({ triggers: steps.map((step) => step.node) })
+                <div className="flex flex-wrap items-center gap-2">
+                    {detail.publishedVersion ? (
+                        <Badge variant={differs ? "warning" : "success"}>
+                            {differs
+                                ? t("versions.draftDiffers", {
+                                      number: detail.publishedVersion.number
+                                  })
+                                : t("versions.draftSame", {
+                                      number: detail.publishedVersion.number
+                                  })}
+                        </Badge>
+                    ) : (
+                        <Badge variant="neutral">{t("versions.notPublished")}</Badge>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => setVersionsOpen(true)}>
+                        <History aria-hidden="true" />
+                        {t("versions.title")}
+                    </Button>
+                    {testRun ? (
+                        <Link
+                            href={`/automations/runs/${testRun.id}`}
+                            className="inline-flex min-w-0 items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                            <span className="truncate">{t("canvas.lastTest")}</span>
+                            <StatusChip status={testRun.status} />
+                        </Link>
+                    ) : null}
+                    <SegmentedControl
+                        className="ml-auto"
+                        size="sm"
+                        value={view}
+                        onValueChange={choose}
+                        aria-label={t("canvas.view")}
+                        options={[
+                            { value: "canvas", label: t("canvas.viewCanvas") },
+                            {
+                                value: "list",
+                                label: t("canvas.viewList"),
+                                disabled: !flow,
+                                title: !flow ? t("canvas.listUnavailable") : undefined
                             }
-                            only="triggers"
-                            addLabel={t("editor.addTrigger")}
-                            onAdded={onAdded}
-                            detail={detail}
-                            secrets={secrets}
-                            readOnly={readOnly}
-                            onChanged={onChanged}
-                        />
-                    </Section>
-                    <Section title={t("editor.steps")} hint={t("editor.stepsHint")}>
-                        <NodeList
-                            nodes={flow.steps}
-                            onChange={(steps) => update({ steps })}
-                            only="steps"
-                            addLabel={t("editor.addStep")}
-                            detail={detail}
-                            secrets={secrets}
-                            readOnly={readOnly}
-                            onChanged={onChanged}
-                        />
-                    </Section>
-                    <Section title={t("editor.always")} hint={t("editor.alwaysHint")}>
-                        <NodeList
-                            nodes={flow.finally}
-                            onChange={(steps) => update({ finally: steps })}
-                            only="steps"
-                            addLabel={t("editor.addStep")}
-                            detail={detail}
-                            secrets={secrets}
-                            readOnly={readOnly}
-                            onChanged={onChanged}
-                        />
-                        <label className="flex items-center gap-2 text-sm">
-                            <Checkbox
-                                checked={flow.finallyOnCancel}
-                                disabled={readOnly}
-                                onChange={(event) =>
-                                    update({ finallyOnCancel: event.target.checked })
-                                }
-                            />
-                            {t("editor.alsoOnCancel")}
-                        </label>
-                    </Section>
-                </div>
-            ) : null}
-
-            <div className="mx-auto w-full max-w-4xl space-y-6">
-                {readOnly ? null : (
-                    <Settings key={detail.name} detail={detail} onSaved={onChanged} />
-                )}
-                <section className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border p-4">
-                    <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium">{t("editor.localNetwork")}</p>
-                        <p className="text-xs text-muted-foreground">
-                            {detail.localNetworkRefusal === "orgAdminOnly"
-                                ? t("editor.localNetworkOrgAdminOnly")
-                                : detail.localNetworkRefusal === "instanceAdminOnly"
-                                  ? t("editor.localNetworkInstanceAdminOnly")
-                                  : t("editor.localNetworkHint")}
-                        </p>
-                    </div>
-                    <Switch
-                        checked={lan}
-                        disabled={readOnly || detail.localNetworkRefusal !== null}
-                        aria-label={t("editor.localNetwork")}
-                        onChange={async (next: boolean) => {
-                            setLan(next);
-                            const answer = await setLocalNetworkAction(detail.id, next);
-                            if (!answer.ok) {
-                                setLan(!next);
-                                toast.show({ title: answer.error });
-                            } else
-                                toast.show({
-                                    title: next
-                                        ? t("editor.localNetworkOn")
-                                        : t("editor.localNetworkOff")
-                                });
-                        }}
+                        ]}
                     />
-                </section>
-            </div>
+                </div>
+                {readOnly ? (
+                    <p className="text-sm text-muted-foreground">{t("editor.readOnly")}</p>
+                ) : null}
+                {!flow ? (
+                    <p className="text-xs text-muted-foreground">{t("canvas.listUnavailable")}</p>
+                ) : null}
+                {view === "canvas" && !wide && !readOnly ? (
+                    <p className="text-xs text-muted-foreground">{t("canvas.phoneReadOnly")}</p>
+                ) : null}
 
-            <VersionsDialog
-                open={versionsOpen}
-                onOpenChange={setVersionsOpen}
-                automationId={detail.id}
-                canRestore={!readOnly}
-                onRestored={(restored) => {
-                    const laid = core.layoutGraph(restored);
-                    draft.change(() => laid, { group: false });
-                    setSaved(JSON.stringify(laid));
-                    onStored(restored);
-                    toast.show({ title: t("versions.restored") });
-                }}
-            />
-            <ConfirmDeleteDialog
-                open={deleting}
-                onOpenChange={setDeleting}
-                name={detail.name}
-                kind={t("title")}
-                requireTyping={false}
-                confirmLabel={t("editor.delete")}
-                pending={pending}
-                onConfirm={() =>
-                    act(async () => {
-                        const answer = await deleteAutomationAction(detail.id);
-                        if (!answer.ok) return void toast.show({ title: answer.error });
-                        toast.show({ title: t("editor.deleted") });
-                        router.push(listHref(detail));
-                    })
-                }
-            />
-        </EditorGraphProvider>
+                {view === "canvas" ? (
+                    <CanvasEditor
+                        graph={graph}
+                        change={draft.change}
+                        undo={draft.undo}
+                        redo={draft.redo}
+                        readOnly={readOnly || !wide}
+                        detail={detail}
+                        secrets={secrets}
+                        samples={samples}
+                        states={states}
+                        onChanged={onChanged}
+                        onAdded={onAdded}
+                        onRunFrom={
+                            readOnly || testing
+                                ? undefined
+                                : (nodeId) =>
+                                      act(async () => {
+                                          if (dirty && !(await save())) return;
+                                          const answer = await startPartialRunAction({
+                                              automationId: detail.id,
+                                              nodeId
+                                          });
+                                          if (!answer.ok) {
+                                              const missing =
+                                                  "missing" in answer ? answer.missing : [];
+                                              const names = missing
+                                                  .map((id) =>
+                                                      nodeLabel(
+                                                          t,
+                                                          graph.nodes.find((node) => node.id === id)
+                                                      )
+                                                  )
+                                                  .join(", ");
+                                              return void toast.show({
+                                                  title: answer.error,
+                                                  body: names || undefined
+                                              });
+                                          }
+                                          setTestRunId(answer.runId);
+                                          toast.show({
+                                              title: t("canvas.runFromStarted", {
+                                                  name: nodeLabel(
+                                                      t,
+                                                      graph.nodes.find((node) => node.id === nodeId)
+                                                  )
+                                              })
+                                          });
+                                      })
+                        }
+                    />
+                ) : flow ? (
+                    <div className="mx-auto w-full max-w-4xl space-y-6">
+                        <p className="text-xs text-muted-foreground">
+                            {t("editor.references", { example: "{{trigger.body.name}}" })}
+                        </p>
+                        <Section
+                            title={t("editor.when")}
+                            hint={
+                                flow.when && flow.when.kind !== "any"
+                                    ? t("flow.whenCombined")
+                                    : t("editor.whenHint")
+                            }
+                        >
+                            <WhenFields
+                                when={flow.when ?? { kind: "any" }}
+                                triggers={flow.triggers.length}
+                                readOnly={!detail.canEdit}
+                                onChange={(when) => update({ when })}
+                            />
+                            <NodeList
+                                nodes={flow.triggers.map((node) => ({ node }))}
+                                onChange={(steps) =>
+                                    update({ triggers: steps.map((step) => step.node) })
+                                }
+                                only="triggers"
+                                addLabel={t("editor.addTrigger")}
+                                onAdded={onAdded}
+                                detail={detail}
+                                secrets={secrets}
+                                readOnly={readOnly}
+                                onChanged={onChanged}
+                            />
+                        </Section>
+                        <Section title={t("editor.steps")} hint={t("editor.stepsHint")}>
+                            <NodeList
+                                nodes={flow.steps}
+                                onChange={(steps) => update({ steps })}
+                                only="steps"
+                                addLabel={t("editor.addStep")}
+                                detail={detail}
+                                secrets={secrets}
+                                readOnly={readOnly}
+                                onChanged={onChanged}
+                            />
+                        </Section>
+                        <Section title={t("editor.always")} hint={t("editor.alwaysHint")}>
+                            <NodeList
+                                nodes={flow.finally}
+                                onChange={(steps) => update({ finally: steps })}
+                                only="steps"
+                                addLabel={t("editor.addStep")}
+                                detail={detail}
+                                secrets={secrets}
+                                readOnly={readOnly}
+                                onChanged={onChanged}
+                            />
+                            <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                    checked={flow.finallyOnCancel}
+                                    disabled={readOnly}
+                                    onChange={(event) =>
+                                        update({ finallyOnCancel: event.target.checked })
+                                    }
+                                />
+                                {t("editor.alsoOnCancel")}
+                            </label>
+                        </Section>
+                    </div>
+                ) : null}
+
+                <div className="mx-auto w-full max-w-4xl space-y-6">
+                    {readOnly ? null : (
+                        <Settings key={detail.name} detail={detail} onSaved={onChanged} />
+                    )}
+                    <section className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border p-4">
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium">{t("editor.localNetwork")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {detail.localNetworkRefusal === "orgAdminOnly"
+                                    ? t("editor.localNetworkOrgAdminOnly")
+                                    : detail.localNetworkRefusal === "instanceAdminOnly"
+                                      ? t("editor.localNetworkInstanceAdminOnly")
+                                      : t("editor.localNetworkHint")}
+                            </p>
+                        </div>
+                        <Switch
+                            checked={lan}
+                            disabled={readOnly || detail.localNetworkRefusal !== null}
+                            aria-label={t("editor.localNetwork")}
+                            onChange={async (next: boolean) => {
+                                setLan(next);
+                                const answer = await setLocalNetworkAction(detail.id, next);
+                                if (!answer.ok) {
+                                    setLan(!next);
+                                    toast.show({ title: answer.error });
+                                } else
+                                    toast.show({
+                                        title: next
+                                            ? t("editor.localNetworkOn")
+                                            : t("editor.localNetworkOff")
+                                    });
+                            }}
+                        />
+                    </section>
+                </div>
+
+                <VersionsDialog
+                    open={versionsOpen}
+                    onOpenChange={setVersionsOpen}
+                    automationId={detail.id}
+                    canRestore={!readOnly}
+                    onRestored={(restored) => {
+                        const laid = core.layoutGraph(restored);
+                        draft.change(() => laid, { group: false });
+                        setSaved(JSON.stringify(laid));
+                        onStored(restored);
+                        toast.show({ title: t("versions.restored") });
+                    }}
+                />
+                <ConfirmDeleteDialog
+                    open={deleting}
+                    onOpenChange={setDeleting}
+                    name={detail.name}
+                    kind={t("title")}
+                    requireTyping={false}
+                    confirmLabel={t("editor.delete")}
+                    pending={pending}
+                    onConfirm={() =>
+                        act(async () => {
+                            const answer = await deleteAutomationAction(detail.id);
+                            if (!answer.ok) return void toast.show({ title: answer.error });
+                            toast.show({ title: t("editor.deleted") });
+                            router.push(listHref(detail));
+                        })
+                    }
+                />
+            </EditorGraphProvider>
+        </AssistPrepare>
     );
 }
 
@@ -1248,6 +1276,16 @@ export function NodeList({ nodes, onChange, only, addLabel, onAdded, ...rest }: 
                             ...Object.keys(rest.detail.appNodes ?? {}),
                             ...(rest.detail.eventApps ?? [])
                         ]}
+                        assist={
+                            <PolarAssist
+                                target={{
+                                    kind: "nodes",
+                                    automationId: rest.detail.id,
+                                    edge: null
+                                }}
+                                onSent={() => setPicking(false)}
+                            />
+                        }
                         onOpenChange={setPicking}
                         onPick={(value) => {
                             setPicking(false);

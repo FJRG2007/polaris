@@ -52,7 +52,7 @@ import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { JsonEditor, JsonView } from "@/components/json-view";
 import type { AutomationDetail } from "@/lib/automations/service";
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
     CanvasBoard,
     NO_SELECTION,
@@ -64,9 +64,12 @@ import { comparatorSymbol } from "@/lib/automations/threshold-form";
 import { NodeFields, configValid, newNode, type T } from "./node-fields";
 import * as catalog from "./node-catalog";
 import { AddBlockDialog, type AddGroup } from "@polaris/ui/automation-add";
+import { PolarAssist, assistEdgeOf } from "../polar-assist";
 import { FailureFields, WhenFields } from "./flow-fields";
 import { NodeIcon, nodeHint, nodeTitle } from "../shared";
+import { scheduleSummary } from "./schedule-words";
 import {
+    AppLogo,
     Button,
     ContextMenuGroup,
     ContextMenuItem,
@@ -104,8 +107,7 @@ export function nodeSubtitle(t: T, node: core.GraphNode): string | null {
         return typeof config.body === "string" && config.body ? config.body : null;
     if (node.type === "core.threshold" && typeof config.value === "number")
         return `${comparatorSymbol(String(config.comparator ?? "gt"))} ${config.value}`;
-    if (node.type === "core.schedule" && config.kind === "cron")
-        return String(config.expression ?? "");
+    if (node.type === "core.schedule") return scheduleSummary(t, node.config);
     return null;
 }
 
@@ -721,6 +723,21 @@ export function CanvasEditor({
                 open={palette}
                 stepsOnly={insertOn !== null}
                 apps={[...Object.keys(detail.appNodes ?? {}), ...(detail.eventApps ?? [])]}
+                assist={
+                    readOnly ? undefined : (
+                        <PolarAssist
+                            target={{
+                                kind: "nodes",
+                                automationId: detail.id,
+                                edge: assistEdgeOf(insertOn)
+                            }}
+                            onSent={() => {
+                                setPalette(false);
+                                setInsertOn(null);
+                            }}
+                        />
+                    )
+                }
                 onOpenChange={(open) => {
                     setPalette(open);
                     if (!open) setInsertOn(null);
@@ -808,6 +825,21 @@ const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
     send: Send
 };
 
+/**
+ * The app whose own logo an app's group wears, as the sidebar draws it; the
+ * icon above stays where that app has no logo, and on the groups that are not an app.
+ */
+const GROUP_APP_LOGOS: Partial<Record<catalog.CatalogGroupId, string>> = {
+    places: catalog.PLACES_APP,
+    "game-servers": "games",
+    deploy: "deploy",
+    chat: "chat",
+    tasks: "tasks",
+    mail: "mail",
+    drive: "drive",
+    calendar: "calendar"
+};
+
 /** The node picker: the shared add dialog, its groups from the catalog, each item with its icon. */
 export function Palette({
     open,
@@ -815,11 +847,14 @@ export function Palette({
     triggersOnly = false,
     title,
     apps,
+    assist,
     onOpenChange,
     onPick
 }: {
     open: boolean;
     stepsOnly: boolean;
+    /** "Build with Polar", under the lists. */
+    assist?: ReactNode;
     /** Only triggers: the list view's triggers, where a step has no place. */
     triggersOnly?: boolean;
     title?: string;
@@ -837,12 +872,22 @@ export function Palette({
                     return {
                         id: group.id,
                         label: t(`picker.groups.${group.id}`),
-                        icon: <Icon aria-hidden="true" />,
+                        icon: GROUP_APP_LOGOS[group.id] ? (
+                            <AppLogo
+                                appId={GROUP_APP_LOGOS[group.id]!}
+                                size={16}
+                                fallback={<Icon aria-hidden="true" />}
+                            />
+                        ) : (
+                            <Icon aria-hidden="true" />
+                        ),
                         items: group.items.map((item) => ({
                             value: item.value,
                             label: item.preset
                                 ? t(`picker.presets.${item.preset}`)
-                                : nodeTitle(t, item.type),
+                                : item.schedule
+                                  ? t(`picker.schedules.${item.schedule}`)
+                                  : nodeTitle(t, item.type),
                             description: item.preset
                                 ? t("picker.presetHint", {
                                       name: catalog.EVENT_PRESETS[item.preset].name
@@ -870,6 +915,7 @@ export function Palette({
                 more: (count) => t("picker.more", { count })
             }}
             groups={groups}
+            assist={assist}
             onPick={(value) => onPick(value)}
             onClose={() => onOpenChange(false)}
         />

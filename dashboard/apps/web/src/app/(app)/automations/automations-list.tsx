@@ -69,6 +69,7 @@ import {
     setEnabledAction,
     setTagsAction
 } from "./actions";
+import { PolarAssist } from "./polar-assist";
 
 const ALL = "all";
 const NONE = "none";
@@ -930,6 +931,15 @@ export function CreateDialog({ onClose }: { onClose: () => void }) {
                         onPick={() => create()}
                     />
                 </ul>
+                <PolarAssist
+                    target={{
+                        kind: "create",
+                        orgId: orgId === "personal" ? null : orgId,
+                        orgName: options.find((option) => option.value === orgId)?.label
+                    }}
+                    disabled={pending}
+                    onSent={onClose}
+                />
                 {(loaded && templates.length === 0) ||
                 (!shelves.data && shelves.error !== null) ? null : (
                     <section className="space-y-1">

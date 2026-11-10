@@ -15,6 +15,7 @@
 
 import { z } from "zod";
 import { nextCronRun, parseCron } from "./cron.js";
+import { wallClock, zonedInstant } from "./schemas/display.js";
 import { durationSchema, durationSeconds } from "./automation-schema.js";
 import { automationNodeId } from "./automation-nodes.js";
 import { isAppEventName, type AppEventApp } from "./automation-app-events.js";
@@ -470,6 +471,38 @@ export const scheduleConfigSchema = z.discriminatedUnion("kind", [
         times: z.array(clock).min(1).max(12),
         /** 0 = Sunday. Empty is every day. */
         days: z.array(z.number().int().min(0).max(6)).max(7).default([])
+    }),
+    z.object({
+        kind: z.literal("monthly"),
+        /** Days of the month; "last" is the month's last day, whatever its length. */
+        days: z
+            .array(z.union([z.number().int().min(1).max(31), z.literal("last")]))
+            .min(1, "daysRequired")
+            .max(32),
+        times: z.array(clock).min(1).max(12)
+    }),
+    z.object({
+        kind: z.literal("yearly"),
+        dates: z
+            .array(
+                z
+                    .object({ month: z.number().int().min(1).max(12), day: z.number().int().min(1).max(31) })
+                    .refine(({ month, day }) => day <= daysInMonth(2028, month), "dateInvalid")
+            )
+            .min(1, "datesRequired")
+            .max(24),
+        times: z.array(clock).min(1).max(12)
+    }),
+    z.object({
+        kind: z.literal("once"),
+        /** A wall-clock date and time in the automation's zone, `YYYY-MM-DDTHH:MM`. */
+        at: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/, "dateTimeInvalid")
+            .refine((value) => {
+                const [year, month, day] = value.slice(0, 10).split("-").map(Number) as [number, number, number];
+                return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(year, month);
+            }, "dateTimeInvalid")
     }),
     z.object({
         kind: z.literal("cron"),
@@ -1065,7 +1098,123 @@ export function nextScheduleDue(
         return new Date(after.getTime() + config.amount * unit);
     }
     if (config.kind === "cron") return nextCronRun(parseCron(config.expression), after, timeZone);
+    if (config.kind === "monthly") return nextMonthlyDue(config.days, config.times, after, timeZone);
+    if (config.kind === "yearly") return nextYearlyDue(config.dates, config.times, after, timeZone);
+    if (config.kind === "once") {
+        const [date, time] = config.at.split("T") as [string, string];
+        const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+        const [hours, minutes] = time.split(":").map(Number) as [number, number];
+        const at = zonedInstant({ year, month, day, hours, minutes }, timeZone);
+        return at.getTime() > after.getTime() ? at : null;
+    }
     return nextDailyDue(config.times, config.days, after, timeZone);
+}
+
+/** The next `count` times a schedule is due after `after`, for the editor's preview. */
+export function upcomingScheduleRuns(
+    config: ScheduleConfig,
+    after: Date,
+    timeZone: string,
+    count = 3
+): Date[] {
+    const out: Date[] = [];
+    let cursor = after;
+    while (out.length < count) {
+        const next = nextScheduleDue(config, cursor, timeZone);
+        if (!next) break;
+        out.push(next);
+        cursor = next;
+    }
+    return out;
+}
+
+/** Days in a month of a year (1-12). */
+export function daysInMonth(year: number, month: number): number {
+    return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/**
+ * The soonest due time among cron runs at each clock time that `accepts` keeps.
+ *
+ * The cron reader does the walking and the daylight saving rules; `accepts` sees
+ * the wall-clock date of each run and turns away the ones a cron field cannot
+ * express exactly (a month's last day, or a day that belongs to another month).
+ */
+function nextFilteredDue(
+    times: readonly string[],
+    dayField: string,
+    monthField: string,
+    accepts: (wall: { year: number; month: number; day: number }) => boolean,
+    after: Date,
+    timeZone: string
+): Date | null {
+    let soonest: Date | null = null;
+    for (const time of times) {
+        const [hour, minute] = time.split(":").map(Number);
+        const cron = parseCron(`${minute} ${hour} ${dayField} ${monthField} *`);
+        let cursor: Date | null = after;
+        // Each turned-away run moves the cursor past it; a year has at most a few
+        // dozen of them, so the cap is never what ends a real schedule.
+        for (let tries = 0; cursor && tries < 500; tries += 1) {
+            const next = nextCronRun(cron, cursor, timeZone);
+            if (!next) break;
+            if (soonest && next >= soonest) break;
+            if (accepts(wallClock(next, timeZone))) {
+                soonest = next;
+                break;
+            }
+            cursor = next;
+        }
+    }
+    return soonest;
+}
+
+/**
+ * Some days of every month. A day a month does not have (the 31st in April) is
+ * skipped that month, the way cron skips it; "last" is the month's own last day.
+ */
+export function nextMonthlyDue(
+    days: readonly (number | "last")[],
+    times: readonly string[],
+    after: Date,
+    timeZone: string
+): Date | null {
+    const numbers = new Set(days.filter((day): day is number => day !== "last"));
+    const last = days.includes("last");
+    const field = [...new Set([...numbers, ...(last ? [28, 29, 30, 31] : [])])]
+        .sort((a, b) => a - b)
+        .join(",");
+    return nextFilteredDue(
+        times,
+        field,
+        "*",
+        (wall) => numbers.has(wall.day) || (last && wall.day === daysInMonth(wall.year, wall.month)),
+        after,
+        timeZone
+    );
+}
+
+/**
+ * Some dates of every year. February 29 runs only in leap years: it is a date
+ * like any other, and a year without it is skipped, as cron skips it.
+ */
+export function nextYearlyDue(
+    dates: readonly { readonly month: number; readonly day: number }[],
+    times: readonly string[],
+    after: Date,
+    timeZone: string
+): Date | null {
+    const wanted = new Set(dates.map((date) => date.month * 100 + date.day));
+    const days = [...new Set(dates.map((date) => date.day))].sort((a, b) => a - b).join(",");
+    const months = [...new Set(dates.map((date) => date.month))].sort((a, b) => a - b).join(",");
+    return nextFilteredDue(
+        times,
+        days,
+        months,
+        (wall) => wanted.has(wall.month * 100 + wall.day),
+        after,
+        timeZone
+    );
 }
 
 /** The soonest of several clock times on some weekdays, through the cron reader so DST is handled once. */

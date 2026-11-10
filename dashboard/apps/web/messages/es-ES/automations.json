@@ -997,6 +997,14 @@
             "mailReceived": "Correo recibido",
             "driveFileUploaded": "Archivo subido a Drive",
             "calendarEventStarting": "Evento del calendario pronto"
+        },
+        "schedules": {
+            "daily": "Cada día a una hora",
+            "weekdays": "Días de la semana",
+            "monthly": "Algunos días del mes",
+            "yearly": "Algunas fechas del año",
+            "once": "Una vez, en fecha y hora",
+            "every": "Cada pocos minutos"
         }
     },
     "code": {
@@ -1012,5 +1020,99 @@
         },
         "hint": "Lee items y devuelve una lista para el siguiente paso. console.log va a la ejecución. Sin red, archivos ni secretos; 1 segundo por ejecución.",
         "tooLong": "El código es más largo de lo que admite un paso."
+    },
+    "schedule": {
+        "kinds": {
+            "every": "Cada pocos minutos, horas o días",
+            "daily": "Cada día o algunos días",
+            "monthly": "Algunos días del mes",
+            "yearly": "Algunas fechas del año",
+            "once": "Una vez",
+            "cron": "Avanzado (cron)"
+        },
+        "times": "Horas",
+        "timeN": "Hora {n}",
+        "addTime": "Otra hora",
+        "removeTime": "Quitar {time}",
+        "workweek": "Lun-vie",
+        "weekend": "Sáb-dom",
+        "monthDays": "Días del mes",
+        "lastDay": "Último día",
+        "shortMonths": "Los meses sin ese día lo saltan. Usa Último día para el final de mes.",
+        "dates": "Fechas",
+        "month": "Mes",
+        "day": "Día",
+        "addDate": "Otra fecha",
+        "removeDate": "Quitar fecha",
+        "leapDay": "El 29 de febrero solo corre en años bisiestos.",
+        "onceAt": "Fecha y hora",
+        "nextRuns": "Próximas, hora de {zone}",
+        "noNext": "Esa hora ya pasó, así que no correrá.",
+        "fromPublish": "Cuenta desde que lo publicas.",
+        "monthDate": "{day} de {month}",
+        "fullDate": "{date} de {year}",
+        "summary": {
+            "everyMinutes": "{amount, plural, one {Cada minuto} other {Cada # minutos}}",
+            "everyHours": "{amount, plural, one {Cada hora} other {Cada # horas}}",
+            "everyDays": "{amount, plural, one {Cada día} other {Cada # días}}",
+            "daily": "Cada día a las {times}",
+            "weekdays": "Cada {days} a las {times}",
+            "monthly": "Cada mes el día {days} a las {times}",
+            "monthlyLast": "Cada mes el día {days} y el último a las {times}",
+            "lastOnly": "El último día de cada mes a las {times}",
+            "yearly": "Cada año el {dates} a las {times}",
+            "once": "Una vez, el {date} a las {time}",
+            "cron": "Programa cron {expression}",
+            "and": "{head} y {last}"
+        },
+        "errors": {
+            "clockTime": "Cada hora debe ser HH:MM.",
+            "cronInvalid": "Esa expresión cron no se entiende.",
+            "daysRequired": "Elige al menos un día.",
+            "datesRequired": "Añade al menos una fecha.",
+            "dateInvalid": "Ese día no existe en ese mes.",
+            "dateTimeInvalid": "Elige una fecha y una hora.",
+            "timesRequired": "Añade al menos una hora.",
+            "amountInvalid": "Usa un número entero del 1 al 10000.",
+            "invalid": "Faltan datos por completar."
+        },
+        "days": {
+            "0": "domingo",
+            "1": "lunes",
+            "2": "martes",
+            "3": "miércoles",
+            "4": "jueves",
+            "5": "viernes",
+            "6": "sábado"
+        },
+        "months": {
+            "1": "enero",
+            "2": "febrero",
+            "3": "marzo",
+            "4": "abril",
+            "5": "mayo",
+            "6": "junio",
+            "7": "julio",
+            "8": "agosto",
+            "9": "septiembre",
+            "10": "octubre",
+            "11": "noviembre",
+            "12": "diciembre"
+        }
+    },
+    "polarAssist": {
+        "open": "Crear con Polar",
+        "labelCreate": "¿Qué debe hacer?",
+        "labelNodes": "¿Qué debe pasar aquí?",
+        "placeholderCreate": "Si una web cae, avísame",
+        "placeholderNodes": "Luego publica el resultado en el canal",
+        "hint": "Polar crea un borrador en el panel. Apruebas cada cambio.",
+        "send": "Preguntar",
+        "cancel": "Cancelar",
+        "shelfPersonal": "mi espacio",
+        "shelfOrg": "la organización {name} ({id})",
+        "draftCreate": "Crea una automatización en {shelf}, como borrador: {words}\n(Zona: {zone})",
+        "draftNodes": "Añade a la automatización {id}: {words}",
+        "draftNodesAt": "Añade pasos a la automatización {id}, en la conexión {from} ({port}) a {to}: {words}"
     }
 }

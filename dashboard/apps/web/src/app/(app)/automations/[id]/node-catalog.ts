@@ -31,6 +31,8 @@ export interface CatalogItem {
     readonly type: string;
     /** Set on a preset: its key under `picker.presets`. */
     readonly preset?: PresetKey;
+    /** Set on a schedule preset: its key under `picker.schedules`. */
+    readonly schedule?: SchedulePresetKey;
 }
 
 export interface CatalogGroup {
@@ -64,7 +66,27 @@ export const EVENT_PRESETS = {
 } as const satisfies Record<string, { name: string; outcomes: readonly never[] }>;
 export type PresetKey = keyof typeof EVENT_PRESETS;
 
+/**
+ * Schedules a reader asks for by name ("every day at eight"), each the
+ * schedule trigger with its kind already chosen, so the picker shows them
+ * instead of leaving them behind a field inside "On a schedule".
+ */
+export const SCHEDULE_PRESETS = {
+    daily: { kind: "daily", times: ["08:00"], days: [] },
+    weekdays: { kind: "daily", times: ["08:00"], days: [1, 2, 3, 4, 5] },
+    monthly: { kind: "monthly", days: [1], times: ["08:00"] },
+    yearly: { kind: "yearly", dates: [{ month: 1, day: 1 }], times: ["08:00"] },
+    once: { kind: "once", at: "" },
+    every: { kind: "every", amount: 15, unit: "minutes" }
+} as const;
+export type SchedulePresetKey = keyof typeof SCHEDULE_PRESETS;
+
 const plain = (type: string): CatalogItem => ({ value: type, type });
+const schedule = (key: SchedulePresetKey): CatalogItem => ({
+    value: `core.schedule#${key}`,
+    type: "core.schedule",
+    schedule: key
+});
 const preset = (key: PresetKey): CatalogItem => ({
     value: `core.onEvent#${key}`,
     type: "core.onEvent",
@@ -110,7 +132,15 @@ export function catalogGroups(options: {
     const groups: CatalogGroup[] = [];
     if (options.triggers) {
         groups.push(
-            { id: "basics", items: ["core.manual", "core.schedule", "core.webhook"].map(plain) },
+            {
+                id: "basics",
+                items: [
+                    plain("core.manual"),
+                    plain("core.schedule"),
+                    ...(Object.keys(SCHEDULE_PRESETS) as SchedulePresetKey[]).map(schedule),
+                    plain("core.webhook")
+                ]
+            },
             {
                 id: "polaris",
                 items: [
@@ -186,12 +216,34 @@ function mergeSame(groups: CatalogGroup[]): CatalogGroup[] {
     return out;
 }
 
-/** The node type and its starting settings for a picked value; null when it names nothing known. */
-export function pickedNode(value: string): { type: string; config?: unknown } | null {
+/**
+ * The node type and its starting settings for a picked value; null when it names nothing known.
+ * A "once" schedule starts at the next whole hour of `now` on this device's
+ * clock, so it is not already in the past when it lands on the canvas.
+ */
+export function pickedNode(
+    value: string,
+    now: Date = new Date()
+): { type: string; config?: unknown } | null {
     const [type, key] = value.split("#", 2) as [string, string | undefined];
     if (key === undefined) return { type };
+    if (type === "core.schedule") {
+        if (!Object.hasOwn(SCHEDULE_PRESETS, key)) return null;
+        const preset = SCHEDULE_PRESETS[key as SchedulePresetKey];
+        return {
+            type,
+            config: preset.kind === "once" ? { kind: "once", at: nextWholeHour(now) } : structuredClone(preset)
+        };
+    }
     const config = Object.hasOwn(EVENT_PRESETS, key) ? EVENT_PRESETS[key as PresetKey] : null;
     return type === "core.onEvent" && config ? { type, config: { ...config, outcomes: [] } } : null;
+}
+
+/** `YYYY-MM-DDTHH:00` of the hour after `now`, on this device's clock. */
+function nextWholeHour(now: Date): string {
+    const at = new Date(now.getTime() + 3_600_000);
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:00`;
 }
 
 /** Whether a picked type starts an automation. */

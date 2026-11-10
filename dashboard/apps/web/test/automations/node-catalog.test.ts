@@ -91,6 +91,33 @@ describe("the node catalog", () => {
             expect(sent).toContain(preset.name);
     });
 
+    it("offers the schedules people ask for by name in Basics, each one the server accepts", () => {
+        const basics = catalog
+            .catalogGroups({ triggers: true, apps: [] })
+            .find((group) => group.id === "basics")!;
+        const schedules = basics.items.filter((item) => item.schedule);
+        expect(schedules.map((item) => item.schedule)).toEqual(
+            Object.keys(catalog.SCHEDULE_PRESETS)
+        );
+        for (const item of schedules) {
+            const picked = catalog.pickedNode(item.value, new Date("2026-11-10T09:15:00Z"));
+            expect(picked?.type).toBe("core.schedule");
+            expect(core.scheduleConfigSchema.safeParse(picked?.config).success).toBe(true);
+        }
+        const once = catalog.pickedNode("core.schedule#once", new Date("2026-11-10T09:15:00Z"));
+        const at = (once?.config as { at: string }).at;
+        // An hour from now on this device's clock, on the hour.
+        expect(at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:00$/);
+        expect(catalog.pickedNode("core.schedule#nope")).toBeNull();
+    });
+
+    it("hands each schedule preset its own copy of the settings", () => {
+        const a = catalog.pickedNode("core.schedule#daily")?.config as { times: string[] };
+        a.times.push("09:00");
+        const b = catalog.pickedNode("core.schedule#daily")?.config as { times: string[] };
+        expect(b.times).toEqual(["08:00"]);
+    });
+
     it("refuses a preset it does not know, and passes a plain type through", () => {
         expect(catalog.pickedNode("core.onEvent#nope")).toBeNull();
         expect(catalog.pickedNode("core.http#publicIpChanged")).toBeNull();
