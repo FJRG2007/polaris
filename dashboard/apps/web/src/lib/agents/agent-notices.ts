@@ -23,20 +23,9 @@ export function sessionPushTag(sessionId: string): string {
     return `agent-session:${sessionId}`;
 }
 
-/** Where a session's page in the Agents app used to be. Kept only so notices
- *  raised before sessions moved to Polar are still found again; it redirects. */
-function legacySessionHref(sessionId: string): string {
-    return `/apps/agents/sessions/${sessionId}`;
-}
-
 /** The same session opened in Polar's Code side. */
 export function polarSessionHref(sessionId: string): string {
     return `/polar?session=${sessionId}`;
-}
-
-/** Every page a session's notices may point at, for finding them again. */
-function sessionHrefs(sessionId: string): string[] {
-    return [legacySessionHref(sessionId), polarSessionHref(sessionId)];
 }
 
 /** The page a run's notices point at. */
@@ -117,7 +106,7 @@ export async function clearSessionWaiting(sessionId: string, userId?: string): P
         await prisma.notification.updateMany({
             where: {
                 type: WAITING_EVENT,
-                href: { in: sessionHrefs(sessionId) },
+                href: polarSessionHref(sessionId),
                 ...(userId ? { userId } : {}),
                 OR: [{ readAt: null }, { actionRequired: true }]
             },
@@ -136,7 +125,7 @@ export async function clearSessionWaiting(sessionId: string, userId?: string): P
 export async function readSessionWaiting(sessionId: string, userId: string): Promise<void> {
     try {
         await prisma.notification.updateMany({
-            where: { type: WAITING_EVENT, href: { in: sessionHrefs(sessionId) }, userId, readAt: null },
+            where: { type: WAITING_EVENT, href: polarSessionHref(sessionId), userId, readAt: null },
             data: { readAt: new Date() }
         });
     } catch (error) {
@@ -245,7 +234,7 @@ export async function clearWorkKept(sessionId: string): Promise<void> {
         await prisma.notification.updateMany({
             where: {
                 type: "agent.work",
-                href: { in: sessionHrefs(sessionId) },
+                href: polarSessionHref(sessionId),
                 OR: [{ readAt: null }, { actionRequired: true }]
             },
             data: { readAt: new Date(), actionRequired: false }

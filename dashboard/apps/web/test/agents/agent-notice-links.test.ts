@@ -55,11 +55,11 @@ describe("a session's notice", () => {
         expect(state.notify.mock.calls[0]?.[0].href).toBe(`/polar?session=${ID}`);
     });
 
-    it("is found again under either page when it is answered", async () => {
+    it("is found again under its Polar page when it is answered", async () => {
         const notices = await import("@/lib/agents/agent-notices");
         await notices.clearWorkKept(ID);
         expect(state.updateMany.mock.calls[0]?.[0]).toMatchObject({
-            where: { href: { in: [`/apps/agents/sessions/${ID}`, `/polar?session=${ID}`] } }
+            where: { href: `/polar?session=${ID}` }
         });
     });
 });
