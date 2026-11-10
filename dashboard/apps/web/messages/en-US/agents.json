@@ -297,6 +297,11 @@
             "turnFailed": "Stopped on an error",
             "sessionClear": "Started over",
             "sessionEnd": "Ended",
+            "endReason": {
+                "prompt_input_exit": "Closed from its prompt",
+                "logout": "Signed out",
+                "other": "The agent exited"
+            },
             "error": "Error"
         },
         "detach": "Detach",

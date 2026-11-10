@@ -297,6 +297,11 @@
             "turnFailed": "Paró por un error",
             "sessionClear": "Empezó de nuevo",
             "sessionEnd": "Terminó",
+            "endReason": {
+                "prompt_input_exit": "Cerrado desde su prompt",
+                "logout": "Sin sesión",
+                "other": "El agente salió"
+            },
             "error": "Error"
         },
         "detach": "Soltar",

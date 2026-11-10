@@ -382,6 +382,15 @@ export function normalizeHookEvent(payload: unknown): NormalizedHookEvent | null
     // ending: the agent is still running in the same terminal.
     if (kind === "session.end" && (record.reason === "clear" || record.reason === "resume"))
         return { kind: "session.clear", detail: "", subject: "" };
+    // Why the tool says it ended (`prompt_input_exit`, `logout`, `other`), kept
+    // on the event: a session that ends seconds after it starts is otherwise a
+    // bare "ended" with nothing to say what ended it.
+    if (kind === "session.end")
+        return {
+            kind,
+            detail: typeof record.reason === "string" ? clip(record.reason) : "",
+            subject: ""
+        };
     if (kind === "turn.failed") {
         const said = [errorText(record.error), record.error_details]
             .filter((part): part is string => typeof part === "string" && part.trim() !== "")

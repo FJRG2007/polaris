@@ -150,6 +150,13 @@ export async function polarCodeOverview(
     };
 }
 
+/** Why a session ended, in words, from the reason its tool reported. */
+function endReason(t: NamespaceTranslator<"agents">, reason: string): string {
+    if (reason === "prompt_input_exit") return t("session.events.endReason.prompt_input_exit");
+    if (reason === "logout") return t("session.events.endReason.logout");
+    return reason ? t("session.events.endReason.other") : "";
+}
+
 /** One session as the thread shows it, or null when it is not this account's. */
 export async function polarCodeThread(
     user: SessionUser,
@@ -176,7 +183,12 @@ export async function polarCodeThread(
             type: "event",
             role: event.kind,
             text: key ? t(key) : event.kind,
-            detail: event.detail ? agentText(t, event.detail) : event.subject
+            detail:
+                event.kind === "session.end"
+                    ? endReason(t, event.detail)
+                    : event.detail
+                      ? agentText(t, event.detail)
+                      : event.subject
         };
     });
     // Stable on equal times, so a prompt and the event it caused keep the order
