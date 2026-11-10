@@ -20,7 +20,8 @@ const taskStatus = {
 };
 const taskTag = { updateMany: vi.fn(), deleteMany: vi.fn() };
 const taskCustomField = { updateMany: vi.fn(), deleteMany: vi.fn() };
-const task = { updateMany: vi.fn(), deleteMany: vi.fn() };
+const task = { updateMany: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() };
+const forgetSubject = vi.fn(async (..._args: unknown[]) => undefined);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -31,6 +32,8 @@ vi.mock("@polaris/db", () => ({
         $transaction: async (operations: unknown[]) => Promise.all(operations)
     }
 }));
+
+vi.mock("@/lib/access/forget", () => ({ forgetSubject }));
 
 const spaces = await import("@/lib/tasks/space-service");
 
@@ -80,12 +83,15 @@ describe("a status", () => {
     it("takes the work with the column when that is what was asked for", async () => {
         // The one gesture on a board that destroys work, so it only happens on
         // being asked for by name.
+        task.findMany.mockResolvedValue([{ id: "t1" }, { id: "t2" }]);
         await spaces.deleteStatus(SPACE, "st1", { kind: "delete" });
         expect(task.deleteMany).toHaveBeenCalledWith({
             where: { statusId: "st1", spaceId: SPACE }
         });
         expect(task.updateMany).not.toHaveBeenCalled();
         expect(taskStatus.deleteMany).toHaveBeenCalledWith({ where: { id: "st1", spaceId: SPACE } });
+        // What names those tasks by id - grants, history, discussion - goes too.
+        expect(forgetSubject).toHaveBeenCalledWith("task.task", ["t1", "t2"]);
     });
 
     it("archives the work instead, onto a column that is staying", async () => {
