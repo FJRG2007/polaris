@@ -115,7 +115,7 @@ describe("searching the connectors", () => {
 
     it("says so when nothing matches", () => {
         list();
-        fireEvent.change(screen.getByRole("searchbox"), { target: { value: "nothing" } });
+        fireEvent.change(screen.getByRole("searchbox", { name: "Search connectors" }), { target: { value: "nothing" } });
         expect(screen.getByText("No connector matches.")).toBeTruthy();
     });
 
@@ -125,12 +125,12 @@ describe("searching the connectors", () => {
             vi.fn(async () => Response.json({}))
         );
         list();
-        fireEvent.change(screen.getByRole("searchbox"), { target: { value: "one" } });
+        fireEvent.change(screen.getByRole("searchbox", { name: "Search connectors" }), { target: { value: "one" } });
         fireEvent.click(screen.getByRole("button", { name: /^Remove/ }));
         fireEvent.change(await screen.findByRole("textbox"), { target: { value: "one" } });
         fireEvent.click(screen.getByRole("button", { name: /^(Delete|Remove)/ }));
         expect(await screen.findByText("two")).toBeTruthy();
-        expect(screen.queryByRole("searchbox")).toBeNull();
+        expect(screen.queryByRole("searchbox", { name: "Search connectors" })).toBeNull();
         expect(screen.queryByText("No connector matches.")).toBeNull();
     });
 });

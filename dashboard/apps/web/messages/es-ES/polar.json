@@ -464,7 +464,11 @@
         "back": "Volver al chat",
         "nav": {
             "permissions": "Permisos y conectores",
-            "connectors": "Conectores"
+            "connectors": "Conectores",
+            "routing": "Respaldos",
+            "codingTools": "Herramientas",
+            "usage": "Uso",
+            "skills": "Skills"
         },
         "browserSites": {
             "title": "Tu navegador",
@@ -474,6 +478,132 @@
             "forget": "Olvidar",
             "forgetLabel": "No dejar a Polar usar {site}",
             "forgetFailed": "No se pudo llegar a tu navegador. Reinténtalo."
+        },
+        "showPages": "Ver páginas",
+        "connectorCatalog": {
+            "title": "Tienda de conectores",
+            "intro": "Servidores oficiales, en la URL de cada proveedor. Conecta uno y Polar usará sus herramientas.",
+            "search": "Buscar en la tienda",
+            "noMatch": "Sin resultados.",
+            "connect": "Conectar",
+            "connected": "Conectado",
+            "unavailable": "No disponible",
+            "hostBlocked": "Tu administrador no permite este host.",
+            "docs": "Docs",
+            "custom": "Conector propio",
+            "customHint": "Cualquier servidor MCP por URL.",
+            "dialogTitle": "Conectar {name}",
+            "dialogOauth": "Inicias sesión en {vendor} y vuelves aquí.",
+            "dialogNone": "No pide acceso.",
+            "method": "Acceso con",
+            "methodOauth": "Cuenta",
+            "methodKey": "Clave API",
+            "apiKey": "Clave API",
+            "cancel": "Cancelar",
+            "entries": {
+                "stripe": "Pagos, clientes y facturas de tu cuenta de Stripe.",
+                "binance": "Mercado y tu cuenta de Binance, con los permisos que des.",
+                "cloudflare-api": "Gestiona tu cuenta de Cloudflare y sus recursos.",
+                "cloudflare-docs": "Busca en la documentación de Cloudflare.",
+                "cloudflare-containers": "Ejecuta comandos en un contenedor.",
+                "cloudflare-browser": "Abre páginas y haz capturas con un navegador remoto.",
+                "shopify-storefront": "Productos, carritos y normas de una tienda.",
+                "booking": "Busca alojamientos como socio de Booking.com.",
+                "adobe-journey-optimizer": "Recorridos, campañas y ofertas de Journey Optimizer.",
+                "adobe-customer-journey-analytics": "Consulta tus datos de Customer Journey Analytics.",
+                "adobe-analytics": "Informes y métricas de Adobe Analytics.",
+                "adobe-target": "Actividades, públicos y ofertas de Adobe Target.",
+                "adobe-rtcdp": "Perfiles, segmentos y destinos de Real-Time CDP.",
+                "adobe-experience-manager": "Contenido y recursos de Experience Manager.",
+                "adobe-marketo": "Leads, programas y campañas de Marketo Engage.",
+                "spotify": "Spotify no publica un servidor MCP propio.",
+                "linkedin": "LinkedIn no publica un servidor MCP propio."
+            },
+            "fields": {
+                "shop": "Dominio",
+                "shopHint": "tienda.myshopify.com o tu dominio",
+                "shopInvalid": "Pon un dominio: tienda.myshopify.com.",
+                "affiliateId": "ID afiliado",
+                "affiliateIdInvalid": "Solo cifras.",
+                "demandKey": "Clave Demand",
+                "partnerHint": "Tus credenciales de socio de Booking."
+            }
+        },
+        "skills": {
+            "title": "Skills",
+            "intro": "Instrucciones que Polar carga cuando hacen falta. Antes solo lee nombre y descripción.",
+            "mine": "Tus skills",
+            "empty": "Aún no hay skills. Añade una del catálogo o crea la tuya.",
+            "catalogTitle": "Incluidas",
+            "create": "Crear skill",
+            "try": "Probar",
+            "add": "Añadir",
+            "added": "Añadida",
+            "edit": "Editar",
+            "delete": "Borrar",
+            "use": "Usar skill",
+            "kind": "skill",
+            "removeHint": "Polar deja de usarla en adelante.",
+            "search": "Buscar skills",
+            "noMatch": "Sin resultados.",
+            "fromCatalog": "Incluida",
+            "save": "Guardar",
+            "cancel": "Cancelar",
+            "editor": {
+                "titleNew": "Nueva skill",
+                "titleEdit": "Editar skill",
+                "body": "Pruébala en un chat temporal antes de guardar.",
+                "name": "Nombre",
+                "nameHint": "Minúsculas, dígitos y guiones.",
+                "description": "Cuándo usarla",
+                "descriptionHint": "Polar lo lee para decidir cuándo aplicarla.",
+                "instructions": "Instrucciones",
+                "instructionsHint": "Markdown. Qué debe hacer Polar, paso a paso."
+            },
+            "errors": {
+                "name_format": "Usa minúsculas, dígitos y guiones.",
+                "too_long": "Muy largo.",
+                "duplicate": "Ya tienes una skill con ese nombre.",
+                "limit": "Tienes el máximo de skills permitido.",
+                "failed": "No se pudo guardar. Reinténtalo.",
+                "noAccess": "No tienes acceso a Polar.",
+                "viewingAs": "Estás viendo como otra persona.",
+                "not_found": "Esa skill ya no existe."
+            },
+            "catalog": {
+                "commit-message": {
+                    "title": "Mensaje de commit",
+                    "description": "Un mensaje de commit claro a partir de un diff."
+                },
+                "thread-summary": {
+                    "title": "Resumir un hilo",
+                    "description": "Decisiones, dudas abiertas y próximos pasos de un hilo largo."
+                },
+                "reply-email": {
+                    "title": "Responder un correo",
+                    "description": "Una respuesta que cubre cada punto, en el tono del correo recibido."
+                },
+                "pr-review": {
+                    "title": "Revisar una PR",
+                    "description": "Fallos de corrección, seguridad y claridad, los graves primero."
+                },
+                "trip-plan": {
+                    "title": "Plan de viaje",
+                    "description": "Un plan día a día según tus fechas, presupuesto y ritmo."
+                },
+                "explain-code": {
+                    "title": "Explicar código",
+                    "description": "Qué hace un fragmento de código, al nivel que pidas."
+                },
+                "meeting-notes": {
+                    "title": "Notas de reunión",
+                    "description": "Notas, decisiones y responsables de una transcripción."
+                },
+                "bug-report": {
+                    "title": "Informe de error",
+                    "description": "Pasos, resultado esperado y real, de una descripción vaga."
+                }
+            }
         }
     },
     "temporary": {
@@ -1047,10 +1177,7 @@
         "pinned": "Los modelos que elijo también tienen respaldo",
         "pinnedHint": "Si está apagado, ves el error del modelo elegido.",
         "notOffered": "{model} (no disponible)",
-        "clear": "Quitar",
-        "clearNamed": "Quitar {name}",
         "effortNamed": "Esfuerzo de {name}",
-        "keyNamed": "Clave de {name}",
         "retry": "Reintentar",
         "effort": {
             "inherit": "Heredar",
@@ -1069,29 +1196,59 @@
         },
         "fallbacks": {
             "title": "Modelos de respaldo",
-            "order": "Si un modelo falla, Polar prueba sus otras claves y luego esta lista, en orden.",
-            "empty": "Sin respaldos. Una llamada fallida muestra su error.",
+            "order": "Si un modelo falla, Polar prueba sus otras claves y luego cada modelo de abajo, en orden.",
+            "empty": "Aún no hay respaldos",
             "move": "Mover {model}. Usa las flechas.",
             "moveHint": "Arrastra o usa las flechas",
             "remove": "Quitar {model}",
             "removeShort": "Quitar",
             "full": "La lista admite hasta {most} modelos.",
-            "newEffort": "Esfuerzo del nuevo respaldo",
-            "newKey": "Clave del nuevo respaldo",
-            "add": "Añadir"
+            "add": "Añadir respaldo",
+            "example": "Ejemplo: tu modelo se queda sin crédito y responde el modelo 1 de aquí.",
+            "emptyHint": "Sin ellos, una llamada fallida muestra su error. Añade un modelo que responda.",
+            "addTitle": "Añadir un respaldo",
+            "editTitle": "Cambiar respaldo",
+            "dialogHint": "Polar lo usa si fallan los anteriores.",
+            "model": "Modelo",
+            "key": "Clave",
+            "keyHint": "Todas prueba cada clave del proveedor, en orden.",
+            "effort": "Esfuerzo",
+            "effortHint": "Heredar mantiene el esfuerzo pedido.",
+            "keyIs": "Clave: {key}",
+            "effortIs": "Esfuerzo: {effort}",
+            "up": "Subir {model}",
+            "upShort": "Subir",
+            "down": "Bajar {model}",
+            "downShort": "Bajar",
+            "edit": "Cambiar {model}",
+            "editShort": "Cambiar",
+            "cancel": "Cancelar",
+            "save": "Guardar"
         },
         "tools": {
             "title": "Herramientas",
-            "intro": "Adónde va una petición de Claude Code u otra herramienta, según su modelo.",
-            "default": "Modelo base",
+            "intro": "Una herramienta como Claude Code pide un modelo en cada petición. Este es el que usa Polar.",
             "automatic": "Automático",
-            "useDefault": "Usa el modelo base",
-            "fable": "Modelo para Fable",
-            "opus": "Modelo para Opus",
-            "sonnet": "Modelo para Sonnet",
-            "haiku": "Modelo para Haiku",
             "defaultEffort": "Esfuerzo base",
-            "defaultEffortHint": "Se usa si el esfuerzo dice Heredar."
+            "defaultEffortHint": "Se usa si el esfuerzo dice Heredar.",
+            "whenAsked": "Si la herramienta pide",
+            "polarUses": "Polar usa",
+            "askOther": "Otro modelo",
+            "askOtherHint": "El modelo base",
+            "askHint": "Un modelo {tier}",
+            "ask": {
+                "fable": "Fable",
+                "opus": "Opus",
+                "sonnet": "Sonnet",
+                "haiku": "Haiku"
+            },
+            "followsDefault": "Igual que otro modelo",
+            "followsAutomatic": "Polar elige en cada petición",
+            "effortIs": "Esfuerzo: {effort}",
+            "change": "Cambiar",
+            "choose": "Elegir",
+            "reset": "Volver al base",
+            "resetNamed": "Volver al base en {name}"
         },
         "following": {
             "title": "Sigues el enrutado de este Polaris",
@@ -1126,7 +1283,6 @@
             "cost": "Coste",
             "empty": "Sin llamadas este mes.",
             "removedKey": "Clave borrada",
-            "noKey": "Sin clave",
             "deployment": "Este Polaris",
             "fallbacks": "Respaldos recientes",
             "noFallbacks": "Sin respaldos en 30 días.",
@@ -1137,6 +1293,11 @@
                 "api": "Herramientas",
                 "voice": "Voz",
                 "translate": "Traducción"
+            },
+            "unitemized": {
+                "own": "Tus claves",
+                "instance": "Claves de Polaris",
+                "hint": "sin clave guardada"
             }
         },
         "reasons": {
@@ -1164,6 +1325,15 @@
             "failed": "No se pudo guardar. Reintenta.",
             "load": "No se pudo leer tu enrutado.",
             "usage": "No se pudo leer el uso del mes."
+        },
+        "own": {
+            "body": "Usas tu propio enrutado. Los cambios se guardan al hacerlos."
         }
+    },
+    "skillTrial": {
+        "banner": "Probando {name}: aún no está en tus skills.",
+        "add": "Añadir skill",
+        "added": "Skill añadida",
+        "addFailed": "No se pudo añadir."
     }
 }

@@ -24,7 +24,9 @@ import { createHash } from "node:crypto";
 export const CONNECTOR_TRANSPORTS = ["http", "sse"] as const;
 export type ConnectorTransport = (typeof CONNECTOR_TRANSPORTS)[number];
 
-export const CONNECTOR_AUTHS = ["none", "bearer", "oauth"] as const;
+/** `headers`: fixed request headers a server asks for in place of a token
+ *  (Booking.com's partner pair, for one). */
+export const CONNECTOR_AUTHS = ["none", "bearer", "oauth", "headers"] as const;
 export type ConnectorAuth = (typeof CONNECTOR_AUTHS)[number];
 
 export const TOOL_POLICIES = ["allow", "ask", "block"] as const;
@@ -68,6 +70,49 @@ export function canonicalServerUrl(raw: string, insecure = false): string | null
     return text.length <= 2048 ? text : null;
 }
 
+/** Most custom headers one connector sends. */
+export const HEADER_LIMIT = 8;
+/** One header value, in characters. */
+export const HEADER_VALUE_MAX = 2048;
+
+/**
+ * Header names a connector may never set itself: the ones the transport, the
+ * token or the MCP session own, and the ones that would change what the
+ * request is rather than who sends it.
+ */
+const RESERVED_HEADER = /^(authorization|proxy-.*|host|cookie|set-cookie|content-.*|connection|keep-alive|transfer-encoding|te|trailer|upgrade|accept|accept-encoding|expect|origin|referer|mcp-session-id|mcp-protocol-version|last-event-id)$/;
+
+/** An RFC 9110 field name: a token, kept short. */
+const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9a-z-]{1,64}$/;
+
+export const headerNameSchema = z
+    .string()
+    .trim()
+    .toLowerCase()
+    .pipe(
+        z
+            .string()
+            .regex(HEADER_NAME, "header_name")
+            .refine((name) => !RESERVED_HEADER.test(name), "header_reserved")
+    );
+
+export const headerValueSchema = z
+    .string()
+    .trim()
+    .min(1)
+    .max(HEADER_VALUE_MAX)
+    // Tab is legal in a field value, but nothing anybody types needs it.
+    .refine((value) => !/[\u0000-\u001f\u007f]/.test(value), "header_value");
+
+export const connectorHeadersSchema = z
+    .array(z.object({ name: headerNameSchema, value: headerValueSchema }))
+    .min(1)
+    .max(HEADER_LIMIT)
+    .refine(
+        (headers) => new Set(headers.map((header) => header.name)).size === headers.length,
+        "header_duplicate"
+    );
+
 export const connectorInputSchema = z
     .object({
         name: z.string().transform(normalizeConnectorName).pipe(z.string().min(1).max(40)),
@@ -78,9 +123,16 @@ export const connectorInputSchema = z
         token: z.string().trim().max(4096).optional(),
         /** A client registered by hand, for a server with no registration. */
         clientId: z.string().trim().max(512).optional(),
-        clientSecret: z.string().trim().max(4096).optional()
+        clientSecret: z.string().trim().max(4096).optional(),
+        /** The headers, for `headers`. Stored with the secret, never shown again. */
+        headers: connectorHeadersSchema.optional(),
+        /** The catalog entry this was added from (`catalog.ts`), if any. */
+        catalogId: z.string().trim().max(64).optional()
     })
     .superRefine((value, context) => {
+        if (value.auth === "headers" && !value.headers) {
+            context.addIssue({ code: "custom", path: ["headers"], message: "required" });
+        }
         if (value.auth === "bearer" && !value.token) {
             context.addIssue({ code: "custom", path: ["token"], message: "required" });
         }
@@ -89,6 +141,27 @@ export const connectorInputSchema = z
         }
     });
 export type ConnectorInput = z.infer<typeof connectorInputSchema>;
+
+/**
+ * The headers a request to a connector carries for who sends it: the token as
+ * `Authorization: Bearer`, the stored headers for `headers`, nothing for
+ * `none`. The stored names were checked when they were saved; a reserved one
+ * that reads back anyway (an older rule, a hand-edited row) is left out.
+ */
+export function connectorRequestHeaders(
+    auth: ConnectorAuth,
+    credentials: { bearer?: string | null; headers?: Readonly<Record<string, string>> | null }
+): Record<string, string> {
+    if (auth === "headers") {
+        const sent: Record<string, string> = {};
+        for (const [name, value] of Object.entries(credentials.headers ?? {}).slice(0, HEADER_LIMIT)) {
+            if (headerNameSchema.safeParse(name).success && headerValueSchema.safeParse(value).success)
+                sent[name] = value;
+        }
+        return sent;
+    }
+    return credentials.bearer ? { authorization: `Bearer ${credentials.bearer}` } : {};
+}
 
 export const toolPolicySchema = z.enum(TOOL_POLICIES);
 

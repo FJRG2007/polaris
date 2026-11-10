@@ -1,96 +1,31 @@
 // @vitest-environment jsdom
 
 /**
- * Polar's settings keep Polar's conversation list beside them, as /polar does:
- * a chat or a Code session picked there opens on /polar, a new one starts
- * there, and putting the list away is the choice the chat page remembers.
+ * Polar's settings list their own pages beside them, as every Polaris app's
+ * settings do: the page on screen is marked, a section left out (connectors for
+ * an account they are closed to) is not offered, Back to chat leaves, and
+ * putting the list away is the choice the chat page remembers. On a narrow
+ * screen the list opens as a drawer.
  */
 
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { SettingsWithSidebar } from "@/app/(app)/polar/settings/settings-sidebar";
+import { POLAR_SETTINGS_SECTIONS, settingsSection, type PolarSettingsSection } from "@/lib/polar/settings-path";
 
-const pushed: string[] = [];
 const kept = new Map<string, string>();
-const codeState = { mode: "chat" as "chat" | "code", access: "manage" as string | null };
-const codeEnabled: boolean[] = [];
+const at = { pathname: "/polar/settings/routing", wide: true };
 
 vi.mock("next/navigation", () => ({
-    usePathname: () => "/polar/settings",
-    useRouter: () => ({ push: (href: string) => void pushed.push(href), back: () => undefined })
+    usePathname: () => at.pathname,
+    useRouter: () => ({ push: () => undefined, back: () => undefined })
 }));
-
-vi.mock("@/components/polar/use-polar-sidebar", () => ({
-    usePolarSidebar: () => ({
-        rows: [
-            {
-                id: "t1",
-                title: "Trip to Lisbon",
-                updatedAt: new Date().toISOString(),
-                pinnedAt: null,
-                archivedAt: null,
-                projectId: null
-            }
-        ],
-        projects: [],
-        hasMore: () => false,
-        isLoading: () => false,
-        openProjects: new Set(),
-        refresh: () => undefined,
-        loadMore: () => undefined,
-        know: () => undefined,
-        retitle: () => undefined,
-        remove: async () => undefined,
-        toggleProject: () => undefined,
-        openProject: () => undefined,
-        createProject: async () => undefined,
-        updateProject: async () => undefined,
-        deleteProject: async () => undefined,
-        rename: async () => undefined,
-        setPinned: async () => undefined,
-        setArchived: async () => undefined,
-        move: async () => undefined
-    })
-}));
-
-vi.mock("@/components/polar/polar-code", () => ({
-    StateDot: () => null,
-    usePolarCode: ({ enabled }: { enabled: boolean }) => {
-        codeEnabled.push(enabled);
-        return {
-            mode: codeState.mode,
-            setMode: () => undefined,
-            access: codeState.access,
-            history: {
-                rows: [
-                    {
-                        id: "s1",
-                        title: "Fix the login page",
-                        repo: "acme/web",
-                        branch: "main",
-                        state: "running",
-                        stateLabel: "Running",
-                        live: true,
-                        createdAt: new Date().toISOString()
-                    }
-                ],
-                more: false,
-                loadingMore: false,
-                loadMore: () => undefined
-            },
-            selected: null,
-            open: () => undefined,
-            refresh: () => undefined
-        };
-    }
-}));
+vi.mock("@/components/polar/use-wide", () => ({ useWide: () => at.wide }));
 
 beforeEach(() => {
-    codeState.mode = "chat";
-    codeState.access = "manage";
-    codeEnabled.length = 0;
-    pushed.length = 0;
+    at.pathname = settingsSection("routing");
+    at.wide = true;
     kept.clear();
     const storage = {
         getItem: (key: string) => kept.get(key) ?? null,
@@ -106,94 +41,66 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-function draw() {
+function draw(sections: readonly PolarSettingsSection[] = POLAR_SETTINGS_SECTIONS) {
     return render(
-        <SettingsWithSidebar>
-            <h1>Polar settings</h1>
+        <SettingsWithSidebar sections={sections}>
+            <h1>Fallbacks page</h1>
         </SettingsWithSidebar>,
         { wrapper: MessagesWrapper }
     );
 }
 
-describe("the settings page's conversation list", () => {
-    it("lists the chats beside the settings", () => {
+const pages = () => screen.getByRole("navigation", { name: "Polar settings" });
+
+describe("the settings page's sidebar", () => {
+    it("lists every settings page as a link to its own address", () => {
         draw();
-        expect(screen.getByRole("navigation", { name: "Conversations" })).toBeTruthy();
-        expect(screen.getByText("Trip to Lisbon")).toBeTruthy();
-        expect(screen.getByRole("heading", { name: "Polar settings" })).toBeTruthy();
+        const links = within(pages()).getAllByRole("link");
+        expect(links.map((link) => link.getAttribute("href"))).toEqual(
+            POLAR_SETTINGS_SECTIONS.map((id) => settingsSection(id))
+        );
+        expect(screen.getByRole("heading", { name: "Fallbacks page" })).toBeTruthy();
     });
 
-    it("opens a chat on Polar's page", () => {
+    it("marks the page on screen, and only that one", () => {
         draw();
-        fireEvent.click(screen.getByText("Trip to Lisbon"));
-        expect(pushed).toEqual(["/polar?thread=t1"]);
+        const current = within(pages())
+            .getAllByRole("link")
+            .filter((link) => link.getAttribute("aria-current") === "page");
+        expect(current.map((link) => link.getAttribute("href"))).toEqual([settingsSection("routing")]);
     });
 
-    it("starts a new chat on Polar's page", () => {
-        kept.set("polar.thread", "t1");
-        draw();
-        fireEvent.click(screen.getByText("New chat"));
-        expect(pushed).toEqual(["/polar?new=1"]);
-        expect(kept.get("polar.thread")).toBe("");
+    it("does not offer a page the layout left out", () => {
+        draw(POLAR_SETTINGS_SECTIONS.filter((id) => id !== "connectors"));
+        const hrefs = within(pages())
+            .getAllByRole("link")
+            .map((link) => link.getAttribute("href"));
+        expect(hrefs).not.toContain(settingsSection("connectors"));
     });
 
-    it("lists the Code sessions in Code and opens one on Polar's page", () => {
-        codeState.mode = "code";
+    it("leads back to the chat", () => {
         draw();
-        expect(screen.queryByText("Trip to Lisbon")).toBeNull();
-        fireEvent.click(screen.getByText("Fix the login page"));
-        expect(pushed).toEqual(["/polar?session=s1"]);
-    });
-
-    it("lists only the chats in Chat", () => {
-        draw();
-        expect(screen.getByText("Trip to Lisbon")).toBeTruthy();
-        expect(screen.queryByText("Fix the login page")).toBeNull();
-    });
-
-    it("leaves Code sessions out for an account Code is closed to", () => {
-        codeState.access = "none";
-        codeState.mode = "code";
-        draw();
-        expect(screen.queryByText("Fix the login page")).toBeNull();
-    });
-
-    it("starts a Code task when Code was last on screen", () => {
-        codeState.mode = "code";
-        draw();
-        fireEvent.click(screen.getByText("New task"));
-        expect(pushed).toEqual(["/polar?session=new"]);
+        expect(screen.getByRole("link", { name: "Back to chat" }).getAttribute("href")).toBe("/polar");
     });
 
     it("puts the list away and back, remembered like the chat page", () => {
         draw();
         fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }));
-        expect(screen.queryByText("Trip to Lisbon")).toBeNull();
-        expect(kept.get("polar.sidebar")).toBe("hidden");
-        fireEvent.click(screen.getByRole("button", { name: "Show conversations" }));
-        expect(screen.getByText("Trip to Lisbon")).toBeTruthy();
-        expect(kept.get("polar.sidebar")).toBe("shown");
+        expect(screen.queryByRole("navigation", { name: "Polar settings" })).toBeNull();
+        expect([...kept.values()]).toContain("hidden");
+        fireEvent.click(screen.getByRole("button", { name: "Show settings pages" }));
+        expect(pages()).toBeTruthy();
+        expect([...kept.values()]).toContain("shown");
     });
 
-    it("reads no Code sessions while the list is put away", () => {
-        kept.set("polar.sidebar", "hidden");
+    it("opens the list as a drawer on a narrow screen", () => {
+        at.wide = false;
         draw();
-        expect(codeEnabled.at(-1)).toBe(false);
-        fireEvent.click(screen.getByRole("button", { name: "Show conversations" }));
-        expect(codeEnabled.at(-1)).toBe(true);
-    });
-
-    it("opens the list as a drawer on a narrow screen", async () => {
-        vi.stubGlobal("matchMedia", (query: string) => ({
-            matches: false,
-            media: query,
-            addEventListener: () => undefined,
-            removeEventListener: () => undefined
-        }));
-        draw();
-        fireEvent.click(screen.getByRole("button", { name: "Show conversations" }));
-        const drawer = await screen.findByRole("dialog");
-        fireEvent.click(within(drawer).getByText("Trip to Lisbon"));
-        expect(pushed).toEqual(["/polar?thread=t1"]);
+        // The rail itself is hidden by CSS below the breakpoint; the drawer is
+        // what a narrow screen reaches.
+        expect(screen.queryByRole("dialog")).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Show settings pages" }));
+        const drawer = screen.getByRole("dialog");
+        expect(within(drawer).getAllByRole("link").length).toBeGreaterThan(POLAR_SETTINGS_SECTIONS.length - 1);
     });
 });

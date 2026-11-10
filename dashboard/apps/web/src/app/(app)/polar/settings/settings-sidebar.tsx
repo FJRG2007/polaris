@@ -1,79 +1,160 @@
 "use client";
 
 /**
- * Polar's conversation list beside its settings, the same one /polar shows,
- * Code sessions included: settings are a page of Polar, not a place that
- * leaves it. Opening a chat or a session, or starting one, goes to /polar
- * with it; putting the list away is the same
- * choice the chat page remembers. On a narrow screen it opens as a drawer, as
- * on /polar.
+ * The sidebar of Polar's settings: the settings pages, in place of the chats,
+ * as every Polaris app's settings do. Back to chat at its top leaves them.
+ * Putting it away is the same choice the chat page remembers for its list; on
+ * a narrow screen it opens as a drawer, as on /polar.
  */
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
-import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import {
+    Brain,
+    Database,
+    Gauge,
+    Globe,
+    Menu,
+    MessageSquare,
+    PanelLeftClose,
+    PanelLeftOpen,
+    Plug,
+    ScrollText,
+    ShieldCheck,
+    Shuffle,
+    Sparkles,
+    SquareTerminal,
+    Wrench,
+    X
+} from "lucide-react";
+import { SettingsBack } from "./settings-back";
 import { useWide } from "@/components/polar/use-wide";
-import { PolarThreads } from "@/components/polar/polar-threads";
-import { usePolarCode } from "@/components/polar/polar-code";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Dialog, DialogContent, DialogTitle } from "@polaris/ui";
-import { usePolarSidebar } from "@/components/polar/use-polar-sidebar";
-import { SIDEBAR_KEY, THREAD_KEY, readStored, writeStored } from "@/lib/polar/stored";
+import { SIDEBAR_KEY, readStored, writeStored } from "@/lib/polar/stored";
+import { Button, Dialog, DialogContent, DialogTitle, cn } from "@polaris/ui";
+import { settingsSection, type PolarSettingsSection } from "@/lib/polar/settings-path";
 
-export function SettingsWithSidebar({ children }: { children: ReactNode }) {
+const ICONS: Record<PolarSettingsSection, ComponentType<{ className?: string }>> = {
+    memory: Brain,
+    tools: Wrench,
+    connectors: Plug,
+    skills: ScrollText,
+    permissions: ShieldCheck,
+    browser: Globe,
+    display: MessageSquare,
+    extras: Sparkles,
+    routing: Shuffle,
+    "coding-tools": SquareTerminal,
+    usage: Gauge,
+    data: Database
+};
+
+function SettingsNav({
+    sections,
+    close
+}: {
+    sections: readonly PolarSettingsSection[];
+    close: { label: string; icon: ComponentType<{ className?: string }>; onClick: () => void };
+}) {
     const t = useTranslations("polar");
-    const router = useRouter();
+    const pathname = usePathname();
+    const labels: Record<PolarSettingsSection, string> = {
+        memory: t("settings.memory.title"),
+        tools: t("settings.tools.title"),
+        connectors: t("settings.nav.connectors"),
+        skills: t("settings.nav.skills"),
+        permissions: t("settings.nav.permissions"),
+        browser: t("settings.browserSites.title"),
+        display: t("settings.display.title"),
+        extras: t("settings.helper.title"),
+        routing: t("settings.nav.routing"),
+        "coding-tools": t("settings.nav.codingTools"),
+        usage: t("settings.nav.usage"),
+        data: t("settings.data.title")
+    };
+    const Close = close.icon;
+    return (
+        <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-w-0 items-center gap-2 px-3 pb-2 pt-3">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <SettingsBack label={t("settings.back")} />
+                    <p className="truncate text-sm font-semibold text-foreground">
+                        {t("settings.title")}
+                    </p>
+                </div>
+                <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label={close.label}
+                    title={close.label}
+                    onClick={close.onClick}
+                >
+                    <Close className="size-4 shrink-0" />
+                </Button>
+            </div>
+            <nav
+                aria-label={t("settings.title")}
+                className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain px-2 pb-3"
+            >
+                {sections.map((id) => {
+                    const href = settingsSection(id);
+                    const current = pathname === href || pathname.startsWith(`${href}/`);
+                    const Icon = ICONS[id];
+                    return (
+                        <Link
+                            key={id}
+                            href={href}
+                            aria-current={current ? "page" : undefined}
+                            className={cn(
+                                "flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-card hover:text-foreground",
+                                current ? "bg-card text-foreground" : "text-muted-foreground"
+                            )}
+                        >
+                            <Icon className="size-4 shrink-0" />
+                            <span className="min-w-0 truncate" title={labels[id]}>
+                                {labels[id]}
+                            </span>
+                        </Link>
+                    );
+                })}
+            </nav>
+        </div>
+    );
+}
+
+export function SettingsWithSidebar({
+    sections,
+    children
+}: {
+    sections: readonly PolarSettingsSection[];
+    children: ReactNode;
+}) {
+    const t = useTranslations("polar");
+    const pathname = usePathname();
     const [hidden, setHidden] = useState(false);
     const [drawer, setDrawer] = useState(false);
     const wide = useWide();
     useEffect(() => setHidden(readStored(SIDEBAR_KEY) === "hidden"), []);
-    const listed = !hidden || drawer;
-    const sidebar = usePolarSidebar({ enabled: listed, onRemoved: () => undefined });
-    const code = usePolarCode({ enabled: listed });
-    const codeMode = code.mode === "code";
+    // A page picked in the drawer is where the drawer was going.
+    useEffect(() => setDrawer(false), [pathname]);
     const hide = (next: boolean) => {
         setHidden(next);
         writeStored(SIDEBAR_KEY, next ? "hidden" : "shown");
     };
-    const threadList = (close: Parameters<typeof PolarThreads>[0]["hide"]) => (
-        <PolarThreads
-            sidebar={sidebar}
-            activeId=""
-            onOpen={(id) => router.push(`/polar?thread=${encodeURIComponent(id)}`)}
-            onNew={(projectId) => {
-                if (projectId === null && codeMode) {
-                    router.push("/polar?session=new");
-                    return;
-                }
-                writeStored(THREAD_KEY, "");
-                router.push(
-                    projectId ? `/polar?new=${encodeURIComponent(projectId)}` : "/polar?new=1"
-                );
-            }}
-            hide={close}
-            newLabel={codeMode ? t("code.newTask") : undefined}
-            code={
-                code.access === null || code.access === "none"
-                    ? null
-                    : {
-                          history: code.history,
-                          activeId: null,
-                          canRename: code.access === "manage",
-                          first: codeMode,
-                          onOpen: (id) => router.push(`/polar?session=${encodeURIComponent(id)}`)
-                      }
-            }
-        />
-    );
     return (
         <>
             {!hidden ? (
                 <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-surface md:flex">
-                    {threadList({
-                        label: t("history.hide"),
-                        icon: PanelLeftClose,
-                        onClick: () => hide(true)
-                    })}
+                    <SettingsNav
+                        sections={sections}
+                        close={{
+                            label: t("history.hide"),
+                            icon: PanelLeftClose,
+                            onClick: () => hide(true)
+                        }}
+                    />
                 </aside>
             ) : null}
             {!wide ? (
@@ -83,39 +164,34 @@ export function SettingsWithSidebar({ children }: { children: ReactNode }) {
                         aria-describedby={undefined}
                         className="left-0 top-0 flex h-full max-h-none w-72 max-w-[85vw] translate-x-0 translate-y-0 flex-col overflow-hidden rounded-none rounded-r-xl border-y-0 border-l-0 bg-card p-0 data-[state=open]:zoom-in-100 data-[state=open]:slide-in-from-left-4"
                     >
-                        <DialogTitle className="sr-only">{t("history.title")}</DialogTitle>
-                        {threadList({
-                            label: t("history.close"),
-                            icon: X,
-                            onClick: () => setDrawer(false)
-                        })}
+                        <DialogTitle className="sr-only">{t("settings.title")}</DialogTitle>
+                        <SettingsNav
+                            sections={sections}
+                            close={{
+                                label: t("history.hide"),
+                                icon: X,
+                                onClick: () => setDrawer(false)
+                            }}
+                        />
                     </DialogContent>
                 </Dialog>
             ) : null}
             <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 py-6 sm:px-6">
-                {!wide ? (
+                {!wide || hidden ? (
                     <Button
                         type="button"
                         size="icon-sm"
                         variant="ghost"
                         className="mb-2"
-                        aria-label={t("history.show")}
-                        title={t("history.show")}
-                        onClick={() => setDrawer(true)}
+                        aria-label={t("settings.showPages")}
+                        title={t("settings.showPages")}
+                        onClick={() => (wide ? hide(false) : setDrawer(true))}
                     >
-                        <Menu className="size-4 shrink-0" />
-                    </Button>
-                ) : hidden ? (
-                    <Button
-                        type="button"
-                        size="icon-sm"
-                        variant="ghost"
-                        className="mb-2"
-                        aria-label={t("history.show")}
-                        title={t("history.show")}
-                        onClick={() => hide(false)}
-                    >
-                        <PanelLeftOpen className="size-4 shrink-0" />
+                        {wide ? (
+                            <PanelLeftOpen className="size-4 shrink-0" />
+                        ) : (
+                            <Menu className="size-4 shrink-0" />
+                        )}
                     </Button>
                 ) : null}
                 {children}

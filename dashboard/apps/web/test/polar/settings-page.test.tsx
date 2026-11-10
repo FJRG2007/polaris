@@ -309,12 +309,12 @@ describe("the settings page", () => {
             {
                 source: "/account/polar-tools",
                 has: [{ type: "query", key: "connector", value: "(?:signed_in|failed)" }],
-                destination: "/polar/settings#connectors",
+                destination: "/polar/settings/connectors",
                 permanent: false
             },
             {
                 source: "/account/polar-tools",
-                destination: "/polar/settings#permissions",
+                destination: "/polar/settings/permissions",
                 permanent: false
             }
         ]);

@@ -31,6 +31,7 @@ import {
     cn
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { ConnectorCatalog } from "./connector-catalog";
 import type { ConnectorView } from "@/lib/polar/connectors/store";
 
 type Policy = ConnectorView["tools"][number]["policy"];
@@ -87,9 +88,12 @@ const SEARCH_FROM = 6;
 
 export function PolarConnectors({
     initial,
-    returned
+    returned,
+    hosts = []
 }: {
     initial: ConnectorView[];
+    /** The administrator's host allowlist; empty allows every host. */
+    hosts?: readonly string[];
     /** How a sign-in that just came back went, from the callback. */
     returned: "signed_in" | "failed" | null;
 }) {
@@ -394,6 +398,21 @@ export function PolarConnectors({
                     </CardBody>
                 </Card>
             ))}
+            <ConnectorCatalog
+                rows={rows}
+                hosts={hosts}
+                send={send}
+                errorText={(code) =>
+                    t(`polarConnectors.errors.${isErrorCode(code) ? code : "failed"}`)
+                }
+                onCustom={() => setAdding(true)}
+                onAdded={(view) => {
+                    setError(null);
+                    setRows((current) => [...current, view]);
+                    setOpen(view.id);
+                    if (view.auth === "oauth" && !view.signedIn) void signIn(view);
+                }}
+            />
             <ConfirmDeleteDialog
                 open={removing !== null}
                 onOpenChange={(next) => !next && setRemoving(null)}

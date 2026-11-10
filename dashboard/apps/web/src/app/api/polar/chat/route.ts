@@ -45,6 +45,15 @@ import {
     usedInMessages
 } from "@/lib/polar/tool-relevance";
 import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
+import { enabledSkills } from "@/lib/polar/skills/store";
+import { trialSkillSchema } from "@/lib/polar/skills/shared";
+import {
+    USE_SKILL,
+    chatSkills,
+    polarSkillTools,
+    readTrialSkill,
+    skillsPrompt
+} from "@/lib/polar/skills/tools";
 import { polarVisualTools } from "@/lib/polar/visual-tool";
 import { polarWeatherTools } from "@/lib/polar/weather";
 import { polarRepoTools } from "@/lib/polar/code-host-tools";
@@ -149,7 +158,9 @@ const bodySchema = z.object({
     /** An answer asked again from its row with more detail or fewer words. */
     refine: z.enum(POLAR_REFINES).nullable().default(null),
     /** Whether the person left their connectors on for this turn. */
-    connectors: z.boolean().default(true)
+    connectors: z.boolean().default(true),
+    /** A skill being tried before it is added: honoured in a temporary chat only. */
+    trialSkill: trialSkillSchema.nullable().default(null)
 });
 
 function refuse(code: string, status: number): NextResponse {
@@ -260,7 +271,8 @@ export async function POST(request: Request): Promise<Response> {
             ...NATIVE_SEARCH_STAND_INS,
             ...polarWebTools("", ""),
             ...connectorSet.tools,
-            ...connectorStandIns(body.data.messages, connectorSet.tools)
+            ...connectorStandIns(body.data.messages, connectorSet.tools),
+            ...polarSkillTools([])
         } as never
     });
     if (!checked.success) return refuse("invalid", 400);
@@ -322,10 +334,19 @@ export async function POST(request: Request): Promise<Response> {
             await savePolarGoal(user.id, body.data.threadId, goal);
         }
     }
-    const [instructions, remembers] = await Promise.all([
+    const [instructions, remembers, savedSkills] = await Promise.all([
         polarThreadInstructions(user.id, body.data.threadId),
-        temporary ? Promise.resolve(false) : polarMemoryEnabled(user.id)
+        temporary ? Promise.resolve(false) : polarMemoryEnabled(user.id),
+        // A chat still answers when the skills cannot be read; it just lists none.
+        enabledSkills(user.id).catch((error: unknown) => {
+            console.error("polar: could not read the skills", error);
+            return [];
+        })
     ]);
+    // The person's enabled skills, and the one a temporary chat is trying -
+    // read again from the request on every turn, never stored.
+    const skills = chatSkills(savedSkills, temporary ? readTrialSkill(body.data.trialSkill) : null);
+    const skillTools = skills.length > 0 ? polarSkillTools(skills) : {};
     const memories = remembers ? await polarMemoryPrompt(user.id) : "";
     // The web is the administrator's to allow and the person's to switch off
     // for a turn; either one off and the tools are simply not offered.
@@ -352,7 +373,8 @@ export async function POST(request: Request): Promise<Response> {
             ? Object.fromEntries(
                   Object.entries(connectorSet.tools).filter(([name]) => !off.has(name))
               )
-            : {})
+            : {}),
+        ...skillTools
     };
     // What the model is sent: the core and the current app's tools, and any
     // this conversation already reached for. Every one stays registered, so an
@@ -369,7 +391,9 @@ export async function POST(request: Request): Promise<Response> {
         // A connector is one the person added on purpose: its tools are always sent.
         ...(body.data.connectors
             ? Object.keys(connectorSet.tools).filter((name) => !off.has(name))
-            : [])
+            : []),
+        // Skills are listed in the system prompt, so the tool that reads them goes with it.
+        ...(USE_SKILL in skillTools ? [USE_SKILL] : [])
     ];
     // The six browser_* tools `browser` replaced stay registered for old turns
     // but are never sent again.
@@ -463,6 +487,7 @@ export async function POST(request: Request): Promise<Response> {
             role: "system",
             content: [
                 polarSystemPrompt(user.name, instructions, memories, web),
+                skillsPrompt(skills),
                 fenceSummary(compacted.summary),
                 // Only on a turn asked again from an answer's row: that turn's
                 // prefix is not cached, every other one is.

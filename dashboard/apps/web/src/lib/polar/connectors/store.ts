@@ -15,6 +15,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { hostAllowed } from "@/lib/polar/connectors/shared";
+import { catalogEntry, urlMatchesEntry } from "@/lib/polar/connectors/catalog";
 import { readPolarPolicy, type PolarConnectorPolicy } from "@/lib/polar/access";
 import { CredentialDecryptError, decryptSecret, encryptSecret } from "@polaris/storage";
 import * as rules from "@/lib/polar/connectors/policy";
@@ -29,6 +30,8 @@ const clientSchema = z.object({
 
 const secretSchema = z.object({
     token: z.string().optional(),
+    /** The custom headers, for `headers`, by lowercase name. */
+    headers: z.record(z.string(), z.string()).optional(),
     registered: z.object({ clientId: z.string(), clientSecret: z.string().nullable() }).optional(),
     client: clientSchema.optional(),
     tokens: z
@@ -131,7 +134,9 @@ function toRow(row: Selected): ConnectorRow {
         name: row.name,
         url: row.url,
         transport: row.transport === "sse" ? "sse" : "http",
-        auth: row.auth === "bearer" || row.auth === "oauth" ? row.auth : "none",
+        auth: (rules.CONNECTOR_AUTHS as readonly string[]).includes(row.auth)
+            ? (row.auth as rules.ConnectorAuth)
+            : "none",
         enabled: row.enabled,
         tools: rules.readCachedTools(row.tools),
         policies: rules.readToolPolicies(row.toolPolicies),
@@ -183,7 +188,11 @@ export function viewOf(row: ConnectorRow, secret: ConnectorSecret | null): Conne
         checkedAt: row.checkedAt?.toISOString() ?? null,
         signedIn:
             row.auth === "none" ||
-            (row.auth === "bearer" ? Boolean(secret?.token) : Boolean(secret?.tokens)),
+            (row.auth === "bearer"
+                ? Boolean(secret?.token)
+                : row.auth === "headers"
+                  ? Object.keys(secret?.headers ?? {}).length > 0
+                  : Boolean(secret?.tokens)),
         tools: row.tools.map((tool) => ({
             name: tool.name,
             title: tool.title ?? tool.name,
@@ -237,8 +246,15 @@ export async function createConnector(
     input: rules.ConnectorInput,
     policy: PolarConnectorPolicy
 ): Promise<ConnectorRow | CreateRefusal> {
-    const url = rules.canonicalServerUrl(input.url, policy.privateNetwork);
+    let url = rules.canonicalServerUrl(input.url, policy.privateNetwork);
     if (!url) return "address";
+    // A catalog entry is held to its own address; one whose server answers only
+    // with the trailing slash keeps it, every other address is canonical.
+    if (input.catalogId) {
+        const entry = catalogEntry(input.catalogId);
+        if (!entry?.available || !urlMatchesEntry(entry, url)) return "address";
+        if (entry.keepTrailingSlash) url = `${url}/`;
+    }
     if (!hostAllowed(url, policy.hosts)) return "host";
     // Two names with one slug would give their tools the same names in a chat.
     const slug = rules.connectorSlug(input.name);
@@ -252,7 +268,9 @@ export async function createConnector(
     const secret: ConnectorSecret | null =
         input.auth === "bearer"
             ? { token: input.token }
-            : input.auth === "oauth" && input.clientId
+            : input.auth === "headers" && input.headers
+              ? { headers: Object.fromEntries(input.headers.map((header) => [header.name, header.value])) }
+              : input.auth === "oauth" && input.clientId
               ? {
                     registered: {
                         clientId: input.clientId,

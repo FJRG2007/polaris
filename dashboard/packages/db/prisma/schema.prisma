@@ -42,6 +42,7 @@ model User {
     translateKeepList TranslateKeepList?
     polarToolGrants   PolarToolGrant[]
     polarConnectors   PolarConnector[]
+    polarSkills       PolarSkill[]
     polarAttachments  PolarAttachment[]
     polarMemories     PolarMemory[]
     polarPreference   PolarPreference?
@@ -16146,6 +16147,25 @@ model PolarConnector {
     checkedAt    DateTime?
     createdAt    DateTime  @default(now())
     updatedAt    DateTime  @updatedAt
+
+    @@unique([ownerId, name])
+}
+
+// A Polar skill: instructions for one kind of task. The model is shown its name
+// and description, and reads the instructions only when it decides the skill
+// applies. One person's. `source` is the catalog id it was added from, or
+// "custom". Sizes are bounded where it is written (`lib/polar/skills/shared.ts`).
+model PolarSkill {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    ownerId      String   @db.Uuid
+    owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    name         String
+    description  String
+    instructions String
+    enabled      Boolean  @default(true)
+    source       String   @default("custom")
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
 
     @@unique([ownerId, name])
 }

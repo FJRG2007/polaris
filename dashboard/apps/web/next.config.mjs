@@ -292,12 +292,12 @@ const nextConfig = {
         {
             source: "/account/polar-tools",
             has: [{ type: "query", key: "connector", value: "(?:signed_in|failed)" }],
-            destination: "/polar/settings#connectors",
+            destination: "/polar/settings/connectors",
             permanent: false
         },
         {
             source: "/account/polar-tools",
-            destination: "/polar/settings#permissions",
+            destination: "/polar/settings/permissions",
             permanent: false
         },
         // Linear and Jira are connected from Connected accounts, beside every

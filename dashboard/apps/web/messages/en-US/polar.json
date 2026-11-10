@@ -464,7 +464,11 @@
         "back": "Back to chat",
         "nav": {
             "permissions": "Permissions and connectors",
-            "connectors": "Connectors"
+            "connectors": "Connectors",
+            "routing": "Fallbacks",
+            "codingTools": "Coding tools",
+            "usage": "Usage",
+            "skills": "Skills"
         },
         "browserSites": {
             "title": "Your browser",
@@ -474,6 +478,132 @@
             "forget": "Forget",
             "forgetLabel": "Stop letting Polar use {site}",
             "forgetFailed": "Could not reach your browser. Try again."
+        },
+        "showPages": "Show settings pages",
+        "connectorCatalog": {
+            "title": "Connector marketplace",
+            "intro": "Official servers, at the address each vendor publishes. Connect one and Polar can use its tools.",
+            "search": "Search the marketplace",
+            "noMatch": "No connector matches.",
+            "connect": "Connect",
+            "connected": "Connected",
+            "unavailable": "Not available",
+            "hostBlocked": "Your administrator doesn't allow this host.",
+            "docs": "Docs",
+            "custom": "Custom connector",
+            "customHint": "Any MCP server, by its address.",
+            "dialogTitle": "Connect {name}",
+            "dialogOauth": "You'll sign in on {vendor} and come back here.",
+            "dialogNone": "No sign-in needed.",
+            "method": "Sign in with",
+            "methodOauth": "Account",
+            "methodKey": "API key",
+            "apiKey": "API key",
+            "cancel": "Cancel",
+            "entries": {
+                "stripe": "Payments, customers and invoices in your Stripe account.",
+                "binance": "Market data and your Binance account, with the scopes you grant.",
+                "cloudflare-api": "Manage your Cloudflare account and its resources.",
+                "cloudflare-docs": "Search Cloudflare's developer documentation.",
+                "cloudflare-containers": "Run commands in a sandboxed container.",
+                "cloudflare-browser": "Fetch pages and take screenshots with a remote browser.",
+                "shopify-storefront": "Products, carts and policies from one store.",
+                "booking": "Search stays and availability as a Booking.com partner.",
+                "adobe-journey-optimizer": "Journeys, campaigns and offers in Journey Optimizer.",
+                "adobe-customer-journey-analytics": "Ask questions of your Customer Journey Analytics data.",
+                "adobe-analytics": "Reports and metrics from Adobe Analytics.",
+                "adobe-target": "Activities, audiences and offers in Adobe Target.",
+                "adobe-rtcdp": "Profiles, segments and destinations in Real-Time CDP.",
+                "adobe-experience-manager": "Pages, content and assets in Experience Manager.",
+                "adobe-marketo": "Leads, programs and campaigns in Marketo Engage.",
+                "spotify": "Spotify publishes no MCP server of its own.",
+                "linkedin": "LinkedIn publishes no MCP server of its own."
+            },
+            "fields": {
+                "shop": "Store domain",
+                "shopHint": "name.myshopify.com or your own domain",
+                "shopInvalid": "Type a domain, like name.myshopify.com.",
+                "affiliateId": "Affiliate ID",
+                "affiliateIdInvalid": "Only digits.",
+                "demandKey": "Demand API key",
+                "partnerHint": "Your Booking.com partner credentials."
+            }
+        },
+        "skills": {
+            "title": "Skills",
+            "intro": "Instructions Polar loads when a task calls for them. Only the name and description are read until then.",
+            "mine": "Your skills",
+            "empty": "No skills yet. Add one from the catalog or create your own.",
+            "catalogTitle": "Built-in skills",
+            "create": "Create skill",
+            "try": "Try",
+            "add": "Add",
+            "added": "Added",
+            "edit": "Edit",
+            "delete": "Delete",
+            "use": "Use this skill",
+            "kind": "skill",
+            "removeHint": "Polar stops using it from now on.",
+            "search": "Search skills",
+            "noMatch": "No skill matches.",
+            "fromCatalog": "Built-in",
+            "save": "Save",
+            "cancel": "Cancel",
+            "editor": {
+                "titleNew": "New skill",
+                "titleEdit": "Edit skill",
+                "body": "Try it in a temporary chat before you save it.",
+                "name": "Name",
+                "nameHint": "Lowercase letters, digits and hyphens.",
+                "description": "When to use it",
+                "descriptionHint": "Polar reads this to decide when the skill applies.",
+                "instructions": "Instructions",
+                "instructionsHint": "Markdown. What Polar should do, step by step."
+            },
+            "errors": {
+                "name_format": "Use lowercase letters, digits and hyphens.",
+                "too_long": "That's too long.",
+                "duplicate": "You already have a skill with this name.",
+                "limit": "You have the most skills one person can keep.",
+                "failed": "Couldn't save the skill. Try again.",
+                "noAccess": "Polar isn't available to you.",
+                "viewingAs": "You're viewing as someone else.",
+                "not_found": "That skill no longer exists."
+            },
+            "catalog": {
+                "commit-message": {
+                    "title": "Commit message",
+                    "description": "A clear commit message from a diff or a list of changes."
+                },
+                "thread-summary": {
+                    "title": "Summarize a thread",
+                    "description": "The decisions, open questions and next steps of a long thread."
+                },
+                "reply-email": {
+                    "title": "Draft an email reply",
+                    "description": "A reply that answers every point, in the tone of the email you got."
+                },
+                "pr-review": {
+                    "title": "Review a pull request",
+                    "description": "Correctness, security and clarity findings, most serious first."
+                },
+                "trip-plan": {
+                    "title": "Plan a trip",
+                    "description": "A day-by-day plan that fits your dates, budget and pace."
+                },
+                "explain-code": {
+                    "title": "Explain code",
+                    "description": "What a piece of code does, at the level you ask for."
+                },
+                "meeting-notes": {
+                    "title": "Meeting notes",
+                    "description": "Notes, decisions and owners from a transcript or rough notes."
+                },
+                "bug-report": {
+                    "title": "Write a bug report",
+                    "description": "Steps, expected and actual result, from a vague description."
+                }
+            }
         }
     },
     "temporary": {
@@ -1047,10 +1177,7 @@
         "pinned": "Models I pick by hand fall back too",
         "pinnedHint": "Off keeps a picked model's error on screen.",
         "notOffered": "{model} (unavailable)",
-        "clear": "Clear",
-        "clearNamed": "Clear {name}",
         "effortNamed": "Effort for {name}",
-        "keyNamed": "Key for {name}",
         "retry": "Try again",
         "effort": {
             "inherit": "Inherit",
@@ -1069,29 +1196,59 @@
         },
         "fallbacks": {
             "title": "Fallback models",
-            "order": "If a model fails, Polar tries its other keys, then this list, in order.",
-            "empty": "No fallbacks. A failed call shows its error.",
+            "order": "When a model fails, Polar first tries its other keys, then each model below, top to bottom.",
+            "empty": "No fallback models yet",
             "move": "Move {model}. Use the arrow keys.",
             "moveHint": "Drag, or use the arrow keys",
             "remove": "Remove {model}",
             "removeShort": "Remove",
             "full": "The list holds up to {most} models.",
-            "newEffort": "Effort for the new fallback",
-            "newKey": "Key for the new fallback",
-            "add": "Add"
+            "add": "Add fallback",
+            "example": "Example: your chat model runs out of credit, so the answer comes from model 1 here.",
+            "emptyHint": "Without one, a failed call shows its error. Add a model to answer instead.",
+            "addTitle": "Add a fallback model",
+            "editTitle": "Change fallback model",
+            "dialogHint": "Polar uses it when the models before it fail.",
+            "model": "Model",
+            "key": "Key",
+            "keyHint": "Any key tries each key for this provider, in order.",
+            "effort": "Effort",
+            "effortHint": "Inherit keeps the effort the call asked for.",
+            "keyIs": "Key: {key}",
+            "effortIs": "Effort: {effort}",
+            "up": "Move {model} up",
+            "upShort": "Move up",
+            "down": "Move {model} down",
+            "downShort": "Move down",
+            "edit": "Change {model}",
+            "editShort": "Change",
+            "cancel": "Cancel",
+            "save": "Save"
         },
         "tools": {
             "title": "Coding tools",
-            "intro": "Where a request from Claude Code or another tool lands, by the model it names.",
-            "default": "Default model",
+            "intro": "A coding tool such as Claude Code names a model in each request. This is the model Polar answers with.",
             "automatic": "Automatic",
-            "useDefault": "Uses the default model",
-            "fable": "Fable override",
-            "opus": "Opus override",
-            "sonnet": "Sonnet override",
-            "haiku": "Haiku override",
             "defaultEffort": "Default effort",
-            "defaultEffortHint": "Used when a model's effort says Inherit."
+            "defaultEffortHint": "Used when a model's effort says Inherit.",
+            "whenAsked": "When a tool asks for",
+            "polarUses": "Polar uses",
+            "askOther": "Any other model",
+            "askOtherHint": "The default model",
+            "askHint": "A model named {tier}",
+            "ask": {
+                "fable": "Fable",
+                "opus": "Opus",
+                "sonnet": "Sonnet",
+                "haiku": "Haiku"
+            },
+            "followsDefault": "Same as any other model",
+            "followsAutomatic": "Polar picks per request",
+            "effortIs": "Effort: {effort}",
+            "change": "Change",
+            "choose": "Choose",
+            "reset": "Use the default again",
+            "resetNamed": "Use the default again for {name}"
         },
         "following": {
             "title": "Following this Polaris's routing",
@@ -1126,7 +1283,6 @@
             "cost": "Cost",
             "empty": "No calls this month.",
             "removedKey": "Removed key",
-            "noKey": "No stored key",
             "deployment": "This Polaris",
             "fallbacks": "Recent fallbacks",
             "noFallbacks": "No fallbacks in the last 30 days.",
@@ -1137,6 +1293,11 @@
                 "api": "Coding tools",
                 "voice": "Voice",
                 "translate": "Translation"
+            },
+            "unitemized": {
+                "own": "Your keys",
+                "instance": "This Polaris's keys",
+                "hint": "no stored key recorded"
             }
         },
         "reasons": {
@@ -1164,6 +1325,15 @@
             "failed": "Couldn't save the routing. Try again.",
             "load": "Couldn't read your routing.",
             "usage": "Couldn't read this month's usage."
+        },
+        "own": {
+            "body": "You use your own routing. Changes save as you make them."
         }
+    },
+    "skillTrial": {
+        "banner": "Trying {name}: not saved to your skills yet.",
+        "add": "Add skill",
+        "added": "Skill added",
+        "addFailed": "Couldn't add the skill."
     }
 }

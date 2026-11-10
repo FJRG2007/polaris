@@ -20,7 +20,7 @@
 import Fuse from "fuse.js";
 import Link from "next/link";
 import { Check, Shuffle } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -123,7 +123,10 @@ export function ModelSelector({
     onChoice,
     open,
     onOpenChange,
-    forCode = false
+    forCode = false,
+    triggerClassName,
+    triggerLabel,
+    triggerContent
 }: {
     providers: ModelSelectorProvider[];
     choice: ModelChoice | null;
@@ -134,6 +137,14 @@ export function ModelSelector({
     /** For an agent session: no Automatic and no intelligence, which only a
      *  chat turn has. */
     forCode?: boolean;
+    /** Replaces the composer's trigger look, for a picker that is a form field
+     *  (Polar's routing settings) rather than a chip on the tool row. */
+    triggerClassName?: string;
+    /** The field's name for assistive tech, when it sits under a label. */
+    triggerLabel?: string;
+    /** What the button says instead of the chosen model ("Change"), for a
+     *  picker beside a row that already names the model. */
+    triggerContent?: ReactNode;
 }) {
     const t = useTranslations("polar");
     const provider = providers.find((entry) => entry.provider === choice?.provider);
@@ -154,11 +165,22 @@ export function ModelSelector({
             }}
         >
             <DropdownMenuTrigger asChild>
-                <button type="button" title={t("picker.title")} className={MODEL_TRIGGER}>
-                    <span className="truncate text-foreground">
-                        {automatic ? t("picker.automatic") : (model?.name ?? t("picker.none"))}
-                    </span>
-                    {choice && leveled ? (
+                <button
+                    type="button"
+                    title={triggerClassName ? (model?.name ?? t("picker.title")) : t("picker.title")}
+                    aria-label={
+                        triggerLabel
+                            ? `${triggerLabel}: ${automatic ? t("picker.automatic") : (model?.name ?? t("picker.none"))}`
+                            : undefined
+                    }
+                    className={triggerClassName ?? MODEL_TRIGGER}
+                >
+                    {triggerContent ?? (
+                        <span className="min-w-0 truncate text-foreground">
+                            {automatic ? t("picker.automatic") : (model?.name ?? t("picker.none"))}
+                        </span>
+                    )}
+                    {!triggerContent && choice && leveled ? (
                         <span className="shrink-0">{t(`intelligence.${choice.intelligence}`)}</span>
                     ) : null}
                 </button>

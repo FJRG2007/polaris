@@ -49,6 +49,7 @@ const state = {
     goalsSet: [] as unknown[][]
 };
 
+vi.mock("@/lib/polar/skills/store", () => ({ enabledSkills: async () => [] }));
 vi.mock("@/lib/polar/access", async () => ({
     ...(await (await import("./fixtures/open-polar-access")).openPolarAccess()),
     polarAccessFor: async () => ({ use: true, spend: true, web: state.web })

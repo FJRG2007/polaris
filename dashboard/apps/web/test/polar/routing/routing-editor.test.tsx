@@ -2,7 +2,8 @@
  * The routing editor's shape: a row per fallback with its effort and key, a
  * stored key that is gone said as "(unavailable)", the add row while there is
  * room and the full message once there is not, and everything as text when
- * the routing is only being shown.
+ * the routing is only being shown; and the pure step that adds or changes one
+ * fallback.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -20,7 +21,7 @@ vi.mock("@/components/polar/elements/model-selector", () => ({
     ModelSelector: () => <span data-picker="" />
 }));
 
-const { RoutingEditor, keyOptions } = await import("@/components/polar/routing-editor");
+const { RoutingEditor, keyOptions, withFallback } = await import("@/components/polar/routing-editor");
 
 const OWN = "0190a3c2-7a3e-7000-8000-000000000001";
 const GONE = "0190a3c2-7a3e-7000-8000-000000000009";
@@ -54,7 +55,7 @@ describe("RoutingEditor", () => {
         );
         expect(html).toContain("Claude A");
         expect(html).toContain("routing.fallbacks.add");
-        expect(html).toContain("routing.tools.default");
+        expect(html).toContain("routing.tools.askOther");
         expect(html).not.toContain("routing.fallbacks.full");
     });
 
@@ -115,5 +116,37 @@ describe("keyOptions", () => {
     it("keeps a stored key that is gone as unavailable", () => {
         const options = keyOptions(t, KEYS, "anthropic", GONE);
         expect(options.at(-1)).toEqual({ value: GONE, label: "routing.keys.unavailable" });
+    });
+});
+
+describe("withFallback", () => {
+    const a = { provider: "anthropic", model: "claude-a", reasoning: "inherit" as const, keyId: null };
+    const b = { provider: "anthropic", model: "claude-b", reasoning: "high" as const, keyId: OWN };
+
+    it("adds a new one at the end", () => {
+        expect(withFallback([a], b, null)).toEqual({ ok: true, fallbacks: [a, b] });
+    });
+
+    it("refuses a model and key already listed, but not the row being changed", () => {
+        expect(withFallback([a, b], { ...b, reasoning: "low" }, null)).toEqual({
+            ok: false,
+            refusal: "duplicate"
+        });
+        expect(withFallback([a, b], { ...b, reasoning: "low" }, 1)).toEqual({
+            ok: true,
+            fallbacks: [a, { ...b, reasoning: "low" }]
+        });
+        expect(withFallback([a, b], { ...b }, 0)).toEqual({ ok: false, refusal: "duplicate" });
+    });
+
+    it("lets the same model in again on another key", () => {
+        const result = withFallback([b], { ...b, keyId: null }, null);
+        expect(result.ok).toBe(true);
+    });
+
+    it("refuses one past the most, and still allows a change when full", () => {
+        const full = Array.from({ length: FALLBACKS_MOST }, (_, index) => ({ ...a, model: `m-${index}` }));
+        expect(withFallback(full, b, null)).toEqual({ ok: false, refusal: "tooMany" });
+        expect(withFallback(full, b, 0).ok).toBe(true);
     });
 });

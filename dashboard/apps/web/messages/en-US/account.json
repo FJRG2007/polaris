@@ -1674,7 +1674,8 @@
         "authKind": {
             "none": "None",
             "bearer": "API key",
-            "oauth": "OAuth"
+            "oauth": "OAuth",
+            "headers": "Headers"
         },
         "token": "API key or token",
         "oauthHint": "You sign in on the server's own page next. Fill in a client ID only if the server gave you one.",

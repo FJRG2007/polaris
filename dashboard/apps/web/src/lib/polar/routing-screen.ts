@@ -54,11 +54,15 @@ export async function routingScreenFor(userId: string, access: PolarAccess): Pro
     return { own, deployment, keys };
 }
 
-/** One key's share of this month. `keyId` null is every call no stored key
- *  paid for; a name of null is a key removed since. */
+/** One key's share of this month. `keyId` null is the calls recorded without
+ *  the stored key that paid - before keys were itemized, or by a path that
+ *  does not name one - told apart by who paid (`payer`); a name of null is a
+ *  key removed since. */
 export interface KeyUsageRow {
     keyId: string | null;
     provider: string;
+    /** Whose key paid: the person's own, or the one this Polaris shares. */
+    payer: "own" | "instance";
     name: string | null;
     source: "own" | "instance" | null;
     requests: number;
@@ -112,7 +116,7 @@ export async function routingUsageFor(userId: string, now = new Date()): Promise
     const since = startOfMonthUtc(now);
     const [byKey, bySurface, fallbacks, own, instance] = await Promise.all([
         prisma.polarUsage.groupBy({
-            by: ["keyId", "provider"],
+            by: ["keyId", "provider", "payer"],
             where: { userId, createdAt: { gte: since } },
             _count: { _all: true },
             _sum: { inputTokens: true, outputTokens: true, costUsd: true }
@@ -153,6 +157,7 @@ export async function routingUsageFor(userId: string, now = new Date()): Promise
                 return {
                     keyId: row.keyId,
                     provider: row.provider,
+                    payer: row.payer === "instance" ? ("instance" as const) : ("own" as const),
                     name: known?.name ?? null,
                     source: known?.source ?? null,
                     requests: row._count._all,

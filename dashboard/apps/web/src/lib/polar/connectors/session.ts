@@ -6,7 +6,8 @@
  * Every byte goes through `connectorFetch`, so the SDK never opens a socket
  * of its own: the private-range check, the timeout and the byte ceiling hold
  * for the MCP traffic and for every OAuth request alike. The token is sent
- * in the `Authorization` header and nowhere else, as the spec requires, and
+ * in the `Authorization` header and nowhere else, as the spec requires (a
+ * server that asks for its own headers instead gets the stored ones), and
  * an OAuth token close to its end is refreshed first and stored again.
  *
  * Server-only. Anything a person sees from here is a code
@@ -22,7 +23,11 @@ import { connectorFetch } from "@/lib/polar/connectors/fetch";
 import type { PolarConnectorPolicy } from "@/lib/polar/access";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import { toCachedTools, CONNECTOR_TOOL_LIMIT } from "@/lib/polar/connectors/policy";
+import {
+    toCachedTools,
+    connectorRequestHeaders,
+    CONNECTOR_TOOL_LIMIT
+} from "@/lib/polar/connectors/policy";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 /** How long one tool call may take, end to end. */
@@ -71,6 +76,10 @@ async function bearerFor(
 ): Promise<string | null> {
     const { row, secret } = found;
     if (row.auth === "none") return null;
+    if (row.auth === "headers") {
+        if (!Object.keys(secret?.headers ?? {}).length) throw new ConnectorError("sign_in");
+        return null;
+    }
     if (row.auth === "bearer") {
         if (!secret?.token) throw new ConnectorError("sign_in");
         return secret.token;
@@ -125,7 +134,11 @@ async function withClient<T>(
     if (!hostAllowed(found.row.url, policy.hosts)) throw new ConnectorError("host");
     const token = await bearerFor(found, policy);
     const url = new URL(found.row.url);
-    const requestInit: RequestInit = token ? { headers: { authorization: `Bearer ${token}` } } : {};
+    const headers = connectorRequestHeaders(found.row.auth, {
+        bearer: token,
+        headers: found.secret?.headers ?? null
+    });
+    const requestInit: RequestInit = Object.keys(headers).length ? { headers } : {};
     const transport =
         found.row.transport === "sse"
             ? new SSEClientTransport(url, {

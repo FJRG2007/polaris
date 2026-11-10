@@ -1674,7 +1674,8 @@
         "authKind": {
             "none": "Ninguno",
             "bearer": "Clave API",
-            "oauth": "OAuth"
+            "oauth": "OAuth",
+            "headers": "Cabeceras"
         },
         "token": "Clave API o token",
         "oauthHint": "Después entras en la página del servidor. Pon un ID de cliente solo si el servidor te dio uno.",
