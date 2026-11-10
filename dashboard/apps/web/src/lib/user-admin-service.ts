@@ -36,6 +36,7 @@ import { revokeExtensionSessions } from "@/lib/extension/sessions";
 import { markPrincipalsMoved, updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
+import { forgetPrincipal, sweepOrphanGrants } from "@/lib/access/forget";
 
 /** One person, as the directory lists them. */
 export interface DirectoryUser {
@@ -624,6 +625,10 @@ export async function deleteUser(actorId: string, userId: string): Promise<{ err
     if (driveLeft) leftBehind.push(driveLeft);
     await (await import("@/lib/cloud-servers-host")).handOverOrgCloudAccounts(userId);
     await prisma.user.delete({ where: { id: userId } });
+    // What was lent to them, and what they had lent of everything that went
+    // with the account by cascade: neither is a foreign key.
+    await forgetPrincipal("user", userId);
+    await sweepOrphanGrants();
     refreshVpnAccessLater();
     await recordAudit({
         actorId,

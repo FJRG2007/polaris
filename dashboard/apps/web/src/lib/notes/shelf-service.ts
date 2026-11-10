@@ -17,6 +17,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import type { NoteActor } from "./access";
 import { contactLines } from "@/lib/privacy-service";
+import { forgetSubject } from "@/lib/access/forget";
 
 /** A folder as the sidebar draws it. */
 export interface FolderSummary {
@@ -225,7 +226,11 @@ export async function spaceContents(spaceId: string): Promise<{ notes: number; f
  *  place in notes that is true - a shelf is not an arrangement, it is where the
  *  writing lives. The screen says how much first. */
 export async function deleteSpace(spaceId: string): Promise<void> {
+    const notes = await prisma.note.findMany({ where: { spaceId }, select: { id: true } });
     await prisma.noteSpace.delete({ where: { id: spaceId } });
+    // The notes cascade; what was lent of them, and of the space, does not.
+    await forgetSubject("note.note", notes.map((note) => note.id));
+    await forgetSubject("note.space", spaceId);
 }
 
 // ---------------------------------------------------------------------------

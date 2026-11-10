@@ -18,6 +18,7 @@
 
 import { OrgError } from "./errors";
 import { prisma } from "@polaris/db";
+import { forgetPrincipal } from "@/lib/access/forget";
 import * as core from "@polaris/core";
 
 export interface OrgRoleView {
@@ -199,4 +200,5 @@ export async function deleteOrgRole(orgId: string, slug: string): Promise<void> 
         }),
         prisma.orgRole.delete({ where: { id: role.id } })
     ]);
+    await forgetPrincipal("role", role.id);
 }

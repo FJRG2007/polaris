@@ -278,7 +278,16 @@ export async function setAgentRepoEnabled(ownerId: string, repoId: string, enabl
 
 /** Forget the repository entirely, with its automations and runs. */
 export async function removeAgentRepo(ownerId: string, repoId: string): Promise<boolean> {
+    const sessions = await prisma.agentSession.findMany({
+        where: { repoId, repo: { ownerId } },
+        select: { id: true }
+    });
     const { count } = await prisma.agentRepo.deleteMany({ where: { id: repoId, ownerId } });
+    // Its workspaces cascade with it; what was lent of them does not.
+    if (count > 0) {
+        const { forgetSubject } = await import("@/lib/access/forget");
+        await forgetSubject("agents.session", sessions.map((session) => session.id));
+    }
     return count > 0;
 }
 

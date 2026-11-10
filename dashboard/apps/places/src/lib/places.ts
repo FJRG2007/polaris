@@ -297,4 +297,6 @@ export async function deletePlace(installedAppId: string, id: string): Promise<v
     if (remaining <= 1) throw new HomeError("There has to be somewhere for cameras to be");
     await prisma.place.delete({ where: { id } });
     await host.accessGrants.dropGrantsFor("place.place", id);
+    // Its rooms and panels cascade with it, and what was lent of them too.
+    await host.accessGrants.sweepOrphanGrants();
 }

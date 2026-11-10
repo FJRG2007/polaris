@@ -103,6 +103,7 @@ function once<M>(load: () => Promise<M>): () => Promise<M> {
 
 const load = {
     accessGrants: once(() => import("@/lib/access/grants")),
+    accessForget: once(() => import("@/lib/access/forget")),
     activityLive: once(() => import("@/lib/presence-activity/live")),
     apiSession: once(() => import("@/lib/api-session")),
     automations: once(() => import("@/lib/automations/app-bridge")),
@@ -180,6 +181,7 @@ const load = {
 export const serverHost = {
     accessGrants: {
         dropGrantsFor: later(load.accessGrants, "dropGrantsFor"),
+        sweepOrphanGrants: later(load.accessForget, "sweepOrphanGrants"),
         grantedActions: later(load.accessGrants, "grantedActions"),
         grantedSubjects: later(load.accessGrants, "grantedSubjects"),
         linkReach: later(load.accessGrants, "linkReach"),

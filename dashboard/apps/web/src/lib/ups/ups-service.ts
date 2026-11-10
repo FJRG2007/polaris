@@ -18,6 +18,7 @@ import { execCommand } from "@polaris/ssh";
 import { borrowSsh } from "@/lib/connection-pool";
 import { usersWithPermission } from "@polaris/auth";
 import { prisma } from "@polaris/db";
+import { forgetSubject } from "@/lib/access/forget";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { nutCommand, nutRead, nutSetVar } from "./nut-client";
 import { getHostConnection } from "@/lib/host-service";
@@ -337,7 +338,10 @@ export async function removeUps(id: string): Promise<boolean> {
             await rememberDismissed(`${row.machineId}/${row.deviceId}`);
         return gone;
     });
-    if (removed.count > 0) await syncSnmp();
+    if (removed.count > 0) {
+        await forgetSubject("place.ups", id);
+        await syncSnmp();
+    }
     return removed.count > 0;
 }
 

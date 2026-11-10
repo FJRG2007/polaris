@@ -46,7 +46,8 @@ import { VPN_ENGINE_APP } from "./vpn/settings";
 import { projectEntryWhere } from "./deploy-project-access";
 import { releaseEnvFor, releaseImageFor } from "./app-extensions/registry";
 import { findApp } from "@/lib/apps/catalog";
-import { dropGrantsFor, dropGrantsOfGoneDomains } from "@/lib/access/grants";
+import { dropGrantsOfGoneDomains } from "@/lib/access/grants";
+import { forgetSubject } from "@/lib/access/forget";
 import { speaksHttp } from "@/lib/deploy/portless";
 import { holdsOnTailnet } from "@/lib/tailscale/tailscale-model";
 import { removeHostVolume } from "@/lib/deploy/host-volumes";
@@ -296,9 +297,16 @@ export async function listProjects(userId: string, orgId: string | null) {
 /** Project, environment and service names only - what the firewall's scope selector
  *  needs, without dragging every domain, volume and deployment along for a list of
  *  labels. */
+/**
+ * The projects and services somebody can pick from, outside Deploy. Like Deploy's
+ * own list it leaves out the projects Polaris runs for its own apps (the
+ * Marketplace one, the mail server's): those are parts of Polaris, not sites of
+ * the reader's.
+ */
 export async function listProjectScopes(ownerId: string) {
+    const [visible, hidden] = await Promise.all([visibleProjectWhere(ownerId), polarisProjectIds()]);
     return prisma.project.findMany({
-        where: await visibleProjectWhere(ownerId),
+        where: hidden.size > 0 ? { AND: [visible, { id: { notIn: [...hidden] } }] } : visible,
         orderBy: { createdAt: "asc" },
         select: {
             id: true,
@@ -2830,13 +2838,14 @@ export async function deleteApplication(
     await prisma.wafRule.deleteMany({
         where: { scopeType: "application", scopeId: applicationId }
     });
-    if (deleteData) {
-        await prisma.analyticsSite.deleteMany({
-            where: { scopeType: "application", scopeId: applicationId }
-        });
-    }
+    // Its numbers go whatever happens to the volumes: nothing can open a
+    // service's analytics once the service is gone, and the sessions, events,
+    // days and reports follow the site by cascade.
+    await prisma.analyticsSite.deleteMany({
+        where: { scopeType: "application", scopeId: applicationId }
+    });
     await prisma.application.delete({ where: { id: applicationId } });
-    await dropGrantsFor("analytics.site", applicationId).catch(() => undefined);
+    await forgetSubject("analytics.site", applicationId).catch(() => undefined);
     await dropGrantsOfGoneDomains().catch(() => undefined);
     // The folder it was built from, when it was uploaded rather than cloned.
     await sourceUpload.forgetUploadedSources(applicationId).catch(() => undefined);

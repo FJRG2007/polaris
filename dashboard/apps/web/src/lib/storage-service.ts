@@ -18,6 +18,7 @@ import { ContainerDriver } from "@/lib/deploy/container-driver";
 import { linkedAccountToken } from "@/lib/connections/storage-token";
 import { fetchUnasMetrics, type UnasMetrics, type UnasTarget } from "@/lib/unifi-unas";
 import { deleteMetricsForSubject } from "@/lib/metrics-history-service";
+import { forgetSubject } from "@/lib/access/forget";
 import { grantedConnectionIds, grantedRootPath } from "@/lib/drive-acl-service";
 import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
 import { resolveContainerName, resolveLocalContainer } from "@/lib/container-files-service";
@@ -1119,6 +1120,9 @@ export async function deleteConnection(ownerId: string, connectionId: string) {
         where: { id: connectionId, ownerId, kind: { not: PERSONAL_KIND } }
     });
     await deleteMetricsForSubject("storage", connectionId);
+    // Only once the row is really gone: a personal drive is refused above.
+    const left = await prisma.storageConnection.count({ where: { id: connectionId } });
+    if (left === 0) await forgetSubject("place.nas", connectionId);
     forgetConnection(connectionId);
 }
 

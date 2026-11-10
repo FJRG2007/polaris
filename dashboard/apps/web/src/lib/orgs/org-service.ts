@@ -21,6 +21,7 @@ import { contactLines } from "@/lib/privacy-service";
 import { discardAvatars } from "@/lib/avatar-service";
 import { isOrgSuccessor } from "@/lib/successor-service";
 import { ensureSystemRoles, roleIsRestricted } from "./role-service";
+import { forgetPrincipal, sweepOrphanGrants } from "@/lib/access/forget";
 
 export { OrgAccessError, OrgError } from "./errors";
 
@@ -1060,6 +1061,9 @@ export async function deleteOrg(orgId: string): Promise<string[]> {
     const driveLeft = await discardOrganizationDrive(orgId);
     if (driveLeft) leftBehind.push(driveLeft);
     await prisma.organization.delete({ where: { id: orgId } });
+    // Its teams, roles and everything it held cascade; the grants to and on
+    // them name them by id and are swept here.
+    await sweepOrphanGrants();
     return leftBehind;
 }
 
@@ -1181,6 +1185,7 @@ export async function updateTeam(teamId: string, input: core.TeamInput): Promise
 
 export async function deleteTeam(teamId: string): Promise<void> {
     await prisma.team.delete({ where: { id: teamId } });
+    await forgetPrincipal("team", teamId);
 }
 
 /** Put somebody on a team. Only people already on the organization's roster:

@@ -12,6 +12,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import type { SpaceAccess, TaskScope } from "./access";
 import { grantedSubjects } from "@/lib/access/grants";
+import { forgetSubject } from "@/lib/access/forget";
 import { TaskRefusal, folderMoveRefusal } from "./refusal";
 
 // ---------------------------------------------------------------------------
@@ -316,8 +317,17 @@ export async function setSpaceArchived(spaceId: string, archived: boolean): Prom
     await prisma.taskSpace.update({ where: { id: spaceId }, data: { archived } });
 }
 
+/** The folders and tasks cascade with the space; their grants, history,
+ *  discussion and followers name them by id and do not, so they go here. */
 export async function deleteSpace(spaceId: string): Promise<void> {
+    const [folders, tasks] = await Promise.all([
+        prisma.taskFolder.findMany({ where: { spaceId }, select: { id: true } }),
+        prisma.task.findMany({ where: { spaceId }, select: { id: true } })
+    ]);
     await prisma.taskSpace.delete({ where: { id: spaceId } });
+    await forgetSubject("task.task", tasks.map((task) => task.id));
+    await forgetSubject("task.folder", folders.map((folder) => folder.id));
+    await forgetSubject("task.space", spaceId);
 }
 
 // ---------------------------------------------------------------------------
@@ -757,6 +767,8 @@ export async function deleteFolder(folderId: string): Promise<void> {
         prisma.taskSprint.updateMany({ where: { folderId }, data: { folderId: folder.parentId } }),
         prisma.taskFolder.delete({ where: { id: folderId } })
     ]);
+    // What was inside stays; what was lent of the folder itself goes with it.
+    await forgetSubject("task.folder", folderId);
 }
 
 /** Everything a create dialog opened from the sidebar needs: the vocabulary of
@@ -856,8 +868,11 @@ export async function updateList(
     });
 }
 
+/** A list's tasks cascade with it; what names them by id goes here. */
 export async function deleteList(listId: string): Promise<void> {
+    const tasks = await prisma.task.findMany({ where: { listId }, select: { id: true } });
     await prisma.taskList.delete({ where: { id: listId } });
+    await forgetSubject("task.task", tasks.map((task) => task.id));
 }
 
 export interface ListDetail {
@@ -1047,10 +1062,15 @@ export async function deleteStatus(
     if (remaining <= 1) throw new TaskRefusal("refusals.spaceNeedsStatus");
 
     if (fate.kind === "delete") {
+        const tasks = await prisma.task.findMany({
+            where: { statusId, spaceId },
+            select: { id: true }
+        });
         await prisma.$transaction([
             prisma.task.deleteMany({ where: { statusId, spaceId } }),
             prisma.taskStatus.deleteMany({ where: { id: statusId, spaceId } })
         ]);
+        await forgetSubject("task.task", tasks.map((task) => task.id));
         return;
     }
 
