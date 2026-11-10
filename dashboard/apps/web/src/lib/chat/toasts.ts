@@ -224,8 +224,22 @@ export async function messageToasts(
 
     const memberships = await prisma.chatChannelMember.findMany({
         where: { userId: actor.id, channelId: { in: asked } },
-        select: { channelId: true, muted: true, mutedUntil: true, locked: true }
+        select: {
+            channelId: true,
+            muted: true,
+            mutedUntil: true,
+            locked: true,
+            lastReadAt: true
+        }
     });
+    // How far the reader has read in each. Sending a message wakes every other
+    // tab and the desktop app with a "posted" frame for that conversation, and
+    // the newest message in it that is not the reader's own is then the one
+    // they were answering - read already, and announced with a chime as if it
+    // had just arrived. Nothing at or before the read mark is news.
+    const readUpTo = new Map(
+        memberships.flatMap((row) => (row.lastReadAt ? [[row.channelId, row.lastReadAt.getTime()]] : []))
+    );
     const locked = new Set(memberships.filter((row) => row.locked).map((row) => row.channelId));
     const quiet = new Set(
         memberships.filter((row) => core.muteInForce(row)).map((row) => row.channelId)
@@ -283,6 +297,12 @@ export async function messageToasts(
     const toasts: MessageToast[] = [];
     for (const row of rows) {
         if (seen.has(row.channelId)) continue;
+        // Newest first, so everything after this one in the conversation was
+        // read as well.
+        if (row.createdAt.getTime() <= (readUpTo.get(row.channelId) ?? -Infinity)) {
+            seen.add(row.channelId);
+            continue;
+        }
         // Not `seen` on the way past: the next message down in the same
         // conversation may be the one that named them, and a channel followed
         // for mentions is announced by the mention rather than by whatever was
