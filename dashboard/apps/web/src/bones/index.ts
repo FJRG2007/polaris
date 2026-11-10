@@ -17,6 +17,7 @@ import routeAccount from "./route-account.bones.json";
 import routeSettings from "./route-settings.bones.json";
 import routeFavorites from "./route-favorites.bones.json";
 import routeTelemetry from "./route-telemetry.bones.json";
+import routeAnalytics from "./route-analytics.bones.json";
 import routeInboxLogs from "./route-inbox-logs.bones.json";
 import routeTasksDocs from "./route-tasks-docs.bones.json";
 import routeTasksTime from "./route-tasks-time.bones.json";
@@ -47,6 +48,7 @@ import routeWatchServices from "./route-watch-services.bones.json";
 import routeWatchWebhooks from "./route-watch-webhooks.bones.json";
 import routeAppsContainers from "./route-apps-containers.bones.json";
 import routeAnalyticsSites from "./route-analytics-sites.bones.json";
+import routeAnalyticsPages from "./route-analytics-pages.bones.json";
 import routeAccountApiKeys from "./route-account-api-keys.bones.json";
 import routeAccountSecurity from "./route-account-security.bones.json";
 import routeAccountSessions from "./route-account-sessions.bones.json";
@@ -54,10 +56,17 @@ import routeAppsMarketplace from "./route-apps-marketplace.bones.json";
 import routeTasksEverything from "./route-tasks-everything.bones.json";
 import routeWatchContainers from "./route-watch-containers.bones.json";
 import routeTelemetryIssues from "./route-telemetry-issues.bones.json";
+import routeAnalyticsEvents from "./route-analytics-events.bones.json";
 import routeDriveDropPoints from "./route-drive-drop-points.bones.json";
+import routeAnalyticsSources from "./route-analytics-sources.bones.json";
+import routeAnalyticsReports from "./route-analytics-reports.bones.json";
 import routeDriveSharedLinks from "./route-drive-shared-links.bones.json";
+import routeAnalyticsRealtime from "./route-analytics-realtime.bones.json";
+import routeAnalyticsSessions from "./route-analytics-sessions.bones.json";
+import routeAnalyticsSettings from "./route-analytics-settings.bones.json";
 import routeAnalyticsSitesNew from "./route-analytics-sites-new.bones.json";
 import routeAccountPreferences from "./route-account-preferences.bones.json";
+import routeAnalyticsGeography from "./route-analytics-geography.bones.json";
 import routeAccountNotifications from "./route-account-notifications.bones.json";
 import routeInboxChannelsConnect from "./route-inbox-channels-connect.bones.json";
 
@@ -77,8 +86,17 @@ export const ROUTE_BONES: Record<string, ResponsiveLayout | undefined> = {
     "route-admin-groups": routeAdminGroups,
     "route-admin-policies": routeAdminPolicies,
     "route-admin-users": routeAdminUsers,
+    "route-analytics": routeAnalytics,
+    "route-analytics-events": routeAnalyticsEvents,
+    "route-analytics-geography": routeAnalyticsGeography,
+    "route-analytics-pages": routeAnalyticsPages,
+    "route-analytics-realtime": routeAnalyticsRealtime,
+    "route-analytics-reports": routeAnalyticsReports,
+    "route-analytics-sessions": routeAnalyticsSessions,
+    "route-analytics-settings": routeAnalyticsSettings,
     "route-analytics-sites": routeAnalyticsSites,
     "route-analytics-sites-new": routeAnalyticsSitesNew,
+    "route-analytics-sources": routeAnalyticsSources,
     "route-apps-backups": routeAppsBackups,
     "route-apps-containers": routeAppsContainers,
     "route-apps-deploy": routeAppsDeploy,
