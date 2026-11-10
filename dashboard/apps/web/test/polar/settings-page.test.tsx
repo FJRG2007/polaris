@@ -268,7 +268,7 @@ describe("the settings page", () => {
         render(<PolarChat />, { wrapper: MessagesWrapper });
         await screen.findByRole("textbox");
         fireEvent.click(screen.getByRole("button", { name: "Polar settings" }));
-        expect(pushed).toEqual(["/polar/settings"]);
+        expect(pushed).toEqual(["/polar/settings/memory"]);
         expect(screen.queryByRole("dialog")).toBeNull();
     });
 
@@ -295,7 +295,7 @@ describe("the settings page", () => {
 
     it("is a route, and the settings component holds no dialog", () => {
         const root = resolve(__dirname, "../../src");
-        expect(existsSync(resolve(root, "app/(app)/polar/settings/page.tsx"))).toBe(true);
+        expect(existsSync(resolve(root, "app/(app)/polar/settings/memory/page.tsx"))).toBe(true);
         const source = readFileSync(resolve(root, "components/polar/polar-settings.tsx"), "utf8");
         expect(source).not.toMatch(/DialogContent|PolarSettings\(/);
     });

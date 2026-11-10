@@ -2159,7 +2159,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         {
             label: "Polar settings", // i18n-ignore
-            href: "/polar/settings",
+            href: "/polar/settings/memory",
             icon: Settings,
             hidden: true,
             keywords: ["memory", "tools", "mcp", "connectors", "web search", "polar"]

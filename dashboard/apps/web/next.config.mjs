@@ -300,6 +300,30 @@ const nextConfig = {
             destination: "/polar/settings/permissions",
             permanent: false
         },
+        // Each Polar settings section is a page of its own. The addresses from
+        // before - `?section=`, a connector sign-in's `?connector=` - and the
+        // bare one land on the page they meant. The section list mirrors
+        // POLAR_SETTINGS_SECTIONS (src/lib/polar/settings-path.ts); a test holds
+        // the two together.
+        {
+            source: "/polar/settings",
+            has: [{ type: "query", key: "connector", value: "(?:signed_in|failed)" }],
+            destination: "/polar/settings/connectors",
+            permanent: false
+        },
+        {
+            source: "/polar/settings",
+            has: [
+                {
+                    type: "query",
+                    key: "section",
+                    value: "(?<section>memory|tools|connectors|skills|permissions|browser|display|extras|routing|coding-tools|usage|data)"
+                }
+            ],
+            destination: "/polar/settings/:section",
+            permanent: false
+        },
+        { source: "/polar/settings", destination: "/polar/settings/memory", permanent: false },
         // Linear and Jira are connected from Connected accounts, beside every
         // other account. The Tasks menu and bookmarks still name the old screen;
         // the hub shows the section only to whoever can manage tasks.
