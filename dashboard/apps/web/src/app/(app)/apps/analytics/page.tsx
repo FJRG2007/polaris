@@ -19,7 +19,7 @@ import { requireAnalyticsReader } from "./reader";
 import { requireInstalledApp } from "@/lib/apps/require-installed";
 import { visitRangeSchema, type VisitRange } from "@polaris/core";
 import { isAnalyticsScope, type AnalyticsScope } from "./site-catalog";
-import { isAnalyticsTab } from "./analytics-reports";
+import { isAnalyticsTab } from "./analytics-tabs";
 
 export const dynamic = "force-dynamic";
 

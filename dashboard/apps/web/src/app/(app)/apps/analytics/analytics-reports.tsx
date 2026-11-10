@@ -49,23 +49,8 @@ import {
 } from "./actions";
 import type { SiteLevel } from "./site-access";
 import type { AnalyticsScope } from "./site-catalog";
+import { ANALYTICS_TABS, type AnalyticsTab } from "./analytics-tabs";
 
-export const ANALYTICS_TABS = [
-    "overview",
-    "sessions",
-    "events",
-    "funnels",
-    "journeys",
-    "goals",
-    "retention",
-    "revenue",
-    "site"
-] as const;
-export type AnalyticsTab = (typeof ANALYTICS_TABS)[number];
-
-export function isAnalyticsTab(value: string | null | undefined): value is AnalyticsTab {
-    return (ANALYTICS_TABS as readonly string[]).includes(value ?? "");
-}
 
 function grouped(value: number): string {
     return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");

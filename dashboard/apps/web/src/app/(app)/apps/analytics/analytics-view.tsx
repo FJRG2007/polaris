@@ -77,9 +77,9 @@ import {
     ReportPanel,
     SectionTabs,
     useFilterNav,
-    useFilterPick,
-    type AnalyticsTab
+    useFilterPick
 } from "./analytics-reports";
+import type { AnalyticsTab } from "./analytics-tabs";
 
 /** Thousands separators without a locale: the browser's separator disagrees with the
  *  server on the first render, and it is not the reader's chosen format either. */
