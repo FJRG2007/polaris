@@ -17,6 +17,7 @@
 import * as core from "@polaris/core";
 import { ANTHROPIC_HEADERS_ENV, MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
 import {
+    apiKeyOptionsFor,
     keySourcesFor,
     signinAccountsFor,
     signinEnvsFor,
@@ -146,6 +147,30 @@ export function credentialsForAgent(
 }
 
 /**
+ * What a session's agent is signed in with, given what the person picked.
+ *
+ * - The machine's own login: nothing at all. The home is signed in already,
+ *   and a stored token injected over it is how a credential revoked months ago
+ *   comes to beat a login that works.
+ * - An API key: that key alone (and what travels with it). Handed the stored
+ *   subscription as well, the tool would use whichever it reads first, and the
+ *   bill would not be the one chosen.
+ * - A sign-in account: that account, over whatever else the tool reads.
+ * - Nothing picked: whatever resolves.
+ */
+export function sessionCredentials(
+    cli: core.AgentCli,
+    available: Record<string, string>,
+    chosen: { env: string; secret: string; apiKey: boolean; extra: Record<string, string> } | null,
+    machineLogin: boolean
+): Record<string, string> {
+    if (machineLogin) return {};
+    if (chosen?.apiKey) return { [chosen.env]: chosen.secret, ...chosen.extra };
+    if (chosen) return { ...credentialsForAgent(cli, available), [chosen.env]: chosen.secret };
+    return credentialsForAgent(cli, available);
+}
+
+/**
  * One thing somebody can pick when handing work to an agent.
  *
  * A tool AND an account, because those are not one choice. Somebody can hold
@@ -178,20 +203,25 @@ export interface AgentOption {
      *  answer". Not an account, so `accountId` stays null - but a different
      *  answer from null on its own, which means "whichever of mine resolves". */
     readonly machine: boolean;
+    /** True for a provider's API key (billed per use) rather than the tool's
+     *  own sign-in, so the picker can say which of the two it is. */
+    readonly apiKey: boolean;
     readonly missing: AgentChoice["missing"];
 }
 
 /** The catalogue crossed with the accounts, as the picker lists it. */
 export async function agentOptionsFor(userId: string | null): Promise<AgentOption[]> {
-    const [choices, accounts] = await Promise.all([
+    const [choices, accounts, apiKeys] = await Promise.all([
         agentChoicesFor(userId),
-        signinOptionsFor(userId)
+        signinOptionsFor(userId),
+        apiKeyOptionsFor(userId)
     ]);
     const options: AgentOption[] = [];
     for (const choice of choices) {
         const cli = core.agentCliById(choice.id);
         const envs = new Set((cli?.credentials ?? []).map((credential) => credential.env));
         const mine = accounts.filter((account) => envs.has(account.env));
+        const keys = apiKeys.filter((key) => envs.has(key.env));
         // Offered for every tool Polaris could sign in itself, because it is the
         // only true answer for a machine somebody signed in themselves - and the
         // only way to stop a stored token that was revoked months ago being
@@ -213,10 +243,13 @@ export async function agentOptionsFor(userId: string | null): Promise<AgentOptio
                 account: "This machine's own login",
                 mine: null,
                 machine: true,
+                apiKey: false,
                 missing: []
             });
         }
-        if (mine.length === 0) {
+        // The plain row means "whichever resolves", which says nothing a row of
+        // its own does not where a key or an account is listed.
+        if (mine.length === 0 && keys.length === 0) {
             options.push({
                 key: choice.id,
                 cli: choice.id,
@@ -228,9 +261,9 @@ export async function agentOptionsFor(userId: string | null): Promise<AgentOptio
                 account: null,
                 mine: null,
                 machine: false,
+                apiKey: false,
                 missing: choice.missing
             });
-            continue;
         }
         for (const account of mine) {
             options.push({
@@ -246,6 +279,26 @@ export async function agentOptionsFor(userId: string | null): Promise<AgentOptio
                 account: account.identity ?? account.name,
                 mine: account.source === "own",
                 machine: false,
+                apiKey: false,
+                missing: []
+            });
+        }
+        // Each API key the tool reads, beside the subscriptions rather than only
+        // in their absence: somebody signed in on a plan can still choose to run
+        // this one on their key.
+        for (const key of keys) {
+            options.push({
+                key: `${choice.id}:${key.id}`,
+                cli: choice.id,
+                label: choice.label,
+                vendor: choice.vendor,
+                docs: choice.docs,
+                readiness: "ready",
+                accountId: key.id,
+                account: key.name,
+                mine: key.source === "own",
+                machine: false,
+                apiKey: true,
                 missing: []
             });
         }

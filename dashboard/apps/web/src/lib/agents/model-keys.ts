@@ -986,6 +986,56 @@ export async function signinOptionsFor(
     );
 }
 
+/**
+ * The provider keys this person can hand a coding tool, one row per key.
+ *
+ * A tool that reads an API key (Claude Code, Codex, ...) was offered one only
+ * while the person had no subscription linked for it: the moment one was, the
+ * picker listed the subscriptions and nothing else, and somebody who wanted to
+ * run Claude Code on their Anthropic key had no row to pick. Each key is its own
+ * row, beside the subscriptions, and the session started on one is handed that
+ * key and nothing else.
+ */
+export async function apiKeyOptionsFor(
+    userId: string | null
+): Promise<Array<{ id: string; env: string; name: string; source: KeySource }>> {
+    const envOf = new Map(
+        MODEL_PROVIDERS.filter((provider) => provider.slug !== GATEWAY_SLUG).map((provider) => [
+            provider.slug,
+            provider.envVar
+        ])
+    );
+    try {
+        const shared = await instanceKeysAreShared();
+        const rows = await prisma.userModelKey.findMany({
+            where: {
+                AND: [
+                    {
+                        OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])]
+                    },
+                    { provider: { in: [...envOf.keys()] } },
+                    spendable()
+                ]
+            },
+            select: { id: true, userId: true, provider: true, name: true },
+            orderBy: [...BY_PRIORITY]
+        });
+        return rows
+            .map((row) => ({
+                id: row.id,
+                env: envOf.get(row.provider) ?? "",
+                name: row.name,
+                source: (row.userId ? "own" : "instance") as KeySource
+            }))
+            .filter((row) => row.env)
+            .sort((left, right) =>
+                left.source === right.source ? 0 : left.source === "own" ? -1 : 1
+            );
+    } catch {
+        return [];
+    }
+}
+
 export async function signinAccountsFor(
     userId: string | null
 ): Promise<Map<string, { name: string; identity: string | null; source: KeySource }>> {
@@ -1053,7 +1103,14 @@ export async function signinEnvsFor(userId: string | null): Promise<Set<string>>
 export async function secretForAccount(
     userId: string | null,
     accountId: string
-): Promise<{ env: string; secret: string } | null> {
+): Promise<{
+    env: string;
+    secret: string;
+    /** A provider's API key rather than a tool's own sign-in. */
+    apiKey: boolean;
+    /** What travels with that key and nothing else (an Anthropic workspace). */
+    extra: Record<string, string>;
+} | null> {
     try {
         const shared = await instanceKeysAreShared();
         const row = await prisma.userModelKey.findFirst({
@@ -1076,12 +1133,20 @@ export async function secretForAccount(
             }
         });
         if (!row) return null;
-        const env = agentSignins().find((signin) => signin.slug === row.provider)?.env;
+        const signin = agentSignins().find((entry) => entry.slug === row.provider)?.env;
+        const provider = signin
+            ? null
+            : MODEL_PROVIDERS.find(
+                  (entry) => entry.slug === row.provider && entry.slug !== GATEWAY_SLUG
+              );
+        const env = signin ?? provider?.envVar;
         if (!env) return null;
         const secret = readSecret(row);
         if (!secret) return null;
         await noteUsed([row.id]);
-        return { env, secret };
+        const extra: Record<string, string> = {};
+        if (provider?.slug === "anthropic") applyWorkspace(extra, row);
+        return { env, secret, apiKey: !!provider, extra };
     } catch {
         return null;
     }

@@ -26,7 +26,7 @@ import { borrowSsh } from "@/lib/connection-pool";
 import { appBaseUrl } from "@/lib/domain-service";
 import { containerState, withContainerPorts } from "./session-ports";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
-import { credentialsForAgent } from "@/lib/agents/agent-readiness";
+import { sessionCredentials } from "@/lib/agents/agent-readiness";
 import { chatCredentialFor, secretForAccount, sessionSecretsFor } from "@/lib/agents/model-keys";
 import { opencodeModelEnv } from "@/lib/agents/opencode-model";
 import * as attachments from "@/lib/agents/session-attachments";
@@ -350,11 +350,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // ago comes to beat a login that works - the tool reads the variable
         // first and never looks at the home.
         credentials: {
-            ...(session.useMachineLogin
-                ? {}
-                : chosen
-                  ? { ...credentialsForAgent(agent.cli, available), [chosen.env]: chosen.secret }
-                  : credentialsForAgent(agent.cli, available)),
+            ...sessionCredentials(agent.cli, available, chosen, session.useMachineLogin),
             // The provider and model picked on the form, last, so they win.
             ...modelEnv
         },

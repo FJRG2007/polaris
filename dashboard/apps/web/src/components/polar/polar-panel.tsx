@@ -1951,6 +1951,22 @@ export function PolarChat({
                     ? "done"
                     : "idle";
     const noKeys = providers !== null && providers.length === 0;
+    // Opening Polar is opening it to type: the box takes the cursor on arrival,
+    // on another conversation, and when the welcome gives way to the thread
+    // (which draws the box anew). Never over a field somebody is in, and not on
+    // a touch screen, where it would throw the keyboard over the page.
+    const composerLayout = fullPage && !noKeys && chat.messages.length === 0 && !inCall;
+    useEffect(() => {
+        if (noKeys) return;
+        const active = document.activeElement;
+        const elsewhere =
+            active instanceof HTMLElement &&
+            active !== document.body &&
+            active !== textarea.current &&
+            (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName));
+        if (elsewhere || !window.matchMedia?.("(pointer: fine)").matches) return;
+        textarea.current?.focus({ preventScroll: true });
+    }, [threadId, composerLayout, noKeys]);
     const lastMessage = chat.messages.at(-1);
     const canCompact = !busy && !compacting && !!lastMessage && !compactionOf(lastMessage);
     const commandsFull = commands.commands.length >= polarShared.POLAR_COMMAND_MOST;

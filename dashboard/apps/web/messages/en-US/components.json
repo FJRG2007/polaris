@@ -1445,6 +1445,8 @@
         "search": "Search agents",
         "machineHint": "Polaris signs it in with nothing. Whatever this machine is already signed in to answers for it - which is what you get after signing in once in a session's own terminal.",
         "yourAccount": "Your account: {account}",
+        "apiKeyAccount": "API key: {account}",
+        "apiKeyHint": "Runs on this API key, billed per use, instead of a subscription.",
         "providedAccount": "Provided by this Polaris: {account}",
         "nothingSigns": "Nothing here signs {agent} in.",
         "loginPrompt": "On this box it would start and sit at its own login prompt, where nobody would ever answer it. Sign it in under AI keys - Polaris runs the sign-in for you and supplies the machine - or run it on a server you have already signed it in on.",

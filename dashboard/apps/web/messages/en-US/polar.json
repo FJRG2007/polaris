@@ -1020,6 +1020,8 @@
         "refresh": "Refresh the list",
         "agentSettings": "Manage agents",
         "notSignedIn": "Not signed in",
+        "apiKeyAccount": "API key: {account}",
+        "apiKeys": "API keys",
         "searchAgents": "Find an agent",
         "noAgentMatch": "No agents match",
         "noVoice": "Voice talks to Polar's chat, not to an agent",

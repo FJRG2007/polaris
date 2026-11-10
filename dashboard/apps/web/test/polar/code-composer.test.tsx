@@ -33,6 +33,7 @@ const CHOICES = {
             account: "This machine's own login",
             mine: null,
             machine: true,
+            apiKey: false,
             missing: []
         }
     ]

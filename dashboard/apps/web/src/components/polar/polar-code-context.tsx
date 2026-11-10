@@ -21,6 +21,7 @@ import { AgentLogo } from "@/components/logos";
 import type { PolarCodeChoices } from "@/lib/polar/code";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useEffect, useState, type ReactNode } from "react";
 import type { PolarCodeBranches } from "@/lib/polar/code";
 import { readPoll } from "@/lib/poll-fetch";
@@ -541,9 +542,18 @@ function Mark({ on }: { on: boolean }) {
     return <Check className={cn("ml-auto size-3.5 shrink-0 text-primary", !on && "opacity-0")} />;
 }
 
+type PolarT = NamespaceTranslator<"polar">;
+
+/** The account an option names, said as an API key where it is one. */
+function accountName(option: AgentOption, t: PolarT): string | null {
+    if (!option.account) return null;
+    return option.apiKey ? t("code.apiKeyAccount", { account: option.account }) : option.account;
+}
+
 /** What an agent option is called: its name, and the account where one is named. */
-function agentName(option: AgentOption): string {
-    return option.account ? `${option.label} - ${option.account}` : option.label;
+function agentName(option: AgentOption, t: PolarT): string {
+    const account = accountName(option, t);
+    return account ? `${option.label} - ${account}` : option.label;
 }
 
 /** The agent, on the composer where Chat has its model picker, in the same look. */
@@ -562,15 +572,17 @@ export function AgentPicker({
     const t = useTranslations("polar");
     const [query, setQuery] = useState("");
     const picked = agents?.find((option) => option.key === value) ?? null;
-    const shown = (agents ?? []).filter((option) => menuSearchMatches(agentName(option), query));
+    const shown = (agents ?? []).filter((option) =>
+        menuSearchMatches(agentName(option, t), query)
+    );
     const searchable = (agents?.length ?? 0) > 6;
     return (
         <DropdownMenu onOpenChange={(next) => (next ? undefined : setQuery(""))}>
             <DropdownMenuTrigger asChild disabled={disabled || agents === null}>
                 <button
                     type="button"
-                    title={picked ? agentName(picked) : t("code.agent")}
-                    aria-label={`${t("code.agent")}: ${picked ? agentName(picked) : ""}`}
+                    title={picked ? agentName(picked, t) : t("code.agent")}
+                    aria-label={`${t("code.agent")}: ${picked ? agentName(picked, t) : ""}`}
                     className={cn(MODEL_TRIGGER, "disabled:opacity-60")}
                 >
                     {picked ? (
@@ -622,11 +634,11 @@ export function AgentPicker({
                             {option.account || option.readiness === "missing" ? (
                                 <span
                                     className="truncate text-xs text-muted-foreground"
-                                    title={option.account ?? undefined}
+                                    title={accountName(option, t) ?? undefined}
                                 >
                                     {option.readiness === "missing"
                                         ? t("code.notSignedIn")
-                                        : option.account}
+                                        : accountName(option, t)}
                                 </span>
                             ) : null}
                         </span>
@@ -639,6 +651,9 @@ export function AgentPicker({
                     </p>
                 ) : null}
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                    <Link href="/account/ai-keys">{t("code.apiKeys")}</Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                     <Link href="/apps/agents/settings">{t("code.agentSettings")}</Link>
                 </DropdownMenuItem>

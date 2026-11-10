@@ -61,6 +61,7 @@ export const CUSTOM_CHOICE: AgentOption = {
     account: null,
     mine: null,
     machine: false,
+    apiKey: false,
     missing: []
 };
 
@@ -217,16 +218,22 @@ export function AgentSelect({
                                             title={
                                                 option.machine
                                                     ? t("agentSelect.machineHint")
-                                                    : option.mine
-                                                      ? t("agentSelect.yourAccount", {
-                                                            account: option.account
-                                                        })
-                                                      : t("agentSelect.providedAccount", {
-                                                            account: option.account
-                                                        })
+                                                    : option.apiKey
+                                                      ? t("agentSelect.apiKeyHint")
+                                                      : option.mine
+                                                        ? t("agentSelect.yourAccount", {
+                                                              account: option.account
+                                                          })
+                                                        : t("agentSelect.providedAccount", {
+                                                              account: option.account
+                                                          })
                                             }
                                         >
-                                            {option.account}
+                                            {option.apiKey
+                                                ? t("agentSelect.apiKeyAccount", {
+                                                      account: option.account
+                                                  })
+                                                : option.account}
                                         </span>
                                     ) : option.vendor ? (
                                         <span className="text-muted-foreground shrink-0 text-xs">

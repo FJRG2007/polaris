@@ -1445,6 +1445,8 @@
         "search": "Buscar agentes",
         "machineHint": "Polaris no le inicia sesión con nada. Responde lo que ya tenga iniciado esta máquina, que es lo que obtienes tras iniciar sesión una vez en el propio terminal de una sesión.",
         "yourAccount": "Tu cuenta: {account}",
+        "apiKeyAccount": "Clave API: {account}",
+        "apiKeyHint": "Usa esta clave API, de pago por uso, en vez de una suscripción.",
         "providedAccount": "La aporta este Polaris: {account}",
         "nothingSigns": "Nada de aquí inicia sesión en {agent}.",
         "loginPrompt": "En esta máquina arrancaría y se quedaría en su propia pantalla de inicio de sesión, donde nadie le respondería nunca. Inicia sesión en Claves de IA (Polaris hace el inicio de sesión por ti y pone la máquina) o ejecútalo en un servidor donde ya lo tengas con sesión iniciada.",

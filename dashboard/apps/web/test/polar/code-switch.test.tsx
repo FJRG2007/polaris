@@ -30,6 +30,7 @@ const CHOICES = {
             account: null,
             mine: null,
             machine: false,
+            apiKey: false,
             missing: []
         }
     ]

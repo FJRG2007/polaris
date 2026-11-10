@@ -1020,6 +1020,8 @@
         "refresh": "Recargar lista",
         "agentSettings": "Ver agentes",
         "notSignedIn": "Sin conectar",
+        "apiKeyAccount": "Clave API: {account}",
+        "apiKeys": "Claves API",
         "searchAgents": "Buscar agente",
         "noAgentMatch": "Ningún agente",
         "noVoice": "La voz va al chat de Polar, no a un agente",
