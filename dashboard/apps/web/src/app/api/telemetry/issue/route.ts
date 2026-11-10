@@ -1,7 +1,7 @@
 // one fault's detail. A route, not an action: see lib/poll-route.
 import { z } from "zod";
 import { pollRoute } from "@/lib/poll-route";
-import { openIssueAction } from "@/app/(app)/apps/telemetry/actions";
+import { openIssueAction } from "@/app/(app)/telemetry/actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

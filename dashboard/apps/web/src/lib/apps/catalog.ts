@@ -396,7 +396,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         name: "Analytics",
         category: "Tools",
         icon: ChartColumn,
-        opensAt: "/apps/analytics",
+        opensAt: "/analytics",
         summary: "Who visits the sites you run here, without a cookie banner.",
         description:
             "Visitors, pages, referrers, countries, devices and events for every site deployed here and for Polaris itself, counted from the traffic that already reaches your edge and, if you want more, a small script. No cookies and nothing sent anywhere else. Compare periods, filter by anything, follow a visit page by page, build funnels and goals, and share a site with the people who need its numbers.", // i18n-ignore
@@ -413,7 +413,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         name: "Telemetry",
         category: "Tools",
         icon: Bug,
-        opensAt: "/apps/telemetry",
+        opensAt: "/telemetry",
         summary: "What broke in your apps and in Polaris, with the stack trace.",
         description:
             "Point any Sentry SDK at Polaris and every exception lands here, grouped into issues with the stack trace, the release, the runtime, the operating system and the browser it happened on. Resolve, ignore and share a project with the people who fix it. The errors stay on your own server.", // i18n-ignore

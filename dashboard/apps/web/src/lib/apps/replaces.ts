@@ -18,8 +18,8 @@ export interface ReplacedProduct {
     /** The tile's file name, without `.svg`. */
     readonly logo: string;
     /** The app's own screen that does the product's job, by its `href`, where
-     *  that is one section of the app rather than the app itself (Analytics
-     *  inside Apps). */
+     *  that is one screen rather than the app itself (Analytics, which Apps
+     *  claims and which opens as an app of its own). */
     readonly section?: string;
 }
 
@@ -33,9 +33,9 @@ export const APP_REPLACES: Readonly<Record<string, readonly ReplacedProduct[]>> 
         product("Render", "render"),
         product("Fly.io", "fly-io"),
         product("Vercel", "vercel"),
-        product("Google Analytics", "google-analytics", "/apps/analytics"),
-        product("Plausible", "plausible", "/apps/analytics"),
-        product("Umami", "umami", "/apps/analytics")
+        product("Google Analytics", "google-analytics", "/analytics"),
+        product("Plausible", "plausible", "/analytics"),
+        product("Umami", "umami", "/analytics")
     ],
     chat: [
         product("Discord", "discord"),

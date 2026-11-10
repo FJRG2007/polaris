@@ -16,8 +16,8 @@ import { userHasManage } from "@/lib/session";
 import { csvCell } from "@/lib/access/grant-use-csv";
 import { sessionWhere } from "@/lib/analytics-reports";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
-import { siteAccess } from "@/app/(app)/apps/analytics/site-access";
-import { requireAnalyticsReader } from "@/app/(app)/apps/analytics/reader";
+import { siteAccess } from "@/app/(app)/analytics/site-access";
+import { requireAnalyticsReader } from "@/app/(app)/analytics/reader";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

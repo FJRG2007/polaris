@@ -319,7 +319,11 @@ export interface BuiltInAlternative {
 function alternativeFor(entry: AppEntry, item: ReplacedProduct): BuiltInAlternative | undefined {
     if (!item.section)
         return { label: entry.label, href: entry.href, permission: entry.permission };
-    const section = APP_SECTIONS[entry.id]?.find((candidate) => candidate.href === item.section);
+    // The screen may have grown into an app of its own (Analytics left Apps), so
+    // it is looked for in every rail rather than only the claiming app's.
+    const section = Object.values(APP_SECTIONS)
+        .flat()
+        .find((candidate) => candidate.href === item.section);
     if (!section) return undefined;
     return {
         label: section.label,
@@ -336,7 +340,7 @@ function alternativeFor(entry: AppEntry, item: ReplacedProduct): BuiltInAlternat
  * tile is named after the template id, as Vaultwarden's is `vaultwarden` - does
  * that template's job, so the card can say so. A claim only has to be made once,
  * in the table the store page and the README already read. Where the product
- * names one section of the app (Umami's is Analytics, inside Apps), that section
+ * names one screen of its own (Umami's is Analytics), that screen
  * is the screen, with the permission it needs rather than the app's.
  */
 export function builtInAlternative(app: AppManifest): BuiltInAlternative | undefined {

@@ -1,5 +1,5 @@
 /**
- * Analytics (/apps/analytics).
+ * Analytics (/analytics).
  *
  * Structured like the firewall and like Deploy, because it answers the same shape of
  * question about the same things: pick what you are looking at in the header, then

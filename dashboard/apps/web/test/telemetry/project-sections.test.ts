@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SECTION, SECTIONS, sectionFor } from "@/app/(app)/apps/telemetry/project-sections";
+import { DEFAULT_SECTION, SECTIONS, sectionFor } from "@/app/(app)/telemetry/project-sections";
 
 describe("the sections of a project", () => {
     it("opens on the faults, which is what somebody came for", () => {

@@ -100,7 +100,7 @@ vi.mock("@/lib/local-server", () => ({
     LOCAL_SERVER_FALLBACK_NAME: "This server"
 }));
 
-const actions = await import("@/app/(app)/apps/telemetry/actions");
+const actions = await import("@/app/(app)/telemetry/actions");
 const { requireTelemetryReader } = await import("@/lib/telemetry/reader");
 const { requireMayShare } = await import("@/lib/access/sharing-service");
 

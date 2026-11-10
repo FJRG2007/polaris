@@ -220,7 +220,9 @@ const nextConfig = {
             ["/apps/vpn", "/vpn"],
             ["/apps/network-filter", "/network-filter"],
             ["/apps/mail-server", "/mail-server"],
-            ["/apps/games", "/game-servers"]
+            ["/apps/games", "/game-servers"],
+            ["/apps/analytics", "/analytics"],
+            ["/apps/telemetry", "/telemetry"]
         ].flatMap(([source, destination]) => [
             { source, destination, permanent: false },
             {

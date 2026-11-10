@@ -20,7 +20,9 @@ const MOVED = [
     ["/apps/vpn/register/abc", "/vpn/register/abc"],
     ["/apps/network-filter/settings", "/network-filter/settings"],
     ["/apps/mail-server/abc", "/mail-server/abc"],
-    ["/apps/games", "/game-servers"]
+    ["/apps/games", "/game-servers"],
+    ["/apps/analytics", "/analytics"],
+    ["/apps/telemetry", "/telemetry"]
 ] as const;
 
 interface Rule {
@@ -78,8 +80,8 @@ describe("official apps", () => {
 
     it("open at a top-level address from the catalog too", () => {
         // Security scans and Cloud servers are sections of Servers, not apps of their
-        // own, and an app that only unlocks a section of an official app (Analytics,
-        // Telemetry) opens where that section always was.
+        // own, and an app that only unlocks a section of an official app opens where
+        // that section always was.
         const unlocked = new Set(
             Object.values(APP_SECTIONS).flat()
                 .filter((section) => section.requiresApp)

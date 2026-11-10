@@ -7,7 +7,7 @@ cwe: CWE-285
 stride: Tampering
 cvss: "4.3"
 cvss_vector: CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N
-location: dashboard/apps/web/src/app/(app)/apps/analytics/actions.ts
+location: dashboard/apps/web/src/app/(app)/analytics/actions.ts
 component: analytics
 reachability: AUTHENTICATED
 exploitability: EASY
@@ -37,4 +37,4 @@ Both require service.configure.
 
 ## History
 - 2026-09-28: discovered by Helio (source audit), status open.
-- 2026-09-28: fixed in dashboard/apps/web/src/app/(app)/apps/analytics/actions.ts; test test/deploy/analytics-tracker-writes.test.ts.
+- 2026-09-28: fixed in dashboard/apps/web/src/app/(app)/analytics/actions.ts; test test/deploy/analytics-tracker-writes.test.ts.

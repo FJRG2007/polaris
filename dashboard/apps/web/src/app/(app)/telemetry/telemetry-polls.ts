@@ -6,7 +6,7 @@
  */
 
 import { readPoll } from "@/lib/poll-fetch";
-import type * as telemetryActionsModule from "@/app/(app)/apps/telemetry/actions";
+import type * as telemetryActionsModule from "@/app/(app)/telemetry/actions";
 
 type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
 

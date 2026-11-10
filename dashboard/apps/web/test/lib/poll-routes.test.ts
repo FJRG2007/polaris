@@ -422,7 +422,7 @@ vi.mock("@/app/(app)/tasks/actions", () => ({
 vi.mock("@/app/(app)/tasks/trackers/actions", () => ({
     trackerTargetsAction: actions.trackerTargetsAction
 }));
-vi.mock("@/app/(app)/apps/analytics/actions", () => ({
+vi.mock("@/app/(app)/analytics/actions", () => ({
     listAnalyticsSitesAction: actions.listAnalyticsSitesAction,
     getAnalyticsOverviewAction: actions.getAnalyticsOverviewAction,
     runAnalyticsReportAction: actions.runAnalyticsReportAction
@@ -456,7 +456,7 @@ vi.mock("@/app/(app)/apps/runners/actions", () => ({
     runnerPrincipalsAction: actions.runnerPrincipalsAction,
     previewScopeAction: actions.previewScopeAction
 }));
-vi.mock("@/app/(app)/apps/telemetry/actions", () => ({
+vi.mock("@/app/(app)/telemetry/actions", () => ({
     telemetryOverviewAction: actions.telemetryOverviewAction,
     openIssueAction: actions.openIssueAction
 }));
@@ -2187,8 +2187,8 @@ const CASES: Case[] = [
         path: "/api/analytics/sites",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/apps/analytics/analytics-polls")>(
-                    "@/app/(app)/apps/analytics/analytics-polls"
+                await actual<typeof import("@/app/(app)/analytics/analytics-polls")>(
+                    "@/app/(app)/analytics/analytics-polls"
                 )
             ).analyticsSites(),
         action: "listAnalyticsSitesAction",
@@ -2199,8 +2199,8 @@ const CASES: Case[] = [
         path: "/api/analytics/overview",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/apps/analytics/analytics-polls")>(
-                    "@/app/(app)/apps/analytics/analytics-polls"
+                await actual<typeof import("@/app/(app)/analytics/analytics-polls")>(
+                    "@/app/(app)/analytics/analytics-polls"
                 )
             ).analyticsOverview({
                 scopeType: "scopeType-1",
@@ -2216,8 +2216,8 @@ const CASES: Case[] = [
         path: "/api/analytics/report",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/apps/analytics/analytics-polls")>(
-                    "@/app/(app)/apps/analytics/analytics-polls"
+                await actual<typeof import("@/app/(app)/analytics/analytics-polls")>(
+                    "@/app/(app)/analytics/analytics-polls"
                 )
             ).analyticsReport({
                 scopeType: "scopeType-1",
@@ -2410,8 +2410,8 @@ const CASES: Case[] = [
         path: "/api/telemetry/overview",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/apps/telemetry/telemetry-polls")>(
-                    "@/app/(app)/apps/telemetry/telemetry-polls"
+                await actual<typeof import("@/app/(app)/telemetry/telemetry-polls")>(
+                    "@/app/(app)/telemetry/telemetry-polls"
                 )
             ).telemetryOverview({ projectId: "project-1", status: "open", query: "timeout" }),
         action: "telemetryOverviewAction",
@@ -2422,8 +2422,8 @@ const CASES: Case[] = [
         path: "/api/telemetry/issue",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/apps/telemetry/telemetry-polls")>(
-                    "@/app/(app)/apps/telemetry/telemetry-polls"
+                await actual<typeof import("@/app/(app)/telemetry/telemetry-polls")>(
+                    "@/app/(app)/telemetry/telemetry-polls"
                 )
             ).telemetryIssue("projectId-1", "issueId-1"),
         action: "openIssueAction",

@@ -166,11 +166,11 @@ export function TelemetryView({
         params.set("status", next.status ?? status);
         const wantedSection = next.section ?? open;
         if (wantedSection !== DEFAULT_SECTION) params.set("section", wantedSection);
-        router.push(`/apps/telemetry?${params.toString()}`);
+        router.push(`/telemetry?${params.toString()}`);
     };
 
     /** A link straight into a project, for the cards. */
-    const hrefFor = (id: string) => `/apps/telemetry?project=${encodeURIComponent(id)}`;
+    const hrefFor = (id: string) => `/telemetry?project=${encodeURIComponent(id)}`;
 
     const act = async (run: () => Promise<{ error?: string }>) => {
         setBusy(true);

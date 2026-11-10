@@ -73,7 +73,7 @@ describe("a template a built-in app already covers", () => {
         const umami = findStoreApp("template-umami");
         expect(umami && builtInAlternative(umami)).toEqual({
             label: "Analytics",
-            href: "/apps/analytics",
+            href: "/analytics",
             permission: "deploy.manage"
         });
     });

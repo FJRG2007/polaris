@@ -43,7 +43,7 @@ vi.mock("@/lib/analytics-service", () => ({
     ensureAnalyticsSite: async () => ({ id: "site-1" })
 }));
 
-const actions = await import("../../src/app/(app)/apps/analytics/actions");
+const actions = await import("../../src/app/(app)/analytics/actions");
 
 beforeEach(() => {
     vi.clearAllMocks();

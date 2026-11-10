@@ -49,7 +49,7 @@ const SCHEMA_WORDS: Readonly<Record<string, TelemetryKey>> = {
     "Name at least one address, or nothing will be able to report": "errors.nameAddress"
 };
 
-const PATH = "/apps/telemetry";
+const PATH = "/telemetry";
 
 /** The caller, and the projects shared with them as `edit` - the only shared
  *  ones anything that changes a project lets through. */

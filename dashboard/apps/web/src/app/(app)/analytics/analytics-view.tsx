@@ -150,7 +150,7 @@ export function AnalyticsView({
         if (!scopeNeedsTarget(scope) || siteId || !services || services.length === 0) return;
         const first = services[0]!.id;
         router.replace(
-            `/apps/analytics?scope=${scope}&id=${encodeURIComponent(first)}&range=${range}`
+            `/analytics?scope=${scope}&id=${encodeURIComponent(first)}&range=${range}`
         );
     }, [scope, siteId, services, range, router]);
 
@@ -331,7 +331,7 @@ function SitePicker({
         next.set("scope", nextScope);
         if (nextId) next.set("id", nextId);
         else next.delete("id");
-        router.push(`/apps/analytics?${next.toString()}`);
+        router.push(`/analytics?${next.toString()}`);
     }
 
     const scopeSelect = (
@@ -398,7 +398,7 @@ function RangeTabs({ range }: { range: VisitRange }) {
                 return (
                     <Link
                         key={value}
-                        href={`/apps/analytics?${next.toString()}`}
+                        href={`/analytics?${next.toString()}`}
                         scroll={false}
                         aria-current={active ? "page" : undefined}
                         className={cn(

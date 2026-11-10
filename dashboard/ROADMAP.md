@@ -507,7 +507,7 @@ Code (pull requests and issues):
 
 Telemetry (what breaks):
 
-- [x] `/apps/telemetry`, beside Analytics and the firewall because it answers the
+- [x] `/telemetry` (an app of its own since 2026-11-10; it was `/apps/telemetry`), beside Analytics and the firewall because it answers the
       third question about the same things: who came, who was turned away, and
       what fell over
 - [x] Speaks the ingest protocol Sentry's clients speak, so an application points

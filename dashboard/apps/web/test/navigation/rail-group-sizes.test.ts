@@ -61,8 +61,6 @@ const PREVIOUS: Record<string, string[]> = {
         "/apps/agents",
         "/apps/code",
         "/apps/firewall",
-        "/apps/analytics",
-        "/apps/telemetry",
         "/apps/databases",
         "/apps/containers",
         "/apps/backups"

@@ -38,7 +38,7 @@ async function say(key: NamespaceKey<"analytics">): Promise<string> {
     return (await getTranslations("analytics"))(key);
 }
 
-const ANALYTICS_PATH = "/apps/analytics";
+const ANALYTICS_PATH = "/analytics";
 
 const scopeSchema = z.object({
     scopeType: z.enum(["application", "polaris"]),

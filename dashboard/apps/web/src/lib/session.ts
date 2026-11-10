@@ -18,7 +18,7 @@ import { redirect } from "next/navigation";
 import { guardSession, type SessionVerdict } from "@/lib/session-guard";
 import { canAny, userHasPermission } from "@polaris/auth";
 import { isAppInstalled } from "@/lib/apps/install-presence";
-import { hasPermission, type Permission } from "@polaris/core";
+import { hasPermission, type GrantSubject, type Permission } from "@polaris/core";
 import { homePathFor, type AppAccessInput } from "@/lib/app-access";
 import { resolveViewAs, type ViewAsIdentity } from "@/lib/view-as-service";
 
@@ -205,6 +205,15 @@ export async function sessionCanAny(user: SessionUser, permission: Permission): 
     return canAny(user.id, permission);
 }
 
+/** The grant subjects that open an app to somebody who holds none of its
+ *  permissions: Watch's connectivity record or a server, one Analytics site, one
+ *  Telemetry project. Every other app that lends single things is an extension. */
+const LENT_SUBJECTS: Record<string, GrantSubject[]> = {
+    watch: ["watch.connectivity", "place.server"],
+    analytics: ["analytics.site"],
+    telemetry: ["telemetry.project"]
+};
+
 /** This user's own capability check, in the shape the app registry asks for. Built
  *  on the "anywhere at all" answer, because that is what deciding whether to draw
  *  a link means. Carries the install probe too, so an app that only exists once
@@ -220,15 +229,15 @@ export function accessFor(user: SessionUser): AppAccessInput {
         // open. Asked only after the permission has said no, and imported here
         // rather than in the app registry because that one is read in the
         // browser.
+        // A role preview carries only the role's grants, never the things
+        // lent to the person previewing it.
         alsoReaches: async (appId) =>
-            // Watch is reached by a person its connectivity record or a server
-            // was shared with; every other app that lends single things is an
-            // extension.
-            appId === "watch"
-                ? (await import("@/lib/access/grants")).reachesAnySubject(user.id, [
-                      "watch.connectivity",
-                      "place.server"
-                  ])
+            appId in LENT_SUBJECTS
+                ? user.viewingAs?.mode !== "role" &&
+                  (await import("@/lib/access/grants")).reachesAnySubject(
+                      user.id,
+                      LENT_SUBJECTS[appId]!
+                  )
                 : (await import("@/lib/app-extensions/registry")).appReaches(appId, user.id),
         reachesSubject: async (subject) =>
             user.viewingAs?.mode !== "role" &&

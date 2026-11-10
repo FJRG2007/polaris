@@ -8,7 +8,7 @@
  * the value once it has held still for a quarter of a second.
  */
 
-import { useDebounced } from "@/app/(app)/apps/telemetry/use-debounced";
+import { useDebounced } from "@/app/(app)/telemetry/use-debounced";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

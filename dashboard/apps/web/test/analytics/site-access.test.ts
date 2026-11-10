@@ -72,7 +72,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@/lib/download-ticket", () => ({ downloadTicketHeaders: () => ({}) }));
 
-const actions = await import("@/app/(app)/apps/analytics/actions");
+const actions = await import("@/app/(app)/analytics/actions");
 const scope = { scopeType: "application", scopeId: APP };
 const funnel = JSON.stringify({
     kind: "funnel",

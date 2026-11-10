@@ -6,7 +6,7 @@
  */
 
 import { readPoll } from "@/lib/poll-fetch";
-import type * as analyticsActionsModule from "@/app/(app)/apps/analytics/actions";
+import type * as analyticsActionsModule from "@/app/(app)/analytics/actions";
 
 type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
 

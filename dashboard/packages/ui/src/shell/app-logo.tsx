@@ -427,6 +427,29 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
+    // Analytics: three bars rising on a panel.
+    analytics: {
+        palette: ["#FDBA74", "#EA580C", "#9A3412"],
+        draw: ({ base, face }) => (
+            <>
+                <rect x="4" y="4" width="24" height="24" rx="6" fill={base} />
+                <rect x="9" y="16" width="3.4" height="7" rx="1.7" fill={face} />
+                <rect x="14.3" y="12" width="3.4" height="11" rx="1.7" fill={face} />
+                <rect x="19.6" y="8.5" width="3.4" height="14.5" rx="1.7" fill={WHITE} />
+            </>
+        )
+    },
+    // Telemetry: a pulse that breaks, on a panel.
+    telemetry: {
+        palette: ["#FDA4AF", "#E11D48", "#9F1239"],
+        draw: ({ base, face }) => (
+            <>
+                <rect x="4" y="4" width="24" height="24" rx="6" fill={base} />
+                <path d="M8 16.5h4l2.5-5.5 3.5 10 2.5-4.5H24" {...LINE} strokeWidth={2.6} />
+                <circle cx="24" cy="16.5" r="1.8" fill={face} />
+            </>
+        )
+    },
     // The VPN: three devices joined through one point.
     vpn: {
         palette: ["#7DD3FC", "#0284C7", "#075985"],

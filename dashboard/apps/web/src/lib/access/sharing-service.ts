@@ -604,9 +604,9 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
         case "dns.filter":
             return "/network-filter";
         case "telemetry.project":
-            return `/apps/telemetry?project=${encodeURIComponent(subjectId)}`;
+            return `/telemetry?project=${encodeURIComponent(subjectId)}`;
         case "analytics.site":
-            return `/apps/analytics?scope=application&id=${encodeURIComponent(subjectId)}`;
+            return `/analytics?scope=application&id=${encodeURIComponent(subjectId)}`;
         case "automation.automation":
             return `/automations/${subjectId}`;
         case "office.document":

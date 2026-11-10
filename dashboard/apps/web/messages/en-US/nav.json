@@ -189,6 +189,12 @@
         "dns-blocker": {
             "description": "Block ads, trackers and unwanted sites across your network"
         },
+        "analytics": {
+            "description": "Who visits the sites you run here"
+        },
+        "telemetry": {
+            "description": "What broke in your apps, with the stack trace"
+        },
         "arcade": {
             "description": "Play on your own, or together from a call"
         }

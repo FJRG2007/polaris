@@ -1,5 +1,5 @@
 /**
- * Telemetry (/apps/telemetry).
+ * Telemetry (/telemetry).
  *
  * What broke, in the applications deployed here and in Polaris itself. Beside
  * Analytics and the firewall because it answers the third question about the

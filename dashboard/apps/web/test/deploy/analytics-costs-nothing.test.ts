@@ -17,7 +17,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const TRACKER = new URL("../../public/analytics.js", import.meta.url);
-const PANEL = new URL("../../src/app/(app)/apps/analytics/analytics-view.tsx", import.meta.url);
+const PANEL = new URL("../../src/app/(app)/analytics/analytics-view.tsx", import.meta.url);
 
 const tracker = await readFile(TRACKER, "utf8");
 const panel = await readFile(PANEL, "utf8");
@@ -66,7 +66,7 @@ describe("the screen that reads the numbers", () => {
         // and it fills one dropdown. It used to be awaited before the first
         // paint, so opening Analytics waited on it.
         const page = await readFile(
-            new URL("../../src/app/(app)/apps/analytics/page.tsx", import.meta.url),
+            new URL("../../src/app/(app)/analytics/page.tsx", import.meta.url),
             "utf8"
         );
         expect(page).not.toContain("listProjectScopes");

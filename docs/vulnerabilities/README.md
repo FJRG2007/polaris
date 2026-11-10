@@ -30,7 +30,7 @@ a regression. Entries are sorted open/regressed first, then by severity.
 | VULN-0025 | Task space or folder admin can make themselves owner | Medium | Fixed | dashboard/apps/web/src/app/(app)/tasks/actions.ts | CWE-269 | 2026-09-28 |
 | VULN-0026 | Chat space admin can remove the space owner | Medium | Fixed | dashboard/apps/web/src/lib/chat/chat-service.ts | CWE-285 | 2026-09-28 |
 | VULN-0027 | Delegated vault manager can lock the owner out of their personal vault | Medium | Fixed | dashboard/apps/web/src/lib/vault/orgs.ts | CWE-285 | 2026-09-28 |
-| VULN-0028 | Read access disables or rotates another project's analytics tracker | Medium | Fixed | dashboard/apps/web/src/app/(app)/apps/analytics/actions.ts | CWE-285 | 2026-09-28 |
+| VULN-0028 | Read access disables or rotates another project's analytics tracker | Medium | Fixed | dashboard/apps/web/src/app/(app)/analytics/actions.ts | CWE-285 | 2026-09-28 |
 | VULN-0029 | Object as server group id deletes other owners' memberships and firewall rules | Medium | Fixed | dashboard/apps/web/src/app/(app)/apps/servers/actions.ts | CWE-943 | 2026-09-28 |
 | VULN-0002 | UniFi UNAS Home Assistant add-on does not verify the NAS SSH host key | Medium | Fixed | plugins/unifi-unas/homeassistant/custom_components/unifi_unas/ssh_manager.py:121 | CWE-295 | 2026-09-28 |
 | VULN-0004 | Private GitHub repositories can be built through the instance GitHub App by any deploy member | Medium | Fixed | dashboard/apps/web/src/lib/github-access.ts | CWE-863 | 2026-09-28 |

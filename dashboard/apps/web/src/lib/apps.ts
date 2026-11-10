@@ -354,6 +354,32 @@ export const POLARIS_APPS: AppEntry[] = [
         adminOnly: true
     },
     {
+        /**
+         * Who visits the sites run here, and what broke in them: apps of their
+         * own once installed, rather than screens in Apps. Somebody a single
+         * site or project was shared with opens them too (`alsoReaches` in
+         * `lib/session.ts`); the old /apps addresses redirect.
+         */
+        id: "analytics",
+        category: "tools",
+        label: "Analytics", // i18n-ignore
+        description: "Who visits the sites you run here", // i18n-ignore
+        icon: ChartColumn,
+        href: "/analytics",
+        permission: "deploy.manage",
+        requiresApp: "analytics"
+    },
+    {
+        id: "telemetry",
+        category: "tools",
+        label: "Telemetry", // i18n-ignore
+        description: "What broke in your apps, with the stack trace", // i18n-ignore
+        icon: Bug,
+        href: "/telemetry",
+        permission: "deploy.manage",
+        requiresApp: "telemetry"
+    },
+    {
         id: "dns-blocker",
         category: "infrastructure",
         label: "Network filter", // i18n-ignore
@@ -704,7 +730,6 @@ const DEVELOPMENT_GROUP = "Development";
 const MACHINES_GROUP = "Machines";
 const NETWORK_GROUP = "Network";
 const DATA_GROUP = "Data & services";
-const OBSERVABILITY_GROUP = "Observability";
 
 /** What people call the Network filter when they search for it: the rail and the
  *  store both find it by these. */
@@ -1564,34 +1589,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Archive,
             keywords: ["restore", "snapshots"],
             group: DATA_GROUP
-        },
-        {
-            label: "Analytics", // i18n-ignore
-            href: "/apps/analytics",
-            needs: "deploy.manage",
-            requiresApp: "analytics",
-            icon: ChartColumn,
-            keywords: ["visitors", "traffic", "pageviews", "referrers", "metrics", "umami"],
-            group: OBSERVABILITY_GROUP
-        },
-        {
-            label: "Telemetry", // i18n-ignore
-            href: "/apps/telemetry",
-            needs: "deploy.manage",
-            requiresApp: "telemetry",
-            // A project shared with somebody who runs nothing else here.
-            reachedBy: "telemetry.project",
-            icon: Bug,
-            keywords: [
-                "errors",
-                "exceptions",
-                "crashes",
-                "stack trace",
-                "sentry",
-                "issues",
-                "logging"
-            ],
-            group: OBSERVABILITY_GROUP
         }
     ],
     watch: [
@@ -2665,6 +2662,40 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "aliases",
                 "forwards",
                 "catch-all"
+            ]
+        }
+    ],
+    analytics: [
+        {
+            // Out of the rail: the app is this one screen. Kept so search finds it.
+            label: "Analytics", // i18n-ignore
+            href: "/analytics",
+            needs: "deploy.manage",
+            requiresApp: "analytics",
+            reachedBy: "analytics.site",
+            icon: ChartColumn,
+            hidden: true,
+            keywords: ["visitors", "traffic", "pageviews", "referrers", "metrics", "umami"]
+        }
+    ],
+    telemetry: [
+        {
+            label: "Telemetry", // i18n-ignore
+            href: "/telemetry",
+            needs: "deploy.manage",
+            requiresApp: "telemetry",
+            // A project shared with somebody who runs nothing else here.
+            reachedBy: "telemetry.project",
+            icon: Bug,
+            hidden: true,
+            keywords: [
+                "errors",
+                "exceptions",
+                "crashes",
+                "stack trace",
+                "sentry",
+                "issues",
+                "logging"
             ]
         }
     ],

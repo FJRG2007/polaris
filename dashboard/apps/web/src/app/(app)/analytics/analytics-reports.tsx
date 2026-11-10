@@ -79,7 +79,7 @@ export function useFilterNav() {
             const search = new URLSearchParams(params.toString());
             if (next.length) search.set("f", JSON.stringify(next));
             else search.delete("f");
-            router.replace(`/apps/analytics?${search.toString()}`, { scroll: false });
+            router.replace(`/analytics?${search.toString()}`, { scroll: false });
         },
         [params, router]
     );
@@ -132,7 +132,7 @@ export function SectionTabs({ tab }: { tab: AnalyticsTab }) {
                 return (
                     <Link
                         key={value}
-                        href={`/apps/analytics?${next.toString()}`}
+                        href={`/analytics?${next.toString()}`}
                         scroll={false}
                         aria-current={active ? "page" : undefined}
                         className={cn(

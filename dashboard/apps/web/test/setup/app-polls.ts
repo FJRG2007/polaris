@@ -612,19 +612,19 @@ vi.mock("@/app/(app)/tasks/tasks-polls", () => ({
     )
 }));
 
-vi.mock("@/app/(app)/apps/analytics/analytics-polls", () => ({
+vi.mock("@/app/(app)/analytics/analytics-polls", () => ({
     analyticsSites: forward(
-        () => import("@/app/(app)/apps/analytics/actions"),
+        () => import("@/app/(app)/analytics/actions"),
         "listAnalyticsSitesAction",
         0
     ),
     analyticsOverview: forward(
-        () => import("@/app/(app)/apps/analytics/actions"),
+        () => import("@/app/(app)/analytics/actions"),
         "getAnalyticsOverviewAction",
         1
     ),
     analyticsReport: forward(
-        () => import("@/app/(app)/apps/analytics/actions"),
+        () => import("@/app/(app)/analytics/actions"),
         "runAnalyticsReportAction",
         1
     )
@@ -703,14 +703,14 @@ vi.mock("@/app/(app)/apps/runners/runners-polls", () => ({
     scopePreview: forward(() => import("@/app/(app)/apps/runners/actions"), "previewScopeAction", 1)
 }));
 
-vi.mock("@/app/(app)/apps/telemetry/telemetry-polls", () => ({
+vi.mock("@/app/(app)/telemetry/telemetry-polls", () => ({
     telemetryOverview: forward(
-        () => import("@/app/(app)/apps/telemetry/actions"),
+        () => import("@/app/(app)/telemetry/actions"),
         "telemetryOverviewAction",
         1
     ),
     telemetryIssue: forward(
-        () => import("@/app/(app)/apps/telemetry/actions"),
+        () => import("@/app/(app)/telemetry/actions"),
         "openIssueAction",
         2
     )

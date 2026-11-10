@@ -80,8 +80,8 @@ vi.mock("@/lib/local-server", () => ({
     LOCAL_SERVER_FALLBACK_NAME: "This server"
 }));
 
-const actions = await import("@/app/(app)/apps/analytics/actions");
-const { requireAnalyticsReader } = await import("@/app/(app)/apps/analytics/reader");
+const actions = await import("@/app/(app)/analytics/actions");
+const { requireAnalyticsReader } = await import("@/app/(app)/analytics/reader");
 const { requireMayShare } = await import("@/lib/access/sharing-service");
 
 const reader = { id: "reader", isAdmin: false } as Parameters<typeof requireMayShare>[0];

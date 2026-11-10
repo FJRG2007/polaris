@@ -193,7 +193,7 @@ const LINKED_TABS = [
         label: "tabs.analytics",
         title: "tabs.openAnalytics",
         icon: ChartColumn,
-        href: (id: string) => `/apps/analytics?scope=application&id=${id}`
+        href: (id: string) => `/analytics?scope=application&id=${id}`
     }
 ] as const;
 

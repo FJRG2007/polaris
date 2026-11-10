@@ -69,8 +69,8 @@ appear only once installed.
 | Databases | `/apps/databases` | Operations | Data & services |
 | Backups | `/apps/backups` | Operations | Data & services |
 | Mail server | `/mail-server` | Operations | Data & services |
-| Analytics | `/apps/analytics` | Operations | Observability |
-| Telemetry | `/apps/telemetry` | Operations | Observability |
+| Analytics | `/analytics` | - | An app of its own |
+| Telemetry | `/telemetry` | - | An app of its own |
 
 Paths, permissions (`needs`, `adminOnly`, `requiresApp`) and search keywords did
 not change, so search and breadcrumbs find every screen where they did before.
