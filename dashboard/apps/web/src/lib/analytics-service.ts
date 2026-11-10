@@ -524,15 +524,32 @@ export async function readAnalytics(
         };
     }
 
+    const report = await rawVisitReport(site.id, from, now, filters, { buckets: spec.buckets });
+    return { ...report, site, from, to: now, online, source: "raw", unavailable: [], filtersIgnored: false };
+}
+
+/**
+ * The report read from the raw rows of one window: the sessions seen in it and
+ * at most `RAW_EVENT_CAP` of its events. The overview and the paged rankings
+ * (`analytics-lists.ts`) both read through here, so they cannot count apart.
+ */
+export async function rawVisitReport(
+    siteId: string,
+    from: number,
+    to: number,
+    filters: readonly VisitFilter[],
+    shape: { buckets: number; limit?: number }
+): Promise<VisitReport> {
+    const narrow = sessionWhere(filters);
     const [sessions, events] = await Promise.all([
         prisma.analyticsSession.findMany({
-            where: { siteId: site.id, lastSeenAt: { gte: new Date(from) }, ...narrow },
+            where: { siteId, lastSeenAt: { gte: new Date(from) }, ...narrow },
             orderBy: { startedAt: "asc" }
         }),
         prisma.analyticsEvent.findMany({
             where: {
-                siteId: site.id,
-                at: { gte: new Date(from), lt: new Date(now) },
+                siteId,
+                at: { gte: new Date(from), lt: new Date(to) },
                 ...(filters.length ? { session: { is: narrow } } : {})
             },
             orderBy: { at: "asc" },
@@ -540,15 +557,14 @@ export async function readAnalytics(
             select: { sessionId: true, at: true, kind: true, name: true, path: true }
         })
     ]);
-
-    const report = reportVisits({
+    return reportVisits({
         sessions: sessions.map(toSessionRow),
         events: events.map(toEventRow),
         from,
-        to: now,
-        buckets: spec.buckets
+        to,
+        buckets: shape.buckets,
+        ...(shape.limit ? { limit: shape.limit } : {})
     });
-    return { ...report, site, from, to: now, online, source: "raw", unavailable: [], filtersIgnored: false };
 }
 
 /**

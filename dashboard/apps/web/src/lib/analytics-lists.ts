@@ -16,6 +16,7 @@
 
 import { prisma } from "@polaris/db";
 import { sessionWhere } from "@/lib/analytics-reports";
+import { rawVisitReport } from "@/lib/analytics-service";
 import { reportVisits, visitDay, type VisitDimension, type VisitFilter, type VisitRow } from "@polaris/core";
 
 /** The deepest a ranking goes. Also the most `reportVisits` will rank. */
@@ -26,7 +27,6 @@ export const LIST_PAGE = 50;
 
 /** The same boundaries `readAnalytics` draws, so a list and the overview agree. */
 const RAW_MAX_MS = 31 * 86_400_000;
-const RAW_EVENT_CAP = 200_000;
 
 /** The dimensions the daily totals carry. Everything else needs the raw rows. */
 const DAILY_DIMENSIONS: ReadonlySet<VisitDimension> = new Set([
@@ -138,37 +138,7 @@ export async function rankedPage(
         return { ...pageRanked(rows, cursor, limit), source: "daily", unavailable: false, capped: rows.length >= RANK_CAP };
     }
 
-    const narrow = sessionWhere(window.filters);
-    const [sessions, events] = await Promise.all([
-        prisma.analyticsSession.findMany({
-            where: { siteId: window.siteId, lastSeenAt: { gte: new Date(window.from) }, ...narrow }
-        }),
-        prisma.analyticsEvent.findMany({
-            where: {
-                siteId: window.siteId,
-                at: { gte: new Date(window.from), lt: new Date(window.to) },
-                ...(window.filters.length ? { session: { is: narrow } } : {})
-            },
-            orderBy: { at: "asc" },
-            take: RAW_EVENT_CAP,
-            select: { sessionId: true, at: true, kind: true, name: true, path: true }
-        })
-    ]);
-    const report = reportVisits({
-        sessions: sessions.map((session) => ({
-            ...session,
-            startedAt: session.startedAt.getTime(),
-            lastSeenAt: session.lastSeenAt.getTime()
-        })),
-        events: events.map((event) => ({
-            sessionId: event.sessionId,
-            at: event.at.getTime(),
-            kind: event.kind === "event" ? ("event" as const) : ("pageview" as const),
-            name: event.name,
-            path: event.path
-        })),
-        from: window.from,
-        to: window.to,
+    const report = await rawVisitReport(window.siteId, window.from, window.to, window.filters, {
         buckets: 1,
         limit: RANK_CAP
     });
