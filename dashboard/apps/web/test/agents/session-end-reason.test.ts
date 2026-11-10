@@ -17,3 +17,10 @@ describe("a session that ends says why", () => {
         expect(normalizeHookEvent({ hook_event_name: "SessionEnd", reason: "resume" })?.kind).toBe("session.clear");
     });
 });
+
+describe("the settings a Claude session is started with", () => {
+    it("accept the bypass warning, so the first prompt is not an answer to it", async () => {
+        const { claudeHookSettings } = await import("@/lib/agents/session-hooks");
+        expect(claudeHookSettings("/state/hook.sh")).toMatchObject({ skipDangerousModePermissionPrompt: true });
+    });
+});

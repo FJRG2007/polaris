@@ -87,7 +87,13 @@ export function claudeHookSettings(scriptPath: string): Record<string, unknown> 
         };
         hooks[event] = [matcher ? { matcher, hooks: [hook] } : { hooks: [hook] }];
     }
-    return { hooks };
+    // The bypass-permissions warning opens on "No, exit", and the first prompt's
+    // Enter chose it: the agent quit before reading the message. Claude Code now
+    // reads the acceptance from this settings key (user, local, flag or policy
+    // settings) rather than from `bypassPermissionsModeAccepted`, so the flag
+    // file Polaris passes with `--settings` carries it. It only skips the
+    // warning; whether permissions are bypassed is still the launch flags' call.
+    return { hooks, skipDangerousModePermissionPrompt: true };
 }
 
 /**
