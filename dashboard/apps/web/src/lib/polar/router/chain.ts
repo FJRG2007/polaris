@@ -21,8 +21,9 @@
  * A stream is held back until its first piece of content, so a provider that
  * accepts the call and then fails before saying anything is routed past like
  * one that refused it (free-claude-code buffers the first 0.75 s for the same
- * reason). Once content has reached the reader the answer is that model's: a
- * failure after it surfaces as it is.
+ * reason). Once content has reached the reader a failure is carried on rather
+ * than ended (`continuation.ts`): the next step that fits is shown what was
+ * already written and asked to continue it, the way free-claude-code does.
  *
  * Once a step has answered, it answers every later step of the same turn, so
  * one model is billed for the whole turn and its tool calls stay coherent.
@@ -38,6 +39,13 @@ import { readsSentFiles, sendsProviderTool, type StandInTarget } from "@/lib/pol
 import { classifyProviderFailure, type FailureKind } from "@/lib/polar/provider-failure";
 import { coolingOf, noteAnswered, noteRefusal, retryAfterMs } from "@/lib/polar/router/health";
 import { reasoningForRoute, type RouteReasoning, type SdkReasoning } from "@/lib/polar/routing";
+import {
+    MAX_CONTINUATIONS,
+    continuable,
+    continuationParams,
+    withoutOverlap,
+    type Delivered
+} from "@/lib/polar/router/continuation";
 
 type CallParams = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["params"];
 type StreamResult = Awaited<ReturnType<LanguageModelV4["doStream"]>>;
@@ -142,15 +150,36 @@ class StreamRefusal extends Error {
     }
 }
 
+/** Carries on a stream that failed after content, or answers null to let the
+ *  failure through. */
+export type Resume = (error: unknown, delivered: Delivered) => Promise<StreamResult | null>;
+
 /**
  * Read a stream up to its first piece of content. An error before it throws,
  * so the router can move on; otherwise the stream is handed back whole, the
  * parts already read first. `release` runs once the stream ends however it
- * ends.
+ * ends. An error after content is offered to `resume`, which may hand back a
+ * stream that continues the answer; the reader sees one answer either way.
  */
-export async function heldStream(result: StreamResult, release: () => void): Promise<StreamResult> {
-    const reader = result.stream.getReader();
+export async function heldStream(
+    result: StreamResult,
+    release: () => void,
+    resume?: Resume
+): Promise<StreamResult> {
+    let reader = result.stream.getReader();
     const held: StreamPart[] = [];
+    const delivered: Delivered = { text: "", tools: false };
+    const openText = new Set<string>();
+    const openReasoning = new Set<string>();
+    const note = (part: StreamPart & { type: string }) => {
+        const piece = part as { id?: string; delta?: string };
+        if (part.type === "text-delta") delivered.text += piece.delta ?? "";
+        else if (part.type === "text-start" && piece.id) openText.add(piece.id);
+        else if (part.type === "text-end" && piece.id) openText.delete(piece.id);
+        else if (part.type === "reasoning-start" && piece.id) openReasoning.add(piece.id);
+        else if (part.type === "reasoning-end" && piece.id) openReasoning.delete(piece.id);
+        else if (part.type.startsWith("tool-")) delivered.tools = true;
+    };
     try {
         for (;;) {
             const { value, done } = await reader.read();
@@ -158,6 +187,7 @@ export async function heldStream(result: StreamResult, release: () => void): Pro
             const part = value as StreamPart & { type: string; error?: unknown };
             if (part.type === "error") throw new StreamRefusal(part.error);
             held.push(value);
+            note(part);
             if (!PREAMBLE.has(part.type)) break;
         }
     } catch (error) {
@@ -171,20 +201,64 @@ export async function heldStream(result: StreamResult, release: () => void): Pro
         finished = true;
         release();
     };
+    let continued = 0;
+    /** Whether the answer goes on in another stream; false ends it on the error. */
+    const carryOn = async (
+        error: unknown,
+        controller: ReadableStreamDefaultController<StreamPart>
+    ): Promise<boolean> => {
+        // Once handed on, the stream that continues owns any further break
+        // (and its own bound), so this one never carries on twice.
+        if (!resume || delivered.tools || continued > 0) return false;
+        // This stream's key is done with either way.
+        finish();
+        const next = await resume(error, { ...delivered }).catch(() => null);
+        if (!next) return false;
+        continued++;
+        // The blocks the broken stream left open are closed as they stood.
+        for (const id of openText) controller.enqueue({ type: "text-end", id } as StreamPart);
+        for (const id of openReasoning) controller.enqueue({ type: "reasoning-end", id } as StreamPart);
+        openText.clear();
+        openReasoning.clear();
+        reader = withoutOverlap(next.stream, delivered.text).getReader();
+        return true;
+    };
     const stream = new ReadableStream<StreamPart>({
         start(controller) {
             for (const part of held) controller.enqueue(part);
         },
         async pull(controller) {
-            try {
-                const { value, done } = await reader.read();
-                if (done) {
-                    finish();
-                    controller.close();
-                } else controller.enqueue(value);
-            } catch (error) {
+            for (;;) {
+                let failure: unknown;
+                let failedPart: StreamPart | null = null;
+                try {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        finish();
+                        controller.close();
+                        return;
+                    }
+                    const part = value as StreamPart & { type: string; error?: unknown };
+                    if (part.type !== "error") {
+                        note(part);
+                        controller.enqueue(value);
+                        return;
+                    }
+                    failure = part.error;
+                    failedPart = value;
+                } catch (error) {
+                    failure = error;
+                }
+                if (await carryOn(failure, controller)) continue;
+                // Not carried on: the failure reaches the reader as it came, a
+                // part as a part and a broken read as an error.
+                if (failedPart) {
+                    controller.enqueue(failedPart);
+                    return;
+                }
                 finish();
-                controller.error(error);
+                controller.error(failure);
+                return;
             }
         },
         cancel(reason) {
@@ -250,9 +324,31 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
     async function call<T>(
         params: CallParams,
         run: (model: LanguageModelV4, params: CallParams) => PromiseLike<T>,
-        streams: boolean
+        streams: boolean,
+        broke?: { index: number; kind: FailureKind | null },
+        depth = 0
     ): Promise<T> {
         const signal = params.abortSignal;
+        /** Carries on step `index`'s answer on whichever step fits next. */
+        const resumeFrom =
+            (index: number): Resume =>
+            async (error, delivered) => {
+                // Bounded across the chain of continuations, not only per stream:
+                // a connection that keeps dropping must end somewhere.
+                if (depth >= MAX_CONTINUATIONS || signal?.aborted || !continuable(error)) return null;
+                // A structured answer is not one a second model can finish.
+                if (params.responseFormat?.type === "json") return null;
+                const { kind } = classifyProviderFailure(error);
+                const refused = ROUTABLE.has(kind);
+                if (refused) {
+                    void noteRefusal(subjectOf(steps[index]!), kind, error);
+                    hooks.onRefused?.(kind, index);
+                }
+                standing = null;
+                const next = delivered.text ? continuationParams(params, delivered.text) : params;
+                const answer = await call(next, run, true, { index, kind: refused ? kind : null }, depth + 1);
+                return answer as unknown as StreamResult;
+            };
         const attempt = async (index: number): Promise<T> => {
             const step = steps[index]!;
             if (step.spent) throw new NoRouteError("rate");
@@ -261,7 +357,7 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
             try {
                 const result = await run(step.model(), adjust(step, params, origin));
                 const answered = streams
-                    ? ((await heldStream(result as StreamResult, admission.release)) as T)
+                    ? ((await heldStream(result as StreamResult, admission.release, resumeFrom(index))) as T)
                     : result;
                 if (!streams) admission.release();
                 return answered;
@@ -278,6 +374,9 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
             providerModels: new Set(),
             unpaid: new Set()
         };
+        // The step whose stream broke is out for the continuation, as a refusal
+        // would put it; a dropped connection leaves it in, to be asked again.
+        if (broke?.kind) ruleOut(ruled, steps[broke.index]!, broke.kind);
 
         // A later step of the turn goes to the step that answered the first.
         // If that one is refused now - a tool loop that ran into a rate limit
