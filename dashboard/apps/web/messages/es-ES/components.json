@@ -1077,7 +1077,7 @@
     },
     "signinDialog": {
         "title": "Iniciar sesión en {tool}",
-        "intro": "Polaris está ejecutando el inicio de sesión en una máquina propia. Abre la página que pide, autorízalo en tu navegador y pega el código que te dé en la línea bajo el terminal.",
+        "intro": "Polaris inicia sesión en una máquina propia y guarda cifrado el acceso para tus sesiones.",
         "subscription": "Esto se ejecuta en una máquina sin ninguna sesión iniciada, así que no toca la herramienta de tu propio ordenador. Aun así, puede retirar una credencial que vinculaste aquí antes: algunos proveedores solo permiten una a la vez.",
         "openPage": "Abrir la página de acceso",
         "installing": "Instalando la herramienta en ella.",
@@ -1086,9 +1086,27 @@
         "typeHere": "Escribe aquí y pulsa Intro",
         "nameHint": "Cómo llamar aquí a esta cuenta. Déjalo vacío y Polaris la nombrará según a quién pertenezca.",
         "namePlaceholder": "Suscripción de trabajo",
-        "copyIn": "Cuando muestre el {what}, cópialo aquí. Polaris no lo lee de la pantalla por ti: guardar la línea equivocada no se notaría hasta que una sesión no pudiera iniciar sesión.",
+        "copyIn": "Cuando muestre tu acceso, cópialo aquí. Polaris no lo lee de la pantalla por ti: guardar la línea equivocada no se notaría hasta que una sesión no pudiera iniciar sesión.",
         "fileHint": "Cuando el terminal diga que has iniciado sesión, pulsa Vincular. Polaris guarda cifrado el acceso que dejó la herramienta y lo repone en cada sesión que lo necesite.",
-        "link": "Vincular"
+        "link": "Vincular",
+        "deviceOpen": "Abrir {host}",
+        "deviceStepOpen": "Abre la página de acceso e inicia sesión.",
+        "deviceStepCode": "Introduce allí este código.",
+        "copyCode": "Copiar",
+        "gettingCode": "Pidiendo un código...",
+        "waiting": "Esperando tu autorización...",
+        "linking": "Guardando el acceso...",
+        "signedInAs": "Conectado como {login}",
+        "signedIn": "Conectado",
+        "linked": "Vinculada. Las sesiones que la necesiten la usan.",
+        "showTerminal": "Ver terminal",
+        "hideTerminal": "Ocultar terminal",
+        "pasteStep": "Abre la página de acceso y apruébalo. Cuando muestre un código, pégalo en la línea bajo el terminal y pulsa Intro.",
+        "ended": "El acceso se detuvo antes de terminar. Reinicia para otro código.",
+        "expired": "Este acceso caducó. Reinicia para obtener otro código.",
+        "restart": "Reiniciar",
+        "done": "Listo",
+        "fellBack": "El acceso rápido no respondió, así que Polaris usa el de la propia herramienta."
     },
     "providerSelect": {
         "free": {

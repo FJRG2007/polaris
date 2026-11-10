@@ -868,259 +868,263 @@ function KeyDialog({
 
     return (
         <Dialog open onOpenChange={(next) => !next && onClose()}>
-            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto overscroll-contain">
-                <DialogHeader>
-                    <DialogTitle>
-                        {existing
-                            ? t("modelKeys.editTitle", {
-                                  thing: thing(action, t("modelKeys.providerKey"))
-                              })
-                            : (action ?? t("modelKeys.addProviderKey"))}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {existing ? t("modelKeys.editHint") : adding}
-                    </DialogDescription>
-                </DialogHeader>
+            {/* One dialog at a time: the form steps aside while the sign-in
+                runs and comes back with what it produced filled in. */}
+            {signingIn && signin && assist ? null : (
+                <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto overscroll-contain">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {existing
+                                ? t("modelKeys.editTitle", {
+                                      thing: thing(action, t("modelKeys.providerKey"))
+                                  })
+                                : (action ?? t("modelKeys.addProviderKey"))}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {existing ? t("modelKeys.editHint") : adding}
+                        </DialogDescription>
+                    </DialogHeader>
 
-                <div className="flex flex-col gap-4">
-                    <label className="flex flex-col gap-1 text-sm">
-                        {t("modelKeys.provider")}
-                        {existing ? (
-                            <span className="border-border bg-surface flex h-9 items-center gap-2 rounded-md border px-3 text-sm">
-                                <IntegrationLogo
-                                    slug={existing.provider}
-                                    className="size-4 shrink-0"
-                                />
-                                <span
-                                    className="min-w-0 truncate"
-                                    title={entry?.name ?? existing.provider}
-                                >
-                                    {entry?.name ?? existing.provider}
-                                </span>
-                            </span>
-                        ) : (
-                            <ProviderSelect
-                                options={providers}
-                                value={provider}
-                                onChange={setProvider}
-                                disabled={busy}
-                            />
-                        )}
-                    </label>
-
-                    <label className="flex flex-col gap-1 text-sm">
-                        {t("modelKeys.name")}
-                        <Input
-                            value={name}
-                            placeholder={t("modelKeys.namePlaceholder")}
-                            autoComplete="off"
-                            aria-invalid={nameError !== null}
-                            onChange={(event) => {
-                                setName(event.target.value);
-                                setTouched(true);
-                            }}
-                            onBlur={() => setTouched(true)}
-                        />
-                        <span
-                            className={`text-xs ${nameError ? "text-danger" : "text-muted-foreground"}`}
-                        >
-                            {nameError ?? t("modelKeys.nameHint")}
-                        </span>
-                    </label>
-
-                    {entry?.isGateway ? (
-                        <>
-                            <label className="flex flex-col gap-1 text-sm">
-                                {t("modelKeys.endpoint")}
-                                <Input
-                                    value={gateway.baseUrl}
-                                    placeholder="https://gateway.example/v1" // i18n-ignore an example address
-                                    onChange={(event) =>
-                                        setGateway({ ...gateway, baseUrl: event.target.value })
-                                    }
-                                />
-                            </label>
-                            <label className="flex flex-col gap-1 text-sm">
-                                {t("modelKeys.model")}
-                                <Input
-                                    value={gateway.model}
-                                    placeholder={t("modelKeys.modelPlaceholder")}
-                                    onChange={(event) =>
-                                        setGateway({ ...gateway, model: event.target.value })
-                                    }
-                                />
-                            </label>
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                <label className="flex flex-col gap-1 text-sm">
-                                    {t("modelKeys.context")}
-                                    <Input
-                                        value={gateway.context}
-                                        inputMode="numeric"
-                                        placeholder="200000"
-                                        onChange={(event) =>
-                                            setGateway({ ...gateway, context: event.target.value })
-                                        }
-                                    />
-                                </label>
-                                <label className="flex flex-col gap-1 text-sm">
-                                    {t("modelKeys.maxOutput")}
-                                    <Input
-                                        value={gateway.maxOutput}
-                                        inputMode="numeric"
-                                        placeholder="32000"
-                                        onChange={(event) =>
-                                            setGateway({
-                                                ...gateway,
-                                                maxOutput: event.target.value
-                                            })
-                                        }
-                                    />
-                                </label>
-                            </div>
-                            <p className="text-muted-foreground -mt-2 text-xs">
-                                {t("modelKeys.gatewayHint")}
-                            </p>
-                        </>
-                    ) : null}
-
-                    {/* The login, where the account has already been chosen. A
-                        button outside this form would be asking somebody to pick
-                        the agent twice for one credential - once on a card and
-                        once here. */}
-                    {signin && !existing ? (
-                        <div className="border-primary/40 bg-primary/10 flex flex-wrap items-center gap-2 rounded-md border p-3">
-                            <div className="min-w-0 flex-1">
-                                <p className="text-sm">{t("modelKeys.canSignIn")}</p>
-                                <p className="text-muted-foreground text-xs">
-                                    {t("modelKeys.canSignInHint", {
-                                        tool: signin.serves[0]?.label ?? t("modelKeys.theTool")
-                                    })}
-                                </p>
-                            </div>
-                            <Button size="sm" onClick={() => setSigningIn(true)} disabled={busy}>
-                                <Wand2 className="size-4 shrink-0" />
-                                {t("modelKeys.signInHere")}
-                            </Button>
-                        </div>
-                    ) : null}
-
-                    <label className="flex flex-col gap-1 text-sm">
-                        {entry?.apiKeyLabel ?? t("modelKeys.apiKey")}
-                        <Input
-                            type="password"
-                            value={secret}
-                            autoComplete="off"
-                            placeholder={
-                                existing
-                                    ? t("modelKeys.keepStored")
-                                    : entry?.isGateway
-                                      ? t("modelKeys.gatewayNoKey")
-                                      : t("modelKeys.pasteKey")
-                            }
-                            onChange={(event) => setSecret(event.target.value)}
-                        />
-                        <span className="text-muted-foreground text-xs">
-                            {t("modelKeys.encrypted")}{" "}
-                            {entry?.checkable
-                                ? t("modelKeys.validated", { provider: entry.name })
-                                : t("modelKeys.provenByRun")}
-                        </span>
-                        {entry?.apiKeyHelp ? (
-                            <span className="text-muted-foreground text-xs">
-                                {entry.apiKeyHelp}
-                            </span>
-                        ) : null}
-                        {/* Said here rather than only on the row in the picker,
-                            because this is the moment somebody is deciding
-                            whether to go and make an account at all. */}
-                        {entry?.freeTier && !existing ? (
-                            <span className="text-success text-xs">
-                                {entry.freeTier.kind === "free"
-                                    ? t("modelKeys.freeTier")
-                                    : t("modelKeys.freeTrial")}{" "}
-                                {entry.freeTier.note}
-                            </span>
-                        ) : null}
-                    </label>
-
-                    {showWorkspace ? (
+                    <div className="flex flex-col gap-4">
                         <label className="flex flex-col gap-1 text-sm">
-                            {t("modelKeys.workspaceId")}
+                            {t("modelKeys.provider")}
+                            {existing ? (
+                                <span className="border-border bg-surface flex h-9 items-center gap-2 rounded-md border px-3 text-sm">
+                                    <IntegrationLogo
+                                        slug={existing.provider}
+                                        className="size-4 shrink-0"
+                                    />
+                                    <span
+                                        className="min-w-0 truncate"
+                                        title={entry?.name ?? existing.provider}
+                                    >
+                                        {entry?.name ?? existing.provider}
+                                    </span>
+                                </span>
+                            ) : (
+                                <ProviderSelect
+                                    options={providers}
+                                    value={provider}
+                                    onChange={setProvider}
+                                    disabled={busy}
+                                />
+                            )}
+                        </label>
+
+                        <label className="flex flex-col gap-1 text-sm">
+                            {t("modelKeys.name")}
                             <Input
-                                value={workspace}
-                                placeholder="wrkspc_01JwQvzr7rXLA5AGx3HKfFUJ" // i18n-ignore the documented example ID
+                                value={name}
+                                placeholder={t("modelKeys.namePlaceholder")}
                                 autoComplete="off"
-                                spellCheck={false}
-                                aria-invalid={workspaceError !== null}
-                                onChange={(event) => setWorkspace(event.target.value)}
+                                aria-invalid={nameError !== null}
+                                onChange={(event) => {
+                                    setName(event.target.value);
+                                    setTouched(true);
+                                }}
+                                onBlur={() => setTouched(true)}
                             />
                             <span
-                                className={`text-xs ${workspaceError ? "text-danger" : "text-muted-foreground"}`}
+                                className={`text-xs ${nameError ? "text-danger" : "text-muted-foreground"}`}
                             >
-                                {workspaceError ?? t("modelKeys.workspaceHint")}
+                                {nameError ?? t("modelKeys.nameHint")}
                             </span>
                         </label>
-                    ) : null}
 
-                    <label className="flex flex-col gap-1 text-sm">
-                        {t("modelKeys.expires")}
-                        <DateInput
-                            mode="date"
-                            value={expiry}
-                            min={earliestExpiry()}
-                            onChange={(event) => setExpiry(event.target.value)}
-                        />
-                        <span className="text-muted-foreground text-xs">
-                            {t("modelKeys.expiryHint", {
-                                provider: entry?.name ?? t("modelKeys.theProvider")
-                            })}
-                        </span>
-                        {expiry ? (
-                            <button
-                                type="button"
-                                onClick={() => setExpiry("")}
-                                className="text-muted-foreground hover:text-foreground self-start text-xs underline"
-                            >
-                                {t("modelKeys.clearDate")}
-                            </button>
+                        {entry?.isGateway ? (
+                            <>
+                                <label className="flex flex-col gap-1 text-sm">
+                                    {t("modelKeys.endpoint")}
+                                    <Input
+                                        value={gateway.baseUrl}
+                                        placeholder="https://gateway.example/v1" // i18n-ignore an example address
+                                        onChange={(event) =>
+                                            setGateway({ ...gateway, baseUrl: event.target.value })
+                                        }
+                                    />
+                                </label>
+                                <label className="flex flex-col gap-1 text-sm">
+                                    {t("modelKeys.model")}
+                                    <Input
+                                        value={gateway.model}
+                                        placeholder={t("modelKeys.modelPlaceholder")}
+                                        onChange={(event) =>
+                                            setGateway({ ...gateway, model: event.target.value })
+                                        }
+                                    />
+                                </label>
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <label className="flex flex-col gap-1 text-sm">
+                                        {t("modelKeys.context")}
+                                        <Input
+                                            value={gateway.context}
+                                            inputMode="numeric"
+                                            placeholder="200000"
+                                            onChange={(event) =>
+                                                setGateway({ ...gateway, context: event.target.value })
+                                            }
+                                        />
+                                    </label>
+                                    <label className="flex flex-col gap-1 text-sm">
+                                        {t("modelKeys.maxOutput")}
+                                        <Input
+                                            value={gateway.maxOutput}
+                                            inputMode="numeric"
+                                            placeholder="32000"
+                                            onChange={(event) =>
+                                                setGateway({
+                                                    ...gateway,
+                                                    maxOutput: event.target.value
+                                                })
+                                            }
+                                        />
+                                    </label>
+                                </div>
+                                <p className="text-muted-foreground -mt-2 text-xs">
+                                    {t("modelKeys.gatewayHint")}
+                                </p>
+                            </>
                         ) : null}
-                    </label>
 
-                    {existing ? null : (
-                        <p className="text-muted-foreground text-xs">
-                            {t("modelKeys.addedAtBottom")}
-                        </p>
-                    )}
-
-                    {error ? <p className="text-danger text-sm">{error}</p> : null}
-
-                    <div className="flex items-center justify-end gap-2">
-                        {entry?.createUrl && !existing ? (
-                            <a
-                                href={entry.createUrl}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                className="text-muted-foreground hover:text-foreground mr-auto text-xs"
-                            >
-                                {t("modelKeys.createAt", { provider: entry.name })}
-                            </a>
+                        {/* The login, where the account has already been chosen. A
+                            button outside this form would be asking somebody to pick
+                            the agent twice for one credential - once on a card and
+                            once here. */}
+                        {signin && !existing ? (
+                            <div className="border-primary/40 bg-primary/10 flex flex-wrap items-center gap-2 rounded-md border p-3">
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm">{t("modelKeys.canSignIn")}</p>
+                                    <p className="text-muted-foreground text-xs">
+                                        {t("modelKeys.canSignInHint", {
+                                            tool: signin.serves[0]?.label ?? t("modelKeys.theTool")
+                                        })}
+                                    </p>
+                                </div>
+                                <Button size="sm" onClick={() => setSigningIn(true)} disabled={busy}>
+                                    <Wand2 className="size-4 shrink-0" />
+                                    {t("modelKeys.signInHere")}
+                                </Button>
+                            </div>
                         ) : null}
-                        <Button variant="ghost" onClick={onClose} disabled={busy}>
-                            {tcommon("actions.cancel")}
-                        </Button>
-                        <Button
-                            onClick={() => void submit()}
-                            disabled={busy || !ready || unchanged}
-                        >
-                            {busy
-                                ? t("modelKeys.checking")
-                                : existing
-                                  ? t("modelKeys.save")
-                                  : (action ?? t("modelKeys.addKey"))}
-                        </Button>
+
+                        <label className="flex flex-col gap-1 text-sm">
+                            {entry?.apiKeyLabel ?? t("modelKeys.apiKey")}
+                            <Input
+                                type="password"
+                                value={secret}
+                                autoComplete="off"
+                                placeholder={
+                                    existing
+                                        ? t("modelKeys.keepStored")
+                                        : entry?.isGateway
+                                          ? t("modelKeys.gatewayNoKey")
+                                          : t("modelKeys.pasteKey")
+                                }
+                                onChange={(event) => setSecret(event.target.value)}
+                            />
+                            <span className="text-muted-foreground text-xs">
+                                {t("modelKeys.encrypted")}{" "}
+                                {entry?.checkable
+                                    ? t("modelKeys.validated", { provider: entry.name })
+                                    : t("modelKeys.provenByRun")}
+                            </span>
+                            {entry?.apiKeyHelp ? (
+                                <span className="text-muted-foreground text-xs">
+                                    {entry.apiKeyHelp}
+                                </span>
+                            ) : null}
+                            {/* Said here rather than only on the row in the picker,
+                                because this is the moment somebody is deciding
+                                whether to go and make an account at all. */}
+                            {entry?.freeTier && !existing ? (
+                                <span className="text-success text-xs">
+                                    {entry.freeTier.kind === "free"
+                                        ? t("modelKeys.freeTier")
+                                        : t("modelKeys.freeTrial")}{" "}
+                                    {entry.freeTier.note}
+                                </span>
+                            ) : null}
+                        </label>
+
+                        {showWorkspace ? (
+                            <label className="flex flex-col gap-1 text-sm">
+                                {t("modelKeys.workspaceId")}
+                                <Input
+                                    value={workspace}
+                                    placeholder="wrkspc_01JwQvzr7rXLA5AGx3HKfFUJ" // i18n-ignore the documented example ID
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                    aria-invalid={workspaceError !== null}
+                                    onChange={(event) => setWorkspace(event.target.value)}
+                                />
+                                <span
+                                    className={`text-xs ${workspaceError ? "text-danger" : "text-muted-foreground"}`}
+                                >
+                                    {workspaceError ?? t("modelKeys.workspaceHint")}
+                                </span>
+                            </label>
+                        ) : null}
+
+                        <label className="flex flex-col gap-1 text-sm">
+                            {t("modelKeys.expires")}
+                            <DateInput
+                                mode="date"
+                                value={expiry}
+                                min={earliestExpiry()}
+                                onChange={(event) => setExpiry(event.target.value)}
+                            />
+                            <span className="text-muted-foreground text-xs">
+                                {t("modelKeys.expiryHint", {
+                                    provider: entry?.name ?? t("modelKeys.theProvider")
+                                })}
+                            </span>
+                            {expiry ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setExpiry("")}
+                                    className="text-muted-foreground hover:text-foreground self-start text-xs underline"
+                                >
+                                    {t("modelKeys.clearDate")}
+                                </button>
+                            ) : null}
+                        </label>
+
+                        {existing ? null : (
+                            <p className="text-muted-foreground text-xs">
+                                {t("modelKeys.addedAtBottom")}
+                            </p>
+                        )}
+
+                        {error ? <p className="text-danger text-sm">{error}</p> : null}
+
+                        <div className="flex items-center justify-end gap-2">
+                            {entry?.createUrl && !existing ? (
+                                <a
+                                    href={entry.createUrl}
+                                    target="_blank"
+                                    rel="noreferrer noopener"
+                                    className="text-muted-foreground hover:text-foreground mr-auto text-xs"
+                                >
+                                    {t("modelKeys.createAt", { provider: entry.name })}
+                                </a>
+                            ) : null}
+                            <Button variant="ghost" onClick={onClose} disabled={busy}>
+                                {tcommon("actions.cancel")}
+                            </Button>
+                            <Button
+                                onClick={() => void submit()}
+                                disabled={busy || !ready || unchanged}
+                            >
+                                {busy
+                                    ? t("modelKeys.checking")
+                                    : existing
+                                      ? t("modelKeys.save")
+                                      : (action ?? t("modelKeys.addKey"))}
+                            </Button>
+                        </div>
                     </div>
-                </div>
-            </DialogContent>
+                </DialogContent>
+            )}
 
             {/* Fills the form rather than saving behind it: what the login
                 produces lands in the field, and the person still presses the

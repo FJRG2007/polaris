@@ -34,6 +34,9 @@ import * as commands from "./session-commands";
 import { upWithFreshImage } from "./session-image";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { agentSignins, type AgentSignin } from "./agent-signins";
+import * as screens from "./signin-screen";
+import * as direct from "./signin-direct";
+import { configuredRequest, readCapped } from "@/lib/safe-fetch";
 
 /** Stamped on every container this starts, so the sweep finds them by label
  *  rather than by matching names it does not own. */
@@ -86,7 +89,15 @@ export interface LoginCommand {
     readonly whoami?: string;
     /** First-run answers this login needs on top of the tool's own. */
     readonly firstRun?: readonly core.AgentFirstRunAnswer[];
+    /** "device" for a login that prints an address and a code and waits for the
+     *  browser, so the dialog shows those two and keeps the terminal folded;
+     *  "paste" for one that asks for something typed back into it. */
+    readonly flow: SigninFlow;
+    /** Questions on the screen Polaris answers itself, once each. */
+    readonly autoAnswers?: readonly screens.SigninAutoAnswer[];
 }
+
+export type SigninFlow = "device" | "paste";
 
 export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
     CLAUDE_CODE_OAUTH_TOKEN: {
@@ -97,7 +108,8 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         install:
             "npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code",
         command: "claude setup-token",
-        whoami: "claude auth status --json"
+        whoami: "claude auth status --json",
+        flow: "paste"
     },
     // `codex login --device-auth` prints a URL and a one-time code and waits for
     // the browser (developers.openai.com/codex/auth). The store is pinned to the
@@ -105,7 +117,8 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
     // nothing in the home to keep.
     CODEX_CHATGPT_AUTH: {
         cli: "codex",
-        command: "codex -c 'cli_auth_credentials_store=\"file\"' login --device-auth"
+        command: "codex -c 'cli_auth_credentials_store=\"file\"' login --device-auth",
+        flow: "device"
     },
     // Gemini CLI has no login subcommand. Started with Google sign-in selected
     // and NO_BROWSER set, it prints the consent URL and reads the authorization
@@ -116,6 +129,7 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
     GEMINI_GOOGLE_AUTH: {
         cli: "gemini",
         command: "NO_BROWSER=true gemini",
+        flow: "paste",
         firstRun: [
             {
                 file: ".gemini/settings.json",
@@ -125,10 +139,14 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
     },
     // `copilot login --device-code`, from GitHub's authenticate-copilot-cli
     // page. With no system keychain, which this container has none of, it asks
-    // to keep the token in ~/.copilot/config.json - answered on the screen.
+    // to keep the token in ~/.copilot/config.json. That file is exactly what is
+    // captured, so the answer is always yes and Polaris gives it: there is no
+    // documented flag that skips the question.
     COPILOT_DEVICE_AUTH: {
         cli: "copilot",
-        command: "copilot login --device-code"
+        command: "copilot login --device-code",
+        flow: "device",
+        autoAnswers: [{ prompt: "Store token in plaintext config file? (y/N)", reply: "y" }]
     }
 };
 
@@ -216,14 +234,21 @@ export const SIGNIN_BOOT = [
     // levels of quoting to get wrong once.
     "printf '%s' \"$POLARIS_LOGIN\" > /tmp/polaris-login.sh",
     "chmod 0755 /tmp/polaris-login.sh",
-    // A shell after it, so the screen survives the command. Without that the
-    // window closed the moment the login printed its result, which is the one
-    // moment somebody needed to be reading it.
-    "POLARIS_RUN='sh /tmp/polaris-login.sh; exec sh'",
+    "POLARIS_RUN='sh /tmp/polaris-login.sh'",
     'if [ "$POLARIS_AS_ROOT" = "yes" ]; then',
-    "  POLARIS_RUN=\"su -p $POLARIS_RUNAS -c 'sh /tmp/polaris-login.sh; exec sh'\"",
+    "  POLARIS_RUN=\"su -p $POLARIS_RUNAS -c 'sh /tmp/polaris-login.sh'\"",
     "fi",
+    // Then the exit status on a line of its own, and a process that holds the
+    // pane open printing nothing - so the screen survives the command with its
+    // last words still on it. It used to be `exec sh`, which in a pane with no
+    // job control printed "can't access tty" and a bare prompt under the result.
+    // The status line is read by the dialog and never shown.
+    'POLARIS_RUN="$POLARIS_RUN; polaris_status=\\$?; echo; echo polaris-signin-exit \\$polaris_status; exec tail -f /dev/null"',
     'tmux new-session -d -s "$POLARIS_TMUX" -x "$POLARIS_COLS" -y "$POLARIS_ROWS" "$POLARIS_RUN"',
+    // Only now is there a screen to read. Before this a capture is tmux not
+    // being installed yet or having no session yet, and its complaints about
+    // that are what reached the dialog in place of the login.
+    ": > /tmp/polaris-signin-ready",
     "exec tail -f /dev/null"
 ].join("\n");
 
@@ -231,6 +256,64 @@ export const SIGNIN_BOOT = [
 export interface SigninAttempt {
     readonly id: string;
     readonly env: string;
+}
+
+/** Which rung of the ladder an attempt is on: the vendor's endpoints called
+ *  from here, or the vendor's CLI in a container. Pasting by hand is the rung
+ *  under both, and is the dialog's own field. */
+export type SigninRung = "direct" | "cli";
+
+/** A direct sign-in in flight. Server memory only: what is in it - the device
+ *  code's id, and the credential once issued - never reaches a browser except
+ *  as the stored, encrypted credential. Gone with the attempt. */
+interface DirectAttempt {
+    readonly userId: string;
+    readonly device: direct.DeviceAuthorization;
+    nextPollAt: number;
+    polling: boolean;
+    value: string | null;
+    email: string | null;
+}
+const directAttempts = new Map<string, DirectAttempt>();
+
+/** Attempts whose direct rung failed, so the screen can say it fell back, and
+ *  the container start still in flight for each. */
+const fellBack = new Set<string>();
+const starting = new Map<string, Promise<void>>();
+
+/** Every request the direct rung makes: the guarded fetch, public addresses
+ *  only, no redirects, a timeout, and a capped read. Nothing it sends or
+ *  receives is logged. */
+const DIRECT_TIMEOUT_MS = 15_000;
+const DIRECT_MAX_BYTES = 64 * 1024;
+const guardedPost: direct.DirectPost = async (url, body) => {
+    const init =
+        "json" in body
+            ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body.json) }
+            : {
+                  headers: { "content-type": "application/x-www-form-urlencoded" },
+                  body: new URLSearchParams(body.form).toString()
+              };
+    const response = await configuredRequest(
+        url,
+        { method: "POST", ...init, timeoutMs: DIRECT_TIMEOUT_MS },
+        { allowPrivate: false }
+    );
+    const bytes = await readCapped(response as unknown as Parameters<typeof readCapped>[0], DIRECT_MAX_BYTES);
+    let json: unknown = null;
+    try {
+        json = bytes ? JSON.parse(Buffer.from(bytes).toString("utf8")) : null;
+    } catch {
+        json = null;
+    }
+    return { status: response.status, json };
+};
+
+/** Why a direct rung was given up, for the server log: a status line or an
+ *  error's class, never a body or a token. */
+function failureName(error: unknown): string {
+    if (error instanceof direct.DirectSigninError) return error.message;
+    return error instanceof Error ? error.name : "unknown";
 }
 
 /**
@@ -254,6 +337,33 @@ export async function beginSignin(userId: string, env: string): Promise<SigninAt
         data: { userId, env },
         select: { id: true, env: true }
     });
+
+    // The comfortable rung first: a code in a second, no machine to start.
+    if (direct.hasDirectSignin(env)) {
+        try {
+            const device = await direct.requestDeviceAuthorization(guardedPost, Date.now());
+            directAttempts.set(attempt.id, {
+                userId,
+                device,
+                nextPollAt: Date.now() + device.intervalMs,
+                polling: false,
+                value: null,
+                email: null
+            });
+            return attempt;
+        } catch (error) {
+            console.warn("[agent-signin] direct sign-in unavailable, running the CLI:", failureName(error));
+            fellBack.add(attempt.id);
+        }
+    }
+    await startContainer(userId, attempt, login);
+    return attempt;
+}
+
+/** The CLI rung: the vendor's own login in a container. Ends the attempt if the
+ *  container cannot be started, since an attempt nobody can reach still counts
+ *  against the per-account bound. */
+async function startContainer(userId: string, attempt: SigninAttempt, login: LoginCommand): Promise<void> {
     try {
         const name = containerName(attempt.id);
         await upWithFreshImage((pullPolicy) =>
@@ -300,7 +410,6 @@ export async function beginSignin(userId: string, env: string): Promise<SigninAt
             }),
             () => new HostdPorts().pull(commands.SESSION_IMAGE)
         );
-        return attempt;
     } catch (error) {
         // The row exists and the container does not, so the row goes: an attempt
         // nobody can reach still counts against the bound above.
@@ -336,16 +445,130 @@ async function runIn(userId: string, id: string, command: string): Promise<strin
  * nothing on it at all - and a blank box with no explanation is the part of this
  * that read as broken.
  */
-export interface SigninView {
-    readonly screen: string;
-    readonly url: string | null;
+export interface SigninView extends screens.SigninProgress {
     readonly ready: boolean;
+    readonly flow: SigninFlow;
+    readonly rung: SigninRung;
+    /** The direct rung failed and this is the CLI standing in for it. */
+    readonly fellBack: boolean;
 }
 
+/**
+ * The capture, and nothing at all until the boot says the session exists.
+ *
+ * tmux's own errors go nowhere: a poll that lands while it is still being
+ * installed answers with an empty screen, which the dialog shows as the machine
+ * still getting ready rather than as "tmux: not found" in the terminal.
+ */
+export function signinCaptureCommand(): string {
+    return `[ -f ${screens.SIGNIN_READY_FILE} ] || exit 0; { ${commands.captureJoinedCommand(60, TMUX)}; } 2>/dev/null`;
+}
+
+/** Attempts whose prompt has been answered, by prompt, so each is answered once
+ *  even when two polls read the same screen. Cleared when the attempt ends. */
+const answered = new Map<string, Set<string>>();
+
 export async function signinScreen(userId: string, id: string): Promise<SigninView> {
-    const screen = await runIn(userId, id, commands.captureJoinedCommand(60, TMUX));
-    const trimmed = screen.trim();
-    return { screen, url: commands.firstUrlIn(screen), ready: trimmed.length > 0 };
+    const attempt = await prisma.agentSigninAttempt.findFirst({
+        where: { id, userId, endedAt: null },
+        select: { env: true }
+    });
+    if (!attempt) throw new Error("That sign-in is no longer open.");
+    const login = LOGIN_COMMANDS[attempt.env];
+
+    const pending = directAttempts.get(id);
+    if (pending) return directView(id, attempt.env, pending);
+    if (starting.has(id)) {
+        // Fell back a moment ago and the machine is still coming up.
+        return {
+            ...screens.readSigninScreen(""),
+            ready: false,
+            flow: login?.flow ?? "paste",
+            rung: "cli",
+            fellBack: true
+        };
+    }
+
+    const progress = screens.readSigninScreen(await runIn(userId, id, signinCaptureCommand()));
+
+    const answers = login?.autoAnswers ?? [];
+    const reply = screens.pendingAutoAnswer(progress.screen, answers);
+    const prompt = answers.find((one) => one.reply === reply)?.prompt;
+    const done = answered.get(id) ?? new Set<string>();
+    if (reply !== null && prompt && !done.has(prompt)) {
+        done.add(prompt);
+        answered.set(id, done);
+        await answerSignin(userId, id, reply).catch(() => undefined);
+    }
+
+    return {
+        ...progress,
+        ready: progress.screen.trim().length > 0,
+        flow: login?.flow ?? "paste",
+        rung: "cli",
+        fellBack: fellBack.has(id)
+    };
+}
+
+/**
+ * One read of a direct attempt: the address and code it already has, and - no
+ * more often than the vendor's interval - one poll of whether it was approved.
+ * Any failure but "not yet" falls back to the CLI on the same attempt.
+ */
+async function directView(id: string, env: string, pending: DirectAttempt): Promise<SigninView> {
+    const now = Date.now();
+    const view = (finished: boolean, exitCode: number | null): SigninView => ({
+        screen: "",
+        url: pending.device.verificationUrl,
+        code: pending.device.userCode,
+        signedInAs: finished ? pending.email : null,
+        exitCode,
+        finished,
+        ready: true,
+        flow: "device",
+        rung: "direct",
+        fellBack: false
+    });
+    if (pending.value) return view(true, 0);
+    // Expired unapproved: the person walked away, which a fallback would not
+    // help. The dialog offers to start again.
+    if (now >= pending.device.expiresAt) return view(false, 1);
+    if (pending.polling || now < pending.nextPollAt) return view(false, null);
+
+    pending.polling = true;
+    try {
+        const grant = await direct.pollDeviceGrant(guardedPost, pending.device);
+        if (grant) {
+            const tokens = await direct.exchangeGrant(guardedPost, grant);
+            pending.value = direct.codexAuthFile(tokens, new Date());
+            pending.email = direct.tokenIdentity(tokens).email;
+            return view(true, 0);
+        }
+        pending.nextPollAt = Date.now() + pending.device.intervalMs;
+        return view(false, null);
+    } catch (error) {
+        console.warn("[agent-signin] direct sign-in failed, running the CLI:", failureName(error));
+        directAttempts.delete(id);
+        fellBack.add(id);
+        const login = LOGIN_COMMANDS[env];
+        if (login) {
+            starting.set(
+                id,
+                startContainer(pending.userId, { id, env }, login)
+                    .catch(() => undefined)
+                    .finally(() => starting.delete(id))
+            );
+        }
+        return {
+            ...screens.readSigninScreen(""),
+            ready: false,
+            flow: "device",
+            rung: "cli",
+            fellBack: true
+        };
+    } finally {
+        pending.polling = false;
+    }
 }
 
 /**
@@ -357,6 +580,8 @@ export async function signinScreen(userId: string, id: string): Promise<SigninVi
  * submit is a separate call after the paste has landed.
  */
 export async function answerSignin(userId: string, id: string, text: string): Promise<void> {
+    // A direct attempt has no terminal to type into.
+    if (directAttempts.get(id)?.userId === userId) return;
     await runIn(userId, id, commands.pastePromptCommand(text, TMUX));
     await new Promise((resolve) => setTimeout(resolve, commands.submitDelayMs(text)));
     await runIn(userId, id, commands.submitCommand(TMUX));
@@ -371,6 +596,9 @@ export async function answerSignin(userId: string, id: string, text: string): Pr
  * container that is already gone.
  */
 export async function endSignin(userId: string, id: string): Promise<void> {
+    answered.delete(id);
+    if (directAttempts.get(id)?.userId === userId) directAttempts.delete(id);
+    fellBack.delete(id);
     await prisma.agentSigninAttempt
         .updateMany({ where: { id, userId, endedAt: null }, data: { endedAt: new Date() } })
         .catch(() => undefined);
@@ -391,6 +619,9 @@ export async function sweepExpired(): Promise<number> {
         select: { id: true }
     });
     for (const attempt of stale) {
+        directAttempts.delete(attempt.id);
+        fellBack.delete(attempt.id);
+        answered.delete(attempt.id);
         await prisma.agentSigninAttempt
             .update({ where: { id: attempt.id }, data: { endedAt: new Date() } })
             .catch(() => undefined);
@@ -500,6 +731,8 @@ export async function identifySignin(
     id: string,
     env: string
 ): Promise<SigninIdentity> {
+    const pending = directAttempts.get(id);
+    if (pending) return pending.userId === userId && pending.email ? { email: pending.email } : {};
     const command = LOGIN_COMMANDS[env]?.whoami;
     if (!command) return {};
     try {
@@ -558,5 +791,10 @@ export function parseCredentialFile(output: string): string | null {
 export async function captureSignin(userId: string, id: string, env: string): Promise<string | null> {
     const file = signinCredentialFile(env);
     if (!file || !(env in LOGIN_COMMANDS)) return null;
+    const pending = directAttempts.get(id);
+    if (pending) {
+        if (pending.userId !== userId) throw new Error("That sign-in is no longer open.");
+        return pending.value;
+    }
     return parseCredentialFile(await runIn(userId, id, credentialFileScript(file)));
 }

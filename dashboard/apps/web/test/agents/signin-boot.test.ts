@@ -25,6 +25,7 @@ import {
     signinFirstRun,
     whoamiScript
 } from "@/lib/agents/signin-runtime";
+import { SIGNIN_EXIT_MARKER, SIGNIN_READY_FILE } from "@/lib/agents/signin-screen";
 
 describe("the sign-in boot script", () => {
     it("interpolates nothing", () => {
@@ -88,7 +89,27 @@ describe("the sign-in boot script", () => {
     it("keeps the screen after the login command finishes", () => {
         // It prints its result and exits, and the window used to go with it -
         // taking the one line somebody was there to read.
-        expect(SIGNIN_BOOT).toContain("exec sh");
+        expect(SIGNIN_BOOT).toContain("exec tail -f /dev/null\"");
+    });
+
+    it("leaves no interactive shell under the result", () => {
+        // `exec sh` in a pane without job control printed "can't access tty"
+        // and a bare prompt beneath the line somebody was reading.
+        expect(SIGNIN_BOOT).not.toContain("exec sh");
+    });
+
+    it("reports how the login command ended, in the line the screen reader looks for", () => {
+        expect(SIGNIN_BOOT).toContain(`echo ${SIGNIN_EXIT_MARKER} \\$polaris_status`);
+        expect(SIGNIN_BOOT).toContain("polaris_status=\\$?;");
+    });
+
+    it("marks the screen ready only once the tmux session exists", () => {
+        // Polled before that, a capture is tmux's own complaint about not being
+        // installed yet, which used to be what the dialog showed.
+        const session = SIGNIN_BOOT.indexOf("tmux new-session");
+        const ready = SIGNIN_BOOT.indexOf(`: > ${SIGNIN_READY_FILE}`);
+        expect(session).toBeGreaterThan(SIGNIN_BOOT.indexOf("apt-get install -y -qq tmux"));
+        expect(ready).toBeGreaterThan(session);
     });
 });
 

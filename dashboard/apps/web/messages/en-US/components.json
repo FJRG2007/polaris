@@ -1077,7 +1077,7 @@
     },
     "signinDialog": {
         "title": "Sign in to {tool}",
-        "intro": "Polaris is running the sign-in on a machine of its own. Open the page it asks for, authorize it in your browser, and paste the code it gives you into the line below the terminal.",
+        "intro": "Polaris runs the sign-in on a machine of its own and keeps the login it saves, encrypted, for your sessions.",
         "subscription": "This runs on a machine with nothing signed in to it, so it leaves the tool on your own computer alone. It may retire a credential you linked here before, though - some vendors allow one at a time.",
         "openPage": "Open the sign-in page",
         "installing": "Installing the tool on it.",
@@ -1086,9 +1086,27 @@
         "typeHere": "Type into it, then press enter",
         "nameHint": "What to call this account here. Leave it empty and Polaris names it after whoever it turns out to belong to.",
         "namePlaceholder": "Work subscription",
-        "copyIn": "When it prints the {what}, copy it in here. Polaris does not read it off the screen for you - storing the wrong line would not show up until a session failed to sign in.",
+        "copyIn": "When it prints your login, copy it in here. Polaris does not read it off the screen for you - storing the wrong line would not show up until a session failed to sign in.",
         "fileHint": "When the terminal says you are signed in, press Link it. Polaris keeps the login the tool saved, encrypted, and puts it back for any session that needs it.",
-        "link": "Link it"
+        "link": "Link it",
+        "deviceOpen": "Open {host}",
+        "deviceStepOpen": "Open the sign-in page and sign in.",
+        "deviceStepCode": "Enter this code there.",
+        "copyCode": "Copy code",
+        "gettingCode": "Getting a code...",
+        "waiting": "Waiting for you to authorize...",
+        "linking": "Saving the login...",
+        "signedInAs": "Signed in as {login}",
+        "signedIn": "Signed in",
+        "linked": "Linked. Sessions that need it use this account.",
+        "showTerminal": "Show terminal",
+        "hideTerminal": "Hide terminal",
+        "pasteStep": "Open the sign-in page and approve it. When it shows a code, paste it into the line under the terminal and press Enter.",
+        "ended": "The sign-in stopped before it finished. Start again for a new code.",
+        "expired": "This sign-in expired. Start again for a new code.",
+        "restart": "Start again",
+        "done": "Done",
+        "fellBack": "The quick sign-in did not answer, so Polaris is running the tool's own sign-in instead."
     },
     "providerSelect": {
         "free": {
