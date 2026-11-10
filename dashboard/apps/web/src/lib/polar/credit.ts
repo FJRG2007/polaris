@@ -11,24 +11,14 @@
  * catalogue lists one, and otherwise the turn fails saying this model needs
  * credit, rather than looking like Polaris spent it.
  *
- * When Polar chose the model - Automatic, or the helper that names a thread -
- * a refusal another model can get past is asked once more of a stand-in
- * (`standInMiddleware`), whichever provider refused it: no credit, a rate
- * limit, a model busy for everyone or gone, and - from another provider - a
- * refused key or an outage. The stand-in comes from the same provider first,
- * then from the others the person may spend on. A model the person
- * pinned has no stand-in: they asked for that one, and the panel says why it
- * did not answer.
+ * What happens when a model is refused for any other reason - another key,
+ * another model, another provider - is the router's (`router/chain.ts`);
+ * the stand-in shape it walks is described here because every step carries it.
  */
 
 import type { LanguageModelMiddleware } from "ai";
 import { fileRoute, type ModelReads } from "@/lib/polar/file-route";
-import {
-    PAID_MODEL_MARK,
-    callError,
-    classifyProviderFailure,
-    type FailureKind
-} from "@/lib/polar/provider-failure";
+import { PAID_MODEL_MARK, callError } from "@/lib/polar/provider-failure";
 
 /** The model a middleware is handed, as the SDK types it. */
 export type LanguageModelV4 = Parameters<
@@ -184,33 +174,6 @@ export function creditMiddleware(
     };
 }
 
-/** The refusals a stand-in may answer, and from where. A key refused, an
- *  outage or a provider down fail every model of that provider, so only
- *  another provider stands in; an account that cannot pay gets another
- *  provider or a free model of its own; a rate limit (limits are per model at
- *  OpenAI, Gemini and Groq), a model busy for everyone or one this key cannot
- *  have, any model. A malformed request or a dropped connection, none. */
-const STAND_IN_KINDS: ReadonlySet<FailureKind> = new Set([
-    "key",
-    "credit",
-    "paid",
-    "rate",
-    "busy",
-    "down",
-    "model"
-]);
-
-/** The kind of a refusal a stand-in may answer, or null. Pure. */
-export function standInKind(error: unknown): FailureKind | null {
-    const { kind } = classifyProviderFailure(error);
-    return STAND_IN_KINDS.has(kind) ? kind : null;
-}
-
-/** Whether a refusal is one some stand-in may answer. Pure. */
-export function standInRetry(error: unknown): boolean {
-    return standInKind(error) !== null;
-}
-
 /** The model that answers when the first one is refused. */
 export interface StandInTarget {
     model: () => LanguageModelV4;
@@ -248,75 +211,4 @@ export function readsSentFiles(params: Pick<CallParams, "prompt">, reads: ModelR
                 (part) => part.type !== "file" || fileRoute(part.mediaType, reads) === "file"
             )
     );
-}
-
-/** Whether `target` may answer a call `origin` refused with `kind`. Pure. */
-export function standInFits(
-    kind: FailureKind,
-    origin: string,
-    target: Pick<StandInTarget, "provider" | "free" | "reads">,
-    params: Pick<CallParams, "tools" | "prompt">
-): boolean {
-    const same = target.provider === origin;
-    if (!same && sendsProviderTool(params)) return false;
-    if (target.reads && !readsSentFiles(params, target.reads)) return false;
-    if (kind === "key" || kind === "down") return !same;
-    if (kind === "credit" || kind === "paid") return !same || target.free;
-    return true;
-}
-
-/** What the stand-in middleware tells its caller. */
-export interface StandInHooks {
-    /** Runs before the stand-in at `index` is asked, so the turn can record
-     *  which model answered. */
-    onStandIn: (index: number) => void;
-    /** Runs with the kind of the first model's refusal, before any stand-in. */
-    onRefused?: (kind: FailureKind) => void;
-}
-
-/**
- * The middleware that asks one stand-in, once, when the first call is refused
- * the way `standInKind` says: the first of `targets`, in order, that
- * `standInFits`. It keeps asking that stand-in for the rest of the turn's
- * steps, so one model answers and is billed for all of them. A stand-in that
- * is refused too surfaces its own refusal, and a refusal no target fits
- * surfaces as it is.
- */
-export function standInMiddleware(
-    origin: string,
-    targets: readonly StandInTarget[],
-    hooks: StandInHooks
-): LanguageModelMiddleware {
-    const adjust = (target: StandInTarget, params: CallParams): CallParams => {
-        let next = target.reasoning ? params : { ...params, reasoning: undefined };
-        if (target.provider !== origin) next = { ...next, maxOutputTokens: target.outputTokens };
-        return next;
-    };
-    let standing: StandInTarget | null = null;
-    async function swap<T>(
-        params: CallParams,
-        attempt: () => PromiseLike<T>,
-        again: (model: LanguageModelV4, params: CallParams) => PromiseLike<T>
-    ): Promise<T> {
-        if (standing) return again(standing.model(), adjust(standing, params));
-        try {
-            return await attempt();
-        } catch (error) {
-            const kind = standInKind(error);
-            if (!kind) throw error;
-            hooks.onRefused?.(kind);
-            const index = targets.findIndex((target) => standInFits(kind, origin, target, params));
-            const target = targets[index];
-            if (!target) throw error;
-            standing = target;
-            hooks.onStandIn(index);
-            return again(target.model(), adjust(target, params));
-        }
-    }
-    return {
-        wrapGenerate: ({ doGenerate, params }) =>
-            swap(params, doGenerate, (model, adjusted) => model.doGenerate(adjusted)),
-        wrapStream: ({ doStream, params }) =>
-            swap(params, doStream, (model, adjusted) => model.doStream(adjusted))
-    };
 }

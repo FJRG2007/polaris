@@ -379,7 +379,8 @@
             "tags": {
                 "Account": "Cuenta",
                 "Deploy": "Deploy",
-                "MCP": "MCP"
+                "MCP": "MCP",
+                "Polar": "Polar"
             },
             "statuses": {
                 "200": "OK",
@@ -504,6 +505,24 @@
                 },
                 "deleteDeployDomainsById": {
                     "summary": "Quitar un dominio"
+                },
+                "postMessages": {
+                    "summary": "API de Mensajes de Anthropic, respondida por Polar",
+                    "description": "Apunta Claude Code a Polaris con ANTHROPIC_BASE_URL en el origen más /api. Necesita polar.use. El modelo puede ser un nivel (fable, opus, sonnet, haiku), proveedor/modelo o automático; tu enrutado decide el resto."
+                },
+                "postMessagesCountTokens": {
+                    "summary": "Cuenta los tokens de una petición de Mensajes"
+                },
+                "postChatCompletions": {
+                    "summary": "Chat Completions de OpenAI, respondido por Polar",
+                    "description": "Para clientes compatibles con OpenAI: la URL base es el origen más /api/v1. Necesita polar.use."
+                },
+                "postResponses": {
+                    "summary": "API Responses de OpenAI, respondida por Polar",
+                    "description": "Lo que habla Codex: la URL base es el origen más /api/v1. Necesita polar.use. Las respuestas no se guardan."
+                },
+                "getModels": {
+                    "summary": "Los modelos a los que llega esta clave"
                 }
             }
         },

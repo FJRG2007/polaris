@@ -54,6 +54,7 @@ vi.mock("@/lib/polar/access", async () => ({
     polarAccessFor: async () => ({ use: true, spend: true, web: state.web })
 }));
 vi.mock("@/lib/polar/usage", () => ({
+    routeRecord: () => ({ keyId: null, fellBack: null }),
     answerUsage: (usage?: { inputTokens?: number; outputTokens?: number }) => ({
         inputTokens: usage?.inputTokens ?? 0,
         outputTokens: usage?.outputTokens ?? 0,

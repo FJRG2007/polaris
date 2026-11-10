@@ -10,7 +10,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/polar/access", () => ({
     polarAccessFor: async () => ({ use: true, spend: false }),
     polarKeySources: async () => new Map([["openrouter", "own"]]),
-    polarCredentialFor: async () => ({ provider: "openrouter", secret: "own-key", source: "own" })
+    polarCredentialFor: async () => ({ provider: "openrouter", secret: "own-key", source: "own" }),
+    polarCredentialsFor: async () => [{ provider: "openrouter", secret: "own-key", source: "own" }]
 }));
 
 function catalogue(modelId: string, cost: number, reasoning = false) {
@@ -41,8 +42,8 @@ vi.mock("@/lib/agents/model-catalog", () => ({
     ]
 }));
 
-const { standInMiddleware, standInRetry, isFreeModel, creditMiddleware, PaidModelError } =
-    await import("@/lib/polar/credit");
+const { isFreeModel, creditMiddleware, PaidModelError } = await import("@/lib/polar/credit");
+const { isRoutable: standInRetry } = await import("@/lib/polar/router/chain");
 const { classifyProviderFailure } = await import("@/lib/polar/provider-failure");
 const { answeredBy, resolvePolarModel, withStandIn } = await import("@/lib/polar/models");
 const { polarHelperModel } = await import("@/lib/polar/helper-model");
@@ -105,13 +106,6 @@ const option = (model: string, reasoning = false) => ({
 const credential = { provider: "openrouter", secret: "k", source: "own" } as never;
 const params = { prompt: [], reasoning: "low" } as never;
 
-/** A free stand-in on the same provider and key. */
-const same = (target: ReturnType<typeof fakeModel>, reasoning = true) => ({
-    model: () => target as never,
-    provider: "openrouter",
-    free: true,
-    reasoning
-});
 
 describe("the refusals a stand-in may answer", () => {
     it("reads OpenRouter's upstream 429 as busy, not as this key's rate limit", () => {
@@ -126,7 +120,7 @@ describe("the refusals a stand-in may answer", () => {
         expect(standInRetry(paymentRequired())).toBe(true);
         expect(standInRetry(new PaidModelError(paymentRequired()))).toBe(true);
         expect(standInRetry({ lastError: upstreamBusy() })).toBe(true);
-        // Only another provider may answer these (`standInFits`).
+        // Another key or another provider answers these.
         expect(standInRetry(Object.assign(new Error("x"), { statusCode: 401 }))).toBe(true);
         expect(standInRetry(Object.assign(new Error("x"), { statusCode: 500 }))).toBe(true);
         expect(standInRetry(Object.assign(new Error("x"), { statusCode: 400 }))).toBe(false);
@@ -142,72 +136,6 @@ describe("the refusals a stand-in may answer", () => {
         expect(free("groq", "a/b", 0, 2)).toBe(false);
         // `:free` is OpenRouter's marker, nobody else's.
         expect(free("groq", "a/b:free", null)).toBe(false);
-    });
-});
-
-describe("standInMiddleware", () => {
-    it("asks the stand-in once, without a reasoning level it cannot take", async () => {
-        const target = fakeModel("meta/llama:free", async () => "answer");
-        const switched = vi.fn();
-        const result = await standInMiddleware("openrouter", [same(target, false)], {
-            onStandIn: switched
-        }).wrapStream!({
-            doStream: () => Promise.reject(upstreamBusy()),
-            doGenerate: vi.fn(),
-            params,
-            model: {} as never
-        });
-        expect(result).toBe("answer");
-        expect(switched).toHaveBeenCalledOnce();
-        expect(target.doStream).toHaveBeenCalledWith(
-            expect.objectContaining({ reasoning: undefined })
-        );
-    });
-
-    it("keeps the stand-in for the turn's later steps", async () => {
-        const target = fakeModel("meta/llama:free", async () => "answer");
-        const first = vi.fn(() => Promise.reject(upstreamBusy()));
-        const middleware = standInMiddleware("openrouter", [same(target)], {
-            onStandIn: () => undefined
-        });
-        for (let step = 0; step < 2; step++) {
-            await middleware.wrapGenerate!({
-                doGenerate: first,
-                doStream: vi.fn(),
-                params,
-                model: {} as never
-            });
-        }
-        expect(first).toHaveBeenCalledOnce();
-        expect(target.doGenerate).toHaveBeenCalledTimes(2);
-    });
-
-    it("surfaces the stand-in's own refusal rather than asking a third time", async () => {
-        const target = fakeModel("meta/llama:free", () => Promise.reject(upstreamBusy()));
-        const failure = await standInMiddleware("openrouter", [same(target)], {
-            onStandIn: () => undefined
-        }).wrapGenerate!({
-            doGenerate: () => Promise.reject(upstreamBusy()),
-            doStream: vi.fn(),
-            params,
-            model: {} as never
-        }).catch((error: unknown) => error);
-        expect(classifyProviderFailure(failure).kind).toBe("busy");
-        expect(target.doGenerate).toHaveBeenCalledOnce();
-    });
-
-    it("leaves a refused key alone", async () => {
-        const target = fakeModel("meta/llama:free", async () => "answer");
-        const failure = await standInMiddleware("openrouter", [same(target)], {
-            onStandIn: () => undefined
-        }).wrapGenerate!({
-            doGenerate: () => Promise.reject(Object.assign(new Error("x"), { statusCode: 401 })),
-            doStream: vi.fn(),
-            params,
-            model: {} as never
-        }).catch((error: unknown) => error);
-        expect(classifyProviderFailure(failure).kind).toBe("key");
-        expect(target.doGenerate).not.toHaveBeenCalled();
     });
 });
 

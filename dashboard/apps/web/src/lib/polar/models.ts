@@ -19,6 +19,18 @@ import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createMistral } from "@ai-sdk/mistral";
+import { PROVIDER_ENDPOINTS } from "@/lib/polar/provider-endpoints";
+import { polarRouting } from "@/lib/polar/router/store";
+import {
+    planSteps,
+    plannedStep,
+    routedModel,
+    type PlanEntry,
+    type PlannedStep,
+    type RoutedModel
+} from "@/lib/polar/router/plan";
+import type { RouteTarget } from "@/lib/polar/routing";
 import { modelProviderName } from "@/lib/agents/model-key-providers";
 import { isAutomatic, type Intelligence, type ModelChoice, type Payer } from "@/lib/polar/shared";
 import {
@@ -40,17 +52,11 @@ import {
 import { listCatalogModels, type CatalogModel } from "@/lib/agents/model-catalog";
 import type { ChatCredential } from "@/lib/agents/model-keys";
 import { providerWindows, WINDOW_PROVIDERS } from "@/lib/polar/provider-windows";
-import {
-    creditMiddleware,
-    freeVariantOf,
-    isFreeModel,
-    polarOutputTokens,
-    standInMiddleware,
-    type LanguageModelV4
-} from "@/lib/polar/credit";
+import { creditMiddleware, freeVariantOf, isFreeModel } from "@/lib/polar/credit";
 import {
     polarAccessFor,
     polarCredentialFor,
+    polarCredentialsFor,
     polarKeySources,
     type PolarAccess
 } from "@/lib/polar/access";
@@ -77,7 +83,8 @@ export function polarServesProvider(slug: string): boolean {
         slug === "openai" ||
         slug === "google-ai" ||
         slug === GATEWAY_SLUG ||
-        slug in OPENAI_COMPATIBLE_BASES
+        slug in OPENAI_COMPATIBLE_BASES ||
+        slug in PROVIDER_ENDPOINTS
     );
 }
 
@@ -262,6 +269,8 @@ export interface ResolvedModel {
     /** Runs with the kind of refusal the chosen model met, when a stand-in
      *  middleware saw it: Automatic remembers the provider for later turns. */
     onRefused?: (kind: FailureKind) => void;
+    /** The router's plan and what it learned while walking it. */
+    routed?: RoutedModel;
 }
 
 /** A model that may answer in place of the one chosen, and whether it did. */
@@ -275,46 +284,46 @@ export interface StandIn {
 export type StandInSource = Pick<ResolvedModel, "model" | "option" | "credential">;
 
 /**
- * `resolved`, asking the first fitting of `sources` once when its call is
- * refused (`standInMiddleware` in `credit.ts`). Only for a model Polar chose:
- * one the person pinned keeps its own refusal. Adding stand-ins to a model
- * that already has some extends the same list, so a turn is still retried
- * once at most.
+ * `resolved`, routed on to `sources` in order when its call is refused
+ * (`router/chain.ts`). Adding stand-ins to a model that already has a plan
+ * extends the same plan, so a turn walks one list.
  */
 export function withStandIn(resolved: ResolvedModel, ...sources: StandInSource[]): ResolvedModel {
-    const all = [...(resolved.standInSources ?? []), ...sources];
-    if (all.length === 0) return resolved;
-    const base = resolved.base ?? resolved.model;
-    let usedAt = -1;
-    const model = wrapLanguageModel({
-        model: base as LanguageModelV4,
-        middleware: standInMiddleware(
-            resolved.option.provider,
-            all.map((source) => ({
-                model: () => source.model as LanguageModelV4,
-                provider: source.option.provider,
-                free: isFreeModel(source.option),
-                reasoning: source.option.reasoning,
-                outputTokens: polarOutputTokens(source.option),
-                reads: source.option
-            })),
-            {
-                onStandIn: (index) => {
-                    usedAt = index;
-                },
-                onRefused: resolved.onRefused
-            }
-        )
-    });
+    if (sources.length === 0 && resolved.routed) return resolved;
+    const fixed = (source: StandInSource): PlannedStep =>
+        plannedStep(
+            { option: source.option, credentials: [source.credential], build: () => source.model },
+            source.credential
+        );
+    const head = resolved.routed?.steps ?? [fixed({ ...resolved, model: resolved.base ?? resolved.model })];
+    const origin = head[0]!.provider;
     return {
-        ...resolved,
-        model,
-        base,
-        standInSources: all,
-        standIns: all.map((source, index) => ({
-            option: source.option,
-            credential: source.credential,
-            used: () => usedAt === index
+        ...resolvedOf([...head, ...sources.map(fixed)], (kind, provider) => {
+            if (provider === origin) resolved.onRefused?.(kind);
+        }),
+        automatic: resolved.automatic,
+        onRefused: resolved.onRefused,
+        base: resolved.base ?? resolved.model
+    };
+}
+
+/** The resolved model for a plan: its first step is the one chosen, the rest
+ *  stand in, in order. */
+function resolvedOf(
+    steps: readonly PlannedStep[],
+    onRefused?: (kind: FailureKind, provider: string) => void
+): ResolvedModel {
+    const routed = routedModel(steps, (kind, step) => onRefused?.(kind, step.provider));
+    const head = steps[0]!;
+    return {
+        model: routed.model,
+        option: head.option,
+        credential: head.credential,
+        routed,
+        standIns: steps.slice(1).map((step) => ({
+            option: step.option,
+            credential: step.credential,
+            used: () => routed.answered() === step
         }))
     };
 }
@@ -347,30 +356,102 @@ export async function resolvePolarModel(
     userId: string,
     choice: ModelChoice,
     signals: TurnSignals = PLAIN_TURN,
-    access?: PolarAccess
+    access?: PolarAccess,
+    options: ResolveOptions = {}
 ): Promise<ResolvedModel | ModelRefusal> {
     if (choice.kind !== "language") return "unsupported_kind";
     const granted = access ?? (await polarAccessFor(userId));
-    if (isAutomatic(choice)) return resolveAutomatic(userId, signals, granted);
-    const provider = (await polarModelOptions(userId, granted)).find(
-        (entry) => entry.provider === choice.provider
-    );
+    if (isAutomatic(choice)) return resolveAutomatic(userId, signals, granted, options);
+    const catalogue = await polarModelOptions(userId, granted);
+    const provider = catalogue.find((entry) => entry.provider === choice.provider);
     if (!provider) return "no_key";
     if (choice.payer && !provider.payers.includes(choice.payer)) return "no_key";
     const option = provider.models.find((model) => model.model === choice.model);
     if (!option) return "unknown_model";
-    const credential = await polarCredentialFor(userId, choice.provider, choice.payer, granted);
-    if (!credential) return "no_key";
-    return {
-        model: languageModel(
-            credential,
-            option.model,
-            freeVariantOf(option.provider, option.model, provider.models),
-            () => noteNoCredit(userId, option.provider)
-        ),
-        option,
-        credential
+    const held = await polarCredentialsFor(userId, choice.provider, choice.payer, granted);
+    const credentials = options.keyId ? held.filter((key) => key.keyId === options.keyId) : held;
+    if (credentials.length === 0) return "no_key";
+    const routing = await polarRouting(userId);
+    const keysOf = credentialCache(userId, granted);
+    const entries: PlanEntry[] = [
+        entryOf(userId, option, credentials, catalogue, options.reasoning)
+    ];
+    if (routing.pinnedFallsBack || options.fallBack) {
+        entries.push(...(await fallbackEntries(userId, routing.fallbacks, catalogue, keysOf)));
+    }
+    const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));
+    return resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind));
+}
+
+/** What a caller outside the composer may ask of a resolution. */
+export interface ResolveOptions {
+    /** One stored key the first model must spend, as a tier pinned it. */
+    keyId?: string | null;
+    /** The effort the first model runs at (`routing.ts`); its fallbacks keep
+     *  their own. */
+    reasoning?: RouteTarget["reasoning"];
+    /** Walk the fallback list even for a model named by hand: a coding tool's
+     *  tier is configured routing, not a pick the person made in the moment. */
+    fallBack?: boolean;
+}
+
+/** The keys of each provider for one call, read once per provider. */
+function credentialCache(userId: string, access: PolarAccess) {
+    const read = new Map<string, Promise<ChatCredential[]>>();
+    return (provider: string): Promise<ChatCredential[]> => {
+        if (!read.has(provider)) {
+            read.set(provider, polarCredentialsFor(userId, provider, null, access));
+        }
+        return read.get(provider)!;
     };
+}
+
+/** A model to plan, on these keys. */
+function entryOf(
+    userId: string,
+    option: PolarModelOption,
+    credentials: readonly ChatCredential[],
+    options: readonly PolarProviderOption[],
+    reasoning?: RouteTarget["reasoning"]
+): PlanEntry {
+    const models = options.find((entry) => entry.provider === option.provider)?.models ?? [];
+    return {
+        option,
+        credentials,
+        reasoning,
+        build: (credential) =>
+            languageModel(
+                credential,
+                option.model,
+                freeVariantOf(option.provider, option.model, models),
+                () => noteNoCredit(userId, option.provider)
+            )
+    };
+}
+
+/**
+ * The person's fallback list as plan entries: each model they may still use,
+ * on the one key it names or on every key held for its provider. An entry
+ * whose provider, model or key is gone is skipped rather than failing the turn.
+ */
+async function fallbackEntries(
+    userId: string,
+    targets: readonly RouteTarget[],
+    options: readonly PolarProviderOption[],
+    keysOf: (provider: string) => Promise<ChatCredential[]>
+): Promise<PlanEntry[]> {
+    const entries: PlanEntry[] = [];
+    for (const target of targets) {
+        const option = options
+            .find((entry) => entry.provider === target.provider)
+            ?.models.find((model) => model.model === target.model);
+        if (!option) continue;
+        const keys = await keysOf(target.provider);
+        const credentials = target.keyId ? keys.filter((key) => key.keyId === target.keyId) : keys;
+        if (credentials.length === 0) continue;
+        entries.push(entryOf(userId, option, credentials, options, target.reasoning));
+    }
+    return entries;
 }
 
 /**
@@ -403,7 +484,14 @@ export function languageModel(
                 apiKey: apiKey || undefined
             })(model);
         default: {
-            const baseURL = OPENAI_COMPATIBLE_BASES[credential.provider];
+            const endpoint = PROVIDER_ENDPOINTS[credential.provider];
+            if (endpoint?.api === "anthropic") {
+                return createAnthropic({ apiKey, baseURL: endpoint.baseUrl })(model);
+            }
+            if (endpoint?.api === "mistral") {
+                return createMistral({ apiKey, baseURL: endpoint.baseUrl })(model);
+            }
+            const baseURL = OPENAI_COMPATIBLE_BASES[credential.provider] ?? endpoint?.baseUrl;
             if (!baseURL) throw new Error(`polar: no client for ${credential.provider}`);
             const client = createOpenAICompatible({ name: credential.provider, baseURL, apiKey });
             if (credential.provider !== "openrouter") return client(model);
@@ -419,19 +507,20 @@ export function languageModel(
 const OTHER_PROVIDERS_MOST = 3;
 
 /**
- * The model Automatic answers a turn with: the first candidate whose key can
- * be read, with stand-ins in Automatic's own order - its own provider's next
- * free candidate (and, for a paid first pick, the next paid one), then the
- * first candidate of each other provider this person may spend on. Another
- * provider's key from this Polaris is offered only while the administrator's
- * ceilings leave room, as the turn itself would be. A provider that refused
- * for want of credit lately is offered only its free models. "no_key" when no
- * candidate's key can be read.
+ * The model Automatic answers a turn with: the first candidate a key is held
+ * for, on each of its provider's keys, then - in this order - its own
+ * provider's next free candidate (and, for a paid first pick, the next paid
+ * one), the person's fallback list, and the first candidate of up to three
+ * other providers they may spend on. Another provider's key from this Polaris
+ * is offered only while the administrator's ceilings leave room, as the turn
+ * itself would be. A provider that refused for want of credit lately is
+ * offered only its free models. "no_key" when no candidate has a key.
  */
 async function resolveAutomatic(
     userId: string,
     signals: TurnSignals,
-    access: PolarAccess
+    access: PolarAccess,
+    resolve: ResolveOptions = {}
 ): Promise<ResolvedModel | ModelRefusal> {
     const options = await polarModelOptions(userId, access);
     const candidates = automaticCandidates(
@@ -441,83 +530,41 @@ async function resolveAutomatic(
         unpaidProviders(userId)
     );
     const route = autoRoute(signals);
-    const tried = new Map<string, ChatCredential | null>();
-    const credentialOf = async (provider: string) => {
-        if (!tried.has(provider)) {
-            tried.set(provider, await polarCredentialFor(userId, provider, null, access));
-        }
-        return tried.get(provider) ?? null;
-    };
-    const build = (option: PolarModelOption, credential: ChatCredential) => ({
-        model: languageModel(
-            credential,
-            option.model,
-            freeVariantOf(
-                option.provider,
-                option.model,
-                options.find((entry) => entry.provider === option.provider)?.models ?? []
-            ),
-            () => noteNoCredit(userId, option.provider)
-        ),
-        option,
-        credential
-    });
+    const keysOf = credentialCache(userId, access);
     for (const [index, option] of candidates.entries()) {
-        const credential = await credentialOf(option.provider);
-        if (!credential) continue;
-        const chosen: ResolvedModel = {
-            ...build(option, credential),
-            automatic: route,
-            onRefused: (kind) => rememberRefusal(userId, option.provider, kind)
-        };
+        const credentials = await keysOf(option.provider);
+        if (credentials.length === 0) continue;
         const later = candidates.slice(index + 1);
-        // Same provider and key first: the turn's provider tools and options
-        // are that provider's, and the purse its ceiling was checked against.
+        // Same provider first: the turn's provider tools and options are that
+        // provider's, and the purse its ceiling was checked against.
         const mine = later.filter((entry) => entry.provider === option.provider);
         const free = mine.find(isFreeModel);
         const paid = isFreeModel(option) ? undefined : mine.find((entry) => !isFreeModel(entry));
-        const sources: StandInSource[] = [free, paid]
-            .filter((entry): entry is PolarModelOption => !!entry)
-            .map((entry) => build(entry, credential));
-        sources.push(
-            ...(await otherStandIns(
-                userId,
-                later,
-                option.provider,
-                credential,
-                credentialOf,
-                build
-            ))
-        );
-        return withStandIn(chosen, ...sources);
+        const routing = await polarRouting(userId);
+        const entries: PlanEntry[] = [
+            entryOf(userId, option, credentials, options, resolve.reasoning),
+            ...[free, paid]
+                .filter((entry): entry is PolarModelOption => !!entry)
+                .map((entry) => entryOf(userId, entry, credentials, options)),
+            ...(await fallbackEntries(userId, routing.fallbacks, options, keysOf))
+        ];
+        const seen = new Set([option.provider]);
+        let others = 0;
+        for (const entry of later) {
+            if (others >= OTHER_PROVIDERS_MOST) break;
+            if (seen.has(entry.provider)) continue;
+            seen.add(entry.provider);
+            const keys = await keysOf(entry.provider);
+            if (keys.length === 0) continue;
+            entries.push(entryOf(userId, entry, keys, options));
+            others++;
+        }
+        const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));
+        return {
+            ...resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind)),
+            automatic: route,
+            onRefused: (kind) => rememberRefusal(userId, option.provider, kind)
+        };
     }
     return "no_key";
-}
-
-/** The first candidate of each other provider whose key this person may spend
- *  now, in Automatic's order. */
-async function otherStandIns(
-    userId: string,
-    later: readonly PolarModelOption[],
-    provider: string,
-    chosen: ChatCredential,
-    credentialOf: (provider: string) => Promise<ChatCredential | null>,
-    build: (option: PolarModelOption, credential: ChatCredential) => StandInSource
-): Promise<StandInSource[]> {
-    const found: StandInSource[] = [];
-    const seen = new Set([provider]);
-    let roomOnShared: boolean | null = chosen.source === "instance" ? true : null;
-    for (const option of later) {
-        if (found.length >= OTHER_PROVIDERS_MOST) break;
-        if (seen.has(option.provider)) continue;
-        seen.add(option.provider);
-        const credential = await credentialOf(option.provider);
-        if (!credential) continue;
-        if (credential.source === "instance") {
-            roomOnShared ??= !(await polarLimitReached(userId));
-            if (!roomOnShared) continue;
-        }
-        found.push(build(option, credential));
-    }
-    return found;
 }

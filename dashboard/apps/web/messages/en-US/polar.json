@@ -1040,5 +1040,130 @@
                 "check": "Check again"
             }
         }
+    },
+    "routing": {
+        "title": "Routing",
+        "intro": "What Polar tries when a model fails, and where coding tools land.",
+        "pinned": "Models I pick by hand fall back too",
+        "pinnedHint": "Off keeps a picked model's error on screen.",
+        "notOffered": "{model} (unavailable)",
+        "clear": "Clear",
+        "clearNamed": "Clear {name}",
+        "effortNamed": "Effort for {name}",
+        "keyNamed": "Key for {name}",
+        "retry": "Try again",
+        "effort": {
+            "inherit": "Inherit",
+            "client": "From client",
+            "off": "Off",
+            "low": "Low",
+            "medium": "Medium",
+            "high": "High",
+            "xhigh": "X-High",
+            "max": "Max"
+        },
+        "keys": {
+            "any": "Any key, in order",
+            "deployment": "{name} (this Polaris)",
+            "unavailable": "(unavailable)"
+        },
+        "fallbacks": {
+            "title": "Fallback models",
+            "order": "If a model fails, Polar tries its other keys, then this list, in order.",
+            "empty": "No fallbacks. A failed call shows its error.",
+            "move": "Move {model}. Use the arrow keys.",
+            "moveHint": "Drag, or use the arrow keys",
+            "remove": "Remove {model}",
+            "removeShort": "Remove",
+            "full": "The list holds up to {most} models.",
+            "newEffort": "Effort for the new fallback",
+            "newKey": "Key for the new fallback",
+            "add": "Add"
+        },
+        "tools": {
+            "title": "Coding tools",
+            "intro": "Where a request from Claude Code or another tool lands, by the model it names.",
+            "default": "Default model",
+            "automatic": "Automatic",
+            "useDefault": "Uses the default model",
+            "fable": "Fable override",
+            "opus": "Opus override",
+            "sonnet": "Sonnet override",
+            "haiku": "Haiku override",
+            "defaultEffort": "Default effort",
+            "defaultEffortHint": "Used when a model's effort says Inherit."
+        },
+        "following": {
+            "title": "Following this Polaris's routing",
+            "body": "An administrator sets it. Customize it to keep your own.",
+            "customize": "Customize"
+        },
+        "reset": {
+            "action": "Use this Polaris's",
+            "title": "Go back to this Polaris's routing?",
+            "body": "Your fallbacks and coding tool models are removed.",
+            "confirm": "Go back"
+        },
+        "connect": {
+            "title": "Connect a coding tool",
+            "intro": "Point the tool at Polaris and sign in with a Polaris API key.",
+            "anthropic": "Anthropic-compatible (Claude Code)",
+            "anthropicHint": "Base URL for tools that speak the Anthropic API.",
+            "openai": "OpenAI-compatible (Codex, OpenCode, Cline, Aider)",
+            "openaiHint": "Base URL for tools that speak the OpenAI API.",
+            "variables": "Claude Code reads:",
+            "key": "Create the key under <link>API keys</link>, with the Polar permission."
+        },
+        "usage": {
+            "title": "Usage by key",
+            "intro": "Your calls this month.",
+            "byKey": "By key",
+            "bySurface": "By source",
+            "key": "Key",
+            "surface": "Source",
+            "requests": "Calls",
+            "tokens": "Tokens",
+            "cost": "Cost",
+            "empty": "No calls this month.",
+            "removedKey": "Removed key",
+            "noKey": "No stored key",
+            "deployment": "This Polaris",
+            "fallbacks": "Recent fallbacks",
+            "noFallbacks": "No fallbacks in the last 30 days.",
+            "fellBack": "{from} -> {to}",
+            "surfaces": {
+                "chat": "Chat",
+                "helper": "Titles and suggestions",
+                "api": "Coding tools",
+                "voice": "Voice",
+                "translate": "Translation"
+            }
+        },
+        "reasons": {
+            "key": "Key refused",
+            "credit": "No credit",
+            "paid": "Paid model, no credit",
+            "rate": "Rate limited",
+            "busy": "Model busy",
+            "down": "Provider down",
+            "model": "Model unavailable",
+            "other": "Failed"
+        },
+        "admin": {
+            "title": "Default routing",
+            "intro": "What Polar falls back to for everyone who set no routing of their own, and where coding tools land."
+        },
+        "errors": {
+            "noAccess": "Polar is not available to you.",
+            "viewingAs": "You are viewing as someone else, so this can't be changed.",
+            "duplicate": "That model and key are already in the list.",
+            "tooMany": "That is more fallbacks than the list holds.",
+            "key": "One of those keys can't be used for its model.",
+            "invalid": "Check the routing and try again.",
+            "pickModel": "Pick a model first.",
+            "failed": "Couldn't save the routing. Try again.",
+            "load": "Couldn't read your routing.",
+            "usage": "Couldn't read this month's usage."
+        }
     }
 }

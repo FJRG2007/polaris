@@ -27,10 +27,13 @@ import {
     providerOfModelKey,
     reorderModelKeys,
     setModelKeyEnabled,
+    setModelKeyLimits,
+    clearModelKeyCooling,
     updateModelKey,
     type KeyOwner
 } from "@/lib/agents/model-keys";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { keyLimitsSchema } from "@/lib/agents/key-limits";
 
 /** What a write reports back. `warning` is the case that is neither: the key was
  *  stored, and the provider could not be asked whether it is any good. */
@@ -277,6 +280,37 @@ export async function reorderKeys(scope: KeyScope, input: unknown): Promise<KeyA
         return { error: (await readerWords("api"))("refusals.aiKeys.orderUnreadable") };
 
     await reorderModelKeys(scope.owner, parsed.data.ids);
+    revalidatePath(scope.path);
+    return {};
+}
+
+/** Set one key's own allowance: what Polar's router holds it to before it steps
+ *  on to the next key. */
+export async function limitKey(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
+    const parsed = z.object({ id: z.string().uuid(), limits: keyLimitsSchema }).safeParse(input);
+    if (!parsed.success) return { error: (await readerWords("api"))("refusals.aiKeys.pickKey") };
+
+    if (!(await setModelKeyLimits(scope.owner, parsed.data.id, parsed.data.limits))) {
+        return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
+    }
+    await recordAudit({
+        actorId: scope.actorId,
+        action: `${scope.audit}.ai-key.limited`,
+        targetType: "modelKey",
+        targetId: parsed.data.id
+    });
+    revalidatePath(scope.path);
+    return {};
+}
+
+/** Put a cooled-down key back in rotation now. */
+export async function reviveKey(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
+    const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
+    if (!parsed.success) return { error: (await readerWords("api"))("refusals.aiKeys.pickKey") };
+
+    if (!(await clearModelKeyCooling(scope.owner, parsed.data.id))) {
+        return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
+    }
     revalidatePath(scope.path);
     return {};
 }

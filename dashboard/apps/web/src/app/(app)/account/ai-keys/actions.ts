@@ -26,8 +26,10 @@ import { agentSigninAnswerSchema, agentSigninEnvSchema, agentSigninIdSchema } fr
 import {
     addKey,
     editKey,
+    limitKey,
     removeKey,
     reorderKeys,
+    reviveKey,
     toggleKey,
     type KeyActionResult,
     type KeyScope
@@ -57,6 +59,14 @@ export async function reorderModelKeysAction(input: unknown): Promise<KeyActionR
 
 export async function toggleModelKeyAction(input: unknown): Promise<KeyActionResult> {
     return toggleKey(await scope(), input);
+}
+
+export async function limitModelKeyAction(input: unknown): Promise<KeyActionResult> {
+    return limitKey(await scope(), input);
+}
+
+export async function reviveModelKeyAction(input: unknown): Promise<KeyActionResult> {
+    return reviveKey(await scope(), input);
 }
 
 // ---------------------------------------------------------------------------

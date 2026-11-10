@@ -53,6 +53,7 @@ vi.mock("@/lib/api-session", () => ({
 }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: !state.limited }) }));
 vi.mock("@/lib/polar/usage", () => ({
+    routeRecord: () => ({ keyId: null, fellBack: null }),
     answerUsage: (usage?: { inputTokens?: number; outputTokens?: number }) => ({
         inputTokens: usage?.inputTokens ?? 0,
         outputTokens: usage?.outputTokens ?? 0,

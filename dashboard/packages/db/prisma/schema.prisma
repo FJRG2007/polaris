@@ -8703,6 +8703,15 @@ model UserModelKey {
     // When a run last used it, so somebody can tell a key that is working from
     // one they pasted and forgot. Null until the first run reads it.
     lastUsedAt      DateTime?
+    // Until when Polar's router steps over it, after the provider refused it
+    // (rate limited, out of credit, key refused, down). Null is ready.
+    coolingUntil    DateTime?
+    // The refusal that cooled it, as a Polar failure kind.
+    coolingReason   String?
+    // Its owner's own allowance on it, as stringified JSON (`key-limits.ts`):
+    // requests a minute, calls at once, requests and tokens a day, tokens a
+    // month. "{}" is no limit of their own.
+    limits          String   @default("{}")
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
 
@@ -16087,6 +16096,10 @@ model PolarPreference {
     // { provider, model, payer }; null is Automatic (the fastest one the
     // person can use). Read through a schema: an unreadable value is Automatic.
     helperModel    Json?
+    // Polar's router for this person (`lib/polar/routing.ts`): the fallback
+    // list, whether a pinned model falls back, and the model each Claude tier
+    // of a coding tool lands on. Null is the deployment's default.
+    routing        Json?
     updatedAt      DateTime @updatedAt
 }
 
@@ -16228,11 +16241,22 @@ model PolarUsage {
     // A transcription's length in seconds, as the provider reported it or as
     // recorded; 0 for a chat answer.
     audioSeconds Int      @default(0)
+    // The stored key that paid, when one did; null for rows before the router
+    // and for a key since removed. Not a relation: usage outlives the key.
+    keyId        String?  @db.Uuid
+    // Where the call came from: "chat", "helper", "api" (a coding tool through
+    // the compatible endpoint), "voice", "translate".
+    surface      String   @default("chat")
+    // Set when a fallback answered: the `provider/model` first asked, and the
+    // kind of refusal that moved the call on.
+    fellBackFrom String?
+    fellBackKind String?
     createdAt    DateTime @default(now())
 
     @@index([userId, createdAt])
     @@index([payer, createdAt])
     @@index([threadId])
+    @@index([keyId, createdAt])
 }
 
 // A picture or file somebody gave Polar. The bytes live on the storage chat

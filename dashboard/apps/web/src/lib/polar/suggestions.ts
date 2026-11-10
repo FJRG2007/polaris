@@ -146,6 +146,9 @@ async function suggest(
     if (!model || !(await helperMaySpend(userId, model))) return null;
     try {
         const { text, totalUsage } = await generateText({
+            // The router retries and walks keys and fallbacks itself
+            // (`router/chain.ts`); the SDK's own retries would walk it all again.
+            maxRetries: 0,
             model: model.resolved.model,
             system: SYSTEM,
             prompt: `User:\n${asked}\n\nAssistant:\n${answered}`,

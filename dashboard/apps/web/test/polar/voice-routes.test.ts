@@ -27,6 +27,7 @@ const state = {
 };
 
 vi.mock("@/lib/polar/usage", () => ({
+    routeRecord: () => ({ keyId: null, fellBack: null }),
     polarLimitReached: async () =>
         state.overLimit ? { used: 10, amount: 5, period: "day" } : null,
     recordPolarUsage: async (input: Record<string, unknown>) => {

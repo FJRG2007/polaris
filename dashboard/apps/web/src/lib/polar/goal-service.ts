@@ -106,6 +106,9 @@ export async function judgeGoal(
     if (!(await helperMaySpend(userId, helper))) return null;
     try {
         const { text, totalUsage } = await generateText({
+            // The router retries and walks keys and fallbacks itself
+            // (`router/chain.ts`); the SDK's own retries would walk it all again.
+            maxRetries: 0,
             model: helper.resolved.model,
             system: SYSTEM,
             prompt: `Condition:\n${condition}\n\nConversation:\n${goalTranscript(messages)}`,

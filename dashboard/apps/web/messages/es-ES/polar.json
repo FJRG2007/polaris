@@ -1040,5 +1040,130 @@
                 "check": "Comprobar"
             }
         }
+    },
+    "routing": {
+        "title": "Enrutado",
+        "intro": "Qué prueba Polar si un modelo falla y adónde van tus herramientas.",
+        "pinned": "Los modelos que elijo también tienen respaldo",
+        "pinnedHint": "Si está apagado, ves el error del modelo elegido.",
+        "notOffered": "{model} (no disponible)",
+        "clear": "Quitar",
+        "clearNamed": "Quitar {name}",
+        "effortNamed": "Esfuerzo de {name}",
+        "keyNamed": "Clave de {name}",
+        "retry": "Reintentar",
+        "effort": {
+            "inherit": "Heredar",
+            "client": "Del cliente",
+            "off": "Nada",
+            "low": "Bajo",
+            "medium": "Medio",
+            "high": "Alto",
+            "xhigh": "Muy alto",
+            "max": "Máximo"
+        },
+        "keys": {
+            "any": "Todas, en orden",
+            "deployment": "{name} (este Polaris)",
+            "unavailable": "(no disponible)"
+        },
+        "fallbacks": {
+            "title": "Modelos de respaldo",
+            "order": "Si un modelo falla, Polar prueba sus otras claves y luego esta lista, en orden.",
+            "empty": "Sin respaldos. Una llamada fallida muestra su error.",
+            "move": "Mover {model}. Usa las flechas.",
+            "moveHint": "Arrastra o usa las flechas",
+            "remove": "Quitar {model}",
+            "removeShort": "Quitar",
+            "full": "La lista admite hasta {most} modelos.",
+            "newEffort": "Esfuerzo del nuevo respaldo",
+            "newKey": "Clave del nuevo respaldo",
+            "add": "Añadir"
+        },
+        "tools": {
+            "title": "Herramientas",
+            "intro": "Adónde va una petición de Claude Code u otra herramienta, según su modelo.",
+            "default": "Modelo base",
+            "automatic": "Automático",
+            "useDefault": "Usa el modelo base",
+            "fable": "Modelo para Fable",
+            "opus": "Modelo para Opus",
+            "sonnet": "Modelo para Sonnet",
+            "haiku": "Modelo para Haiku",
+            "defaultEffort": "Esfuerzo base",
+            "defaultEffortHint": "Se usa si el esfuerzo dice Heredar."
+        },
+        "following": {
+            "title": "Sigues el enrutado de este Polaris",
+            "body": "Lo fija un administrador. Personalízalo para tener el tuyo.",
+            "customize": "Personalizar"
+        },
+        "reset": {
+            "action": "Usar el de Polaris",
+            "title": "¿Volver al enrutado de este Polaris?",
+            "body": "Se quitan tus respaldos y modelos de herramientas.",
+            "confirm": "Volver"
+        },
+        "connect": {
+            "title": "Conectar una herramienta",
+            "intro": "Apunta la herramienta a Polaris y entra con una clave API.",
+            "anthropic": "Compatible con Anthropic (Claude Code)",
+            "anthropicHint": "URL base para herramientas con la API de Anthropic.",
+            "openai": "Compatible con OpenAI (Codex, OpenCode, Cline, Aider)",
+            "openaiHint": "URL base para herramientas con la API de OpenAI.",
+            "variables": "Claude Code lee:",
+            "key": "Crea la clave en <link>Claves API</link>, con el permiso de Polar."
+        },
+        "usage": {
+            "title": "Uso por clave",
+            "intro": "Tus llamadas de este mes.",
+            "byKey": "Por clave",
+            "bySurface": "Por origen",
+            "key": "Clave",
+            "surface": "Origen",
+            "requests": "Llamadas",
+            "tokens": "Tokens",
+            "cost": "Coste",
+            "empty": "Sin llamadas este mes.",
+            "removedKey": "Clave borrada",
+            "noKey": "Sin clave",
+            "deployment": "Este Polaris",
+            "fallbacks": "Respaldos recientes",
+            "noFallbacks": "Sin respaldos en 30 días.",
+            "fellBack": "{from} -> {to}",
+            "surfaces": {
+                "chat": "Chat",
+                "helper": "Títulos y sugerencias",
+                "api": "Herramientas",
+                "voice": "Voz",
+                "translate": "Traducción"
+            }
+        },
+        "reasons": {
+            "key": "Rechazada",
+            "credit": "Sin crédito",
+            "paid": "De pago, sin crédito",
+            "rate": "Límite de uso",
+            "busy": "Saturado",
+            "down": "Proveedor caído",
+            "model": "Modelo no disponible",
+            "other": "Falló"
+        },
+        "admin": {
+            "title": "Enrutado base",
+            "intro": "El respaldo de Polar para quien no fijó el suyo, y adónde van las herramientas de código."
+        },
+        "errors": {
+            "noAccess": "Polar no está disponible para ti.",
+            "viewingAs": "Estás viendo como otra persona; no se puede cambiar.",
+            "duplicate": "Ese modelo con esa clave ya está en la lista.",
+            "tooMany": "Son más respaldos de los que caben.",
+            "key": "Una de esas claves no sirve para su modelo.",
+            "invalid": "Revisa el enrutado y reintenta.",
+            "pickModel": "Elige un modelo primero.",
+            "failed": "No se pudo guardar. Reintenta.",
+            "load": "No se pudo leer tu enrutado.",
+            "usage": "No se pudo leer el uso del mes."
+        }
     }
 }

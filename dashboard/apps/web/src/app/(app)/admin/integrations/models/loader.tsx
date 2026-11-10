@@ -50,6 +50,7 @@ export function ModelProvidersLoader({
                     <ModelKeysView
                         providers={keyProviders}
                         keys={data.keys}
+                        health={data.health}
                         actions={actions}
                         copy={keysCopy}
                         footer={data.shared ? sharedFooter : privateFooter}

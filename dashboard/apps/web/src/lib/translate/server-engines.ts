@@ -20,10 +20,10 @@ import { CredentialDecryptError, decryptSecret, encryptSecret } from "@polaris/s
 import { generateText } from "ai";
 import { PLAIN_TURN } from "@/lib/polar/automatic";
 import { automaticChoice } from "@/lib/polar/shared";
-import { resolvePolarModel } from "@/lib/polar/models";
+import { answeredBy, resolvePolarModel } from "@/lib/polar/models";
 import { deeplTranslate } from "@/lib/integrations/deepl";
 import { deeplSource, deeplTarget, googleCode } from "@/lib/translate/provider-codes";
-import { answerUsage, recordPolarUsage } from "@/lib/polar/usage";
+import { answerUsage, recordPolarUsage, routeRecord } from "@/lib/polar/usage";
 import { googleDetect, googleTranslate } from "@/lib/integrations/google-translate";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { classifyProviderFailure, failureLogLine } from "@/lib/polar/provider-failure";
@@ -170,10 +170,13 @@ async function polarTranslate(
     const helper = await polarHelper(userId);
     if (!helper) throw new EngineRefusal("unavailable");
     if (!(await helperMaySpend(userId, helper))) throw new EngineRefusal("limit");
-    const { option, credential } = helper.resolved;
+    const { option } = helper.resolved;
     let text: string;
     try {
         const answer = await generateText({
+            // The router retries and walks keys and fallbacks itself
+            // (`router/chain.ts`); the SDK's own retries would walk it all again.
+            maxRetries: 0,
             model: helper.resolved.model,
             system: SYSTEM,
             prompt: JSON.stringify({ from: from ?? "auto", to, texts }),
@@ -186,10 +189,12 @@ async function polarTranslate(
             userId,
             threadId: null,
             messageId: null,
-            provider: option.provider,
-            model: option.model,
-            payer: credential.source === "instance" ? "instance" : "own",
-            usage: answerUsage(answer.totalUsage, option)
+            provider: answeredBy(helper.resolved).option.provider,
+            model: answeredBy(helper.resolved).option.model,
+            payer: answeredBy(helper.resolved).credential.source === "instance" ? "instance" : "own",
+            usage: answerUsage(answer.totalUsage, answeredBy(helper.resolved).option),
+            surface: "translate",
+            ...routeRecord(helper.resolved)
         }).catch((error: unknown) => console.error("translate: could not record usage", error));
     } catch (error) {
         console.warn(

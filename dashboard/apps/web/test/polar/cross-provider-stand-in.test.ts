@@ -25,10 +25,21 @@ vi.mock("@/lib/polar/access", () => ({
                   provider,
                   secret: `${provider}-key`,
                   source: provider === "deepseek" ? "instance" : "own"
-              }
+              },
+    polarCredentialsFor: async (_user: string, provider: string) =>
+        provider === "deepseek" && !state.spend
+            ? []
+            : [
+                  {
+                      provider,
+                      secret: `${provider}-key`,
+                      source: provider === "deepseek" ? "instance" : "own"
+                  }
+              ]
 }));
 
 vi.mock("@/lib/polar/usage", () => ({
+    routeRecord: () => ({ keyId: null, fellBack: null }),
     polarLimitReached: async () =>
         state.limited ? { used: 10, amount: 10, period: "day" as const } : null
 }));
@@ -67,7 +78,6 @@ vi.mock("@/lib/agents/model-catalog", () => ({
     ]
 }));
 
-const { standInFits, standInMiddleware } = await import("@/lib/polar/credit");
 const { answeredBy, rememberRefusal, resolvePolarModel, withStandIn } =
     await import("@/lib/polar/models");
 const { automaticChoice } = await import("@/lib/polar/shared");
@@ -86,18 +96,8 @@ function refusal(status: number, body: unknown) {
     });
 }
 
-const GROQ_RATE = refusal(429, {
-    error: { message: "Rate limit reached", type: "tokens", code: "rate_limit_exceeded" }
-});
-const GROQ_KEY = refusal(401, {
-    error: { message: "Invalid API Key", type: "invalid_request_error", code: "invalid_api_key" }
-});
 const DEEPSEEK_BALANCE = refusal(402, {
     error: { message: "Insufficient Balance", type: "unknown_error", code: "invalid_request_error" }
-});
-const ANTHROPIC_OVERLOADED = refusal(529, {
-    type: "error",
-    error: { type: "overloaded_error", message: "Overloaded" }
 });
 
 function fakeModel(modelId: string, answer: () => Promise<unknown>) {
@@ -111,181 +111,7 @@ function fakeModel(modelId: string, answer: () => Promise<unknown>) {
     };
 }
 
-const target = (
-    model: ReturnType<typeof fakeModel>,
-    provider: string,
-    free = false,
-    outputTokens?: number
-) => ({ model: () => model as never, provider, free, reasoning: true, outputTokens });
-
 const params = { prompt: [], maxOutputTokens: 16_384 } as never;
-const webSearch = {
-    prompt: [],
-    tools: [{ type: "provider", id: "anthropic.web_search_20250305", name: "web_search", args: {} }]
-} as never;
-
-describe("which stand-in fits which refusal", () => {
-    const tools = { tools: [] } as never;
-    it("leaves a refused key and an outage to another provider", () => {
-        expect(standInFits("key", "groq", { provider: "groq", free: true }, tools)).toBe(false);
-        expect(standInFits("key", "groq", { provider: "openrouter", free: false }, tools)).toBe(
-            true
-        );
-        expect(standInFits("down", "groq", { provider: "groq", free: false }, tools)).toBe(false);
-    });
-
-    it("hands a key with no credit only its own free models", () => {
-        expect(
-            standInFits("credit", "deepseek", { provider: "deepseek", free: false }, tools)
-        ).toBe(false);
-        expect(standInFits("credit", "deepseek", { provider: "deepseek", free: true }, tools)).toBe(
-            true
-        );
-        expect(standInFits("paid", "openrouter", { provider: "groq", free: false }, tools)).toBe(
-            true
-        );
-    });
-
-    it("lets any model answer a rate limit, a busy model or a missing one", () => {
-        for (const kind of ["rate", "busy", "model"] as const) {
-            expect(standInFits(kind, "groq", { provider: "groq", free: false }, tools)).toBe(true);
-        }
-    });
-
-    it("keeps a turn that sends a provider-only tool with its own provider", () => {
-        expect(
-            standInFits("busy", "anthropic", { provider: "openrouter", free: true }, webSearch)
-        ).toBe(false);
-        expect(
-            standInFits("busy", "anthropic", { provider: "anthropic", free: false }, webSearch)
-        ).toBe(true);
-    });
-
-    it("passes over a model that would only take the turn's picture or PDF as text", () => {
-        const picture = {
-            tools: [],
-            prompt: [
-                {
-                    role: "user",
-                    content: [
-                        { type: "text", text: "What is this?" },
-                        { type: "file", mediaType: "image/png", data: "AA==" }
-                    ]
-                }
-            ]
-        } as never;
-        const sees = { inputs: ["text", "image"], attachment: true };
-        const blind = { inputs: ["text"], attachment: false };
-        expect(
-            standInFits(
-                "busy",
-                "anthropic",
-                { provider: "openrouter", free: true, reads: blind },
-                picture
-            )
-        ).toBe(false);
-        expect(
-            standInFits("busy", "anthropic", { provider: "groq", free: true, reads: sees }, picture)
-        ).toBe(true);
-        expect(
-            standInFits("busy", "anthropic", { provider: "groq", free: true, reads: blind }, tools)
-        ).toBe(true);
-    });
-});
-
-describe("standInMiddleware across providers", () => {
-    it("skips its own provider for a refused key and asks the next provider", async () => {
-        const own = fakeModel("qwen-32b", async () => "own");
-        const other = fakeModel("openai/gpt-mini", async () => "other");
-        const onStandIn = vi.fn();
-        const onRefused = vi.fn();
-        const answer = await standInMiddleware(
-            "groq",
-            [target(own, "groq"), target(other, "openrouter", false, 4_000)],
-            { onStandIn, onRefused }
-        ).wrapGenerate!({
-            doGenerate: () => Promise.reject(GROQ_KEY),
-            doStream: vi.fn(),
-            params,
-            model: {} as never
-        });
-        expect(answer).toBe("other");
-        expect(own.doGenerate).not.toHaveBeenCalled();
-        expect(onStandIn).toHaveBeenCalledWith(1);
-        expect(onRefused).toHaveBeenCalledWith("key");
-        // Another provider's model reserves its own answer length.
-        expect(other.doGenerate).toHaveBeenCalledWith(
-            expect.objectContaining({ maxOutputTokens: 4_000 })
-        );
-    });
-
-    it("tries its own provider first for a rate limit, keeping the call as it was", async () => {
-        const own = fakeModel("qwen-32b", async () => "own");
-        const other = fakeModel("openai/gpt-mini", async () => "other");
-        const answer = await standInMiddleware(
-            "groq",
-            [target(own, "groq"), target(other, "openrouter")],
-            { onStandIn: () => undefined }
-        ).wrapGenerate!({
-            doGenerate: () => Promise.reject(GROQ_RATE),
-            doStream: vi.fn(),
-            params,
-            model: {} as never
-        });
-        expect(answer).toBe("own");
-        expect(own.doGenerate).toHaveBeenCalledWith(
-            expect.objectContaining({ maxOutputTokens: 16_384 })
-        );
-    });
-
-    it("moves a key with no credit to another provider when its own has nothing free", async () => {
-        const ownPaid = fakeModel("deepseek-reasoner", async () => "own");
-        const other = fakeModel("gemma-free", async () => "other");
-        const answer = await standInMiddleware(
-            "deepseek",
-            [target(ownPaid, "deepseek"), target(other, "groq", true)],
-            { onStandIn: () => undefined }
-        ).wrapStream!({
-            doStream: () => Promise.reject(DEEPSEEK_BALANCE),
-            doGenerate: vi.fn(),
-            params,
-            model: {} as never
-        });
-        expect(answer).toBe("other");
-        expect(ownPaid.doStream).not.toHaveBeenCalled();
-    });
-
-    it("does not switch providers for a turn that sends a provider-only tool", async () => {
-        const other = fakeModel("openai/gpt-mini", async () => "other");
-        const failure = await standInMiddleware("anthropic", [target(other, "openrouter")], {
-            onStandIn: () => undefined
-        }).wrapStream!({
-            doStream: () => Promise.reject(ANTHROPIC_OVERLOADED),
-            doGenerate: vi.fn(),
-            params: webSearch,
-            model: {} as never
-        }).catch((error: unknown) => error);
-        expect(failure).toBe(ANTHROPIC_OVERLOADED);
-        expect(other.doStream).not.toHaveBeenCalled();
-    });
-
-    it("asks one stand-in at most, even with more in line", async () => {
-        const first = fakeModel("openai/gpt-mini", () => Promise.reject(GROQ_RATE));
-        const second = fakeModel("deepseek-chat", async () => "second");
-        const failure = await standInMiddleware(
-            "groq",
-            [target(first, "openrouter"), target(second, "deepseek")],
-            { onStandIn: () => undefined }
-        ).wrapGenerate!({
-            doGenerate: () => Promise.reject(GROQ_KEY),
-            doStream: vi.fn(),
-            params,
-            model: {} as never
-        }).catch((error: unknown) => error);
-        expect(failure).toBe(GROQ_RATE);
-        expect(second.doGenerate).not.toHaveBeenCalled();
-    });
-});
 
 describe("Automatic's stand-ins across providers", () => {
     it("lines up its own provider first, then the others in Automatic's order", async () => {

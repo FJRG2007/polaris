@@ -1,6 +1,7 @@
 "use server";
 
 import { requireAdmin } from "@/lib/session";
+import { keyStatuses } from "@/lib/agents/key-status-read";
 import {
     instanceKeysAreShared,
     INSTANCE,
@@ -16,5 +17,5 @@ export async function loadModelProvidersAction() {
         listAgentSignins(INSTANCE),
         instanceKeysAreShared()
     ]);
-    return { keys, signins, shared };
+    return { keys, signins, shared, health: await keyStatuses(keys) };
 }

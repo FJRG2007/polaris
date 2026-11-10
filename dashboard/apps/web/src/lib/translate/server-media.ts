@@ -14,11 +14,11 @@
 import { z } from "zod";
 import { PLAIN_TURN } from "@/lib/polar/automatic";
 import { automaticChoice } from "@/lib/polar/shared";
-import { resolvePolarModel } from "@/lib/polar/models";
+import { answeredBy, resolvePolarModel } from "@/lib/polar/models";
 import { EngineRefusal } from "@/lib/translate/server-engines";
 import { experimental_transcribe as transcribe, generateText } from "ai";
 import { polarTranscriber, polarVoiceAvailability } from "@/lib/polar/voice";
-import { answerUsage, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
+import { answerUsage, polarLimitReached, recordPolarUsage, routeRecord } from "@/lib/polar/usage";
 import { classifyProviderFailure, failureLogLine } from "@/lib/polar/provider-failure";
 import { helperMaySpend, helperReasoning, type PolarHelper } from "@/lib/polar/helper-model";
 
@@ -98,10 +98,13 @@ export async function serverReadImage(
     const helper = await imageReader(userId);
     if (!helper) throw new EngineRefusal("unavailable");
     if (!(await helperMaySpend(userId, helper))) throw new EngineRefusal("limit");
-    const { option, credential } = helper.resolved;
+    const { option } = helper.resolved;
     let text: string;
     try {
         const answer = await generateText({
+            // The router retries and walks keys and fallbacks itself
+            // (`router/chain.ts`); the SDK's own retries would walk it all again.
+            maxRetries: 0,
             model: helper.resolved.model,
             messages: [
                 {
@@ -121,10 +124,12 @@ export async function serverReadImage(
             userId,
             threadId: null,
             messageId: null,
-            provider: option.provider,
-            model: option.model,
-            payer: credential.source === "instance" ? "instance" : "own",
-            usage: answerUsage(answer.totalUsage, option)
+            provider: answeredBy(helper.resolved).option.provider,
+            model: answeredBy(helper.resolved).option.model,
+            payer: answeredBy(helper.resolved).credential.source === "instance" ? "instance" : "own",
+            usage: answerUsage(answer.totalUsage, answeredBy(helper.resolved).option),
+            surface: "translate",
+            ...routeRecord(helper.resolved)
         }).catch((error: unknown) => console.error("translate: could not record usage", error));
     } catch (error) {
         console.warn(
@@ -171,7 +176,9 @@ export async function serverTranscribe(
             model: transcriber.option.model,
             payer: transcriber.source,
             usage: { inputTokens: 0, outputTokens: 0, costUsd: null },
-            audioSeconds: Math.ceil(seconds)
+            audioSeconds: Math.ceil(seconds),
+            keyId: transcriber.keyId ?? null,
+            surface: "translate"
         }).catch((error: unknown) => console.error("translate: could not record usage", error));
         return { text: result.text.trim() };
     } catch (error) {

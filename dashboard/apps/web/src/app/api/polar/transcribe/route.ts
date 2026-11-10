@@ -95,7 +95,9 @@ export async function POST(request: Request): Promise<Response> {
             model: transcriber.option.model,
             payer: transcriber.source,
             usage: { inputTokens: 0, outputTokens: 0, costUsd: null },
-            audioSeconds: Math.ceil(seconds)
+            audioSeconds: Math.ceil(seconds),
+            keyId: transcriber.keyId ?? null,
+            surface: "voice"
         }).catch((error) => console.error("polar: could not record a transcription", error));
         return NextResponse.json({ text: result.text.trim() });
     } catch (error) {

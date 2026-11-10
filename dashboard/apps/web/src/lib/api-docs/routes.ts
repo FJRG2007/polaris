@@ -32,7 +32,7 @@ export interface DocumentedRoute {
     path: string;
     /** The route file, relative to src/app. */
     file: string;
-    tag: "Account" | "Deploy" | "MCP";
+    tag: "Account" | "Deploy" | "MCP" | "Polar";
     summary: string;
     description?: string;
     /** Changes something, and counts against the stricter rate limit. */
@@ -55,6 +55,10 @@ const accepted = (schema: ZodTypeAny): DocumentedResponse => ({
     schema,
     text: true
 });
+
+/** A compatible request: the wire format's own, read by the route itself. */
+const compatBody = z.object({ model: z.string() }).passthrough();
+const compatAnswer = (description: string) => z.record(z.unknown()).describe(description);
 
 /** An entity whose fields this reference does not pin down. */
 const entity = (description: string) => z.object({}).passthrough().describe(description);
@@ -514,6 +518,61 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
                 }),
                 false
             )
+        }
+    },
+    {
+        method: "POST",
+        path: "/api/v1/messages",
+        file: "api/v1/messages/route.ts",
+        tag: "Polar",
+        summary: "Anthropic Messages API, answered by Polar",
+        description:
+            "Point Claude Code at Polaris with ANTHROPIC_BASE_URL set to the origin plus /api. Needs polar.use. The model can be a tier (fable, opus, sonnet, haiku), provider/model, or automatic; your routing decides the rest.",
+        changes: true,
+        body: compatBody,
+        responses: { 200: ok(compatAnswer("An Anthropic message, or its event stream"), false) }
+    },
+    {
+        method: "POST",
+        path: "/api/v1/messages/count_tokens",
+        file: "api/v1/messages/count_tokens/route.ts",
+        tag: "Polar",
+        summary: "Count the tokens of a Messages request",
+        changes: false,
+        body: compatBody,
+        responses: { 200: ok(z.object({ input_tokens: z.number().int() }), false) }
+    },
+    {
+        method: "POST",
+        path: "/api/v1/chat/completions",
+        file: "api/v1/chat/completions/route.ts",
+        tag: "Polar",
+        summary: "OpenAI Chat Completions, answered by Polar",
+        description: "For OpenAI-compatible clients: base URL is the origin plus /api/v1. Needs polar.use.",
+        changes: true,
+        body: compatBody,
+        responses: { 200: ok(compatAnswer("A chat completion, or its event stream"), false) }
+    },
+    {
+        method: "POST",
+        path: "/api/v1/responses",
+        file: "api/v1/responses/route.ts",
+        tag: "Polar",
+        summary: "OpenAI Responses API, answered by Polar",
+        description: "What Codex speaks: base URL is the origin plus /api/v1. Needs polar.use. Responses are not stored.",
+        changes: true,
+        body: compatBody,
+        responses: { 200: ok(compatAnswer("A response, or its event stream"), false) }
+    },
+    {
+        method: "GET",
+        path: "/api/v1/models",
+        file: "api/v1/models/route.ts",
+        tag: "Polar",
+        summary: "The models this key can address",
+        changes: false,
+        responses: {
+            200: ok(z.object({ data: z.array(z.object({ id: z.string() }).passthrough()) }).passthrough(), false)
         }
     }
 ];

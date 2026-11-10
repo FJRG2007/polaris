@@ -33,6 +33,7 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { CONNECTOR_AUDIENCES, DEFAULT_CONNECTOR_POLICY } from "@/lib/polar/connectors/shared";
 import {
     chatCredentialFor,
+    chatCredentialsFor,
     instanceKeysAreShared,
     keySourcesFor,
     type ChatCredential,
@@ -341,4 +342,18 @@ export async function polarCredentialFor(
         return chatCredentialFor(userId, provider, payer);
     if (payer === "instance") return null;
     return chatCredentialFor(userId, provider, "own");
+}
+
+/** Every credential a Polar call may spend for one provider, in the order the
+ *  router tries them, held to the same rule. */
+export async function polarCredentialsFor(
+    userId: string,
+    provider: string,
+    payer: KeySource | null = null,
+    access?: PolarAccess
+): Promise<ChatCredential[]> {
+    if ((access ?? (await polarAccessFor(userId))).spend)
+        return chatCredentialsFor(userId, provider, payer);
+    if (payer === "instance") return [];
+    return chatCredentialsFor(userId, provider, "own");
 }

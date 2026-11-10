@@ -244,6 +244,8 @@ export interface PolarTranscriber {
     model: TranscriptionModel;
     option: TranscriptionOption;
     source: KeySource;
+    /** The stored key it spends, for the usage record. */
+    keyId?: string;
 }
 
 /**
@@ -280,7 +282,8 @@ export async function polarTranscriber(
         return {
             model: transcriptionModelFor(option, credential.secret),
             option,
-            source: credential.source
+            source: credential.source,
+            keyId: credential.keyId
         };
     }
     return null;

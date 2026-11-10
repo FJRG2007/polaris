@@ -3,7 +3,8 @@
  * chat: what Polar remembers, the tools it may use grouped by the MCP server
  * they come from, the actions it runs without asking, the connectors that
  * bring more tools, what chats show, the extras around them (a suggested next
- * message, the model for titles and suggestions), and what the person keeps.
+ * message, the model for titles and suggestions), how a failing call falls back
+ * and where a coding tool's request lands, and what the person keeps.
  *
  * The connectors and the "Always allow" list lived at /account/polar-tools;
  * they are here now, beside the switches for the same tools, and that address
@@ -31,6 +32,7 @@ import { listGrants } from "@/lib/polar/tool-grants";
 import { PolarConnectors } from "./polar-connectors";
 import { PolarToolGrants } from "./polar-tool-grants";
 import { PolarBrowserSites } from "./polar-browser-sites";
+import { PolarRoutingSettings } from "./polar-routing";
 import { Card, CardBody, PAGE_BLEED, Skeleton, cn } from "@polaris/ui";
 import { homePathForUser, requireUser } from "@/lib/session";
 import { listConnectorViews } from "@/lib/polar/connectors/store";
@@ -109,6 +111,7 @@ export default async function PolarSettingsPage({
         { id: "browser", label: t("settings.browserSites.title") },
         { id: "display", label: t("settings.display.title") },
         { id: "extras", label: t("settings.helper.title") },
+        { id: "routing", label: t("routing.title") },
         { id: "data", label: t("settings.data.title") }
     ];
     const asked = one(params.section) ?? (returned ? "connectors" : null);
@@ -193,6 +196,7 @@ export default async function PolarSettingsPage({
                     ) : null}
                     {section === "display" ? <DisplaySettings /> : null}
                     {section === "extras" ? <PolarHelperSettings /> : null}
+                    {section === "routing" ? <PolarRoutingSettings /> : null}
                     {section === "data" ? <DataSettings /> : null}
                 </div>
             </SettingsWithSidebar>

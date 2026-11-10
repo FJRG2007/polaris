@@ -1045,7 +1045,35 @@
         "addedAtBottom": "Se añade al final de la lista. Arrastra las filas de la tabla para reordenar.",
         "createAt": "Crear una en {provider}",
         "checking": "Comprobando...",
-        "save": "Guardar"
+        "save": "Guardar",
+        "status": {
+            "title": "Estado",
+            "ready": "Lista",
+            "cooling": "En pausa",
+            "refused": "Rechazada por el proveedor",
+            "no_credit": "Sin crédito - solo gratuitos",
+            "limit_day": "Límite del día",
+            "limit_month": "Límite del mes",
+            "until": "Hasta",
+            "revive": "Volver a usarla",
+            "reviveNamed": "Volver a usar {name}"
+        },
+        "limits": {
+            "action": "Límites",
+            "named": "Límites de {name}",
+            "title": "Límites de {name}",
+            "hint": "Polar salta esta clave al llegar a uno. Vacío es sin límite.",
+            "requestsPerMinute": "Peticiones por minuto",
+            "concurrency": "Llamadas a la vez",
+            "requestsPerDay": "Peticiones al día",
+            "tokensPerDay": "Tokens al día",
+            "tokensPerMonth": "Tokens al mes",
+            "none": "Sin límite",
+            "invalid": "Pon un entero mayor que 0.",
+            "usedToday": "{used} hoy",
+            "usedMonth": "{used} este mes",
+            "failed": "No se guardaron los límites."
+        }
     },
     "signinDialog": {
         "title": "Iniciar sesión en {tool}",

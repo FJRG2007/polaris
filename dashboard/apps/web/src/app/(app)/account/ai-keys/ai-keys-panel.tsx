@@ -9,6 +9,7 @@ import { Badge, Card, CardBody } from "@polaris/ui";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { assistedSignins } from "@/lib/agents/signin-runtime";
 import { signinProviderRows } from "@/lib/agents/agent-signins";
+import { keyStatuses } from "@/lib/agents/key-status-read";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
 import { modelProviderName, modelProviderRows } from "@/lib/agents/model-key-providers";
 import {
@@ -28,7 +29,9 @@ import {
     captureAgentSigninAction,
     deleteModelKeyAction,
     endAgentSigninAction,
+    limitModelKeyAction,
     reorderModelKeysAction,
+    reviveModelKeyAction,
     toggleModelKeyAction,
     updateModelKeyAction
 } from "./actions";
@@ -50,6 +53,8 @@ export async function AiKeysPanel({ userId }: { userId: string }) {
         signinEnvsFor(INSTANCE)
     ]);
 
+    const health = await keyStatuses(keys);
+
     const covered = [...sources.entries()]
         .filter(([, source]) => source === "instance")
         .map(([slug]) => modelProviderName(slug));
@@ -59,12 +64,15 @@ export async function AiKeysPanel({ userId }: { userId: string }) {
             <ModelKeysView
                 providers={modelProviderRows()}
                 keys={keys}
+                health={health}
                 actions={{
                     add: addModelKeyAction,
                     update: updateModelKeyAction,
                     remove: deleteModelKeyAction,
                     reorder: reorderModelKeysAction,
-                    toggle: toggleModelKeyAction
+                    toggle: toggleModelKeyAction,
+                    limit: limitModelKeyAction,
+                    revive: reviveModelKeyAction
                 }}
                 copy={{
                     title: t("aiKeys.keys.title"),

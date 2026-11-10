@@ -22,6 +22,7 @@ const state = {
 };
 
 vi.mock("@/lib/polar/usage", () => ({
+    routeRecord: () => ({ keyId: null, fellBack: null }),
     answerUsage: () => ({ inputTokens: 1, outputTokens: 1, costUsd: null }),
     polarLimitReached: async () => state.hit,
     recordPolarUsage: async (entry: unknown) => void state.recorded.push(entry)

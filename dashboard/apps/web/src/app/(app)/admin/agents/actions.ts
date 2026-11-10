@@ -14,6 +14,9 @@ import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { polarPolicySchema, savePolarPolicy } from "@/lib/polar/access";
 import { setSetting } from "@/lib/setting-store";
+import { instanceRouteKeys } from "@/lib/polar/routing-screen";
+import { checkRouting, pinnedKeyIds } from "@/lib/polar/routing-keys";
+import { instanceRouting, setInstanceRouting } from "@/lib/polar/router/store";
 import { SHARED_WORKSPACE_KEY } from "@/lib/agents/session-capacity";
 import type { PickerModel } from "@/components/model-picker";
 import { savePlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
@@ -290,4 +293,26 @@ export async function findPolarGroupsAction(
         take: 20
     });
     return { results: found };
+}
+
+/**
+ * The deployment's default routing: what every account that set none of its
+ * own falls back through, and what a coding tool's request lands on. Held to
+ * the deployment's own keys.
+ */
+export async function saveInstanceRoutingAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const [keys, current] = await Promise.all([instanceRouteKeys(), instanceRouting()]);
+    const checked = checkRouting(input, keys, pinnedKeyIds(current));
+    if (!checked.ok) {
+        return { error: (await getTranslations("polar"))(`routing.errors.${checked.refusal}`) };
+    }
+    await setInstanceRouting(checked.routing);
+    await recordAudit({
+        actorId: admin.id,
+        action: "agents.polar.routing",
+        metadata: { fallbacks: checked.routing.fallbacks.length }
+    });
+    revalidatePath("/admin/agents");
+    return {};
 }

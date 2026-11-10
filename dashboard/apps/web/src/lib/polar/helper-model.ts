@@ -29,7 +29,7 @@ import { PLAIN_TURN } from "@/lib/polar/automatic";
 import { automaticChoice } from "@/lib/polar/shared";
 import type { PolarAccess } from "@/lib/polar/access";
 import type { PolarHelperModel } from "@/lib/polar/display";
-import { answerUsage, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
+import { answerUsage, polarLimitReached, recordPolarUsage, routeRecord } from "@/lib/polar/usage";
 import {
     answeredBy,
     reasoningFor,
@@ -117,7 +117,9 @@ export async function recordHelperUsage(
             provider: option.provider,
             model: option.model,
             payer: credential.source === "instance" ? "instance" : "own",
-            usage: answerUsage(usage, option)
+            usage: answerUsage(usage, option),
+            surface: "helper",
+            ...routeRecord(helper.resolved)
         });
     } catch (error) {
         console.error("polar: could not record a small job's usage", error);

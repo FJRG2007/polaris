@@ -115,6 +115,9 @@ export async function titlePolarThread(
     let title: string | null = null;
     try {
         const { text, totalUsage } = await generateText({
+            // The router retries and walks keys and fallbacks itself
+            // (`router/chain.ts`); the SDK's own retries would walk it all again.
+            maxRetries: 0,
             model,
             system: SYSTEM,
             prompt: `User:\n${asked}${answered ? `\n\nAssistant:\n${answered}` : ""}`,

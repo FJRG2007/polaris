@@ -78,7 +78,13 @@ import {
 } from "@/lib/polar/helper-model";
 import { fenceSummary, splitAtCompaction } from "@/lib/polar/compaction";
 import { turnSignals } from "@/lib/polar/automatic";
-import { answerUsage, stepContext, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
+import {
+    answerUsage,
+    stepContext,
+    polarLimitReached,
+    recordPolarUsage,
+    routeRecord
+} from "@/lib/polar/usage";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import {
     answeredBy,
@@ -446,6 +452,9 @@ export async function POST(request: Request): Promise<Response> {
     // the context bar. `totalUsage` sums every step and overstates it.
     let lastStep: { inputTokens: number | undefined; outputTokens: number | undefined } | undefined;
     const result = streamText({
+        // The router retries and walks keys and fallbacks itself
+        // (`router/chain.ts`); the SDK's own retries would walk it all again.
+        maxRetries: 0,
         model: resolved.model,
         // One breakpoint after the tools and the system prompt: Anthropic caches
         // that prefix (docs.anthropic.com prompt caching); OpenAI and Gemini
@@ -599,7 +608,8 @@ export async function POST(request: Request): Promise<Response> {
                         provider: answered.option.provider,
                         model: answered.option.model,
                         payer: answered.credential.source === "instance" ? "instance" : "own",
-                        usage: spent
+                        usage: spent,
+                        ...routeRecord(resolved)
                     });
                 } catch (error) {
                     console.error("polar: could not record the turn's usage", error);

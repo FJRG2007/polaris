@@ -24,6 +24,10 @@ vi.mock("@/lib/polar/access", () => ({
     polarCredentialFor: async (...args: unknown[]) => {
         state.credentials.push(args);
         return state.credential;
+    },
+    polarCredentialsFor: async (...args: unknown[]) => {
+        state.credentials.push(args);
+        return state.credential ? [state.credential] : [];
     }
 }));
 vi.mock("@/lib/agents/model-catalog", () => ({

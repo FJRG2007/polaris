@@ -44,6 +44,7 @@ import {
     secretFingerprint,
     CredentialDecryptError
 } from "@polaris/storage";
+import { keyLimitsOf, type KeyLimits } from "@/lib/agents/key-limits";
 
 /** Whose keys a call is about: an account, or the deployment itself. */
 export type KeyOwner = string | null;
@@ -95,6 +96,12 @@ export interface ModelKeyView {
     /** Whether runs may spend it. Off keeps the row and hands it to nothing. */
     enabled: boolean;
     updatedAt: string;
+    /** Its owner's own allowance on it (`key-limits.ts`). */
+    limits: KeyLimits;
+    /** Until when Polar's router steps over it, and the refusal that cooled
+     *  it; null when it is ready. */
+    coolingUntil: string | null;
+    coolingReason: string | null;
 }
 
 /** The columns a screen may see. Everything absent from here is either the
@@ -108,7 +115,10 @@ const VIEW_SELECT = {
     expiresAt: true,
     lastUsedAt: true,
     enabled: true,
-    updatedAt: true
+    updatedAt: true,
+    limits: true,
+    coolingUntil: true,
+    coolingReason: true
 } as const;
 
 function toView(row: {
@@ -121,7 +131,11 @@ function toView(row: {
     lastUsedAt: Date | null;
     enabled: boolean;
     updatedAt: Date;
+    limits: string;
+    coolingUntil: Date | null;
+    coolingReason: string | null;
 }): ModelKeyView {
+    const cooling = row.coolingUntil && row.coolingUntil > new Date() ? row.coolingUntil : null;
     return {
         id: row.id,
         provider: row.provider,
@@ -131,7 +145,10 @@ function toView(row: {
         expiresAt: row.expiresAt?.toISOString() ?? null,
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
         enabled: row.enabled,
-        updatedAt: row.updatedAt.toISOString()
+        updatedAt: row.updatedAt.toISOString(),
+        limits: keyLimitsOf(row.limits),
+        coolingUntil: cooling?.toISOString() ?? null,
+        coolingReason: cooling ? row.coolingReason : null
     };
 }
 
@@ -411,6 +428,30 @@ export async function setModelKeyEnabled(
     return result.count > 0;
 }
 
+/** Set one of this owner's keys' own allowance (`key-limits.ts`). False when
+ *  it holds no such key. */
+export async function setModelKeyLimits(
+    owner: KeyOwner,
+    id: string,
+    limits: KeyLimits
+): Promise<boolean> {
+    const result = await prisma.userModelKey.updateMany({
+        where: { id, userId: owner },
+        data: { limits: JSON.stringify(limits) }
+    });
+    return result.count > 0;
+}
+
+/** Put one of this owner's keys back in the router's rotation now, rather than
+ *  when its cool-down ends. False when it holds no such key. */
+export async function clearModelKeyCooling(owner: KeyOwner, id: string): Promise<boolean> {
+    const result = await prisma.userModelKey.updateMany({
+        where: { id, userId: owner },
+        data: { coolingUntil: null, coolingReason: null }
+    });
+    return result.count > 0;
+}
+
 export async function deleteModelKey(owner: KeyOwner, id: string): Promise<boolean> {
     const result = await prisma.userModelKey.deleteMany({ where: { id, userId: owner } });
     return result.count > 0;
@@ -449,6 +490,10 @@ interface StoredKey {
     encryptedSecret: Uint8Array;
     secretNonce: Uint8Array;
     secretKeyId: string;
+    name?: string;
+    limits?: string;
+    coolingUntil?: Date | null;
+    coolingReason?: string | null;
 }
 
 /**
@@ -467,7 +512,11 @@ async function storedKeys(owner: KeyOwner): Promise<StoredKey[]> {
             config: true,
             encryptedSecret: true,
             secretNonce: true,
-            secretKeyId: true
+            secretKeyId: true,
+            name: true,
+            limits: true,
+            coolingUntil: true,
+            coolingReason: true
         },
         orderBy: [...BY_PRIORITY]
     });
@@ -665,6 +714,14 @@ export interface ChatCredential {
     /** Set for an Anthropic key that is not tied to one workspace: the one it
      *  acts in, sent with every request. */
     workspaceId?: string | null;
+    /** The stored row it came from, so the router can cool it down, hold it
+     *  to its allowance and record what it spent. */
+    keyId?: string;
+    keyName?: string;
+    limits?: KeyLimits;
+    /** Until when the router steps over it, when a provider refused it lately. */
+    coolingUntil?: Date | null;
+    coolingReason?: string | null;
 }
 
 /**
@@ -678,40 +735,79 @@ export async function chatCredentialFor(
     provider: string,
     payer: KeySource | null = null
 ): Promise<ChatCredential | null> {
+    const [first] = await chatCredentialsFor(userId, provider, payer, 1);
+    if (!first) return null;
+    if (first.keyId) await noteUsed([first.keyId]);
+    return first;
+}
+
+/**
+ * Every credential a chat with this person may spend for one provider, in the
+ * order they are tried: their own keys in their order, then the deployment's
+ * when it shares them. What Polar's router walks when one key is refused or has
+ * spent its allowance. `most` stops reading once that many decrypted. Empty
+ * when nothing usable is stored, or the store could not be read. Marks none of
+ * them used: the router does, for the one that answered.
+ */
+export async function chatCredentialsFor(
+    userId: string,
+    provider: string,
+    payer: KeySource | null = null,
+    most = Number.POSITIVE_INFINITY
+): Promise<ChatCredential[]> {
+    const found: ChatCredential[] = [];
     try {
         const owners: Array<[KeySource, KeyOwner]> = [];
         if (payer !== "instance") owners.push(["own", userId]);
         if (payer !== "own" && (await instanceKeysAreShared())) owners.push(["instance", INSTANCE]);
         for (const [source, owner] of owners) {
-            const picked = firstUsable(await storedKeys(owner), provider);
-            if (!picked) continue;
-            if (provider === GATEWAY_SLUG) {
-                const config = readGatewayConfig(parseConfig(picked.row.config));
-                if (!config.baseUrl) continue;
-                await noteUsed([picked.row.id]);
-                return {
-                    provider,
-                    source,
-                    secret: picked.secret,
-                    baseUrl: config.baseUrl.replace(/\/+$/, ""),
-                    gatewayModel: config.model || null
-                };
+            for (const row of await storedKeys(owner)) {
+                if (found.length >= most) return found;
+                if (row.provider !== provider) continue;
+                const secret = readSecret(row);
+                if (secret === null) continue;
+                const credential = credentialOf(row, source, secret);
+                if (credential) found.push(credential);
             }
-            if (!picked.secret) continue;
-            await noteUsed([picked.row.id]);
-            return {
-                provider,
-                source,
-                secret: picked.secret,
-                baseUrl: null,
-                gatewayModel: null,
-                workspaceId: provider === "anthropic" ? workspaceOf(picked.row.config) : null
-            };
         }
-        return null;
+        return found;
     } catch {
-        return null;
+        return found;
     }
+}
+
+/** One stored row as a chat credential, or null when it cannot serve a chat:
+ *  a gateway with no endpoint, or a provider key with no secret. */
+function credentialOf(row: StoredKey, source: KeySource, secret: string): ChatCredential | null {
+    const tracked = {
+        keyId: row.id,
+        keyName: row.name ?? "",
+        limits: keyLimitsOf(row.limits),
+        coolingUntil: row.coolingUntil ?? null,
+        coolingReason: row.coolingReason ?? null
+    };
+    if (row.provider === GATEWAY_SLUG) {
+        const config = readGatewayConfig(parseConfig(row.config));
+        if (!config.baseUrl) return null;
+        return {
+            provider: row.provider,
+            source,
+            secret,
+            baseUrl: config.baseUrl.replace(/\/+$/, ""),
+            gatewayModel: config.model || null,
+            ...tracked
+        };
+    }
+    if (!secret) return null;
+    return {
+        provider: row.provider,
+        source,
+        secret,
+        baseUrl: null,
+        gatewayModel: null,
+        workspaceId: row.provider === "anthropic" ? workspaceOf(row.config) : null,
+        ...tracked
+    };
 }
 
 /** Best-effort, and after the fact: it is a note on a screen, not something a run

@@ -15,8 +15,10 @@ import { INSTANCE } from "@/lib/agents/model-keys";
 import {
     addKey,
     editKey,
+    limitKey,
     removeKey,
     reorderKeys,
+    reviveKey,
     toggleKey,
     type KeyActionResult,
     type KeyScope
@@ -51,4 +53,12 @@ export async function reorderInstanceModelKeysAction(input: unknown): Promise<Ke
 
 export async function toggleInstanceModelKeyAction(input: unknown): Promise<KeyActionResult> {
     return toggleKey(await scope(), input);
+}
+
+export async function limitInstanceModelKeyAction(input: unknown): Promise<KeyActionResult> {
+    return limitKey(await scope(), input);
+}
+
+export async function reviveInstanceModelKeyAction(input: unknown): Promise<KeyActionResult> {
+    return reviveKey(await scope(), input);
 }

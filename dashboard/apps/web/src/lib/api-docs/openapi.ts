@@ -140,7 +140,7 @@ export function buildOpenApi(
                 "Calls an API key can make. A key acts as the person who made it, and never with more than they can do themselves."
         },
         servers: [{ url: baseUrl }],
-        tags: [{ name: "Account" }, { name: "Deploy" }, { name: "MCP" }],
+        tags: [{ name: "Account" }, { name: "Deploy" }, { name: "MCP" }, { name: "Polar" }],
         components: {
             securitySchemes: {
                 apiKey: {

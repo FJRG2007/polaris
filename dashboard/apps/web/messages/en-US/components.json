@@ -1045,7 +1045,35 @@
         "addedAtBottom": "Added at the bottom of the list. Drag rows in the table to reorder.",
         "createAt": "Create one at {provider}",
         "checking": "Checking...",
-        "save": "Save"
+        "save": "Save",
+        "status": {
+            "title": "Status",
+            "ready": "Ready",
+            "cooling": "Cooling down",
+            "refused": "Refused by the provider",
+            "no_credit": "No credit - free models only",
+            "limit_day": "Day limit reached",
+            "limit_month": "Month limit reached",
+            "until": "Until",
+            "revive": "Put back in rotation",
+            "reviveNamed": "Put {name} back in rotation"
+        },
+        "limits": {
+            "action": "Limits",
+            "named": "Limits for {name}",
+            "title": "Limits for {name}",
+            "hint": "Polar steps over this key once it reaches one. Empty is no limit.",
+            "requestsPerMinute": "Requests per minute",
+            "concurrency": "Calls at once",
+            "requestsPerDay": "Requests per day",
+            "tokensPerDay": "Tokens per day",
+            "tokensPerMonth": "Tokens per month",
+            "none": "No limit",
+            "invalid": "Enter a whole number above 0.",
+            "usedToday": "{used} today",
+            "usedMonth": "{used} this month",
+            "failed": "Couldn't save the limits."
+        }
     },
     "signinDialog": {
         "title": "Sign in to {tool}",

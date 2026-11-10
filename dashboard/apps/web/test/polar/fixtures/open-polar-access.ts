@@ -12,6 +12,8 @@ export async function openPolarAccess() {
         polarAccessFor: async () => ({ use: true, spend: true, web: true, connectors: true }),
         polarKeySources: (userId: string) => keys.keySourcesFor(userId),
         polarCredentialFor: (...args: Parameters<typeof keys.chatCredentialFor>) =>
-            keys.chatCredentialFor(...args)
+            keys.chatCredentialFor(...args),
+        polarCredentialsFor: (userId: string, provider: string, payer: "own" | "instance" | null = null) =>
+            keys.chatCredentialsFor(userId, provider, payer)
     };
 }

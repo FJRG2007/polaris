@@ -105,6 +105,12 @@ export async function recordPolarUsage(input: {
     usage: AnswerUsage;
     /** A transcription's length; absent for a chat answer. */
     audioSeconds?: number;
+    /** The stored key that paid (`ChatCredential.keyId`), when one did. */
+    keyId?: string | null;
+    /** Where the call came from (`PolarUsage.surface`). Defaults to "chat". */
+    surface?: PolarUsageSurface;
+    /** Set when a fallback answered: what was asked first, and why it moved on. */
+    fellBack?: { from: string; kind: string } | null;
 }): Promise<void> {
     await prisma.polarUsage.create({
         data: {
@@ -117,9 +123,47 @@ export async function recordPolarUsage(input: {
             inputTokens: input.usage.inputTokens,
             outputTokens: input.usage.outputTokens,
             costUsd: input.usage.costUsd,
-            audioSeconds: Math.max(0, Math.round(input.audioSeconds ?? 0))
+            audioSeconds: Math.max(0, Math.round(input.audioSeconds ?? 0)),
+            keyId: input.keyId ?? null,
+            surface: input.surface ?? "chat",
+            fellBackFrom: input.fellBack?.from ?? null,
+            fellBackKind: input.fellBack?.kind ?? null
         }
     });
+}
+
+/** Where a recorded call came from. */
+export const POLAR_USAGE_SURFACES = ["chat", "helper", "api", "voice", "translate"] as const;
+export type PolarUsageSurface = (typeof POLAR_USAGE_SURFACES)[number];
+
+/**
+ * What a routed answer records about how it was routed: the stored key that
+ * paid, and - when a fallback answered - the model first asked and the kind
+ * of refusal that moved the call on. Pure.
+ */
+export function routeRecord(resolved: {
+    option: { provider: string; model: string };
+    credential: { keyId?: string };
+    routed?: {
+        answered: () => { option: { provider: string; model: string }; credential: { keyId?: string } } | null;
+        firstRefusal: () => string | null;
+    };
+}): { keyId: string | null; fellBack: { from: string; kind: string } | null } {
+    const answered = resolved.routed?.answered() ?? null;
+    const paid = answered ?? resolved;
+    const moved =
+        answered !== null &&
+        (answered.option.provider !== resolved.option.provider ||
+            answered.option.model !== resolved.option.model ||
+            answered.credential.keyId !== resolved.credential.keyId);
+    const kind = resolved.routed?.firstRefusal() ?? null;
+    return {
+        keyId: paid.credential.keyId ?? null,
+        fellBack:
+            moved && kind
+                ? { from: `${resolved.option.provider}/${resolved.option.model}`, kind }
+                : null
+    };
 }
 
 /** The first moment of the current calendar month, in UTC. */

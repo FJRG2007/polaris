@@ -22,7 +22,9 @@ import { ModelProvidersLoader } from "./loader";
 import {
     addInstanceModelKeyAction,
     deleteInstanceModelKeyAction,
+    limitInstanceModelKeyAction,
     reorderInstanceModelKeysAction,
+    reviveInstanceModelKeyAction,
     toggleInstanceModelKeyAction,
     updateInstanceModelKeyAction
 } from "./actions";
@@ -40,7 +42,9 @@ export default async function ModelProvidersPage() {
         update: updateInstanceModelKeyAction,
         remove: deleteInstanceModelKeyAction,
         reorder: reorderInstanceModelKeysAction,
-        toggle: toggleInstanceModelKeyAction
+        toggle: toggleInstanceModelKeyAction,
+        limit: limitInstanceModelKeyAction,
+        revive: reviveInstanceModelKeyAction
     };
     // Both readings of the sharing note, so the region can show the one that is
     // true once it knows, without a translation of its own.

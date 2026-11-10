@@ -34,7 +34,20 @@ import { anthropicWorkspaceIdSchema, modelKeyNameSchema } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { ProviderSelect } from "@/components/model-keys/provider-select";
-import { ChevronDown, ChevronUp, GripVertical, Pencil, Plus, Trash2, Wand2 } from "lucide-react";
+import type { KeyHealthView, KeyLimits } from "@/lib/agents/key-limits";
+import { isCoolingState, revivedStatus } from "@/lib/agents/key-status";
+import { KeyLimitsDialog, KeyStanding } from "@/components/model-keys/key-standing";
+import {
+    ChevronDown,
+    ChevronUp,
+    Gauge,
+    GripVertical,
+    Pencil,
+    Plus,
+    RotateCcw,
+    Trash2,
+    Wand2
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -60,6 +73,10 @@ export interface ModelKeyActions {
     reorder: (input: unknown) => Promise<KeyActionResult>;
     /** Switching one on or off. Absent where the screen offers no switch. */
     toggle?: (input: unknown) => Promise<KeyActionResult>;
+    /** Setting a key's own allowance. Absent where the table offers none. */
+    limit?: (input: unknown) => Promise<KeyActionResult>;
+    /** Putting a cooled key back in rotation now. */
+    revive?: (input: unknown) => Promise<KeyActionResult>;
 }
 
 /** The words that differ between the two owners. Everything else the table says
@@ -161,10 +178,14 @@ export function ModelKeysView({
     actions,
     copy,
     assist,
-    footer
+    footer,
+    health
 }: {
     providers: ProviderRow[];
     keys: ModelKeyView[];
+    /** Each key's standing with Polar's router, by id. Absent where the table
+     *  lists something the router does not spend (agent sign-ins). */
+    health?: Record<string, KeyHealthView>;
     actions: ModelKeyActions;
     copy: ModelKeysCopy;
     /**
@@ -198,6 +219,14 @@ export function ModelKeysView({
         setServed(keys);
         setRows(keys);
     }
+    // The standings, held the same way so a revive shows at once.
+    const [statuses, setStatuses] = useState(health);
+    const [servedHealth, setServedHealth] = useState(health);
+    if (servedHealth !== health) {
+        setServedHealth(health);
+        setStatuses(health);
+    }
+    const [limiting, setLimiting] = useState<ModelKeyView | null>(null);
 
     const byslug = useMemo(
         () => new Map(providers.map((provider) => [provider.slug, provider])),
@@ -251,6 +280,46 @@ export function ModelKeysView({
               router.refresh();
           }
         : null;
+
+    // Shown back in rotation at once, and put back if the server refuses.
+    const revive = actions.revive
+        ? async (key: ModelKeyView) => {
+              const current = statuses?.[key.id];
+              if (!current) return;
+              const previous = statuses;
+              setStatuses({ ...statuses, [key.id]: revivedStatus(current) });
+              setError(null);
+              const result = await runAction(() => actions.revive!({ id: key.id }), setError);
+              if (!result || result.error) {
+                  setStatuses(previous);
+                  if (result?.error) setError(result.error);
+                  return;
+              }
+              router.refresh();
+          }
+        : null;
+
+    // Saved into the row at once; the dialog stays open on a refusal and the
+    // row goes back to what the server holds.
+    const saveLimits = async (key: ModelKeyView, limits: KeyLimits): Promise<string | null> => {
+        if (!actions.limit) return null;
+        const previous = rows;
+        setRows(rows.map((row) => (row.id === key.id ? { ...row, limits } : row)));
+        let failure: string | null = null;
+        const result = await runAction(
+            () => actions.limit!({ id: key.id, limits }),
+            (message) => {
+                failure = message;
+            }
+        );
+        if (!result || result.error) {
+            setRows(previous);
+            return result?.error ?? failure ?? t("modelKeys.limits.failed");
+        }
+        setLimiting(null);
+        router.refresh();
+        return null;
+    };
 
     const remove = async (key: ModelKeyView) => {
         const provider = byslug.get(key.provider);
@@ -319,6 +388,11 @@ export function ModelKeysView({
                                     <th className="w-full max-w-0 px-3 py-2 font-medium">
                                         {t("modelKeys.name")}
                                     </th>
+                                    {statuses ? (
+                                        <th className="hidden whitespace-nowrap px-3 py-2 font-medium sm:table-cell">
+                                            {t("modelKeys.status.title")}
+                                        </th>
+                                    ) : null}
                                     <th className="hidden whitespace-nowrap px-3 py-2 font-medium md:table-cell">
                                         {t("modelKeys.expires")}
                                     </th>
@@ -332,7 +406,7 @@ export function ModelKeysView({
                                 {rows.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={6}
+                                            colSpan={statuses ? 7 : 6}
                                             className="text-muted-foreground px-3 py-8 text-center"
                                         >
                                             {copy.empty}
@@ -354,6 +428,13 @@ export function ModelKeysView({
                                                     ? (enabled) => void toggle(row, enabled)
                                                     : null
                                             }
+                                            status={
+                                                statuses ? (statuses[row.id] ?? null) : undefined
+                                            }
+                                            onLimits={
+                                                actions.limit && statuses ? () => setLimiting(row) : null
+                                            }
+                                            onRevive={revive ? () => void revive(row) : null}
                                         />
                                     ))
                                 )}
@@ -403,6 +484,15 @@ export function ModelKeysView({
                     }}
                 />
             ) : null}
+            {limiting ? (
+                <KeyLimitsDialog
+                    key={limiting.id}
+                    keyRow={limiting}
+                    status={statuses?.[limiting.id] ?? null}
+                    onClose={() => setLimiting(null)}
+                    onSave={(limits) => saveLimits(limiting, limits)}
+                />
+            ) : null}
             {confirmElement}
         </div>
     );
@@ -416,7 +506,10 @@ function KeyRow({
     onMove,
     onEdit,
     onRemove,
-    onToggle
+    onToggle,
+    status,
+    onLimits,
+    onRevive
 }: {
     row: ModelKeyView;
     provider: ProviderRow | null;
@@ -426,6 +519,10 @@ function KeyRow({
     onEdit: () => void;
     onRemove: () => void;
     onToggle: ((enabled: boolean) => void) | null;
+    /** Undefined where the table shows no standing; null for a key it has none for. */
+    status?: KeyHealthView | null;
+    onLimits?: (() => void) | null;
+    onRevive?: (() => void) | null;
 }) {
     const t = useTranslations("components");
     const [over, setOver] = useState(false);
@@ -483,8 +580,20 @@ function KeyRow({
                         </Badge>
                     ) : null}
                     {row.enabled ? null : <Badge className="shrink-0">{t("modelKeys.off")}</Badge>}
+                    {/* The standing rides with the name below sm, where its own
+                        column is dropped; a ready key says nothing there. */}
+                    {status && status.state !== "ready" ? (
+                        <span className="shrink-0 sm:hidden">
+                            <KeyStanding status={status} compact />
+                        </span>
+                    ) : null}
                 </span>
             </td>
+            {status !== undefined ? (
+                <td className="hidden px-3 py-2 sm:table-cell">
+                    {status ? <KeyStanding status={status} /> : null}
+                </td>
+            ) : null}
             <td className="hidden whitespace-nowrap px-3 py-2 md:table-cell">
                 {row.expiresAt ? (
                     <span className="flex items-center gap-2">
@@ -534,6 +643,28 @@ function KeyRow({
                     >
                         <ChevronDown className="size-4 shrink-0" />
                     </Button>
+                    {onRevive && status && isCoolingState(status.state) ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onRevive}
+                            aria-label={t("modelKeys.status.reviveNamed", { name: row.name })}
+                            title={t("modelKeys.status.revive")}
+                        >
+                            <RotateCcw className="size-4 shrink-0" />
+                        </Button>
+                    ) : null}
+                    {onLimits ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onLimits}
+                            aria-label={t("modelKeys.limits.named", { name: row.name })}
+                            title={t("modelKeys.limits.action")}
+                        >
+                            <Gauge className="size-4 shrink-0" />
+                        </Button>
+                    ) : null}
                     <Button
                         variant="ghost"
                         size="icon"

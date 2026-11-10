@@ -14,6 +14,7 @@ import type { ModelChoice } from "@/lib/polar/shared";
 import {
     answerUsage,
     recordPolarUsage,
+    routeRecord,
     polarLimitReached,
     type AnswerUsage,
     type PolarLimitHit
@@ -68,6 +69,9 @@ export async function compactPolarThread(input: {
     let answered = resolved;
     try {
         const result = await generateText({
+            // The router retries and walks keys and fallbacks itself
+            // (`router/chain.ts`); the SDK's own retries would walk it all again.
+            maxRetries: 0,
             model: resolved.model,
             system: compactionSystem(input.instructions),
             prompt: compactionTranscript(previous, summarised),
@@ -121,7 +125,9 @@ export async function compactPolarThread(input: {
             provider: answered.option.provider,
             model: answered.option.model,
             payer: answered.credential.source === "instance" ? "instance" : "own",
-            usage: spent
+            usage: spent,
+            surface: "helper",
+            ...(typeof resolved === "string" ? {} : routeRecord(resolved))
         });
     } catch (error) {
         console.error("polar: could not record a compaction's usage", error);
