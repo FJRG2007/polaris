@@ -11,10 +11,12 @@
  * minute late (the computer slept) is left to the server, which already told
  * the person.
  *
- * Every tab and device with the page open rings, so stopping it in one has to
- * reach the rest: the stop is written on the row (`stoppedDue`), and while
- * something rings here the snapshot is read again every few seconds so the
- * ring falls quiet wherever it was answered. Tabs of this browser hear sooner,
+ * One tab per browser rings, and a browser leaves the ring to the desktop app
+ * while the app is the client elected to sound (`anotherClientSounds`).
+ * Stopping it on one device has to reach every other that rings: the stop is
+ * written on the row (`stoppedDue`), and while something rings here the
+ * snapshot is read again every few seconds so the ring falls quiet wherever it
+ * was answered. Tabs of this browser hear sooner,
  * over the clock's broadcast channel.
  */
 
@@ -118,8 +120,25 @@ function fresh(): Promise<Response> {
     return fetch("/api/calendar/time", { cache: "no-store" });
 }
 
-/** Claim a ring for this tab: false when another tab of this browser has it. */
-async function claim(key: string): Promise<boolean> {
+/**
+ * Whether the desktop app (or, while its computer sits untouched, a browser)
+ * is the client the server elected to make the account's sounds, and this page
+ * is not it. A browser tab then leaves the ring to the app, as messages and
+ * calls already do. A dashboard that does not offer the answer leaves nobody
+ * yielding: an alarm rung twice is better than one rung nowhere.
+ */
+function anotherClientRings(): boolean {
+    try {
+        return hostUi.soundingClient.anotherClientSounds();
+    } catch {
+        return false;
+    }
+}
+
+/** Claim a ring for this tab: false when another tab of this browser has it,
+ *  or when another kind of client rings for the account. */
+export async function claim(key: string): Promise<boolean> {
+    if (anotherClientRings()) return false;
     const take = (): boolean => {
         try {
             const raw = window.localStorage.getItem(RANG_KEY);

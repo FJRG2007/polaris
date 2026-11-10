@@ -193,6 +193,10 @@ const EAGER_UI = [
     // How loud Polaris' sounds are: a number the frame's own chime and toasts
     // already read, so its module is in the shell's chunk anyway.
     "notificationSound.soundGain",
+    // Whether the desktop app sounds for the account instead of this page: a
+    // read of what the notification stream said, in a module the shell's own
+    // message chime (`device-once`) already loads.
+    "soundingClient.anotherClientSounds",
     // Telling the rail an app's favorites changed: a function in the module
     // the rail itself (in the shell) already loads.
     "appFavorites.refreshAppFavorites",
