@@ -10,6 +10,7 @@
 
 import { Badge } from "../components/badge";
 import { Input } from "../components/input";
+import { publicDocHref } from "../lib/public-docs";
 import * as tv from "@polaris/core/tv-compat";
 import { Button } from "../components/button";
 import { Select } from "../components/select";
@@ -28,8 +29,6 @@ export const TV_GUIDE_SLUGS: Readonly<Record<TvGuide, string>> = {
     privacy: "polaris-tv-privacy"
 };
 
-/** The public docs, for a screen that is not the docs site itself. */
-const PUBLIC_DOCS = "https://fjrg2007.github.io/polaris";
 /** Models drawn at first and added per "Show more". */
 const PAGE = 24;
 /** Brand chips shown beside "All"; the search reaches every other brand. */
@@ -44,8 +43,7 @@ const TIER_BADGE = { full: "success", app: "primary", network: "neutral" } as co
 const TIER_ICON = { full: House, app: AppWindow, network: Router } as const;
 
 export function publicGuideHref(locale: string, guide: TvGuide): string {
-    const lang = locale.startsWith("es") ? "es" : "en";
-    return `${PUBLIC_DOCS}/${lang}/docs/${TV_GUIDE_SLUGS[guide]}/`;
+    return publicDocHref(locale, TV_GUIDE_SLUGS[guide]);
 }
 
 function useDate() {

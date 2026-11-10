@@ -15,6 +15,7 @@
  */
 
 import { Button } from "@polaris/ui";
+import { CodeLine } from "@/components/json-view";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -57,7 +58,7 @@ export function RunsOnSnippet({ labels, label }: { labels: readonly string[]; la
         <div className="flex flex-col gap-1">
             {shown ? <span className="text-xs text-muted-foreground">{shown}</span> : null}
             <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
-                <code className="min-w-0 flex-1 truncate font-mono text-xs">{line}</code>
+                <CodeLine value={line} language="yaml" title={line} className="min-w-0 flex-1 truncate text-xs" />
                 <Button
                     size="icon"
                     variant="ghost"

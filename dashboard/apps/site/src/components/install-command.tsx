@@ -15,10 +15,13 @@ export type InstallSystem = "unix" | "windows";
 
 export function InstallCommand({
     commands,
+    painted,
     labels,
     className
 }: {
     commands: Readonly<Record<InstallSystem, string>>;
+    /** The same lines highlighted at build time; empty falls back to plain text. */
+    painted: Readonly<Record<InstallSystem, string>>;
     labels: { unix: string; windows: string; system: string; copy: string };
     className?: string;
 }) {
@@ -46,19 +49,29 @@ export function InstallCommand({
                     ]}
                 />
             </div>
-            <div className="flex min-w-0 items-center gap-2 rounded-lg bg-background px-3 py-2.5">
+            <div className="code-block flex min-w-0 items-center gap-2 rounded-lg bg-background px-3 py-2.5">
                 <span
                     aria-hidden="true"
                     className="select-none font-mono text-sm text-muted-foreground"
                 >
                     {system === "windows" ? ">" : "$"}
                 </span>
-                <code
-                    className="min-w-0 flex-1 overflow-x-auto whitespace-pre font-mono text-sm [scrollbar-width:none]"
-                    title={command}
-                >
-                    {command}
-                </code>
+                {painted[system] ? (
+                    <code
+                        className="shiki min-w-0 flex-1 overflow-x-auto whitespace-pre font-mono text-sm [scrollbar-width:none]"
+                        title={command}
+                        // Shiki's own markup: it escaped the line, and the only
+                        // elements in it are the spans it added.
+                        dangerouslySetInnerHTML={{ __html: painted[system] }}
+                    />
+                ) : (
+                    <code
+                        className="min-w-0 flex-1 overflow-x-auto whitespace-pre font-mono text-sm [scrollbar-width:none]"
+                        title={command}
+                    >
+                        {command}
+                    </code>
+                )}
                 <CopyButton value={command} label={labels.copy} />
             </div>
         </div>

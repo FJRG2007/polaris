@@ -505,9 +505,11 @@ export function MinecraftClientMods({
                                 <span className="w-16 shrink-0 text-xs text-muted-foreground">
                                     {system.label}
                                 </span>
-                                <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 text-xs">
-                                    {packCommands[system.key]}
-                                </code>
+                                <hostUi.jsonView.CodeLine
+                                    value={packCommands[system.key]}
+                                    language={system.key === "windows" ? "powershell" : "bash"}
+                                    className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 text-xs"
+                                />
                                 <CopyButton
                                     value={packCommands[system.key]}
                                     label={t("clientMods.commandFor", { system: system.label })}

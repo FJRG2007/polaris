@@ -113,6 +113,38 @@ export function CodeView({
     );
 }
 
+/**
+ * One line of code inside a row or a sentence - a shell command, an attribute,
+ * a call - painted the way `CodeView` paints a block, without the block. The
+ * caller keeps its own box and copy button around it.
+ */
+export function CodeLine({
+    value,
+    language,
+    className,
+    title
+}: {
+    value: string;
+    /** A highlight.js token: `bash`, `xml`, `javascript`, `yaml`. */
+    language: string;
+    className?: string;
+    title?: string;
+}) {
+    const highlight = useHighlighter(language);
+    const painted = highlight ? highlight(value, language) : null;
+    return painted === null ? (
+        <code className={cn("font-mono", className)} title={title}>
+            {value}
+        </code>
+    ) : (
+        <code
+            className={cn("font-mono", className)}
+            title={title}
+            dangerouslySetInnerHTML={{ __html: painted }}
+        />
+    );
+}
+
 /** A JSON document nobody may change: highlighted, scrollable, copyable. */
 export function JsonView({
     value,

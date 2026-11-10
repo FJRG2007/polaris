@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { buttonVariants, cn } from "@polaris/ui";
 import { asset, href, siteData, words } from "@/lib/site";
+import { highlightInline } from "@/lib/highlight";
 import { InstallCommand } from "@/components/install-command";
 import type { ShowcaseItem, SiteLocale } from "@/data/builders";
 import { ShotGallery, type Shot } from "@/components/shot-gallery";
@@ -78,12 +79,17 @@ function tourFeatures(locale: SiteLocale): { main: Feature[]; more: Feature[] } 
     return { main: MAIN_FEATURES.flatMap(feature), more: MORE_FEATURES.flatMap(feature) };
 }
 
-export function HomeView({ locale }: { locale: SiteLocale }) {
+export async function HomeView({ locale }: { locale: SiteLocale }) {
     const all = words(locale);
     const t = all.home;
     const data = siteData();
     const { replaces, showcase } = data.locales[locale];
     const commands = { unix: data.install.unix ?? "", windows: data.install.windows ?? "" };
+    const [unix, windows] = await Promise.all([
+        highlightInline(commands.unix, "bash"),
+        highlightInline(commands.windows, "powershell")
+    ]);
+    const painted = { unix, windows };
     const installWords = { unix: t.unix, windows: t.windows, system: t.system, copy: t.copy };
     const lead = showcase[0]?.items[0];
     const steps = [
@@ -103,6 +109,7 @@ export function HomeView({ locale }: { locale: SiteLocale }) {
                 <p className="max-w-2xl text-pretty text-lg text-muted-foreground">{t.intro}</p>
                 <InstallCommand
                     commands={commands}
+                    painted={painted}
                     labels={installWords}
                     className="max-w-3xl text-left"
                 />
@@ -232,6 +239,7 @@ export function HomeView({ locale }: { locale: SiteLocale }) {
                 <p className="max-w-xl text-muted-foreground">{t.ctaBody}</p>
                 <InstallCommand
                     commands={commands}
+                    painted={painted}
                     labels={installWords}
                     className="max-w-3xl text-left"
                 />

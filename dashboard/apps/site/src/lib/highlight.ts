@@ -22,6 +22,12 @@ export async function highlight(code: string, lang: CodeLanguage): Promise<strin
     });
 }
 
+/** One line painted for a `<code>` of its own: the spans, without shiki's block. */
+export async function highlightInline(code: string, lang: CodeLanguage): Promise<string> {
+    const html = await highlight(code, lang);
+    return /<code>([\s\S]*)<\/code>/.exec(html)?.[1] ?? "";
+}
+
 export async function highlightAll(
     samples: readonly { label: string; code: string; lang: CodeLanguage }[]
 ): Promise<HighlightedCode[]> {

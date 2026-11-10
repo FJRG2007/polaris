@@ -451,13 +451,16 @@ const featureFiles = readdirSync(featuresDir)
     .filter((file) => file.endsWith(".md") && !file.endsWith(".es.md"))
     .sort();
 // Guides that live outside `docs/features` but belong on the site: setting up
-// the services Polaris connects to, how to connect an assistant, and what the
-// MCP server offers it. The Spanish site reads `<name>.es.md` beside each one
+// the services Polaris connects to, how to connect an assistant, what the MCP
+// server offers it, and how a site or an application reports to Analytics and
+// Telemetry. The Spanish site reads `<name>.es.md` beside each one
 // where it exists, and the English text where it does not.
 const extraGuides = [
     "docs/integrations-setup.md",
     "docs/connecting-ai-assistants.md",
-    "docs/developers/mcp.md"
+    "docs/developers/mcp.md",
+    "docs/developers/analytics.md",
+    "docs/developers/telemetry.md"
 ].filter((file) => existsSync(join(root, file)));
 /** The guide in the page's language: its `.es.md` sibling on the Spanish site, when there is one. */
 const ownGuide = (file: string, spanish: boolean) => {

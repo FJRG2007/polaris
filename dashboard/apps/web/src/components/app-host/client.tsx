@@ -187,6 +187,12 @@ const MetricsHistory = dynamic(
     { ssr: false }
 ) as typeof import("@/components/metrics-history").MetricsHistory;
 
+/** A line of code painted by the dashboard's highlighter. */
+const CodeLine = dynamic(
+    () => import("@/components/json-view").then((module) => module.CodeLine),
+    { ssr: false }
+);
+
 const LogViewer = dynamic(
     () => import("@/components/log-viewer").then((module) => module.LogViewer),
     { ssr: false }
@@ -264,6 +270,7 @@ export const clientHost = {
     filePicker: { ChooseFilesDialog, FilePickerDialog, useChooseFiles },
     gameLogo: { GameLogo },
     i18nProvider: { useClient, useLocale },
+    jsonView: { CodeLine },
     logViewer: { LogViewer },
     logos: { IntegrationLogo },
     mediaPlayer: { MediaPlayer },

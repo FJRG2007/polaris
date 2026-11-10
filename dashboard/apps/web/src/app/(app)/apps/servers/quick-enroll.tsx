@@ -19,6 +19,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Checkbox, Input, Select } from "@polaris/ui";
+import { CodeLine } from "@/components/json-view";
 import { EnrollmentProgress } from "./enrollment-progress";
 import { dropServerOptions } from "@/components/server-picker";
 import {
@@ -236,9 +237,11 @@ export function QuickEnroll({
 
                 <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3">
                     <Terminal className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <code className="flex-1 break-all font-mono text-xs leading-relaxed">
-                        {showing.command}
-                    </code>
+                    <CodeLine
+                        value={showing.command}
+                        language="bash"
+                        className="min-w-0 flex-1 break-all text-xs leading-relaxed"
+                    />
                     <Button
                         size="icon"
                         variant="ghost"
