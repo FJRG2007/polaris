@@ -24,7 +24,9 @@ beforeEach(() => {
         "fetch",
         vi.fn(async (url: string, init?: RequestInit) => {
             calls.push({ url, init });
-            return new Response(new Blob(["x"]), { status: 200 });
+            // A string body: Node 22's Response does not read jsdom's Blob, so
+            // a Blob body made blob() reject there and the preload never landed.
+            return new Response("x", { status: 200 });
         })
     );
     URL.createObjectURL = vi.fn(() => `blob:picture-${(made += 1)}`);
@@ -39,9 +41,7 @@ afterEach(() => {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 /** Until a preload has landed. Reading a response's blob takes more than one
- *  turn of the event loop on a busy machine, so one `settle` is not enough to
- *  wait for it: CI's first shard failed these on every run while they passed
- *  on a quiet one. */
+ *  turn of the event loop, so one `settle` is not enough to wait for it. */
 const landed = (src: string) => vi.waitFor(() => expect(cachedPicture(src)).not.toBeNull());
 
 describe("the picture cache", () => {
