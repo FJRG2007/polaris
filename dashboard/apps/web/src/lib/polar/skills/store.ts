@@ -54,6 +54,23 @@ export async function enabledSkills(
     });
 }
 
+/**
+ * The skills a custom agent lists, by name, whether or not they are switched on
+ * for plain Polar: picking them for the agent is the decision.
+ */
+export async function agentSkills(
+    ownerId: string,
+    names: readonly string[]
+): Promise<Pick<SkillInput, "name" | "description" | "instructions">[]> {
+    if (names.length === 0) return [];
+    return prisma.polarSkill.findMany({
+        where: { ownerId, name: { in: [...names] } },
+        select: { name: true, description: true, instructions: true },
+        orderBy: { createdAt: "asc" },
+        take: SKILL_LIMIT
+    });
+}
+
 /** Adds a skill, from the editor or the catalog. */
 export async function createSkill(
     ownerId: string,

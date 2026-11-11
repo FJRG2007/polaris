@@ -146,7 +146,8 @@
         "connectivity": "Internet se cae o vuelve",
         "redeploy": "Redesplegar servicio",
         "code": "Código JS",
-        "agentWork": "El agente trabaja en el repo"
+        "agentWork": "El agente trabaja en el repo",
+        "askAgent": "Usar un agente"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -244,7 +245,13 @@
         },
         "agentInstructions": "Instrucciones",
         "agentInstructionsHint": "Tus palabras para el agente. Lo que se escribe en GitHub le llega como el evento, nunca como instrucciones.",
-        "agentRepoSearch": "Buscar repositorios"
+        "agentRepoSearch": "Buscar repositorios",
+        "askAgent": "Agente",
+        "askAgentPick": "Elige un agente",
+        "askAgentSearch": "Buscar agentes",
+        "askAgentNone": "Aún no hay agentes. Crea uno en los ajustes de Polar.",
+        "askAgentPrompt": "Pregunta",
+        "askAgentHint": "Inserta valores de pasos previos. Los siguientes leen la respuesta como text."
     },
     "operators": {
         "eq": "igual a",
@@ -364,7 +371,14 @@
         "agentsForbidden": "La cuenta con la que se ejecuta no puede iniciar trabajo de agentes",
         "repoGone": "Ese repositorio ya no está o lo conectó otra persona",
         "repoOff": "Ese repositorio está desactivado",
-        "agentRefused": "El agente no arrancó: un límite, una pausa o ningún agente conectado"
+        "agentRefused": "El agente no arrancó: un límite, una pausa o ningún agente conectado",
+        "agentRequired": "Elige un agente para este paso",
+        "promptRequired": "Escribe la pregunta",
+        "polarForbidden": "Polar no está disponible para la cuenta que lo ejecuta",
+        "agentGone": "Ese agente ya no existe",
+        "polarNoKey": "Ninguna clave de IA responde por la cuenta que lo ejecuta",
+        "polarLimit": "La cuenta que lo ejecuta llegó al límite de la clave compartida",
+        "polarFailed": "El proveedor de IA no respondió"
     },
     "secrets": {
         "title": "Secretos",
@@ -694,7 +708,8 @@
         "connectivity": "Empieza cuando la línea cae, vuelve, cambia de IP o deja de verse desde fuera.",
         "redeploy": "Despliega un servicio de nuevo, como Redesplegar en su página.",
         "code": "Cambia elementos con JavaScript y pásalos al siguiente paso.",
-        "agentWork": "Inicia una ejecución o sesión del agente en un repositorio conectado."
+        "agentWork": "Inicia una ejecución o sesión del agente en un repositorio conectado.",
+        "askAgent": "Pregunta a uno de tus agentes de Polar y usa su respuesta después."
     },
     "flow": {
         "conditionGroup": "Condiciones",

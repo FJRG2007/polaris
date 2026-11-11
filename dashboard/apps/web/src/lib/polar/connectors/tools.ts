@@ -45,7 +45,9 @@ const FAILED: Record<string, string> = {
 
 export async function polarConnectorTools(
     user: Pick<SessionUser, "id">,
-    access: Pick<PolarAccess, "connectors">
+    access: Pick<PolarAccess, "connectors">,
+    /** Only these connectors, as a custom agent lists them; null for all. */
+    only: ReadonlySet<string> | null = null
 ): Promise<ConnectorToolSet> {
     const result = EMPTY();
     if (!access.connectors) return result;
@@ -54,6 +56,7 @@ export async function polarConnectorTools(
         connectorPolicy()
     ]);
     for (const { row } of connectors) {
+        if (only && !only.has(row.id)) continue;
         if (!hostAllowed(row.url, policy.hosts)) continue;
         for (const entry of row.tools) {
             const answer = rules.effectiveToolPolicy(entry, row.policies);

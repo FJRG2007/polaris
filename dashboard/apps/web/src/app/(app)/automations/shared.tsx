@@ -304,6 +304,7 @@ const NODE_KEYS = {
     "core.waitCondition": "waitCondition",
     "core.redeploy": "redeploy",
     "core.agentWork": "agentWork",
+    "core.askAgent": "askAgent",
     "core.code": "code"
 } as const;
 
@@ -347,6 +348,7 @@ const NODE_ICONS: Record<string, LucideIcon> = {
     "game-servers.action.command": SquareTerminal,
     "core.redeploy": Rocket,
     "core.agentWork": Bot,
+    "core.askAgent": Bot,
     "core.code": Code,
     "core.manual": Hand,
     "core.schedule": Clock,

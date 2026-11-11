@@ -146,7 +146,8 @@
         "connectivity": "The internet goes down or comes back",
         "redeploy": "Redeploy a service",
         "code": "Run code",
-        "agentWork": "Agent works on the repository"
+        "agentWork": "Agent works on the repository",
+        "askAgent": "Ask an agent"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -244,7 +245,13 @@
         },
         "agentInstructions": "Instructions",
         "agentInstructionsHint": "Your words for the agent. What people write on GitHub reaches it as the event, never as instructions.",
-        "agentRepoSearch": "Search repositories"
+        "agentRepoSearch": "Search repositories",
+        "askAgent": "Agent",
+        "askAgentPick": "Pick an agent",
+        "askAgentSearch": "Search agents",
+        "askAgentNone": "No agents yet. Create one in Polar's settings.",
+        "askAgentPrompt": "Question",
+        "askAgentHint": "Insert values from earlier steps. Later steps read the answer as text."
     },
     "operators": {
         "eq": "equals",
@@ -364,7 +371,14 @@
         "agentsForbidden": "The account it runs as cannot start agent work",
         "repoGone": "That repository is gone or connected by someone else",
         "repoOff": "That repository is turned off",
-        "agentRefused": "The agent did not start: a limit, a pause or no agent signed in"
+        "agentRefused": "The agent did not start: a limit, a pause or no agent signed in",
+        "agentRequired": "Pick an agent for this step",
+        "promptRequired": "Write the question to ask",
+        "polarForbidden": "Polar isn't available to the account this runs as",
+        "agentGone": "That agent no longer exists",
+        "polarNoKey": "No AI provider key can answer for the account this runs as",
+        "polarLimit": "The shared key's limit is reached for the account this runs as",
+        "polarFailed": "The AI provider didn't answer"
     },
     "secrets": {
         "title": "Secrets",
@@ -694,7 +708,8 @@
         "connectivity": "Starts when the line drops, returns, changes address or stops being reachable.",
         "redeploy": "Deploy a service again, as Redeploy on its page does.",
         "code": "Change items with JavaScript and pass them on.",
-        "agentWork": "Start an agent run or session on a connected repository."
+        "agentWork": "Start an agent run or session on a connected repository.",
+        "askAgent": "Ask one of your Polar agents and use its answer in later steps."
     },
     "flow": {
         "conditionGroup": "Conditions",

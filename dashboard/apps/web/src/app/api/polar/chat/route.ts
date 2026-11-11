@@ -45,7 +45,9 @@ import {
     usedInMessages
 } from "@/lib/polar/tool-relevance";
 import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
-import { enabledSkills } from "@/lib/polar/skills/store";
+import { agentSkills, enabledSkills } from "@/lib/polar/skills/store";
+import { polarThreadAgent } from "@/lib/polar/agents/store";
+import { agentPrompt } from "@/lib/polar/agents/shared";
 import { trialSkillSchema } from "@/lib/polar/skills/shared";
 import {
     USE_SKILL,
@@ -144,6 +146,8 @@ const bodySchema = z.object({
     parentId: z.string().max(64).nullable().default(null),
     /** The project a new thread is filed under; ignored for an existing one. */
     projectId: z.string().uuid().nullable().default(null),
+    /** The custom agent a new chat starts with; a stored chat keeps its own. */
+    agentId: z.string().uuid().nullable().default(null),
     /** A new thread made temporary: not listed, no memory, deleted on leave. */
     temporary: z.boolean().default(false),
     /** False for a turn sent on a command's own model: the thread keeps the
@@ -237,9 +241,16 @@ export async function POST(request: Request): Promise<Response> {
     if (!body.success) return refuse("invalid", 400);
 
     const access = await polarAccessFor(user.id);
+    // The chat's custom agent (`lib/polar/agents`): the one it was started with,
+    // read again on every turn so an edit to the agent reaches it at once.
+    const agent = await polarThreadAgent(user.id, body.data.threadId, body.data.agentId);
     const [toolset, connectorSet] = await Promise.all([
         polarTools(user),
-        polarConnectorTools(user, access)
+        polarConnectorTools(
+            user,
+            access,
+            agent && agent.connectorIds.length > 0 ? new Set(agent.connectorIds) : null
+        )
     ]);
     // Tools the person switched off in Polar's settings: never offered, and
     // never turned up by find_tools either.
@@ -295,7 +306,8 @@ export async function POST(request: Request): Promise<Response> {
 
     // A thread whose model has since been retired by its provider falls back to
     // the first model this person can use, and the answer says so.
-    let choice: ModelChoice = body.data.choice;
+    // An agent with a model of its own answers on it.
+    let choice: ModelChoice = agent?.choice ?? body.data.choice;
     const signals = turnSignals(messages);
     let resolved = await resolvePolarModel(user.id, choice, signals, access);
     let fellBackFrom: string | null = null;
@@ -316,7 +328,8 @@ export async function POST(request: Request): Promise<Response> {
         body.data.remember ? choice : null,
         body.data.projectId,
         body.data.temporary,
-        body.data.code ?? null
+        body.data.code ?? null,
+        agent?.id ?? null
     );
     if (!owned) return refuse("not_found", 404);
     // The stored kind decides, whatever this request said.
@@ -342,7 +355,10 @@ export async function POST(request: Request): Promise<Response> {
         polarThreadInstructions(user.id, body.data.threadId),
         temporary ? Promise.resolve(false) : polarMemoryEnabled(user.id),
         // A chat still answers when the skills cannot be read; it just lists none.
-        enabledSkills(user.id).catch((error: unknown) => {
+        (agent && agent.skills.length > 0
+            ? agentSkills(user.id, agent.skills)
+            : enabledSkills(user.id)
+        ).catch((error: unknown) => {
             console.error("polar: could not read the skills", error);
             return [];
         })
@@ -354,7 +370,7 @@ export async function POST(request: Request): Promise<Response> {
     const memories = remembers ? await polarMemoryPrompt(user.id) : "";
     // The web is the administrator's to allow and the person's to switch off
     // for a turn; either one off and the tools are simply not offered.
-    const web = access.web && body.data.web;
+    const web = access.web && body.data.web && (agent?.web ?? true);
     const webTools = web ? polarWebTools(resolved.credential.provider, resolved.option.model) : {};
     // Reading a repository is reading the web, under the same switch. Always
     // registered; sent while the page shared or the conversation names one.
@@ -492,6 +508,7 @@ export async function POST(request: Request): Promise<Response> {
             role: "system",
             content: [
                 polarSystemPrompt(user.name, instructions, memories, web),
+                agent ? agentPrompt(agent) : "",
                 codeTaskPrompt(body.data.code),
                 skillsPrompt(skills),
                 fenceSummary(compacted.summary),

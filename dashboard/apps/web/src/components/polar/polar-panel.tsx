@@ -199,6 +199,8 @@ import type { PolarRefine } from "@/lib/polar/prompt";
 import * as answerActions from "@/components/polar/polar-answer-actions";
 import { VoiceCall, type VoiceNotice } from "@/components/polar/polar-voice";
 import { SkillTrialBar, trialFromAddress, type SkillTrial } from "@/components/polar/polar-skill-trial";
+import { AgentBar, type ChatAgent } from "@/components/polar/polar-agent-bar";
+import { agentNameAction } from "@/app/(app)/polar/settings/agents-actions";
 import { useAnnounceWrites } from "@/lib/polar/tool-changes";
 import { PolarReachContext } from "@/components/polar/polar-reach";
 
@@ -841,6 +843,8 @@ export function PolarChat({
     // A skill opened from the Skills settings to try: only ever in a temporary
     // chat, and let go of once the chat stops being one.
     const [trialSkill, setTrialSkill] = useState<SkillTrial | null>(null);
+    // The custom agent this chat answers as; null for plain Polar.
+    const [agent, setAgent] = useState<ChatAgent | null>(null);
     useEffect(() => {
         if (!temporary) setTrialSkill(null);
     }, [temporary]);
@@ -946,7 +950,8 @@ export function PolarChat({
         serversOff,
         connectorsOn,
         trialSkill,
-        codeTask
+        codeTask,
+        agent
     });
     live.current = {
         threadId,
@@ -962,7 +967,8 @@ export function PolarChat({
         serversOff,
         connectorsOn,
         trialSkill,
-        codeTask
+        codeTask,
+        agent
     };
 
     /** The page as it goes with the next turn: null with sharing off. */
@@ -1001,6 +1007,7 @@ export function PolarChat({
                                 : null,
                             refine: refining,
                             code: live.current.codeTask,
+                            agentId: live.current.agent?.id ?? null,
                             parentId:
                                 messages.length > 1
                                     ? (messages[messages.length - 2]?.id ?? null)
@@ -1353,6 +1360,7 @@ export function PolarChat({
                 queue: QueuedMessage[];
                 choice: ModelChoice | null;
                 code?: PolarCodeTask | null;
+                agent?: ChatAgent | null;
             };
         };
         // An answer that is not a chat (a proxy page, an older server) opens nothing.
@@ -1375,6 +1383,7 @@ export function PolarChat({
         setOpening(shown);
         setThreadId(thread.id);
         setNewProject(thread.projectId);
+        setAgent(thread.agent ?? null);
         // The thread already open: the same chat, so its messages are set on it.
         if (thread.id === threadId) chat.setMessages(shown);
         setQueue(thread.queue);
@@ -1401,6 +1410,7 @@ export function PolarChat({
         const fresh = params?.get("new") ?? null;
         const session = params?.get("session") ?? null;
         const trying = trialFromAddress(params?.get("skill") ?? null);
+        const withAgent = params?.get("agent") ?? null;
         if (session) {
             window.history.replaceState(null, "", window.location.pathname);
             setInCode(false);
@@ -1414,6 +1424,16 @@ export function PolarChat({
             if (trying) {
                 setTemporary(true);
                 setTrialSkill(trying);
+            }
+            if (withAgent) {
+                // Set now, so the first message already goes to the agent; the
+                // name follows, and an agent that is gone is let go of.
+                setAgent({ id: withAgent, name: "" });
+                void agentNameAction({ id: withAgent }).then((name) =>
+                    setAgent((current) =>
+                        current?.id === withAgent ? (name ? { id: withAgent, name } : null) : current
+                    )
+                );
             }
             setReopened(true);
             return;
@@ -1480,6 +1500,7 @@ export function PolarChat({
         discardTemporary();
         setNewProject(projectId);
         setCodeTask(null);
+        setAgent(null);
         setInCode(false);
         if (projectId) sidebar.openProject(projectId);
         tree.current = new Map();
@@ -2329,6 +2350,11 @@ export function PolarChat({
                         requestAnimationFrame(() => textarea.current?.focus());
                     }}
                 />
+            ) : null}
+            {agent?.name ? (
+                <div className="px-3 pb-2">
+                    <AgentBar agent={agent} onEnd={() => startNew()} />
+                </div>
             ) : null}
             {temporary && trialSkill ? (
                 <div className="px-3 pb-2">

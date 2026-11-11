@@ -769,6 +769,50 @@ export async function thresholdSubjectsAction(
 const agentReposRequestSchema = z.object(pageFields).strict();
 
 /**
+ * The caller's custom Polar agents, a page at a time, by name: what an "Ask an
+ * agent" step may ask, since it spends the caller's keys and limits.
+ */
+export async function polarAgentOptionsAction(
+    input: unknown
+): Promise<OptionsPage<{ id: string; name: string }> | { error: string }> {
+    try {
+        const who = await actor();
+        const parsed = agentReposRequestSchema.safeParse(input);
+        if (!parsed.success) return { items: [], next: null };
+        const { query, cursor, limit, ids } = parsed.data;
+        const { prisma } = await import("@polaris/db");
+        const { decodeServerCursor, encodeServerCursor } = await import("@/lib/server-options");
+        const after = decodeServerCursor(cursor);
+        const rows = await prisma.polarAgent.findMany({
+            where: {
+                ownerId: who.id,
+                ...(ids ? { id: { in: ids } } : {}),
+                ...(query ? { name: { contains: query, mode: "insensitive" } } : {}),
+                ...(after
+                    ? {
+                          OR: [
+                              { name: { gt: after.name } },
+                              { name: after.name, id: { gt: after.id } }
+                          ]
+                      }
+                    : {})
+            },
+            select: { id: true, name: true },
+            orderBy: [{ name: "asc" }, { id: "asc" }],
+            take: limit + 1
+        });
+        const page = rows.slice(0, limit);
+        const last = page.at(-1);
+        return {
+            items: page,
+            next: rows.length > limit && last ? encodeServerCursor(last.name, last.id) : null
+        };
+    } catch (caught) {
+        return { error: (await failure(caught)).error };
+    }
+}
+
+/**
  * The repositories the caller connected, a page at a time: what an agent step
  * may work on, since it spends the connecting account's keys and limits.
  */

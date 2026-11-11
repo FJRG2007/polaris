@@ -36,7 +36,8 @@ export default defineConfig({
             "./test/setup/layout-box.ts",
             "./test/setup/mention-actions.ts",
             "./test/setup/activity-card-actions.ts",
-            "./test/setup/server-options-actions.ts"
+            "./test/setup/server-options-actions.ts",
+            "./test/setup/polar-agent-actions.ts"
         ],
         testTimeout: 30_000,
         hookTimeout: 30_000

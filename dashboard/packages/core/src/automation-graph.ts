@@ -907,6 +907,15 @@ export const CORE_NODE_CONFIGS = {
         target: z.enum(AGENT_WORK_TARGETS).default("run")
     }),
     /**
+     * Ask one of the owner's custom Polar agents something: its instructions
+     * and model, the owner's keys and limits. It answers in text, for the
+     * steps after it; it has no tools here.
+     */
+    "core.askAgent": z.object({
+        agentId: z.union([z.literal(""), z.string().uuid()]).default(""),
+        prompt: text(AUTOMATION_LIMITS.textLength * 4).default("")
+    }),
+    /**
      * JavaScript the person wrote, run in a sandbox with no network, files or
      * secrets: it takes `items` and returns the items for the next step.
      * `items` is a whole reference to a list; empty, the step reads the output
@@ -965,6 +974,8 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     "core.announce": { role: "action", ports: [], idempotent: true },
     "core.redeploy": { role: "action", ports: [], idempotent: false },
     "core.agentWork": { role: "action", ports: [], idempotent: false },
+    // A model's answer differs every time, and every ask is spent.
+    "core.askAgent": { role: "action", ports: [], idempotent: false },
     // Reads its input and nothing else: the same items give the same answer.
     "core.code": { role: "action", ports: [], idempotent: true },
     "core.try": {

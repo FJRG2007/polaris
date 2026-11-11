@@ -26,7 +26,8 @@ import {
     Sparkles,
     SquareTerminal,
     Wrench,
-    X
+    X,
+    Bot
 } from "lucide-react";
 import { SettingsBack } from "./settings-back";
 import { useWide } from "@/components/polar/use-wide";
@@ -40,6 +41,7 @@ const ICONS: Record<PolarSettingsSection, ComponentType<{ className?: string }>>
     tools: Wrench,
     connectors: Plug,
     skills: ScrollText,
+    agents: Bot,
     permissions: ShieldCheck,
     browser: Globe,
     display: MessageSquare,
@@ -54,7 +56,10 @@ const ICONS: Record<PolarSettingsSection, ComponentType<{ className?: string }>>
 type GroupId = "personal" | "abilities" | "models" | "privacy";
 const GROUPS: readonly { id: GroupId; sections: readonly PolarSettingsSection[] }[] = [
     { id: "personal", sections: ["memory", "display", "extras"] },
-    { id: "abilities", sections: ["tools", "connectors", "skills", "browser", "coding-tools"] },
+    {
+        id: "abilities",
+        sections: ["tools", "connectors", "skills", "agents", "browser", "coding-tools"]
+    },
     { id: "models", sections: ["routing", "usage"] },
     { id: "privacy", sections: ["permissions", "data"] }
 ];
@@ -73,6 +78,7 @@ function SettingsNav({
         tools: t("settings.tools.title"),
         connectors: t("settings.nav.connectors"),
         skills: t("settings.nav.skills"),
+        agents: t("settings.nav.agents"),
         permissions: t("settings.nav.permissions"),
         browser: t("settings.browserSites.title"),
         display: t("settings.display.title"),

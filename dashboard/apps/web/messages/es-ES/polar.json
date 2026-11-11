@@ -469,7 +469,8 @@
             "routing": "Respaldos",
             "codingTools": "Herramientas",
             "usage": "Uso",
-            "skills": "Skills"
+            "skills": "Skills",
+            "agents": "Agentes"
         },
         "browserSites": {
             "title": "Tu navegador",
@@ -649,6 +650,48 @@
             "abilities": "Lo que Polar usa",
             "models": "Modelos y uso",
             "privacy": "Privacidad y datos"
+        },
+        "agents": {
+            "title": "Agentes",
+            "intro": "Agentes con sus instrucciones, skills y conectores. Chatea con uno o úsalo en una automatización.",
+            "create": "Crear agente",
+            "empty": "Aún no hay agentes. Crea uno para algo que pidas a Polar a menudo.",
+            "chat": "Chatear",
+            "edit": "Editar",
+            "delete": "Borrar",
+            "kind": "agente",
+            "removeHint": "Sus chats vuelven a ser de Polar.",
+            "save": "Guardar",
+            "cancel": "Cancelar",
+            "editor": {
+                "titleNew": "Nuevo agente",
+                "titleEdit": "Editar agente",
+                "body": "Qué hace y qué puede usar.",
+                "name": "Nombre",
+                "nameHint": "Se ve en sus chats y en Automatizaciones.",
+                "description": "Para qué es",
+                "descriptionHint": "Una línea para distinguirlos.",
+                "instructions": "Instrucciones",
+                "instructionsHint": "Markdown. Quién es y cómo trabaja, paso a paso.",
+                "model": "Modelo",
+                "automatic": "Automático",
+                "web": "Leer la web",
+                "webHint": "Busca y lee páginas si este Polaris lo permite.",
+                "skills": "Skills",
+                "connectors": "Conectores",
+                "picksHint": "Sin elegir usa los de siempre.",
+                "noSkills": "Aún no tienes skills.",
+                "noConnectors": "Aún no tienes conectores."
+            },
+            "errors": {
+                "too_long": "Es demasiado largo.",
+                "duplicate": "Ya tienes un agente con este nombre.",
+                "limit": "Tienes el máximo de agentes por persona.",
+                "failed": "No se pudo guardar. Reintenta.",
+                "noAccess": "Polar no está disponible para ti.",
+                "viewingAs": "Estás viendo como otra persona.",
+                "not_found": "Ese agente ya no existe."
+            }
         }
     },
     "temporary": {
@@ -1390,5 +1433,10 @@
         "added": "Skill añadida",
         "addFailed": "No se pudo añadir.",
         "end": "No probar más"
+    },
+    "agentBar": {
+        "banner": "Chateando con {name}",
+        "edit": "Editar agentes",
+        "end": "Volver a Polar"
     }
 }

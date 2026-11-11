@@ -12,6 +12,7 @@ export const POLAR_SETTINGS_SECTIONS = [
     "tools",
     "connectors",
     "skills",
+    "agents",
     "browser",
     "coding-tools",
     "routing",

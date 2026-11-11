@@ -228,6 +228,8 @@ export interface PolarThreadView {
     choice: ModelChoice | null;
     /** The repository a Code task is about; null for a plain chat. */
     code: PolarCodeTask | null;
+    /** The custom agent the chat was started with; null for plain Polar. */
+    agent: { id: string; name: string } | null;
     queue: QueuedMessage[];
     messages: PolarStoredMessage[];
 }
@@ -245,6 +247,7 @@ export async function getPolarThread(userId: string, id: string): Promise<PolarT
             archivedAt: true,
             choice: true,
             code: true,
+            agent: { select: { id: true, name: true } },
             queue: true,
             messages: {
                 select: { id: true, parentId: true, role: true, parts: true, metadata: true },
@@ -267,6 +270,7 @@ export async function getPolarThread(userId: string, id: string): Promise<PolarT
         choice: (thread.choice as ModelChoice | null) ?? null,
         code:
             thread.code === null ? null : (polarCodeTaskSchema.safeParse(thread.code).data ?? null),
+        agent: thread.agent ?? null,
         queue: queue.success ? queue.data : [],
         messages: rows.map((row) => ({
             id: row.id,
@@ -301,7 +305,9 @@ export async function ensurePolarThread(
     choice: ModelChoice | null,
     projectId: string | null = null,
     temporary = false,
-    code: PolarCodeTask | null = null
+    code: PolarCodeTask | null = null,
+    /** The custom agent a new chat starts with, already read as this person's. */
+    agentId: string | null = null
 ): Promise<{ temporary: boolean } | null> {
     const existing = await prisma.polarThread.findUnique({
         where: { id },
@@ -334,6 +340,7 @@ export async function ensurePolarThread(
                     : null,
             ...(choice ? { choice: choice as unknown as Prisma.InputJsonValue } : {}),
             ...(code ? { code: code as unknown as Prisma.InputJsonValue } : {}),
+            agentId,
             temporary
         }
     });

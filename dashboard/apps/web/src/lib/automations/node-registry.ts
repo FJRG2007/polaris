@@ -11,6 +11,7 @@ import { HTTP_SERVER_NODES } from "./nodes/http-node";
 import { codeNode } from "./nodes/code-node";
 import { redeployNode } from "./nodes/deploy-node";
 import { agentWorkNode } from "./nodes/agent-node";
+import { askAgentNode } from "./nodes/ask-agent-node";
 import { CORE_SERVER_NODES } from "./nodes/core-nodes";
 import { appAutomationNodes } from "@/lib/app-extensions/registry";
 
@@ -20,6 +21,7 @@ const CORE = new Map<string, ServerNode>(
         ...HTTP_SERVER_NODES,
         redeployNode as ServerNode,
         agentWorkNode as ServerNode,
+        askAgentNode as ServerNode,
         codeNode as ServerNode
     ].map((node) => [node.type, node])
 );

@@ -25,7 +25,12 @@ import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AutomationDetail } from "@/lib/automations/service";
 import { useEffect, useState } from "react";
-import { agentRepoOptionsAction, rotateHookAction, thresholdSubjectsAction } from "../actions";
+import {
+    agentRepoOptionsAction,
+    polarAgentOptionsAction,
+    rotateHookAction,
+    thresholdSubjectsAction
+} from "../actions";
 import { PagedPicker } from "@/components/paged-picker";
 import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
 import { RefInput, RefTextarea } from "./references";
@@ -149,6 +154,7 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     "core.announce": () => ({ name: "", payload: [] }),
     "core.redeploy": () => ({ applicationId: "" }),
     "core.agentWork": () => ({ repoId: "", mode: null, instructions: "", target: "run" }),
+    "core.askAgent": () => ({ agentId: "", prompt: "" }),
     "core.code": () => ({ code: CODE_TEMPLATES.filter, items: "" }),
     "core.chat": () => ({
         preset: "slack",
@@ -440,6 +446,8 @@ export function NodeFields({
             return <RedeployFields config={config} set={set} />;
         case "core.agentWork":
             return <AgentWorkFields config={config} set={set} />;
+        case "core.askAgent":
+            return <AskAgentFields config={config} set={set} />;
         case "core.code":
             return <CodeFields config={config} set={set} />;
         case "core.connectivity":
@@ -917,6 +925,36 @@ function AgentWorkFields({ config, set }: { config: Config; set: (change: Config
                 <p className="mt-1 text-xs text-muted-foreground">
                     {t("fields.agentInstructionsHint")}
                 </p>
+            </Field>
+        </div>
+    );
+}
+
+function AskAgentFields({ config, set }: { config: Config; set: (change: Config) => void }) {
+    const t = useTranslations("automations");
+    const agentId = typeof config.agentId === "string" ? config.agentId : "";
+    return (
+        <div className="space-y-3">
+            <Field label={t("fields.askAgent")}>
+                <PagedPicker
+                    read={polarAgentOptionsAction}
+                    scope={{}}
+                    cache="automations:polar-agents"
+                    value={agentId}
+                    onValueChange={(id) => set({ agentId: id })}
+                    placeholder={t("fields.askAgentPick")}
+                    searchPlaceholder={t("fields.askAgentSearch")}
+                    emptyText={t("fields.askAgentNone")}
+                    aria-label={t("fields.askAgent")}
+                />
+            </Field>
+            <Field label={t("fields.askAgentPrompt")}>
+                <RefTextarea
+                    rows={4}
+                    value={typeof config.prompt === "string" ? config.prompt : ""}
+                    onChange={(event) => set({ prompt: event.target.value })}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">{t("fields.askAgentHint")}</p>
             </Field>
         </div>
     );

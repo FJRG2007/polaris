@@ -23,6 +23,9 @@ import { Card, CardBody, Skeleton } from "@polaris/ui";
 import { PolarBrowserSites } from "./polar-browser-sites";
 import { PolarSkills } from "./polar-skills";
 import { listSkills } from "@/lib/polar/skills/store";
+import { PolarAgents } from "./polar-agents";
+import { listAgents } from "@/lib/polar/agents/store";
+import { polarModelOptions } from "@/lib/polar/models";
 import { connectorPolicy, listConnectorViews } from "@/lib/polar/connectors/store";
 import { DisplaySettings } from "@/components/polar/polar-display";
 import { PolarHelperSettings } from "@/components/polar/polar-helper-settings";
@@ -41,6 +44,7 @@ export async function sectionMetadata(id: PolarSettingsSection): Promise<Metadat
         tools: t("settings.tools.title"),
         connectors: t("settings.nav.connectors"),
         skills: t("settings.nav.skills"),
+        agents: t("settings.nav.agents"),
         permissions: t("settings.nav.permissions"),
         browser: t("settings.browserSites.title"),
         display: t("settings.display.title"),
@@ -85,6 +89,37 @@ async function ConnectorsSection({
 /** The skills, once read; a viewer acting as somebody else reads and never writes. */
 async function SkillsSection({ userId, readOnly }: { userId: string; readOnly: boolean }) {
     return <PolarSkills initial={await listSkills(userId)} readOnly={readOnly} />;
+}
+
+/** The agents, with the skills, connectors and models they can be given. */
+async function AgentsSection({ userId, readOnly }: { userId: string; readOnly: boolean }) {
+    const access = await polarAccessFor(userId);
+    const [agents, skills, connectors, providers] = await Promise.all([
+        listAgents(userId),
+        listSkills(userId),
+        access.connectors ? listConnectorViews(userId) : Promise.resolve([]),
+        polarModelOptions(userId, access).catch(() => [])
+    ]);
+    const models = providers
+        .flatMap((provider) =>
+            provider.models.map((option) => ({
+                provider: option.provider,
+                model: option.model,
+                label: `${option.providerName}: ${option.name}`
+            }))
+        )
+        .slice(0, 1000);
+    return (
+        <PolarAgents
+            initial={agents}
+            readOnly={readOnly}
+            picks={{
+                skills: skills.map((skill) => skill.name),
+                connectors: connectors.map((entry) => ({ id: entry.id, name: entry.name })),
+                models
+            }}
+        />
+    );
 }
 
 export function ListSkeleton() {
@@ -172,6 +207,12 @@ export async function SettingsSectionPage({
             return (
                 <Suspense fallback={<ListSkeleton />}>
                     <SkillsSection userId={user.id} readOnly={Boolean(user.viewingAs)} />
+                </Suspense>
+            );
+        case "agents":
+            return (
+                <Suspense fallback={<ListSkeleton />}>
+                    <AgentsSection userId={user.id} readOnly={Boolean(user.viewingAs)} />
                 </Suspense>
             );
         case "display":

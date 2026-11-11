@@ -43,6 +43,7 @@ model User {
     polarToolGrants   PolarToolGrant[]
     polarConnectors   PolarConnector[]
     polarSkills       PolarSkill[]
+    polarAgents       PolarAgent[]
     polarAttachments  PolarAttachment[]
     polarMemories     PolarMemory[]
     polarPreference   PolarPreference?
@@ -16092,6 +16093,10 @@ model PolarThread {
     // The project the chat is filed under. Its instructions reach the model.
     projectId   String?           @db.Uuid
     project     PolarProject?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+    // The custom agent the chat was started with: its instructions, skills,
+    // connectors and model answer every turn. Null for plain Polar.
+    agentId     String?           @db.Uuid
+    agent       PolarAgent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
     // A temporary chat: out of every list and search, never read or written to
     // memory, deleted when its tab leaves it and swept after a day otherwise.
     temporary   Boolean           @default(false)
@@ -16179,6 +16184,29 @@ model PolarSkill {
     source       String   @default("custom")
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
+
+    @@unique([ownerId, name])
+}
+
+// A custom agent one person made, as ChatGPT's GPTs: a name, the instructions
+// it follows, the skills and connectors it may use (empty means the person's
+// usual ones), whether it reads the web, and the model it answers on (null is
+// Automatic). Used to start a Polar chat and as a step in Automations. Only its
+// owner sees it.
+model PolarAgent {
+    id           String        @id @default(uuid(7)) @db.Uuid
+    ownerId      String        @db.Uuid
+    owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    name         String
+    description  String        @default("")
+    instructions String
+    skills       String[]      @default([])
+    connectorIds String[]      @default([])
+    web          Boolean       @default(true)
+    choice       Json?
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @updatedAt
+    threads      PolarThread[]
 
     @@unique([ownerId, name])
 }
