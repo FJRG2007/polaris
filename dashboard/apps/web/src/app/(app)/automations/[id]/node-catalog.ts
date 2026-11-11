@@ -67,6 +67,7 @@ export const EVENT_PRESETS = {
     codeIssueOpened: { name: "code.issue-opened", outcomes: [] },
     codeIssueLabeled: { name: "code.issue-labeled", outcomes: [] },
     codePullRequestOpened: { name: "code.pull-request-opened", outcomes: [] },
+    codePullRequestUpdated: { name: "code.pull-request-updated", outcomes: [] },
     codeReviewRequested: { name: "code.review-requested", outcomes: [] },
     codeReviewSubmitted: { name: "code.review-submitted", outcomes: [] },
     codeChecksFailed: { name: "code.checks-failed", outcomes: [] }
@@ -111,6 +112,7 @@ const APP_EVENT_PRESETS: Readonly<Record<core.AppEventApp, readonly PresetKey[]>
     calendar: ["calendarEventStarting"],
     code: [
         "codePullRequestOpened",
+        "codePullRequestUpdated",
         "codeReviewRequested",
         "codeReviewSubmitted",
         "codeChecksFailed",

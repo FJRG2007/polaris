@@ -460,7 +460,7 @@ vi.mock("@/app/(app)/telemetry/actions", () => ({
     telemetryOverviewAction: actions.telemetryOverviewAction,
     openIssueAction: actions.openIssueAction
 }));
-vi.mock("@/app/(app)/apps/agents/actions", () => ({
+vi.mock("@/app/(app)/automations/code-review/actions", () => ({
     adviseRepoAction: actions.adviseRepoAction
 }));
 vi.mock("@/app/(app)/mail/actions", () => ({
@@ -2458,8 +2458,8 @@ const CASES: Case[] = [
         path: "/api/agents/repo-advice",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/apps/agents/repos/repos-polls")>(
-                    "@/app/(app)/apps/agents/repos/repos-polls"
+                await actual<typeof import("@/app/(app)/automations/code-review/repos-polls")>(
+                    "@/app/(app)/automations/code-review/repos-polls"
                 )
             ).repoAdvice({ kind: "sample" }),
         action: "adviseRepoAction",

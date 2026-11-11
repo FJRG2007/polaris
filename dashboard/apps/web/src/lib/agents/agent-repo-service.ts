@@ -17,8 +17,11 @@ import { inheritedConfig } from "@/lib/agents/agent-defaults-service";
 import {
     DEFAULT_AGENT_PUSH_POLICY,
     defaultShellPolicy,
+    parseReviewSettings,
     recommendExecution,
+    reviewSettingsEmpty,
     type AgentExecution,
+    type ReviewSettings,
     type AgentRepoConfigInput,
     type ExecutionAdvice
 } from "@polaris/core";
@@ -42,6 +45,8 @@ export interface AgentRepoView {
     pullRequests: boolean | null;
     issues: boolean | null;
     gate: string | null;
+    /** Which pull requests are reviewed on their own; every null inherits. */
+    review: ReviewSettings;
     /** Run in a session's checkout before the agent starts. Empty runs nothing. */
     setupScript: string;
     /** Whether a failing setup script stops the session. */
@@ -78,6 +83,7 @@ export async function listAgentRepos(ownerId: string): Promise<AgentRepoView[]> 
         pullRequests: row.pullRequests,
         issues: row.issues,
         gate: row.gate,
+        review: parseReviewSettings(row.review),
         setupScript: row.setupScript,
         setupRequired: row.setupRequired,
         workflowInstalledAt: row.workflowInstalledAt,
@@ -209,6 +215,15 @@ export async function upsertAgentRepo(
         pullRequests: input.config.pullRequests,
         issues: input.config.issues,
         gate: input.config.gate,
+        // Absent is "this caller does not edit reviews" (the add dialog, a
+        // re-run wizard) and leaves them alone; a block of nulls clears them.
+        ...(input.config.review === null
+            ? {}
+            : {
+                  review: reviewSettingsEmpty(input.config.review)
+                      ? null
+                      : JSON.stringify(input.config.review)
+              }),
         // A change of execution invalidates whatever workflow is in the repository,
         // so the installer runs again rather than trusting the stamp.
         error: null
@@ -327,6 +342,7 @@ export async function defaultConfigFor(
         pullRequests: null,
         issues: null,
         gate: null,
+        review: null,
         advice
     };
 }

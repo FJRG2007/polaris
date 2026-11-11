@@ -22,7 +22,7 @@ const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 const PLAIN_PRE: Record<string, string> = {
     "apps/extension/src/entrypoints/sidepanel/offline.tsx": "offline reply text; the extension ships no highlighter",
     "apps/translate/src/screens/website-mode.tsx": "a translated web page's own <pre> content",
-    "apps/web/src/app/(app)/apps/agents/runs/runs-view.tsx": "a failed gate step's log",
+    "apps/web/src/app/(app)/automations/code-review/runs/runs-view.tsx": "a failed gate step's log",
     "apps/web/src/app/(app)/apps/containers/[containerId]/container-view.tsx": "container logs",
     "apps/web/src/app/(app)/apps/databases/workbench.tsx": "a stored value that is not JSON",
     "apps/web/src/app/(app)/apps/deploy/cron-panel.tsx": "a cron run's output",

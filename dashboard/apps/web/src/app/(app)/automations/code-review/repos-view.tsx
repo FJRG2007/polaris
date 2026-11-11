@@ -5,7 +5,7 @@ import { RepoDialog } from "./repo-dialog";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import { AddRepoDialog } from "./add-repo-dialog";
-import { removeRepoAction, setRepoEnabledAction } from "../actions";
+import { removeRepoAction, setRepoEnabledAction } from "./actions";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
 import { Check, Plus, Settings2, TriangleAlert, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, Switch } from "@polaris/ui";

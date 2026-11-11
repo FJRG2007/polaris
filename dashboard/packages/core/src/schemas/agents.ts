@@ -16,6 +16,7 @@
  */
 
 import { z } from "zod";
+import { reviewSettingsSchema } from "../review.js";
 import { enigmaSettingsSchema } from "./agent-sessions.js";
 import { githubLoginSchema, githubRepoSchema } from "./runners.js";
 import {
@@ -96,7 +97,9 @@ export const agentRepoConfigSchema = z
         // the tier above, which is the whole thing the tiers exist to avoid.
         pullRequests: z.boolean().nullable().default(null),
         issues: z.boolean().nullable().default(null),
-        gate: agentGateModeSchema.nullable().default(null)
+        gate: agentGateModeSchema.nullable().default(null),
+        /** Which pull requests are reviewed on their own; null inherits. */
+        review: reviewSettingsSchema.nullable().default(null)
     })
     .refine((value) => value.execution !== "runners" || value.poolId !== null, {
         message: "Pick the runner pool this repository should use",
@@ -137,7 +140,9 @@ export const agentDefaultsSchema = z.object({
      *  is installed, which version, and any of its own settings the operator
      *  wants set. `gate` stays its own field above because the dispatch path has
      *  always read it there. */
-    enigma: enigmaSettingsSchema.nullable().default(null)
+    enigma: enigmaSettingsSchema.nullable().default(null),
+    /** Which pull requests are reviewed on their own, at this tier. */
+    review: reviewSettingsSchema.nullable().default(null)
 });
 
 export type AgentDefaultsInput = z.infer<typeof agentDefaultsSchema>;

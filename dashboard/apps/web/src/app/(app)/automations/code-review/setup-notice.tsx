@@ -150,7 +150,7 @@ export async function SetupNotice() {
         return (
             <Notice>
                 {t.rich("notice.noProvider", {
-                    link: link(connectionsHref(AI_KEYS_SECTION, "/apps/agents"))
+                    link: link(connectionsHref(AI_KEYS_SECTION, "/automations/code-review"))
                 })}
             </Notice>
         );

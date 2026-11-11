@@ -212,7 +212,6 @@
         "Account standing": "Estado de la cuenta",
         "Activity": "Actividad",
         "Agent defaults": "Ajustes de agentes",
-        "Agents": "Agentes",
         "Alarms": "Alarmas",
         "Alerts": "Alertas",
         "Analytics": "Analítica",
@@ -427,7 +426,10 @@
         "Time": "Hora",
         "Timers & focus": "Temporizadores",
         "Stopwatch": "Cronómetro",
-        "World clock": "Reloj mundial"
+        "World clock": "Reloj mundial",
+        "Agent runs": "Trabajos",
+        "Code review": "Revisiones",
+        "Review settings": "Ajustes de revisión"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

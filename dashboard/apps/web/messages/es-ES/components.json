@@ -1888,5 +1888,9 @@
     },
     "deployTargetPicker": {
         "search": "Busca por nombre"
+    },
+    "listField": {
+        "remove": "Quitar {value}",
+        "full": "Hasta {max}"
     }
 }

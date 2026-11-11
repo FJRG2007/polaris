@@ -226,7 +226,7 @@ export async function savePlatformAgentDefaultsAction(input: unknown): Promise<{
     await savePlatformAgentDefaults(parsed.data);
     await recordAudit({ actorId: admin.id, action: "admin.agents.defaults.updated" });
     revalidatePath("/admin/agents");
-    revalidatePath("/apps/agents/settings");
+    revalidatePath("/automations/code-review/settings");
     return {};
 }
 

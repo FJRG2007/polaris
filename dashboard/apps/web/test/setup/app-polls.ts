@@ -722,8 +722,8 @@ vi.mock("@/app/(app)/telemetry/telemetry-polls", () => ({
     telemetryReleases: forward(() => import("@/app/(app)/telemetry/actions"), "releasesAction", 1)
 }));
 
-vi.mock("@/app/(app)/apps/agents/repos/repos-polls", () => ({
-    repoAdvice: forward(() => import("@/app/(app)/apps/agents/actions"), "adviseRepoAction", 1)
+vi.mock("@/app/(app)/automations/code-review/repos-polls", () => ({
+    repoAdvice: forward(() => import("@/app/(app)/automations/code-review/actions"), "adviseRepoAction", 1)
 }));
 
 vi.mock("@/app/(app)/mail/mail-polls", () => ({

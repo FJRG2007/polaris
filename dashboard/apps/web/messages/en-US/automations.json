@@ -1047,6 +1047,7 @@
             "codeIssueOpened": "Issue opened",
             "codeIssueLabeled": "Issue labeled",
             "codePullRequestOpened": "Pull request opened",
+            "codePullRequestUpdated": "Pull request updated",
             "codeReviewRequested": "Review requested",
             "codeReviewSubmitted": "Review submitted",
             "codeChecksFailed": "Checks failed"

@@ -350,7 +350,7 @@ export function CodeRepoBar({
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuItem asChild>
-                        <Link href="/apps/agents/repos">
+                        <Link href="/automations/code-review">
                             <FolderGit2 className="size-3.5 shrink-0" />
                             <span className="min-w-0 truncate">{t("code.connectInAgents")}</span>
                         </Link>

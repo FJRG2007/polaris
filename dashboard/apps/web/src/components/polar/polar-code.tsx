@@ -930,7 +930,7 @@ function CodeStart({
             {choices !== null && choices.repos.length === 0 ? (
                 <Notice>
                     {t("code.noRepos")}{" "}
-                    <Link href="/apps/agents/repos" className="text-primary hover:underline">
+                    <Link href="/automations/code-review" className="text-primary hover:underline">
                         {t("code.connectRepo")}
                     </Link>
                 </Notice>

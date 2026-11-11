@@ -74,15 +74,15 @@ function instanceOrigin(): string | null {
 }
 
 /**
- * A markdown link to the Agents app, or the bare label when this run has no
+ * A markdown link to the code review screens, or the bare label when this run has no
  * instance address to point at. Naming a repository deep-links to its settings.
  */
 export function settingsLink(label: string, owner?: string, repo?: string): string {
     const origin = instanceOrigin();
     if (!origin) return label;
-    const base = `${origin}/apps/agents`;
+    const base = `${origin}/automations/code-review`;
     const url = owner
-        ? `${base}/repos?repo=${encodeURIComponent(repo ? `${owner}/${repo}` : owner)}`
+        ? `${base}?repo=${encodeURIComponent(repo ? `${owner}/${repo}` : owner)}`
         : base;
     return `[${label}](${url})`;
 }

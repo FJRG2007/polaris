@@ -17,7 +17,7 @@ import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import * as orchestration from "@/lib/agents/orchestration-service";
 
-const RUNS_PATH = "/apps/agents/orchestration";
+const RUNS_PATH = "/automations/code-review/orchestration";
 
 type Result = { error?: string };
 

@@ -8,7 +8,7 @@
  */
 
 import { useState } from "react";
-import { DEFAULT_AGENT_POLICY } from "@polaris/core";
+import { DEFAULT_AGENT_POLICY, DEFAULT_REVIEW } from "@polaris/core";
 import { AgentDefaultsCard } from "@/components/agent-defaults-card";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { platformModelChoices, savePlatformAgentDefaultsAction } from "./actions";
@@ -34,6 +34,7 @@ export function PlatformDefaultsView({
                 tier={tier}
                 title={t("agents.defaults.title")}
                 inherited={DEFAULT_AGENT_POLICY}
+                inheritedReview={DEFAULT_REVIEW}
                 inheritedFrom={t("agents.defaults.inheritedFrom")}
                 pools={pools}
                 providers={providers}

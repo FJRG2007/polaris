@@ -167,8 +167,7 @@ describe("review loop words", () => {
         "session.merge.title",
         "session.merge.errors.notAllowed",
         "issueSessions.started",
-        "issueSessions.pullOpened",
-        "rules.targetHints.session"
+        "issueSessions.pullOpened"
     ] as const;
 
     it.each(["en-US", "es-ES"] as const)("are written in %s", (locale) => {

@@ -334,7 +334,7 @@ describe("formatApiKeyErrorSummary", () => {
     });
     expect(msg).toContain("no API key found");
     expect(msg).toContain("https://github.com/acme/repo/settings/secrets/actions");
-    expect(msg).toContain("https://polaris.example/apps/agents/repos?repo=acme%2Frepo");
+    expect(msg).toContain("https://polaris.example/automations/code-review?repo=acme%2Frepo");
   });
 
   it("renders the invalid-key body for any other auth error", () => {

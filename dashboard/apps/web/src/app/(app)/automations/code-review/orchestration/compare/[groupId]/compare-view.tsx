@@ -49,7 +49,7 @@ export function CompareView({ variants }: { variants: Variant[] }) {
 
     return (
         <div className="space-y-3">
-            <Link href="/apps/agents/orchestration" className="text-sm text-muted-foreground underline">
+            <Link href="/automations/code-review/orchestration" className="text-sm text-muted-foreground underline">
                 {t("orchestration.back")}
             </Link>
             {error ? <p className="text-sm text-danger">{error}</p> : null}

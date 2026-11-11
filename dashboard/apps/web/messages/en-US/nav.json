@@ -212,7 +212,6 @@
         "Account standing": "Account standing",
         "Activity": "Activity",
         "Agent defaults": "Agent defaults",
-        "Agents": "Agents",
         "Alarms": "Alarms",
         "Alerts": "Alerts",
         "Analytics": "Analytics",
@@ -427,7 +426,10 @@
         "Time": "Time",
         "Timers & focus": "Timers & focus",
         "Stopwatch": "Stopwatch",
-        "World clock": "World clock"
+        "World clock": "World clock",
+        "Agent runs": "Agent runs",
+        "Code review": "Code review",
+        "Review settings": "Review settings"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

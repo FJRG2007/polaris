@@ -20,6 +20,7 @@ import { considerFallback } from "@/lib/agents/agent-fallback";
 import { githubAppInstallationToken } from "@/lib/github-service";
 import { policyForRepo } from "@/lib/agents/agent-defaults-service";
 import { agentRepoByFullName } from "@/lib/agents/agent-repo-service";
+import { reviewedPushes, reviewSettingsFor } from "@/lib/agents/review-gate";
 import { startIssueSession } from "@/lib/agents/issue-sessions";
 import { finishAgentRun, sweepStaleRuns } from "@/lib/agents/agent-run-service";
 import {
@@ -28,7 +29,9 @@ import {
     ALWAYS_ON_TRIGGER,
     policyAllowsTrigger,
     policyAllowsVisibility,
-    type AgentTrigger
+    reviewSkip,
+    type AgentTrigger,
+    type ReviewCandidate
 } from "@polaris/core";
 
 /** What a webhook boils down to, once the event's shape is out of the way. */
@@ -48,6 +51,10 @@ export interface Incident {
     fromFork: boolean;
     /** The text that named the app, when a mention is what happened. */
     body: string;
+    /** The pull request as the review filters see it, when there is one. */
+    pr: ReviewCandidate | null;
+    /** A draft pull request was just marked ready for review. */
+    readied: boolean;
 }
 
 /** Everything read out of a payload, all optional: it is untrusted input and a
@@ -68,9 +75,12 @@ interface Payload {
     requested_reviewer?: { login?: string };
     pull_request?: {
         number?: number;
+        title?: string;
         body?: string;
+        draft?: boolean;
+        user?: { login?: string };
         base?: { ref?: string };
-        head?: { repo?: { full_name?: string } };
+        head?: { repo?: { full_name?: string }; sha?: string };
         labels?: Array<{ name?: string }>;
     };
     check_suite?: { conclusion?: string; pull_requests?: Array<{ number?: number }> };
@@ -100,7 +110,16 @@ function classify(event: string, payload: Payload, appHandle: string): Incident 
         ? !headRepo ||
           headRepo.toLowerCase() !== (payload.repository?.full_name ?? "").toLowerCase()
         : false;
-    const base = { issueNumber, prNumber, actor, labels, branch, fromFork };
+    const pr: ReviewCandidate | null = payload.pull_request
+        ? {
+              draft: payload.pull_request.draft === true,
+              title: payload.pull_request.title ?? "",
+              author: payload.pull_request.user?.login ?? actor,
+              baseBranch: branch,
+              labels
+          }
+        : null;
+    const base = { issueNumber, prNumber, actor, labels, branch, fromFork, pr, readied: false };
 
     // A comment or a review body is newly authored by definition: the event IS
     // somebody writing it. An issue or pull request body is not - it stays on the
@@ -134,11 +153,22 @@ function classify(event: string, payload: Payload, appHandle: string): Incident 
             }
             return null;
         case "pull_request":
-            return payload.action === "opened" || payload.action === "reopened"
-                ? { ...base, trigger: "pr.opened", body: payload.pull_request?.body ?? "" }
-                : payload.action === "review_requested"
-                  ? { ...base, trigger: "pr.review_requested", body: "" }
-                  : null;
+            if (payload.action === "opened" || payload.action === "reopened")
+                return { ...base, trigger: "pr.opened", body: payload.pull_request?.body ?? "" };
+            // A draft made ready is, to a bot that skips drafts, the pull request
+            // arriving; whether it was already reviewed is the settings' call.
+            if (payload.action === "ready_for_review")
+                return {
+                    ...base,
+                    trigger: "pr.opened",
+                    readied: true,
+                    body: payload.pull_request?.body ?? ""
+                };
+            if (payload.action === "synchronize")
+                return { ...base, trigger: "pr.updated", body: "" };
+            return payload.action === "review_requested"
+                ? { ...base, trigger: "pr.review_requested", body: "" }
+                : null;
         case "pull_request_review":
             // An approval has nothing to address, so it is not a trigger.
             return payload.action === "submitted" && payload.review?.state !== "approved"
@@ -334,6 +364,7 @@ export async function handleAgentWebhook(params: {
     const policy = await policyForRepo(repo.ownerId, repo);
     if (!policyAllowsVisibility(policy, repo.isPrivate)) return [];
     if (!policyAllowsTrigger(policy, incident.trigger)) return [];
+    if (!(await reviewWanted(repo, incident, payload))) return [];
 
     // Automations listening for it hear it, whatever the rules below do.
     const trigger = incident.trigger;
@@ -432,6 +463,32 @@ export async function handleAgentWebhook(params: {
         if (result.runId) started.push(result.runId);
     }
     return started;
+}
+
+/**
+ * Whether a pull request event nobody asked for starts a review, by the review
+ * settings in force: drafts, branches, labels, titles, authors, and whether new
+ * pushes are reviewed and how many times. Anything else passes untouched.
+ */
+async function reviewWanted(
+    repo: { id: string; ownerId: string; repoFullName: string; review: string | null },
+    incident: Incident,
+    payload: Payload
+): Promise<boolean> {
+    if (incident.trigger !== "pr.opened" && incident.trigger !== "pr.updated") return true;
+    if (!incident.pr) return true;
+    const settings = await reviewSettingsFor(repo, {
+        defaultBranch: payload.repository?.default_branch ?? null,
+        head: payload.pull_request?.head?.sha ?? null
+    });
+    if (incident.trigger === "pr.updated" && !settings.incremental) return false;
+    // Reviewed as a draft already, so being made ready is not new.
+    if (incident.readied && settings.drafts) return false;
+    if (reviewSkip(settings, incident.pr)) return false;
+    if (incident.trigger === "pr.updated" && settings.pauseAfter > 0 && incident.prNumber !== null) {
+        if ((await reviewedPushes(repo.id, incident.prNumber)) >= settings.pauseAfter) return false;
+    }
+    return true;
 }
 
 /**

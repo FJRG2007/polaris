@@ -296,7 +296,7 @@ describe("a background run that finished", () => {
             userId: "owner",
             event: "agent.run.succeeded",
             level: "success",
-            href: "/apps/agents/runs?run=r1"
+            href: "/automations/code-review/runs?run=r1"
         });
         expect(notify.mock.calls[1]![0]).toMatchObject({ event: "agent.run", level: "danger" });
     });

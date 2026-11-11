@@ -59,6 +59,8 @@ export interface AgentDefaultsView {
     issues: boolean | null;
     gate: AgentGateMode | null;
     enigma: core.EnigmaSettings;
+    /** Which pull requests are reviewed on their own at this tier. */
+    review: core.ReviewSettings;
 }
 
 /** The GitHub account a repository belongs to, which is the scope key its
@@ -101,6 +103,7 @@ const SELECT = {
     issues: true,
     gate: true,
     enigma: true,
+    review: true,
     pool: { select: { name: true } }
 } as const;
 
@@ -119,6 +122,7 @@ type Row = {
     issues: boolean | null;
     gate: string | null;
     enigma: string | null;
+    review: string | null;
     pool: { name: string } | null;
 };
 
@@ -140,7 +144,8 @@ function toView(row: Row): AgentDefaultsView {
         gate: row.gate as AgentGateMode | null,
         // Read through the parser rather than handed over raw: a column written by
         // a newer build can name a scope this one does not have.
-        enigma: core.parseEnigmaSettings(row.enigma)
+        enigma: core.parseEnigmaSettings(row.enigma),
+        review: core.parseReviewSettings(row.review)
     };
 }
 
@@ -176,6 +181,8 @@ export async function getAgentDefaults(
  */
 export async function saveAgentDefaults(ownerId: string, input: AgentDefaultsInput): Promise<void> {
     const { scope, ...values } = input;
+    // A review block of nothing but nulls decides nothing, same as no block.
+    if (core.reviewSettingsEmpty(values.review)) values.review = null;
     const empty = Object.values(values).every((value) => value === null);
     if (empty) {
         await prisma.agentDefaults.deleteMany({ where: { ownerId, scope } });
@@ -193,7 +200,8 @@ export async function saveAgentDefaults(ownerId: string, input: AgentDefaultsInp
         fallback: values.fallback === null ? null : JSON.stringify(values.fallback),
         // Null clears the tier rather than storing an empty object, so "nothing
         // set here" and "everything set here to its default" stay different.
-        enigma: values.enigma ? JSON.stringify(values.enigma) : null
+        enigma: values.enigma ? JSON.stringify(values.enigma) : null,
+        review: values.review ? JSON.stringify(values.review) : null
     };
     await prisma.agentDefaults.upsert({
         where: { ownerId_scope: { ownerId, scope } },
@@ -229,13 +237,15 @@ export async function getPlatformAgentDefaults(): Promise<AgentDefaultsView> {
         ...values,
         scope: GENERAL_SCOPE,
         poolName: null,
-        enigma: values.enigma ?? core.INHERIT_ENIGMA
+        enigma: values.enigma ?? core.INHERIT_ENIGMA,
+        review: values.review ?? core.INHERIT_REVIEW
     };
 }
 
 /** Store it, or forget the key when it decides nothing. */
 export async function savePlatformAgentDefaults(input: AgentDefaultsInput): Promise<void> {
     const { scope: _scope, ...values } = input;
+    if (core.reviewSettingsEmpty(values.review)) values.review = null;
     const empty = Object.values(values).every((value) => value === null);
     if (empty) {
         await setSetting(PLATFORM_KEY, null);
@@ -301,6 +311,28 @@ export async function policyForRepo(
         overrideOf(general ? toView(general) : null),
         overrideOf(platform)
     );
+}
+
+/**
+ * The review settings saved for one repository, over all four tiers, nearest
+ * first. The repository's own file, when a tier points at it, is laid over this
+ * by the caller - it needs GitHub, and this needs only the database.
+ */
+export async function savedReviewTiers(
+    ownerId: string,
+    repo: { repoFullName: string; review: string | null }
+): Promise<core.ReviewSettings[]> {
+    const scope = scopeOf(repo.repoFullName);
+    const [rows, platform] = await Promise.all([
+        prisma.agentDefaults.findMany({
+            where: { ownerId, scope: { in: [scope, GENERAL_SCOPE] } },
+            select: { scope: true, review: true }
+        }),
+        getPlatformAgentDefaults()
+    ]);
+    const tier = (name: string) =>
+        core.parseReviewSettings(rows.find((row) => row.scope === name)?.review ?? null);
+    return [core.parseReviewSettings(repo.review), tier(scope), tier(GENERAL_SCOPE), platform.review];
 }
 
 /**

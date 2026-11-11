@@ -733,6 +733,7 @@ const DEVICES_GROUP = "Devices";
  * (`test/navigation/rail-group-sizes.test.ts`).
  */
 const DEVELOPMENT_GROUP = "Development";
+const CODE_REVIEW_GROUP = "Code review";
 const MACHINES_GROUP = "Machines";
 const NETWORK_GROUP = "Network";
 const DATA_GROUP = "Data & services";
@@ -1440,14 +1441,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["install", "catalog"]
         },
         {
-            label: "Agents", // i18n-ignore
-            href: "/apps/agents",
-            needs: "agents.read",
-            icon: Bot,
-            keywords: ["coding agent", "ai", "review", "pull requests", "issues", "github"],
-            group: DEVELOPMENT_GROUP
-        },
-        {
             label: "Code", // i18n-ignore
             href: "/apps/code",
             needs: "agents.read",
@@ -2141,6 +2134,67 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/automations/secrets",
             icon: KeyRound,
             keywords: ["tokens", "webhook urls", "credentials", "passwords"]
+        },
+        // The repository bot: an agent that reviews pull requests and works
+        // issues when GitHub says something happened. Its rules are ordinary
+        // automations; these are the repositories it is on and how it runs.
+        {
+            label: "Repositories", // i18n-ignore
+            href: "/automations/code-review",
+            needs: "agents.read",
+            icon: FolderGit2,
+            group: CODE_REVIEW_GROUP,
+            keywords: [
+                "code review",
+                "coding agent",
+                "repos",
+                "pull requests",
+                "issues",
+                "github",
+                "where it runs",
+                "runners"
+            ]
+        },
+        {
+            label: "Agent runs", // i18n-ignore
+            href: "/automations/code-review/runs",
+            needs: "agents.read",
+            icon: History,
+            group: CODE_REVIEW_GROUP,
+            keywords: ["code review", "history", "logs", "failed", "what happened"]
+        },
+        {
+            label: "Orchestration", // i18n-ignore
+            href: "/automations/code-review/orchestration",
+            needs: "agents.read",
+            icon: Network,
+            group: CODE_REVIEW_GROUP,
+            keywords: ["tasks", "coordinator", "approve", "compare", "fan out", "needs you"]
+        },
+        {
+            label: "Review settings", // i18n-ignore
+            href: "/automations/code-review/settings",
+            needs: "agents.read",
+            icon: SlidersHorizontal,
+            group: CODE_REVIEW_GROUP,
+            keywords: [
+                "code review",
+                "defaults",
+                "organization",
+                "public",
+                "private",
+                "quality gate",
+                "enigma"
+            ]
+        },
+        {
+            label: "Set up", // i18n-ignore
+            href: "/automations/code-review/setup",
+            needs: "agents.read",
+            icon: BookOpen,
+            group: CODE_REVIEW_GROUP,
+            hidden: true,
+            keywords: ["code review", "wizard", "getting started", "connect", "install"]
         }
     ],
     /**
@@ -2955,88 +3009,6 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 keywords: ["whatsapp", "telegram", "slack", "discord"]
             },
             { label: "Logs", href: "/admin/inbox/logs", icon: ScrollText } // i18n-ignore
-        ]
-    },
-    {
-        id: "agents",
-        label: "Agents", // i18n-ignore
-        icon: Bot,
-        base: "/apps/agents",
-        parent: { label: "Apps", href: "/apps/deploy" }, // i18n-ignore
-        sections: [
-            {
-                label: "Overview", // i18n-ignore
-                href: "/apps/agents",
-                icon: LayoutDashboard,
-                keywords: ["agents", "coding agent", "ai", "summary"]
-            },
-            {
-                label: "Repositories", // i18n-ignore
-                href: "/apps/agents/repos",
-                needs: "agents.read",
-                icon: FolderGit2,
-                keywords: [
-                    "repos",
-                    "enable",
-                    "where it runs",
-                    "model",
-                    "actions",
-                    "runners",
-                    "server"
-                ]
-            },
-            {
-                label: "Automations", // i18n-ignore
-                href: "/apps/agents/automations",
-                needs: "agents.read",
-                icon: Workflow,
-                keywords: [
-                    "triggers",
-                    "rules",
-                    "issue opened",
-                    "pull request",
-                    "review",
-                    "ci failed"
-                ]
-            },
-            {
-                label: "Orchestration", // i18n-ignore
-                href: "/apps/agents/orchestration",
-                needs: "agents.read",
-                icon: Network,
-                keywords: ["runs", "tasks", "coordinator", "approve", "compare", "fan out", "needs you"]
-            },
-            {
-                label: "Runs", // i18n-ignore
-                href: "/apps/agents/runs",
-                needs: "agents.read",
-                icon: History,
-                keywords: ["history", "logs", "failed", "what happened"]
-            },
-            {
-                label: "Settings", // i18n-ignore
-                href: "/apps/agents/settings",
-                needs: "agents.read",
-                icon: SlidersHorizontal,
-                keywords: [
-                    "defaults",
-                    "organization",
-                    "public",
-                    "private",
-                    "pull requests",
-                    "issues",
-                    "quality gate",
-                    "enigma"
-                ]
-            },
-            {
-                label: "Set up", // i18n-ignore
-                href: "/apps/agents/setup",
-                needs: "agents.read",
-                icon: BookOpen,
-                hidden: true,
-                keywords: ["wizard", "getting started", "connect", "install"]
-            }
         ]
     },
     {

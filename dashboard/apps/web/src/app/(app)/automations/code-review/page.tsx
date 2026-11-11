@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { PageHeader } from "@polaris/ui";
+import { SetupNotice } from "./setup-notice";
 import { ReposView } from "./repos-view";
 import { requirePermission } from "@/lib/session";
 import { providersFor } from "@/lib/agents/model-keys";
@@ -25,7 +27,14 @@ export default async function AgentReposPage() {
                 title={t("overview.repositories")}
                 description={t("pages.repos")}
             />
-            <ReposView repos={repos} providers={providers} />
+            <div className="flex flex-col gap-4">
+                {/* Whether GitHub and a model are connected is a question for
+                    the integration store, so it streams in behind the list. */}
+                <Suspense fallback={null}>
+                    <SetupNotice />
+                </Suspense>
+                <ReposView repos={repos} providers={providers} />
+            </div>
         </>
     );
 }

@@ -65,6 +65,7 @@ import {
     listAgentDefaults,
     policyForNewRepo,
     saveAgentDefaults,
+    savedReviewTiers,
     repoScopes,
     type AgentDefaultsView
 } from "@/lib/agents/agent-defaults-service";
@@ -78,19 +79,20 @@ import {
     upsertAgentRepo
 } from "@/lib/agents/agent-repo-service";
 import {
-    agentAutomationSchema,
     agentDefaultsSchema,
     agentRepoConfigSchema,
     enableAgentRepoSchema,
     manualAgentRunSchema,
     policyAllowsVisibility,
     repoFullNameSchema,
+    resolveReview,
     type AgentPolicy,
+    type ResolvedReview,
     type AgentRepoConfigInput,
     type ExecutionAdvice
 } from "@polaris/core";
 
-const AGENTS_PATH = "/apps/agents";
+const AGENTS_PATH = "/automations/code-review";
 
 /** The model each connected provider offers, from the same catalog the AI
  *  providers screen is built from. Used only to seed a form: an operator naming
@@ -164,6 +166,8 @@ export async function adviseRepoAction(input: unknown): Promise<{
     providers?: string[];
     defaults?: AgentRepoConfigInput;
     policy?: AgentPolicy;
+    /** What each automatic-review setting resolves to above this repository. */
+    review?: ResolvedReview;
     /** The GitHub App is why this repository cannot be reached, found now
      *  rather than at the save. */
     githubGap?: GithubInstallGap;
@@ -175,7 +179,7 @@ export async function adviseRepoAction(input: unknown): Promise<{
         .safeParse(input);
     if (!parsed.success) return { error: await say("text.pickRepository") };
 
-    const [pools, allPools, providers, policy, gap] = await Promise.all([
+    const [pools, allPools, providers, policy, gap, reviewTiers] = await Promise.all([
         poolsServing(user.id, parsed.data.repoFullName),
         prisma.runnerPool.findMany({
             where: { ownerId: user.id, enabled: true },
@@ -184,7 +188,8 @@ export async function adviseRepoAction(input: unknown): Promise<{
         }),
         providersFor(user.id),
         policyForNewRepo(user.id, parsed.data.repoFullName),
-        githubInstallGapForRepo(user.id, parsed.data.repoFullName)
+        githubInstallGapForRepo(user.id, parsed.data.repoFullName),
+        savedReviewTiers(user.id, { repoFullName: parsed.data.repoFullName, review: null })
     ]);
 
     // The first connected provider's model is only a starting point; the tiers
@@ -204,6 +209,7 @@ export async function adviseRepoAction(input: unknown): Promise<{
         providers,
         defaults,
         policy,
+        review: resolveReview(...reviewTiers),
         ...(gap ? { githubGap: gap } : {})
     };
 }
@@ -300,7 +306,6 @@ export async function enableRepoAction(
     });
 
     revalidatePath(AGENTS_PATH);
-    revalidatePath(`${AGENTS_PATH}/repos`);
     // A warning, not a refusal: the settings are saved and correct, the
     // repository just does not carry them yet. It is on the row as well.
     return warningText(error);
@@ -369,7 +374,7 @@ export async function updateRepoConfigAction(
         enabled: parsed.data.config.enabled
     });
 
-    revalidatePath(`${AGENTS_PATH}/repos`);
+    revalidatePath(AGENTS_PATH);
     return warningText(error);
 }
 
@@ -397,7 +402,7 @@ export async function setRepoEnabledAction(
           })
         : {};
 
-    revalidatePath(`${AGENTS_PATH}/repos`);
+    revalidatePath(AGENTS_PATH);
     return warningText(error);
 }
 
@@ -426,57 +431,7 @@ export async function removeRepoAction(
     if (!(await removeAgentRepo(user.id, parsed.data.repoId)))
         return { error: await say("errors.repoNotFound") };
     revalidatePath(AGENTS_PATH);
-    revalidatePath(`${AGENTS_PATH}/repos`);
     return warningText(warning);
-}
-
-export async function saveAutomationAction(input: unknown): Promise<{ error?: string }> {
-    const user = await requirePermission("agents.manage");
-    const parsed = z
-        .object({
-            id: z.string().uuid().optional(),
-            repoId: z.string().uuid(),
-            automation: agentAutomationSchema
-        })
-        .safeParse(input);
-    if (!parsed.success)
-        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkRule") };
-
-    // The repository has to be one this person owns; an id from the form is a
-    // claim, not proof.
-    if (!(await getAgentRepo(user.id, parsed.data.repoId)))
-        return { error: await say("errors.repoNotFound") };
-
-    const data = {
-        repoId: parsed.data.repoId,
-        trigger: parsed.data.automation.trigger,
-        condition: JSON.stringify(parsed.data.automation.condition),
-        mode: parsed.data.automation.mode,
-        instructions: parsed.data.automation.instructions,
-        enabled: parsed.data.automation.enabled,
-        target: parsed.data.automation.target
-    };
-    if (parsed.data.id) {
-        await prisma.agentAutomation.updateMany({
-            where: { id: parsed.data.id, repoId: data.repoId },
-            data
-        });
-    } else {
-        await prisma.agentAutomation.create({ data });
-    }
-    revalidatePath(`${AGENTS_PATH}/automations`);
-    return {};
-}
-
-export async function removeAutomationAction(input: unknown): Promise<{ error?: string }> {
-    const user = await requirePermission("agents.manage");
-    const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
-    if (!parsed.success) return { error: await say("errors.checkRequest") };
-    await prisma.agentAutomation.deleteMany({
-        where: { id: parsed.data.id, repo: { ownerId: user.id } }
-    });
-    revalidatePath(`${AGENTS_PATH}/automations`);
-    return {};
 }
 
 /** Start a run by hand, with a prompt the operator writes. */
@@ -593,32 +548,6 @@ export async function saveAgentDefaultsAction(input: unknown): Promise<{ error?:
         return { error: await failure(caught, "errors.saveSettings") };
     }
     revalidatePath(`${AGENTS_PATH}/settings`);
-    revalidatePath(`${AGENTS_PATH}/repos`);
-    return {};
-}
-
-/**
- * Give a repository the rules a new one is created with.
- *
- * For repositories added before Polaris seeded any, and for anybody who cleared
- * them and wants them back. Deliberately a button rather than something that
- * happens on its own: a repository with no rules is a legitimate choice - it
- * still answers a mention - and putting rules back under somebody who removed
- * them would be Polaris overruling them.
- */
-export async function addDefaultAutomationsAction(input: unknown): Promise<{ error?: string }> {
-    const user = await requirePermission("agents.manage");
-    const parsed = z.object({ repoId: z.string().uuid() }).safeParse(input);
-    if (!parsed.success) return { error: await say("errors.checkRequest") };
-    if (!(await getAgentRepo(user.id, parsed.data.repoId)))
-        return { error: await say("errors.repoNotFound") };
-
-    // Only onto an empty one. Running it twice would leave two rules for the same
-    // event, which is two runs and two comments on one issue.
-    const existing = await prisma.agentAutomation.count({ where: { repoId: parsed.data.repoId } });
-    if (existing > 0) return { error: await say("errors.hasRules") };
-
-    await seedDefaultAutomations(parsed.data.repoId);
-    revalidatePath(`${AGENTS_PATH}/automations`);
+    revalidatePath(AGENTS_PATH);
     return {};
 }

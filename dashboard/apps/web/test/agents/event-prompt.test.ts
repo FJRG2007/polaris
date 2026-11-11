@@ -18,7 +18,9 @@ const BASE: Incident = {
     labels: [],
     branch: null,
     fromFork: false,
-    body: "Propuesta de agregar una demo de calculadora"
+    body: "Propuesta de agregar una demo de calculadora",
+    pr: null,
+    readied: false
 };
 
 suite("describe", () => {

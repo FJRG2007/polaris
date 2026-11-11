@@ -16,6 +16,7 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { agentModelChoices, saveAgentDefaultsAction } from "../actions";
 import { Button, Card, CardBody, Select } from "@polaris/ui";
+import * as core from "@polaris/core";
 import { resolveAgentPolicy, type AgentPolicy } from "@polaris/core";
 import type { AgentDefaultsView } from "@/lib/agents/agent-defaults-service";
 import { AgentDefaultsCard, emptyTier } from "@/components/agent-defaults-card";
@@ -68,6 +69,8 @@ export function SettingsView({
     // through to the catch-all and then the deployment.
     const fromPlatform = resolveAgentPolicy(overrideOf(platform));
     const fromGeneral = resolveAgentPolicy(overrideOf(general), overrideOf(platform));
+    const reviewFromPlatform = core.resolveReview(platform.review);
+    const reviewFromGeneral = core.resolveReview(general.review, platform.review);
 
     const update = (scope: string, next: AgentDefaultsView) =>
         setRows((current) => current.map((row) => (row.scope === scope ? next : row)));
@@ -82,6 +85,7 @@ export function SettingsView({
                     tier={row}
                     title={row.scope === GENERAL ? t("settings.all") : row.scope}
                     inherited={row.scope === GENERAL ? fromPlatform : fromGeneral}
+                    inheritedReview={row.scope === GENERAL ? reviewFromPlatform : reviewFromGeneral}
                     inheritedFrom={
                         row.scope === GENERAL ? t("settings.fromDeployment") : t("settings.fromAll")
                     }

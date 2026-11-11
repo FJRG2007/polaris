@@ -4,7 +4,7 @@
         "give": "Give to an agent",
         "promptTail": "Update the task in Polaris as you go.",
         "title": "Give {reference} to an agent",
-        "noRepos": "An agent works in a repository the Agents app already reaches, and none is connected yet.",
+        "noRepos": "An agent works in a repository connected to code review, and none is connected yet.",
         "repository": "Repository",
         "pickRepository": "Pick a repository",
         "repoSearch": "Search repositories",

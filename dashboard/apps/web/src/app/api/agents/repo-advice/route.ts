@@ -1,7 +1,7 @@
 // how a repository is best run, and what may run it. A route, not an action: see lib/poll-route.
 import { z } from "zod";
 import { jsonParam, pollRoute } from "@/lib/poll-route";
-import { adviseRepoAction } from "@/app/(app)/apps/agents/actions";
+import { adviseRepoAction } from "@/app/(app)/automations/code-review/actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

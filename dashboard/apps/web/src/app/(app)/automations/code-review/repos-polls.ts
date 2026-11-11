@@ -6,7 +6,7 @@
  */
 
 import { readPoll } from "@/lib/poll-fetch";
-import type * as agentsActionsModule from "@/app/(app)/apps/agents/actions";
+import type * as agentsActionsModule from "@/app/(app)/automations/code-review/actions";
 
 type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
 

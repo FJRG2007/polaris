@@ -30,7 +30,7 @@ export function polarSessionHref(sessionId: string): string {
 
 /** The page a run's notices point at. */
 export function runHref(runId: string): string {
-    return `/apps/agents/runs?run=${runId}`;
+    return `/automations/code-review/runs?run=${runId}`;
 }
 
 interface SessionSubject {
@@ -289,7 +289,7 @@ export async function noticeRunsPausedForCredit(ownerId: string, runId: string):
             event: "agent.run",
             title: t("agents.pausedCreditsTitle"),
             body: t("agents.pausedCreditsBody"),
-            href: "/apps/agents/runs",
+            href: "/automations/code-review/runs",
             level: "danger",
             actionRequired: true,
             metadata: { runId, paused: "credits" }

@@ -15,6 +15,7 @@
             "issueOpened": "Issue abierta",
             "issueLabeled": "Issue etiquetada",
             "prOpened": "Pull request abierta",
+            "prUpdated": "Pull request actualizada",
             "prReviewRequested": "Revisión pedida",
             "prReviewSubmitted": "Revisión enviada",
             "ciFailed": "Checks fallidos",
@@ -25,6 +26,7 @@
             "issueOpened": "Una issue nueva. Útil para clasificar, o para intentar un arreglo de inmediato.",
             "issueLabeled": "Se añade una etiqueta a una issue. Combínalo con una etiqueta para que solo se atiendan las que marques.",
             "prOpened": "Una pull request nueva, para una revisión automática.",
+            "prUpdated": "Commits nuevos en una pull request, para revisar lo que cambió. Solo si se revisan los nuevos push.",
             "prReviewRequested": "Se pide una revisión a la app por su nombre.",
             "prReviewSubmitted": "Alguien revisó una pull request, para poder atender sus comentarios.",
             "ciFailed": "Falló un check, para leer los registros e intentar un arreglo.",
@@ -97,12 +99,6 @@
     },
     "overview": {
         "repositories": "Repositorios",
-        "off": "Inactivo",
-        "problem": "Problema",
-        "recentRuns": "Últimas ejecuciones",
-        "noRuns": "Aún no se ha ejecutado nada. Menciona la app en una issue o una pull request, o inicia una ejecución desde un repositorio.",
-        "emptyTitle": "Aún no hay ningún repositorio con un agente.",
-        "emptyHint": "Elige uno, decide dónde deben ocurrir sus ejecuciones y menciona la app en una issue para probarlo.",
         "setUp": "Configurar"
     },
     "page": {
@@ -187,11 +183,9 @@
         "repoNotFound": "Repositorio no encontrado",
         "saveSettings": "No se pudieron guardar los ajustes",
         "checkRequest": "Revisa la solicitud",
-        "checkRule": "Revisa la regla",
         "notEnabled": "Ese repositorio no está activado para ejecuciones del agente",
         "runNotFound": "Ejecución no encontrada",
         "poolNotYours": "Ese grupo de runners no es tuyo.",
-        "hasRules": "Ese repositorio ya tiene reglas.",
         "githubAppMissing": "Polaris no está instalado en {owner} en GitHub, así que tu cuenta no llega a este repositorio. Instálalo allí y vuelve a probar.",
         "githubAppPrivate": "La app de GitHub de Polaris es privada, así que no se puede instalar en {owner} y tu cuenta no llega a este repositorio. Hazla pública, instálala allí y vuelve a probar.",
         "githubAppPrivateMember": "La app de GitHub de Polaris es privada, así que no se puede instalar en {owner} y tu cuenta no llega a este repositorio. Antes, un administrador tiene que hacerla pública.",
@@ -200,7 +194,7 @@
     "sessions": {
         "errors": {
             "checkForm": "Revisa los datos",
-            "repoNotConnected": "Ese repositorio no está conectado a la app de Agentes.",
+            "repoNotConnected": "Ese repositorio no está conectado a la revisión de código.",
             "noSharedMachine": "Este Polaris no ofrece una máquina compartida.",
             "serverNotYours": "Ese servidor no es tuyo.",
             "signInHost": "Nada de aquí inicia sesión en {agent}. Inicia sesión tú en ese servidor o añade {ways} en Claves de IA.",
@@ -500,35 +494,8 @@
         }
     },
     "rules": {
-        "noRepos": "Añade antes un repositorio. Las reglas son por repositorio.",
-        "add": "Añadir regla",
-        "none": "Aún no hay reglas, así que estos repositorios solo responden cuando se menciona la app. Una regla es lo que hace que actúe por su cuenta: responder a una issue nueva, revisar una pull request nueva.",
-        "addUsual": "Añadir las reglas habituales a {name}",
-        "addUsualPick": "Añadir reglas habituales a un repo",
-        "unknownRepo": "repositorio desconocido",
-        "remove": "Quitar esta regla",
-        "edit": "Editar regla",
-        "when": "Cuándo",
-        "labels": "Solo estas etiquetas",
-        "labelsHint": "Separadas por comas. Déjalo vacío para cualquier etiqueta.",
-        "branches": "Solo estas ramas base",
-        "branchesHint": "Separadas por comas. Déjalo vacío para cualquier rama.",
-        "instructions": "Instrucciones",
-        "instructionsPlaceholder": "Revisa la corrección y la seguridad. No comentes el formato.",
-        "instructionsHint": "Se dan al agente junto con lo que inició la ejecución. Son tuyas, no del autor de la issue.",
-        "isOn": "Regla activa",
-        "on": "Activa",
         "saving": "Guardando...",
-        "save": "Guardar",
-        "target": "Inicia",
-        "targets": {
-            "run": "Una ejecución",
-            "session": "Una sesión"
-        },
-        "targetHints": {
-            "run": "El agente responde una vez, en GitHub, y termina.",
-            "session": "Abre una sesión que puedes ver y dirigir. Su enlace se publica en la issue."
-        }
+        "save": "Guardar"
     },
     "repos": {
         "add": "Añadir repositorio",
@@ -704,8 +671,6 @@
         "sessions": "Agentes en marcha ahora mismo, cada uno en su propia rama. Mira uno, respóndele o envíale lo siguiente.",
         "settingsTitle": "Ajustes",
         "settings": "Lo que heredan tus repositorios. Defínelo una vez aquí, acótalo por cuenta y sobrescríbelo en los repositorios que necesiten algo distinto.",
-        "automationsTitle": "Automatizaciones",
-        "automations": "Lo que inicia una ejecución, además de que alguien mencione la app. Un repositorio sin reglas sigue respondiendo a una mención.",
         "sessionOn": "{repo} en {branch}",
         "sessionWorkspace": "Un espacio de trabajo propio, sin nada descargado"
     },
@@ -758,5 +723,41 @@
         "failed": "Se creó una sesión para esto pero no arrancó. Se puede reintentar desde Polaris.",
         "started": "Una sesión está trabajando en esto. Síguela o dirígela aquí: {url}\n\nRama: `{branch}`",
         "pullOpened": "La sesión abrió la pull request #{number}: {url}"
+    },
+    "review": {
+        "title": "Revisiones automáticas",
+        "intro": "Qué pull requests se revisan sin que nadie lo pida. Pedir una revisión por nombre o mencionar la app siempre funciona.",
+        "none": "ninguno",
+        "override": "Fijar aquí",
+        "useInherited": "Heredar",
+        "drafts": "Borradores",
+        "draftsHint": "Desactivado espera a que el borrador se marque listo y entonces lo revisa.",
+        "incremental": "Nuevos push",
+        "incrementalHint": "Volver a revisar cuando se suben commits a una pull request ya revisada.",
+        "pauseAfter": "Pausar tras",
+        "pauseAfterHint": "Deja de revisar nuevos push de una pull request tras este número. 0 no para nunca. Pedirlo sigue funcionando.",
+        "source": "Ajustes desde",
+        "sources": {
+            "saved": "Polaris",
+            "repo": "Archivo del repo",
+            "branch": "Archivo de la PR"
+        },
+        "sourceNotes": {
+            "saved": "Lo guardado aquí, en Polaris.",
+            "repo": "{path} en la rama por defecto manda en lo que fija. Sin el archivo, se aplica lo guardado aquí.",
+            "branch": "{path} en la rama de la pull request manda en lo que fija, así que un cambio en él se aplica a esa pull request."
+        },
+        "baseBranches": "Ramas destino",
+        "baseBranchesHint": "Solo pull requests hacia estas. * dentro de un nombre, ** cruzando barras. Vacío es cualquier rama.",
+        "baseBranchesPlaceholder": "main, release/*",
+        "labels": "Etiquetas",
+        "labelsHint": "Necesita una de estas etiquetas. Con ! delante, se omiten las que la tengan. Vacío no filtra.",
+        "labelsPlaceholder": "needs-review, !skip-review",
+        "ignoreTitleKeywords": "Omitir títulos con",
+        "ignoreTitleKeywordsHint": "Sin distinguir mayúsculas. Se omite la pull request cuyo título contenga una.",
+        "ignoreTitleKeywordsPlaceholder": "WIP, no fusionar",
+        "ignoreAuthors": "Omitir autores",
+        "ignoreAuthorsHint": "Usuarios de GitHub, normalmente bots, cuyas pull requests nunca se revisan solas.",
+        "ignoreAuthorsPlaceholder": "dependabot[bot]"
     }
 }

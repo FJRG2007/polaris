@@ -5,7 +5,7 @@ import { ExecutionPicker } from "./execution-picker";
 import { useEffect, useState, useTransition } from "react";
 import { RepoSettingsFields } from "./repo-settings-fields";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
-import { updateRepoConfigAction } from "../actions";
+import { updateRepoConfigAction } from "./actions";
 import {
     Button,
     Dialog,
@@ -25,13 +25,17 @@ import {
     AGENT_EFFORTS,
     AGENT_PUSH_POLICIES,
     AGENT_SHELL_POLICIES,
+    DEFAULT_REVIEW,
     type AgentExecution,
     type AgentGateMode,
     type AgentPolicy,
     type AgentPushPolicy,
     type AgentShellPolicy,
-    type ExecutionAdvice
+    type ExecutionAdvice,
+    type ResolvedReview,
+    type ReviewSettings
 } from "@polaris/core";
+import { ReviewFields } from "@/components/agents/review-fields";
 import * as polls from "./repos-polls";
 
 /** Everything about one repository that is worth changing after it is added. */
@@ -47,6 +51,8 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
     const [pullRequests, setPullRequests] = useState<boolean | null>(repo.pullRequests);
     const [issues, setIssues] = useState<boolean | null>(repo.issues);
     const [gate, setGate] = useState<AgentGateMode | null>(repo.gate as AgentGateMode | null);
+    const [review, setReview] = useState<ReviewSettings>(repo.review);
+    const [inheritedReview, setInheritedReview] = useState<ResolvedReview>(DEFAULT_REVIEW);
     const [setupScript, setSetupScript] = useState(repo.setupScript);
     const [setupRequired, setSetupRequired] = useState(repo.setupRequired);
     const [advice, setAdvice] = useState<ExecutionAdvice | null>(null);
@@ -66,6 +72,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             setPools(result.pools ?? []);
             setAllPools(result.allPools ?? []);
             setPolicy(result.policy ?? null);
+            if (result.review) setInheritedReview(result.review);
         })();
     }, [repo.repoFullName, repo.isPrivate]);
 
@@ -81,6 +88,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             pullRequests: repo.pullRequests,
             issues: repo.issues,
             gate: repo.gate,
+            review: repo.review,
             setupScript: repo.setupScript.trim(),
             setupRequired: repo.setupRequired
         },
@@ -94,6 +102,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             pullRequests,
             issues,
             gate,
+            review,
             setupScript: setupScript.trim(),
             setupRequired
         }
@@ -116,7 +125,8 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                                 enabled: repo.enabled,
                                 pullRequests,
                                 issues,
-                                gate
+                                gate,
+                                review
                             },
                             setup: { script: setupScript, required: setupRequired }
                         }),
@@ -202,6 +212,14 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                         onIssues={setIssues}
                         onGate={setGate}
                     />
+
+                    <section className="flex min-w-0 flex-col gap-3 border-t border-border pt-4">
+                        <div className="min-w-0">
+                            <p className="text-sm font-medium">{t("review.title")}</p>
+                            <p className="text-xs text-muted-foreground">{t("review.intro")}</p>
+                        </div>
+                        <ReviewFields value={review} inherited={inheritedReview} onChange={setReview} />
+                    </section>
 
                     <div className="space-y-1">
                         <label className="text-sm font-medium" htmlFor="repo-setup-script">

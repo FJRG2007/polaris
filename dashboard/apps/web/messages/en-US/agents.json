@@ -15,6 +15,7 @@
             "issueOpened": "Issue opened",
             "issueLabeled": "Issue labeled",
             "prOpened": "Pull request opened",
+            "prUpdated": "Pull request updated",
             "prReviewRequested": "Review requested",
             "prReviewSubmitted": "Review submitted",
             "ciFailed": "Checks failed",
@@ -25,6 +26,7 @@
             "issueOpened": "A new issue. Useful for triage, or for attempting a fix straight away.",
             "issueLabeled": "A label is added to an issue. Pair it with a label so only the ones you mark are picked up.",
             "prOpened": "A new pull request, for an automatic review.",
+            "prUpdated": "New commits on a pull request, for a review of what changed. Only when new pushes are reviewed.",
             "prReviewRequested": "The app is asked for a review by name.",
             "prReviewSubmitted": "Somebody reviewed a pull request, so their feedback can be addressed.",
             "ciFailed": "A check run failed, so the logs can be read and a fix attempted.",
@@ -97,12 +99,6 @@
     },
     "overview": {
         "repositories": "Repositories",
-        "off": "Off",
-        "problem": "Problem",
-        "recentRuns": "Recent runs",
-        "noRuns": "Nothing has run yet. Mention the app in an issue or a pull request, or start a run from a repository.",
-        "emptyTitle": "No repository has an agent on it yet.",
-        "emptyHint": "Pick one, choose where its runs should happen, and mention the app in an issue to try it.",
         "setUp": "Set up"
     },
     "page": {
@@ -187,11 +183,9 @@
         "repoNotFound": "Repository not found",
         "saveSettings": "Could not save the settings",
         "checkRequest": "Check the request",
-        "checkRule": "Check the rule",
         "notEnabled": "That repository is not enabled for agent runs",
         "runNotFound": "Run not found",
         "poolNotYours": "That runner pool is not one of yours.",
-        "hasRules": "That repository already has rules.",
         "githubAppMissing": "Polaris is not installed on {owner} on GitHub, so your account cannot reach this repository. Install it there, then try again.",
         "githubAppPrivate": "Polaris's GitHub app is private, so it cannot be installed on {owner} and your account cannot reach this repository. Make the app public, install it there, then try again.",
         "githubAppPrivateMember": "Polaris's GitHub app is private, so it cannot be installed on {owner} and your account cannot reach this repository. An administrator has to make the app public first.",
@@ -200,7 +194,7 @@
     "sessions": {
         "errors": {
             "checkForm": "Check the form",
-            "repoNotConnected": "That repository is not connected to the Agents app.",
+            "repoNotConnected": "That repository is not connected to code review.",
             "noSharedMachine": "This Polaris does not offer a shared machine.",
             "serverNotYours": "That server is not one of yours.",
             "signInHost": "Nothing here signs {agent} in. Either sign it in on that server yourself, or add {ways} under AI keys.",
@@ -500,35 +494,8 @@
         }
     },
     "rules": {
-        "noRepos": "Add a repository first. Rules are per repository.",
-        "add": "Add a rule",
-        "none": "No rules yet, so these repositories only answer when the app is mentioned. A rule is what makes one act on its own - reply to a new issue, review a new pull request.",
-        "addUsual": "Add the usual rules to {name}",
-        "addUsualPick": "Add the usual rules to a repository",
-        "unknownRepo": "unknown repository",
-        "remove": "Remove this rule",
-        "edit": "Edit rule",
-        "when": "When",
-        "labels": "Only these labels",
-        "labelsHint": "Comma separated. Leave empty for any label.",
-        "branches": "Only these base branches",
-        "branchesHint": "Comma separated. Leave empty for any branch.",
-        "instructions": "Instructions",
-        "instructionsPlaceholder": "Review for correctness and security. Do not comment on formatting.",
-        "instructionsHint": "Given to the agent alongside what triggered the run. Yours, not the issue author's.",
-        "isOn": "Rule is on",
-        "on": "On",
         "saving": "Saving...",
-        "save": "Save",
-        "target": "Starts",
-        "targets": {
-            "run": "A one-off run",
-            "session": "A session"
-        },
-        "targetHints": {
-            "run": "The agent answers once, on GitHub, and stops.",
-            "session": "Opens a session you can watch and steer. Its link is posted on the issue."
-        }
+        "save": "Save"
     },
     "repos": {
         "add": "Add a repository",
@@ -704,8 +671,6 @@
         "sessions": "Agents running right now, in a branch of their own. Watch one, answer it, or send it the next thing.",
         "settingsTitle": "Settings",
         "settings": "What your repositories inherit. Set it once here, narrow it per account, and override it on the repositories that need something different.",
-        "automationsTitle": "Automations",
-        "automations": "What starts a run, besides somebody mentioning the app. A repository with no rules still answers a mention.",
         "sessionOn": "{repo} on {branch}",
         "sessionWorkspace": "A workspace of your own, with nothing checked out"
     },
@@ -758,5 +723,41 @@
         "failed": "A session was created for this but did not start. It can be retried from Polaris.",
         "started": "A session is working on this. Watch or steer it here: {url}\n\nBranch: `{branch}`",
         "pullOpened": "The session opened pull request #{number}: {url}"
+    },
+    "review": {
+        "title": "Automatic reviews",
+        "intro": "Which pull requests get reviewed without anyone asking. Asking for a review by name or mentioning the app always works.",
+        "none": "none",
+        "override": "Set here",
+        "useInherited": "Use inherited",
+        "drafts": "Draft pull requests",
+        "draftsHint": "Off waits until the draft is marked ready, then reviews it.",
+        "incremental": "New pushes",
+        "incrementalHint": "Review again when commits are pushed to a pull request already reviewed.",
+        "pauseAfter": "Pause after",
+        "pauseAfterHint": "Stop reviewing new pushes to one pull request after this many. 0 never stops. Asking still works.",
+        "source": "Settings come from",
+        "sources": {
+            "saved": "Polaris",
+            "repo": "Repository file",
+            "branch": "Pull request's file"
+        },
+        "sourceNotes": {
+            "saved": "What is saved here, in Polaris.",
+            "repo": "{path} on the default branch overrides what it sets. Without the file, what is saved here applies.",
+            "branch": "{path} on the pull request's own branch overrides what it sets, so a change to it applies to that pull request."
+        },
+        "baseBranches": "Target branches",
+        "baseBranchesHint": "Only pull requests into these. * matches within a name, ** across slashes. Empty is every branch.",
+        "baseBranchesPlaceholder": "main, release/*",
+        "labels": "Labels",
+        "labelsHint": "Needs one of these labels. Put ! in front to skip pull requests with it. Empty is no filter.",
+        "labelsPlaceholder": "needs-review, !skip-review",
+        "ignoreTitleKeywords": "Skip titles with",
+        "ignoreTitleKeywordsHint": "Any case. A pull request whose title contains one of these is skipped.",
+        "ignoreTitleKeywordsPlaceholder": "WIP, do not merge",
+        "ignoreAuthors": "Skip authors",
+        "ignoreAuthorsHint": "GitHub logins, usually bots, whose pull requests are never reviewed on their own.",
+        "ignoreAuthorsPlaceholder": "dependabot[bot]"
     }
 }

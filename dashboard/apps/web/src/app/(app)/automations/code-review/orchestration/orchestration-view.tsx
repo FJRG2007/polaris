@@ -253,7 +253,7 @@ function NeedRow({
                             {t("orchestration.compareReady", { count: need.count, title: need.title })}
                         </p>
                         <Button asChild size="sm" variant="secondary">
-                            <Link href={`/apps/agents/orchestration/compare/${need.groupId}`}>
+                            <Link href={`/automations/code-review/orchestration/compare/${need.groupId}`}>
                                 <GitCompare className="size-4 shrink-0" />
                                 {t("orchestration.compare")}
                             </Link>

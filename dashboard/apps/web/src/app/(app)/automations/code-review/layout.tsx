@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Messages } from "@/components/i18n/messages";
 
-/** Every screen of Agents draws its words from this namespace. */
-export default function AgentsLayout({ children }: { children: ReactNode }) {
+/** The repository bot's screens draw their words from the agents namespace. */
+export default function CodeReviewLayout({ children }: { children: ReactNode }) {
     return <Messages namespaces={["agents"]}>{children}</Messages>;
 }

@@ -25,7 +25,7 @@ import {
     enableRepoAction,
     listAgentRepoChoices,
     searchAgentRepoChoices
-} from "../actions";
+} from "./actions";
 import {
     AGENT_EFFORTS,
     policyAllowsVisibility,

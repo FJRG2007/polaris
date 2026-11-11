@@ -48,14 +48,14 @@ export default async function AgentSetupPage() {
                         done={modelReady}
                         title={t("setup.model.title")}
                         body={t("setup.model.body")}
-                        href={connectionsHref(AI_KEYS_SECTION, "/apps/agents/setup")}
+                        href={connectionsHref(AI_KEYS_SECTION, "/automations/code-review/setup")}
                         action={t("setup.model.action")}
                     />
                     <Step
                         done={repoReady}
                         title={t("repos.add")}
                         body={t("setup.repo.body")}
-                        href="/apps/agents/repos"
+                        href="/automations/code-review"
                         action={t("repos.add")}
                     />
                 </div>

@@ -4,7 +4,7 @@
         "give": "Pasar a un agente",
         "promptTail": "Actualiza la tarea en Polaris sobre la marcha.",
         "title": "Pasar {reference} a un agente",
-        "noRepos": "Un agente trabaja en un repositorio al que ya llega la app Agentes, y todavía no hay ninguno conectado.",
+        "noRepos": "Un agente trabaja en un repositorio conectado a la revisión de código, y aún no hay ninguno.",
         "repository": "Repositorio",
         "pickRepository": "Elige un repositorio",
         "repoSearch": "Buscar repositorios",
