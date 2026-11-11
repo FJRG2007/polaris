@@ -35,7 +35,8 @@
 import { prisma } from "@polaris/db";
 import { addressMatches } from "./access";
 import { BROADCAST_TAG } from "./broadcast";
-import { parseJoinAddresses } from "./parse";
+import { parseJoinAddresses, parseProperties } from "./parse";
+import { readContainerFile } from "../container-files";
 import { gameOfServer } from "@polaris/core";
 import { playerSelector } from "./announcement";
 import { editionOf, readPlayerLog, withServerContainer } from "./service";
@@ -163,16 +164,21 @@ export async function relayTargets(
         where: { userId },
         select: { installedAppId: true, player: true, followSignIns: true }
     });
-    if (links.length === 0) return [];
     const connected = await prisma.userConnection.findMany({
         where: { userId, provider: "minecraft" },
         select: { label: true }
     });
     const ownNames = new Set(connected.map((connection) => connection.label.toLowerCase()));
+    if (links.length === 0 && ownNames.size === 0) return [];
 
     const installs = await prisma.installedApp.findMany({
         where: {
-            id: { in: [...new Set(links.map((link) => link.installedAppId))] },
+            // The linked ones, and - for an account with its Minecraft connected -
+            // its own servers, where that name needs no link (see below).
+            OR: [
+                { id: { in: [...new Set(links.map((link) => link.installedAppId))] } },
+                ...(ownNames.size > 0 ? [{ ownerId: userId }] : [])
+            ],
             status: { not: "removed" }
         },
         select: { id: true, ownerId: true, catalogId: true, applicationId: true }
@@ -225,7 +231,36 @@ export async function relayTargets(
         }
         targets.push({ installedAppId: link.installedAppId, ownerId, player: on.name });
     }
+
+    // The account's own servers, for the Minecraft account it connected: nobody
+    // has to link a player to themselves on a server they run. Only where the
+    // server asks Mojang who is joining (`online-mode`), because only then is a
+    // player called that name the owner of that Minecraft account; a server
+    // that invents identities lets anybody type it. Unreadable counts as not
+    // asking - a message not shown is the safe way to be wrong.
+    for (const install of java) {
+        if (install.ownerId !== userId) continue;
+        if (targets.some((target) => target.installedAppId === install.id)) continue;
+        const on = open.find(
+            (visit) => visit.installedAppId === install.id && ownNames.has(visit.name.toLowerCase())
+        );
+        if (!on || !(await authenticatesPlayers(install))) continue;
+        targets.push({ installedAppId: install.id, ownerId: install.ownerId, player: on.name });
+    }
     return targets;
+}
+
+/** Whether a Java server checks with Mojang who joins: `online-mode` on, as its
+ *  own properties file says. False when the file cannot be read. */
+async function authenticatesPlayers(install: { id: string; ownerId: string }): Promise<boolean> {
+    try {
+        const properties = await withServerContainer(install.ownerId, install.id, (server) =>
+            readContainerFile(server, "/data/server.properties")
+        );
+        return properties !== null && parseProperties(properties)["online-mode"] !== "false";
+    } catch {
+        return false;
+    }
 }
 
 /**
@@ -240,21 +275,22 @@ export async function relayReady(userId: string): Promise<boolean> {
         where: { userId },
         select: { installedAppId: true, player: true, followSignIns: true }
     });
-    if (links.length === 0) return false;
-    const [connected, installs] = await Promise.all([
-        prisma.userConnection.findMany({
-            where: { userId, provider: "minecraft" },
-            select: { label: true }
-        }),
-        prisma.installedApp.findMany({
-            where: {
-                id: { in: [...new Set(links.map((link) => link.installedAppId))] },
-                status: { not: "removed" }
-            },
-            select: { id: true, ownerId: true, catalogId: true }
-        })
-    ]);
+    const connected = await prisma.userConnection.findMany({
+        where: { userId, provider: "minecraft" },
+        select: { label: true }
+    });
     const ownNames = new Set(connected.map((connection) => connection.label.toLowerCase()));
+    if (links.length === 0 && ownNames.size === 0) return false;
+    const installs = await prisma.installedApp.findMany({
+        where: {
+            OR: [
+                { id: { in: [...new Set(links.map((link) => link.installedAppId))] } },
+                ...(ownNames.size > 0 ? [{ ownerId: userId }] : [])
+            ],
+            status: { not: "removed" }
+        },
+        select: { id: true, ownerId: true, catalogId: true }
+    });
     const java = new Map(
         installs
             .filter(
@@ -264,6 +300,9 @@ export async function relayReady(userId: string): Promise<boolean> {
             )
             .map((install) => [install.id, install.ownerId])
     );
+    // A Java server of the account's own, with its Minecraft connected, needs no
+    // link: `relayTargets` finds that name on it.
+    if (ownNames.size > 0 && [...java.values()].some((ownerId) => ownerId === userId)) return true;
     return links.some((link) => {
         const ownerId = java.get(link.installedAppId);
         if (!ownerId) return false;

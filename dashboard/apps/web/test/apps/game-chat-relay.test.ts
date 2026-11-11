@@ -34,7 +34,9 @@ const fake = vi.hoisted(() => ({
     said: [] as { installedAppId: string; line: string }[],
     /** The servers that already show a channel to everybody playing. */
     showing: new Set<string>(),
-    failing: new Set<string>()
+    failing: new Set<string>(),
+    /** Each server's properties file, by install id; absent reads as unreadable. */
+    properties: {} as Record<string, string>
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -44,9 +46,17 @@ vi.mock("@polaris/db", () => ({
                 fake.links.filter((link) => link.userId === where.userId)
         },
         installedApp: {
-            findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
+            findMany: async ({
+                where
+            }: {
+                where: { OR: ({ id: { in: string[] } } | { ownerId: string })[] };
+            }) =>
                 fake.installs.filter(
-                    (install) => where.id.in.includes(install.id) && install.status !== "removed"
+                    (install) =>
+                        install.status !== "removed" &&
+                        where.OR.some((rule) =>
+                            "id" in rule ? rule.id.in.includes(install.id) : rule.ownerId === install.ownerId
+                        )
                 )
         },
         userConnection: {
@@ -78,6 +88,7 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     ) => {
         if (fake.failing.has(installedAppId)) throw new Error("the server is not answering");
         return work({
+            installedAppId,
             running: true,
             say: async (argv: string[]) => {
                 fake.said.push({ installedAppId, line: argv[0] ?? "" });
@@ -87,6 +98,10 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     }
 }));
 
+vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
+    readContainerFile: async (server: { installedAppId: string }) =>
+        fake.properties[server.installedAppId] ?? null
+}));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/chat-link-service", () => ({
     serversShowing: async () => fake.showing
 }));
@@ -142,6 +157,7 @@ beforeEach(() => {
         { installedAppId: "bedrock", name: "ana_mc" }
     ];
     fake.connections = [{ userId: ANA, label: "Ana_MC" }];
+    fake.properties = {};
     fake.joinLog =
         "[12:00:00] [Server thread/INFO]: Ana_MC[/203.0.113.7:51234] logged in with entity id 1";
     fake.signedInFrom = { [ANA]: ["203.0.113.7"] };
@@ -348,6 +364,46 @@ describe("who it is shown to", () => {
         );
         await relay.relayChatToMinecraft(MESSAGE);
         expect(fake.said.map((one) => one.installedAppId)).toEqual(["survival"]);
+    });
+
+    it("is the account's connected Minecraft name on its own server, with no link, where the server checks names with Mojang", async () => {
+        fake.installs.push({
+            id: "own",
+            ownerId: ANA,
+            catalogId: "minecraft",
+            status: "running",
+            applicationId: "app-own"
+        });
+        fake.sessions.push({ installedAppId: "own", name: "Ana_MC" });
+        fake.properties.own = ["motd=hi", "online-mode=true"].join(String.fromCharCode(10));
+        await relay.relayChatToMinecraft(MESSAGE);
+        expect(fake.said.map((one) => one.installedAppId).sort()).toEqual(["own", "survival"]);
+        expect(await relay.relayReady(ANA)).toBe(true);
+    });
+
+    it("is nobody unlinked on an own server that lets anybody type that name, or whose settings cannot be read", async () => {
+        fake.links = [];
+        fake.installs.push({
+            id: "own",
+            ownerId: ANA,
+            catalogId: "minecraft",
+            status: "running",
+            applicationId: "app-own"
+        });
+        fake.sessions.push({ installedAppId: "own", name: "Ana_MC" });
+        fake.properties.own = "online-mode=false";
+        await relay.relayChatToMinecraft(MESSAGE);
+        delete fake.properties.own;
+        await relay.relayChatToMinecraft(MESSAGE);
+        expect(fake.said).toEqual([]);
+    });
+
+    it("is nobody unlinked on a server somebody else owns", async () => {
+        fake.links = [];
+        fake.sessions.push({ installedAppId: "creative", name: "Ana_MC" });
+        fake.properties.creative = "online-mode=true";
+        await relay.relayChatToMinecraft(MESSAGE);
+        expect(fake.said).toEqual([]);
     });
 
     it("carries on to the next server when one will not take it", async () => {
