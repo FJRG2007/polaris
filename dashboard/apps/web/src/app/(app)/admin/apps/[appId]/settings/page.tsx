@@ -1,9 +1,9 @@
 /**
- * One Polaris app's administrator settings: the address the app's menu and
- * page open. A native app draws its settings here; an installable app draws
- * them among its own routes, named by `settingsAt` in its catalog entry, and
- * this sends the reader there - so every app's settings have the same address
- * whichever code draws them.
+ * One Polaris app's administrator settings: the one address the app's menu
+ * and page open. A native app draws its settings here; an installable app
+ * draws them among its own routes, named by `settingsAt` in its catalog
+ * entry, and they are drawn inside this page - that route answers nowhere
+ * else - so every app's settings have the same address.
  *
  * An app every Polaris comes with (Chat) is always installed: it has no catalog
  * entry and no install row, and its settings are drawn here all the same.
@@ -20,6 +20,7 @@ import { PageHeader, Skeleton } from "@polaris/ui";
 import { VpnAdminSettings } from "@/app/(app)/vpn/vpn-admin-settings";
 import { requireAdmin } from "@/lib/session";
 import { AppSettingsLoader } from "./loader";
+import { renderAppSettings } from "@/lib/app-bundles/serve-page";
 import { findStoreApp } from "@/lib/apps/marketplace-store";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
@@ -27,9 +28,11 @@ import { Messages } from "@/components/i18n/messages";
 export const dynamic = "force-dynamic";
 
 export default async function PolarisAppSettingsPage({
-    params
+    params,
+    searchParams
 }: {
     params: Promise<{ appId: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireAdmin();
     const { appId } = await params;
@@ -54,8 +57,13 @@ export default async function PolarisAppSettingsPage({
                 <PageHeader title={t("detail.settings")} />
                 <AppSettingsLoader
                     appId={app.id}
-                    elsewhereLabel={t("services.appSettings", { name: app.name })}
-                    own={app.id === "vpn" ? <VpnAdminSettings /> : null}
+                    own={
+                        app.id === "vpn" ? (
+                            <VpnAdminSettings />
+                        ) : (
+                            await renderAppSettings(app.id, searchParams)
+                        )
+                    }
                     revision={Date.now()}
                 />
             </div>

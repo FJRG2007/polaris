@@ -7,9 +7,9 @@
  * `/translate/glossaries` is the reader's own glossaries and never-translate
  * list, for anybody who may translate.
  *
- * `/translate/settings` is the app's administrator settings - the page
- * Management > Polaris apps > Translate > Settings opens - and is there only
- * for an administrator.
+ * `/translate/settings` is the app's administrator settings, drawn only by
+ * Management > Polaris apps > Translate > Settings
+ * (`/admin/apps/translate/settings`); at its own address it is not found.
  */
 
 import Link from "next/link";
@@ -39,6 +39,14 @@ export default async function TranslatePage({
     const glossaries = raw[0] === "glossaries";
     if (!glossaries && (raw[0] !== "settings" || !user.isAdmin)) notFound();
     const t = await translateT();
+    // Drawn inside the admin settings page, which draws the frame around it.
+    if (!glossaries)
+        return (
+            <div className="flex min-w-0 flex-col gap-4">
+                <p className="text-sm text-muted-foreground">{t("settings.description")}</p>
+                <SettingsPanel />
+            </div>
+        );
     return (
         <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-4">
             <Link
@@ -48,23 +56,8 @@ export default async function TranslatePage({
                 <ArrowLeft className="size-4 shrink-0" aria-hidden />
                 {t("title")}
             </Link>
-            {glossaries ? (
-                <>
-                    <PageHeader
-                        title={t("glossary.title")}
-                        description={t("glossary.description")}
-                    />
-                    <GlossaryManager />
-                </>
-            ) : (
-                <>
-                    <PageHeader
-                        title={t("settings.title")}
-                        description={t("settings.description")}
-                    />
-                    <SettingsPanel />
-                </>
-            )}
+            <PageHeader title={t("glossary.title")} description={t("glossary.description")} />
+            <GlossaryManager />
         </div>
     );
 }

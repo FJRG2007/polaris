@@ -94,7 +94,8 @@ function Section({ id, title, children }: { id?: string; title: string; children
     );
 }
 
-export function SettingsView() {
+/** `manager`: the reader administers this Polaris, and so has its Calendar settings. */
+export function SettingsView({ manager = false }: { manager?: boolean }) {
     const t = useCalendarT();
     const toast = useToast();
     const locale = hostUi.i18nProvider.useLocale();
@@ -468,16 +469,20 @@ export function SettingsView() {
                 />
             </Section>
 
-            <Section title={t("settingsPage.everybody")}>
-                <Row
-                    label={t("settingsPage.everybodyLabel")}
-                    hint={t("settingsPage.everybodyHint")}
-                >
-                    <Button asChild size="sm" variant="outline">
-                        <Link href="/calendar/admin">{t("settingsPage.everybodyOpen")}</Link>
-                    </Button>
-                </Row>
-            </Section>
+            {manager ? (
+                <Section title={t("settingsPage.everybody")}>
+                    <Row
+                        label={t("settingsPage.everybodyLabel")}
+                        hint={t("settingsPage.everybodyHint")}
+                    >
+                        <Button asChild size="sm" variant="outline">
+                            <Link href="/admin/apps/calendar/settings">
+                                {t("settingsPage.everybodyOpen")}
+                            </Link>
+                        </Button>
+                    </Row>
+                </Section>
+            ) : null}
         </div>
     );
 }

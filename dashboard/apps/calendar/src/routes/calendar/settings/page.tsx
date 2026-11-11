@@ -14,7 +14,7 @@ import { AccountsSection } from "../../../screens/accounts/accounts-section";
 export const dynamic = "force-dynamic";
 
 export default async function CalendarSettingsPage() {
-    await requireCalendarUser();
+    const user = await requireCalendarUser();
     const t = await calendarT();
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
@@ -32,7 +32,7 @@ export default async function CalendarSettingsPage() {
             />
             <div className="flex flex-col gap-4">
                 <AccountsSection />
-                <SettingsView />
+                <SettingsView manager={user.isAdmin} />
             </div>
         </div>
     );

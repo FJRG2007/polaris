@@ -25,9 +25,7 @@
         "bookingOff": "Booking pages are switched off on this Polaris."
     },
     "instancePage": {
-        "title": "Calendar for everybody",
         "description": "What everybody on this Polaris may do in the Calendar.",
-        "back": "Settings",
         "adminOnly": "Only an administrator can change these.",
         "noChanges": "No changes to save",
         "fixSuggested": "Fix the suggested calendars first",

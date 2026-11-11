@@ -13,7 +13,7 @@ export function BookingOffNote({ canManage }: { canManage: boolean }) {
         <StatusNote tone="warning">
             {t("bookingPage.switchedOff")}{" "}
             {canManage ? (
-                <Link href="/calendar/admin" className="underline underline-offset-2">
+                <Link href="/admin/apps/calendar/settings" className="underline underline-offset-2">
                     {t("bookingPage.switchOn")}
                 </Link>
             ) : null}

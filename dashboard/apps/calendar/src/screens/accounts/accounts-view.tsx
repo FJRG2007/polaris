@@ -318,7 +318,7 @@ export function SubscriptionsOff({ canManage }: { canManage: boolean }) {
             {t("accounts.subscriptionsOff")}{" "}
             {canManage ? (
                 <Link
-                    href="/calendar/admin"
+                    href="/admin/apps/calendar/settings"
                     className="text-foreground underline underline-offset-2"
                 >
                     {t("accounts.subscriptionsOn")}

@@ -100,8 +100,6 @@
         "configuration": "Configuration"
     },
     "detail": {
-        "builds": "Builds",
-        "noBuild": "No build of its own",
         "back": "All apps",
         "replaces": "Replaces",
         "needsProject": "A Deploy project to run it in, and permission to manage apps there.",
@@ -187,7 +185,6 @@
         "notFound": "That service is not one of this app's.",
         "waitingOutput": "Waiting for output...",
         "notRunning": "Not running.",
-        "appSettings": "Open the {name} settings",
         "state": {
             "running": "Running",
             "stopped": "Stopped",

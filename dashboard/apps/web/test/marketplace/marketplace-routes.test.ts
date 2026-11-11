@@ -67,7 +67,10 @@ const { default: PolarisAppSettingsPage } =
 const { loadAppSettingsAction } = await import("@/app/(app)/admin/apps/[appId]/settings/data");
 
 const query = (app?: string) => ({ searchParams: Promise.resolve(app ? { app } : {}) });
-const page = (appId: string) => ({ params: Promise.resolve({ appId }) });
+const page = (appId: string) => ({
+    params: Promise.resolve({ appId }),
+    searchParams: Promise.resolve({})
+});
 
 beforeEach(() => {
     session.admin = true;
@@ -112,18 +115,18 @@ describe("the admin screen", () => {
 });
 
 describe("an app's settings address", () => {
-    // The page paints its shell at once; where the settings are is decided by the
-    // read its region makes after the paint, which moves there when they are elsewhere.
+    // The page paints its shell at once; whether the app is installed is decided
+    // by the read its region makes after the paint.
     it("paints the shell of an app the catalogue knows", async () => {
         await expect(PolarisAppSettingsPage(page("translate"))).resolves.toBeTruthy();
         await expect(PolarisAppSettingsPage(page("no-such-app"))).rejects.toThrow("not found");
     });
 
-    it("opens the app's own settings screen once it is installed", async () => {
+    it("draws an installed app's own settings here, never moving to its route", async () => {
         installs.catalogIds = ["translate"];
         await expect(loadAppSettingsAction("translate")).resolves.toEqual({
-            screen: "moved",
-            to: "/translate/settings"
+            screen: "settings",
+            services: null
         });
     });
 

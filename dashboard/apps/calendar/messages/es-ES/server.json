@@ -25,9 +25,7 @@
         "bookingOff": "Las páginas de reserva están desactivadas en este Polaris."
     },
     "instancePage": {
-        "title": "Calendario para todos",
         "description": "Lo que todos en este Polaris pueden hacer en Calendario.",
-        "back": "Ajustes",
         "adminOnly": "Solo un administrador puede cambiar esto.",
         "noChanges": "No hay cambios",
         "fixSuggested": "Corrige los calendarios sugeridos",

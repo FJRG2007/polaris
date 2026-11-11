@@ -54,6 +54,9 @@ export async function renderAppPage(
 ) {
     const { path = [] } = await params;
     const url = [surface, ...path.map((part) => encodeURIComponent(part))].join("/");
+    // An app's administrator settings have one address,
+    // `/admin/apps/<app>/settings`, which draws them (`renderAppSettings`).
+    if (findApp(app)?.settingsAt === url) notFound();
     const hit = findAppRoute("page", url);
     if (hit) {
         const Page = (await hit.load()).default as PageComponent | undefined;
@@ -79,4 +82,18 @@ export async function renderAppPage(
             canUpdate={user.isAdmin}
         />
     );
+}
+
+/**
+ * The administrator settings an installed app draws among its own routes
+ * (`settingsAt` in its catalog entry), for `/admin/apps/<app>/settings` to
+ * draw inside its own frame. Null when the app's code is not here.
+ */
+export async function renderAppSettings(app: string, searchParams: AppPageProps["searchParams"]) {
+    const at = findApp(app)?.settingsAt;
+    const hit = at ? findAppRoute("page", at) : null;
+    if (!hit) return null;
+    const Page = (await hit.load()).default as PageComponent | undefined;
+    if (!Page) return null;
+    return <Page params={Promise.resolve(hit.params)} searchParams={searchParams} />;
 }

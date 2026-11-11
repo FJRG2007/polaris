@@ -100,8 +100,6 @@
         "configuration": "Configuración"
     },
     "detail": {
-        "builds": "Versiones",
-        "noBuild": "Sin versión propia",
         "back": "Catálogo",
         "replaces": "Sustituye a",
         "needsProject": "Un proyecto de Deploy donde ejecutarlo, y permiso para gestionar apps en él.",
@@ -187,7 +185,6 @@
         "notFound": "Ese servicio no es de esta app.",
         "waitingOutput": "Esperando salida...",
         "notRunning": "No está en marcha.",
-        "appSettings": "Abrir los ajustes de {name}",
         "state": {
             "running": "En marcha",
             "stopped": "Parado",
