@@ -295,8 +295,8 @@ function Invoke-LanAccess {
     $key = "auth.lanSignIn"
     switch ($Action) {
         "on" { $sql = "INSERT INTO ""Setting"" (id, key, value, scope) VALUES (gen_random_uuid(), '$key', 'on', 'global') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value; SELECT 'on';" }
-        "off" { $sql = "DELETE FROM ""Setting"" WHERE key = '$key'; SELECT 'off';" }
-        "status" { $sql = "SELECT COALESCE((SELECT value FROM ""Setting"" WHERE key = '$key'), 'off');" }
+        "off" { $sql = "INSERT INTO ""Setting"" (id, key, value, scope) VALUES (gen_random_uuid(), '$key', 'off', 'global') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value; SELECT 'off';" }
+        "status" { $sql = "SELECT CASE WHEN (SELECT value FROM ""Setting"" WHERE key = '$key') = 'off' THEN 'off' ELSE 'on' END;" }
         default { Stop-WithError "usage: polaris lan-access [on|off|status]" }
     }
     $dbUser = Get-Setting "POSTGRES_USER"

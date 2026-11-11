@@ -73,7 +73,7 @@ case "$(cat "$DOCKER_CALLS")" in *"INSERT INTO \"Setting\""*"'auth.lanSignIn', '
 case "$out" in *"Sign-in by local IP is on."*) ok "lan-access on says it is on" ;; *) bad "lan-access on said: $out" ;; esac
 : >"$DOCKER_CALLS"
 out=$(PSQL_ANSWER=off sh "$cli" lan-access off 2>&1)
-case "$(cat "$DOCKER_CALLS")" in *"DELETE FROM \"Setting\" WHERE key = 'auth.lanSignIn'"*) ok "lan-access off forgets the setting" ;; *) bad "lan-access off sent: $(cat "$DOCKER_CALLS")" ;; esac
+case "$(cat "$DOCKER_CALLS")" in *"INSERT INTO \"Setting\""*"'auth.lanSignIn', 'off'"*) ok "lan-access off stores the refusal" ;; *) bad "lan-access off sent: $(cat "$DOCKER_CALLS")" ;; esac
 case "$out" in *"is off. Sign in on http://polaris.local"*) ok "lan-access off names where to sign in" ;; *) bad "lan-access off said: $out" ;; esac
 if sh "$cli" lan-access maybe >/dev/null 2>&1; then bad "lan-access accepted an unknown word"; else ok "lan-access refuses an unknown word"; fi
 

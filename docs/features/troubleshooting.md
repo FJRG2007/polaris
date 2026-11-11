@@ -63,13 +63,13 @@ network where nothing can reach it.
 
 If the password is right and Polaris still refuses it, look at the address bar.
 Polaris accepts sign-in only on its own addresses: `polaris.local`, the domains
-you set up, and this machine's own IP once you allow it. On any other address the
+you set up, and this machine's own IP on your network. On any other address the
 password is never checked. Since the November 2026 update the screen says this and
 names the address to use.
 
 - Open Polaris on the address the installer printed, usually `http://polaris.local`.
-- If `polaris.local` does not open on that device, allow
-  [signing in by local IP](#opening-polaris-by-its-ip-address).
+- If `polaris.local` does not open on that device, open
+  [this machine's IP](#opening-polaris-by-its-ip-address) instead.
 - If you just created the account and it still fails on the right address, run
   `polaris doctor` on the machine. It names the cause and how to fix it.
 
@@ -77,13 +77,13 @@ names the address to use.
 
 Some phones, TVs and Windows machines cannot open `polaris.local`. Open the
 machine's address on your network, such as `https://192.168.1.20`, instead.
-Signing in there is off until an administrator turns it on, and only this
+Signing in there works unless an administrator turned it off, and only this
 machine's private addresses are ever accepted.
 
 - In Polaris: Admin > Domains > **Sign in by local IP**. The card lists the
   addresses it accepts.
-- On the machine, when nobody can sign in yet: `polaris lan-access on`. Turn it off
-  again with `polaris lan-access off`, and check it with `polaris lan-access status`.
+- If it was turned off and nobody can sign in, turn it back on from the machine
+  with `polaris lan-access on`, and check it with `polaris lan-access status`.
 
 The browser warns about the certificate on an IP address the first time. Passkeys
 do not work on an IP address; use your password, or `polaris.local`.

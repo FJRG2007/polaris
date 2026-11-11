@@ -643,8 +643,12 @@ export interface AuthOptions {
      * sign-in on that domain failing with INVALID_ORIGIN until the container was
      * restarted. Supplied by the app, which owns where they are stored; failures
      * are the caller's to swallow, and cost only the extra origins.
+     *
+     * Given the request when there is one (the origin check), so the app can
+     * trust an address that is only known from the request itself - this
+     * machine's IP typed by hand. Absent where hosts are listed without one.
      */
-    readonly configuredHosts?: () => Promise<readonly string[]>;
+    readonly configuredHosts?: (request?: Request) => Promise<readonly string[]>;
 
     /**
      * Told about every session that opens, whatever the method, after it is stored,
@@ -745,9 +749,9 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
         appName: "Polaris",
         secret: env.POLARIS_AUTH_SECRET,
         baseURL: env.POLARIS_APP_URL,
-        trustedOrigins: async () => {
+        trustedOrigins: async (request) => {
             if (!options.configuredHosts) return fixedOrigins;
-            const hosts = await options.configuredHosts().catch(() => []);
+            const hosts = await options.configuredHosts(request).catch(() => []);
             return [...fixedOrigins, ...hosts.flatMap(origins)];
         },
         database: prismaAdapter(prisma, { provider: env.POLARIS_DB_PROVIDER }),

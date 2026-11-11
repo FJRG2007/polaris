@@ -5,7 +5,7 @@
  * network - `https://192.168.1.20` typed by hand, for a device where
  * `polaris.local` does not resolve.
  *
- * Off until an administrator turns it on. The switch flips at once and goes back
+ * On unless an administrator turned it off. The switch flips at once and goes back
  * if the server refuses. The addresses it would accept are listed, each with a
  * link, so whoever turns it on can open one straight away.
  */
@@ -31,7 +31,7 @@ export function LanSignInCard({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [optimistic, setOptimistic] = useState<boolean | null>(null);
-    const enabled = optimistic ?? view?.enabled ?? false;
+    const enabled = optimistic ?? view?.enabled ?? true;
 
     async function toggle(next: boolean) {
         if (!view || next === view.enabled) return;

@@ -16,7 +16,7 @@
 import { createRequestAuth } from "@polaris/auth";
 
 const requestAuth = createRequestAuth({
-    configuredHosts: async () => {
+    configuredHosts: async (request) => {
         const [
             { dashboardHosts, publicHostname },
             { getPolarisPublicUrl },
@@ -35,9 +35,9 @@ const requestAuth = createRequestAuth({
             getPolarisPublicUrl().catch(() => null),
             // Tailscale names the machine the same way, under the tailnet's ts.net.
             getTailscaleHost().catch(() => null),
-            // The machine's own private addresses, only once an administrator
-            // allowed signing in on them (Admin > Domains, `polaris lan-access`).
-            lanSignInHosts().catch(() => [])
+            // The machine's own private addresses, unless an administrator
+            // turned that off (Admin > Domains, `polaris lan-access`).
+            lanSignInHosts(request).catch(() => [])
         ]);
         const tunnelHost = publicHostname(tunnel);
         return [

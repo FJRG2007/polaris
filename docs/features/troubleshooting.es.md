@@ -66,14 +66,14 @@ nada puede alcanzarlo.
 
 Si la contraseña es correcta y Polaris la rechaza, mira la barra de direcciones.
 Polaris solo acepta iniciar sesión en sus propias direcciones: `polaris.local`, los
-dominios que configuraste y la IP de esta máquina cuando lo permites. En cualquier
+dominios que configuraste y la IP de esta máquina en tu red. En cualquier
 otra dirección la contraseña ni se comprueba. Desde la actualización de noviembre
 de 2026 la pantalla lo dice y nombra la dirección que hay que usar.
 
 - Abre Polaris en la dirección que mostró el instalador, normalmente
   `http://polaris.local`.
-- Si `polaris.local` no abre en ese dispositivo, permite
-  [entrar por IP local](#abrir-polaris-por-su-direccion-ip).
+- Si `polaris.local` no abre en ese dispositivo, abre
+  [la IP de esta máquina](#abrir-polaris-por-su-direccion-ip).
 - Si acabas de crear la cuenta y falla en la dirección correcta, ejecuta
   `polaris doctor` en la máquina. Dice la causa y cómo arreglarla.
 
@@ -81,14 +81,13 @@ de 2026 la pantalla lo dice y nombra la dirección que hay que usar.
 
 Algunos móviles, televisores y equipos con Windows no abren `polaris.local`. Abre
 en su lugar la dirección de la máquina en tu red, como `https://192.168.1.20`.
-Entrar ahí está desactivado hasta que un administrador lo activa, y solo se aceptan
-las direcciones privadas de esta máquina.
+Entrar ahí funciona salvo que un administrador lo haya desactivado, y solo se
+aceptan las direcciones privadas de esta máquina.
 
 - En Polaris: Admin > Dominios > **Entrar por IP local**. La tarjeta muestra las
   direcciones que acepta.
-- En la máquina, cuando aún nadie puede entrar: `polaris lan-access on`. Se
-  desactiva con `polaris lan-access off` y se consulta con
-  `polaris lan-access status`.
+- Si se desactivó y nadie puede entrar, se vuelve a activar desde la máquina con
+  `polaris lan-access on`, y se consulta con `polaris lan-access status`.
 
 La primera vez el navegador avisa del certificado de una dirección IP. Las llaves
 de acceso no funcionan en una dirección IP; usa tu contraseña o `polaris.local`.
