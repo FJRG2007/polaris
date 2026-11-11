@@ -15,7 +15,7 @@
 
 import { keepOwnScroll } from "@/lib/keep-own-scroll";
 import * as refs from "./references";
-import { AtSign } from "lucide-react";
+import { AtSign, BotMessageSquare } from "lucide-react";
 import { REFERENCE } from "./markdown";
 import { Extension } from "@tiptap/core";
 import { cn, Skeleton } from "@polaris/ui";
@@ -113,7 +113,7 @@ const ROOM_MENTIONS: readonly RoomSuggestion[] = [
 
 export interface RoomSuggestion {
     readonly kind: "room";
-    readonly id: "everyone" | "here";
+    readonly id: "everyone" | "here" | "polar";
     readonly label: string;
     readonly detail: string;
     readonly image: null;
@@ -132,11 +132,27 @@ export type SuggestionItem = MentionCandidate | RoomSuggestion;
  * what it had just written and offering it again: Enter picked it a second time,
  * added another space, and the message was never sent.
  */
-export function roomMatches(query: string): RoomSuggestion[] {
+/** Polar, which answers in the conversation when it is named (`lib/chat/polar-mention`). */
+const POLAR_MENTION: RoomSuggestion = {
+    kind: "room",
+    id: "polar",
+    label: "@polar",
+    detail: "Ask Polar",
+    image: null
+};
+
+export function roomMatches(
+    query: string,
+    offers: { rooms: boolean; polar: boolean } = { rooms: true, polar: false }
+): RoomSuggestion[] {
     if (/\s/.test(query)) return [];
     const needle = query.toLowerCase();
-    if (needle.length === 0) return [...ROOM_MENTIONS];
-    return ROOM_MENTIONS.filter(
+    const listed = [
+        ...(offers.rooms ? ROOM_MENTIONS : []),
+        ...(offers.polar ? [POLAR_MENTION] : [])
+    ];
+    if (needle.length === 0) return listed;
+    return listed.filter(
         (room) => room.id.startsWith(needle) || (room.id === "everyone" && "all".startsWith(needle))
     );
 }
@@ -229,7 +245,11 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
                                 />
                             ) : item.kind === "room" ? (
                                 <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[0.6875rem] text-primary">
-                                    <AtSign className="size-3" />
+                                    {item.id === "polar" ? (
+                                        <BotMessageSquare className="size-3 shrink-0" />
+                                    ) : (
+                                        <AtSign className="size-3 shrink-0" />
+                                    )}
                                 </span>
                             ) : (
                                 <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[0.625rem] uppercase text-muted-foreground">
@@ -262,7 +282,7 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
  * them apart is what lets a description mention a task without notifying half a
  * team, and it means neither list has to be filtered by what the reader meant.
  */
-export function mentionExtension(search: MentionSearch, rooms = false) {
+export function mentionExtension(search: MentionSearch, rooms = false, polar = false) {
     return Extension.create({
         name: "polarisMentions",
         addProseMirrorPlugins() {
@@ -270,7 +290,7 @@ export function mentionExtension(search: MentionSearch, rooms = false) {
                 Suggestion({
                     editor: this.editor,
                     pluginKey: POPUP_KEYS.people,
-                    ...mentionSuggestion("@", ["user", "team"], search, rooms)
+                    ...mentionSuggestion("@", ["user", "team"], search, rooms, polar)
                 }),
                 Suggestion({
                     editor: this.editor,
@@ -332,7 +352,9 @@ function mentionSuggestion(
     kinds: readonly refs.ReferenceKind[],
     search: MentionSearch,
     /** Whether this surface is a conversation, and so has a room to name. */
-    rooms = false
+    rooms = false,
+    /** Whether Polar can be asked here, which any conversation allows. */
+    polar = false
 ): Omit<SuggestionOptions<SuggestionItem>, "editor"> {
     // Whether a lookup is in flight. The plugin opens the popup before the first
     // answer arrives, and an empty list is otherwise indistinguishable from a
@@ -357,7 +379,8 @@ function mentionSuggestion(
             // one, and the rare one is the one everybody already knows the
             // spelling of. They are still here, and typing enough of "everyone",
             // "all" or "here" still narrows the list to them.
-            const named = rooms && char === "@" ? roomMatches(query) : [];
+            const named =
+                (rooms || polar) && char === "@" ? roomMatches(query, { rooms, polar }) : [];
             searching = true;
             try {
                 return [...(await search(kinds, query)), ...named];

@@ -69,6 +69,9 @@ export interface ChatMessageView {
      *  webhooks, rather than by a person - drawn with an APP badge, as Discord
      *  does, because the name on it is whatever the sender chose. */
     readonly fromWebhook?: boolean;
+    /** Written by an assistant answering a mention - "polar" - and drawn with
+     *  its mark and an AI badge, never as a person. */
+    readonly fromAgent?: string;
     readonly kind: core.ChatMessageKind;
     /** Empty for a deleted message - the tombstone carries no text. */
     readonly body: string;
@@ -617,6 +620,21 @@ export async function send(
     // Not awaited, and never allowed to fail the send: a message going out
     // matters more than the notification about it.
     void announceRoomMention(input.channelId, actor.id, input.body, id).catch(() => undefined);
+    // `@polar` asks Polar, which answers in the conversation - see `polar-mention`.
+    // Loaded only for a message that names it.
+    if (/@polar/i.test(input.body)) {
+        void import("./polar-mention")
+            .then((polar) =>
+                polar.answerPolarLater({
+                    channelId: input.channelId,
+                    messageId: id,
+                    authorId: actor.id,
+                    parentId: input.parentId ?? null,
+                    body: input.body
+                })
+            )
+            .catch((error: unknown) => console.error("chat: Polar could not be asked:", error));
+    }
     // Into the game, for whoever is playing and asked for it - see `game-relay`.
     // Loaded when it runs, so a Polaris with no game running pays nothing for it.
     void import("./game-relay")
@@ -1787,6 +1805,7 @@ export const MESSAGE_SELECT = {
     createdAt: true,
     webhookId: true,
     authorLabel: true,
+    agent: true,
     translation: true
 } as const;
 
@@ -1808,6 +1827,8 @@ interface Row {
      *  read that selected its own columns (search) still decorates. */
     webhookId?: string | null;
     authorLabel?: string | null;
+    /** The assistant that wrote it, for one answering a mention. */
+    agent?: string | null;
     /** `{ from, to, original }` when it was sent translated - see
      *  `core.readSentTranslation`. Optional for the same reason as above. */
     translation?: unknown;
@@ -2096,10 +2117,11 @@ export async function decorateMessages(
             // under is the whole of who wrote it.
             authorName: row.authorId
                 ? (names.get(row.authorId) ?? null)
-                : row.webhookId
+                : row.webhookId || row.agent
                   ? (row.authorLabel ?? null)
                   : null,
             ...(row.webhookId ? { fromWebhook: true } : {}),
+            ...(row.agent ? { fromAgent: row.agent } : {}),
             kind: row.kind as core.ChatMessageKind,
             body: row.deletedAt ? "" : notice ? noticeString(notice) : row.body,
             ...(notice ? { notice } : {}),

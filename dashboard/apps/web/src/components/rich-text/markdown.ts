@@ -615,19 +615,37 @@ function meaningOf(word: string): ChannelMention {
  */
 export function channelMentions(markdown: string): Set<ChannelMention> {
     const found = new Set<ChannelMention>();
+    forEachProseText(markdown, (text) => {
+        for (const match of text.matchAll(CHANNEL_MENTION)) found.add(meaningOf(match[2] ?? ""));
+    });
+    return found;
+}
+
+/** `@polar`, as a whole word, the way the room mentions are matched. */
+const POLAR_MENTION = /(^|[^\w@])@polar(?![\w-])/i;
+
+/** Whether a message asks Polar something: `@polar` outside code. */
+export function polarMentioned(markdown: string): boolean {
+    if (!/@polar/i.test(markdown)) return false;
+    let found = false;
+    forEachProseText(markdown, (text) => {
+        if (POLAR_MENTION.test(text)) found = true;
+    });
+    return found;
+}
+
+/** Every run of prose text in a message: code, inline or fenced, is skipped. */
+function forEachProseText(markdown: string, visit: (text: string) => void): void {
     const walk = (node: JSONContent) => {
         if (node.type === "codeBlock" || node.type === MARKDOWN_BLOCK) return;
         if (node.type === "text") {
             if ((node.marks ?? []).some((mark) => mark.type === "code")) return;
-            for (const match of (node.text ?? "").matchAll(CHANNEL_MENTION)) {
-                found.add(meaningOf(match[2] ?? ""));
-            }
+            visit(node.text ?? "");
             return;
         }
         for (const child of node.content ?? []) walk(child);
     };
     walk(markdownToDoc(markdown));
-    return found;
 }
 
 /**

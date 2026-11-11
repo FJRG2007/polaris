@@ -33,6 +33,8 @@ const PRODUCT_PREFIX = "polaris";
 const RESERVED = new Set([
     // The product, and the roles it would be mistaken for.
     "polaris",
+    // The assistant: `@polar` in Chat asks it, so nobody may answer to it.
+    "polar",
     "admin",
     "administrator",
     "root",

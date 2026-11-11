@@ -309,7 +309,7 @@ export function RichTextEditor({
                 commands: () => commands.current ?? [],
                 say: () => (id) => words.current(`editor.blocks.${id}`)
             }),
-            mentionExtension(search, mentionsIn !== null && roomMentions),
+            mentionExtension(search, mentionsIn !== null && roomMentions, mentionsIn !== null),
             ...(writesEmoji ? [CustomEmojiNode, emojiExtension(() => customEmoji.current)] : [])
         ],
         [hint, search, mentionsIn, roomMentions, writesEmoji]

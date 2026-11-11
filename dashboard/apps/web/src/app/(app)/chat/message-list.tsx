@@ -192,7 +192,8 @@ import {
     Star,
     Trash2,
     Volume2,
-    Webhook
+    Webhook,
+    BotMessageSquare
 } from "lucide-react";
 import * as polls from "./chat-reads";
 import { unlockProofFor } from "./lock-session";
@@ -996,6 +997,13 @@ function Message({
                                     </span>
                                 )}
                             </Writer>
+                        ) : message.fromAgent ? (
+                            <span
+                                className="inline-flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                                aria-hidden="true"
+                            >
+                                <BotMessageSquare className="size-4 shrink-0" />
+                            </span>
                         ) : message.fromWebhook ? (
                             <span
                                 className="inline-flex size-7 items-center justify-center rounded-full bg-primary/15 text-primary"
@@ -1070,6 +1078,11 @@ function Message({
                                 {/* Not a person: something outside Polaris posting
                                 through one of the channel's webhooks, under a name
                                 it chose. Discord's APP tag says the same. */}
+                                {message.fromAgent && (
+                                    <span className="shrink-0 self-center rounded bg-primary px-1 text-[0.625rem] font-semibold uppercase leading-4 text-primary-foreground">
+                                        {t("polar.badge")}
+                                    </span>
+                                )}
                                 {message.fromWebhook && (
                                     <span
                                         className="shrink-0 self-center rounded bg-primary px-1 text-[0.625rem] font-semibold uppercase leading-4 text-primary-foreground"

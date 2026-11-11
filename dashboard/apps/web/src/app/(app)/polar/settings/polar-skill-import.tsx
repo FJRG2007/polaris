@@ -277,7 +277,7 @@ export function SkillImportDialog({
                     {review ? (
                         <div className="flex flex-col gap-3">
                             <AuditNote audit={review.preview.audit} />
-                            <ul className="flex max-h-[50vh] flex-col divide-y divide-border overflow-y-auto rounded-md border border-border">
+                            <ul className="flex max-h-[50vh] flex-col divide-y divide-border overflow-y-auto overscroll-contain rounded-md border border-border">
                                 {candidates.map((entry, index) => (
                                     <CandidateRow
                                         key={`${entry.origin}-${index}`}

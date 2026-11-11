@@ -2328,5 +2328,15 @@
         "back": "Keep it",
         "done": "Done",
         "add": "Add"
+    },
+    "polar": {
+        "notAvailable": "Polar isn't available to you. An administrator decides who can use it.",
+        "tooFast": "Too many questions at once. Ask again in a minute.",
+        "noProvider": "I need an AI provider key to answer you. Add one of your own, or ask an administrator to share this Polaris's keys.",
+        "noProviderOwnOnly": "I need an AI provider key to answer you, and this Polaris's keys aren't shared with you. Add one of your own.",
+        "addKey": "Add a key",
+        "limitReached": "You've reached your limit on this Polaris's shared key. [Add a key of your own](/account/ai-keys) to keep asking.",
+        "failed": "I couldn't answer that just now. Try again in a moment.",
+        "badge": "AI"
     }
 }

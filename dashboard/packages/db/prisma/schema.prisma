@@ -10135,6 +10135,10 @@ model ChatMessage {
     // `authorId` outlives an account.
     webhookId    String?   @db.Uuid
     authorLabel  String?
+    // Written by an assistant answering a mention rather than by a person or a
+    // webhook: "polar" for Polar. Its name is `authorLabel`, and `replyToId` is
+    // the message that asked.
+    agent        String?
     // Sent through live translation: `{ from, to, original }` - the language
     // it was typed in, the one it went out in, and the words as typed, which
     // only the author is shown. Null for everything else; cleared on an edit,
