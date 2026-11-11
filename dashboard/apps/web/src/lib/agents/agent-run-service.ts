@@ -140,6 +140,9 @@ export interface CreateRunInput {
     /** What the agent is being asked to do, kept so a retry on the next model in
      *  the fallback chain asks the same thing. */
     prompt?: string | null;
+    /** The operator's instructions from an automation step; null reads the
+     *  repository's own rules. */
+    instructions?: string | null;
     /** Which try this is on that chain, and the run it followed. */
     attempt?: number;
     parentRunId?: string | null;
@@ -167,6 +170,7 @@ export async function createAgentRun(
             prNumber: input.prNumber ?? null,
             startedById: input.startedById ?? null,
             prompt: input.prompt ?? null,
+            instructions: input.instructions ?? null,
             attempt: input.attempt ?? 1,
             parentRunId: input.parentRunId ?? null,
             tokenHash: hashToken(token),

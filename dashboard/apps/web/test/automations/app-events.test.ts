@@ -165,10 +165,18 @@ describe("picker", () => {
             "tasks",
             "mail",
             "drive",
-            "calendar"
+            "calendar",
+            "code"
         ]);
         installed.mockResolvedValue(false);
-        expect(await events.eventApps(user)).toEqual(["deploy", "chat", "tasks", "mail", "drive"]);
+        expect(await events.eventApps(user)).toEqual([
+            "deploy",
+            "chat",
+            "tasks",
+            "mail",
+            "drive",
+            "code"
+        ]);
         can.mockResolvedValue(false);
         expect(await events.eventApps(user)).toEqual([]);
     });

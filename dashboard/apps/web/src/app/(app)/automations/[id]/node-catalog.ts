@@ -62,7 +62,14 @@ export const EVENT_PRESETS = {
     chatMessage: { name: "chat.message", outcomes: [] },
     mailReceived: { name: "mail.received", outcomes: [] },
     driveFileUploaded: { name: "drive.file-uploaded", outcomes: [] },
-    calendarEventStarting: { name: "calendar.event-starting", outcomes: [] }
+    calendarEventStarting: { name: "calendar.event-starting", outcomes: [] },
+    codeMentioned: { name: "code.mentioned", outcomes: [] },
+    codeIssueOpened: { name: "code.issue-opened", outcomes: [] },
+    codeIssueLabeled: { name: "code.issue-labeled", outcomes: [] },
+    codePullRequestOpened: { name: "code.pull-request-opened", outcomes: [] },
+    codeReviewRequested: { name: "code.review-requested", outcomes: [] },
+    codeReviewSubmitted: { name: "code.review-submitted", outcomes: [] },
+    codeChecksFailed: { name: "code.checks-failed", outcomes: [] }
 } as const satisfies Record<string, { name: string; outcomes: readonly never[] }>;
 export type PresetKey = keyof typeof EVENT_PRESETS;
 
@@ -101,13 +108,23 @@ const APP_EVENT_PRESETS: Readonly<Record<core.AppEventApp, readonly PresetKey[]>
     tasks: ["taskCreated", "taskCompleted"],
     mail: ["mailReceived"],
     drive: ["driveFileUploaded"],
-    calendar: ["calendarEventStarting"]
+    calendar: ["calendarEventStarting"],
+    code: [
+        "codePullRequestOpened",
+        "codeReviewRequested",
+        "codeReviewSubmitted",
+        "codeChecksFailed",
+        "codeIssueOpened",
+        "codeIssueLabeled",
+        "codeMentioned"
+    ]
 };
 
 /** Each app's steps, in the order its group lists them. */
 const APP_STEPS: Readonly<Partial<Record<core.AppEventApp, readonly string[]>>> = {
     "game-servers": ["game-servers.action.power", "game-servers.action.command"],
-    deploy: ["core.redeploy"]
+    deploy: ["core.redeploy"],
+    code: ["core.agentWork"]
 };
 
 const PLACES_TRIGGERS = ["time", "interval", "change", "stays", "threshold", "sun"].map(

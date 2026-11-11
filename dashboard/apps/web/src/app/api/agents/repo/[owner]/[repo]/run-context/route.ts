@@ -71,11 +71,14 @@ export async function GET(
     // keeps a settings change mid-flight from redirecting a run already going.
     const run = await prisma.agentRun.findUnique({
         where: { id: caller.runId },
-        select: { mode: true, model: true, trigger: true }
+        select: { mode: true, model: true, trigger: true, instructions: true }
     });
 
     const [instructions, policy, apiUrl] = await Promise.all([
-        instructionsFor(caller.repoId, run?.trigger ?? null, run?.mode ?? null),
+        // An automation step's own words, when it gave some; else the rules.
+        run?.instructions != null
+            ? run.instructions.trim()
+            : instructionsFor(caller.repoId, run?.trigger ?? null, run?.mode ?? null),
         policyForRepo(row.ownerId, row),
         appBaseUrl()
     ]);

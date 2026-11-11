@@ -97,7 +97,8 @@ export async function getAgentRepo(ownerId: string, repoId: string): Promise<Age
 export async function agentRepoByFullName(repoFullName: string) {
     return prisma.agentRepo.findFirst({
         where: { repoFullName, enabled: true },
-        include: { automations: { where: { enabled: true } } }
+        // A rule that moved to the central automations is theirs to start.
+        include: { automations: { where: { enabled: true, movedToId: null } } }
     });
 }
 
@@ -266,6 +267,9 @@ export async function seedDefaultAutomations(repoId: string): Promise<void> {
             }
         ]
     });
+    // They live in Automations: moved now, so the repository lands there with them.
+    const { moveAgentRules } = await import("./rule-move");
+    await moveAgentRules(repoId);
 }
 
 /** Stop running agents here. The row stays: the automations and the run history on

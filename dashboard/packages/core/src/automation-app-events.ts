@@ -22,7 +22,8 @@ export const APP_EVENT_APPS = [
     "tasks",
     "mail",
     "drive",
-    "calendar"
+    "calendar",
+    "code"
 ] as const;
 export type AppEventApp = (typeof APP_EVENT_APPS)[number];
 
@@ -92,6 +93,23 @@ const calendarEvent = z
     })
     .strict();
 
+/** Something on a connected GitHub repository: a pull request, an issue, a
+ *  mention of the app, a failed check. `body` is what somebody wrote there -
+ *  untrusted text, for a step to quote, never to obey. */
+const repoEvent = z
+    .object({
+        repoId: id,
+        repo: z.string().min(3).max(200),
+        number: z.number().int().positive().nullable(),
+        pullRequest: z.boolean(),
+        title: z.string().max(500),
+        actor: z.string().max(100),
+        labels: z.array(z.string().max(100)).max(50),
+        branch: z.string().max(255).nullable(),
+        body: z.string().max(4000)
+    })
+    .strict();
+
 export const APP_EVENTS = {
     "game-server.started": { app: "game-servers", payload: gameServer },
     "game-server.stopped": { app: "game-servers", payload: gameServer },
@@ -104,10 +122,33 @@ export const APP_EVENTS = {
     "chat.message": { app: "chat", payload: chatMessage },
     "mail.received": { app: "mail", payload: mailReceived },
     "drive.file-uploaded": { app: "drive", payload: driveUpload },
-    "calendar.event-starting": { app: "calendar", payload: calendarEvent }
+    "calendar.event-starting": { app: "calendar", payload: calendarEvent },
+    "code.mentioned": { app: "code", payload: repoEvent },
+    "code.issue-opened": { app: "code", payload: repoEvent },
+    "code.issue-labeled": { app: "code", payload: repoEvent },
+    "code.pull-request-opened": { app: "code", payload: repoEvent },
+    "code.review-requested": { app: "code", payload: repoEvent },
+    "code.review-submitted": { app: "code", payload: repoEvent },
+    "code.checks-failed": { app: "code", payload: repoEvent }
 } as const satisfies Record<string, { app: AppEventApp; payload: z.ZodTypeAny }>;
 
 export type AppEventName = keyof typeof APP_EVENTS;
+
+/** The repository trigger each `code.*` event is (AGENT_TRIGGERS), both ways. */
+export const CODE_EVENT_TRIGGERS = {
+    "code.mentioned": "mention",
+    "code.issue-opened": "issue.opened",
+    "code.issue-labeled": "issue.labeled",
+    "code.pull-request-opened": "pr.opened",
+    "code.review-requested": "pr.review_requested",
+    "code.review-submitted": "pr.review_submitted",
+    "code.checks-failed": "ci.failed"
+} as const satisfies Partial<Record<AppEventName, string>>;
+export type CodeEventName = keyof typeof CODE_EVENT_TRIGGERS;
+
+export function isCodeEventName(name: string): name is CodeEventName {
+    return Object.hasOwn(CODE_EVENT_TRIGGERS, name);
+}
 export type AppEventPayload<Name extends AppEventName> = z.infer<
     (typeof APP_EVENTS)[Name]["payload"]
 >;

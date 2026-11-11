@@ -287,6 +287,8 @@ export async function handleAgentWebhook(params: {
      *  the Integration row rather than hardcoded, because every instance names its
      *  own App. */
     appHandle: string;
+    /** GitHub's id for this delivery, so a retried one starts nothing twice. */
+    delivery?: string | null;
 }): Promise<string[]> {
     // Runs nothing ever reported back on would otherwise sit at `running` with a
     // live callback token. This is the regularly executing server path that
@@ -333,6 +335,28 @@ export async function handleAgentWebhook(params: {
     if (!policyAllowsVisibility(policy, repo.isPrivate)) return [];
     if (!policyAllowsTrigger(policy, incident.trigger)) return [];
 
+    // Automations listening for it hear it, whatever the rules below do.
+    const trigger = incident.trigger;
+    const announce = () =>
+        trigger === "manual"
+            ? Promise.resolve(false)
+            : import("@/lib/automations/code-events").then(({ announceRepoEvent }) =>
+                  announceRepoEvent(
+                      {
+                          repo,
+                          trigger,
+                          issueNumber: incident.issueNumber,
+                          prNumber: incident.prNumber,
+                          title: incidentTitle(params.payload, incident),
+                          actor: incident.actor,
+                          labels: incident.labels,
+                          branch: incident.branch,
+                          body: incident.body
+                      },
+                      params.delivery ?? null
+                  )
+              );
+
     // A mention needs no rule: it is somebody addressing the app directly, and a
     // repository where that did nothing would look installed and be inert. On a
     // public repository that would also mean any stranger could spend the
@@ -341,6 +365,9 @@ export async function handleAgentWebhook(params: {
     // can comment already has that access.
     if (incident.trigger === ALWAYS_ON_TRIGGER) {
         if (!repo.isPrivate && !(await canWriteToRepo(repoFullName, incident.actor))) return [];
+        // An automation that answers mentions answers this one instead of
+        // the default run, as a mention rule aimed at a session used to.
+        if (await announce()) return [];
         // A mention rule aimed at a session answers the mention with one
         // somebody can steer, rather than the run a mention otherwise starts.
         const steered = repo.automations.find(
@@ -370,6 +397,7 @@ export async function handleAgentWebhook(params: {
         return result.runId ? [result.runId] : [];
     }
 
+    await announce();
     const rules = repo.automations.filter((row) => row.trigger === incident.trigger);
     const allowed = rules.filter((row) => matches(parseCondition(row.condition), incident));
     if (allowed.length === 0) return [];

@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
+// No automation listens here, so the rules answer every event as before.
+vi.mock("@/lib/automations/code-events", () => ({ announceRepoEvent: async () => false }));
 vi.mock("@/lib/agents/agent-run-service", () => ({
     finishAgentRun: vi.fn(),
     sweepStaleRuns: vi.fn(async () => 0)

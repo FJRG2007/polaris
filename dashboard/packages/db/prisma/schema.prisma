@@ -8840,6 +8840,9 @@ model AgentAutomation {
     // run | session - what the trigger starts: a headless run, or an
     // interactive session somebody can watch and steer.
     target       String   @default("run")
+    // The automation this rule moved to. Set, the webhook starts nothing for it
+    // and the automation does instead. No FK: the automation may be removed alone.
+    movedToId    String?  @db.Uuid
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
 
@@ -8881,6 +8884,9 @@ model AgentRun {
     // that invented its own prompt would be a different piece of work wearing the
     // first one's name.
     prompt      String?
+    // The operator's instructions for this run, when an automation step gave
+    // them. Null reads the repository's own rules, as runs always have.
+    instructions String?
     // Which try this is on the fallback chain, and the run it followed. A run
     // started because the one before it could not be served is a second attempt at
     // ONE piece of work, and a screen that showed them as unrelated failures would

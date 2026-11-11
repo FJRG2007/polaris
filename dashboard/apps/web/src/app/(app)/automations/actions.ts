@@ -766,6 +766,53 @@ export async function thresholdSubjectsAction(
     }
 }
 
+const agentReposRequestSchema = z.object(pageFields).strict();
+
+/**
+ * The repositories the caller connected, a page at a time: what an agent step
+ * may work on, since it spends the connecting account's keys and limits.
+ */
+export async function agentRepoOptionsAction(
+    input: unknown
+): Promise<OptionsPage<{ id: string; name: string }> | { error: string }> {
+    try {
+        const who = await actor();
+        const parsed = agentReposRequestSchema.safeParse(input);
+        if (!parsed.success) return { items: [], next: null };
+        const { query, cursor, limit, ids } = parsed.data;
+        const { prisma } = await import("@polaris/db");
+        const { decodeServerCursor, encodeServerCursor } = await import("@/lib/server-options");
+        const after = decodeServerCursor(cursor);
+        const rows = await prisma.agentRepo.findMany({
+            where: {
+                ownerId: who.id,
+                ...(ids ? { id: { in: ids } } : {}),
+                ...(query ? { repoFullName: { contains: query, mode: "insensitive" } } : {}),
+                ...(after
+                    ? {
+                          OR: [
+                              { repoFullName: { gt: after.name } },
+                              { repoFullName: after.name, id: { gt: after.id } }
+                          ]
+                      }
+                    : {})
+            },
+            select: { id: true, repoFullName: true },
+            orderBy: [{ repoFullName: "asc" }, { id: "asc" }],
+            take: limit + 1
+        });
+        const page = rows.slice(0, limit);
+        const last = page.at(-1);
+        return {
+            items: page.map((row) => ({ id: row.id, name: row.repoFullName })),
+            next:
+                rows.length > limit && last ? encodeServerCursor(last.repoFullName, last.id) : null
+        };
+    } catch (caught) {
+        return { error: (await failure(caught)).error };
+    }
+}
+
 /** One of the account's own notification destinations, as a notice step lists it. */
 export interface NoticeDestinationChoice {
     readonly id: string;

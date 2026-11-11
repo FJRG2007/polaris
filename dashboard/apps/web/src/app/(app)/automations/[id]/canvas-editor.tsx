@@ -46,6 +46,7 @@ import {
     Mail,
     HardDrive,
     CalendarClock,
+    FolderGit2,
     type LucideIcon
 } from "lucide-react";
 import type { SecretSummary } from "@/lib/automations/secrets";
@@ -819,6 +820,7 @@ const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
     mail: Mail,
     drive: HardDrive,
     calendar: CalendarClock,
+    code: FolderGit2,
     logic: GitBranch,
     timing: Hourglass,
     data: Database,

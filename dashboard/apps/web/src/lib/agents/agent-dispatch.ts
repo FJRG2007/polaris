@@ -44,6 +44,9 @@ export interface DispatchInput {
      *  operator's own words. */
     prompt: string;
     mode?: string | null;
+    /** The operator's instructions, when an automation step gave them; absent
+     *  reads the repository's own rules at run-context time. */
+    instructions?: string | null;
     issueNumber?: number | null;
     prNumber?: number | null;
     startedById?: string | null;
@@ -96,6 +99,7 @@ export async function dispatchRun(input: DispatchInput): Promise<DispatchResult>
         model: input.repo.model,
         mode: input.mode ?? null,
         prompt: input.prompt,
+        instructions: input.instructions ?? null,
         attempt: input.attempt ?? 1,
         parentRunId: input.parentRunId ?? null,
         issueNumber: input.issueNumber ?? null,

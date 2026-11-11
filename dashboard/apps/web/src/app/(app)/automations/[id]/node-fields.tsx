@@ -25,7 +25,7 @@ import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AutomationDetail } from "@/lib/automations/service";
 import { useEffect, useState } from "react";
-import { rotateHookAction, thresholdSubjectsAction } from "../actions";
+import { agentRepoOptionsAction, rotateHookAction, thresholdSubjectsAction } from "../actions";
 import { PagedPicker } from "@/components/paged-picker";
 import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
 import { RefInput, RefTextarea } from "./references";
@@ -148,6 +148,7 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     "core.set": () => ({ values: [] }),
     "core.announce": () => ({ name: "", payload: [] }),
     "core.redeploy": () => ({ applicationId: "" }),
+    "core.agentWork": () => ({ repoId: "", mode: null, instructions: "", target: "run" }),
     "core.code": () => ({ code: CODE_TEMPLATES.filter, items: "" }),
     "core.chat": () => ({
         preset: "slack",
@@ -437,6 +438,8 @@ export function NodeFields({
             return <ChatMessageFields config={config} set={set} />;
         case "core.redeploy":
             return <RedeployFields config={config} set={set} />;
+        case "core.agentWork":
+            return <AgentWorkFields config={config} set={set} />;
         case "core.code":
             return <CodeFields config={config} set={set} />;
         case "core.connectivity":
@@ -850,6 +853,70 @@ function ChatMessageFields({ config, set }: { config: Config; set: (change: Conf
                     value={config.body ?? ""}
                     onChange={(event) => set({ body: event.target.value })}
                 />
+            </Field>
+        </div>
+    );
+}
+
+/** Picked on the step, or left to the repository event that started the run. */
+const FROM_EVENT = "event";
+const AUTO_MODE = "auto";
+
+function AgentWorkFields({ config, set }: { config: Config; set: (change: Config) => void }) {
+    const t = useTranslations("automations");
+    const repoId = typeof config.repoId === "string" ? config.repoId : "";
+    const mode = typeof config.mode === "string" ? config.mode : AUTO_MODE;
+    const target = config.target === "session" ? "session" : "run";
+    return (
+        <div className="space-y-3">
+            <Field label={t("fields.agentRepo")}>
+                <PagedPicker
+                    read={agentRepoOptionsAction}
+                    scope={{}}
+                    cache="automations:agent-repos"
+                    value={repoId || FROM_EVENT}
+                    fixed={[{ value: FROM_EVENT, label: t("fields.agentRepoEvent") }]}
+                    onValueChange={(id) => set({ repoId: id === FROM_EVENT ? "" : id })}
+                    placeholder={t("fields.agentRepoEvent")}
+                    searchPlaceholder={t("fields.agentRepoSearch")}
+                    emptyText={t("fields.agentRepoNone")}
+                    aria-label={t("fields.agentRepo")}
+                />
+            </Field>
+            <Field label={t("fields.agentMode")}>
+                <Select
+                    value={mode}
+                    onValueChange={(next) => set({ mode: next === AUTO_MODE ? null : next })}
+                    options={[
+                        { value: AUTO_MODE, label: t("fields.agentModeAuto") },
+                        ...core.AGENT_RUN_MODES.map((value) => ({
+                            value,
+                            label: t(`fields.agentModes.${value}`)
+                        }))
+                    ]}
+                    aria-label={t("fields.agentMode")}
+                />
+            </Field>
+            <Field label={t("fields.agentTarget")}>
+                <Select
+                    value={target}
+                    onValueChange={(next) => set({ target: next })}
+                    options={core.AGENT_WORK_TARGETS.map((value) => ({
+                        value,
+                        label: t(`fields.agentTargets.${value}`)
+                    }))}
+                    aria-label={t("fields.agentTarget")}
+                />
+            </Field>
+            <Field label={t("fields.agentInstructions")}>
+                <RefTextarea
+                    rows={4}
+                    value={typeof config.instructions === "string" ? config.instructions : ""}
+                    onChange={(event) => set({ instructions: event.target.value })}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                    {t("fields.agentInstructionsHint")}
+                </p>
             </Field>
         </div>
     );

@@ -217,7 +217,12 @@ export async function POST(request: Request): Promise<Response> {
         }
         const appHandle = await githubAppHandle();
         if (!appHandle) return Response.json({ ok: true });
-        const runs = await handleAgentWebhook({ event, payload, appHandle });
+        const runs = await handleAgentWebhook({
+            event,
+            payload,
+            appHandle,
+            delivery: request.headers.get("x-github-delivery")
+        });
         return Response.json({ runs: runs.length });
     }
 

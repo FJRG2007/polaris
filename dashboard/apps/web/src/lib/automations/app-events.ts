@@ -116,7 +116,8 @@ const APP_PERMISSION: Readonly<Record<core.AppEventApp, core.Permission>> = {
     tasks: "tasks.read",
     mail: "mail.use",
     drive: "drive.read",
-    calendar: "calendar.use"
+    calendar: "calendar.use",
+    code: "agents.read"
 };
 const INSTALLABLE: Partial<Record<core.AppEventApp, string>> = {
     "game-servers": core.GAME_SERVERS_APP_ID,

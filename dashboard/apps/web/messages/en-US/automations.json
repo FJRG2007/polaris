@@ -145,7 +145,8 @@
         "threshold": "A reading crosses a threshold",
         "connectivity": "The internet goes down or comes back",
         "redeploy": "Redeploy a service",
-        "code": "Run code"
+        "code": "Run code",
+        "agentWork": "Agent works on the repository"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -220,7 +221,30 @@
         "serviceSearch": "Search services",
         "serviceNone": "No services of yours yet.",
         "serviceOpenDeploy": "Open Deploy",
-        "serviceGone": "That service is gone or out of reach."
+        "serviceGone": "That service is gone or out of reach.",
+        "agentRepo": "Repository",
+        "agentRepoEvent": "The one the event names",
+        "agentRepoNone": "No repositories connected yet.",
+        "agentMode": "Mode",
+        "agentModeAuto": "Agent chooses",
+        "agentModes": {
+            "Build": "Build",
+            "AddressReviews": "Address reviews",
+            "Review": "Review",
+            "IncrementalReview": "Review new commits",
+            "Plan": "Plan",
+            "Fix": "Fix bugs",
+            "ResolveConflicts": "Resolve conflicts",
+            "Task": "Task"
+        },
+        "agentTarget": "Starts",
+        "agentTargets": {
+            "run": "A run that answers once",
+            "session": "A session you can steer"
+        },
+        "agentInstructions": "Instructions",
+        "agentInstructionsHint": "Your words for the agent. What people write on GitHub reaches it as the event, never as instructions.",
+        "agentRepoSearch": "Search repositories"
     },
     "operators": {
         "eq": "equals",
@@ -335,7 +359,12 @@
         "codeMemory": "The code used too much memory",
         "codeOutput": "The code returned too much, or something that is not JSON",
         "codeInput": "The items were too large for a Code step",
-        "codeLimited": "Too many Code runs this minute"
+        "codeLimited": "Too many Code runs this minute",
+        "repoRequired": "Pick a repository, or start from a repository event",
+        "agentsForbidden": "The account it runs as cannot start agent work",
+        "repoGone": "That repository is gone or connected by someone else",
+        "repoOff": "That repository is turned off",
+        "agentRefused": "The agent did not start: a limit, a pause or no agent signed in"
     },
     "secrets": {
         "title": "Secrets",
@@ -664,7 +693,8 @@
         "threshold": "Starts when a server, service or UPS reading stays past a value.",
         "connectivity": "Starts when the line drops, returns, changes address or stops being reachable.",
         "redeploy": "Deploy a service again, as Redeploy on its page does.",
-        "code": "Change items with JavaScript and pass them on."
+        "code": "Change items with JavaScript and pass them on.",
+        "agentWork": "Start an agent run or session on a connected repository."
     },
     "flow": {
         "conditionGroup": "Conditions",
@@ -973,7 +1003,8 @@
             "tasks": "Tasks",
             "mail": "Mail",
             "drive": "Drive",
-            "calendar": "Calendar"
+            "calendar": "Calendar",
+            "code": "Code"
         },
         "presets": {
             "publicIpChanged": "Public IP changed",
@@ -996,7 +1027,14 @@
             "playerJoined": "Player joined",
             "mailReceived": "Mail received",
             "driveFileUploaded": "File uploaded to Drive",
-            "calendarEventStarting": "Calendar event starting soon"
+            "calendarEventStarting": "Calendar event starting soon",
+            "codeMentioned": "App mentioned",
+            "codeIssueOpened": "Issue opened",
+            "codeIssueLabeled": "Issue labeled",
+            "codePullRequestOpened": "Pull request opened",
+            "codeReviewRequested": "Review requested",
+            "codeReviewSubmitted": "Review submitted",
+            "codeChecksFailed": "Checks failed"
         },
         "schedules": {
             "daily": "Every day at a time",

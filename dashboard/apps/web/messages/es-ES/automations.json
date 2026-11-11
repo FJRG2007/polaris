@@ -145,7 +145,8 @@
         "threshold": "Una lectura cruza un umbral",
         "connectivity": "Internet se cae o vuelve",
         "redeploy": "Redesplegar servicio",
-        "code": "Código JS"
+        "code": "Código JS",
+        "agentWork": "El agente trabaja en el repo"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -220,7 +221,30 @@
         "serviceSearch": "Buscar servicios",
         "serviceNone": "Aún no tienes servicios.",
         "serviceOpenDeploy": "Abrir Deploy",
-        "serviceGone": "Ese servicio ya no existe o no está a tu alcance."
+        "serviceGone": "Ese servicio ya no existe o no está a tu alcance.",
+        "agentRepo": "Repositorio",
+        "agentRepoEvent": "El que nombra el evento",
+        "agentRepoNone": "Aún no hay repositorios conectados.",
+        "agentMode": "Modo",
+        "agentModeAuto": "Elige el agente",
+        "agentModes": {
+            "Build": "Crear",
+            "AddressReviews": "Atender revisiones",
+            "Review": "Revisar",
+            "IncrementalReview": "Revisar commits nuevos",
+            "Plan": "Plan",
+            "Fix": "Arreglar",
+            "ResolveConflicts": "Resolver conflictos",
+            "Task": "Tarea"
+        },
+        "agentTarget": "Inicia",
+        "agentTargets": {
+            "run": "Una ejecución de una vez",
+            "session": "Una sesión que puedes guiar"
+        },
+        "agentInstructions": "Instrucciones",
+        "agentInstructionsHint": "Tus palabras para el agente. Lo que se escribe en GitHub le llega como el evento, nunca como instrucciones.",
+        "agentRepoSearch": "Buscar repositorios"
     },
     "operators": {
         "eq": "igual a",
@@ -335,7 +359,12 @@
         "codeMemory": "El código usó demasiada memoria",
         "codeOutput": "El código devolvió demasiado, o algo que no es JSON",
         "codeInput": "Los elementos eran demasiado grandes para un paso de código",
-        "codeLimited": "Demasiadas ejecuciones este minuto"
+        "codeLimited": "Demasiadas ejecuciones este minuto",
+        "repoRequired": "Elige un repositorio o empieza desde un evento de repositorio",
+        "agentsForbidden": "La cuenta con la que se ejecuta no puede iniciar trabajo de agentes",
+        "repoGone": "Ese repositorio ya no está o lo conectó otra persona",
+        "repoOff": "Ese repositorio está desactivado",
+        "agentRefused": "El agente no arrancó: un límite, una pausa o ningún agente conectado"
     },
     "secrets": {
         "title": "Secretos",
@@ -664,7 +693,8 @@
         "threshold": "Empieza cuando una lectura de un servidor, servicio o SAI se pasa de un valor.",
         "connectivity": "Empieza cuando la línea cae, vuelve, cambia de IP o deja de verse desde fuera.",
         "redeploy": "Despliega un servicio de nuevo, como Redesplegar en su página.",
-        "code": "Cambia elementos con JavaScript y pásalos al siguiente paso."
+        "code": "Cambia elementos con JavaScript y pásalos al siguiente paso.",
+        "agentWork": "Inicia una ejecución o sesión del agente en un repositorio conectado."
     },
     "flow": {
         "conditionGroup": "Condiciones",
@@ -973,7 +1003,8 @@
             "tasks": "Tareas",
             "mail": "Correo",
             "drive": "Drive",
-            "calendar": "Calendario"
+            "calendar": "Calendario",
+            "code": "Code"
         },
         "presets": {
             "publicIpChanged": "Cambió la IP pública",
@@ -996,7 +1027,14 @@
             "playerJoined": "Entra un jugador",
             "mailReceived": "Correo recibido",
             "driveFileUploaded": "Archivo subido a Drive",
-            "calendarEventStarting": "Evento del calendario pronto"
+            "calendarEventStarting": "Evento del calendario pronto",
+            "codeMentioned": "App mencionada",
+            "codeIssueOpened": "Issue abierta",
+            "codeIssueLabeled": "Issue etiquetada",
+            "codePullRequestOpened": "Pull request abierta",
+            "codeReviewRequested": "Revisión pedida",
+            "codeReviewSubmitted": "Revisión enviada",
+            "codeChecksFailed": "Checks fallidos"
         },
         "schedules": {
             "daily": "Cada día a una hora",

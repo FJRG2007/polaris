@@ -181,6 +181,24 @@ export function recommendExecution(input: ExecutionAdviceInput): ExecutionAdvice
  * review comment or an issue body) and because the list is what an operator
  * reads on a form. The mapping to GitHub events lives in the webhook.
  */
+/** The runtime's own modes, by the names it reads (agent-runtime/modes.ts).
+ *  None picked, the agent chooses from what it was handed. */
+export const AGENT_RUN_MODES = [
+    "Build",
+    "AddressReviews",
+    "Review",
+    "IncrementalReview",
+    "Plan",
+    "Fix",
+    "ResolveConflicts",
+    "Task"
+] as const;
+export type AgentRunMode = (typeof AGENT_RUN_MODES)[number];
+
+/** What an agent step starts: a run that answers once, or a session somebody
+ *  can watch and steer. */
+export const AGENT_WORK_TARGETS = ["run", "session"] as const;
+
 export const AGENT_TRIGGERS = [
     "mention",
     "issue.opened",

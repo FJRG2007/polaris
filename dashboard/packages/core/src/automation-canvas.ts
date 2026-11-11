@@ -710,6 +710,7 @@ export const CORE_NODE_OUTPUT_PATHS: Readonly<Record<graphs.CoreNodeType, readon
         "publicIp"
     ],
     "core.redeploy": ["deploymentId", "applicationId"],
+    "core.agentWork": ["runId", "sessionId", "repo"],
     "core.code": ["items", "count", "logs"]
 };
 

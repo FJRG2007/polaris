@@ -9,6 +9,7 @@ import { Badge, Button, Skeleton } from "@polaris/ui";
 import {
     Activity,
     Bell,
+    Bot,
     CircleStop,
     Clock,
     Code,
@@ -239,6 +240,11 @@ const RUN_ERRORS = [
     "deployFailed",
     "deployLoop",
     "serviceGone",
+    "repoRequired",
+    "agentsForbidden",
+    "repoGone",
+    "repoOff",
+    "agentRefused",
     "codeSyntax",
     "codeRuntime",
     "codeTimeout",
@@ -297,6 +303,7 @@ const NODE_KEYS = {
     "core.try": "try",
     "core.waitCondition": "waitCondition",
     "core.redeploy": "redeploy",
+    "core.agentWork": "agentWork",
     "core.code": "code"
 } as const;
 
@@ -339,6 +346,7 @@ const NODE_ICONS: Record<string, LucideIcon> = {
     "game-servers.action.power": Power,
     "game-servers.action.command": SquareTerminal,
     "core.redeploy": Rocket,
+    "core.agentWork": Bot,
     "core.code": Code,
     "core.manual": Hand,
     "core.schedule": Clock,

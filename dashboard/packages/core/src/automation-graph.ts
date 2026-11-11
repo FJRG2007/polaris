@@ -19,6 +19,7 @@ import { wallClock, zonedInstant } from "./schemas/display.js";
 import { durationSchema, durationSeconds } from "./automation-schema.js";
 import { automationNodeId } from "./automation-nodes.js";
 import { isAppEventName, type AppEventApp } from "./automation-app-events.js";
+import { AGENT_RUN_MODES, AGENT_WORK_TARGETS } from "./agents.js";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -894,6 +895,18 @@ export const CORE_NODE_CONFIGS = {
     /** Deploy a service again, as Redeploy on its page does. */
     "core.redeploy": z.object({ applicationId: z.string().uuid("serviceRequired") }),
     /**
+     * Put an agent to work on a connected repository: the one the event that
+     * started the run names, or the one picked here. The instructions are the
+     * operator's; what somebody wrote on GitHub reaches the agent only as the
+     * event it is answering.
+     */
+    "core.agentWork": z.object({
+        repoId: z.union([z.literal(""), z.string().uuid()]).default(""),
+        mode: z.enum(AGENT_RUN_MODES).nullable().default(null),
+        instructions: text(AUTOMATION_LIMITS.textLength * 4).default(""),
+        target: z.enum(AGENT_WORK_TARGETS).default("run")
+    }),
+    /**
      * JavaScript the person wrote, run in a sandbox with no network, files or
      * secrets: it takes `items` and returns the items for the next step.
      * `items` is a whole reference to a list; empty, the step reads the output
@@ -951,6 +964,7 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     // The event's dedupe key is the step's idempotency key.
     "core.announce": { role: "action", ports: [], idempotent: true },
     "core.redeploy": { role: "action", ports: [], idempotent: false },
+    "core.agentWork": { role: "action", ports: [], idempotent: false },
     // Reads its input and nothing else: the same items give the same answer.
     "core.code": { role: "action", ports: [], idempotent: true },
     "core.try": {

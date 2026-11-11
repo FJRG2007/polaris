@@ -302,6 +302,15 @@ export async function register(): Promise<void> {
             console.error("polaris: Watch alarms could not be carried to Automations:", error)
         );
 
+    // Agent rules of connected repositories become automations the same way:
+    // keyed by legacyRef, and the webhook stops answering a rule once it moved.
+    const { moveAgentRules } = await import("./lib/agents/rule-move");
+    void afterPredecessor()
+        .then(() => moveAgentRules())
+        .catch((error: unknown) =>
+            console.error("polaris: agent rules could not be moved to Automations:", error)
+        );
+
     // Domain health and Watch alarms used to start here, as two timers of their
     // own. They are scheduled jobs now - `domain-health` and `alarms` in
     // `lib/cron/jobs.ts` - because a timer takes no lease, and during an update

@@ -89,6 +89,7 @@ async function fallBack(runId: string): Promise<FallbackOutcome> {
             startedById: true,
             parentRunId: true,
             prompt: true,
+            instructions: true,
             repo: {
                 select: {
                     id: true,
@@ -130,6 +131,7 @@ async function fallBack(runId: string): Promise<FallbackOutcome> {
         repo: { ...run.repo, model: next },
         trigger: run.trigger as AgentTrigger,
         prompt: run.prompt ?? "",
+        instructions: run.instructions,
         mode: run.mode,
         issueNumber: run.issueNumber,
         prNumber: run.prNumber,
