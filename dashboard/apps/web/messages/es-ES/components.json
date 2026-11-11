@@ -1892,5 +1892,17 @@
     "listField": {
         "remove": "Quitar {value}",
         "full": "Hasta {max}"
+    },
+    "improve": {
+        "prompt": "Mejorar el prompt",
+        "email": "Corregir y mejorar el correo",
+        "working": "Mejorando...",
+        "empty": "Escribe algo para mejorarlo",
+        "undo": "Deshacer la mejora",
+        "failed": "No se pudo mejorar el texto. Inténtalo de nuevo.",
+        "noModel": "Añade una clave de IA para mejorar texto.",
+        "limit": "Se alcanzó el límite de uso de IA.",
+        "rateLimited": "Demasiadas mejoras seguidas. Espera un minuto.",
+        "notAllowed": "Tu cuenta no puede usar Polar."
     }
 }

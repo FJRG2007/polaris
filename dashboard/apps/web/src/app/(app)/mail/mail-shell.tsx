@@ -72,6 +72,8 @@ export interface MailContextValue {
     readonly shelf: string;
     /** Whether somebody has let this person read a mailbox of theirs. */
     readonly lent: boolean;
+    /** Whether this person may use Polar, which corrects a draft. */
+    readonly canImprove: boolean;
     /** Pull everything the server drew again. The answer to every live frame:
      *  one small query, against teaching the client to apply every kind of
      *  change to a shape the server already knows how to build. */
@@ -269,6 +271,7 @@ export function MailShell({
     shelf: serverShelf,
     lent,
     mailboxIds,
+    canImprove,
     children
 }: {
     accounts: MailAccountView[];
@@ -284,6 +287,7 @@ export function MailShell({
     lent: boolean;
     /** Every mailbox this person has, whichever shelf it is on. */
     mailboxIds: string[];
+    canImprove: boolean;
     children: ReactNode;
 }) {
     // During render rather than in an effect, and on purpose: the screens inside
@@ -685,6 +689,7 @@ export function MailShell({
             viewerName,
             shelf,
             lent,
+            canImprove,
             refresh,
             reloadLists,
             refreshMailbox,
@@ -707,6 +712,7 @@ export function MailShell({
             viewerName,
             shelf,
             lent,
+            canImprove,
             refresh,
             reloadLists,
             refreshMailbox,

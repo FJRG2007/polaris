@@ -101,10 +101,11 @@ export async function helperMaySpend(userId: string, helper: PolarHelper): Promi
     return !(await polarLimitReached(userId));
 }
 
-/** Records what a small job spent, under the thread, with no message of its own. */
+/** Records what a small job spent, under the thread (null for a job outside
+ *  any chat, such as improving a draft), with no message of its own. */
 export async function recordHelperUsage(
     userId: string,
-    threadId: string,
+    threadId: string | null,
     helper: PolarHelper,
     usage: LanguageModelUsage | undefined
 ): Promise<void> {

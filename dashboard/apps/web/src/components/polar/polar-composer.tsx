@@ -3,7 +3,8 @@
 /**
  * Polar's composer, the one both sides of Polar type into: the chips above the
  * box, the attached files, the box itself, and the tool row under it - attach,
- * the microphone, the picker, and the button that sends or opens a voice
+ * the microphone, the wand that improves the draft, the picker, and the
+ * button that sends or opens a voice
  * conversation. Chat and Code each pass what differs (what sending does, what
  * the picker picks) and nothing else, so the two cannot drift apart.
  *
@@ -20,6 +21,7 @@ import type { VoiceAvailability } from "@/lib/polar/voice-call";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { BorderBeam } from "@/components/polar/motion/border-beam";
 import { useRef, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
+import { ImproveButton } from "@/components/polar/improve-button";
 import { AttachmentList, type AttachmentData } from "@/components/polar/elements/attachments";
 import { DictationButton, VoiceModeButton, type VoiceNotice } from "@/components/polar/polar-voice";
 import {
@@ -237,6 +239,12 @@ export function PolarComposer({
                                 onValueChange(now.trim() ? `${now.trimEnd()} ${text}` : text);
                                 own.current?.focus();
                             }}
+                        />
+                        <ImproveButton
+                            value={value}
+                            onChange={onValueChange}
+                            purpose="prompt"
+                            disabled={disabled}
                         />
                         {picker}
                     </PromptInputTools>

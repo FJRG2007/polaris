@@ -60,6 +60,28 @@ export function keepSignatureDelimiter(body: string): string {
     return lines.join("\n");
 }
 
+/**
+ * The body split at its signature: what the person wrote, and the delimiter
+ * with everything under it (the signature, and a quote below it when the
+ * signature sits above one). `tail` is empty when there is no signature, and
+ * `head + tail` is always the body. Outside code blocks only, as above.
+ */
+export function splitAtSignature(body: string): { head: string; tail: string } {
+    const lines = body.split("\n");
+    let fenced = false;
+    for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index] ?? "";
+        if (FENCE.test(line)) {
+            fenced = !fenced;
+            continue;
+        }
+        if (fenced || line !== SIGNATURE_DELIMITER) continue;
+        const head = lines.slice(0, index).join("\n");
+        return { head, tail: body.slice(head.length) };
+    }
+    return { head: body, tail: "" };
+}
+
 /** What a composer is opened with, as far as its signature is concerned. */
 export interface SignedSeed {
     readonly body?: string;

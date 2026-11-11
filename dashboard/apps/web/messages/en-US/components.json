@@ -1892,5 +1892,17 @@
     "listField": {
         "remove": "Remove {value}",
         "full": "Up to {max}"
+    },
+    "improve": {
+        "prompt": "Improve the prompt",
+        "email": "Correct and improve the email",
+        "working": "Improving...",
+        "empty": "Write something to improve it",
+        "undo": "Undo the improvement",
+        "failed": "The text could not be improved. Try again.",
+        "noModel": "Add an AI key to improve text.",
+        "limit": "The AI usage limit has been reached.",
+        "rateLimited": "Too many improvements in a row. Wait a minute.",
+        "notAllowed": "Your account cannot use Polar."
     }
 }

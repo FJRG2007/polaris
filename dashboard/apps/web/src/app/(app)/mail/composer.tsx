@@ -42,7 +42,8 @@ import type { PickedFile } from "@/components/file-picker/picked-file";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { useRef, useMemo, useState, useEffect, useCallback } from "react";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
-import { keepSignatureDelimiter, signatureBlock, withSignature } from "./signature";
+import { ImproveButton } from "@/components/polar/improve-button";
+import { keepSignatureDelimiter, signatureBlock, splitAtSignature, withSignature } from "./signature";
 import { joinComposerBody, trimComposerBody } from "./trimmed-content";
 import { TrimmedPill } from "./trimmed-pill";
 import { draftSaves, type DraftFields, type DraftSaves, type DraftWriter } from "./draft-saves";
@@ -119,8 +120,16 @@ function parsed(body: string): unknown {
 }
 
 export function Composer() {
-    const { accounts, identities, composing, openComposer, refreshMailbox, viewerName, shelf } =
-        useMail();
+    const {
+        accounts,
+        identities,
+        composing,
+        openComposer,
+        refreshMailbox,
+        viewerName,
+        shelf,
+        canImprove
+    } = useMail();
     const toast = useToast();
     const t = useTranslations("mailCompose");
     const tm = useTranslations("mail");
@@ -852,6 +861,26 @@ export function Composer() {
                                         setSubject(template.subject);
                                 }}
                             />
+
+                            {canImprove ? (
+                                // What the person wrote, never the signature or
+                                // the quote under it.
+                                <ImproveButton
+                                    size="icon"
+                                    purpose="email"
+                                    subject={subject}
+                                    value={splitAtSignature(body).head}
+                                    onChange={(next) => {
+                                        // The blank lines before the signature
+                                        // stay, so its delimiter still opens a
+                                        // paragraph of its own.
+                                        const { head, tail } = splitAtSignature(body);
+                                        const gap = tail ? (/\s*$/.exec(head)?.[0] ?? "") : "";
+                                        setBody(`${tail ? next.trimEnd() : next}${gap}${tail}`);
+                                    }}
+                                    disabled={sending}
+                                />
+                            ) : null}
 
                             {signature ? (
                                 <Button

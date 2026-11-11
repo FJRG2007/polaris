@@ -155,6 +155,7 @@ describe("Code's composer is Chat's", () => {
             "Attach files",
             "Dictate",
             "Microphone and model",
+            "Write something to improve it",
             "Model, intelligence and key",
             "Voice mode"
         ]);
@@ -166,6 +167,7 @@ describe("Code's composer is Chat's", () => {
             "Attach files",
             "Dictate",
             "Microphone and model",
+            "Write something to improve it",
             "Agent: Claude Code - This machine's own login",
             "Permissions: Full access",
             "Voice talks to Polar's chat, not to an agent"
