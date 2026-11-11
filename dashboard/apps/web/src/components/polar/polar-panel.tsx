@@ -2523,9 +2523,9 @@ export function PolarChat({
                     </span>
                     <PolarModeSwitch code={code} />
                     <span className="flex-1" />
-                    {/* Usage and settings belong to Polar, not to the chat, so they
-                        stay in Code too; temporary, sharing and commands are the
-                        chat's own. */}
+                    {/* Commands, usage and settings belong to Polar, not to the
+                        chat, so they stay in Code too; temporary and sharing are
+                        the chat's own. */}
                     <>
                         <span className="polar-head-wide flex items-center gap-2">
                             {!chatMode ? null : !chatStarted ? (
@@ -2554,14 +2554,12 @@ export function PolarChat({
                                     <Share2 />
                                 </MessageAction>
                             )}
-                            {chatMode ? (
-                                <MessageAction
-                                    label={t("commands.manage")}
-                                    onClick={() => setManaging(true)}
-                                >
-                                    <SquareSlash />
-                                </MessageAction>
-                            ) : null}
+                            <MessageAction
+                                label={t("commands.manage")}
+                                onClick={() => setManaging(true)}
+                            >
+                                <SquareSlash />
+                            </MessageAction>
                             <MessageAction
                                 label={t("usage.title")}
                                 onClick={() => setShowUsage(true)}
@@ -2614,12 +2612,10 @@ export function PolarChat({
                                         {t("temporary.shareChat")}
                                     </DropdownMenuItem>
                                 )}
-                                {chatMode ? (
-                                    <DropdownMenuItem onSelect={() => setManaging(true)}>
-                                        <SquareSlash />
-                                        {t("commands.manage")}
-                                    </DropdownMenuItem>
-                                ) : null}
+                                <DropdownMenuItem onSelect={() => setManaging(true)}>
+                                    <SquareSlash />
+                                    {t("commands.manage")}
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => setShowUsage(true)}>
                                     <Gauge />
                                     {t("usage.title")}
