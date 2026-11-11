@@ -46,6 +46,7 @@ import {
   ListPullRequestReviewsTool,
   ResolveReviewThreadTool,
 } from "./reviewComments.ts";
+import { RunScannersTool } from "./scan.ts";
 import { SelectModeTool } from "./selectMode.ts";
 import { addTools, type PolarisTool } from "./shared.ts";
 import { KillBackgroundTool, ShellTool } from "./shell.ts";
@@ -165,6 +166,8 @@ function buildCommonTools(ctx: ToolContext, outputSchema?: JsonSchema): PolarisT
     GitTool(ctx),
     GitFetchTool(ctx),
     UploadFileTool(ctx),
+    // read-only and shell-free, so offered whatever the shell permission is
+    RunScannersTool(ctx),
   ];
 
   // cross-repo tools only surface on --xrepo runs (keeps the single-repo tool

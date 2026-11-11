@@ -76,6 +76,12 @@ Everything below is a deliberate departure, not drift.
   end-of-turn decision, and two hooks each deciding whether the agent may stop is
   a loop neither can see. Everything else Enigma writes composes: the skills are
   read-only guidance and the post-edit hooks run per edit and exit.
+- **Scanners.** `mcp/scan.ts` is ours: a `run_scanners` tool offered in every
+  shell mode. It fetches gitleaks, shellcheck, hadolint, actionlint, zizmor and
+  osv-scanner from their GitHub releases at a pinned version, refuses any
+  download whose sha256 is not the pinned one, and starts each with an argument
+  array in an environment without credentials. Bumping one means a new version
+  and both architectures' digests in `SCANNERS`.
 - **Why a run stopped.** Upstream treats a `session.error` as recoverable and
   reports only the harness's own terminal verdict. For one class that loses the
   reason: a provider refusing a request for exceeding the ACCOUNT's allowance is

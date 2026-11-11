@@ -797,7 +797,8 @@
             "linkedIssues": "Check linked issues",
             "suggestLabels": "Suggest labels",
             "applyLabels": "Apply labels",
-            "suggestReviewers": "Suggest reviewers"
+            "suggestReviewers": "Suggest reviewers",
+            "scanners": "Run scanners"
         },
         "tone": "Tone",
         "toneHint": "How to phrase it: language, length, voice.",

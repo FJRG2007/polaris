@@ -797,7 +797,8 @@
             "linkedIssues": "Revisar issues",
             "suggestLabels": "Sugerir etiquetas",
             "applyLabels": "Poner etiquetas",
-            "suggestReviewers": "Sugerir revisores"
+            "suggestReviewers": "Sugerir revisores",
+            "scanners": "Escáneres"
         },
         "tone": "Tono",
         "toneHint": "Cómo redactarla: idioma, longitud, voz.",

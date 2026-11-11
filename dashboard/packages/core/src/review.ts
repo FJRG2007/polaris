@@ -130,6 +130,9 @@ export const reviewSettingsSchema = z.object({
     applyLabels: nullable(z.boolean()),
     /** Suggest who should review, from who owns and last changed the code. */
     suggestReviewers: nullable(z.boolean()),
+    /** Run the pinned static analysers (secrets, shell, Dockerfiles, workflows,
+     *  vulnerable dependencies) over the changed files and report their findings. */
+    scanners: nullable(z.boolean()),
     /** Pre-merge checks, each off, a warning, or an error. */
     titleCheck: nullable(level),
     descriptionCheck: nullable(level),
@@ -195,6 +198,7 @@ export const DEFAULT_REVIEW: ResolvedReview = {
     suggestLabels: false,
     applyLabels: false,
     suggestReviewers: false,
+    scanners: false,
     titleCheck: "off",
     descriptionCheck: "off",
     issueCheck: "off",
@@ -434,6 +438,10 @@ export function reviewInstructions(settings: ResolvedReview): string {
     if (settings.suggestReviewers)
         lines.push(
             "- Suggest up to three reviewers from the people who own or most recently changed the touched code (CODEOWNERS, git history), in a `### Suggested reviewers` line. Never the author."
+        );
+    if (settings.scanners)
+        lines.push(
+            "- Run `run_scanners` on the changed files and report the findings the change introduced, with the scanner's name, as review comments on the lines they are about."
         );
     const checks: string[] = [];
     for (const key of ["titleCheck", "descriptionCheck", "issueCheck"] as const)

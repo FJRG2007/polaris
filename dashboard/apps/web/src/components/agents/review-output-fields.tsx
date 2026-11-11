@@ -26,7 +26,8 @@ type BoolKey =
     | "linkedIssues"
     | "suggestLabels"
     | "applyLabels"
-    | "suggestReviewers";
+    | "suggestReviewers"
+    | "scanners";
 
 type CheckKey = "titleCheck" | "descriptionCheck" | "issueCheck" | "docstringCheck";
 
@@ -40,7 +41,8 @@ const BOOLS: readonly BoolKey[] = [
     "linkedIssues",
     "suggestLabels",
     "applyLabels",
-    "suggestReviewers"
+    "suggestReviewers",
+    "scanners"
 ];
 const CHECKS: readonly CheckKey[] = ["titleCheck", "descriptionCheck", "issueCheck", "docstringCheck"];
 

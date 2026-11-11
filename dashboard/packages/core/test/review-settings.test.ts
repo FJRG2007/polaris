@@ -226,3 +226,10 @@ describe("rows still being typed", () => {
         expect(core.reviewSettingsSchema.safeParse({ recipes: ["text"] }).success).toBe(false);
     });
 });
+
+describe("scanners", () => {
+    it("asks Review mode to run them only when turned on", () => {
+        expect(core.reviewInstructions(core.DEFAULT_REVIEW)).toBe("");
+        expect(core.reviewInstructions({ ...core.DEFAULT_REVIEW, scanners: true })).toContain("`run_scanners`");
+    });
+});
