@@ -99,6 +99,10 @@
         "polar": {
             "label": "Polar",
             "description": "Ask a question from here without leaving the Overview."
+        },
+        "mail": {
+            "label": "Mail",
+            "description": "What is unread in your inboxes, newest first."
         }
     },
     "picker": {
@@ -226,5 +230,13 @@
         "blocked": "Blocked",
         "share": "Share blocked",
         "permitted": "Permitted"
+    },
+    "mail": {
+        "unavailable": "Your mail could not be read just now.",
+        "empty": "Nothing unread in your inboxes.",
+        "open": "Open Mail",
+        "unread": "<big>{count}</big><rest> unread</rest>",
+        "noSubject": "(no subject)",
+        "unknownSender": "Unknown sender"
     }
 }

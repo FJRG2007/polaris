@@ -32,6 +32,7 @@ import { gameServerSummaries, upcomingEventsFor } from "@/lib/app-extensions/reg
 import type { UpcomingEvent } from "@/lib/app-extensions/types";
 import { getWatchOverview } from "@/lib/watch-overview-service";
 import { dnsBlockerSummary, type DnsBlockerSummary } from "@/lib/dns-blocker/insights";
+import { unreadCounts, unreadInboxPreview, type MailInboxPreview } from "@/lib/mailbox/views";
 import { inFlightDeployments, listProjects } from "@/lib/deploy-service";
 import { myUrgentTasks, myWorkCounts } from "@/lib/tasks/report-service";
 import { HOST_CONNECTION_PREFIX, listAccessibleConnections } from "@/lib/storage-service";
@@ -165,6 +166,13 @@ export interface OverviewData {
     games?: OverviewGames | null;
     calendar?: OverviewCalendar | null;
     dnsBlocker?: OverviewDnsBlocker | null;
+    mail?: OverviewMail | null;
+}
+
+/** The reader's own inboxes: how much is unread, and the newest of it. */
+export interface OverviewMail {
+    unread: number;
+    messages: (MailInboxPreview & { href: string })[];
 }
 
 /** The network's network filter today. `today` is null while its DNS server is not
@@ -190,7 +198,8 @@ const SERVER_WIDGETS = [
     "activity",
     "games",
     "calendar",
-    "dnsBlocker"
+    "dnsBlocker",
+    "mail"
 ] as const;
 
 type ServerWidgetId = (typeof SERVER_WIDGETS)[number];
@@ -217,14 +226,15 @@ export async function getOverviewData(
     const asked = new Set(wanted.filter(isServerOverviewWidget));
     if (asked.size === 0) return {};
 
-    const [canDeploy, canTasks, canDrive, canGames, canCalendar] = await Promise.all([
+    const [canDeploy, canTasks, canDrive, canGames, canCalendar, canMail] = await Promise.all([
         asked.has("services") || asked.has("usage") || asked.has("alarms")
             ? sessionCanAny(user, "deploy.read")
             : Promise.resolve(false),
         asked.has("tasks") ? sessionCanAny(user, "tasks.read") : Promise.resolve(false),
         asked.has("storage") ? sessionCanAny(user, "drive.read") : Promise.resolve(false),
         asked.has("games") ? sessionCanAny(user, "games.read") : Promise.resolve(false),
-        asked.has("calendar") ? sessionCanAny(user, "calendar.use") : Promise.resolve(false)
+        asked.has("calendar") ? sessionCanAny(user, "calendar.use") : Promise.resolve(false),
+        asked.has("mail") ? sessionCanAny(user, "mail.use") : Promise.resolve(false)
     ]);
 
     // Services, usage and alarms all come out of the same monitoring read, so
@@ -248,7 +258,8 @@ export async function getOverviewData(
         activity,
         games,
         calendar,
-        dnsBlocker
+        dnsBlocker,
+        mail
     ] = await Promise.all([
         asked.has("services") && canDeploy
             ? card(() => deployedServices(user))
@@ -279,6 +290,22 @@ export async function getOverviewData(
             : Promise.resolve(undefined),
         canDnsBlocker
             ? card(async () => ({ today: await dnsBlockerSummary() }))
+            : Promise.resolve(undefined),
+        asked.has("mail") && canMail
+            ? card(async (): Promise<OverviewMail> => {
+                  // The count the badge shows, and the newest of what it counts.
+                  const [counts, messages] = await Promise.all([
+                      unreadCounts(user.id, null),
+                      unreadInboxPreview(user.id, CARD_ROWS)
+                  ]);
+                  return {
+                      unread: counts.total,
+                      messages: messages.map((message) => ({
+                          ...message,
+                          href: `/mail/t/${message.threadId}`
+                      }))
+                  };
+              })
             : Promise.resolve(undefined)
     ]);
 
@@ -319,6 +346,7 @@ export async function getOverviewData(
     if (asked.has("games")) data.games = canGames ? (games ?? null) : null;
     if (asked.has("calendar")) data.calendar = canCalendar ? (calendar ?? null) : null;
     if (asked.has("dnsBlocker")) data.dnsBlocker = canDnsBlocker ? (dnsBlocker ?? null) : null;
+    if (asked.has("mail")) data.mail = canMail ? (mail ?? null) : null;
     return data;
 }
 

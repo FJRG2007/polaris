@@ -23,6 +23,9 @@ export interface CustomizeRow {
     label: string;
     description: string;
     icon: LucideIcon;
+    /** The app the card belongs to, drawn by its logo; the icon stands in for
+     *  a card of no app, or an app with no logo. */
+    appId: string | null;
     /** The widths it can be drawn at; one or none means it has no choice. */
     sizes: readonly OverviewWidgetSize[];
     size: OverviewWidgetSize;
@@ -35,6 +38,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowDown, ArrowUp, GripVertical, RotateCcw, type LucideIcon } from "lucide-react";
 import type { OverviewCardKey, OverviewWidgetSize } from "@polaris/core";
 import {
+    AppLogo,
     Button,
     Dialog,
     DialogContent,
@@ -131,9 +135,16 @@ export function CustomizeDialog({
                                 >
                                     <GripVertical className="size-4" aria-hidden="true" />
                                 </span>
-                                <Icon
-                                    className="size-4 shrink-0 text-muted-foreground"
-                                    aria-hidden="true"
+                                <AppLogo
+                                    appId={widget.appId ?? ""}
+                                    size={18}
+                                    className="shrink-0"
+                                    fallback={
+                                        <Icon
+                                            className="size-4 shrink-0 text-muted-foreground"
+                                            aria-hidden="true"
+                                        />
+                                    }
                                 />
                                 <div className="flex min-w-0 flex-1 flex-col">
                                     <span className="truncate text-sm font-medium" title={label}>

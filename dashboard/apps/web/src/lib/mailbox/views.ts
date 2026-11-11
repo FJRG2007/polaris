@@ -774,3 +774,42 @@ export const unreadCounts = cache(
         return { total, byAccount };
     }
 );
+
+/** One unread message as the Overview's Mail card lists it. */
+export interface MailInboxPreview {
+    readonly threadId: string;
+    readonly subject: string;
+    readonly from: string;
+    readonly at: string;
+}
+
+/**
+ * The newest unread messages in the reader's own inboxes, for the Overview:
+ * the same messages the inbox badge counts (seen = false in an inbox, not
+ * snoozed), newest first, bounded to what the card draws.
+ */
+export async function unreadInboxPreview(
+    userId: string,
+    take: number
+): Promise<MailInboxPreview[]> {
+    const rows = await prisma.mailMessage.findMany({
+        where: {
+            account: onShelf(userId, null),
+            folder: { role: "inbox" },
+            seen: false,
+            OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }]
+        },
+        select: { threadId: true, subject: true, fromJson: true, sentAt: true },
+        orderBy: { sentAt: "desc" },
+        take
+    });
+    return rows.map((row) => {
+        const sender = addressesFrom(row.fromJson)[0];
+        return {
+            threadId: row.threadId,
+            subject: row.subject,
+            from: sender ? sender.name || sender.address : "",
+            at: row.sentAt.toISOString()
+        };
+    });
+}

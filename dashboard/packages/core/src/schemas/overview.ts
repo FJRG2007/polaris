@@ -39,7 +39,8 @@ export const OVERVIEW_WIDGET_IDS = [
     "games",
     "calendar",
     "dnsBlocker",
-    "polar"
+    "polar",
+    "mail"
 ] as const;
 
 export type OverviewWidgetId = (typeof OVERVIEW_WIDGET_IDS)[number];
@@ -197,6 +198,9 @@ export const DEFAULT_OVERVIEW_LAYOUT: readonly OverviewWidgetPreference[] = [
     { id: "usage", size: "sm", hidden: false },
     { id: "services", size: "md", hidden: false },
     { id: "notifications", size: "md", hidden: false },
+    // What is waiting in the inbox, beside the alerts. Only on the grid of
+    // somebody who may use Mail.
+    { id: "mail", size: "md", hidden: false },
     { id: "tasks", size: "sm", hidden: false },
     // Beside the work: what is next in somebody's day. Only on the grid of an
     // instance that installed the Calendar.

@@ -21,6 +21,7 @@ import { sizeLabel, widgetDescription, widgetLabel } from "./widget-names";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { WidgetCard } from "./widget-card";
 import { ShortcutPicker } from "./shortcut-picker";
+import { MailWidget } from "./widgets/mail";
 import { CustomizeDialog, type CustomizeRow } from "./customize-dialog";
 import { saveOverviewPreferencesAction } from "./actions";
 import { packOverviewSpans } from "@/lib/overview/pack";
@@ -43,7 +44,7 @@ import {
 import type { AppWidgetKind } from "@/lib/overview/app-widgets";
 import type { OverviewData } from "@/lib/overview/overview-service";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { overviewSize, overviewWidget } from "@/lib/overview/catalog";
+import { overviewSize, overviewWidget, overviewWidgetApp } from "@/lib/overview/catalog";
 import { AppsWidget, NotificationsWidget, RecentWidget, ShortcutsWidget } from "./widgets/personal";
 import {
     AlarmsWidget,
@@ -642,6 +643,7 @@ export function OverviewGrid({
                   label: card.kind.label,
                   description: card.kind.hint,
                   icon: Blocks,
+                  appId: card.kind.app,
                   sizes: OVERVIEW_WIDGET_SIZES,
                   size: card.app.size,
                   hidden: card.app.hidden
@@ -651,6 +653,7 @@ export function OverviewGrid({
                   label: widgetLabel(t, card.key, overviewWidget(card.key).label),
                   description: widgetDescription(t, card.key, overviewWidget(card.key).description),
                   icon: overviewWidget(card.key).icon,
+                  appId: overviewWidgetApp(card.key),
                   sizes: overviewWidget(card.key).sizes,
                   size: card.widget.size,
                   hidden: card.widget.hidden
@@ -909,6 +912,8 @@ function WidgetBody({
                     data={data === undefined ? undefined : (data.dnsBlocker ?? null)}
                 />
             );
+        case "mail":
+            return <MailWidget data={data === undefined ? undefined : (data.mail ?? null)} />;
     }
 }
 

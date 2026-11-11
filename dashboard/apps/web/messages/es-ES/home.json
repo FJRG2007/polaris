@@ -99,6 +99,10 @@
         "dnsBlocker": {
             "label": "Filtro de red",
             "description": "Las consultas de las últimas 24 horas en tu red y cuántas se han bloqueado."
+        },
+        "mail": {
+            "label": "Correo",
+            "description": "Lo que tienes sin leer en tus bandejas, lo último primero."
         }
     },
     "picker": {
@@ -226,5 +230,13 @@
         "blocked": "Bloqueadas",
         "share": "Parte bloqueada",
         "permitted": "Permitidas"
+    },
+    "mail": {
+        "unavailable": "No se ha podido leer tu correo ahora mismo.",
+        "empty": "No tienes nada sin leer.",
+        "open": "Abrir Correo",
+        "unread": "<big>{count}</big><rest> sin leer</rest>",
+        "noSubject": "(sin asunto)",
+        "unknownSender": "Sin remitente"
     }
 }

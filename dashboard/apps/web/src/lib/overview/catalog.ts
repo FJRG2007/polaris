@@ -12,6 +12,7 @@
  * on and cannot read is worse than not being offered it.
  */
 
+import { appOwningPath } from "@/lib/apps";
 import type { Permission } from "@polaris/core";
 import type { OverviewWidgetId, OverviewWidgetSize } from "@polaris/core";
 import {
@@ -24,6 +25,7 @@ import {
     HardDrive,
     LayoutGrid,
     ListTodo,
+    Mail,
     Rocket,
     ScrollText,
     ShieldBan,
@@ -138,6 +140,15 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         local: true
     },
     {
+        id: "mail",
+        label: "Mail", // i18n-ignore
+        description: "What is unread in your inboxes, newest first.", // i18n-ignore
+        icon: Mail,
+        permission: "mail.use",
+        href: "/mail",
+        sizes: ALL_SIZES
+    },
+    {
         id: "recent",
         label: "Recently visited", // i18n-ignore
         description: "Where you have been in Polaris, on this device.", // i18n-ignore
@@ -245,6 +256,13 @@ const BY_ID = new Map(OVERVIEW_WIDGETS.map((widget) => [widget.id, widget]));
 export function overviewWidget(id: OverviewWidgetId): OverviewWidgetEntry {
     // Ids come from the schema's own enum, so every one of them is in the map.
     return BY_ID.get(id)!;
+}
+
+/** The app a card is a window onto, by its own screen; null for a card of
+ *  no app (the pinned links, the launcher, the account's pages). */
+export function overviewWidgetApp(id: OverviewWidgetId): string | null {
+    const href = overviewWidget(id).href;
+    return href ? (appOwningPath(href)?.id ?? null) : null;
 }
 
 /** Whether a stored size is one this card is legible at, for a layout written
