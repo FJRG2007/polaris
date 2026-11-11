@@ -191,7 +191,7 @@ describe("the Chat / Code switch", () => {
         );
     });
 
-    it("answers with Polar's own models by default, about the picked repository, starting nothing", async () => {
+    it("answers on Automatic by default, as Chat does, about the picked repository, starting nothing", async () => {
         access = "manage";
         polarTasks.length = 0;
         window.localStorage.removeItem("polar.code.agent");
@@ -209,7 +209,8 @@ describe("the Chat / Code switch", () => {
         expect(polarTasks).toEqual([
             {
                 text: "What does the login form validate?",
-                choice: expect.objectContaining({ provider: "anthropic", model: "claude-sonnet" }),
+                // Not the first model listed: a key may have no credit for it.
+                choice: expect.objectContaining({ provider: "auto", model: "auto" }),
                 code: { repo: "acme/web", branch: "" }
             }
         ]);

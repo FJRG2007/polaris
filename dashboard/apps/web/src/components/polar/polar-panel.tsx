@@ -787,6 +787,9 @@ export function PolarChat({
     /** The repository a Code task answered here is about, until another
      *  conversation opens. */
     const [codeTask, setCodeTask] = useState<PolarCodeTask | null>(null);
+    /** The conversation belongs to Code: a task Polar answers itself, with or
+     *  without a repository, shown in Code where it was asked. */
+    const [inCode, setInCode] = useState(false);
     /** A Code task's first message, sent once the new conversation is on screen. */
     const codeOpening = useRef<string | null>(null);
     const [input, setInput] = useState("");
@@ -871,6 +874,9 @@ export function PolarChat({
     const wide = useWide();
     // Chat or Code: Code is Agents sessions, drawn over the chat (which keeps its draft).
     const code = usePolarCode();
+    /** The conversation is on screen: in Chat, or in Code for a task Polar
+     *  answers itself on a repository, which stays in Code. */
+    const threadShown = code.mode === "chat" || inCode;
     const tree = useRef<VersionTree>(new Map());
     const textarea = useRef<HTMLTextAreaElement>(null);
     // Text asked about from a right-click menu: quoted here, once, with the
@@ -1329,7 +1335,10 @@ export function PolarChat({
         };
     }, [discardTemporary]);
 
-    const openThread = async (id: string) => {
+    /** Opens a stored conversation. `show` puts it on screen on its own side -
+     *  Code for a Code task, else Chat; a reload behind a Code session named in
+     *  the address loads it without taking the screen from that session. */
+    const openThread = async (id: string, show = true) => {
         setCodeTask(null);
         const response = await fetch(`/api/polar/threads/${id}`).catch(() => null);
         // A remembered chat that was deleted, or belongs to another account.
@@ -1342,6 +1351,7 @@ export function PolarChat({
                 messages: StoredMessage[];
                 queue: QueuedMessage[];
                 choice: ModelChoice | null;
+                code?: PolarCodeTask | null;
             };
         };
         // An answer that is not a chat (a proxy page, an older server) opens nothing.
@@ -1368,6 +1378,12 @@ export function PolarChat({
         if (thread.id === threadId) chat.setMessages(shown);
         setQueue(thread.queue);
         if (thread.choice) setChoice(thread.choice);
+        // A Code task reopens in Code with its repository; any other in Chat.
+        setCodeTask(thread.code ?? null);
+        if (show) {
+            setInCode(Boolean(thread.code));
+            code.setMode(thread.code ? "code" : "chat");
+        }
         setShowHistory(fullPage);
         setDrawer(false);
     };
@@ -1386,6 +1402,7 @@ export function PolarChat({
         const trying = trialFromAddress(params?.get("skill") ?? null);
         if (session) {
             window.history.replaceState(null, "", window.location.pathname);
+            setInCode(false);
             code.open(session === "new" ? null : session);
         } else if (named || fresh) {
             window.history.replaceState(null, "", window.location.pathname);
@@ -1403,7 +1420,9 @@ export function PolarChat({
         const keep = chatScope || reloaded() || polarDisplayStore.get().reopenLastChat;
         const reopen = named ?? (keep ? readStored(threadKey) : null);
         if (reopen) {
-            void openThread(reopen).finally(() => setReopened(true));
+            void openThread(reopen, named !== null || session === null).finally(() =>
+                setReopened(true)
+            );
             return;
         }
         setReopened(true);
@@ -1415,7 +1434,7 @@ export function PolarChat({
             if (gone || !settings.reopenLastChat) return;
             if (live.current.threadId !== first || messagesNow.current > 0) return;
             const last = readStored(threadKey);
-            if (last) void openThread(last);
+            if (last) void openThread(last, session === null);
         });
         return () => {
             gone = true;
@@ -1460,6 +1479,7 @@ export function PolarChat({
         discardTemporary();
         setNewProject(projectId);
         setCodeTask(null);
+        setInCode(false);
         if (projectId) sidebar.openProject(projectId);
         tree.current = new Map();
         setOpening([]);
@@ -1601,7 +1621,7 @@ export function PolarChat({
         // Code's composer takes no files: a drop there must not land, unseen,
         // on the chat kept mounted underneath.
         onDragOver: (event: React.DragEvent) => {
-            if (code.mode !== "chat") return;
+            if (!threadShown) return;
             if (!droppable(Array.from(event.dataTransfer.types))) return;
             event.preventDefault();
             event.dataTransfer.dropEffect = "copy";
@@ -1613,7 +1633,7 @@ export function PolarChat({
         },
         onDrop: (event: React.DragEvent) => {
             const types = Array.from(event.dataTransfer.types);
-            if (code.mode !== "chat" || !droppable(types)) return;
+            if (!threadShown || !droppable(types)) return;
             event.preventDefault();
             setDragging(false);
             const items = droppedItems.carriesItems(types)
@@ -1946,14 +1966,16 @@ export function PolarChat({
     const startCodeChat = (task: { text: string; choice: ModelChoice; code: PolarCodeTask | null }) => {
         startNew();
         setChoice(task.choice);
+        // Set after startNew, which lets go of any task before; the
+        // conversation then shows in Code, where it was asked.
         setCodeTask(task.code);
+        setInCode(true);
         codeOpening.current = task.text;
-        code.setMode("chat");
     };
     // Sent once the new conversation and its model are what the request reads.
     useEffect(() => {
         const text = codeOpening.current;
-        if (text === null || code.mode !== "chat" || chat.messages.length > 0) return;
+        if (text === null || !threadShown || chat.messages.length > 0) return;
         if (live.current.choice === null) return;
         codeOpening.current = null;
         turnChoice.current = null;
@@ -2171,20 +2193,27 @@ export function PolarChat({
     );
     const chatMode = code.mode === "chat";
     /** A new conversation on the side on screen: a chat, or a Code task. */
-    const startNewHere = () => (chatMode ? startNew() : code.open(null));
+    const startNewHere = () => {
+        if (chatMode) return startNew();
+        setCodeTask(null);
+        setInCode(false);
+        code.open(null);
+    };
     // One history for both sides: the chats, and the Code sessions beside them.
     const threadList = (hide: Parameters<typeof PolarThreads>[0]["hide"]) => (
         <PolarThreads
             sidebar={sidebar}
-            activeId={chatMode ? threadId : ""}
+            activeId={threadShown ? threadId : ""}
             runs={runMarks}
             onOpen={(id) => {
                 setComparison(null);
-                code.setMode("chat");
+                // The thread decides the side: a Code task opens in Code.
                 void openThread(id);
             }}
             onNew={(projectId) => {
                 if (projectId === null && !chatMode) {
+                    setCodeTask(null);
+                    setInCode(false);
                     code.open(null);
                     setDrawer(false);
                     setShowHistory(false);
@@ -2200,10 +2229,12 @@ export function PolarChat({
                     ? null
                     : {
                           history: code.history,
-                          activeId: chatMode ? null : code.selected,
+                          activeId: threadShown ? null : code.selected,
                           canRename: code.access === "manage",
                           first: !chatMode,
                           onOpen: (id) => {
+                              setCodeTask(null);
+                              setInCode(false);
                               code.open(id);
                               setDrawer(false);
                               setShowHistory(false);
@@ -2528,7 +2559,7 @@ export function PolarChat({
                         the chat's own. */}
                     <>
                         <span className="polar-head-wide flex items-center gap-2">
-                            {!chatMode ? null : !chatStarted ? (
+                            {!threadShown ? null : !chatStarted ? (
                                 <MessageAction
                                     label={temporary ? t("temporary.off") : t("temporary.on")}
                                     aria-pressed={temporary}
@@ -2590,7 +2621,7 @@ export function PolarChat({
                                 </MessageAction>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="min-w-48">
-                                {!chatMode ? null : !chatStarted ? (
+                                {!threadShown ? null : !chatStarted ? (
                                     <DropdownMenuItem onSelect={() => setTemporary(!temporary)}>
                                         <Ghost />
                                         {temporary ? t("temporary.off") : t("temporary.on")}
@@ -2671,7 +2702,7 @@ export function PolarChat({
 
                 {/* Chat stays mounted under Code, so a draft or an answer on its
                     way is still there when the switch goes back. */}
-                {chatMode ? null : (
+                {threadShown ? null : (
                     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                         <PolarCodeView
                             code={code}
@@ -2684,8 +2715,8 @@ export function PolarChat({
                     </div>
                 )}
                 <div
-                    className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !chatMode && "hidden")}
-                    inert={chatMode ? undefined : true}
+                    className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !threadShown && "hidden")}
+                    inert={threadShown ? undefined : true}
                 >
                     {comparison ? (
                         <polarCompare.PolarCompare

@@ -50,7 +50,7 @@ import type { GithubAppGap } from "@/lib/github-app-reach";
 import type { VoiceNotice } from "@/components/polar/polar-voice";
 import { GithubAppGapNotice } from "@/components/github-app-gap";
 import * as core from "@polaris/core";
-import type { ModelChoice } from "@/lib/polar/shared";
+import { automaticChoice, type ModelChoice } from "@/lib/polar/shared";
 import { usePolarUploads } from "@/components/polar/polar-uploads";
 import { POLAR_ATTACHMENT_MOST, POLAR_ATTACHMENT_TYPES } from "@/lib/polar/shared";
 import {
@@ -667,7 +667,13 @@ function CodeStart({
     // A tool that takes its model from Polaris signs in with that provider's
     // key, so its own sign-in does not matter.
     const takesModel = agent !== null && core.MODEL_CHOICE_AGENT_CLIS.includes(agent.cli);
-    const model = takesModel || polar ? (picked ?? firstModel(providers)) : null;
+    // Polar starts on Automatic, as Chat does: the first model listed may be
+    // one the key has no credit for. An agent CLI needs a model of its own.
+    const model = polar
+        ? (picked ?? automaticChoice())
+        : takesModel
+          ? (picked ?? firstModel(providers))
+          : null;
     const fetchedName = useRepoName(repoId, choices?.repos ?? []);
     const repoName = choices?.repos.find((repo) => repo.id === repoId)?.name ?? fetchedName;
     const unlinked = agent?.readiness === "missing" && !takesModel ? agent : null;

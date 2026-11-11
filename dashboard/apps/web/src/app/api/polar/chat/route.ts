@@ -315,7 +315,8 @@ export async function POST(request: Request): Promise<Response> {
         firstText(messages[0]),
         body.data.remember ? choice : null,
         body.data.projectId,
-        body.data.temporary
+        body.data.temporary,
+        body.data.code ?? null
     );
     if (!owned) return refuse("not_found", 404);
     // The stored kind decides, whatever this request said.

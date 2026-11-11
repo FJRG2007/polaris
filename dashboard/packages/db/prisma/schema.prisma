@@ -16091,6 +16091,9 @@ model PolarThread {
     // The chat's /goal (`lib/polar/goals.ts`): the condition Polar keeps
     // working toward, its counters and the newest judgement. Null for none.
     goal        Json?
+    // The repository a Code task asked Polar about ({ repo, branch }), so the
+    // conversation reopens in Code with it. Null for a plain chat.
+    code        Json?
     createdAt   DateTime          @default(now())
     updatedAt   DateTime          @updatedAt
     messages    PolarMessage[]

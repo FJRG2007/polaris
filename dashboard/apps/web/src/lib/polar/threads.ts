@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import type { UIMessage } from "ai";
 import { prisma, Prisma } from "@polaris/db";
 import { FAILURE_PART, keepStoredFailures } from "@/lib/polar/provider-failure";
+import { polarCodeTaskSchema, type PolarCodeTask } from "@/lib/polar/code-task";
 import {
     keepSharedAttachments,
     discardPolarAttachments,
@@ -225,6 +226,8 @@ export interface PolarThreadView {
     projectId: string | null;
     archivedAt: string | null;
     choice: ModelChoice | null;
+    /** The repository a Code task is about; null for a plain chat. */
+    code: PolarCodeTask | null;
     queue: QueuedMessage[];
     messages: PolarStoredMessage[];
 }
@@ -241,6 +244,7 @@ export async function getPolarThread(userId: string, id: string): Promise<PolarT
             projectId: true,
             archivedAt: true,
             choice: true,
+            code: true,
             queue: true,
             messages: {
                 select: { id: true, parentId: true, role: true, parts: true, metadata: true },
@@ -261,6 +265,8 @@ export async function getPolarThread(userId: string, id: string): Promise<PolarT
         projectId: thread.projectId,
         archivedAt: thread.archivedAt?.toISOString() ?? null,
         choice: (thread.choice as ModelChoice | null) ?? null,
+        code:
+            thread.code === null ? null : (polarCodeTaskSchema.safeParse(thread.code).data ?? null),
         queue: queue.success ? queue.data : [],
         messages: rows.map((row) => ({
             id: row.id,
@@ -294,7 +300,8 @@ export async function ensurePolarThread(
     firstText: string,
     choice: ModelChoice | null,
     projectId: string | null = null,
-    temporary = false
+    temporary = false,
+    code: PolarCodeTask | null = null
 ): Promise<{ temporary: boolean } | null> {
     const existing = await prisma.polarThread.findUnique({
         where: { id },
@@ -303,10 +310,14 @@ export async function ensurePolarThread(
     if (existing) {
         if (existing.userId !== userId) return null;
         // Null for a turn on a command's own model: the thread keeps its model.
-        if (choice) {
+        // A Code task keeps its repository; a turn without one leaves it be.
+        if (choice || code) {
             await prisma.polarThread.update({
                 where: { id },
-                data: { choice: choice as unknown as Prisma.InputJsonValue }
+                data: {
+                    ...(choice ? { choice: choice as unknown as Prisma.InputJsonValue } : {}),
+                    ...(code ? { code: code as unknown as Prisma.InputJsonValue } : {})
+                }
             });
         }
         return { temporary: existing.temporary };
@@ -322,6 +333,7 @@ export async function ensurePolarThread(
                     ? projectId
                     : null,
             ...(choice ? { choice: choice as unknown as Prisma.InputJsonValue } : {}),
+            ...(code ? { code: code as unknown as Prisma.InputJsonValue } : {}),
             temporary
         }
     });
@@ -485,6 +497,7 @@ export async function branchPolarThread(
             title: true,
             titleSource: true,
             choice: true,
+            code: true,
             projectId: true,
             branchRootId: true
         }
@@ -521,7 +534,8 @@ export async function branchPolarThread(
                     source.titleSource === "generating" ? "placeholder" : source.titleSource,
                 projectId: source.projectId,
                 branchRootId: source.branchRootId ?? threadId,
-                ...(source.choice ? { choice: source.choice as Prisma.InputJsonValue } : {})
+                ...(source.choice ? { choice: source.choice as Prisma.InputJsonValue } : {}),
+                ...(source.code ? { code: source.code as Prisma.InputJsonValue } : {})
             },
             select: ROW_SELECT
         });
