@@ -126,6 +126,9 @@ interface Bootstrap {
     readonly agentLauncher: string;
     /** How the tool reopens a conversation, or empty. See `agentResumeStyle`. */
     readonly agentResume: string;
+    /** The flags that run one turn without the tool's interface, or empty for a
+     *  tool that keeps its interactive terminal. See `AgentCli.headless`. */
+    readonly agentHeadless: string;
     /** The parent's transcript a fork reopens, or empty. See `forkTranscript`. */
     readonly agentFork: string;
     /** The whole of what installing Enigma means, base64 so it survives the
@@ -288,6 +291,8 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         );
     }
     const modelEnv = await modelEnvFor(session);
+    // Only the tools whose turn flags were checked against their own docs.
+    const headless = agent.cli.headless?.join(" ") ?? "";
 
     return {
         repoFullName: session.repoFullName,
@@ -303,6 +308,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         agentInstall: agent.install,
         agentLauncher: agent.launcher,
         agentResume: core.agentResumeStyle(agent.cli.id),
+        agentHeadless: headless,
         agentFork: await forkTranscriptFor(session, agent.cli.id),
         // Empty when Enigma is off, which is what the boot script tests for.
         // One script rather than an argv and a second script: it installs the
@@ -329,7 +335,9 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
             token,
             agent.cli.id === "claude" ? `${base}/api/agents/sessions/${session.id}/permission` : undefined
         ),
-        hookSettings: JSON.stringify(claudeHookSettings(`${stateDirFor(session)}/hook.sh`)),
+        hookSettings: JSON.stringify(
+            claudeHookSettings(`${stateDirFor(session)}/hook.sh`, { headless: headless !== "" })
+        ),
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
         // Empty for a workspace, which clones nothing. A header built around an
         // empty token is a header git would send.
@@ -509,6 +517,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_AGENT_INSTALL: boot.agentInstall,
         POLARIS_AGENT_LAUNCHER: boot.agentLauncher,
         POLARIS_AGENT_RESUME: boot.agentResume,
+        POLARIS_AGENT_HEADLESS: boot.agentHeadless,
         POLARIS_AGENT_FORK: boot.agentFork,
         POLARIS_ENIGMA_SETUP: boot.enigmaSetup,
         POLARIS_ENIGMA_CONFIGURE: boot.enigmaConfigure,
@@ -814,7 +823,10 @@ async function waitForAgent(
         // own startup are seconds in which it says yes and there is nothing to
         // type into - which is how a first prompt came to be echoed onto the
         // screen as text. The probe asks the terminal itself.
-        const ready = await runInSession(sessionId, commands.agentReadyCommand()).catch(() => null);
+        const ready = await runInSession(
+            sessionId,
+            `${commands.runnerReadyCommand(stateDirFor(placement))} || { ${commands.agentReadyCommand()}; }`
+        ).catch(() => null);
         if (ready?.code === 0) return true;
         if (Date.now() + AGENT_READY_POLL_MS >= deadline) return false;
         await new Promise((resolve) => setTimeout(resolve, AGENT_READY_POLL_MS));
@@ -830,13 +842,25 @@ async function waitForAgent(
  * first, so what somebody asked for survives even if the machine has gone away.
  */
 export async function promptSession(sessionId: string, text: string): Promise<void> {
-    await steer(
+    // A session whose runner takes its prompts gets this one as a file in the
+    // queue: nothing typed, nothing that has to look ready first.
+    const placement = await sessionPlacement(sessionId);
+    if (!placement) throw new Error("That session no longer exists.");
+    const queued = await runInSession(
         sessionId,
-        commands.pastePromptCommand(text),
-        "The agent's terminal did not take the prompt"
-    );
+        commands.queuePromptCommand(stateDirFor(placement), text)
+    ).catch(() => null);
+    if (queued?.code === 0) return;
+    // The interface is open beside the runner: the prompt goes to it, typed.
+    const target =
+        queued?.code === commands.NOT_QUEUED.interfaceOpen
+            ? `${commands.TMUX_SESSION}:${commands.INTERFACE_WINDOW}`
+            : commands.TMUX_SESSION;
+    if (queued && queued.code !== commands.NOT_QUEUED.interactive && target === commands.TMUX_SESSION)
+        throw new Error("The agent's machine did not take the prompt");
+    await steer(sessionId, commands.pastePromptCommand(text, target), "The agent's terminal did not take the prompt");
     await new Promise((resolve) => setTimeout(resolve, commands.submitDelayMs(text)));
-    await steer(sessionId, commands.submitCommand(), "The prompt was pasted but not submitted");
+    await steer(sessionId, commands.submitCommand(target), "The prompt was pasted but not submitted");
 }
 
 /**
@@ -876,6 +900,14 @@ export async function deliverFirstPrompt(
 
 /** Stop what the agent is doing without ending the session. */
 export async function interruptSession(sessionId: string): Promise<void> {
+    const placement = await sessionPlacement(sessionId);
+    if (placement) {
+        const stopped = await runInSession(
+            sessionId,
+            commands.interruptTurnCommand(stateDirFor(placement))
+        ).catch(() => null);
+        if (stopped?.code === 0) return;
+    }
     await steer(
         sessionId,
         commands.interruptCommand(),
@@ -890,8 +922,30 @@ export async function interruptSession(sessionId: string): Promise<void> {
  * terminal, and typing on a guess is how a launch line ends up as a prompt.
  */
 export async function agentHasExited(sessionId: string): Promise<boolean> {
-    const result = await runInSession(sessionId, commands.agentExitedCommand()).catch(() => null);
+    const placement = await sessionPlacement(sessionId);
+    if (!placement) return false;
+    const result = await runInSession(
+        sessionId,
+        commands.agentExitedCommand(commands.TMUX_SESSION, stateDirFor(placement))
+    ).catch(() => null);
     return result?.code === 0;
+}
+
+/**
+ * Open the agent's own interface beside the runner, on the same conversation.
+ * "interactive" for a session whose terminal already is the interface, "busy"
+ * while a turn is running.
+ */
+export async function openAgentInterface(
+    sessionId: string
+): Promise<"opened" | "interactive" | "busy"> {
+    const placement = await sessionPlacement(sessionId);
+    if (!placement) throw new Error("That session no longer exists.");
+    const result = await runInSession(sessionId, commands.openInterfaceCommand(stateDirFor(placement)));
+    if (result.code === 0) return "opened";
+    if (result.code === commands.NOT_OPENED.interactive) return "interactive";
+    if (result.code === commands.NOT_OPENED.turnRunning) return "busy";
+    throw new Error("The session's terminal did not open the agent's interface");
 }
 
 /** Bring the agent back on its conversation, typed into the shell it left. */

@@ -74,9 +74,15 @@ const PERMISSION_CURL_SECONDS = 125;
  * nothing of the operator's to preserve, and a merge would be a way to inherit
  * configuration nobody meant to give it.
  */
-export function claudeHookSettings(scriptPath: string): Record<string, unknown> {
+export function claudeHookSettings(
+    scriptPath: string,
+    { headless = false }: { headless?: boolean } = {}
+): Record<string, unknown> {
     const hooks: Record<string, unknown[]> = {};
     for (const { event, matcher } of CLAUDE_HOOK_EVENTS) {
+        // A session that runs each prompt as a process of its own ends one of
+        // those with every answer, and that is not the session ending.
+        if (headless && event === "SessionEnd") continue;
         const hook = {
             type: "command",
             command: scriptPath,

@@ -394,6 +394,17 @@ export interface AgentCli {
      * `AgentFirstRunAnswer`.
      */
     readonly firstRun: readonly AgentFirstRunAnswer[];
+    /**
+     * The flags that run one turn without the tool's full-screen interface:
+     * the prompt on standard input, the answer printed, the process gone. A
+     * session of a tool that has them runs every prompt this way, so nothing
+     * has to be typed into a terminal or wait for one to look ready; the
+     * interface itself is still there for whoever opens it.
+     *
+     * Absent where the flags have not been checked against the tool's own
+     * documentation, and such a tool keeps its interactive terminal.
+     */
+    readonly headless?: readonly string[];
 }
 
 /**
@@ -478,7 +489,10 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             // Settings were always right: they live in the configuration home
             // under their own name, which is the same path either way.
             { file: ".claude/settings.json", json: { theme: "dark" } }
-        ]
+        ],
+        // code.claude.com/docs/en/headless: `-p` reads the prompt from standard
+        // input, runs hooks from `--settings`, and shows no trust dialog.
+        headless: ["-p"]
     },
     {
         id: "codex",

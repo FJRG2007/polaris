@@ -769,6 +769,26 @@ export async function resumeSessionAction(input: unknown): Promise<{ error?: str
     return {};
 }
 
+/**
+ * Open the agent's own interface in the session's terminal, for whoever may
+ * steer it. A session whose terminal already is the interface says so.
+ */
+export async function openAgentInterfaceAction(
+    sessionId: string
+): Promise<{ outcome?: "opened" | "interactive" | "busy"; error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = sessionIdSchema.safeParse(sessionId);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await controlledSession(parsed.data);
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (core.isSessionOver(session.state)) return { error: t("sessions.errors.ended") };
+    try {
+        return { outcome: await runtime.openAgentInterface(session.id) };
+    } catch (error) {
+        return { error: agentText(t, sessions.readableFailure(error, `opening the interface of ${session.id}`)) };
+    }
+}
+
 // ---------------------------------------------------------------------------
 // History
 // ---------------------------------------------------------------------------

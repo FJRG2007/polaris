@@ -15,7 +15,7 @@ import * as ui from "@polaris/ui";
 import { languageForFile } from "@/lib/code-language";
 import { CodeSurface } from "@/components/code-surface";
 import type { SessionView } from "@/lib/agents/session-service";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ClientMessages } from "@/components/i18n/client-namespaces";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
@@ -23,6 +23,7 @@ import * as polls from "@/components/agents/sessions/sessions-polls";
 import type { FileAnswer, FilesAnswer } from "@/lib/agents/session-files";
 import type { PreviewPortsAnswer } from "@/lib/agents/session-preview";
 import { SessionChanges } from "@/components/agents/sessions/session-changes";
+import { openAgentInterfaceAction } from "@/components/agents/sessions/actions";
 import {
     ExternalLink,
     FileCode2,
@@ -135,11 +136,14 @@ export function PolarCodeWorkspace({
                                 </ClientMessages>
                             </div>
                         ) : live ? (
-                            <TerminalPanel
-                                target={{ kind: "agent", sessionId: session.id }}
-                                label={session.title}
-                                height="h-full min-h-80"
-                            />
+                            <div className="flex h-full min-h-0 flex-col gap-2">
+                                <InterfaceButton sessionId={session.id} />
+                                <TerminalPanel
+                                    target={{ kind: "agent", sessionId: session.id }}
+                                    label={session.title}
+                                    height="h-full min-h-80"
+                                />
+                            </div>
                         ) : (
                             <ui.EmptyState
                                 icon={<SquareTerminal className="size-5" />}
@@ -150,6 +154,40 @@ export function PolarCodeWorkspace({
                 </div>
             </ui.SheetContent>
         </ui.Dialog>
+    );
+}
+
+/**
+ * The agent's own interface, opened in the terminal beside the runner that
+ * answers the thread's prompts. The terminal below switches to it.
+ */
+function InterfaceButton({ sessionId }: { sessionId: string }) {
+    const t = useTranslations("polar");
+    const [said, setSaid] = useState<string | null>(null);
+    const [busy, startTransition] = useTransition();
+    const open = () =>
+        startTransition(async () => {
+            const answer = await openAgentInterfaceAction(sessionId).catch(() => ({
+                error: t("code.pane.interfaceFailed"),
+                outcome: undefined
+            }));
+            if (answer.error) setSaid(answer.error);
+            else if (answer.outcome === "interactive") setSaid(t("code.pane.interfaceAlready"));
+            else if (answer.outcome === "busy") setSaid(t("code.pane.interfaceBusy"));
+            else setSaid(null);
+        });
+    return (
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <ui.Button type="button" size="sm" variant="outline" onClick={open} disabled={busy}>
+                <SquareTerminal className="size-4 shrink-0" aria-hidden />
+                {t("code.pane.openInterface")}
+            </ui.Button>
+            {said ? (
+                <p role="status" className="min-w-0 text-xs text-muted-foreground">
+                    {said}
+                </p>
+            ) : null}
+        </div>
     );
 }
 

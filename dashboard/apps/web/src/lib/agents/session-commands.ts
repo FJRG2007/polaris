@@ -482,8 +482,11 @@ export function agentReadyCommand(session = TMUX_SESSION): string {
  * leaves it in. So a pane in canonical mode is a shell waiting for a line, which
  * is the only moment typing a launch into it does what the button says.
  */
-export function agentExitedCommand(session = TMUX_SESSION): string {
+export function agentExitedCommand(session = TMUX_SESSION, stateDir?: string): string {
     const tty = `$(tmux display-message -p -t ${shellQuote(session)} '#{pane_tty}' 2>/dev/null)`;
+    // A runner's window is a shell between turns, and it is not an agent that
+    // exited: there is nothing to type a launch into.
+    if (stateDir) return `! ${runnerIn(stateDir)} && ${agentExitedCommand(session)}`;
     // The flag first: during the boot the pane is the setup script, which is in
     // canonical mode too and is not an agent that has exited.
     return `test -f ${AGENT_READY_FLAG} && stty -F "${tty}" -a 2>/dev/null | tr ' ' '\\n' | grep -qx icanon`;
@@ -684,9 +687,18 @@ export const PREVIEW_PROMPT =
 export const LAUNCH_SCRIPT = [
     "#!/bin/sh",
     "# Written by Polaris. Starts this session's agent; an argument reopens that conversation.",
-    'id="${1:-}"',
+    "# --turn <file> runs the prompt in that file without the agent's interface, on the conversation its hooks last named.",
+    'turn=""',
+    'if [ "${1:-}" = "--turn" ]; then',
+    '  turn="${2:-}"',
+    '  id="$(head -c 128 "$POLARIS_STATE_DIR/agent-session-id" 2>/dev/null || true)"',
+    '  case "$id" in *[!A-Za-z0-9_-]*) id="" ;; esac',
+    "else",
+    '  id="${1:-}"',
+    "fi",
     'case "$id" in *[!A-Za-z0-9_-]*) echo "polaris: that is not a conversation Polaris can reopen"; exit 1 ;; esac',
     'line="$POLARIS_AGENT_COMMAND"',
+    'if [ -n "$turn" ]; then line="$line $POLARIS_AGENT_HEADLESS"; fi',
     'if [ -n "$id" ]; then',
     '  case "$POLARIS_AGENT_RESUME" in',
     '    flag) line="$line --resume $id" ;;',
@@ -712,12 +724,15 @@ export const LAUNCH_SCRIPT = [
     '  line="$line --settings \\"$POLARIS_STATE_DIR/settings.json\\" --mcp-config \\"$POLARIS_STATE_DIR/mcp.json\\""',
     `  if [ -n "\${POLARIS_PREVIEW_BASE:-}" ]; then line="$line --append-system-prompt \\"${PREVIEW_PROMPT}\\""; fi`,
     "fi",
-    'if [ -n "$id" ]; then echo "polaris: starting $POLARIS_AGENT_COMMAND on conversation $id"; else echo "polaris: starting $POLARIS_AGENT_COMMAND"; fi',
+    'if [ -n "$turn" ]; then :; elif [ -n "$id" ]; then echo "polaris: starting $POLARIS_AGENT_COMMAND on conversation $id"; else echo "polaris: starting $POLARIS_AGENT_COMMAND"; fi',
     // Written last, so anything holding a prompt knows the terminal it is about
     // to type into belongs to the agent rather than to the installer.
     `: > ${AGENT_READY_FLAG}`,
     `chmod 0666 ${AGENT_READY_FLAG} 2>/dev/null || true`,
     'cd "$POLARIS_WORKDIR"',
+    // A turn reads its prompt from the file, so no part of it is ever a shell
+    // word or a keystroke.
+    'if [ -n "$turn" ]; then line="$line < \\"$turn\\""; fi',
     'if [ "$POLARIS_AS_ROOT" = "yes" ]; then',
     '  su -p "$POLARIS_RUNAS" -c "cd \\"$POLARIS_WORKDIR\\" && $line"',
     "else",
@@ -725,6 +740,163 @@ export const LAUNCH_SCRIPT = [
     "fi",
     ""
 ].join("\n");
+
+/** The tmux window a person opens the agent's own interface in, beside the
+ *  runner. While it is open, prompts go to it rather than to the runner. */
+export const INTERFACE_WINDOW = "polaris-tui";
+
+/** The window the runner names itself, so an interrupt reaches it by name. */
+export const RUNNER_WINDOW = "polaris-runner";
+
+/** Written by the runner once it is taking prompts. Beside the checkout, so it
+ *  says which way this session's prompts go even after a container restart. */
+export const RUNNER_READY_FILE = "runner.ready";
+
+/**
+ * The runner: takes each prompt Polaris queues and runs it as one turn without
+ * the agent's interface, one at a time, in order.
+ *
+ * A prompt is a file in `prompts/`, written whole and renamed into place, so
+ * nothing is ever typed into a terminal and nothing has to look ready first.
+ * The turn's own hooks report what happens, as an interactive agent's do; the
+ * runner adds only what they cannot: a turn that exited on an error (the tool
+ * signed out, a refused key) and one stopped by Polaris, so neither leaves the
+ * session on "Working".
+ *
+ * Ctrl-C reaches the turn and not the runner, which traps it. While a person has
+ * the interface open (`INTERFACE_WINDOW`), it waits, so two processes never
+ * write the same conversation.
+ */
+export const RUNNER_SCRIPT = [
+    "#!/bin/sh",
+    "# Written by Polaris. Runs each prompt Polaris queues, one at a time, without the agent's interface.",
+    'd="$POLARIS_STATE_DIR"',
+    'q="$d/prompts"',
+    'mkdir -p "$q"',
+    // A turn a restart cut short is not picked up again half done.
+    'rm -f "$d/turn.txt" "$d/interrupted"',
+    "trap 'echo \"polaris: stopped\"' INT",
+    `tmux rename-window -t "\${TMUX_PANE:-}" ${RUNNER_WINDOW} 2>/dev/null || true`,
+    `: > "$d/${RUNNER_READY_FILE}"`,
+    `: > ${AGENT_READY_FLAG}`,
+    `chmod 0666 ${AGENT_READY_FLAG} 2>/dev/null || true`,
+    'echo "polaris: ready. Prompts from Polaris run here, one at a time."',
+    "while :; do",
+    `  if tmux list-windows -t "$POLARIS_TMUX" -F '#{window_name}' 2>/dev/null | grep -qx ${INTERFACE_WINDOW}; then sleep 1; continue; fi`,
+    '  next="$(ls "$q" 2>/dev/null | grep -v "^\\." | head -n 1)"',
+    '  if [ -z "$next" ]; then sleep 1; continue; fi',
+    '  mv "$q/$next" "$d/turn.txt" 2>/dev/null || { sleep 1; continue; }',
+    '  chmod 0644 "$d/turn.txt" 2>/dev/null || true',
+    '  rm -f "$d/turn.rc" "$d/interrupted"',
+    '  echo "polaris: working on a prompt"',
+    '  { sh "$d/launch.sh" --turn "$d/turn.txt" 2>&1; echo $? > "$d/turn.rc"; } | tee "$d/turn.log"',
+    '  rc="$(cat "$d/turn.rc" 2>/dev/null || echo 1)"',
+    '  if [ -f "$d/interrupted" ]; then',
+    `    printf '{"hook_event_name":"Stop"}' | sh "$d/hook.sh" >/dev/null 2>&1 || true`,
+    '  elif [ "$rc" != "0" ]; then',
+    // The last line the tool printed, as words for the session: no control
+    // characters, quotes or backslashes, so it is a JSON string as it stands.
+    `    said="$(tail -n 1 "$d/turn.log" 2>/dev/null | tr -d '\\000-\\037"\\\\' | cut -c1-300)"`,
+    `    printf '{"hook_event_name":"StopFailure","error":"%s"}' "\${said:-The agent exited with status $rc}" | sh "$d/hook.sh" >/dev/null 2>&1 || true`,
+    "  fi",
+    '  rm -f "$d/turn.txt" "$d/interrupted"',
+    "done",
+    ""
+].join("\n");
+
+const RUNNER_SCRIPT_BASE64 = Buffer.from(RUNNER_SCRIPT, "utf8").toString("base64");
+
+/**
+ * What the interface window runs: the agent on the conversation the runner was
+ * on. A window opened later starts from tmux's own environment, which is the
+ * boot's, so what the setup cleared before the agent started is cleared again.
+ */
+export const INTERFACE_SCRIPT = [
+    "#!/bin/sh",
+    "# Written by Polaris. Opens the agent's own interface on this session's conversation.",
+    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP",
+    'for pair in $POLARIS_CREDENTIAL_FILES; do unset "$(printf %s "$pair" | cut -d= -f1)"; done',
+    'id="$(head -c 128 "$POLARIS_STATE_DIR/agent-session-id" 2>/dev/null || true)"',
+    'case "$id" in *[!A-Za-z0-9_-]*) id="" ;; esac',
+    'exec sh "$POLARIS_STATE_DIR/launch.sh" "$id"',
+    ""
+].join("\n");
+
+const INTERFACE_SCRIPT_BASE64 = Buffer.from(INTERFACE_SCRIPT, "utf8").toString("base64");
+
+/** Whether this session runs its prompts through the runner, as a test a
+ *  command can start with: a session booted before the runner existed has no
+ *  marker and keeps its interactive terminal. */
+function runnerIn(stateDir: string): string {
+    return `[ -f "${stateDir}/${RUNNER_READY_FILE}" ]`;
+}
+
+/** Whether the agent's own interface is open in its window. */
+function interfaceOpen(session = TMUX_SESSION): string {
+    return `tmux list-windows -t ${shellQuote(session)} -F '#{window_name}' 2>/dev/null | grep -qx ${INTERFACE_WINDOW}`;
+}
+
+/** Whether the runner is up and taking prompts: the readiness question for a
+ *  session that runs its turns without the interface. */
+export function runnerReadyCommand(stateDir: string): string {
+    return `${runnerIn(stateDir)} && test -f ${AGENT_READY_FLAG}`;
+}
+
+/** What `queuePromptCommand` exits with when the prompt is not queued. */
+export const NOT_QUEUED = { interactive: 3, interfaceOpen: 4 } as const;
+
+/**
+ * Hand the runner a prompt: written aside, then renamed into the queue, so the
+ * runner never reads half of one. Exits `NOT_QUEUED.interactive` for a session
+ * with no runner and `NOT_QUEUED.interfaceOpen` while the interface is open;
+ * both are typed into the terminal instead.
+ *
+ * The state directory is Polaris's own path (`$HOME` on a server, which the
+ * shell expands), never anything a person typed. The prompt travels as base64.
+ */
+export function queuePromptCommand(stateDir: string, text: string): string {
+    const encoded = Buffer.from(text, "utf8").toString("base64");
+    return [
+        `${runnerIn(stateDir)} || exit ${NOT_QUEUED.interactive}`,
+        `${interfaceOpen()} && exit ${NOT_QUEUED.interfaceOpen}`,
+        `q="${stateDir}/prompts"`,
+        'mkdir -p "$q"',
+        'n="$(date +%s%N 2>/dev/null)"',
+        'case "$n" in *N|"") n="$(date +%s)000000000" ;; esac',
+        'n="$n-$$"',
+        `printf %s ${encoded} | base64 -d > "$q/.$n"`,
+        'mv "$q/.$n" "$q/$n"'
+    ].join("\n");
+}
+
+/** Stop the turn the runner is on, leaving the runner and the session up.
+ *  Exits `NOT_QUEUED.interactive` for a session with no runner. */
+export function interruptTurnCommand(stateDir: string): string {
+    return [
+        `${runnerIn(stateDir)} || exit ${NOT_QUEUED.interactive}`,
+        `[ -f "${stateDir}/turn.txt" ] || exit 0`,
+        `: > "${stateDir}/interrupted"`,
+        `tmux send-keys -t ${shellQuote(`${TMUX_SESSION}:${RUNNER_WINDOW}`)} C-c`
+    ].join("\n");
+}
+
+/** What `openInterfaceCommand` exits with when it opens nothing. */
+export const NOT_OPENED = { interactive: 3, turnRunning: 4 } as const;
+
+/**
+ * Open the agent's own interface in a window beside the runner, on the same
+ * conversation, or bring it forward when it is already open. Not while a turn
+ * is running: two processes on one conversation would each write over the
+ * other. The id is checked here because it is about to be part of a command.
+ */
+export function openInterfaceCommand(stateDir: string, session = TMUX_SESSION): string {
+    return [
+        `${runnerIn(stateDir)} || exit ${NOT_OPENED.interactive}`,
+        `if ${interfaceOpen(session)}; then tmux select-window -t ${shellQuote(`${session}:${INTERFACE_WINDOW}`)}; exit 0; fi`,
+        `[ -f "${stateDir}/turn.txt" ] && exit ${NOT_OPENED.turnRunning}`,
+        `tmux new-window -t ${shellQuote(session)} -n ${INTERFACE_WINDOW} "sh \\"${stateDir}/interface.sh\\""`
+    ].join("\n");
+}
 
 /** Left in the state directory of a container kept for its unsaved work, whose
  *  session is over. A reboot of the box restarts that container too, and the
@@ -838,12 +1010,22 @@ const START_AGENT = [
     "export POLARIS_AS_ROOT POLARIS_WORKDIR POLARIS_STATE_DIR",
     `printf %s ${LAUNCH_SCRIPT_BASE64} | base64 -d > "$POLARIS_STATE_DIR/launch.sh"`,
     'chmod 0755 "$POLARIS_STATE_DIR/launch.sh"',
+    // The runner and the interface window, for a tool that runs a turn without
+    // its interface. Written either way: a script nothing starts costs nothing.
+    `printf %s ${RUNNER_SCRIPT_BASE64} | base64 -d > "$POLARIS_STATE_DIR/runner.sh"`,
+    `printf %s ${INTERFACE_SCRIPT_BASE64} | base64 -d > "$POLARIS_STATE_DIR/interface.sh"`,
+    'chmod 0755 "$POLARIS_STATE_DIR/runner.sh" "$POLARIS_STATE_DIR/interface.sh"',
     // A machine that restarted under a session comes back to the conversation
     // it was in, not to a blank one. The id is the one the agent's own hooks
     // last reported - see `hookScript` - and only a reopened checkout uses it.
     `if [ -f "$POLARIS_STATE_DIR/${SESSION_ENDED_FILE}" ]; then`,
     '  echo "polaris: this session has ended. Its work is kept here and the agent was not started again."',
     "  exec sh",
+    "fi",
+    // Every prompt as a turn of its own, without the interface: nothing is
+    // typed into a terminal, and no first-run screen can stand in the way.
+    'if [ -n "$POLARIS_AGENT_HEADLESS" ]; then',
+    '  exec sh "$POLARIS_STATE_DIR/runner.sh"',
     "fi",
     'POLARIS_RESUME_ID=""',
     'if [ "$POLARIS_REOPENED" = "yes" ] && [ -f "$POLARIS_STATE_DIR/agent-session-id" ]; then',
