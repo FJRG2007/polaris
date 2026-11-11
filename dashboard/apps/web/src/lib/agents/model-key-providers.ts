@@ -47,6 +47,7 @@ const PROVIDER_ALIASES: Record<string, string[]> = {
     "cline-pass": ["cline"],
     vercel: ["ai gateway"],
     opencode: ["zen"],
+    "opencode-go": ["go"],
     upstage: ["solar"],
     inception: ["mercury"],
     "nano-gpt": ["nanogpt"]

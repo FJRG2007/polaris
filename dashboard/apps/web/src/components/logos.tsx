@@ -64,6 +64,7 @@ const MODEL_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     kilo: models.KiloMark,
     poe: models.PoeMark,
     opencode: models.OpenCodeMark,
+    "opencode-go": models.OpenCodeMark,
     "cline-pass": models.ClineMark,
     // The gateway is not a provider, but it is a thing with a name and a mark,
     // and it sits in the same list.

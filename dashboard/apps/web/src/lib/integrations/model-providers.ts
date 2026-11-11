@@ -684,6 +684,21 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         defaultModel: { label: "GPT 5.5 Pro (Zen)", slug: "opencode/gpt-5.5-pro" } // i18n-ignore
     },
     {
+        // The flat-rate plan beside Zen, from the same console. models.dev gives
+        // both `OPENCODE_API_KEY`, but two providers on one variable means the
+        // second key overwrites the first, so Go's is named here. Nothing reads
+        // it by that name: OpenCode takes the chosen key from its own config
+        // (`opencode-model.ts`), and Polar calls the endpoint directly.
+        slug: "opencode-go",
+        name: "OpenCode Go",
+        kind: "gateway",
+        envVar: "OPENCODE_GO_API_KEY",
+        summary: "A flat monthly plan for the open coding models.",
+        docsUrl: "https://opencode.ai/docs/go",
+        keyUrl: "https://opencode.ai/auth",
+        defaultModel: { label: "Kimi K3 (Go)", slug: "opencode-go/kimi-k3" } // i18n-ignore
+    },
+    {
         slug: "cortecs",
         name: "Cortecs",
         kind: "gateway",

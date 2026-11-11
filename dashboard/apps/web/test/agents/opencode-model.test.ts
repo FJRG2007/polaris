@@ -15,6 +15,8 @@ describe("opencode provider mapping", () => {
         expect(opencodeProviderId("anthropic")).toBe("anthropic");
         expect(opencodeProviderId("google-ai")).toBe("google");
         expect(opencodeProviderId("moonshot")).toBe("moonshotai");
+        expect(opencodeProviderId("opencode")).toBe("opencode");
+        expect(opencodeProviderId("opencode-go")).toBe("opencode-go");
         expect(opencodeProviderId("enigma")).toBe(OPENCODE_GATEWAY_ID);
     });
 

@@ -66,6 +66,7 @@ export const PROVIDER_ENDPOINTS: Readonly<Record<string, ProviderEndpoint>> = {
     orcarouter: { api: "openai", baseUrl: "https://api.orcarouter.ai/v1" },
     synthetic: { api: "openai", baseUrl: "https://api.synthetic.new/openai/v1" },
     opencode: { api: "openai", baseUrl: "https://opencode.ai/inference/openai/v1" },
+    "opencode-go": { api: "openai", baseUrl: "https://opencode.ai/inference/go/openai/v1" },
     cortecs: { api: "openai", baseUrl: "https://api.cortecs.ai/v1" },
     edenai: { api: "openai", baseUrl: "https://api.edenai.run/v3" },
     "cline-pass": { api: "openai", baseUrl: "https://api.cline.bot/api/v1" },
