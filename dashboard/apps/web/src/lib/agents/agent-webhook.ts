@@ -83,6 +83,7 @@ interface Payload {
         title?: string;
         body?: string;
         draft?: boolean;
+        merged?: boolean;
         user?: { login?: string };
         base?: { ref?: string };
         head?: { repo?: { full_name?: string }; sha?: string };
@@ -187,6 +188,11 @@ function classify(event: string, payload: Payload, appHandle: string): Incident 
                 };
             if (payload.action === "synchronize")
                 return { ...base, trigger: "pr.updated", body: "" };
+            // Closed unmerged is nothing to follow up on.
+            if (payload.action === "closed")
+                return payload.pull_request?.merged === true
+                    ? { ...base, trigger: "pr.merged", body: payload.pull_request?.body ?? "" }
+                    : null;
             return payload.action === "review_requested"
                 ? { ...base, trigger: "pr.review_requested", body: "" }
                 : null;

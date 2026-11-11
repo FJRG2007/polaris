@@ -128,6 +128,7 @@ export const APP_EVENTS = {
     "code.issue-labeled": { app: "code", payload: repoEvent },
     "code.pull-request-opened": { app: "code", payload: repoEvent },
     "code.pull-request-updated": { app: "code", payload: repoEvent },
+    "code.pull-request-merged": { app: "code", payload: repoEvent },
     "code.review-requested": { app: "code", payload: repoEvent },
     "code.review-submitted": { app: "code", payload: repoEvent },
     "code.checks-failed": { app: "code", payload: repoEvent }
@@ -142,6 +143,7 @@ export const CODE_EVENT_TRIGGERS = {
     "code.issue-labeled": "issue.labeled",
     "code.pull-request-opened": "pr.opened",
     "code.pull-request-updated": "pr.updated",
+    "code.pull-request-merged": "pr.merged",
     "code.review-requested": "pr.review_requested",
     "code.review-submitted": "pr.review_submitted",
     "code.checks-failed": "ci.failed"

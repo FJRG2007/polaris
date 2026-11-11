@@ -161,6 +161,20 @@ describe("automatic reviews", () => {
         expect(await prEvent("synchronize")).toEqual([]);
     });
 
+    it("follows up on a merge, never on a pull request closed unmerged", async () => {
+        mocks.agentRepoByFullName.mockResolvedValue({
+            id: "repo-1",
+            ownerId: "owner-1",
+            isPrivate: true,
+            repoFullName: "acme/app",
+            review: null,
+            automations: [rule("pr.merged")]
+        });
+        expect(await prEvent("closed", { merged: false })).toEqual([]);
+        expect(await prEvent("closed", { merged: true })).toEqual(["run-1"]);
+        expect(mocks.dispatchRun).toHaveBeenLastCalledWith(expect.objectContaining({ trigger: "pr.merged" }));
+    });
+
     it("never filters a review somebody asked for", async () => {
         mocks.reviewSettingsFor.mockResolvedValue(settings({ ignoreAuthors: ["dana"] }));
         expect(await prEvent("review_requested", { draft: true })).toEqual(["run-1"]);

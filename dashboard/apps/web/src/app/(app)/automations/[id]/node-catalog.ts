@@ -68,6 +68,7 @@ export const EVENT_PRESETS = {
     codeIssueLabeled: { name: "code.issue-labeled", outcomes: [] },
     codePullRequestOpened: { name: "code.pull-request-opened", outcomes: [] },
     codePullRequestUpdated: { name: "code.pull-request-updated", outcomes: [] },
+    codePullRequestMerged: { name: "code.pull-request-merged", outcomes: [] },
     codeReviewRequested: { name: "code.review-requested", outcomes: [] },
     codeReviewSubmitted: { name: "code.review-submitted", outcomes: [] },
     codeChecksFailed: { name: "code.checks-failed", outcomes: [] }
@@ -113,6 +114,7 @@ const APP_EVENT_PRESETS: Readonly<Record<core.AppEventApp, readonly PresetKey[]>
     code: [
         "codePullRequestOpened",
         "codePullRequestUpdated",
+        "codePullRequestMerged",
         "codeReviewRequested",
         "codeReviewSubmitted",
         "codeChecksFailed",

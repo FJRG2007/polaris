@@ -1048,6 +1048,7 @@
             "codeIssueLabeled": "Issue labeled",
             "codePullRequestOpened": "Pull request opened",
             "codePullRequestUpdated": "Pull request updated",
+            "codePullRequestMerged": "Pull request merged",
             "codeReviewRequested": "Review requested",
             "codeReviewSubmitted": "Review submitted",
             "codeChecksFailed": "Checks failed"
