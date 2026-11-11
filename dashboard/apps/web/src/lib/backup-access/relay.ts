@@ -33,7 +33,7 @@ export const RELAY_LISTEN_PORT = wg.LAST_LISTEN_PORT + 1;
  *  never meets a tunnel's. */
 export const RELAY_SLOT = 16383;
 /** Raised when both ends must be brought up again with what this build renders. */
-export const RELAY_SPEC = 4;
+export const RELAY_SPEC = 5;
 /** The web ports every relay carries. */
 export const WEB_PORTS = [80, 443] as const;
 /**
@@ -182,6 +182,24 @@ export function renderHomeConfig(keys: RelayKeys, relayAddress: string): string 
     ].join("\n");
 }
 
+/**
+ * How frp's two halves hold their link: one TCP connection per proxied
+ * connection, with frp's own heartbeat, rather than everything multiplexed over
+ * one.
+ *
+ * Multiplexed (frp's default), every game player, call and tunnel rides a single
+ * stream whose writes give up after ten seconds; a satellite line that stalls for
+ * longer closes it, and every player on every server is dropped at the same
+ * instant, the calls with them - seen on 2026-11-11 as frpc's work connections all
+ * ending in EOF together and frps answering "control is closed". Unmultiplexed,
+ * the control connection waits out 90 seconds of silence before it gives up, and
+ * a stall only slows each connection down. Both ends must agree.
+ */
+const FRP_TRANSPORT = ["transport.tcpMux = false"];
+/** Work connections frpc opens ahead of need, so a player joining does not wait
+ *  for frps to ask for one through the control connection first. */
+const FRP_POOL = 5;
+
 /** The secret frpc logs in to frps with. frps is only reachable through the link
  *  and its own project's network already, so this is a second lock; derived from
  *  the house's key, so nothing new is stored and both ends always agree. */
@@ -202,6 +220,8 @@ export function renderRelayFrp(keys: RelayKeys, carried: RelayPortSet): string {
         'bindAddr = "0.0.0.0"',
         `bindPort = ${FRP_CONTROL_PORT}`,
         'proxyBindAddr = "0.0.0.0"',
+        ...FRP_TRANSPORT,
+        `transport.maxPoolCount = ${FRP_POOL}`,
         'auth.method = "token"',
         `auth.token = "${frpToken(keys)}"`,
         `allowPorts = [${allowed.join(", ")}]`,
@@ -236,6 +256,8 @@ export function renderHomeFrp(
         `serverPort = ${FRP_CONTROL_PORT}`,
         // The link can come up after frpc does; it logs in again until it does.
         "loginFailExit = false",
+        ...FRP_TRANSPORT,
+        `transport.poolCount = ${FRP_POOL}`,
         'auth.method = "token"',
         `auth.token = "${frpToken(keys)}"`,
         'log.to = "console"',

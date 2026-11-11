@@ -89,6 +89,14 @@ describe("backup relay config", () => {
         expect(text).not.toMatch(/kcpBindPort|quicBindPort|webServer/);
     });
 
+    it("keeps each proxied connection on its own stream, both ends agreeing", () => {
+        for (const text of [renderRelayFrp(keys, withUdp), renderHomeFrp(keys, withUdp)]) {
+            expect(text).toContain("transport.tcpMux = false");
+        }
+        expect(renderHomeFrp(keys, withUdp)).toContain("transport.poolCount = 5");
+        expect(renderRelayFrp(keys, withUdp)).toContain("transport.maxPoolCount = 5");
+    });
+
     it("renders frpc: dials through the link, one proxy per side port to this machine", () => {
         const text = renderHomeFrp(keys, withUdp);
         expect(text).toContain('serverAddr = "127.0.0.1"');
