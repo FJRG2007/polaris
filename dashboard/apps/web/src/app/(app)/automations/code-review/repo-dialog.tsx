@@ -23,6 +23,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { agentWord } from "@/lib/agents/words";
 import {
     AGENT_EFFORTS,
+    AGENT_LEARNINGS_MAX,
     AGENT_PUSH_POLICIES,
     AGENT_SHELL_POLICIES,
     DEFAULT_REVIEW,
@@ -54,6 +55,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
     const [gate, setGate] = useState<AgentGateMode | null>(repo.gate as AgentGateMode | null);
     const [review, setReview] = useState<ReviewSettings>(repo.review);
     const [inheritedReview, setInheritedReview] = useState<ResolvedReview>(DEFAULT_REVIEW);
+    const [learnings, setLearnings] = useState(repo.learnings);
     const [setupScript, setSetupScript] = useState(repo.setupScript);
     const [setupRequired, setSetupRequired] = useState(repo.setupRequired);
     const [advice, setAdvice] = useState<ExecutionAdvice | null>(null);
@@ -90,6 +92,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             issues: repo.issues,
             gate: repo.gate,
             review: repo.review,
+            learnings: repo.learnings.trim(),
             setupScript: repo.setupScript.trim(),
             setupRequired: repo.setupRequired
         },
@@ -104,6 +107,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             issues,
             gate,
             review,
+            learnings: learnings.trim(),
             setupScript: setupScript.trim(),
             setupRequired
         }
@@ -127,7 +131,10 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                                 pullRequests,
                                 issues,
                                 gate,
-                                review
+                                review,
+                                // Sent only when edited here, so a save never puts
+                                // back notes a run rewrote while this was open.
+                                learnings: learnings.trim() === repo.learnings.trim() ? null : learnings
                             },
                             setup: { script: setupScript, required: setupRequired }
                         }),
@@ -222,6 +229,23 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                         <ReviewFields value={review} inherited={inheritedReview} onChange={setReview} />
                         <ReviewOutputFields value={review} inherited={inheritedReview} onChange={setReview} />
                     </section>
+
+                    <div className="space-y-1">
+                        <label className="text-sm font-medium" htmlFor="repo-learnings">
+                            {t("repoDialog.learnings")}
+                        </label>
+                        <Textarea
+                            id="repo-learnings"
+                            rows={6}
+                            maxLength={AGENT_LEARNINGS_MAX}
+                            spellCheck={false}
+                            className="font-mono text-xs"
+                            value={learnings}
+                            onChange={(event) => setLearnings(event.target.value)}
+                            placeholder={t("repoDialog.learningsPlaceholder")}
+                        />
+                        <p className="text-xs text-muted-foreground">{t("repoDialog.learningsHint")}</p>
+                    </div>
 
                     <div className="space-y-1">
                         <label className="text-sm font-medium" htmlFor="repo-setup-script">

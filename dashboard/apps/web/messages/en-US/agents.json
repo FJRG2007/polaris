@@ -554,7 +554,10 @@
         },
         "git": "Git access",
         "shell": "Shell",
-        "publicShell": "This repository is public, so anybody can open a pull request the agent then reads. A full shell hands whatever it runs the provider keys in its environment."
+        "publicShell": "This repository is public, so anybody can open a pull request the agent then reads. A full shell hands whatever it runs the provider keys in its environment.",
+        "learnings": "What the agent has learned",
+        "learningsHint": "Notes runs keep about this repository and read at the start of the next one. Correct or delete anything wrong.",
+        "learningsPlaceholder": "Nothing yet. Runs add commands, quirks and corrections here."
     },
     "settingsFields": {
         "on": "On",
@@ -798,7 +801,8 @@
             "suggestLabels": "Suggest labels",
             "applyLabels": "Apply labels",
             "suggestReviewers": "Suggest reviewers",
-            "scanners": "Run scanners"
+            "scanners": "Run scanners",
+            "webSearch": "Check on the web"
         },
         "tone": "Tone",
         "toneHint": "How to phrase it: language, length, voice.",
@@ -833,6 +837,12 @@
         "add": "Add",
         "removeEntry": "Remove {name}",
         "incomplete": "Needs both fields to be saved.",
-        "count": "{count, plural, one {# entry} other {# entries}}"
+        "count": "{count, plural, one {# entry} other {# entries}}",
+        "knowledgeTitle": "What the agent knows",
+        "knowledgeIntro": "Applies to every run on the repository, not only reviews.",
+        "guidelineFiles": "Guideline files",
+        "guidelineFilesHint": "Files of house rules the agent reads first, as globs.",
+        "linkedRepos": "Linked repositories",
+        "linkedReposHint": "Other repositories of the same account it may read for context. Never written to."
     }
 }

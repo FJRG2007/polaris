@@ -82,6 +82,10 @@ Everything below is a deliberate departure, not drift.
   download whose sha256 is not the pinned one, and starts each with an argument
   array in an environment without credentials. Bumping one means a new version
   and both architectures' digests in `SCANNERS`.
+- **Linked repositories.** `RepoSettings` gained `xrepo`, and `resolvePayload`
+  falls back to it when the payload carries no cross-repo request, so the
+  repositories an operator links in Polaris reach a run through the run context
+  instead of through a `--xrepo` flag nobody types here.
 - **Why a run stopped.** Upstream treats a `session.error` as recoverable and
   reports only the harness's own terminal verdict. For one class that loses the
   reason: a provider refusing a request for exceeding the ACCOUNT's allowance is

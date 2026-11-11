@@ -83,6 +83,9 @@ export const agentModelSchema = z
  * chosen execution rather than left as a loose optional, so a repository cannot
  * be stored claiming to run on a pool it does not name.
  */
+/** The longest the agent's notes on one repository may grow, as the runtime caps them. */
+export const AGENT_LEARNINGS_MAX = 100_000;
+
 export const agentRepoConfigSchema = z
     .object({
         execution: agentExecutionSchema,
@@ -99,7 +102,10 @@ export const agentRepoConfigSchema = z
         issues: z.boolean().nullable().default(null),
         gate: agentGateModeSchema.nullable().default(null),
         /** Which pull requests are reviewed on their own; null inherits. */
-        review: reviewSettingsSchema.nullable().default(null)
+        review: reviewSettingsSchema.nullable().default(null),
+        /** What the agent has noted about the repository, as edited here. Null
+         *  leaves the stored notes alone; empty clears them. */
+        learnings: z.string().max(AGENT_LEARNINGS_MAX).nullable().default(null)
     })
     .refine((value) => value.execution !== "runners" || value.poolId !== null, {
         message: "Pick the runner pool this repository should use",

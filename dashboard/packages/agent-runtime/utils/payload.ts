@@ -249,7 +249,9 @@ export function resolvePayload(
     eventInstructions: jsonPayload?.eventInstructions,
     previousRunsNote: jsonPayload?.previousRunsNote,
     event,
-    xrepo: jsonPayload?.xrepo,
+    // a payload's own cross-repo request wins; else the repositories the
+    // operator linked, from the run context
+    xrepo: jsonPayload?.xrepo ?? repoSettings.xrepo ?? undefined,
     timeout: inputs.timeout ?? jsonPayload?.timeout,
     cwd: resolveCwd(inputs.cwd),
     progressComment: jsonPayload?.progressComment,

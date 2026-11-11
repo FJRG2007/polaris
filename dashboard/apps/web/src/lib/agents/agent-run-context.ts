@@ -18,7 +18,13 @@
 import { runSecretsFor } from "@/lib/agents/model-keys";
 import { EFFORT_ALIASES } from "@polaris/agent-runtime/shared";
 import { ENIGMA_VERSION, gateScript } from "@/lib/agents/agent-gate";
-import { parseAgentTriggers, type AgentGateMode, type AgentTrigger } from "@polaris/core";
+import {
+    AGENT_RUN_MODES,
+    parseAgentTriggers,
+    type AgentGateMode,
+    type AgentTrigger,
+    type LinkedRepoAccess
+} from "@polaris/core";
 
 /** One rule, as the runtime reads it. */
 interface RunContextMode {
@@ -57,6 +63,9 @@ export interface RunContextPayload {
         xrepoBrief: string | null;
         xrepoLearnings: string | null;
         xrepoLearningsHeadings: never[];
+        /** The repositories linked to this one, as read access. A Polaris
+         *  field the vendored runtime gained; null keeps the run single-repo. */
+        xrepo: LinkedRepoAccess | null;
     };
     apiToken: string;
     /** Always false. The upstream shape carries a funded-model programme Polaris
@@ -106,19 +115,28 @@ export interface BuildRunContextInput {
     /** What the operator's review settings ask a review to contain, for Review
      *  mode (incremental reviews inherit it). Empty adds nothing. */
     reviewGuide?: string;
-    /** The named jobs people can ask for, as guidance for every mode. */
+    /** Standing guidance for every mode: recipes, guideline files, web search. */
     recipes?: string;
+    /** What earlier runs noted about the repository. The runtime hands it to the
+     *  agent as an editable file and writes it back, so nothing else may ride in
+     *  it - whatever did would be saved as a note and doubled on the next run. */
+    learnings?: string | null;
+    xrepo?: LinkedRepoAccess | null;
 }
+
+/** The runtime looks a child mode's operator text up under its parent. */
+const PARENT_MODE: Record<string, string> = { IncrementalReview: "Review", Fix: "Build" };
+/** The modes that carry their own text, so standing guidance reaches every mode. */
+const TOP_MODES = AGENT_RUN_MODES.filter((mode) => !(mode in PARENT_MODE));
 
 /**
  * Build the context for a run.
  *
  * `modes` is left empty: the runtime ships its own catalogue (Build, Review and
  * the rest) and this field is for adding custom ones, which Polaris does not yet
- * offer. `modeInstructions` is how the operator's prose reaches the agent when an
- * automation forces a mode; a run with no forced mode carries the same text as
- * the repository-wide learnings, which is where the runtime looks for standing
- * guidance.
+ * offer. `modeInstructions` is how every piece of operator prose reaches the
+ * agent; `learnings` is only the agent's own notes, because the runtime writes
+ * that field back.
  */
 export async function buildRunContext(input: BuildRunContextInput): Promise<RunContextPayload> {
     // Resolved for whoever owns the repository, not for the deployment: their own
@@ -128,12 +146,19 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<RunC
     const instructions = input.instructions.trim();
     const join = (...parts: Array<string | undefined>) =>
         parts.map((part) => part?.trim() ?? "").filter(Boolean).join("\n\n");
-    const modeInstructions: Record<string, string> =
-        input.mode && instructions ? { [input.mode]: instructions } : {};
-    // The runtime looks Review's text up for IncrementalReview too.
-    const review = join(modeInstructions.Review, input.reviewGuide);
-    if (review) modeInstructions.Review = review;
-    const learnings = join(instructions, input.recipes);
+    // The automation's words go to the mode it forces, or to every mode when it
+    // forces none; standing guidance goes to every mode; the review settings
+    // only to Review, which IncrementalReview reads as well.
+    const forced = input.mode ? (PARENT_MODE[input.mode] ?? input.mode) : null;
+    const modeInstructions: Record<string, string> = {};
+    for (const mode of TOP_MODES) {
+        const text = join(
+            forced === null || forced === mode ? instructions : undefined,
+            mode === "Review" ? input.reviewGuide : undefined,
+            input.recipes
+        );
+        if (text) modeInstructions[mode] = text;
+    }
 
     return {
         settings: {
@@ -169,12 +194,13 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<RunC
             // A merge gate must never turn itself on.
             approvalCheck: false,
             modeInstructions,
-            learnings: learnings || null,
+            learnings: input.learnings?.trim() || null,
             learningsHeadings: [],
             envAllowlist: null,
             xrepoBrief: null,
             xrepoLearnings: null,
-            xrepoLearningsHeadings: []
+            xrepoLearningsHeadings: [],
+            xrepo: input.xrepo ?? null
         },
         apiToken: input.runToken,
         oss: false,

@@ -147,7 +147,15 @@ export const reviewSettingsSchema = z.object({
     /** Files the review leaves out, as globs (`dist/**`, `*.lock`). */
     pathFilters: nullable(list),
     /** Named jobs anyone allowed to mention the app can ask for by name. */
-    recipes: nullable(rows(named))
+    recipes: nullable(rows(named)),
+
+    // What the agent knows beyond the diff, in every mode.
+    /** The repository's own guideline files, as globs (`AGENTS.md`, `docs/style/**`). */
+    guidelineFiles: nullable(list),
+    /** Check how a library or API behaves, or a published vulnerability, on the web. */
+    webSearch: nullable(z.boolean()),
+    /** Other repositories of the same account the agent may read, by name. */
+    linkedRepos: nullable(list)
 });
 
 type ReviewShape = z.infer<typeof reviewSettingsSchema>;
@@ -207,7 +215,10 @@ export const DEFAULT_REVIEW: ResolvedReview = {
     customChecks: [],
     pathInstructions: [],
     pathFilters: [],
-    recipes: []
+    recipes: [],
+    guidelineFiles: [],
+    webSearch: false,
+    linkedRepos: []
 };
 
 /** `ignoreTitleKeywords` -> `ignore_title_keywords`, the name YAML files use. */
@@ -465,13 +476,64 @@ export function reviewInstructions(settings: ResolvedReview): string {
 }
 
 /**
- * The named jobs people can ask for, as standing guidance for every mode.
- * Empty when there are none.
+ * Standing guidance for every mode: the named jobs people can ask for, the
+ * repository's guideline files, and whether to check claims on the web.
+ * Empty when none of them is set.
  */
 export function recipeInstructions(settings: ResolvedReview): string {
-    if (settings.recipes.length === 0) return "";
-    return [
-        "When somebody who mentions you asks for one of these by name, do what it says:",
-        ...settings.recipes.map((recipe) => `- "${recipe.name}": ${recipe.instructions}`)
-    ].join("\n");
+    const parts: string[] = [];
+    if (settings.recipes.length > 0)
+        parts.push(
+            [
+                "When somebody who mentions you asks for one of these by name, do what it says:",
+                ...settings.recipes.map((recipe) => `- "${recipe.name}": ${recipe.instructions}`)
+            ].join("\n")
+        );
+    if (settings.guidelineFiles.length > 0) {
+        const globs = settings.guidelineFiles.map((glob) => `\`${glob}\``).join(", ");
+        parts.push(`Before you change or review code, read the repository's guideline files matching ${globs} and hold the work to them.`);
+    }
+    if (settings.webSearch)
+        parts.push(
+            "When a claim depends on how a library, API or tool version behaves, or on a published vulnerability, check it with web search before you make it, and cite the page."
+        );
+    return parts.join("\n\n");
+}
+
+/** A repository name as GitHub allows it. */
+const REPO_NAME = /^[A-Za-z0-9._-]{1,100}$/;
+
+/** The runtime's own cross-repo shape, as `linkedRepoAccess` hands it over. */
+export interface LinkedRepoAccess {
+    mode: "explicit";
+    /** Every repository the run may read, the primary first. */
+    read: string[];
+    /** Only the primary: a linked repository is read, never written. */
+    write: string[];
+    /** Entries that could not be granted - another account, or not a name. */
+    unavailable: string[];
+}
+
+/**
+ * The linked repositories as cross-repo read access, or null when there are
+ * none. An installation is one account, so only repositories of the primary's
+ * own owner can be granted; anything else is named back as unavailable rather
+ * than silently dropped.
+ */
+export function linkedRepoAccess(repoFullName: string, linked: readonly string[]): LinkedRepoAccess | null {
+    const [owner = "", primary = ""] = repoFullName.split("/");
+    const read = new Map<string, string>();
+    const unavailable: string[] = [];
+    for (const entry of linked) {
+        const parts = entry.split("/");
+        const sameOwner = parts.length === 2 && (parts[0] ?? "").toLowerCase() === owner.toLowerCase();
+        const name = parts.length === 1 ? (parts[0] ?? "") : sameOwner ? (parts[1] ?? "") : "";
+        if (!REPO_NAME.test(name) || name === "." || name === "..") {
+            unavailable.push(entry);
+            continue;
+        }
+        if (name.toLowerCase() !== primary.toLowerCase()) read.set(name.toLowerCase(), name);
+    }
+    if (read.size === 0 && unavailable.length === 0) return null;
+    return { mode: "explicit", read: [primary, ...read.values()], write: [primary], unavailable };
 }

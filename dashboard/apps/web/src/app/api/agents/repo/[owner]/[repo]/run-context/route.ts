@@ -24,7 +24,7 @@ import { authenticateRun } from "@/lib/agents/agent-auth";
 import { buildRunContext } from "@/lib/agents/agent-run-context";
 import { policyForRepo } from "@/lib/agents/agent-defaults-service";
 import { reviewSettingsFor } from "@/lib/agents/review-gate";
-import { DEFAULT_REVIEW, recipeInstructions, reviewInstructions } from "@polaris/core";
+import { DEFAULT_REVIEW, linkedRepoAccess, recipeInstructions, reviewInstructions } from "@polaris/core";
 import { issueRunToken, markRunStarted } from "@/lib/agents/agent-run-service";
 
 export const runtime = "nodejs";
@@ -61,7 +61,8 @@ export async function GET(
             pullRequests: true,
             issues: true,
             gate: true,
-            review: true
+            review: true,
+            learnings: true
         }
     });
     if (!row?.enabled) {
@@ -119,7 +120,9 @@ export async function GET(
         // gate's review pass as the standard the diff is judged against.
         intent: instructions || `A ${run?.trigger ?? "manual"} agent run on ${row.repoFullName}.`,
         reviewGuide: reviewInstructions(review),
-        recipes: recipeInstructions(review)
+        recipes: recipeInstructions(review),
+        learnings: row.learnings,
+        xrepo: linkedRepoAccess(row.repoFullName, review.linkedRepos)
     });
 
     return Response.json(context, { headers: { "cache-control": "no-store" } });

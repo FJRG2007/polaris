@@ -8564,6 +8564,10 @@ model AgentRepo {
     // Which pull requests are reviewed on their own, as stringified JSON in the
     // shape of ReviewSettings. Null, and any null inside it, inherits.
     review        String?
+    // What the agent noted about this repository across runs - its commands,
+    // quirks and the corrections people gave it - as Markdown. Written back by
+    // each run and editable by the operator. Null is nothing noted yet.
+    learnings     String?
     // When the workflow file was last written into the repository. Null for
     // `server` execution, which needs no workflow at all, and for a repository
     // enabled before the write succeeded.

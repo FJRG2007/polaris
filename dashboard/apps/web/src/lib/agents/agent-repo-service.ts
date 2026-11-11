@@ -47,6 +47,8 @@ export interface AgentRepoView {
     gate: string | null;
     /** Which pull requests are reviewed on their own; every null inherits. */
     review: ReviewSettings;
+    /** What the agent noted about the repository across runs. Empty is nothing yet. */
+    learnings: string;
     /** Run in a session's checkout before the agent starts. Empty runs nothing. */
     setupScript: string;
     /** Whether a failing setup script stops the session. */
@@ -84,6 +86,7 @@ export async function listAgentRepos(ownerId: string): Promise<AgentRepoView[]> 
         issues: row.issues,
         gate: row.gate,
         review: parseReviewSettings(row.review),
+        learnings: row.learnings ?? "",
         setupScript: row.setupScript,
         setupRequired: row.setupRequired,
         workflowInstalledAt: row.workflowInstalledAt,
@@ -224,6 +227,8 @@ export async function upsertAgentRepo(
                       ? null
                       : JSON.stringify(input.config.review)
               }),
+        // Same convention: absent leaves the agent's notes alone.
+        ...(input.config.learnings === null ? {} : { learnings: input.config.learnings.trim() || null }),
         // A change of execution invalidates whatever workflow is in the repository,
         // so the installer runs again rather than trusting the stamp.
         error: null
@@ -343,6 +348,7 @@ export async function defaultConfigFor(
         issues: null,
         gate: null,
         review: null,
+        learnings: null,
         advice
     };
 }

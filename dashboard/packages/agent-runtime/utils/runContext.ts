@@ -1,4 +1,4 @@
-import type { PushPermission, ShellPermission } from "../external.ts";
+import type { PushPermission, ShellPermission, XrepoConfig } from "../external.ts";
 import { apiFetch } from "./apiFetch.ts";
 import type { RepoContext } from "./github.ts";
 
@@ -76,6 +76,10 @@ export interface RepoSettings {
   xrepoBrief: string | null;
   xrepoLearnings: string | null;
   xrepoLearningsHeadings: LearningsHeading[];
+  // a Polaris field: the repositories the operator linked to this one, as the
+  // cross-repo access a run gets when its payload carries none. null keeps the
+  // run single-repo, which is also what an older control plane sends.
+  xrepo: XrepoConfig | null;
 }
 
 /**
@@ -137,6 +141,7 @@ const defaultSettings: RepoSettings = {
   xrepoBrief: null,
   xrepoLearnings: null,
   xrepoLearningsHeadings: [],
+  xrepo: null,
 };
 
 const defaultRunContext: RunContext = {
@@ -238,6 +243,7 @@ export async function fetchRunContext(params: {
         xrepoBrief: data.settings?.xrepoBrief ?? null,
         xrepoLearnings: data.settings?.xrepoLearnings ?? null,
         xrepoLearningsHeadings: data.settings?.xrepoLearningsHeadings ?? [],
+        xrepo: data.settings?.xrepo ?? null,
       },
       apiToken: data.apiToken,
       oss: data.oss ?? false,

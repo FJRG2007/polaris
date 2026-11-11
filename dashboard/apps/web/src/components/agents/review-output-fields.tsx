@@ -27,7 +27,8 @@ type BoolKey =
     | "suggestLabels"
     | "applyLabels"
     | "suggestReviewers"
-    | "scanners";
+    | "scanners"
+    | "webSearch";
 
 type CheckKey = "titleCheck" | "descriptionCheck" | "issueCheck" | "docstringCheck";
 
@@ -105,7 +106,7 @@ export function ReviewOutputFields({
         current: T[] | null,
         fallback: readonly T[],
         render: (rows: T[]) => React.ReactNode,
-        key: "pathFilters" | "customChecks" | "pathInstructions" | "recipes"
+        key: "pathFilters" | "customChecks" | "pathInstructions" | "recipes" | "guidelineFiles" | "linkedRepos"
     ) =>
         current === null ? (
             <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -250,6 +251,43 @@ export function ReviewOutputFields({
                     "recipes"
                 )}
             </Field>
+
+            <div className="min-w-0">
+                <p className="text-sm font-medium">{t("reviewOutput.knowledgeTitle")}</p>
+                <p className="text-xs text-muted-foreground">{t("reviewOutput.knowledgeIntro")}</p>
+            </div>
+            <Field label={t("reviewOutput.guidelineFiles")} hint={t("reviewOutput.guidelineFilesHint")}>
+                {own(
+                    value.guidelineFiles,
+                    inherited.guidelineFiles,
+                    (rows) => (
+                        <ListField
+                            value={rows}
+                            onChange={(next) => set("guidelineFiles", next)}
+                            placeholder="AGENTS.md, docs/style/**"
+                            max={core.REVIEW_LIST_MAX}
+                        />
+                    ),
+                    "guidelineFiles"
+                )}
+            </Field>
+            <Field label={t("reviewOutput.linkedRepos")} hint={t("reviewOutput.linkedReposHint")}>
+                {own(
+                    value.linkedRepos,
+                    inherited.linkedRepos,
+                    (rows) => (
+                        <ListField
+                            value={rows}
+                            onChange={(next) => set("linkedRepos", next)}
+                            placeholder="shared-types, design-system"
+                            max={core.REVIEW_LIST_MAX}
+                            caseInsensitive
+                        />
+                    ),
+                    "linkedRepos"
+                )}
+            </Field>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{bool("webSearch")}</div>
         </div>
     );
 }

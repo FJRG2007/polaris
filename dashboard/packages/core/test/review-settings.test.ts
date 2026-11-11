@@ -233,3 +233,22 @@ describe("scanners", () => {
         expect(core.reviewInstructions({ ...core.DEFAULT_REVIEW, scanners: true })).toContain("`run_scanners`");
     });
 });
+
+describe("what the agent knows", () => {
+    it("names the guideline files and asks for web checks only when set", () => {
+        expect(core.recipeInstructions(core.DEFAULT_REVIEW)).toBe("");
+        const text = core.recipeInstructions({ ...core.DEFAULT_REVIEW, guidelineFiles: ["AGENTS.md"], webSearch: true });
+        expect(text).toContain("`AGENTS.md`");
+        expect(text).toContain("web search");
+    });
+
+    it("grants linked repositories of the same owner as read access", () => {
+        expect(core.linkedRepoAccess("acme/app", [])).toBeNull();
+        expect(core.linkedRepoAccess("acme/app", ["shared", "ACME/design", "app", "other/x", "../etc", "Shared"])).toEqual({
+            mode: "explicit",
+            read: ["app", "Shared", "design"],
+            write: ["app"],
+            unavailable: ["other/x", "../etc"]
+        });
+    });
+});

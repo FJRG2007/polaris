@@ -554,7 +554,10 @@
         },
         "git": "Acceso a Git",
         "shell": "Shell",
-        "publicShell": "Este repositorio es público, así que cualquiera puede abrir una pull request que el agente leerá después. Un shell completo entrega a lo que ejecute las claves del proveedor de su entorno."
+        "publicShell": "Este repositorio es público, así que cualquiera puede abrir una pull request que el agente leerá después. Un shell completo entrega a lo que ejecute las claves del proveedor de su entorno.",
+        "learnings": "Lo que ha aprendido",
+        "learningsHint": "Notas que guardan las ejecuciones y leen al empezar la siguiente. Corrige o borra lo que esté mal.",
+        "learningsPlaceholder": "Nada aún. Aquí se anotan comandos, rarezas y correcciones."
     },
     "settingsFields": {
         "on": "Sí",
@@ -798,7 +801,8 @@
             "suggestLabels": "Sugerir etiquetas",
             "applyLabels": "Poner etiquetas",
             "suggestReviewers": "Sugerir revisores",
-            "scanners": "Escáneres"
+            "scanners": "Escáneres",
+            "webSearch": "Buscar en la web"
         },
         "tone": "Tono",
         "toneHint": "Cómo redactarla: idioma, longitud, voz.",
@@ -833,6 +837,12 @@
         "add": "Añadir",
         "removeEntry": "Quitar {name}",
         "incomplete": "Rellena ambos campos para guardarla.",
-        "count": "{count, plural, one {# entrada} other {# entradas}}"
+        "count": "{count, plural, one {# entrada} other {# entradas}}",
+        "knowledgeTitle": "Qué sabe el agente",
+        "knowledgeIntro": "Vale para toda ejecución en el repo, no solo revisiones.",
+        "guidelineFiles": "Archivos de guía",
+        "guidelineFilesHint": "Normas de la casa que lee primero, como globs.",
+        "linkedRepos": "Repos enlazados",
+        "linkedReposHint": "Otros repos de la misma cuenta que puede leer como contexto. Nunca los escribe."
     }
 }
