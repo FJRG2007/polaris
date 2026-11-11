@@ -819,7 +819,8 @@ main() {
         printf '\npolaris: ----------------------------------------------------------\n' >&2
         printf 'polaris: First run - open this link to create the administrator:\n' >&2
         printf 'polaris:   http://polaris.local/oauth/setup?token=%s\n' "$setup_token" >&2
-        printf 'polaris: (registration is otherwise invite-only)\n' >&2
+        printf 'polaris: The token is already in the link. Nothing else to edit or type.\n' >&2
+        printf "polaris: Lost it? Run 'polaris setup' to print it again.\n" >&2
         printf 'polaris: ----------------------------------------------------------\n\n' >&2
     fi
     log "check status with: polaris status"

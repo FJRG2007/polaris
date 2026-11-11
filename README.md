@@ -320,23 +320,43 @@ What Polaris replaces, on your own hardware and with one account:
 
 ## Install
 
-One command installs the dashboard, database, reverse proxy and host daemon,
-and generates the secrets:
+Three steps. You never open or edit a file, and you never type a token:
 
-```bash
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
+1. **Run one command** on the machine Polaris will live on. It installs
+   everything (dashboard, database, reverse proxy, host daemon), creates every
+   password and secret, and starts it.
 
-# Windows (PowerShell)
-irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.ps1 | iex
-```
+   ```bash
+   # macOS / Linux
+   curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
+
+   # Windows (PowerShell)
+   irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.ps1 | iex
+   ```
+
+2. **Open the link it prints at the end.** It looks like
+   `http://polaris.local/oauth/setup?token=...` and already contains the token.
+   Copy the whole line into the browser. If you reach this machine by its IP
+   address instead, keep everything from `/oauth/setup` on and change only the
+   start (for example `https://127.0.0.1/oauth/setup?token=...`). The
+   certificate is self-signed until a domain points here, so the browser warns
+   once.
+
+3. **Create the administrator** on that page. From then on everything is done
+   in the browser.
+
+Lost the link? Run `polaris setup` on the same machine and it prints it again.
 
 Linux is the recommended host - Ubuntu Server is what Polaris is run against.
 Windows works, but Docker there runs inside WSL and the host Polaris manages is
 that virtual machine rather than the machine itself; see
 [Requirements](#requirements).
 
-Prefer to do it by hand? Clone the repo and run Compose directly:
+<details>
+<summary>Only if you will not use the installer: running Compose by hand</summary>
+
+This path is for people who want to manage the files themselves. With the
+installer above, none of it is needed.
 
 ```bash
 git clone https://github.com/FJRG2007/polaris.git
@@ -348,8 +368,9 @@ docker compose --profile full up -d
 ```
 
 Then open `https://127.0.0.1/oauth/setup?token=` followed by the
-`POLARIS_SETUP_TOKEN` you put in `.env`, and create the administrator. The
-certificate is self-signed until a domain points here, so the browser warns once.
+`POLARIS_SETUP_TOKEN` you put in `.env`, and create the administrator.
+
+</details>
 
 To update, use the Update button in Settings.
 

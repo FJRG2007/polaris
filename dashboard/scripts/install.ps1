@@ -512,7 +512,8 @@ function Invoke-PolarisInstall {
             $token = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_SETUP_TOKEN=" } | Select-Object -First 1) -replace "^POLARIS_SETUP_TOKEN=", ""
             Write-Host "polaris: First run - open this link to create the administrator:" -ForegroundColor Yellow
             Write-Host "polaris:   $openUrl/oauth/setup?token=$token" -ForegroundColor Yellow
-            Write-Host "polaris: (registration is otherwise invite-only)" -ForegroundColor Yellow
+            Write-Host "polaris: The token is already in the link. Nothing else to edit or type." -ForegroundColor Yellow
+            Write-Host "polaris: Lost it? Run 'polaris setup' to print it again." -ForegroundColor Yellow
         }
         Write-Log "check status with: polaris status"
     }
