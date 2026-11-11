@@ -371,6 +371,13 @@ function builtInWords(webLocale: string): site.BuiltInWords {
 }
 
 const readmeEn = read(join(root, "README.md"));
+
+// The landing page leads with these two lines. A README edit that moves them
+// out of the parser's reach published an empty box, so the build stops instead.
+const install = site.parseInstallLines(readmeEn);
+if (!install.unix || !install.windows) {
+    throw new Error("README.md: the install lines were not found (see parseInstallLines)");
+}
 const readmeEs = read(join(root, "README.es.md"));
 const replacesEn = site.parseReplaces(readmeEn, /already pay/i, logos);
 const replacesEs = site.parseReplaces(readmeEs, /ya pagas/i, logos);
@@ -600,7 +607,7 @@ const showcaseEsLocal = withPhones(
 
 const data: site.SiteData = {
     repo,
-    install: site.parseInstallLines(readmeEn),
+    install,
     locales: {
         en: {
             apps: storeList("en-US", showcaseEn),
