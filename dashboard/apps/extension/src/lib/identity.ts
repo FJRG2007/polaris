@@ -12,6 +12,7 @@
  * without a browser.
  */
 
+import { PERSON_KEYS } from "@polaris/core/identity-person";
 import { onShelf, type ShelfOrganization } from "@/lib/shelf";
 import { autocompleteToken, type PageFields, type ProfilePart } from "@/lib/fields";
 import {
@@ -51,10 +52,9 @@ export interface OpenIdentity {
 
 /** Every field empty, to start from. */
 export function blankIdentity(): Record<keyof IdentityValues, string> {
-    return Object.fromEntries(IDENTITY_KEYS.map((key) => [key, ""])) as Record<
-        keyof IdentityValues,
-        string
-    >;
+    return Object.fromEntries(
+        [...IDENTITY_KEYS, ...PERSON_KEYS].map((key) => [key, ""])
+    ) as Record<keyof IdentityValues, string>;
 }
 
 /** The whole name an identity carries, in the order it is written. */

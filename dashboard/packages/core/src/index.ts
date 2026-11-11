@@ -143,6 +143,7 @@ export * from "./tasks.js";
 export * from "./vault.js";
 export * from "./vault-uris.js";
 export * from "./vault-items.js";
+export * from "./identity-person.js";
 export * from "./vault-cards.js";
 export * from "./schemas/storage.js";
 export * from "./schemas/deploy.js";

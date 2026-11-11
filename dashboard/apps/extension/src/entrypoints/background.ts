@@ -22,6 +22,7 @@ import { ACCOUNT_LOCALE, words } from "@/lib/locale-store";
 import { offerFor, type CaptureOffer } from "@/lib/capture";
 import { generatePassword } from "@polaris/core/password-generator";
 import { EMAIL_FIELD, hostOf, readUriMatch, type UriMatch } from "@polaris/core";
+import { PERSON_FIELDS, readPerson } from "@polaris/core/identity-person";
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
 import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
@@ -1414,6 +1415,9 @@ async function readLogin(cipher: Record<string, unknown>): Promise<Login | null>
     };
 }
 
+/** The custom fields an identity's personal details are kept in. */
+const PERSON_FIELD_NAMES = new Set<string>(Object.values(PERSON_FIELDS));
+
 /** The identity type, as the wire numbers it. */
 const CIPHER_IDENTITY = 4;
 
@@ -1431,6 +1435,14 @@ async function readIdentity(
         typeof value === "string" && value !== "" ? ((await decrypt(value, key)) ?? "") : "";
     const values = identity.blankIdentity();
     for (const field of identity.IDENTITY_KEYS) values[field] = (await say(held[field])).trim();
+    // The personal details live in custom fields with agreed names.
+    const custom: Array<{ name: string; value: string }> = [];
+    for (const field of Array.isArray(cipher["fields"]) ? (cipher["fields"] as unknown[]) : []) {
+        const one = (field ?? {}) as Record<string, unknown>;
+        const name = await say(one["name"]);
+        if (PERSON_FIELD_NAMES.has(name)) custom.push({ name, value: await say(one["value"]) });
+    }
+    Object.assign(values, readPerson(custom));
     return {
         id,
         name: (await say(cipher["name"])) || "Untitled",

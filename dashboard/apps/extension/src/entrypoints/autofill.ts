@@ -47,9 +47,18 @@ import {
     type GeneratorOptions
 } from "@/lib/generator";
 import {
+    CONFIRM_WORDS,
+    dateForBox,
+    datePartForBox,
+    personSlot,
+    pickDatePart,
+    pickStatus
+} from "@/lib/person";
+import {
     autocompleteToken,
     emptyProfile,
     placePart,
+    profilePart,
     PROFILE_PARTS,
     readForm,
     type PageFields,
@@ -671,6 +680,85 @@ async function start(): Promise<void> {
         for (const slot of NAME_SLOTS) into(at(fields[slot]), slot);
         for (const part of PROFILE_PARTS) into(at(fields.profile[part]), part);
         await fillPlaces(values, field, replace, locales);
+        fillPerson(values, field, locales);
+    };
+
+    /**
+     * The personal details - identity document, date of birth whole or in
+     * parts, country of birth, nationality, marital status - and the boxes that
+     * ask for an email or phone a second time.
+     *
+     * Read at fill time from the same place `fillPlaces` looks, because most of
+     * these are dropdowns and none of them carries a menu of its own. Only
+     * boxes still empty, and dropdowns still on their prompt, are touched:
+     * these are never what the menu was opened on, so nothing typed by hand is
+     * replaced.
+     */
+    const fillPerson = (values: IdentityValues, field: HTMLInputElement, locales: readonly string[]): void => {
+        const scope = field.form ?? fillScope(field) ?? field.ownerDocument;
+        const pool = field.form
+            ? [...field.form.elements]
+            : [...scope.querySelectorAll("input, select")];
+        const lang = field.ownerDocument.documentElement.lang || navigator.language || "";
+        const done = new Set<string>();
+        for (const element of pool) {
+            if (element.nodeName === "SELECT") {
+                const select = element as HTMLSelectElement;
+                const slot = personSlot(describeSelect(select), groupWords(select));
+                if (slot === null || done.has(slot)) continue;
+                done.add(slot);
+                const chosen = select.options[select.selectedIndex];
+                if (chosen && !isPlaceholder(optionOf(chosen))) continue;
+                const options = optionsOf(select);
+                const index =
+                    slot === "maritalStatus"
+                        ? pickStatus(options, values.maritalStatus)
+                        : slot === "birthCountry" || slot === "nationality"
+                          ? values[slot]
+                              ? pickCountry(options, values[slot], locales)
+                              : -1
+                          : slot === "birthDay" || slot === "birthMonth" || slot === "birthYear"
+                            ? pickDatePart(options, values.birthDate, slot, locales)
+                            : -1;
+                if (index !== -1 && index !== select.selectedIndex) putSelect(select, index);
+                continue;
+            }
+            if (!isInput(element) || element === field) continue;
+            const box = element;
+            const facts = describeInput(box);
+            if (!PERSON_BOX_TYPES.has(facts.type) || box.value.trim() !== "") continue;
+            const part = profilePart(facts);
+            if ((part === "email" || part === "phone") && CONFIRM_WORDS.test(facts.words)) {
+                if (values[part]) {
+                    offeredOn.add(box);
+                    put(box, values[part]);
+                }
+                continue;
+            }
+            const slot = personSlot(facts, groupWords(box));
+            if (slot === null || done.has(slot)) continue;
+            done.add(slot);
+            const value =
+                slot === "nationalId"
+                    ? values.nationalId
+                    : slot === "birthDate"
+                      ? dateForBox(values.birthDate, {
+                            type: facts.type,
+                            hint: `${box.placeholder} ${facts.words}`,
+                            lang
+                        })
+                      : slot === "birthDay" || slot === "birthMonth" || slot === "birthYear"
+                        ? datePartForBox(values.birthDate, slot, facts.maxLength ?? null)
+                        : slot === "birthCountry" || slot === "nationality"
+                          ? countryInput(values[slot], locales, {
+                                token: autocompleteToken(facts.autocomplete),
+                                maxLength: facts.maxLength ?? null
+                            })
+                          : "";
+            if (value === "") continue;
+            offeredOn.add(box);
+            put(box, value);
+        }
     };
 
     /**
@@ -1140,6 +1228,39 @@ function put(field: HTMLInputElement, value: string): void {
     descriptor?.set?.call(field, value);
     field.dispatchEvent(new Event("input", { bubbles: true }));
     field.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+/** The boxes a personal detail can be typed into. */
+const PERSON_BOX_TYPES = new Set(["text", "date", "tel", "number", "search", "email"]);
+
+/**
+ * The words of the group a box or dropdown sits in: its fieldset's legend, a
+ * labelled group around it, and the text of the nearest container that is
+ * still small enough to be about it. "Día" says nothing on its own; the group
+ * around it says "Fecha de nacimiento".
+ */
+function groupWords(element: Element): string {
+    const parts: string[] = [];
+    const legend = element.closest("fieldset")?.querySelector("legend")?.textContent ?? "";
+    if (legend.trim()) parts.push(legend);
+    const group = element.closest("[role=group], [role=radiogroup]");
+    if (group) {
+        parts.push(group.getAttribute("aria-label") ?? "");
+        const root = element.getRootNode() as Document | ShadowRoot;
+        for (const id of (group.getAttribute("aria-labelledby") ?? "").split(/\s+/).filter(Boolean)) {
+            parts.push(root.getElementById?.(id)?.textContent ?? "");
+        }
+    }
+    let up = element.parentElement;
+    for (let depth = 0; up && depth < 3; depth += 1, up = up.parentElement) {
+        const text = up.textContent ?? "";
+        if (text.length > 400) break;
+        if (depth === 2 || up.querySelectorAll("input, select").length > 1) {
+            parts.push(text);
+            break;
+        }
+    }
+    return parts.join(" ").replace(/\s+/g, " ").toLowerCase();
 }
 
 /** One `<option>`, as the place rules read it. */

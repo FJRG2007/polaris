@@ -1,6 +1,6 @@
 {
     "name": "@polaris/extension",
-    "version": "0.1.139",
+    "version": "0.1.140",
     "private": true,
     "type": "module",
     "description": "The Polaris browser extension for Chrome and Firefox: Polaris in the toolbar, starting with your logins and autofill.",

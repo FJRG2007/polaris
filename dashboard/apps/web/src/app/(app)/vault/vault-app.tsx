@@ -1297,6 +1297,28 @@ export function VaultApp() {
                                   })
                                 : null}
 
+                            {current.type === core.CIPHER_IDENTITY
+                                ? (() => {
+                                      const person = core.readPerson(current.fields);
+                                      const shown: Array<[core.PersonKey, string]> = core.PERSON_KEYS.map(
+                                          (key): [core.PersonKey, string] => [key, personText(key, person[key], locale, t)]
+                                      ).filter(([, text]) => text !== "");
+                                      return (
+                                          <Section title={t("identity.groups.person")} when={shown.length > 0}>
+                                              {shown.map(([key, text]) => (
+                                                  <Row
+                                                      key={key}
+                                                      label={t(`identity.person.${key}`)}
+                                                      value={text}
+                                                      copied={copied === `person-${key}`}
+                                                      onCopy={() => copy(`person-${key}`, text)}
+                                                  />
+                                              ))}
+                                          </Section>
+                                      );
+                                  })()
+                                : null}
+
                             {current.type === core.CIPHER_SSH_KEY ? (
                                 <Section title={t("app.sections.key")} when>
                                     <Row
@@ -1527,6 +1549,32 @@ function Section({
 }
 
 /** One labelled value, with the affordances that value deserves. */
+/** One personal detail as a reader wants it: a date in their own format, a
+ *  country by its name, a status in words. Text another client stored in some
+ *  other shape is shown as it was. */
+function personText(
+    key: core.PersonKey,
+    stored: string,
+    locale: string,
+    t: ReturnType<typeof useTranslations<"vault">>
+): string {
+    if (!stored) return "";
+    if (key === "birthDate") {
+        const parts = core.dateParts(stored);
+        if (!parts) return stored;
+        return new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(
+            new Date(Date.UTC(parts.year, parts.month - 1, parts.day))
+        );
+    }
+    if (key === "birthCountry" || key === "nationality") return countryText(stored, locale);
+    if (key === "maritalStatus") {
+        return (core.MARITAL_STATUSES as readonly string[]).includes(stored)
+            ? t(`identity.person.statuses.${stored as core.MaritalStatus}`)
+            : stored;
+    }
+    return stored;
+}
+
 function Row({
     label,
     value,

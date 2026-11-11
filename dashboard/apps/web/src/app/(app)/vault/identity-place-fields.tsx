@@ -15,10 +15,13 @@ import { countryCodeOf, countryLabel, regionsOf, type Region } from "./identity-
  *  and code as well. A stored value that names no country stays, as typed. */
 export function CountryField({
     value,
-    onChange
+    onChange,
+    label
 }: {
     value: string;
     onChange: (code: string) => void;
+    /** What the box is called to a screen reader, where it is not the address's country. */
+    label?: string;
 }) {
     const t = useTranslations("vault");
     const locale = useLocale();
@@ -40,7 +43,7 @@ export function CountryField({
             searchPlaceholder={t("identity.searchCountry")}
             emptyText={t("identity.noCountry")}
             placeholder={t("identity.pickCountry")}
-            aria-label={t("identity.fields.country")}
+            aria-label={label ?? t("identity.fields.country")}
         />
     );
 }

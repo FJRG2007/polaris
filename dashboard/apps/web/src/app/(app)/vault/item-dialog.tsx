@@ -51,6 +51,7 @@ import {
 } from "./vault-model";
 import { IDENTITY_GROUPS, identityHintKey, identityLabelKey } from "./identity-fields";
 import { CountryField, RegionField } from "./identity-place-fields";
+import { IdentityPersonFields } from "./identity-person-fields";
 import { countryCodeOf } from "./identity-places";
 import { cipherTypeLabel, uriMatchLabel } from "./vault-labels";
 import { accountIdentityAction } from "./vault-actions";
@@ -116,7 +117,9 @@ function openedAs(item: VaultItem) {
         bank: core.fieldValue(item.fields, core.BANK_FIELD),
         codes: core.fieldValue(item.fields, core.RECOVERY_CODES_FIELD),
         email: core.fieldValue(item.fields, core.EMAIL_FIELD),
-        apiKey: core.readApiKey(item.fields)
+        apiKey: core.readApiKey(item.fields),
+        // An identity's personal details, kept in custom fields - see `PERSON_FIELDS`.
+        person: core.readPerson(item.fields)
     };
 }
 
@@ -172,6 +175,8 @@ export function ItemDialog({
     const [email, setEmail] = useState("");
     /** An API key's parts, kept in custom fields - see `API_KEY_FIELDS`. */
     const [apiKey, setApiKey] = useState<core.ApiKeyParts>({ key: "", secret: "", endpoint: "" });
+    /** An identity's personal details, kept in custom fields - see `PERSON_FIELDS`. */
+    const [person, setPerson] = useState<core.PersonValues>(() => core.readPerson([]));
     const [newFolder, setNewFolder] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -205,13 +210,14 @@ export function ItemDialog({
         setCodes(opened.codes);
         setEmail(opened.email);
         setApiKey(opened.apiKey);
+        setPerson(opened.person);
     }, [item]);
     // An item that exists, edited back to what it holds, has nothing to save.
     // Compared exactly: a space in a password is part of the password.
     const unchanged =
         item !== null &&
         Boolean(item.id) &&
-        !isDirty(openedAs(item), { draft, expiry, bank, codes, email, apiKey }, (value) =>
+        !isDirty(openedAs(item), { draft, expiry, bank, codes, email, apiKey, person }, (value) =>
             JSON.stringify(value)
         );
 
@@ -366,6 +372,7 @@ export function ItemDialog({
         if (from.type === core.CIPHER_CARD) {
             return core.withChangedField(from.fields, core.BANK_FIELD, bank, core.FIELD_TEXT);
         }
+        if (from.type === core.CIPHER_IDENTITY) return core.writePerson(from.fields, core.normalizePerson(person));
         if (from.type !== core.CIPHER_LOGIN) return from.fields;
         // Hidden, because a recovery code is a password and belongs behind the
         // same press as one.
@@ -1079,6 +1086,7 @@ export function ItemDialog({
                                     </div>
                                 </fieldset>
                             ))}
+                            <IdentityPersonFields value={person} onChange={setPerson} />
                         </div>
                     ) : null}
 

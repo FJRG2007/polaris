@@ -64,6 +64,13 @@ export interface IdentityValues {
     readonly state: string;
     readonly postalCode: string;
     readonly country: string;
+    /** The personal details kept beside the identity (`PERSON_FIELDS`): a
+     *  document number, a `YYYY-MM-DD` date, two country codes and a status. */
+    readonly nationalId: string;
+    readonly birthDate: string;
+    readonly birthCountry: string;
+    readonly nationality: string;
+    readonly maritalStatus: string;
 }
 
 /** One decrypted login, reduced to what a list needs to draw it. */

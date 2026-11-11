@@ -186,7 +186,8 @@
             "name": "Name",
             "contact": "Getting hold of them",
             "address": "Address",
-            "numbers": "Numbers they were given"
+            "numbers": "Numbers they were given",
+            "person": "Personal details"
         },
         "fields": {
             "title": "Title",
@@ -222,7 +223,24 @@
         "searchRegion": "Search regions",
         "noRegion": "Nothing by that name",
         "pickRegion": "Choose one",
-        "useTyped": "Use \"{typed}\""
+        "useTyped": "Use \"{typed}\"",
+        "person": {
+            "nationalId": "Identity document",
+            "nationalIdHint": "DNI, NIE, national ID card",
+            "birthDate": "Date of birth",
+            "birthCountry": "Country of birth",
+            "nationality": "Nationality",
+            "maritalStatus": "Marital status",
+            "statusNone": "Not set",
+            "statuses": {
+                "single": "Single",
+                "married": "Married",
+                "partnership": "Civil partnership",
+                "divorced": "Divorced",
+                "separated": "Separated",
+                "widowed": "Widowed"
+            }
+        }
     },
     "item": {
         "expiry": {

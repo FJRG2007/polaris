@@ -240,6 +240,11 @@ const PROFILE_WORDS: readonly (readonly [ProfilePart, RegExp])[] = [
     ["username", /user.?name|usuario|nick|handle|\balias\b/i]
 ];
 
+/** A country or place that is somebody's birth or nationality, not where they
+ *  live: those are personal details (`lib/person.ts`), never the address. */
+const NOT_THE_ADDRESS =
+    /nacimiento|birth|naissance|geburt|nascita|nascimento|nacionalidad|nationality|citizenship|nationalit|staatsangeh|cittadinanza/i;
+
 /** No box for any part, which is a page before anything has been read. */
 export function emptyProfile(): Record<ProfilePart, number | null> {
     return Object.fromEntries(PROFILE_PARTS.map((part) => [part, null])) as Record<
@@ -267,7 +272,7 @@ export function placePart(field: FieldFacts | undefined): PlacePart | null {
         const part = PROFILE_TOKENS[token];
         return part === "country" || part === "state" ? part : null;
     }
-    if (NOT_A_LOGIN.test(field.words)) return null;
+    if (NOT_A_LOGIN.test(field.words) || NOT_THE_ADDRESS.test(field.words)) return null;
     for (const [part, words] of PROFILE_WORDS) {
         if (part !== "country" && part !== "state") continue;
         if (words.test(field.words)) return part;
@@ -283,6 +288,7 @@ export function profilePart(field: FieldFacts | undefined): ProfilePart | null {
     if (token !== "" && token !== "off") return PROFILE_TOKENS[token] ?? null;
     if (NOT_A_LOGIN.test(field.words)) return null;
     if (field.type === "email") return "email";
+    if (NOT_THE_ADDRESS.test(field.words)) return null;
     if (field.type === "tel") return "phone";
     for (const [part, words] of PROFILE_WORDS) if (words.test(field.words)) return part;
     return null;
@@ -482,7 +488,13 @@ function nameKind(field: FieldFacts | undefined): NameKind | null {
     if (token === "name") return "full";
     if (token === "given-name") return "given";
     if (token === "additional-name") return "middle";
-    if (token === "family-name") return "family";
+    if (token === "family-name") {
+        // Spanish forms often mark both surname boxes `family-name`; the label
+        // says which half each one is.
+        if (FIRST_SURNAME_WORDS.test(field.words)) return "firstSurname";
+        if (SECOND_SURNAME_WORDS.test(field.words)) return "secondSurname";
+        return "family";
+    }
     if (token !== "" && token !== "off") return null;
     if (NOT_A_LOGIN.test(field.words) || /user|login|company|empresa/i.test(field.words))
         return null;

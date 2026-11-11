@@ -186,7 +186,8 @@
             "name": "Nombre",
             "contact": "Cómo contactar",
             "address": "Dirección",
-            "numbers": "Documentos"
+            "numbers": "Documentos",
+            "person": "Datos personales"
         },
         "fields": {
             "title": "Título",
@@ -222,7 +223,24 @@
         "searchRegion": "Buscar región",
         "noRegion": "Nada con ese nombre",
         "pickRegion": "Elige una",
-        "useTyped": "Usar \"{typed}\""
+        "useTyped": "Usar \"{typed}\"",
+        "person": {
+            "nationalId": "Documento",
+            "nationalIdHint": "DNI, NIE, documento nacional",
+            "birthDate": "Nacimiento",
+            "birthCountry": "País nacimiento",
+            "nationality": "Nacionalidad",
+            "maritalStatus": "Estado civil",
+            "statusNone": "Ninguno",
+            "statuses": {
+                "single": "Soltero/a",
+                "married": "Casado/a",
+                "partnership": "Pareja de hecho",
+                "divorced": "Divorciado",
+                "separated": "Separado/a",
+                "widowed": "Viudo/a"
+            }
+        }
     },
     "item": {
         "expiry": {

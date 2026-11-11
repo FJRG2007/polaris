@@ -25,6 +25,10 @@
             "types": "./dist/faces.d.ts",
             "import": "./dist/faces.js"
         },
+        "./identity-person": {
+            "types": "./dist/identity-person.d.ts",
+            "import": "./dist/identity-person.js"
+        },
         "./password-generator": {
             "types": "./dist/password-generator.d.ts",
             "import": "./dist/password-generator.js"
@@ -69,7 +73,7 @@
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "scripts": {
-        "build": "tsup src/index.ts src/tokens.ts src/link-password.ts src/password-generator.ts src/faces.ts src/waf.ts src/sheets/index.ts src/catalog-search.ts src/search-text.ts src/extension-install.ts src/browser-agent.ts src/variable-groups.ts src/instance-fallback.ts src/geo.ts src/tv-compat/index.ts --format esm --dts --clean",
+        "build": "tsup src/index.ts src/tokens.ts src/link-password.ts src/password-generator.ts src/identity-person.ts src/faces.ts src/waf.ts src/sheets/index.ts src/catalog-search.ts src/search-text.ts src/extension-install.ts src/browser-agent.ts src/variable-groups.ts src/instance-fallback.ts src/geo.ts src/tv-compat/index.ts --format esm --dts --clean",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },
