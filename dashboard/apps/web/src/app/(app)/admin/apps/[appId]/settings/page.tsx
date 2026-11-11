@@ -61,7 +61,9 @@ export default async function PolarisAppSettingsPage({
                         app.id === "vpn" ? (
                             <VpnAdminSettings />
                         ) : (
-                            await renderAppSettings(app.id, searchParams)
+                            <Suspense fallback={<Skeleton className="h-64 w-full rounded-lg" />}>
+                                <AppOwnSettings appId={app.id} searchParams={searchParams} />
+                            </Suspense>
                         )
                     }
                     revision={Date.now()}
@@ -69,6 +71,17 @@ export default async function PolarisAppSettingsPage({
             </div>
         </Messages>
     );
+}
+
+/** The settings page an installable app draws among its own routes, read after the shell paints. */
+async function AppOwnSettings({
+    appId,
+    searchParams
+}: {
+    appId: string;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+    return renderAppSettings(appId, searchParams);
 }
 
 async function BuiltInSettings({ appId }: { appId: string }) {
