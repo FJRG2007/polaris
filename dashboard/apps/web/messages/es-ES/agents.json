@@ -758,6 +758,17 @@
         "ignoreTitleKeywordsPlaceholder": "WIP, no fusionar",
         "ignoreAuthors": "Omitir autores",
         "ignoreAuthorsHint": "Usuarios de GitHub, normalmente bots, cuyas pull requests nunca se revisan solas.",
-        "ignoreAuthorsPlaceholder": "dependabot[bot]"
+        "ignoreAuthorsPlaceholder": "dependabot[bot]",
+        "askingTitle": "Quién pide",
+        "askingIntro": "Menciones y respuestas siempre llegan a la app salvo que esto diga otra cosa.",
+        "mentionsFromAnyone": "Cualquiera en repos públicos",
+        "mentionsFromAnyoneHint": "Desactivado responde solo a quien puede escribir en el repositorio, para que un desconocido no gaste tus créditos.",
+        "autoReply": "Respuestas en sus hilos",
+        "autoReplyHint": "Contesta a una respuesta a uno de sus comentarios de revisión sin que la nombren.",
+        "mentionsPerHour": "Menciones por hora",
+        "mentionsPerHourHint": "Máximo de menciones que un repositorio responde en una hora. 0 es sin límite.",
+        "ignoreMentionsFrom": "No responder",
+        "ignoreMentionsFromHint": "Usuarios de GitHub cuyas menciones se ignoran.",
+        "ignoreMentionsFromPlaceholder": "some-bot[bot]"
     }
 }

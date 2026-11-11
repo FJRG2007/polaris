@@ -34,6 +34,14 @@ vi.mock("@/lib/agents/agent-repo-service", () => ({
     agentRepoByFullName: mocks.agentRepoByFullName
 }));
 vi.mock("@/lib/agents/issue-sessions", () => ({ startIssueSession: mocks.startIssueSession }));
+vi.mock("@/lib/agents/review-gate", async () => {
+    const core = await import("@polaris/core");
+    return {
+        reviewSettingsFor: async () => core.DEFAULT_REVIEW,
+        reviewedPushes: async () => 0,
+        mentionsThisHour: async () => 0
+    };
+});
 
 import { ALWAYS_ON_TRIGGER } from "@polaris/core";
 import { handleAgentWebhook } from "@/lib/agents/agent-webhook";

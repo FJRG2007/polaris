@@ -16,7 +16,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const INHERIT = "__inherit__";
 
-type ListKey = "baseBranches" | "labels" | "ignoreTitleKeywords" | "ignoreAuthors";
+type ListKey = "baseBranches" | "labels" | "ignoreTitleKeywords" | "ignoreAuthors" | "ignoreMentionsFrom";
 
 export function ReviewFields({
     value,
@@ -35,7 +35,7 @@ export function ReviewFields({
     const listSummary = (entries: readonly string[]) =>
         entries.length === 0 ? t("review.none") : entries.join(", ");
 
-    const bool = (key: "drafts" | "incremental") => (
+    const bool = (key: "drafts" | "incremental" | "mentionsFromAnyone" | "autoReply") => (
         <Select
             value={value[key] === null ? INHERIT : String(value[key])}
             onValueChange={(next) => set(key, next === INHERIT ? null : next === "true")}
@@ -94,9 +94,10 @@ export function ReviewFields({
                     {bool("incremental")}
                 </Field>
                 <Field label={t("review.pauseAfter")} hint={t("review.pauseAfterHint")}>
-                    <PauseAfter
+                    <CountField
                         value={value.pauseAfter}
                         inherited={inherited.pauseAfter}
+                        max={core.REVIEW_PAUSE_MAX}
                         onChange={(next) => set("pauseAfter", next)}
                     />
                 </Field>
@@ -138,19 +139,45 @@ export function ReviewFields({
             <Field label={t("review.ignoreAuthors")} hint={t("review.ignoreAuthorsHint")}>
                 {list("ignoreAuthors", t("review.ignoreAuthorsPlaceholder"))}
             </Field>
+
+            <div className="min-w-0 border-t border-border pt-4">
+                <p className="text-sm font-medium">{t("review.askingTitle")}</p>
+                <p className="text-xs text-muted-foreground">{t("review.askingIntro")}</p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label={t("review.mentionsFromAnyone")} hint={t("review.mentionsFromAnyoneHint")}>
+                    {bool("mentionsFromAnyone")}
+                </Field>
+                <Field label={t("review.autoReply")} hint={t("review.autoReplyHint")}>
+                    {bool("autoReply")}
+                </Field>
+                <Field label={t("review.mentionsPerHour")} hint={t("review.mentionsPerHourHint")}>
+                    <CountField
+                        value={value.mentionsPerHour}
+                        inherited={inherited.mentionsPerHour}
+                        max={core.MENTIONS_PER_HOUR_MAX}
+                        onChange={(next) => set("mentionsPerHour", next)}
+                    />
+                </Field>
+            </div>
+            <Field label={t("review.ignoreMentionsFrom")} hint={t("review.ignoreMentionsFromHint")}>
+                {list("ignoreMentionsFrom", t("review.ignoreMentionsFromPlaceholder"))}
+            </Field>
         </div>
     );
 }
 
-/** A number of pushes, or inherit. Kept as text while typed so clearing the
+/** A count, or inherit. Kept as text while typed so clearing the
  *  field to type a new number does not snap it back. */
-function PauseAfter({
+function CountField({
     value,
     inherited,
+    max,
     onChange
 }: {
     value: number | null;
     inherited: number;
+    max: number;
     onChange: (next: number | null) => void;
 }) {
     const t = useTranslations("agents");
@@ -159,14 +186,14 @@ function PauseAfter({
             type="number"
             inputMode="numeric"
             min={0}
-            max={core.REVIEW_PAUSE_MAX}
+            max={max}
             value={value === null ? "" : String(value)}
             placeholder={t("settingsFields.inherit", { value: String(inherited) })}
             onChange={(event) => {
                 const raw = event.target.value.trim();
                 if (raw === "") return onChange(null);
                 const number = Math.trunc(Number(raw));
-                if (Number.isFinite(number)) onChange(Math.min(core.REVIEW_PAUSE_MAX, Math.max(0, number)));
+                if (Number.isFinite(number)) onChange(Math.min(max, Math.max(0, number)));
             }}
         />
     );

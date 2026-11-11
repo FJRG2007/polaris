@@ -20,7 +20,8 @@ const BASE: Incident = {
     fromFork: false,
     body: "Propuesta de agregar una demo de calculadora",
     pr: null,
-    readied: false
+    readied: false,
+    replyTo: null
 };
 
 suite("describe", () => {

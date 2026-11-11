@@ -124,3 +124,26 @@ describe("reviewSkip", () => {
         expect(core.reviewSkip(settings({ labels: ["!skip-review"] }), pr())).toBeNull();
     });
 });
+
+describe("mentionRefusal", () => {
+    const mention = { actor: "eve", publicRepo: true, canWrite: false, answeredThisHour: 0 };
+
+    it("refuses an ignored login before anything else", () => {
+        expect(core.mentionRefusal(settings({ ignoreMentionsFrom: ["Eve"] }), { ...mention, canWrite: true })).toBe(
+            "ignored"
+        );
+    });
+
+    it("keeps strangers out of public repositories unless allowed", () => {
+        expect(core.mentionRefusal(settings(), mention)).toBe("stranger");
+        expect(core.mentionRefusal(settings(), { ...mention, canWrite: true })).toBeNull();
+        expect(core.mentionRefusal(settings({ mentionsFromAnyone: true }), mention)).toBeNull();
+        expect(core.mentionRefusal(settings(), { ...mention, publicRepo: false, canWrite: null })).toBeNull();
+    });
+
+    it("stops at the hourly limit, and zero is none", () => {
+        const many = { ...mention, canWrite: true, answeredThisHour: 50 };
+        expect(core.mentionRefusal(settings({ mentionsPerHour: 50 }), many)).toBe("limit");
+        expect(core.mentionRefusal(settings(), many)).toBeNull();
+    });
+});

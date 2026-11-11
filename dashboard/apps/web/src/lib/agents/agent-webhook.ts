@@ -20,7 +20,7 @@ import { considerFallback } from "@/lib/agents/agent-fallback";
 import { githubAppInstallationToken } from "@/lib/github-service";
 import { policyForRepo } from "@/lib/agents/agent-defaults-service";
 import { agentRepoByFullName } from "@/lib/agents/agent-repo-service";
-import { reviewedPushes, reviewSettingsFor } from "@/lib/agents/review-gate";
+import { mentionsThisHour, reviewedPushes, reviewSettingsFor } from "@/lib/agents/review-gate";
 import { startIssueSession } from "@/lib/agents/issue-sessions";
 import { finishAgentRun, sweepStaleRuns } from "@/lib/agents/agent-run-service";
 import {
@@ -29,6 +29,7 @@ import {
     ALWAYS_ON_TRIGGER,
     policyAllowsTrigger,
     policyAllowsVisibility,
+    mentionRefusal,
     reviewSkip,
     type AgentTrigger,
     type ReviewCandidate
@@ -55,6 +56,10 @@ export interface Incident {
     pr: ReviewCandidate | null;
     /** A draft pull request was just marked ready for review. */
     readied: boolean;
+    /** The review comment this one answers, when it is a reply in a review
+     *  thread that does not name the app. Answered only if that comment is the
+     *  app's own and replies are on. */
+    replyTo: number | null;
 }
 
 /** Everything read out of a payload, all optional: it is untrusted input and a
@@ -70,7 +75,7 @@ interface Payload {
         labels?: Array<{ name?: string }>;
         pull_request?: unknown;
     };
-    comment?: { body?: string };
+    comment?: { body?: string; in_reply_to_id?: number };
     review?: { body?: string; state?: string };
     requested_reviewer?: { login?: string };
     pull_request?: {
@@ -119,7 +124,17 @@ function classify(event: string, payload: Payload, appHandle: string): Incident 
               labels
           }
         : null;
-    const base = { issueNumber, prNumber, actor, labels, branch, fromFork, pr, readied: false };
+    const base = {
+        issueNumber,
+        prNumber,
+        actor,
+        labels,
+        branch,
+        fromFork,
+        pr,
+        readied: false,
+        replyTo: null
+    };
 
     // A comment or a review body is newly authored by definition: the event IS
     // somebody writing it. An issue or pull request body is not - it stays on the
@@ -135,6 +150,12 @@ function classify(event: string, payload: Payload, appHandle: string): Incident 
         .filter((text): text is string => typeof text === "string")
         .find((text) => mentions(text, appHandle));
     if (mentionText) return { ...base, trigger: ALWAYS_ON_TRIGGER, body: mentionText };
+
+    // A reply in a review thread, without the app's name. Whether the thread is
+    // the app's own needs GitHub, so it is settled by the handler.
+    const replyTo = payload.comment?.in_reply_to_id;
+    if (event === "pull_request_review_comment" && payload.action === "created" && typeof replyTo === "number")
+        return { ...base, trigger: ALWAYS_ON_TRIGGER, body: payload.comment?.body ?? "", replyTo };
 
     switch (event) {
         case "issues":
@@ -395,7 +416,7 @@ export async function handleAgentWebhook(params: {
     // who can already write to the repository. On a private one, everybody who
     // can comment already has that access.
     if (incident.trigger === ALWAYS_ON_TRIGGER) {
-        if (!repo.isPrivate && !(await canWriteToRepo(repoFullName, incident.actor))) return [];
+        if (!(await mentionAnswered(repo, incident, payload, params.appHandle))) return [];
         // An automation that answers mentions answers this one instead of
         // the default run, as a mention rule aimed at a session used to.
         if (await announce()) return [];
@@ -489,6 +510,63 @@ async function reviewWanted(
         if ((await reviewedPushes(repo.id, incident.prNumber)) >= settings.pauseAfter) return false;
     }
     return true;
+}
+
+/**
+ * Whether a mention - or a reply in one of the app's own review threads - is
+ * answered: not from somebody on the ignore list, from a person who can write
+ * to a public repository unless strangers are allowed, and under the hourly
+ * limit. A reply in a thread is answered only when replies are on and the
+ * comment it answers is the app's.
+ */
+async function mentionAnswered(
+    repo: { id: string; ownerId: string; repoFullName: string; review: string | null; isPrivate: boolean },
+    incident: Incident,
+    payload: Payload,
+    appHandle: string
+): Promise<boolean> {
+    const settings = await reviewSettingsFor(repo, {
+        defaultBranch: payload.repository?.default_branch ?? null,
+        head: payload.pull_request?.head?.sha ?? null
+    });
+    if (incident.replyTo !== null) {
+        if (!settings.autoReply) return false;
+        if (!(await repliesToApp(repo.repoFullName, incident.replyTo, appHandle))) return false;
+    }
+    const base = { actor: incident.actor, publicRepo: !repo.isPrivate, canWrite: null, answeredThisHour: 0 };
+    // The cheap refusal first, so an ignored login never costs a GitHub call.
+    if (mentionRefusal(settings, { ...base, publicRepo: false }) === "ignored") return false;
+    const canWrite =
+        base.publicRepo && !settings.mentionsFromAnyone ? await canWriteToRepo(repo.repoFullName, incident.actor) : null;
+    const answeredThisHour = settings.mentionsPerHour > 0 ? await mentionsThisHour(repo.id) : 0;
+    return mentionRefusal(settings, { ...base, canWrite, answeredThisHour }) === null;
+}
+
+/** Whether review comment `id` was written by the app. A failure answers no. */
+async function repliesToApp(repoFullName: string, id: number, appHandle: string): Promise<boolean> {
+    if (!appHandle) return false;
+    const [owner, repo] = repoFullName.split("/");
+    const token = await githubAppInstallationToken(owner).catch(() => null);
+    if (!token) return false;
+    try {
+        const response = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/pulls/comments/${encodeURIComponent(String(id))}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: "application/vnd.github+json",
+                    "User-Agent": "polaris",
+                    "X-GitHub-Api-Version": "2022-11-28"
+                },
+                cache: "no-store"
+            }
+        );
+        if (!response.ok) return false;
+        const body = (await response.json()) as { user?: { login?: string; type?: string } };
+        return body.user?.type === "Bot" && (body.user.login ?? "").startsWith(appHandle);
+    } catch {
+        return false;
+    }
 }
 
 /**

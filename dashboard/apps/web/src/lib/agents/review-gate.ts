@@ -75,3 +75,13 @@ export async function reviewSettingsFor(
 export async function reviewedPushes(repoId: string, prNumber: number): Promise<number> {
     return prisma.agentRun.count({ where: { repoId, prNumber, trigger: "pr.updated" } });
 }
+
+/**
+ * How many mentions this repository answered with a run in the last hour, for
+ * the hourly limit. A mention answered with a session is not counted: a
+ * session is somebody's to steer, and the session limits already bound it.
+ */
+export async function mentionsThisHour(repoId: string): Promise<number> {
+    const since = new Date(Date.now() - 60 * 60 * 1000);
+    return prisma.agentRun.count({ where: { repoId, trigger: "mention", createdAt: { gte: since } } });
+}

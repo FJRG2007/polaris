@@ -758,6 +758,17 @@
         "ignoreTitleKeywordsPlaceholder": "WIP, do not merge",
         "ignoreAuthors": "Skip authors",
         "ignoreAuthorsHint": "GitHub logins, usually bots, whose pull requests are never reviewed on their own.",
-        "ignoreAuthorsPlaceholder": "dependabot[bot]"
+        "ignoreAuthorsPlaceholder": "dependabot[bot]",
+        "askingTitle": "Who can ask",
+        "askingIntro": "Mentions and replies always reach the app unless these say otherwise.",
+        "mentionsFromAnyone": "Anyone on public repositories",
+        "mentionsFromAnyoneHint": "Off answers only people who can write to the repository, so a stranger cannot spend your credits.",
+        "autoReply": "Replies in its threads",
+        "autoReplyHint": "Answer a reply to one of its own review comments without being named.",
+        "mentionsPerHour": "Mentions per hour",
+        "mentionsPerHourHint": "The most mentions one repository answers in an hour. 0 is no limit.",
+        "ignoreMentionsFrom": "Never answer",
+        "ignoreMentionsFromHint": "GitHub logins whose mentions are ignored.",
+        "ignoreMentionsFromPlaceholder": "some-bot[bot]"
     }
 }

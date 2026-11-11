@@ -5,8 +5,11 @@
  * somebody else's say-so, so the operator narrows it: drafts or not, which base
  * branches, which labels, titles and authors keep it away, and whether new pushes
  * to a pull request already reviewed are reviewed again. A person who asks for a
- * review by name, or mentions the app, is never filtered by any of it - that is
- * somebody asking, not Polaris deciding.
+ * review by name, or mentions the app, is never filtered by those - that is
+ * somebody asking, not Polaris deciding. Who may ask is its own set of fields:
+ * whether strangers on a public repository can, who is never answered, how many
+ * mentions an hour a repository answers, and whether a reply to the bot's own
+ * review comment counts as asking.
  *
  * Settings come in tiers exactly like Enigma's: the repository, then the GitHub
  * account it belongs to, then the person's general tier, then the instance. Every
@@ -37,6 +40,9 @@ const ENTRY_MAX = 100;
  *  stops and waits to be asked. */
 export const REVIEW_PAUSE_MAX = 100;
 
+/** The highest hourly mention limit a repository can set. */
+export const MENTIONS_PER_HOUR_MAX = 1000;
+
 export interface ReviewSettings {
     /** Review a pull request while it is still a draft. */
     readonly drafts: boolean | null;
@@ -58,6 +64,16 @@ export interface ReviewSettings {
      *  and waits to be asked. Zero never stops. */
     readonly pauseAfter: number | null;
     readonly configSource: ReviewConfigSource | null;
+    /** On a public repository, answer mentions from people who cannot write to
+     *  it. Off keeps a stranger from spending the operator's credits. */
+    readonly mentionsFromAnyone: boolean | null;
+    /** GitHub logins whose mentions are never answered. */
+    readonly ignoreMentionsFrom: string[] | null;
+    /** A reply to one of the bot's own review comments is answered without
+     *  naming it, the way a reviewer answers a thread. */
+    readonly autoReply: boolean | null;
+    /** The most mentions a repository answers in an hour. Zero is no limit. */
+    readonly mentionsPerHour: number | null;
 }
 
 /** Nothing decided at this tier. */
@@ -69,7 +85,11 @@ export const INHERIT_REVIEW: ReviewSettings = {
     ignoreAuthors: null,
     incremental: null,
     pauseAfter: null,
-    configSource: null
+    configSource: null,
+    mentionsFromAnyone: null,
+    ignoreMentionsFrom: null,
+    autoReply: null,
+    mentionsPerHour: null
 };
 
 /**
@@ -85,7 +105,11 @@ export const DEFAULT_REVIEW: ResolvedReview = {
     ignoreAuthors: [],
     incremental: false,
     pauseAfter: 5,
-    configSource: "saved"
+    configSource: "saved",
+    mentionsFromAnyone: false,
+    ignoreMentionsFrom: [],
+    autoReply: false,
+    mentionsPerHour: 0
 };
 
 export type ResolvedReview = {
@@ -104,7 +128,11 @@ export const reviewSettingsSchema = z.object({
     ignoreAuthors: list.nullable().default(null),
     incremental: z.boolean().nullable().default(null),
     pauseAfter: z.number().int().min(0).max(REVIEW_PAUSE_MAX).nullable().default(null),
-    configSource: z.enum(REVIEW_CONFIG_SOURCES).nullable().default(null)
+    configSource: z.enum(REVIEW_CONFIG_SOURCES).nullable().default(null),
+    mentionsFromAnyone: z.boolean().nullable().default(null),
+    ignoreMentionsFrom: list.nullable().default(null),
+    autoReply: z.boolean().nullable().default(null),
+    mentionsPerHour: z.number().int().min(0).max(MENTIONS_PER_HOUR_MAX).nullable().default(null)
 });
 
 /**
@@ -120,7 +148,11 @@ const reviewFileSchema = z
         ignore_title_keywords: list.optional(),
         ignore_authors: list.optional(),
         incremental: z.boolean().optional(),
-        pause_after: z.number().int().min(0).max(REVIEW_PAUSE_MAX).optional()
+        pause_after: z.number().int().min(0).max(REVIEW_PAUSE_MAX).optional(),
+        mentions_from_anyone: z.boolean().optional(),
+        ignore_mentions_from: list.optional(),
+        auto_reply: z.boolean().optional(),
+        mentions_per_hour: z.number().int().min(0).max(MENTIONS_PER_HOUR_MAX).optional()
     })
     .passthrough();
 
@@ -142,7 +174,11 @@ export function reviewSettingsFromFile(parsed: unknown): ReviewSettings | null {
         ignoreAuthors: file.ignore_authors ?? null,
         incremental: file.incremental ?? null,
         pauseAfter: file.pause_after ?? null,
-        configSource: null
+        configSource: null,
+        mentionsFromAnyone: file.mentions_from_anyone ?? null,
+        ignoreMentionsFrom: file.ignore_mentions_from ?? null,
+        autoReply: file.auto_reply ?? null,
+        mentionsPerHour: file.mentions_per_hour ?? null
     };
 }
 
@@ -166,7 +202,11 @@ export function resolveReview(
         ignoreAuthors: pick("ignoreAuthors"),
         incremental: pick("incremental"),
         pauseAfter: pick("pauseAfter"),
-        configSource: pick("configSource")
+        configSource: pick("configSource"),
+        mentionsFromAnyone: pick("mentionsFromAnyone"),
+        ignoreMentionsFrom: pick("ignoreMentionsFrom"),
+        autoReply: pick("autoReply"),
+        mentionsPerHour: pick("mentionsPerHour")
     };
 }
 
@@ -196,7 +236,11 @@ export function parseReviewSettings(raw: string | null | undefined): ReviewSetti
         ignoreAuthors: field("ignoreAuthors"),
         incremental: field("incremental"),
         pauseAfter: field("pauseAfter"),
-        configSource: field("configSource")
+        configSource: field("configSource"),
+        mentionsFromAnyone: field("mentionsFromAnyone"),
+        ignoreMentionsFrom: field("ignoreMentionsFrom"),
+        autoReply: field("autoReply"),
+        mentionsPerHour: field("mentionsPerHour")
     };
 }
 
@@ -281,5 +325,29 @@ export function reviewSkip(settings: ResolvedReview, pr: ReviewCandidate): Revie
         .filter((label) => !label.startsWith("!"))
         .map((label) => label.toLowerCase());
     if (wanted.length > 0 && !wanted.some((label) => has.has(label))) return "label";
+    return null;
+}
+
+/** Why a mention is not answered, or null when it is. */
+export type MentionRefusal = "ignored" | "stranger" | "limit";
+
+/**
+ * Whether a mention is answered. Pure: the caller asks GitHub whether the person
+ * can write and counts the hour's mentions, and only when the answer matters.
+ */
+export function mentionRefusal(
+    settings: ResolvedReview,
+    mention: {
+        readonly actor: string;
+        readonly publicRepo: boolean;
+        /** Null when it was not asked because it could not change the answer. */
+        readonly canWrite: boolean | null;
+        readonly answeredThisHour: number;
+    }
+): MentionRefusal | null {
+    const actor = mention.actor.toLowerCase();
+    if (settings.ignoreMentionsFrom.some((login) => login.toLowerCase() === actor)) return "ignored";
+    if (mention.publicRepo && !settings.mentionsFromAnyone && mention.canWrite !== true) return "stranger";
+    if (settings.mentionsPerHour > 0 && mention.answeredThisHour >= settings.mentionsPerHour) return "limit";
     return null;
 }

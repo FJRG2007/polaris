@@ -12,7 +12,8 @@ const mocks = vi.hoisted(() => ({
     dispatchRun: vi.fn(),
     agentRepoByFullName: vi.fn(),
     reviewSettingsFor: vi.fn(),
-    reviewedPushes: vi.fn()
+    reviewedPushes: vi.fn(),
+    mentionsThisHour: vi.fn()
 }));
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
@@ -23,7 +24,7 @@ vi.mock("@/lib/agents/agent-run-service", () => ({
 }));
 vi.mock("@/lib/agents/agent-dispatch", () => ({ dispatchRun: mocks.dispatchRun }));
 vi.mock("@/lib/agents/agent-fallback", () => ({ considerFallback: vi.fn(async () => undefined) }));
-vi.mock("@/lib/github-service", () => ({ githubAppInstallationToken: vi.fn() }));
+vi.mock("@/lib/github-service", () => ({ githubAppInstallationToken: vi.fn(async () => "token-1") }));
 vi.mock("@/lib/agents/agent-defaults-service", () => ({
     policyForRepo: vi.fn(async () => ({
         privateRepos: true,
@@ -36,7 +37,8 @@ vi.mock("@/lib/agents/agent-repo-service", () => ({ agentRepoByFullName: mocks.a
 vi.mock("@/lib/agents/issue-sessions", () => ({ startIssueSession: vi.fn() }));
 vi.mock("@/lib/agents/review-gate", () => ({
     reviewSettingsFor: mocks.reviewSettingsFor,
-    reviewedPushes: mocks.reviewedPushes
+    reviewedPushes: mocks.reviewedPushes,
+    mentionsThisHour: mocks.mentionsThisHour
 }));
 
 import { handleAgentWebhook } from "@/lib/agents/agent-webhook";
@@ -74,12 +76,46 @@ function prEvent(action: string, pr: Record<string, unknown> = {}, extra: Record
     });
 }
 
+const fetchMock = vi.fn();
+
+function commentEvent(body: string, extra: Record<string, unknown> = {}, isPrivate = true) {
+    mocks.agentRepoByFullName.mockResolvedValue({
+        id: "repo-1",
+        ownerId: "owner-1",
+        isPrivate,
+        repoFullName: "acme/app",
+        review: null,
+        automations: []
+    });
+    return handleAgentWebhook({
+        event: "pull_request_review_comment",
+        appHandle: "polaris",
+        payload: {
+            action: "created",
+            repository: { full_name: "acme/app", default_branch: "main" },
+            sender: { login: "eve", type: "User" },
+            comment: { body, ...extra },
+            pull_request: {
+                number: 7,
+                title: "x",
+                user: { login: "dana" },
+                base: { ref: "main" },
+                head: { repo: { full_name: "acme/app" }, sha: "abc123" },
+                labels: []
+            }
+        }
+    });
+}
+
 const settings = (over: Partial<core.ResolvedReview> = {}) => ({ ...core.DEFAULT_REVIEW, ...over });
 
 beforeEach(() => {
     vi.clearAllMocks();
     mocks.dispatchRun.mockResolvedValue({ runId: "run-1" });
     mocks.reviewedPushes.mockResolvedValue(0);
+    mocks.mentionsThisHour.mockResolvedValue(0);
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockReset();
     mocks.reviewSettingsFor.mockResolvedValue(settings());
     mocks.agentRepoByFullName.mockResolvedValue({
         id: "repo-1",
@@ -129,5 +165,40 @@ describe("automatic reviews", () => {
         mocks.reviewSettingsFor.mockResolvedValue(settings({ ignoreAuthors: ["dana"] }));
         expect(await prEvent("review_requested", { draft: true })).toEqual(["run-1"]);
         expect(mocks.reviewSettingsFor).not.toHaveBeenCalled();
+    });
+});
+
+describe("who is answered", () => {
+    it("answers a mention, and not one from an ignored login", async () => {
+        expect(await commentEvent("@polaris look")).toEqual(["run-1"]);
+        mocks.reviewSettingsFor.mockResolvedValue(settings({ ignoreMentionsFrom: ["EVE"] }));
+        expect(await commentEvent("@polaris look")).toEqual([]);
+    });
+
+    it("asks GitHub on a public repository unless strangers are allowed", async () => {
+        fetchMock.mockResolvedValue(new Response(JSON.stringify({ permission: "read" })));
+        expect(await commentEvent("@polaris look", {}, false)).toEqual([]);
+        mocks.reviewSettingsFor.mockResolvedValue(settings({ mentionsFromAnyone: true }));
+        fetchMock.mockClear();
+        expect(await commentEvent("@polaris look", {}, false)).toEqual(["run-1"]);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("stops at the hourly limit", async () => {
+        mocks.reviewSettingsFor.mockResolvedValue(settings({ mentionsPerHour: 3 }));
+        mocks.mentionsThisHour.mockResolvedValue(3);
+        expect(await commentEvent("@polaris look")).toEqual([]);
+    });
+
+    it("answers a reply in its own thread only when replies are on", async () => {
+        fetchMock.mockResolvedValue(
+            new Response(JSON.stringify({ user: { login: "polaris[bot]", type: "Bot" } }))
+        );
+        expect(await commentEvent("why?", { in_reply_to_id: 55 })).toEqual([]);
+        mocks.reviewSettingsFor.mockResolvedValue(settings({ autoReply: true }));
+        expect(await commentEvent("why?", { in_reply_to_id: 55 })).toEqual(["run-1"]);
+        expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain("/pulls/comments/55");
+        fetchMock.mockResolvedValue(new Response(JSON.stringify({ user: { login: "dana", type: "User" } })));
+        expect(await commentEvent("why?", { in_reply_to_id: 56 })).toEqual([]);
     });
 });
