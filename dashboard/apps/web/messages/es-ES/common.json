@@ -149,7 +149,13 @@
         "copied": "Copiado al portapapeles",
         "copyFailed": "Se bloqueó la copia. Usa el atajo de copiar del teclado.",
         "pasteFailed": "{surface, select, app {La app no permitió pegar. Usa el atajo de pegar del teclado.} other {El navegador no permitió pegar. Usa el atajo de pegar del teclado.}}",
-        "browserMenu": "Mayús+clic derecho abre el menú del navegador"
+        "browserMenu": "Mayús+clic derecho abre el menú del navegador",
+        "openLink": "Abrir",
+        "openNewTab": "{surface, select, app {Abrir en el navegador} other {Abrir en otra pestaña}}",
+        "openNewWindow": "Abrir en otra ventana",
+        "copyLink": "Copiar enlace",
+        "copyAddress": "Copiar dirección",
+        "askPolarLink": "Preguntar a Polar"
     },
     "permissionSections": {
         "search": "Buscar permisos",

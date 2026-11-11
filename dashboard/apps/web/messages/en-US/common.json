@@ -149,7 +149,13 @@
         "copied": "Copied to the clipboard",
         "copyFailed": "Copying was blocked. Use your keyboard's copy shortcut.",
         "pasteFailed": "{surface, select, app {The app didn't allow pasting. Use your keyboard's paste shortcut.} other {The browser didn't allow pasting. Use your keyboard's paste shortcut.}}",
-        "browserMenu": "Shift+right-click opens the browser's own menu"
+        "browserMenu": "Shift+right-click opens the browser's own menu",
+        "openLink": "Open",
+        "openNewTab": "{surface, select, app {Open in your browser} other {Open in new tab}}",
+        "openNewWindow": "Open in new window",
+        "copyLink": "Copy link address",
+        "copyAddress": "Copy email address",
+        "askPolarLink": "Ask Polar about it"
     },
     "permissionSections": {
         "search": "Search permissions",

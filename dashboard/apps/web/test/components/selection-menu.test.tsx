@@ -212,6 +212,58 @@ describe("selection menu", () => {
     });
 });
 
+describe("a link", () => {
+    function linkPage() {
+        return page(
+            <>
+                <a data-testid="out" href="https://example.com/docs">docs</a>
+                <a data-testid="in" href="/tasks/l/abc">list</a>
+                <a data-testid="mail" href="mailto:ana@example.com">Ana</a>
+                <a data-testid="js" href="javascript:void(0)">nothing</a>
+            </>
+        );
+    }
+
+    it("opens Polaris's menu for a web link: open elsewhere, copy, ask Polar", () => {
+        linkPage();
+        expect(rightClick(screen.getByTestId("out"))).toBe(false);
+        expect(screen.getByRole("menuitem", { name: "Open in new tab" })).toBeTruthy();
+        expect(screen.getByRole("menuitem", { name: "Copy link address" })).toBeTruthy();
+        expect(screen.queryByRole("menuitem", { name: "Open" })).toBeNull();
+        fireEvent.click(screen.getByRole("menuitem", { name: "Ask Polar about it" }));
+        expect(polar.ask).toHaveBeenCalledWith("https://example.com/docs");
+    });
+
+    it("offers to open a link to this Polaris in place", () => {
+        linkPage();
+        rightClick(screen.getByTestId("in"));
+        expect(screen.getByRole("menuitem", { name: "Open" })).toBeTruthy();
+    });
+
+    it("copies a mail link as the bare address", () => {
+        expect(
+            selectionMenu.linkAt(
+                Object.assign(document.createElement("a"), { href: "mailto:ana@example.com" }),
+                document
+            )?.copyText
+        ).toBe("ana@example.com");
+    });
+
+    it("leaves a script link, and Shift+right-click, to the browser", () => {
+        linkPage();
+        expect(rightClick(screen.getByTestId("js"))).toBe(true);
+        expect(rightClick(screen.getByTestId("out"), { shiftKey: true })).toBe(true);
+    });
+
+    it("lets selected text inside a link win over the link", () => {
+        linkPage();
+        select(screen.getByTestId("out"));
+        rightClick(screen.getByTestId("out"));
+        expect(screen.getByRole("menuitem", { name: /^Copy(?! link)/ })).toBeTruthy();
+        expect(screen.queryByRole("menuitem", { name: "Copy link address" })).toBeNull();
+    });
+});
+
 describe("text selected inside a received email", () => {
     it("opens the same menu, without Select all, for what the frame reports", () => {
         page();

@@ -78,6 +78,45 @@ export function selectionAt(target: EventTarget | null, doc: Document): Selectio
     return { text, field };
 }
 
+/** A link a right-click landed on. */
+export interface LinkAt {
+    /** Absolute address. */
+    readonly href: string;
+    /** What "copy" puts on the clipboard: the address, or for a mail link the
+     *  bare address without `mailto:`. */
+    readonly copyText: string;
+    /** On this Polaris, so "open" is a step inside the app. */
+    readonly internal: boolean;
+}
+
+const LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
+/**
+ * The link a right-click on `target` is about, or null - for anything that is
+ * not a link, a link inside an editor (its own menu edits it), a surface that
+ * keeps the browser's menu, or an address that is not the web or mail.
+ */
+export function linkAt(target: EventTarget | null, doc: Document): LinkAt | null {
+    const element = elementOf(target);
+    if (!element || element.closest(NATIVE) || element.closest(EDITABLE)) return null;
+    const anchor = element.closest("a[href]");
+    const raw = anchor?.getAttribute("href");
+    if (!raw) return null;
+    let url: URL;
+    try {
+        url = new URL(raw, doc.baseURI);
+    } catch {
+        return null;
+    }
+    if (!LINK_PROTOCOLS.has(url.protocol)) return null;
+    const mail = url.protocol === "mailto:";
+    return {
+        href: url.href,
+        copyText: mail ? decodeURIComponent(url.pathname) : url.href,
+        internal: !mail && url.origin === new URL(doc.baseURI).origin
+    };
+}
+
 /** Where to draw a menu opened from the keyboard: under the selection. */
 export function selectionPoint(
     found: SelectionAt,

@@ -15,7 +15,18 @@
  * only the browser's menu has.
  */
 
-import { ClipboardPaste, Copy, Languages, Search, TextSelect } from "lucide-react";
+import {
+    AppWindow,
+    ClipboardPaste,
+    Copy,
+    ExternalLink,
+    Languages,
+    Link2,
+    Search,
+    TextSelect
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { desktopBridge } from "@/lib/desktop-bridge";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
     AppLogo,
@@ -164,6 +175,11 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
     const paste = usePasteState();
     const translates = useTextTranslator() !== null;
     const [menu, setMenu] = useState<OpenMenu | null>(null);
+    /** A right-click on a link with nothing selected under it. */
+    const [link, setLink] = useState<
+        (selectionMenu.LinkAt & { readonly x: number; readonly y: number }) | null
+    >(null);
+    const router = useRouter();
     const [translating, setTranslating] = useState<SelectionToTranslate | null>(null);
     const live = useRef({ polar, toast, t, translates });
     live.current = { polar, toast, t, translates };
@@ -179,7 +195,24 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
             const keyboard = selectionMenu.fromKeyboard(event);
             if (!keyboard && event.shiftKey) return;
             const found = selectionMenu.selectionAt(event.target, document);
-            if (!found) return;
+            if (!found) {
+                // A link, with nothing selected on it: Polaris's own menu for it,
+                // so opening it the way this app opens things and asking Polar
+                // about it are one press away. From the keyboard the menu sits
+                // under the link.
+                const linked = selectionMenu.linkAt(event.target, document);
+                if (!linked) return;
+                event.preventDefault();
+                const box = keyboard
+                    ? (event.target as Element).closest("a")?.getBoundingClientRect()
+                    : null;
+                setLink({
+                    ...linked,
+                    x: box ? box.left : event.clientX,
+                    y: box ? box.bottom : event.clientY
+                });
+                return;
+            }
             event.preventDefault();
             const point = keyboard
                 ? selectionMenu.selectionPoint(found, document)
@@ -340,6 +373,70 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
                             >
                                 <AppLogo appId="polar" size={16} />
                                 {t("selectionMenu.askPolar")}
+                            </DropdownMenuItem>
+                        ) : null}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="max-w-[min(18rem,70vw)] normal-case tracking-normal">
+                            {t("selectionMenu.browserMenu")}
+                        </DropdownMenuLabel>
+                    </DropdownMenuContent>
+                ) : null}
+            </DropdownMenu>
+            <DropdownMenu
+                open={link !== null}
+                onOpenChange={(open) => (open ? undefined : setLink(null))}
+            >
+                <DropdownMenuTrigger asChild>
+                    <span
+                        aria-hidden
+                        tabIndex={-1}
+                        className="pointer-events-none fixed size-0"
+                        style={{ left: link?.x ?? 0, top: link?.y ?? 0 }}
+                    />
+                </DropdownMenuTrigger>
+                {link ? (
+                    <DropdownMenuContent
+                        align="start"
+                        sideOffset={2}
+                        data-link-menu
+                        className="max-w-[min(20rem,85vw)]"
+                        onCloseAutoFocus={(event) => event.preventDefault()}
+                    >
+                        <DropdownMenuLabel className="truncate normal-case tracking-normal">
+                            {link.copyText}
+                        </DropdownMenuLabel>
+                        {link.internal ? (
+                            <DropdownMenuItem
+                                onSelect={() => {
+                                    const url = new URL(link.href);
+                                    router.push(`${url.pathname}${url.search}${url.hash}`);
+                                }}
+                            >
+                                <AppWindow />
+                                {t("selectionMenu.openLink")}
+                            </DropdownMenuItem>
+                        ) : null}
+                        <DropdownMenuItem
+                            onSelect={() => void window.open(link.href, "_blank", "noopener")}
+                        >
+                            <ExternalLink />
+                            {desktopBridge() && link.internal
+                                ? t("selectionMenu.openNewWindow")
+                                : t("selectionMenu.openNewTab")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => void copy(link.copyText)}>
+                            <Link2 />
+                            {link.href.startsWith("mailto:")
+                                ? t("selectionMenu.copyAddress")
+                                : t("selectionMenu.copyLink")}
+                        </DropdownMenuItem>
+                        {polar.allowed ? (
+                            <DropdownMenuItem
+                                data-link-ask-polar
+                                onSelect={() => polar.ask(link.copyText)}
+                            >
+                                <AppLogo appId="polar" size={16} />
+                                {t("selectionMenu.askPolarLink")}
                             </DropdownMenuItem>
                         ) : null}
                         <DropdownMenuSeparator />

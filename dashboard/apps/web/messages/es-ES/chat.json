@@ -1,6 +1,6 @@
 {
     "callLost": {
-        "title": "Has salido de la llamada",
+        "title": "Saliste de la llamada",
         "body": "La página se sustituyó mientras estabas dentro. Puede que los demás sigan en ella.",
         "rejoin": "Volver"
     },
