@@ -12,7 +12,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { FlaskConical, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, FlaskConical, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import {
     Badge,
     Button,
@@ -29,12 +29,13 @@ import {
     Switch,
     Textarea
 } from "@polaris/ui";
-import { SKILL_CATALOG } from "@/lib/polar/skills/catalog";
+import { SKILL_CATALOG, catalogSkill } from "@/lib/polar/skills/catalog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     SKILL_DESCRIPTION_MAX,
     SKILL_INSTRUCTIONS_MAX,
     SKILL_NAME_MAX,
+    DIRECTORY_SOURCE,
     TRIAL_SKILL_KEY,
     skillFieldError,
     skillInputSchema,
@@ -45,9 +46,18 @@ import {
 import {
     addTrialSkillAction,
     deleteSkillAction,
+    importSkillsAction,
     saveSkillAction,
     setSkillEnabledAction
 } from "./skills-actions";
+import {
+    SkillDirectory,
+    SkillImportDialog,
+    downloadSkill,
+    downloadSkills,
+    type ImportReview,
+    type SkillDraft
+} from "./polar-skill-import";
 
 /** A list this long is easier to search than to scroll. */
 const SEARCH_FROM = 6;
@@ -69,7 +79,8 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
     const [rows, setRows] = useState(initial);
     const [query, setQuery] = useState("");
     const [error, setError] = useState<string | null>(null);
-    const [editing, setEditing] = useState<SkillView | "new" | null>(null);
+    const [editing, setEditing] = useState<Editing>(null);
+    const [importing, setImporting] = useState<{ review: ImportReview | null } | null>(null);
     const [removing, setRemoving] = useState<SkillView | null>(null);
     const [adding, setAdding] = useState<string | null>(null);
 
@@ -80,6 +91,14 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
     );
     const held = new Set(rows.map((row) => row.source));
     const heldNames = new Set(rows.map((row) => row.name));
+
+    function addViews(views: SkillView[]) {
+        setError(null);
+        setRows((current) => [
+            ...current.filter((row) => !views.some((view) => view.id === row.id)),
+            ...views
+        ]);
+    }
 
     async function toggle(row: SkillView, enabled: boolean) {
         setError(null);
@@ -119,18 +138,41 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
                         <h2 className="text-sm font-semibold">{t("settings.skills.title")}</h2>
                         <p className="text-sm text-muted-foreground">{t("settings.skills.intro")}</p>
                     </div>
-                    {!readOnly ? (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="shrink-0"
-                            onClick={() => setEditing("new")}
-                        >
-                            <Plus className="h-3.5 w-3.5 shrink-0" />
-                            {t("settings.skills.create")}
-                        </Button>
-                    ) : null}
+                    <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                        {rows.length > 0 ? (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => downloadSkills(rows)}
+                            >
+                                <Download className="h-3.5 w-3.5 shrink-0" />
+                                {t("settings.skills.export")}
+                            </Button>
+                        ) : null}
+                        {!readOnly ? (
+                            <>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setImporting({ review: null })}
+                                >
+                                    <Upload className="h-3.5 w-3.5 shrink-0" />
+                                    {t("settings.skills.import")}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditing("new")}
+                                >
+                                    <Plus className="h-3.5 w-3.5 shrink-0" />
+                                    {t("settings.skills.create")}
+                                </Button>
+                            </>
+                        ) : null}
+                    </div>
                 </div>
                 {error ? (
                     <p role="alert" className="text-sm text-danger">
@@ -165,9 +207,13 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
                                             <span className="truncate font-mono" title={row.name}>
                                                 {row.name}
                                             </span>
-                                            {row.source !== "custom" ? (
+                                            {catalogSkill(row.source) ? (
                                                 <Badge variant="neutral" className="shrink-0">
                                                     {t("settings.skills.fromCatalog")}
+                                                </Badge>
+                                            ) : row.source.startsWith(DIRECTORY_SOURCE) ? (
+                                                <Badge variant="neutral" className="shrink-0">
+                                                    skills.sh
                                                 </Badge>
                                             ) : null}
                                         </p>
@@ -178,6 +224,16 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
                                             {row.description}
                                         </p>
                                     </div>
+                                    <Button
+                                        type="button"
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        aria-label={t("settings.skills.download")}
+                                        title={t("settings.skills.download")}
+                                        onClick={() => downloadSkill(row)}
+                                    >
+                                        <Download className="size-4 shrink-0" />
+                                    </Button>
                                     {!readOnly ? (
                                         <>
                                             <Button
@@ -270,6 +326,23 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
                 </ul>
             </div>
 
+            <SkillDirectory
+                held={{ names: heldNames, sources: held }}
+                readOnly={readOnly}
+                onReview={(review) => setImporting({ review })}
+                onTry={(draft) => router.push(trySkillHref({ draft }))}
+            />
+
+            <SkillImportDialog
+                open={importing !== null}
+                review={importing?.review ?? null}
+                onClose={() => setImporting(null)}
+                onAdded={addViews}
+                onFix={(draft) => {
+                    setImporting(null);
+                    setEditing(draft);
+                }}
+            />
             <SkillEditor
                 editing={editing}
                 onClose={() => setEditing(null)}
@@ -298,13 +371,21 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
 
 const EMPTY: SkillInput = { name: "", description: "", instructions: "" };
 
+/** What the editor is open on: a saved skill, a new one, or an imported one to fix. */
+type Editing = SkillView | "new" | SkillDraft | null;
+
+const isDraft = (editing: Editing): editing is SkillDraft =>
+    editing !== null && typeof editing === "object" && "draft" in editing;
+const isSaved = (editing: Editing): editing is SkillView =>
+    editing !== null && typeof editing === "object" && "id" in editing;
+
 function SkillEditor({
     editing,
     onClose,
     onSaved,
     onTry
 }: {
-    editing: SkillView | "new" | null;
+    editing: Editing;
     onClose: () => void;
     onSaved: (view: SkillView) => void;
     onTry: (draft: SkillInput) => void;
@@ -312,7 +393,7 @@ function SkillEditor({
     const t = useTranslations("polar");
     const open = editing !== null;
     const [values, setValues] = useState<SkillInput>(EMPTY);
-    const [loadedFor, setLoadedFor] = useState<SkillView | "new" | null>(null);
+    const [loadedFor, setLoadedFor] = useState<Editing>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -321,20 +402,21 @@ function SkillEditor({
         setLoadedFor(editing);
         setError(null);
         setValues(
-            editing && editing !== "new"
+            isSaved(editing)
                 ? {
                       name: editing.name,
                       description: editing.description,
                       instructions: editing.instructions
                   }
-                : EMPTY
+                : isDraft(editing)
+                  ? { ...editing.draft }
+                  : EMPTY
         );
     }
 
     const checked = skillInputSchema.safeParse(values);
     const unchanged =
-        editing !== null &&
-        editing !== "new" &&
+        isSaved(editing) &&
         values.name === editing.name &&
         values.description === editing.description &&
         values.instructions === editing.instructions;
@@ -351,8 +433,19 @@ function SkillEditor({
         if (!complete || pending || !checked.success) return;
         setPending(true);
         setError(null);
+        if (isDraft(editing)) {
+            // An imported skill keeps where it came from.
+            const added = await importSkillsAction({
+                items: [{ skill: checked.data, directory: editing.directory }]
+            });
+            setPending(false);
+            const first = added.ok ? added.value[0] : null;
+            if (first?.ok) onSaved(first.value);
+            else setError(first ? first.error : added.ok ? null : added.error);
+            return;
+        }
         const answer = await saveSkillAction({
-            id: editing && editing !== "new" ? editing.id : null,
+            id: isSaved(editing) ? editing.id : null,
             skill: checked.data
         });
         setPending(false);
@@ -395,7 +488,7 @@ function SkillEditor({
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
-                        {editing === "new"
+                        {!isSaved(editing)
                             ? t("settings.skills.editor.titleNew")
                             : t("settings.skills.editor.titleEdit")}
                     </DialogTitle>

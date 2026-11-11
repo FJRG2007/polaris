@@ -567,7 +567,12 @@
                 "failed": "No se pudo guardar. Reinténtalo.",
                 "noAccess": "No tienes acceso a Polar.",
                 "viewingAs": "Estás viendo como otra persona.",
-                "not_found": "Esa skill ya no existe."
+                "not_found": "Esa skill ya no existe.",
+                "slowDown": "Demasiadas búsquedas. Prueba en unos minutos.",
+                "unreachable": "No se pudo llegar ahí. Revisa la dirección.",
+                "address": "De esa dirección no se lee ninguna skill.",
+                "nothing": "Ahí no hay ningún SKILL.md.",
+                "too_many": "Hay más de 30 skills. Indica una carpeta."
             },
             "catalog": {
                 "commit-message": {
@@ -602,6 +607,41 @@
                     "title": "Informe de error",
                     "description": "Pasos, resultado esperado y real, de una descripción vaga."
                 }
+            },
+            "import": "Importar",
+            "export": "Exportar",
+            "download": "Bajar SKILL.md",
+            "directoryTitle": "Buscar skills",
+            "directoryIntro": "Skills publicadas en skills.sh.",
+            "directorySearch": "Buscar en skills.sh",
+            "directoryHint": "Escribe 2 letras o más.",
+            "directoryEmpty": "Nada en skills.sh coincide.",
+            "installs": "{count} usos",
+            "importer": {
+                "title": "Importar skills",
+                "body": "Un SKILL.md, un repositorio o carpeta de GitHub, una página de skills.sh o un archivo exportado aquí.",
+                "url": "Dirección",
+                "read": "Leer",
+                "or": "o",
+                "file": "Elegir archivos",
+                "fileHint": ".md, .json o .zip",
+                "reviewTitle": "Revisa antes de añadir",
+                "add": "Añadir {count}",
+                "back": "Atrás",
+                "fix": "Editar",
+                "instructionsOnly": "Solo se añaden las instrucciones, no los scripts ni otros archivos.",
+                "unreadable": "No se pudo leer {name}.",
+                "nothingInFile": "Ese archivo no tiene SKILL.md.",
+                "problems": {
+                    "invalid": "Le falta nombre, descripción o instrucciones.",
+                    "too_long": "Más larga de lo que se admite aquí.",
+                    "duplicate": "Ya tienes una skill con este nombre."
+                }
+            },
+            "audit": {
+                "pass": "Auditorías superadas",
+                "warn": "Marcada por {providers}",
+                "fail": "Suspendió con {providers}"
             }
         },
         "groups": {
@@ -1349,6 +1389,6 @@
         "add": "Añadir skill",
         "added": "Skill añadida",
         "addFailed": "No se pudo añadir.",
-        "end": "Dejar de probar"
+        "end": "No probar más"
     }
 }

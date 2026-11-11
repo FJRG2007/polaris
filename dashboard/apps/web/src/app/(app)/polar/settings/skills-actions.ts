@@ -13,7 +13,19 @@ import { requireUser } from "@/lib/session";
 import * as store from "@/lib/polar/skills/store";
 import { polarAccessFor } from "@/lib/polar/access";
 import { getTranslations } from "@/lib/i18n/request";
-import { skillInputSchema, trialSkillSchema, type SkillView } from "@/lib/polar/skills/shared";
+import * as remote from "@/lib/polar/skills/remote";
+import {
+    DIRECTORY_SOURCE,
+    skillInputSchema,
+    trialSkillSchema,
+    type SkillView
+} from "@/lib/polar/skills/shared";
+import {
+    markDuplicates,
+    readSkillBundle,
+    readSkillFile,
+    type SkillCandidate
+} from "@/lib/polar/skills/skill-file";
 
 type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -93,4 +105,130 @@ export async function deleteSkillAction(input: unknown): Promise<Result<null>> {
     // Already gone is what was asked for.
     await store.deleteSkill(caller.id, parsed.data.id);
     return { ok: true, value: null };
+}
+
+/** Searches and imports reach other servers; this bounds what one person makes them do. */
+const REMOTE_LIMIT = 60;
+const REMOTE_WINDOW_MS = 10 * 60 * 1000;
+
+async function remoteCaller(): Promise<{ id: string } | { error: string }> {
+    const caller = await writer();
+    if ("error" in caller) return caller;
+    const { rateLimit } = await import("@/lib/rate-limit-service");
+    const allowed = await rateLimit(`polar-skills-remote:${caller.id}`, REMOTE_LIMIT, REMOTE_WINDOW_MS);
+    if (allowed.ok) return caller;
+    const t = await getTranslations("polar");
+    return { error: t("settings.skills.errors.slowDown") };
+}
+
+const searchSchema = z.object({ query: z.string().trim().min(2).max(200) });
+
+/** The public skills directory's matches for what the person typed. */
+export async function searchSkillDirectoryAction(
+    input: unknown
+): Promise<Result<remote.DirectoryEntry[]>> {
+    const caller = await remoteCaller();
+    if ("error" in caller) return { ok: false, error: caller.error };
+    const parsed = searchSchema.safeParse(input);
+    const t = await getTranslations("polar");
+    if (!parsed.success) return { ok: false, error: t("settings.skills.errors.failed") };
+    const found = await remote.searchDirectory(parsed.data.query);
+    return found ? { ok: true, value: found } : { ok: false, error: t("settings.skills.errors.unreachable") };
+}
+
+const previewSchema = z.union([
+    z.object({ url: z.string().trim().min(1).max(2048) }).strict(),
+    z.object({ directory: z.string().trim().min(1).max(400) }).strict(),
+    z
+        .object({
+            files: z
+                .array(
+                    z.object({
+                        name: z.string().trim().min(1).max(500),
+                        text: z.string().max(300_000)
+                    })
+                )
+                .min(1)
+                .max(remote.IMPORT_MAX)
+        })
+        .strict()
+]);
+
+export interface SkillPreview {
+    candidates: SkillCandidate[];
+    /** For a directory skill: what its audits said. */
+    audit: remote.DirectoryAudit | null;
+}
+
+/** What an address, a directory entry or chosen files hold, before anything is added. */
+export async function previewSkillImportAction(input: unknown): Promise<Result<SkillPreview>> {
+    const parsed = previewSchema.safeParse(input);
+    const t = await getTranslations("polar");
+    if (!parsed.success) return { ok: false, error: t("settings.skills.errors.address") };
+    const request = parsed.data;
+    // Files are read here and reach nobody else; only addresses are rate-limited.
+    const caller = "files" in request ? await writer() : await remoteCaller();
+    if ("error" in caller) return { ok: false, error: caller.error };
+
+    let found: SkillCandidate[] | remote.RemoteRefusal;
+    let audit: remote.DirectoryAudit | null = null;
+    if ("files" in request) {
+        found = request.files.flatMap(
+            (file) =>
+                (/\.json$/i.test(file.name) ? readSkillBundle(file.text, file.name) : null) ?? [
+                    readSkillFile(file.text, skillNameFromPath(file.name), file.name)
+                ]
+        );
+        if (found.length > remote.IMPORT_MAX) found = "too_many";
+    } else if ("directory" in request) {
+        const one = await remote.directorySkill(request.directory);
+        found = typeof one === "string" ? one : [one];
+        if (typeof one !== "string") audit = await remote.directoryAudit(request.directory);
+    } else {
+        found = await remote.skillsAt(request.url);
+    }
+    if (typeof found === "string") return { ok: false, error: t(`settings.skills.errors.${found}`) };
+    const held = new Set((await store.listSkills(caller.id)).map((row) => row.name));
+    return { ok: true, value: { candidates: markDuplicates(found, held), audit } };
+}
+
+/** The name a file's path gives a skill: its folder for a `SKILL.md`, else the file name. */
+function skillNameFromPath(path: string): string {
+    const parts = path.split(/[\/]/).filter(Boolean);
+    const last = parts.at(-1) ?? "skill";
+    return last.toLowerCase() === "skill.md" ? (parts.at(-2) ?? "skill") : last.replace(/\.[^.]+$/, "");
+}
+
+const importSchema = z.object({
+    items: z
+        .array(
+            z.object({
+                skill: skillInputSchema,
+                directory: z.string().trim().max(400).nullable().default(null)
+            })
+        )
+        .min(1)
+        .max(remote.IMPORT_MAX)
+});
+
+/** Adds the skills an import found, each on its own: one refused never stops the rest. */
+export async function importSkillsAction(
+    input: unknown
+): Promise<Result<({ ok: true; value: SkillView } | { ok: false; error: string })[]>> {
+    const caller = await writer();
+    if ("error" in caller) return { ok: false, error: caller.error };
+    const parsed = importSchema.safeParse(input);
+    if (!parsed.success) {
+        const t = await getTranslations("polar");
+        return { ok: false, error: t("settings.skills.errors.failed") };
+    }
+    const results: ({ ok: true; value: SkillView } | { ok: false; error: string })[] = [];
+    for (const item of parsed.data.items) {
+        const source =
+            item.directory && remote.isDirectoryId(item.directory)
+                ? `${DIRECTORY_SOURCE}${item.directory}`
+                : "custom";
+        results.push(await answer(await store.createSkill(caller.id, item.skill, source)));
+    }
+    return { ok: true, value: results };
 }

@@ -567,7 +567,12 @@
                 "failed": "Couldn't save the skill. Try again.",
                 "noAccess": "Polar isn't available to you.",
                 "viewingAs": "You're viewing as someone else.",
-                "not_found": "That skill no longer exists."
+                "not_found": "That skill no longer exists.",
+                "slowDown": "Too many lookups. Try again in a few minutes.",
+                "unreachable": "Couldn't reach that address. Check it and try again.",
+                "address": "No skill can be read from that address.",
+                "nothing": "There's no SKILL.md there.",
+                "too_many": "Over 30 skills there. Point at one folder."
             },
             "catalog": {
                 "commit-message": {
@@ -602,6 +607,41 @@
                     "title": "Write a bug report",
                     "description": "Steps, expected and actual result, from a vague description."
                 }
+            },
+            "import": "Import",
+            "export": "Export",
+            "download": "Download SKILL.md",
+            "directoryTitle": "Find skills",
+            "directoryIntro": "Skills people publish on skills.sh.",
+            "directorySearch": "Search skills.sh",
+            "directoryHint": "Type 2 or more letters.",
+            "directoryEmpty": "Nothing on skills.sh matches.",
+            "installs": "{count} installs",
+            "importer": {
+                "title": "Import skills",
+                "body": "A SKILL.md, a GitHub repository or folder, a skills.sh page, or a file exported from here.",
+                "url": "Address",
+                "read": "Read",
+                "or": "or",
+                "file": "Choose files",
+                "fileHint": ".md, .json or .zip",
+                "reviewTitle": "Review before adding",
+                "add": "Add {count}",
+                "back": "Back",
+                "fix": "Fix",
+                "instructionsOnly": "Only the instructions are added, not a skill's scripts or other files.",
+                "unreadable": "{name} couldn't be read.",
+                "nothingInFile": "No SKILL.md in that file.",
+                "problems": {
+                    "invalid": "Missing a name, a description or instructions.",
+                    "too_long": "Longer than a skill can be here.",
+                    "duplicate": "You already have a skill with this name."
+                }
+            },
+            "audit": {
+                "pass": "Passed every audit",
+                "warn": "Flagged by {providers}",
+                "fail": "Failed an audit by {providers}"
             }
         },
         "groups": {

@@ -73,9 +73,12 @@ export interface SkillView {
     description: string;
     instructions: string;
     enabled: boolean;
-    /** The catalog id it was added from, or "custom". */
+    /** The catalog id it was added from, `skills.sh:<id>` from the directory, or "custom". */
     source: string;
 }
+
+/** How a skill added from the skills.sh directory records where it came from. */
+export const DIRECTORY_SOURCE = "skills.sh:";
 
 /** Where a draft waits between the editor and the chat that tries it. */
 export const TRIAL_SKILL_KEY = "polar.trialSkill";
