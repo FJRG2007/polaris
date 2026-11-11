@@ -105,3 +105,35 @@ export function totpRemaining(value: string): number {
     const period = parseTotp(value)?.period ?? 30;
     return period - (Math.floor(Date.now() / 1000) % period);
 }
+
+/** The secret alone, upper case in groups of four, as an authenticator app
+ *  asks for it when typed by hand; null when the value is not one. */
+export function totpKey(value: string): string | null {
+    const settings = parseTotp(value);
+    if (!settings) return null;
+    const cleaned = settings.secret.replace(/[\s=-]/g, "").toUpperCase();
+    return (cleaned.match(/.{1,4}/g) ?? []).join(" ");
+}
+
+/**
+ * The `otpauth://` link a QR code carries, so the same key can be added to an
+ * authenticator app: the stored link as it is, or one written for a bare
+ * secret, labelled by the site and the account it signs in to.
+ */
+export function otpauthUri(
+    value: string,
+    label: { issuer: string; account: string }
+): string | null {
+    const settings = parseTotp(value);
+    if (!settings) return null;
+    const trimmed = value.trim();
+    if (trimmed.toLowerCase().startsWith("otpauth://")) return trimmed;
+    const issuer = label.issuer.trim();
+    const account = label.account.trim();
+    const name = issuer && account ? `${issuer}:${account}` : issuer || account || "Polaris";
+    const params = new URLSearchParams({
+        secret: settings.secret.replace(/[\s=-]/g, "").toUpperCase()
+    });
+    if (issuer) params.set("issuer", issuer);
+    return `otpauth://totp/${encodeURIComponent(name)}?${params.toString()}`;
+}

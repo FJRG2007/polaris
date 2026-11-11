@@ -1104,7 +1104,11 @@ export function VaultApp() {
                                     >
                                         {current.login.totp ? (
                                             <div className="px-3 py-2">
-                                                <TotpCode value={current.login.totp} />
+                                                <TotpCode
+                                                    value={current.login.totp}
+                                                    issuer={current.name}
+                                                    account={current.login.username}
+                                                />
                                             </div>
                                         ) : null}
                                         {recoveryCodes ? (

@@ -12,7 +12,7 @@
  * authenticator writes a secret - is GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ.
  */
 
-import { parseTotp, totpCode, totpRemaining } from "../src/totp";
+import { otpauthUri, parseTotp, totpCode, totpKey, totpRemaining } from "../src/totp";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const SEED = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
@@ -100,5 +100,27 @@ describe("how long the code has left", () => {
         expect(totpRemaining(SEED)).toBe(15);
         vi.setSystemTime(59_000);
         expect(totpRemaining(SEED)).toBe(1);
+    });
+});
+
+describe("moving a key to an authenticator app", () => {
+    it("shows the bare secret in groups of four, upper case", () => {
+        expect(totpKey("jbsw y3dp ehpk 3pxp")).toBe("JBSW Y3DP EHPK 3PXP");
+        expect(totpKey("otpauth://totp/Site:ana?secret=JBSWY3DPEHPK3PXP")).toBe(
+            "JBSW Y3DP EHPK 3PXP"
+        );
+        expect(totpKey("not a key!")).toBeNull();
+    });
+
+    it("keeps a stored link as it is and writes one for a bare secret", () => {
+        const stored = "otpauth://totp/Site:ana?secret=JBSWY3DPEHPK3PXP&digits=8";
+        expect(otpauthUri(stored, { issuer: "Other", account: "x" })).toBe(stored);
+        expect(otpauthUri("jbswy3dpehpk3pxp", { issuer: "GitHub", account: "ana@example.test" })).toBe(
+            "otpauth://totp/GitHub%3Aana%40example.test?secret=JBSWY3DPEHPK3PXP&issuer=GitHub"
+        );
+        expect(otpauthUri("JBSWY3DPEHPK3PXP", { issuer: "", account: "" })).toBe(
+            "otpauth://totp/Polaris?secret=JBSWY3DPEHPK3PXP"
+        );
+        expect(otpauthUri("nope!", { issuer: "a", account: "b" })).toBeNull();
     });
 });

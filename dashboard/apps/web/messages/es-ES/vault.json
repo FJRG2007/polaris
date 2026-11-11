@@ -700,7 +700,11 @@
         "label": "Autenticador",
         "unreadable": "No se puede leer esa clave.",
         "copy": "Copiar el código",
-        "copyLabel": "Copiar el código del autenticador"
+        "copyLabel": "Copiar el código del autenticador",
+        "showKey": "Ver clave",
+        "hideKey": "Ocultar clave",
+        "keyLabel": "Clave",
+        "keyHint": "Escanéala o escríbela en otra app de autenticación."
     },
     "qr": {
         "intro": "{surface, select, app {Apunta la cámara al cuadrado que muestra el sitio, pega una captura con Ctrl+V o elige la imagen. Nada de ello sale de esta app.} other {Apunta la cámara al cuadrado que muestra el sitio, pega una captura con Ctrl+V o elige la imagen. Nada de ello sale de este navegador.}}",

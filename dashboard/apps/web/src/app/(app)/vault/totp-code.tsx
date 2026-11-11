@@ -8,12 +8,13 @@
  * happens here, from a secret that was decrypted in this tab.
  */
 
-import { Button } from "@polaris/ui";
-import { Check, Copy } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { Button, CopyButton } from "@polaris/ui";
 import { useEffect, useState } from "react";
+import { Check, Copy, KeyRound } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as core from "@/lib/vault/totp-browser";
-import { totpCode, totpRemaining } from "@/lib/vault/totp-browser";
+import { otpauthUri, totpCode, totpKey, totpRemaining } from "@/lib/vault/totp-browser";
 
 /**
  * The seconds left, as a ring that empties.
@@ -74,8 +75,58 @@ function CountdownRing({ remaining, of }: { remaining: number; of: number }) {
     );
 }
 
-export function TotpCode({ value }: { value: string }) {
+/**
+ * The key itself, to add the same login to an authenticator app: the QR code
+ * a phone scans and the secret for typing by hand. Hidden until asked for -
+ * it is the second factor, and anybody who sees it holds it.
+ */
+function TotpKeyPanel({
+    value,
+    issuer,
+    account
+}: {
+    value: string;
+    issuer: string;
+    account: string;
+}) {
+    const t = useTranslations("vault");
+    const key = totpKey(value);
+    const uri = otpauthUri(value, { issuer, account });
+    if (!key || !uri) return null;
+    return (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-border p-3">
+            {/* Fixed light colours: a QR has to stay readable in dark mode. */}
+            <div className="shrink-0 rounded-md bg-white p-2">
+                <QRCodeSVG value={uri} size={132} bgColor="#ffffff" fgColor="#000000" />
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="text-xs text-muted-foreground">{t("totp.keyLabel")}</span>
+                <div className="flex min-w-0 items-center gap-2">
+                    <code className="min-w-0 break-all font-mono text-sm">{key}</code>
+                    <CopyButton
+                        value={key.replace(/ /g, "")}
+                        label={t("totp.keyLabel")}
+                        className="shrink-0"
+                    />
+                </div>
+                <span className="text-xs text-muted-foreground">{t("totp.keyHint")}</span>
+            </div>
+        </div>
+    );
+}
+
+export function TotpCode({
+    value,
+    issuer = "",
+    account = ""
+}: {
+    value: string;
+    /** The site and the account, which name the key in an authenticator app. */
+    issuer?: string;
+    account?: string;
+}) {
     const [code, setCode] = useState<string | null>(null);
+    const [showKey, setShowKey] = useState(false);
     const [remaining, setRemaining] = useState(30);
     const t = useTranslations("vault");
     const [copied, setCopied] = useState(false);
@@ -106,27 +157,44 @@ export function TotpCode({ value }: { value: string }) {
     }
 
     return (
-        <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1">
-                <span className="text-xs text-muted-foreground">{t("totp.label")}</span>
-                <p className="font-mono text-sm tracking-widest">
-                    {code.slice(0, 3)} {code.slice(3)}
-                </p>
+        <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                    <span className="text-xs text-muted-foreground">{t("totp.label")}</span>
+                    <p className="font-mono text-sm tracking-widest">
+                        {code.slice(0, 3)} {code.slice(3)}
+                    </p>
+                </div>
+                <CountdownRing remaining={remaining} of={core.parseTotp(value)?.period ?? 30} />
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    title={t("totp.copy")}
+                    aria-label={t("totp.copyLabel")}
+                    onClick={async () => {
+                        await navigator.clipboard.writeText(code);
+                        setCopied(true);
+                        window.setTimeout(() => setCopied(false), 2000);
+                    }}
+                >
+                    {copied ? (
+                        <Check className="size-4 text-success" />
+                    ) : (
+                        <Copy className="size-4" />
+                    )}
+                </Button>
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    title={showKey ? t("totp.hideKey") : t("totp.showKey")}
+                    aria-label={showKey ? t("totp.hideKey") : t("totp.showKey")}
+                    aria-pressed={showKey}
+                    onClick={() => setShowKey((shown) => !shown)}
+                >
+                    <KeyRound className="size-4 shrink-0" />
+                </Button>
             </div>
-            <CountdownRing remaining={remaining} of={core.parseTotp(value)?.period ?? 30} />
-            <Button
-                size="icon"
-                variant="ghost"
-                title={t("totp.copy")}
-                aria-label={t("totp.copyLabel")}
-                onClick={async () => {
-                    await navigator.clipboard.writeText(code);
-                    setCopied(true);
-                    window.setTimeout(() => setCopied(false), 2000);
-                }}
-            >
-                {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
-            </Button>
+            {showKey ? <TotpKeyPanel value={value} issuer={issuer} account={account} /> : null}
         </div>
     );
 }
