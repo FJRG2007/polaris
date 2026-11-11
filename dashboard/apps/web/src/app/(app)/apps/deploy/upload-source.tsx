@@ -476,7 +476,6 @@ export function UploadedSourceSection({
                             if (picked && !pending) send();
                         }}
                         aria-disabled={pending || !picked}
-                        className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
                     >
                         {pending && <Loader2 className="animate-spin" aria-hidden />}{" "}
                         {t("upload.send")}

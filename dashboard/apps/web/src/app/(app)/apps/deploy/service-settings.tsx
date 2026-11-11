@@ -2065,7 +2065,6 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                                     if (!submitBlocked) submitExposure();
                                 }}
                                 aria-disabled={submitBlocked}
-                                className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
                             >
                                 {pending && <Loader2 className="animate-spin" aria-hidden />}
                                 {submitLabel}

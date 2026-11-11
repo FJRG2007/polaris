@@ -576,7 +576,6 @@ export function SaveBar({
                 onClick={() => {
                     if (!blocked) onSave();
                 }}
-                className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
             >
                 {pending && <Loader2 className="animate-spin" aria-hidden />}
                 {label ?? t("kit.save")}
