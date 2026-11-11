@@ -1191,7 +1191,10 @@
     "settings": {
         "confirmTrash": "Confirmar envío a papelera",
         "confirmTrashHint": "Pide confirmación antes de mover algo a la papelera. Borrar para siempre pregunta siempre.",
-        "saveFailed": "No se pudo guardar. Inténtalo de nuevo."
+        "saveFailed": "No se pudo guardar. Inténtalo de nuevo.",
+        "trashKeep": "Vaciado",
+        "trashKeepHint": "Lo que está en la papelera se elimina para siempre al llegar a esta antigüedad.",
+        "trashKeepChoice": "{days, plural, =0 {Hasta que la vacíe} =1 {Después de un día} other {Después de # días}}"
     },
     "disposable": {
         "title": "Envío rápido",

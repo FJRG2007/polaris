@@ -220,6 +220,7 @@ export const mailAccountEditSchema = z.object({
 export const MAIL_TRASH_KEEP_CHOICES: readonly { readonly days: number; readonly label: string }[] =
     [
         { days: 0, label: "Until I empty it" },
+        { days: 1, label: "After a day" },
         { days: 7, label: "After 7 days" },
         { days: 30, label: "After 30 days" },
         { days: 60, label: "After 60 days" },

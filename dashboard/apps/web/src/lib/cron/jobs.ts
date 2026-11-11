@@ -18,6 +18,7 @@ import { purgeRecycleBin } from "@/lib/deploy/recycle-bin";
 import { pruneOldRestorePoints } from "@/lib/restore-points/service";
 import { withLease } from "./lease";
 import { sweepTrash } from "@/lib/mailbox/trash";
+import { sweepDriveTrash } from "@/lib/trash-service";
 import { wakeSnoozed } from "@/lib/mailbox/messages";
 import { sweepBounces } from "@/lib/mailbox/bounces";
 import { sweepExpiredSends } from "@/lib/vault/sends";
@@ -504,6 +505,14 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: 24 * HOUR,
         leaseMs: 25 * HOUR,
         run: sweepTrash
+    },
+    {
+        key: "drive-trash",
+        // Every few hours, so "after a day" means about a day. Leased: two
+        // passes would each ask the storage to delete the same files.
+        everyMs: 6 * HOUR,
+        leaseMs: 7 * HOUR,
+        run: sweepDriveTrash
     },
     {
         key: "mail-uploads",

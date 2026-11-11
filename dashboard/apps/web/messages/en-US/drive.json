@@ -1191,7 +1191,10 @@
     "settings": {
         "confirmTrash": "Ask before moving to Trash",
         "confirmTrashHint": "Show a confirmation before anything goes to the recycle bin. Deleting permanently always asks.",
-        "saveFailed": "Could not save that. Try again."
+        "saveFailed": "Could not save that. Try again.",
+        "trashKeep": "Empty the bin",
+        "trashKeepHint": "Items in the bin are deleted for good once they are this old.",
+        "trashKeepChoice": "{days, plural, =0 {Until I empty it} =1 {After a day} other {After # days}}"
     },
     "disposable": {
         "title": "Quick send",

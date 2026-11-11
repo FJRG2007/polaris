@@ -155,6 +155,9 @@ describe("the work Polaris runs on a schedule", () => {
             // The security pass tells people about regressions and fixes dedicated
             // domains; two runners would tell them twice and write the same records.
             "domain-security",
+            // Two passes would each ask the storage to delete the same old
+            // files from the same bin.
+            "drive-trash",
             // Two passes would each write the same server's switch, and read
             // the token the other was about to write.
             "game-anticheat-default",

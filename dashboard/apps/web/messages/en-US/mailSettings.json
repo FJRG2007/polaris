@@ -251,7 +251,7 @@
         "trashHint": "Messages in this mailbox's trash are deleted on the mail server once they are this old",
         "trash": "Empty the trash",
         "trashLabel": "When this mailbox's trash is emptied",
-        "trashKeep": "{days, plural, =0 {Until I empty it} other {After # days}}",
+        "trashKeep": "{days, plural, =0 {Until I empty it} =1 {After a day} other {After # days}}",
         "checkNow": "Check this mailbox now",
         "edit": "Edit this mailbox",
         "share": "Share this mailbox",

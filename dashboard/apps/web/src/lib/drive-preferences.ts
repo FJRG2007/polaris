@@ -10,18 +10,31 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
+import { MAIL_TRASH_KEEP_CHOICES } from "@polaris/core";
+
+/** How long something stays in the bin before it is deleted for good: the
+ *  same choices as Mail's, 0 being "until I empty it". */
+export const DRIVE_TRASH_KEEP_DAYS: readonly number[] = MAIL_TRASH_KEEP_CHOICES.map(
+    (choice) => choice.days
+);
 
 const fields = {
     /** Whether moving something to the bin asks first. Turned off from the
      *  question itself ("Don't ask again"), and back on in Drive > Settings. */
-    confirmTrash: z.boolean()
+    confirmTrash: z.boolean(),
+    /** Days an item stays in the bin; 0 keeps it until the bin is emptied,
+     *  which is what Drive always did, so it is the default. */
+    trashKeepDays: z
+        .number()
+        .int()
+        .refine((days) => DRIVE_TRASH_KEEP_DAYS.includes(days))
 };
 
 export const drivePreferencesSchema = z.object(fields);
 
 export type DrivePreferences = z.infer<typeof drivePreferencesSchema>;
 
-export const DEFAULT_DRIVE_PREFERENCES: DrivePreferences = { confirmTrash: true };
+export const DEFAULT_DRIVE_PREFERENCES: DrivePreferences = { confirmTrash: true, trashKeepDays: 0 };
 
 /** Every field present and valid, whatever the stored document holds. */
 export function readDrivePreferences(raw: string | null | undefined): DrivePreferences {
@@ -33,10 +46,14 @@ export function readDrivePreferences(raw: string | null | undefined): DrivePrefe
     }
     const value = (parsed && typeof parsed === "object" ? parsed : {}) as Record<string, unknown>;
     const confirmTrash = fields.confirmTrash.safeParse(value.confirmTrash);
+    const trashKeepDays = fields.trashKeepDays.safeParse(value.trashKeepDays);
     return {
         confirmTrash: confirmTrash.success
             ? confirmTrash.data
-            : DEFAULT_DRIVE_PREFERENCES.confirmTrash
+            : DEFAULT_DRIVE_PREFERENCES.confirmTrash,
+        trashKeepDays: trashKeepDays.success
+            ? trashKeepDays.data
+            : DEFAULT_DRIVE_PREFERENCES.trashKeepDays
     };
 }
 
@@ -56,7 +73,11 @@ export async function saveDrivePreferences(
 ): Promise<DrivePreferences> {
     const current = await loadDrivePreferences(userId);
     const next = drivePreferencesSchema.parse({ ...current, ...patch });
-    if (next.confirmTrash === current.confirmTrash) return current;
+    if (
+        next.confirmTrash === current.confirmTrash &&
+        next.trashKeepDays === current.trashKeepDays
+    )
+        return current;
     const value = JSON.stringify(next);
     await prisma.drivePreference.upsert({
         where: { userId },

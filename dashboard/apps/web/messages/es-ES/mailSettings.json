@@ -251,7 +251,7 @@
         "trashHint": "Los mensajes de la papelera de este buzón se eliminan en el servidor de correo cuando tienen esta antigüedad",
         "trash": "Vaciar la papelera",
         "trashLabel": "Cuándo se vacía la papelera de este buzón",
-        "trashKeep": "{days, plural, =0 {Hasta que la vacíe} other {Después de # días}}",
+        "trashKeep": "{days, plural, =0 {Hasta que la vacíe} =1 {Después de un día} other {Después de # días}}",
         "checkNow": "Revisar este buzón ahora",
         "edit": "Editar este buzón",
         "share": "Compartir este buzón",

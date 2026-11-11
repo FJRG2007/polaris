@@ -12,6 +12,7 @@ import { randomBytes } from "node:crypto";
 import { getDriver } from "@/lib/storage-service";
 import { baseName, normalizeRelPath } from "@polaris/core";
 import { POLARIS_DIR, TRASH_DIR } from "@/lib/system-paths";
+import { readDrivePreferences } from "@/lib/drive-preferences";
 import { invalidateFolderSizes, invalidateFolderSizesMany } from "@/lib/drive-folder-size";
 
 export { TRASH_DIR };
@@ -402,4 +403,50 @@ export async function emptyTrash(ownerId: string): Promise<void> {
         }
     }
     await prisma.trashItem.deleteMany({ where: { ownerId } });
+}
+
+/** The most items one owner's sweep deletes in a pass; the rest go next pass. */
+const SWEEP_BATCH = 500;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Delete for good what has sat in each person's bin longer than they chose in
+ * Drive > Settings. Somebody who never chose keeps their bin until they empty
+ * it, as Drive always did.
+ *
+ * The choice is held in a JSON document, so the rows that name a choice at all
+ * are found first and read in code; there is one per person who changed a Drive
+ * setting. Never throws: one unreachable storage must not stop the sweep for
+ * everybody else.
+ */
+export async function sweepDriveTrash(): Promise<number> {
+    const rows = await prisma.drivePreference.findMany({
+        where: { value: { contains: '"trashKeepDays"' } },
+        select: { userId: true, value: true }
+    });
+    let deleted = 0;
+    for (const row of rows) {
+        const days = readDrivePreferences(row.value).trashKeepDays;
+        if (days <= 0) continue;
+        try {
+            const old = await prisma.trashItem.findMany({
+                where: {
+                    ownerId: row.userId,
+                    deletedAt: { lt: new Date(Date.now() - days * DAY_MS) }
+                },
+                select: { id: true },
+                orderBy: { deletedAt: "asc" },
+                take: SWEEP_BATCH
+            });
+            if (old.length === 0) continue;
+            const outcome = await deleteTrashItemsForever(
+                row.userId,
+                old.map((item) => item.id)
+            );
+            deleted += old.length - outcome.failures.length;
+        } catch (caught) {
+            console.error("drive: trash sweep failed for one account", caught);
+        }
+    }
+    return deleted;
 }
