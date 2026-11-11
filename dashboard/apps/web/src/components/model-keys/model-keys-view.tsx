@@ -42,6 +42,7 @@ import {
     ChevronUp,
     Gauge,
     GripVertical,
+    MoreHorizontal,
     Pencil,
     Plus,
     RotateCcw,
@@ -58,6 +59,11 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
     Input,
     isDirty,
     Switch,
@@ -385,7 +391,7 @@ export function ModelKeysView({
                                     {/* w-full max-w-0: the name is the column that gives, so
                                         a long one truncates instead of spilling the table
                                         sideways. */}
-                                    <th className="w-full max-w-0 px-3 py-2 font-medium">
+                                    <th className="w-full min-w-24 max-w-0 whitespace-nowrap px-3 py-2 font-medium">
                                         {t("modelKeys.name")}
                                     </th>
                                     {statuses ? (
@@ -626,63 +632,60 @@ function KeyRow({
                     <Button
                         variant="ghost"
                         size="icon"
-                        disabled={index === 0}
-                        onClick={() => onMove(index, index - 1)}
-                        aria-label={t("modelKeys.earlier", { name: row.name })}
-                        title={t("modelKeys.moveUp")}
-                    >
-                        <ChevronUp className="size-4 shrink-0" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={index === total - 1}
-                        onClick={() => onMove(index, index + 1)}
-                        aria-label={t("modelKeys.later", { name: row.name })}
-                        title={t("modelKeys.moveDown")}
-                    >
-                        <ChevronDown className="size-4 shrink-0" />
-                    </Button>
-                    {onRevive && status && isCoolingState(status.state) ? (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={onRevive}
-                            aria-label={t("modelKeys.status.reviveNamed", { name: row.name })}
-                            title={t("modelKeys.status.revive")}
-                        >
-                            <RotateCcw className="size-4 shrink-0" />
-                        </Button>
-                    ) : null}
-                    {onLimits ? (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={onLimits}
-                            aria-label={t("modelKeys.limits.named", { name: row.name })}
-                            title={t("modelKeys.limits.action")}
-                        >
-                            <Gauge className="size-4 shrink-0" />
-                        </Button>
-                    ) : null}
-                    <Button
-                        variant="ghost"
-                        size="icon"
                         onClick={onEdit}
                         aria-label={t("modelKeys.editNamed", { name: row.name })}
                         title={t("modelKeys.edit")}
                     >
                         <Pencil className="size-4 shrink-0" />
                     </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onRemove}
-                        aria-label={t("modelKeys.deleteNamed", { name: row.name })}
-                        title={t("modelKeys.delete")}
-                    >
-                        <Trash2 className="size-4 shrink-0" />
-                    </Button>
+                    {/* The rest in one menu, so every row ends in the same two
+                        buttons and a key that can be revived does not push its
+                        row out of line with the others. */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={t("modelKeys.moreNamed", { name: row.name })}
+                                title={t("modelKeys.more")}
+                            >
+                                <MoreHorizontal className="size-4 shrink-0" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="min-w-44">
+                            {onRevive && status && isCoolingState(status.state) ? (
+                                <DropdownMenuItem onSelect={onRevive}>
+                                    <RotateCcw />
+                                    {t("modelKeys.status.revive")}
+                                </DropdownMenuItem>
+                            ) : null}
+                            <DropdownMenuItem
+                                disabled={index === 0}
+                                onSelect={() => onMove(index, index - 1)}
+                            >
+                                <ChevronUp />
+                                {t("modelKeys.moveUp")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                disabled={index === total - 1}
+                                onSelect={() => onMove(index, index + 1)}
+                            >
+                                <ChevronDown />
+                                {t("modelKeys.moveDown")}
+                            </DropdownMenuItem>
+                            {onLimits ? (
+                                <DropdownMenuItem onSelect={onLimits}>
+                                    <Gauge />
+                                    {t("modelKeys.limits.action")}
+                                </DropdownMenuItem>
+                            ) : null}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem variant="danger" onSelect={onRemove}>
+                                <Trash2 />
+                                {t("modelKeys.delete")}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </td>
         </tr>

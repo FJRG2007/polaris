@@ -1004,6 +1004,8 @@
         "later": "Try {name} later",
         "moveDown": "Move down",
         "editNamed": "Edit {name}",
+        "more": "More",
+        "moreNamed": "More for {name}",
         "edit": "Edit",
         "off": "Disabled",
         "turnOff": "Turn off",

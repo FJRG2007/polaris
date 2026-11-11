@@ -1004,6 +1004,8 @@
         "later": "Probar {name} después",
         "moveDown": "Bajar",
         "editNamed": "Editar {name}",
+        "more": "Más",
+        "moreNamed": "Más para {name}",
         "edit": "Editar",
         "off": "Desactivada",
         "turnOff": "Apagar",
