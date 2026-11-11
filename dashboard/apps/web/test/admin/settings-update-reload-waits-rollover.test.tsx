@@ -32,6 +32,12 @@ vi.mock("@/app/(app)/admin/settings/transfer-actions", () => ({
 vi.mock("@/app/(app)/admin/domains/actions", () => ({ removeAddressAction: async () => ({}) }));
 vi.mock("@/lib/use-password-safety", () => ({ usePasswordSafety: () => null }));
 vi.mock("@/lib/new-build", () => ({ checkForNewBuild: async () => false }));
+/** The call this page is in, or null. */
+let heldCall: unknown = null;
+vi.mock("@/app/(app)/chat/call-hold", async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    useHeldCall: () => heldCall
+}));
 
 const { SettingsView } = await import("@/app/(app)/admin/settings/settings-view");
 
@@ -62,6 +68,7 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
 const reload = vi.fn();
 
 beforeEach(() => {
+    heldCall = null;
     reload.mockClear();
     fetchMock.mockClear();
     vi.stubGlobal("fetch", fetchMock);
@@ -118,5 +125,16 @@ describe("reloading onto the new build", () => {
             await vi.advanceTimersByTimeAsync(15_000);
         });
         expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not reload a page that is in a call, and says why", async () => {
+        heldCall = { session: { meetingId: "m", channelId: "c" }, withVideo: false, viewerId: "v" };
+        answeredBy = ["old", "new", "old", "new"];
+        const { container } = view();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(15_000);
+        });
+        expect(reload).not.toHaveBeenCalled();
+        expect(container.textContent).toContain("You are in a call, so this page does not reload by itself");
     });
 });

@@ -21,6 +21,7 @@
 
 import type { SettingsOverview } from "./overview";
 import { checkForNewBuild } from "@/lib/new-build";
+import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { clearUpdateInProgress, markUpdateInProgress } from "@/lib/update-in-progress";
 import { LogViewer } from "@/components/log-viewer";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -218,6 +219,10 @@ export function SettingsView({
 }) {
     const format = useDisplayFormat();
     const t = useTranslations("admin");
+    // Read when the update finishes, which is a callback long after this render.
+    const held = useHeldCall();
+    const inCall = useRef(false);
+    inCall.current = Boolean(held?.session);
     // Null until the overview lands. The card draws its shape meanwhile rather
     // than a sentence about a check that has not happened - "Up to date" before
     // anybody has looked is the one thing this line must never say.
@@ -643,12 +648,26 @@ export function SettingsView({
         }
     }
 
-    /** Stop everything and reload, so the page comes back on the new build. */
+    /**
+     * Stop everything and reload, so the page comes back on the new build.
+     *
+     * Not while a call is on in this page. Reloading here left the call, and in
+     * the desktop app a reload that lands while the edge is still switching
+     * builds goes through its error screen, which is a navigation the call is
+     * never walked back from - so the person was out of the call without being
+     * told. The update notice takes over instead: it offers the reload and
+     * carries the call through it (`call-resume`).
+     */
     function finish(message: string): void {
         stopPolling();
         // The run is over, so the page that comes back after this reload has no
         // run of its own to wait for.
         forgetRunStart();
+        if (inCall.current) {
+            setUpdateMsg(t("settings.run.doneInCall"));
+            void checkForNewBuild();
+            return;
+        }
         setUpdateMsg(message);
         setTimeout(() => window.location.reload(), 1200);
     }

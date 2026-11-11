@@ -99,6 +99,25 @@ function offeredNote(): boolean {
 export function takeRememberedCall(
     viewerId: string
 ): { session: CallSession; video: boolean } | null {
+    const note = takeCallNote(viewerId);
+    return note?.kind === "resume" ? { session: note.session, video: note.video } : null;
+}
+
+/**
+ * What the note says about the call this tab was on: walk back into it, or it
+ * was lost - the page was left mid-call by something other than a reload, such
+ * as the desktop app moving the window to another address or showing its
+ * error screen while Polaris switched builds. A lost call is not rejoined on
+ * its own (a microphone must not open itself), but it is said, so nobody sits
+ * in a dashboard believing they are still in the call. Null for no note, or a
+ * note that is stale or somebody else's.
+ */
+export function takeCallNote(
+    viewerId: string
+):
+    | { kind: "resume"; session: CallSession; video: boolean }
+    | { kind: "lost"; session: CallSession }
+    | null {
     if (typeof window === "undefined") return null;
     let raw: string | null = null;
     try {
@@ -120,8 +139,8 @@ export function takeRememberedCall(
             return null;
         if (note.viewerId !== viewerId) return null;
         if (typeof note.at !== "number" || Date.now() - note.at > WINDOW_MS) return null;
-        if (note.reason === "leaving" && !reloaded()) return null;
-        return { session, video: note.video === true };
+        if (note.reason === "leaving" && !reloaded()) return { kind: "lost", session };
+        return { kind: "resume", session, video: note.video === true };
     } catch {
         return null;
     }

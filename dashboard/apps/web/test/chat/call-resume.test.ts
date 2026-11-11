@@ -13,7 +13,7 @@
 
 import type { CallSession } from "@/app/(app)/chat/call-hold";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { rememberCall, takeRememberedCall } from "@/app/(app)/chat/call-resume";
+import { rememberCall, takeCallNote, takeRememberedCall } from "@/app/(app)/chat/call-resume";
 
 const SESSION: CallSession = {
     meetingId: "019f8506-683f-7dd0-9c13-1e9ee9237fe3",
@@ -114,6 +114,14 @@ describe("the note a page leaves on its way out", () => {
         rememberCall(SESSION, false, VIEWER, "leaving");
         loadedBy("reload");
         expect(takeRememberedCall(VIEWER)?.session).toEqual(SESSION);
+    });
+
+    it("says the call was lost when the page came back some other way", () => {
+        rememberCall(SESSION, false, VIEWER, "leaving");
+        loadedBy("navigate");
+        expect(takeCallNote(VIEWER)).toEqual({ kind: "lost", session: SESSION });
+        // Read once, like every other note.
+        expect(takeCallNote(VIEWER)).toBeNull();
     });
 
     it("does not after navigating away and back", () => {

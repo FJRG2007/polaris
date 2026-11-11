@@ -1,4 +1,9 @@
 {
+    "callLost": {
+        "title": "You left the call",
+        "body": "The page was replaced while you were in it. The others may still be there.",
+        "rejoin": "Rejoin"
+    },
     "errors": {
         "notInConversation": "You are not in that conversation",
         "channelMenu": {

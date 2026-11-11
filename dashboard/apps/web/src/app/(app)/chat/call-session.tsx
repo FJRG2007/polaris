@@ -23,7 +23,7 @@ import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCall } from "./use-call";
 import { CallAudio } from "./call-audio";
-import { Button, cn, useShortcutHint } from "@polaris/ui";
+import { Button, cn, useShortcutHint, useToast } from "@polaris/ui";
 import { useCallHotkeys } from "./call-hotkeys";
 import { useCallRecorder } from "./call-recorder";
 import { useCallRemote } from "./call-remote-hook";
@@ -31,7 +31,7 @@ import { useChatStream } from "./use-chat-stream";
 import { playCallSound } from "@/lib/call-sounds";
 import { RecordingPanel } from "./recording-panel";
 import { usePresenceRefresh } from "@/components/presence-store";
-import { rememberCall, takeRememberedCall } from "./call-resume";
+import { rememberCall, takeCallNote } from "./call-resume";
 import { handsQueueSummary, type HandInQueue } from "./call-signals";
 import { ControlHint } from "./control-hint";
 import { useRingBack } from "./ring-back";
@@ -130,11 +130,36 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
      * and a room that has since ended is a state the provider already knows how
      * to let go of.
      */
+    const tl = useTranslations("chat");
+    const toast = useToast();
     useEffect(() => {
-        const back = takeRememberedCall(viewerId);
+        const back = takeCallNote(viewerId);
+        if (!back) return;
         // Brought back, never rung again: whoever was being rung may have
         // answered while this page was loading.
-        if (back) enter({ ...back.session, placedAt: undefined }, back.video);
+        const session = { ...back.session, placedAt: undefined };
+        if (back.kind === "resume") {
+            enter(session, back.video);
+            return;
+        }
+        // Lost to a page that was replaced rather than reloaded: said, and one
+        // press away, never rejoined by itself.
+        toast.show({
+            key: `call-lost:${session.meetingId}`,
+            title: tl("callLost.title"),
+            body: tl("callLost.body"),
+            actions: [
+                {
+                    label: tl("callLost.rejoin"),
+                    run: async () => {
+                        enter(session, false);
+                        return null;
+                    }
+                }
+            ]
+        });
+        // Once per page: the note is gone as soon as it is read.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [enter, viewerId]);
 
     /**

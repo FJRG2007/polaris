@@ -62,6 +62,15 @@ export function setCallHotkeys(sender: WebContents, input: CallHotkeysInput): Ca
     return result;
 }
 
+/**
+ * Whether the page in `contents` is in a call: it took the call's keys and has
+ * not let them go. The page asks for them for the whole of every call, with or
+ * without bindings, so this is the app's one reading of "a call is on here".
+ */
+export function holdsCall(contents: WebContents): boolean {
+    return holder === contents && !contents.isDestroyed();
+}
+
 /** Let every key go, as the app quits. */
 export function releaseCallHotkeys(): void {
     release();

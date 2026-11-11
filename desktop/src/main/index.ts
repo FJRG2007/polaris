@@ -20,7 +20,7 @@
 
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
-import { releaseCallHotkeys } from "./call-hotkeys";
+import { holdsCall, releaseCallHotkeys } from "./call-hotkeys";
 import { DEEP_LINK_SCHEME, deepLinkIn, readDeepLink } from "@/shared/deep-link";
 import { DeepLinks } from "./deep-links";
 import { registerMailHandler } from "./mail-handler";
@@ -275,13 +275,19 @@ function watchForPrimary(window: BrowserWindow): void {
             .resolve()
             .then((resolved) => {
                 if (current !== primary || !alternate || window.isDestroyed()) return;
+                // Moving loads another page, and a call does not survive that:
+                // the person was taken out of it with the window in the
+                // background and nothing said. The alternate is the same
+                // Polaris, so the window stays on it until the call is over.
+                if (holdsCall(window.webContents)) return;
                 const step = backStep(resolved, primary, window.isFocused());
                 if (step === "now") moveTo(window, null);
                 if (step !== "on-blur" || waitingForBlur) return;
                 waitingForBlur = true;
                 window.once("blur", () => {
                     waitingForBlur = false;
-                    if (current === primary && alternate && !window.isDestroyed()) moveTo(window, null);
+                    if (window.isDestroyed() || holdsCall(window.webContents)) return;
+                    if (current === primary && alternate) moveTo(window, null);
                 });
             })
             .catch(() => undefined);

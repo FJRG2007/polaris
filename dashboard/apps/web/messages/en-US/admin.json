@@ -3815,6 +3815,7 @@
             "noLiveLog": "Updating - this host writes no live log. Reconnecting when Polaris is back...",
             "serving": "The new build is serving - reloading...",
             "complete": "Update complete - reloading...",
+            "doneInCall": "Update installed. You are in a call, so this page does not reload by itself: press Reload on the update notice when it suits you, and you stay in the call.",
             "failed": "Update failed (exit code {code}). See the log below.",
             "failedUnknown": "Update failed (exit code unknown). See the log below."
         },

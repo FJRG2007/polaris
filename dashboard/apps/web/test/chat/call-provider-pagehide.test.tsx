@@ -104,3 +104,36 @@ describe("leaving the page mid-call", () => {
         expect(window.sessionStorage.getItem(KEY)).toBeNull();
     });
 });
+
+/** What the provider holds, drawn so a test can read it. */
+function InCall() {
+    const { session } = useCallHold();
+    return <span>{session ? `in ${session.meetingId}` : "not in a call"}</span>;
+}
+
+describe("coming back to a page that was replaced mid-call", () => {
+    it("says the call was lost, and rejoins only when asked", async () => {
+        const { ToastProvider } = await import("@polaris/ui");
+        const { MessagesWrapper } = await import("../setup/i18n");
+        // Left mid-call, and loaded again by a navigation rather than a reload -
+        // the desktop app's error screen while the edge switched builds.
+        window.sessionStorage.setItem(
+            KEY,
+            JSON.stringify({ session: SESSION, video: false, viewerId: VIEWER, reason: "leaving", at: Date.now() })
+        );
+        render(
+            <ToastProvider>
+                <CallProvider viewerId={VIEWER}>
+                    <InCall />
+                </CallProvider>
+            </ToastProvider>,
+            { wrapper: MessagesWrapper }
+        );
+
+        expect(await screen.findByText("You left the call")).toBeTruthy();
+        expect(screen.getByText("not in a call")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Rejoin" }));
+        expect(await screen.findByText(`in ${SESSION.meetingId}`)).toBeTruthy();
+    });
+});

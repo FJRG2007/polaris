@@ -3815,6 +3815,7 @@
             "noLiveLog": "Actualizando. Este servidor no escribe registro en directo. Se volverá a conectar cuando Polaris vuelva...",
             "serving": "La nueva compilación ya está sirviendo. Recargando...",
             "complete": "Actualización completada. Recargando...",
+            "doneInCall": "Actualización instalada. Estás en una llamada, así que esta página no se recarga sola: pulsa Recargar en el aviso cuando te venga bien y seguirás en la llamada.",
             "failed": "La actualización ha fallado (código de salida {code}). Mira el registro de abajo.",
             "failedUnknown": "La actualización ha fallado (código de salida desconocido). Mira el registro de abajo."
         },
