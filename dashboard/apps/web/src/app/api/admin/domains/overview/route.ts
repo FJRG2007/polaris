@@ -17,6 +17,7 @@
 import { NextResponse } from "next/server";
 import { apiAdmin } from "@/lib/api-session";
 
+import { lanSignInView } from "@/lib/lan-sign-in";
 import { getDomainZones } from "@/lib/domain-zones";
 import { ownerDomainPolicy } from "@/lib/owner-domains";
 import { checkedAddresses } from "@/lib/address-health";
@@ -29,13 +30,21 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<Response> {
     const refused = await apiAdmin();
     if (refused instanceof Response) return refused;
-    const [config, effectiveAppUrl, zones, addresses, ownerPolicy] = await Promise.all([
+    const [config, effectiveAppUrl, zones, addresses, ownerPolicy, lanSignIn] = await Promise.all([
         getDomainConfig(),
         appBaseUrl(),
         getDomainZones(),
         checkedAddresses(),
-        ownerDomainPolicy()
+        ownerDomainPolicy(),
+        lanSignInView()
     ]);
-    const overview: DomainsOverview = { config, zones, addresses, effectiveAppUrl, ownerPolicy };
+    const overview: DomainsOverview = {
+        config,
+        zones,
+        addresses,
+        effectiveAppUrl,
+        ownerPolicy,
+        lanSignIn
+    };
     return NextResponse.json(overview);
 }

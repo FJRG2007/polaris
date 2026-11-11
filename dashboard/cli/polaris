@@ -6,6 +6,21 @@
 set -eu
 
 INSTALL_DIR="${POLARIS_INSTALL_DIR:-__POLARIS_INSTALL_DIR__}"
+# Run straight from a checkout (`sh dashboard/cli/polaris ...`) the path was never
+# baked in: the checkout is two folders up. Spelled in two halves so the
+# installer's substitution, which rewrites the placeholder, leaves this test alone.
+if [ "$INSTALL_DIR" = "__POLARIS_""INSTALL_DIR__" ]; then
+    INSTALL_DIR=$(cd "$(dirname "$0")/../.." && pwd)
+fi
+# The copy in /usr/local/bin is written once, by the installer; the Update button
+# refreshes the checkout but cannot reach that folder. So the installed copy hands
+# over to the checkout's, and a command added in an update is there as soon as the
+# update is.
+CHECKOUT_CLI="$INSTALL_DIR/dashboard/cli/polaris"
+if [ -z "${POLARIS_CLI_HANDED_OVER:-}" ] && [ -f "$CHECKOUT_CLI" ] \
+    && [ "$(cd "$(dirname "$0")" && pwd)/$(basename "$0")" != "$CHECKOUT_CLI" ]; then
+    POLARIS_CLI_HANDED_OVER=1 POLARIS_INSTALL_DIR="$INSTALL_DIR" exec sh "$CHECKOUT_CLI" "$@"
+fi
 COMPOSE_DIR="$INSTALL_DIR/dashboard/docker"
 ENV_FILE="$COMPOSE_DIR/.env"
 
@@ -114,9 +129,45 @@ pretty_status() {
     printf '\n'
 }
 
-# Diagnose common deployment faults without mutating anything. Today it catches
-# the DB password desync (P1000): the password baked into the postgres volume at
-# first init no longer matches the one in .env, so the web can never authenticate.
+# This machine's private address on its network: the one its default route
+# leaves from. Docker's bridges are private too, and none is how a phone reaches it.
+lan_addresses() {
+    { ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p'; } \
+        | grep -E '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)' || true
+}
+
+# Allow or stop signing in on this machine's private address - the same switch as
+# Admin > Domains > Sign in by local IP. Written straight to the database, so it
+# works for an operator who cannot sign in yet; the web reads it per request.
+lan_access() {
+    key="auth.lanSignIn"
+    case "${1:-status}" in
+        on) sql="INSERT INTO \"Setting\" (id, key, value, scope) VALUES (gen_random_uuid(), '$key', 'on', 'global') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value; SELECT 'on';" ;;
+        off) sql="DELETE FROM \"Setting\" WHERE key = '$key'; SELECT 'off';" ;;
+        status) sql="SELECT COALESCE((SELECT value FROM \"Setting\" WHERE key = '$key'), 'off');" ;;
+        *) die "usage: polaris lan-access [on|off|status]" ;;
+    esac
+    db_user=$(val POSTGRES_USER || true)
+    db_name=$(val POSTGRES_DB || true)
+    state=$(compose exec -T postgres psql -U "${db_user:-polaris}" -d "${db_name:-polaris}" \
+        -v ON_ERROR_STOP=1 -tAc "$sql" | tail -n1) \
+        || die "could not reach the database. Check that Polaris is running: polaris status"
+    if [ "$state" = "on" ]; then
+        echo "Sign-in by local IP is on."
+        addresses=$(lan_addresses)
+        if [ -n "$addresses" ]; then
+            echo "Open Polaris on:"
+            printf '%s\n' "$addresses" | sed 's#^#  https://#'
+        fi
+        echo "Turn it off with: polaris lan-access off"
+    else
+        echo "Sign-in by local IP is off. Sign in on $(val POLARIS_APP_URL || true), or turn it on with: polaris lan-access on"
+    fi
+}
+
+# Diagnose common deployment faults without changing anything: the DB password
+# desync (P1000), keys in .env that are not the shape the web needs, sign-ins
+# refused for the address they were made on, and the placeholder domain.
 doctor() {
     esc=$(printf '\033'); r="${esc}[0m"; green="${esc}[32m"; yellow="${esc}[33m"; red="${esc}[31m"
     problems=0
@@ -148,8 +199,50 @@ doctor() {
         fi
     fi
 
-    site=$(val POLARIS_SITE_ADDRESS)
-    appurl=$(val POLARIS_APP_URL)
+    # The master key encrypts every stored credential and must be 32 random bytes,
+    # base64. A hand-typed value of 32 characters decodes to 24 and breaks every
+    # encrypted read and write while the rest of Polaris keeps running.
+    master=$(val POLARIS_MASTER_KEY || true)
+    if [ -n "$master" ]; then
+        bytes=$(printf '%s' "$master" | base64 -d 2>/dev/null | wc -c | tr -d ' ')
+        if [ "$bytes" != "32" ]; then
+            printf '  %s[fail]%s POLARIS_MASTER_KEY decodes to %s bytes; it must be 32.\n' "$red" "$r" "${bytes:-0}"
+            printf '         Saved passwords and keys cannot be read or written until it is fixed.\n'
+            store="${POLARIS_SECRETS_FILE:-/var/lib/polaris/secrets.env}"
+            kept=$(sed -n 's/^POLARIS_MASTER_KEY=//p' "$store" 2>/dev/null | head -n1 || true)
+            kept_bytes=$(printf '%s' "$kept" | base64 -d 2>/dev/null | wc -c | tr -d ' ')
+            if [ -n "$kept" ] && [ "$kept" != "$master" ] && [ "$kept_bytes" = "32" ]; then
+                printf '         The installer kept the original in %s.\n' "$store"
+                printf '         Copy its POLARIS_MASTER_KEY line into %s, then run: polaris start\n' "$ENV_FILE"
+            else
+                printf '         Make a new one with: openssl rand -base64 32\n'
+                printf '         Put it in %s as POLARIS_MASTER_KEY, then run: polaris start\n' "$ENV_FILE"
+                printf '         Anything saved under the old key has to be entered again.\n'
+            fi
+            problems=$((problems + 1))
+        fi
+    fi
+    auth_secret=$(val POLARIS_AUTH_SECRET || true)
+    if [ -n "$auth_secret" ] && [ "${#auth_secret}" -lt 32 ]; then
+        printf '  %s[warn]%s POLARIS_AUTH_SECRET is %s characters; use at least 32.\n' "$yellow" "$r" "${#auth_secret}"
+        printf '         Make one with: openssl rand -base64 48 - changing it signs everybody out.\n'
+    fi
+
+    site=$(val POLARIS_SITE_ADDRESS || true)
+    appurl=$(val POLARIS_APP_URL || true)
+
+    # A sign-in on an address Polaris does not accept it on is refused before the
+    # password is read. The log names the address.
+    if command -v docker >/dev/null 2>&1; then
+        refused=$(docker logs --tail 400 polaris-web-1 2>&1 \
+            | sed -n 's/.*Invalid origin: \([^ ]*\).*/\1/p' | sort -u | head -n3 || true)
+        for origin in $refused; do
+            printf '  %s[fail]%s sign-in was refused on %s: Polaris does not accept sign-in there.\n' "$red" "$r" "$origin"
+            printf '         Sign in on %s instead.\n' "${appurl:-the address in POLARIS_APP_URL}"
+            printf '         If that is this machine on your network, allow it with: polaris lan-access on\n'
+            problems=$((problems + 1))
+        done
+    fi
     case "${site}${appurl}" in
         *example.com*)
             printf '  %s[fail]%s POLARIS_SITE_ADDRESS / POLARIS_APP_URL still use the placeholder\n' "$red" "$r"
@@ -637,7 +730,7 @@ completion_bash() {
 _polaris() {
     local cur=${COMP_WORDS[COMP_CWORD]}
     local prev=${COMP_WORDS[COMP_CWORD-1]}
-    local commands="setup token status ps doctor logs start stop restart update login logout whoami projects deploy deployments build-log rollback env secrets domains completion help"
+    local commands="setup token status ps doctor lan-access logs start stop restart update login logout whoami projects deploy deployments build-log rollback env secrets domains completion help"
     if [ "$COMP_CWORD" -eq 1 ]; then
         COMPREPLY=($(compgen -W "$commands" -- "$cur"))
         return
@@ -649,6 +742,8 @@ _polaris() {
             if [ "$COMP_CWORD" -eq 2 ]; then COMPREPLY=($(compgen -W "list add remove" -- "$cur")); return; fi ;;
         completion)
             COMPREPLY=($(compgen -W "bash" -- "$cur")); return ;;
+        lan-access)
+            COMPREPLY=($(compgen -W "on off status" -- "$cur")); return ;;
     esac
     case "$prev" in
         --cert) COMPREPLY=($(compgen -W "le internal none" -- "$cur")); return ;;
@@ -675,6 +770,7 @@ case "$cmd" in
         ;;
     ps) compose ps ;;
     doctor) doctor ;;
+    lan-access) lan_access "$@" ;;
     logs)
         if [ "$#" -gt 0 ] && is_ref "$1"; then deploy_logs "$@"; else compose logs "$@"; fi
         ;;
@@ -715,7 +811,9 @@ This stack (on the host):
   polaris token        Print the current setup token
   polaris status       Show a clean, colored view of every service
   polaris ps           Show the raw docker compose status table
-  polaris doctor       Diagnose common faults (e.g. Postgres auth mismatch)
+  polaris doctor       Diagnose common faults and say how to fix each one
+  polaris lan-access [on|off|status]
+                       Allow signing in on this machine's local IP
   polaris logs [svc]   Show container logs
   polaris start        Start the stack
   polaris stop         Stop the stack

@@ -280,9 +280,10 @@ export function parseInstallLines(markdown: string): {
     unix: string | null;
     windows: string | null;
 } {
+    // Indented too: the README shows them inside a numbered step.
     return {
-        unix: /^curl -fsSL \S+install\.sh \| sh$/m.exec(markdown)?.[0] ?? null,
-        windows: /^irm \S+install\.ps1 \| iex$/m.exec(markdown)?.[0] ?? null
+        unix: /^[ \t]*(curl -fsSL \S+install\.sh \| sh)$/m.exec(markdown)?.[1] ?? null,
+        windows: /^[ \t]*(irm \S+install\.ps1 \| iex)$/m.exec(markdown)?.[1] ?? null
     };
 }
 

@@ -310,19 +310,42 @@ Lo que Polaris sustituye, en tu propio hardware y con una sola cuenta:
 
 ## Instalar
 
-Un comando. Levanta todo: dashboard, base de datos, proxy inverso y el daemon de
-host, y genera sus secretos:
+Tres pasos. No abres ni editas ningún archivo y no escribes ningún token:
 
-```bash
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
+1. **Ejecuta un comando** en la máquina donde vivirá Polaris. Instala todo
+   (dashboard, base de datos, proxy inverso, daemon de host), crea todas las
+   contraseñas y secretos, y lo arranca.
 
-# Windows (PowerShell)
-irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.ps1 | iex
-```
+   ```bash
+   # macOS / Linux
+   curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
+
+   # Windows (PowerShell)
+   irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.ps1 | iex
+   ```
+
+2. **Abre el enlace que muestra al final.** Es como
+   `http://polaris.local/oauth/setup?token=...` y ya lleva el token. Copia la
+   línea entera en el navegador. Si `polaris.local` no abre en ese equipo, deja
+   todo desde `/oauth/setup` y cambia solo el principio por `https://127.0.0.1`
+   en la propia máquina. Para entrar desde otro equipo por la IP de la máquina
+   hay que activar
+   [entrar por IP local](docs/features/troubleshooting.es.md#abrir-polaris-por-su-direccion-ip).
+   El certificado es autofirmado hasta que un dominio apunte aquí, así que el
+   navegador avisa una vez.
+
+3. **Crea el administrador** en esa página. Desde ahí todo se hace en el
+   navegador.
+
+¿Perdiste el enlace? Ejecuta `polaris setup` en la misma máquina y lo vuelve a
+mostrar. ¿Algo no funciona? [Cuando no se puede acceder a Polaris](docs/features/troubleshooting.es.md)
+reúne los arreglos, y `polaris doctor` en la máquina dice la causa.
 
 Linux es el host recomendado. Para instalarlo a mano con Docker Compose, sigue los
-pasos de [Install](README.md#install).
+pasos de [Install](README.md#install). No edites `.env` a mano en una instalación
+hecha con el instalador.
+
+Para actualizar, usa el botón Actualizar de Ajustes.
 
 ## Dónde funciona
 

@@ -26,6 +26,7 @@ import { readJson } from "@/lib/read-json";
 import { DomainSetupWizard } from "./setup-wizard";
 import { DnsRecordsCard } from "./dns-records-card";
 import { AddressFollowCard } from "./address-follow-card";
+import { LanSignInCard } from "./lan-sign-in-card";
 import { AddressList } from "@/components/address-list";
 import { OwnerDomainsCard } from "./owner-domains-card";
 import { PageSection } from "@/components/page-section";
@@ -171,6 +172,11 @@ export function DomainsView() {
                     </div>
                 </PendingCard>
             )}
+
+            <LanSignInCard
+                view={overview?.lanSignIn}
+                onSaved={(lanSignIn) => apply({ lanSignIn })}
+            />
 
             <AddressFollowCard />
 

@@ -22,6 +22,7 @@ import {
     type AcmeContactStatus
 } from "@/lib/tls/acme-edge";
 import { setOwnerDomainPolicy, type OwnerDomainPolicy } from "@/lib/owner-domains";
+import { lanSignInView, setLanSignIn, type LanSignInView } from "@/lib/lan-sign-in";
 import { addressFollowView, type AddressFollowView } from "@/lib/domain-address-sync";
 import {
     backupView,
@@ -207,6 +208,30 @@ export async function saveOwnerDomainPolicyAction(
                     : (await getTranslations("admin"))("domains.errors.couldNotSave")
         };
     }
+}
+
+/** Allow or stop signing in on this machine's private address. Audited. */
+export async function setLanSignInAction(
+    input: unknown
+): Promise<{ view?: LanSignInView; error?: string }> {
+    const user = await requireAdmin();
+    const t = await getTranslations("admin");
+    const parsed = z.boolean().safeParse(input);
+    if (!parsed.success) return { error: t("domains.errors.couldNotSave") };
+    try {
+        await setLanSignIn(parsed.data);
+    } catch (caught) {
+        console.error("[domains] saving LAN sign-in failed", caught);
+        return { error: t("domains.errors.couldNotSave") };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "auth.lan-sign-in",
+        targetType: "setting",
+        metadata: { enabled: parsed.data }
+    });
+    revalidatePath("/admin/domains");
+    return { view: await lanSignInView() };
 }
 
 /**

@@ -19,6 +19,21 @@ param(
 $ErrorActionPreference = "Stop"
 
 $installDir = if ($env:POLARIS_INSTALL_DIR) { $env:POLARIS_INSTALL_DIR } else { "__POLARIS_INSTALL_DIR__" }
+# Run straight from a checkout the path was never baked in: the checkout is two
+# folders up. Spelled in two halves so the installer's substitution leaves it be.
+if ($installDir -eq ("__POLARIS_" + "INSTALL_DIR__")) {
+    $installDir = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+}
+# The installed copy is written once, by the installer; the Update button
+# refreshes the checkout but not that copy. So it hands over to the checkout's,
+# and a command added in an update is there as soon as the update is.
+$checkoutCli = Join-Path $installDir "dashboard\cli\polaris.ps1"
+if (-not $env:POLARIS_CLI_HANDED_OVER -and (Test-Path $checkoutCli) -and ($PSCommandPath -ne $checkoutCli)) {
+    $env:POLARIS_CLI_HANDED_OVER = "1"
+    $env:POLARIS_INSTALL_DIR = $installDir
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $checkoutCli $Command @Rest
+    exit $LASTEXITCODE
+}
 $composeDir = Join-Path $installDir "dashboard\docker"
 $envFile = Join-Path $composeDir ".env"
 
@@ -218,8 +233,43 @@ function Invoke-Doctor {
         }
     }
 
+    # The master key encrypts every stored credential and must be 32 random bytes,
+    # base64. A hand-typed value of 32 characters decodes to 24.
+    $master = Get-Setting "POLARIS_MASTER_KEY"
+    if ($master) {
+        $bytes = 0
+        try { $bytes = [Convert]::FromBase64String($master).Length } catch { $bytes = 0 }
+        if ($bytes -ne 32) {
+            Write-Host "  [fail] POLARIS_MASTER_KEY decodes to $bytes bytes; it must be 32." -ForegroundColor Red
+            Write-Host "         Saved passwords and keys cannot be read or written until it is fixed."
+            Write-Host "         Put back the value the installer wrote, or make a new one and put it"
+            Write-Host "         in $envFile as POLARIS_MASTER_KEY, then run: polaris start"
+            Write-Host "         Anything saved under the old key has to be entered again."
+            $problems++
+        }
+    }
+    $authSecret = Get-Setting "POLARIS_AUTH_SECRET"
+    if ($authSecret -and $authSecret.Length -lt 32) {
+        Write-Host "  [warn] POLARIS_AUTH_SECRET is $($authSecret.Length) characters; use at least 32." -ForegroundColor Yellow
+        Write-Host "         Changing it signs everybody out."
+    }
+
     $site = Get-Setting "POLARIS_SITE_ADDRESS"
     $appUrl = Get-Setting "POLARIS_APP_URL"
+
+    # A sign-in on an address Polaris does not accept it on is refused before the
+    # password is read. The log names the address.
+    if (Get-Command docker -ErrorAction SilentlyContinue) {
+        $webLog = Get-Quiet { docker logs --tail 400 polaris-web-1 } | Out-String
+        $refused = [regex]::Matches($webLog, "Invalid origin: (\S+)") | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique | Select-Object -First 3
+        foreach ($origin in $refused) {
+            Write-Host "  [fail] sign-in was refused on ${origin}: Polaris does not accept sign-in there." -ForegroundColor Red
+            Write-Host "         Sign in on $appUrl instead."
+            Write-Host "         If that is this machine on your network, allow it with: polaris lan-access on"
+            $problems++
+        }
+    }
+
     if ("$site$appUrl" -match "example\.com") {
         Write-Host "  [fail] POLARIS_SITE_ADDRESS / POLARIS_APP_URL still use the placeholder" -ForegroundColor Red
         Write-Host "         example.com. Certificate issuance loops on it and the site stays"
@@ -233,6 +283,51 @@ function Invoke-Doctor {
     else {
         Write-Host ""
         Write-Host "  $problems problem(s) found" -ForegroundColor Yellow
+    }
+}
+
+# Allow or stop signing in on this machine's private address - the same switch as
+# Admin > Domains > Sign in by local IP, written straight to the database so it
+# works for an operator who cannot sign in yet.
+function Invoke-LanAccess {
+    param([string]$Action)
+    if (-not $Action) { $Action = "status" }
+    $key = "auth.lanSignIn"
+    switch ($Action) {
+        "on" { $sql = "INSERT INTO ""Setting"" (id, key, value, scope) VALUES (gen_random_uuid(), '$key', 'on', 'global') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value; SELECT 'on';" }
+        "off" { $sql = "DELETE FROM ""Setting"" WHERE key = '$key'; SELECT 'off';" }
+        "status" { $sql = "SELECT COALESCE((SELECT value FROM ""Setting"" WHERE key = '$key'), 'off');" }
+        default { Stop-WithError "usage: polaris lan-access [on|off|status]" }
+    }
+    $dbUser = Get-Setting "POSTGRES_USER"
+    if (-not $dbUser) { $dbUser = "polaris" }
+    $dbName = Get-Setting "POSTGRES_DB"
+    if (-not $dbName) { $dbName = "polaris" }
+    # Fed on stdin: Windows PowerShell 5.1 mangles the double quotes of an argument
+    # handed to a native command, and the table name needs them.
+    Assert-Docker
+    $env:COMPOSE_PROFILES = Get-Setting "COMPOSE_PROFILES"
+    Push-Location $composeDir
+    try { $answer = $sql | & docker compose exec -T postgres psql -U $dbUser -d $dbName -v ON_ERROR_STOP=1 -tA }
+    finally { Pop-Location }
+    if ($LASTEXITCODE -ne 0) { Stop-WithError "could not reach the database. Check that Polaris is running: polaris status" }
+    $state = "$($answer | Select-Object -Last 1)".Trim()
+    if ($state -eq "on") {
+        Write-Host "Sign-in by local IP is on."
+        # Only adapters with a way out: the virtual ones Docker and VPNs add have
+        # private addresses too, and none of them is how a phone reaches this box.
+        $addresses = Get-NetIPConfiguration -ErrorAction SilentlyContinue |
+            Where-Object { $_.IPv4DefaultGateway } |
+            ForEach-Object { $_.IPv4Address.IPAddress } |
+            Where-Object { $_ -match "^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)" }
+        if ($addresses) {
+            Write-Host "Open Polaris on:"
+            foreach ($address in $addresses) { Write-Host "  https://$address" }
+        }
+        Write-Host "Turn it off with: polaris lan-access off"
+    }
+    else {
+        Write-Host "Sign-in by local IP is off. Sign in on $(Get-Setting "POLARIS_APP_URL"), or turn it on with: polaris lan-access on"
     }
 }
 
@@ -718,6 +813,7 @@ switch ($Command) {
     }
     "ps" { Invoke-Compose @("ps") }
     "doctor" { Invoke-Doctor }
+    "lan-access" { Invoke-LanAccess $firstRest }
     "logs" {
         if ($deployRef) { Show-ServiceLogs (Get-ApiContext) $Rest } else { Invoke-Compose (@("logs") + $Rest) }
     }
@@ -770,7 +866,9 @@ This stack (on the host):
   polaris token        Print the current setup token
   polaris status       Show a clean, colored view of every service
   polaris ps           Show the raw docker compose status table
-  polaris doctor       Diagnose common faults (e.g. database auth mismatch)
+  polaris doctor       Diagnose common faults and say how to fix each one
+  polaris lan-access [on|off|status]
+                       Allow signing in on this machine's local IP
   polaris logs [svc]   Show container logs
   polaris start        Start the stack
   polaris stop         Stop the stack

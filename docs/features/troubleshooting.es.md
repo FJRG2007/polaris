@@ -3,7 +3,8 @@
 [Read in English](troubleshooting.md) - [Volver al README](../../README.es.md)
 
 Qué comprobar cuando una pantalla dice que no se puede acceder a Polaris, en el orden
-que encuentra la causa más rápido. Nada de esto necesita una terminal.
+que encuentra la causa más rápido. Solo [En la propia máquina](#en-la-propia-maquina) usa una terminal, para cuando no
+abre ninguna pantalla.
 
 ## Averigua hasta dónde llega
 
@@ -60,6 +61,62 @@ nada puede alcanzarlo.
   perdió la red, el relay sigue en marcha y la web no carga.
 - Una regla de tu router o un registro DNS te corresponde a ti. La pantalla del
   dominio indica los valores que hay que escribir.
+
+## El inicio de sesión dice que el correo o la contraseña no son correctos
+
+Si la contraseña es correcta y Polaris la rechaza, mira la barra de direcciones.
+Polaris solo acepta iniciar sesión en sus propias direcciones: `polaris.local`, los
+dominios que configuraste y la IP de esta máquina cuando lo permites. En cualquier
+otra dirección la contraseña ni se comprueba. Desde la actualización de noviembre
+de 2026 la pantalla lo dice y nombra la dirección que hay que usar.
+
+- Abre Polaris en la dirección que mostró el instalador, normalmente
+  `http://polaris.local`.
+- Si `polaris.local` no abre en ese dispositivo, permite
+  [entrar por IP local](#abrir-polaris-por-su-direccion-ip).
+- Si acabas de crear la cuenta y falla en la dirección correcta, ejecuta
+  `polaris doctor` en la máquina. Dice la causa y cómo arreglarla.
+
+## Abrir Polaris por su dirección IP
+
+Algunos móviles, televisores y equipos con Windows no abren `polaris.local`. Abre
+en su lugar la dirección de la máquina en tu red, como `https://192.168.1.20`.
+Entrar ahí está desactivado hasta que un administrador lo activa, y solo se aceptan
+las direcciones privadas de esta máquina.
+
+- En Polaris: Admin > Dominios > **Entrar por IP local**. La tarjeta muestra las
+  direcciones que acepta.
+- En la máquina, cuando aún nadie puede entrar: `polaris lan-access on`. Se
+  desactiva con `polaris lan-access off` y se consulta con
+  `polaris lan-access status`.
+
+La primera vez el navegador avisa del certificado de una dirección IP. Las llaves
+de acceso no funcionan en una dirección IP; usa tu contraseña o `polaris.local`.
+
+## En la propia máquina
+
+Solo para cuando no abre ninguna pantalla. Ejecútalos donde está instalado Polaris:
+
+| Comando | Qué te dice |
+| --- | --- |
+| `polaris status` | Si todas las partes de Polaris están en marcha |
+| `polaris doctor` | Fallos conocidos, cada uno con su arreglo: una dirección donde se rechaza la sesión, una clave de `.env` con un formato incorrecto, una contraseña de la base de datos que ya no coincide |
+| `polaris logs --tail 300 web` | Las últimas 300 líneas del panel |
+| `polaris lan-access on` | Permite entrar por la IP de esta máquina |
+| `polaris setup` | El enlace que crea el primer administrador |
+
+¿Pides ayuda a alguien? Mándale lo que muestran `polaris status`,
+`polaris doctor` y `polaris logs --tail 300 web`. Ninguno muestra contraseñas ni
+claves.
+
+¿Instalado antes de noviembre de 2026 y un comando de arriba no existe? Ejecútalo
+una vez desde la carpeta donde está instalado Polaris:
+`sh /opt/polaris/dashboard/cli/polaris doctor` (`/opt/polaris` salvo que eligieras otra). Desde entonces `polaris` usa los
+comandos más nuevos tras cada actualización.
+
+No edites `.env` a mano. El instalador escribe todas sus claves, y una clave
+cambiada a mano puede impedir que se abran las contraseñas guardadas. Si ya lo
+hiciste, `polaris doctor` dice cómo dejarla como estaba.
 
 ## La app de escritorio se quedó en esta pantalla
 

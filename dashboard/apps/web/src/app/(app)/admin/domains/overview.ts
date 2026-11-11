@@ -7,6 +7,7 @@
  * cross the wire unchanged and there is no second definition to drift.
  */
 
+import type { LanSignInView } from "@/lib/lan-sign-in";
 import type { DomainConfig } from "@/lib/domain-service";
 import type { CheckedAddress } from "@/lib/address-health";
 import type { DomainZoneConfig } from "@/lib/domain-zones";
@@ -25,4 +26,7 @@ export interface DomainsOverview {
     effectiveAppUrl: string;
     /** Whether accounts may bring domains of their own, and how many. */
     ownerPolicy: OwnerDomainPolicy;
+    /** Whether signing in on this machine's private address is allowed. Absent
+     *  from a copy kept by a tab from before it existed. */
+    lanSignIn?: LanSignInView;
 }

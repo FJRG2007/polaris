@@ -592,6 +592,14 @@
             "tunnel": "El acceso público pasa por un túnel de Cloudflare/ngrok, sin abrir puertos ni necesitar IP pública. Configura uno en <link>Integraciones</link> o usa el botón <b>Túnel público</b> de cada servicio. Los subdominios automáticos se quedan en la red local.",
             "lan": "Los subdominios gratuitos resuelven a tu IP local ({ip}) y solo funcionan en tu red, servidos con la CA interna (un aviso del navegador la primera vez). Elige un dominio comodín o un túnel para publicar los servicios."
         },
+        "lanSignIn": {
+            "title": "Entrar por IP local",
+            "description": "Permite entrar con la dirección de esta máquina en tu red, para equipos donde polaris.local no abre. Solo se aceptan sus direcciones privadas.",
+            "toggle": "Permitir entrar por IP local",
+            "onHint": "Se puede entrar en estas direcciones:",
+            "offHint": "Actívalo para entrar en estas direcciones:",
+            "noAddress": "Esta máquina aún no ha dicho su dirección en tu red. Sale aquí a los pocos minutos de arrancar."
+        },
         "owner": {
             "title": "Dominios propios",
             "description": "Una cuenta o una organización puede añadir un dominio suyo, demostrarlo con un registro DNS y hacer que sus servicios respondan en él. Polaris pide certificados para esos nombres, así que esto decide quién puede apuntar un nombre a este servidor.",

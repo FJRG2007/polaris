@@ -17,22 +17,35 @@ import { createRequestAuth } from "@polaris/auth";
 
 const requestAuth = createRequestAuth({
     configuredHosts: async () => {
-        const [{ dashboardHosts, publicHostname }, { getPolarisPublicUrl }, { getTailscaleHost }] =
-            await Promise.all([
-                import("./domain-edge"),
-                import("./polaris-tunnel-service"),
-                import("./tailscale/tailscale-service")
-            ]);
-        const [hosts, tunnel, tailnet] = await Promise.all([
+        const [
+            { dashboardHosts, publicHostname },
+            { getPolarisPublicUrl },
+            { getTailscaleHost },
+            { lanSignInHosts }
+        ] = await Promise.all([
+            import("./domain-edge"),
+            import("./polaris-tunnel-service"),
+            import("./tailscale/tailscale-service"),
+            import("./lan-sign-in")
+        ]);
+        const [hosts, tunnel, tailnet, lan] = await Promise.all([
             dashboardHosts(),
             // A tunnel publishes the dashboard on a hostname nobody configured - the
             // provider mints it - so it is collected separately from the domains.
             getPolarisPublicUrl().catch(() => null),
             // Tailscale names the machine the same way, under the tailnet's ts.net.
-            getTailscaleHost().catch(() => null)
+            getTailscaleHost().catch(() => null),
+            // The machine's own private addresses, only once an administrator
+            // allowed signing in on them (Admin > Domains, `polaris lan-access`).
+            lanSignInHosts().catch(() => [])
         ]);
         const tunnelHost = publicHostname(tunnel);
-        return [...hosts, ...(tunnelHost ? [tunnelHost] : []), ...(tailnet ? [tailnet] : [])];
+        return [
+            ...hosts,
+            ...(tunnelHost ? [tunnelHost] : []),
+            ...(tailnet ? [tailnet] : []),
+            ...lan
+        ];
     },
     // Lazily imported for the same reason as the domain modules: the mail service
     // reaches the database and pulls in an SMTP client, and this module is loaded

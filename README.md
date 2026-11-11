@@ -336,16 +336,20 @@ Three steps. You never open or edit a file, and you never type a token:
 
 2. **Open the link it prints at the end.** It looks like
    `http://polaris.local/oauth/setup?token=...` and already contains the token.
-   Copy the whole line into the browser. If you reach this machine by its IP
-   address instead, keep everything from `/oauth/setup` on and change only the
-   start (for example `https://127.0.0.1/oauth/setup?token=...`). The
-   certificate is self-signed until a domain points here, so the browser warns
-   once.
+   Copy the whole line into the browser. If `polaris.local` does not open on
+   that device, keep everything from `/oauth/setup` on and change only the start
+   to `https://127.0.0.1` on the machine itself. Signing in from another device
+   by the machine's IP needs
+   [sign-in by local IP](docs/features/troubleshooting.md#opening-polaris-by-its-ip-address)
+   turned on. The certificate is self-signed until a domain points here, so the
+   browser warns once.
 
 3. **Create the administrator** on that page. From then on everything is done
    in the browser.
 
 Lost the link? Run `polaris setup` on the same machine and it prints it again.
+Something not working? [When Polaris cannot be reached](docs/features/troubleshooting.md)
+lists the fixes, and `polaris doctor` on the machine names the cause.
 
 Linux is the recommended host - Ubuntu Server is what Polaris is run against.
 Windows works, but Docker there runs inside WSL and the host Polaris manages is
@@ -362,6 +366,7 @@ installer above, none of it is needed.
 git clone https://github.com/FJRG2007/polaris.git
 cd polaris/dashboard/docker
 cp .env.example .env                  # then replace every REPLACE_ME value in it
+                                      # with the output of the command above it
 docker network create polaris-proxy   # compose expects both to exist already
 docker network create polaris-hub
 docker compose --profile full up -d
@@ -369,6 +374,8 @@ docker compose --profile full up -d
 
 Then open `https://127.0.0.1/oauth/setup?token=` followed by the
 `POLARIS_SETUP_TOKEN` you put in `.env`, and create the administrator.
+A key typed by hand instead of generated (`POLARIS_MASTER_KEY` must be 32
+random bytes) stops saved passwords from opening; `polaris doctor` checks them.
 
 </details>
 

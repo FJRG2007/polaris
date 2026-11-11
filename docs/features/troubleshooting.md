@@ -3,7 +3,8 @@
 [Leer en español](troubleshooting.es.md) - [Back to the README](../../README.md)
 
 What to check when a screen says Polaris is not reachable, in the order that finds
-the cause fastest. None of it needs a terminal.
+the cause fastest. Only [On the machine itself](#on-the-machine-itself) uses a terminal, for when no
+screen opens.
 
 ## Find out how far it goes
 
@@ -57,6 +58,60 @@ network where nothing can reach it.
   the machine lost its network, the relay stays up and the site does not load.
 - A rule in your router or a DNS record is yours to change. The domain screen names
   the values to type.
+
+## Sign-in says the email or password is wrong
+
+If the password is right and Polaris still refuses it, look at the address bar.
+Polaris accepts sign-in only on its own addresses: `polaris.local`, the domains
+you set up, and this machine's own IP once you allow it. On any other address the
+password is never checked. Since the November 2026 update the screen says this and
+names the address to use.
+
+- Open Polaris on the address the installer printed, usually `http://polaris.local`.
+- If `polaris.local` does not open on that device, allow
+  [signing in by local IP](#opening-polaris-by-its-ip-address).
+- If you just created the account and it still fails on the right address, run
+  `polaris doctor` on the machine. It names the cause and how to fix it.
+
+## Opening Polaris by its IP address
+
+Some phones, TVs and Windows machines cannot open `polaris.local`. Open the
+machine's address on your network, such as `https://192.168.1.20`, instead.
+Signing in there is off until an administrator turns it on, and only this
+machine's private addresses are ever accepted.
+
+- In Polaris: Admin > Domains > **Sign in by local IP**. The card lists the
+  addresses it accepts.
+- On the machine, when nobody can sign in yet: `polaris lan-access on`. Turn it off
+  again with `polaris lan-access off`, and check it with `polaris lan-access status`.
+
+The browser warns about the certificate on an IP address the first time. Passkeys
+do not work on an IP address; use your password, or `polaris.local`.
+
+## On the machine itself
+
+Only for when no screen opens at all. Run these where Polaris is installed:
+
+| Command | What it tells you |
+| --- | --- |
+| `polaris status` | Whether every part of Polaris is running |
+| `polaris doctor` | Known faults, each with the fix: a refused sign-in address, a key in `.env` that is not the right shape, a database password that no longer matches |
+| `polaris logs --tail 300 web` | The last 300 lines from the dashboard |
+| `polaris lan-access on` | Allow signing in on this machine's IP |
+| `polaris setup` | The link that creates the first administrator |
+
+Asking somebody for help? Send them the output of `polaris status`,
+`polaris doctor` and `polaris logs --tail 300 web`. None of them prints a password
+or a key.
+
+Installed before November 2026 and a command above is unknown? Run it once from
+the folder Polaris is installed in: `sh /opt/polaris/dashboard/cli/polaris doctor`
+(`/opt/polaris` unless you chose another). From then on `polaris` uses the newest commands after every
+update.
+
+Do not edit `.env` by hand. The installer writes every key in it, and a key
+changed by hand can stop saved passwords from opening. If you already did,
+`polaris doctor` says how to put it back.
 
 ## The desktop app stopped on this screen
 

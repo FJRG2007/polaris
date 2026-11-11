@@ -157,6 +157,21 @@ describe("README", () => {
             windows: "irm https://example.test/install.ps1 | iex"
         });
     });
+
+    it("reads the install lines from inside a numbered step", () => {
+        const indented = [
+            "1. **Run one command**",
+            "",
+            "   ```bash",
+            "   curl -fsSL https://example.test/install.sh | sh",
+            "   irm https://example.test/install.ps1 | iex",
+            "   ```"
+        ].join(String.fromCharCode(10));
+        expect(site.parseInstallLines(indented)).toEqual({
+            unix: "curl -fsSL https://example.test/install.sh | sh",
+            windows: "irm https://example.test/install.ps1 | iex"
+        });
+    });
 });
 
 describe("apiOperations", () => {
