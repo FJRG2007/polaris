@@ -98,7 +98,6 @@ export function ImportExport({
                 problems: answer.problems
             });
             setFile(null);
-            if (input.current) input.current.value = "";
             onImported();
         } catch (caught) {
             setProblem(caught instanceof Error ? caught.message : String(caught));
