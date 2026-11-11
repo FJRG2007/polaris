@@ -3517,6 +3517,13 @@ function claimOn(app: AppEntry, pathname: string): number {
  *  The most specific claim wins: Apps owns `/apps`, and Game servers answers
  *  inside it at `/game-servers`. */
 export function resolveActiveApp(pathname: string): AppEntry {
+    // POLARIS_APPS is a non-empty literal, so [0] is always present.
+    return appOwningPath(pathname) ?? POLARIS_APPS[0]!;
+}
+
+/** The app whose screens a path is one of, by the same most-specific claim;
+ *  null for a path no app owns (the account's pages). */
+export function appOwningPath(pathname: string): AppEntry | null {
     let best: AppEntry | null = null;
     let bestClaim = -1;
     for (const app of POLARIS_APPS) {
@@ -3526,8 +3533,7 @@ export function resolveActiveApp(pathname: string): AppEntry {
             bestClaim = claim;
         }
     }
-    // POLARIS_APPS is a non-empty literal, so [0] is always present.
-    return best ?? POLARIS_APPS[0]!;
+    return best;
 }
 
 /**

@@ -13,7 +13,7 @@
 
 import Link from "next/link";
 import { AppLogo, Button, cn } from "@polaris/ui";
-import { POLARIS_APPS } from "@/lib/apps";
+import { appOwningPath, POLARIS_APPS } from "@/lib/apps";
 import { useEffect, useState } from "react";
 import { shortcutIcon } from "../shortcut-icons";
 import { RelativeTime } from "@/components/relative-time";
@@ -140,9 +140,18 @@ export function RecentWidget() {
                     key={place.href}
                     href={place.href}
                     icon={
-                        <Clock
-                            className="size-4 shrink-0 text-muted-foreground"
-                            aria-hidden="true"
+                        // The app the page sits in, by its logo; the clock for a
+                        // page no app owns, or an app with no logo of its own.
+                        <AppLogo
+                            appId={appOwningPath(place.href.split(/[?#]/)[0]!)?.id ?? ""}
+                            size={16}
+                            className="shrink-0"
+                            fallback={
+                                <Clock
+                                    className="size-4 shrink-0 text-muted-foreground"
+                                    aria-hidden="true"
+                                />
+                            }
                         />
                     }
                     label={place.label}
