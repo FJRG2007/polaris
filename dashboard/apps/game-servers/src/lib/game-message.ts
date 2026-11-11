@@ -28,7 +28,9 @@ export function gameMessage<N extends GameNamespace>(
 export function readGameMessage(
     text: string
 ): { namespace: GameNamespace; key: string; params: MessageParams | undefined } | null {
-    const named = /^(\w+):([\w.]+)(?:\?(\{.*\}))?$/s.exec(text);
+    // Keys name things by their ids, and an id may have a hyphen in it
+    // (`lib.blueprints.shrinking-world.name`).
+    const named = /^(\w+):([\w.-]+)(?:\?(\{.*\}))?$/s.exec(text);
     if (!named || !gameCatalogs.namespaces.includes(named[1] as GameNamespace)) return null;
     let params: MessageParams | undefined;
     if (named[3]) {

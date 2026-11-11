@@ -30,7 +30,7 @@ function usedKeys(): Set<string> {
         keys.add(match[1]!);
     for (const file of readdirSync(join(GAME, "engine")).filter((name) => name.endsWith(".js"))) {
         const code = readFileSync(join(GAME, "engine", file), "utf8");
-        for (const match of code.matchAll(/\bt\('([\w.]+)'/g)) keys.add(match[1]!);
+        for (const match of code.matchAll(/\bt\('([\w.-]+)'/g)) keys.add(match[1]!);
     }
     return keys;
 }
