@@ -16,6 +16,7 @@ import { prisma } from "@polaris/db";
 import { escapeHtml } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { compactionOf } from "@/lib/polar/compaction";
+import { withoutPseudoToolCalls } from "@/lib/polar/pseudo-tools";
 import { isVisualPart, visualPartMarkdown } from "@/lib/polar/visuals";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
 
@@ -106,8 +107,12 @@ function partsMarkdown(parts: readonly unknown[], names: ExportNames): string {
     for (const raw of parts) {
         const part = (raw ?? {}) as Part;
         const type = typeof part.type === "string" ? part.type : "";
-        if (type === "text" && typeof part.text === "string" && part.text.trim()) {
-            lines.push(part.text.trim());
+        const words =
+            type === "text" && typeof part.text === "string"
+                ? withoutPseudoToolCalls(part.text).trim()
+                : "";
+        if (words) {
+            lines.push(words);
         } else if (type === "file") {
             lines.push(
                 `> ${names.file(typeof part.filename === "string" ? part.filename : names.attachment)}`

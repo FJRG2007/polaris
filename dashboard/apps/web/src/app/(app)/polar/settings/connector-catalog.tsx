@@ -42,8 +42,7 @@ import {
 type Method = "oauth" | "key";
 
 /** Why an entry cannot be connected here, or null when it can. */
-function blockedReason(entry: CatalogEntry, hosts: readonly string[]): "none" | "host" | null {
-    if (!entry.available) return "none";
+function blockedReason(entry: CatalogEntry, hosts: readonly string[]): "host" | null {
     if (entry.field) return null;
     return hostAllowed(entry.endpoint, hosts) ? null : "host";
 }
@@ -132,7 +131,7 @@ export function ConnectorCatalog({
                                             <Badge variant="neutral">
                                                 {t("settings.connectorCatalog.unavailable")}
                                             </Badge>
-                                        ) : entry.available ? (
+                                        ) : (
                                             <Button
                                                 type="button"
                                                 size="sm"
@@ -141,9 +140,8 @@ export function ConnectorCatalog({
                                                 <Plug className="h-3.5 w-3.5 shrink-0" />
                                                 {t("settings.connectorCatalog.connect")}
                                             </Button>
-                                        ) : null}
-                                        {entry.available ? (
-                                            <a
+                                        )}
+                                        <a
                                                 href={entry.docs}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
@@ -152,7 +150,6 @@ export function ConnectorCatalog({
                                                 {t("settings.connectorCatalog.docs")}
                                                 <ExternalLink className="size-3 shrink-0" />
                                             </a>
-                                        ) : null}
                                     </div>
                                 </CardBody>
                             </Card>

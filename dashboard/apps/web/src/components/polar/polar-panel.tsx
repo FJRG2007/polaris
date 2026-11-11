@@ -144,6 +144,7 @@ import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion"
 import { WebSources } from "@/components/polar/elements/sources";
 import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
 import { answeredNothing } from "@/lib/polar/unanswered";
+import { withoutPseudoToolCalls } from "@/lib/polar/pseudo-tools";
 import { repoStepOf } from "@/lib/polar/code-host";
 import {
     noBrowserIn,
@@ -563,7 +564,7 @@ function newId(): string {
 /** A message's words alone, without the views it drew: what is read aloud. */
 function wordsOf(message: UIMessage): string {
     return message.parts
-        .map((part) => (part.type === "text" ? part.text : ""))
+        .map((part) => (part.type === "text" ? withoutPseudoToolCalls(part.text) : ""))
         .join("")
         .trim();
 }
@@ -572,7 +573,7 @@ function wordsOf(message: UIMessage): string {
 function textOf(message: UIMessage): string {
     return message.parts
         .map((part) => {
-            if (part.type === "text") return part.text;
+            if (part.type === "text") return withoutPseudoToolCalls(part.text);
             const visual = visualPartMarkdown(part as never);
             return visual ? `\n\n${visual}\n\n` : "";
         })
@@ -2231,7 +2232,6 @@ export function PolarChat({
                           history: code.history,
                           activeId: threadShown ? null : code.selected,
                           canRename: code.access === "manage",
-                          first: !chatMode,
                           onOpen: (id) => {
                               setCodeTask(null);
                               setInCode(false);
@@ -2332,7 +2332,14 @@ export function PolarChat({
             ) : null}
             {temporary && trialSkill ? (
                 <div className="px-3 pb-2">
-                    <SkillTrialBar trial={trialSkill} />
+                    <SkillTrialBar
+                        trial={trialSkill}
+                        onEnd={() => {
+                            setTrialSkill(null);
+                            setTemporary(false);
+                            startNew();
+                        }}
+                    />
                 </div>
             ) : null}
             <PolarComposer
@@ -3213,7 +3220,7 @@ function MessageView({
     const lastTool = lastWork ? toolOf(lastWork) : null;
     const answering = message.parts
         .slice(lastWork ? message.parts.indexOf(lastWork) + 1 : 0)
-        .some((part) => part.type === "text" && part.text.trim() !== "");
+        .some((part) => part.type === "text" && withoutPseudoToolCalls(part.text).trim() !== "");
     const current =
         lastTool &&
         (lastTool.tool.state === "input-streaming" || lastTool.tool.state === "input-available")
@@ -3309,13 +3316,15 @@ function MessageView({
                 const failure = polarFailure.failureOf(part);
                 if (failure) return <div key={index}>{renderFailure(failure)}</div>;
                 if (part.type === "text") {
-                    if (!part.text.trim()) return null;
+                    // A tool call a weak model wrote as text ran nothing and is not for reading.
+                    const words = mine ? part.text : withoutPseudoToolCalls(part.text);
+                    if (!words.trim()) return null;
                     return (
                         <MessageContent key={index} from={from}>
                             {mine ? (
-                                <p className="whitespace-pre-wrap">{part.text}</p>
+                                <p className="whitespace-pre-wrap">{words}</p>
                             ) : (
-                                <MessageResponse>{citeSources(part.text, sources)}</MessageResponse>
+                                <MessageResponse>{citeSources(words, sources)}</MessageResponse>
                             )}
                         </MessageContent>
                     );

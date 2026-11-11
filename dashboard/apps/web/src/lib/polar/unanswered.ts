@@ -7,6 +7,7 @@
 
 import { FAILURE_PART } from "@/lib/polar/provider-failure";
 import { POLAR_VISUAL_TOOL } from "@/lib/polar/visuals";
+import { withoutPseudoToolCalls } from "@/lib/polar/pseudo-tools";
 
 type AnswerPart = { type: string; text?: string; state?: string; toolName?: string };
 
@@ -14,7 +15,7 @@ type AnswerPart = { type: string; text?: string; state?: string; toolName?: stri
 export function answeredNothing(parts: readonly AnswerPart[]): boolean {
     return !parts.some(
         (part) =>
-            (part.type === "text" && !!part.text?.trim()) ||
+            (part.type === "text" && !!withoutPseudoToolCalls(part.text ?? "").trim()) ||
             part.type === "file" ||
             part.type === FAILURE_PART ||
             part.type === `tool-${POLAR_VISUAL_TOOL}` ||

@@ -1,42 +1,40 @@
 "use client";
 
 /**
- * Back to the chat the settings were opened from: the page the side panel was
- * open on (it is still open there), or Polar's own page for somebody who came
- * straight to this address.
+ * Back to the chat the settings were opened from: the address it was on (a
+ * page the side panel was open on, where it still is), or Polar's own page for
+ * somebody who came straight to this address. It goes to that address rather
+ * than back in history, where the settings page visited before this one is.
  */
 
-import { useEffect, useRef } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { SETTINGS_FROM_CHAT_KEY } from "@/lib/polar/settings-path";
+import { SETTINGS_FROM_CHAT_KEY, chatReturnPath } from "@/lib/polar/settings-path";
 
 export function SettingsBack({ label }: { label: string }) {
-    const router = useRouter();
-    const fromChat = useRef(false);
+    const [href, setHref] = useState("/polar");
     useEffect(() => {
         try {
-            if (window.sessionStorage.getItem(SETTINGS_FROM_CHAT_KEY) === null) return;
-            fromChat.current = true;
-            window.sessionStorage.removeItem(SETTINGS_FROM_CHAT_KEY);
+            setHref(chatReturnPath(window.sessionStorage.getItem(SETTINGS_FROM_CHAT_KEY)));
         } catch {
             // Unknown; Back goes to Polar's own page.
         }
     }, []);
     return (
-        <a
-            href="/polar"
-            onClick={(event) => {
-                // Only a visit the chat opened goes back; any other goes to
-                // the chat page rather than to another site.
-                if (!fromChat.current || window.history.length < 2) return;
-                event.preventDefault();
-                router.back();
+        <Link
+            href={href}
+            onClick={() => {
+                try {
+                    window.sessionStorage.removeItem(SETTINGS_FROM_CHAT_KEY);
+                } catch {
+                    // Nothing to forget.
+                }
             }}
             className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
         >
             <ArrowLeft aria-hidden className="size-3.5 shrink-0" />
             {label}
-        </a>
+        </Link>
     );
 }

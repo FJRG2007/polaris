@@ -22,6 +22,7 @@ import {
     storedAddressRules
 } from "@/lib/link-guards";
 import { linkLimitColumns } from "@/lib/link-limits";
+import { withoutPseudoToolCalls } from "@/lib/polar/pseudo-tools";
 import * as core from "@polaris/core";
 import { randomUUID } from "node:crypto";
 import { prisma, Prisma, VISIBLE_USER } from "@polaris/db";
@@ -254,7 +255,7 @@ function textOf(parts: unknown): string {
     return parts
         .map((part) => {
             if (part && typeof part === "object" && (part as { type?: unknown }).type === "text") {
-                return String((part as { text?: unknown }).text ?? "");
+                return withoutPseudoToolCalls(String((part as { text?: unknown }).text ?? ""));
             }
             const visual = visualPartMarkdown(part as never);
             return visual ? `\n\n${visual}\n\n` : "";
@@ -271,7 +272,7 @@ function blocksOf(parts: unknown): SharedPolarBlock[] | undefined {
     let drew = false;
     for (const part of parts) {
         if (part && typeof part === "object" && (part as { type?: unknown }).type === "text") {
-            const text = String((part as { text?: unknown }).text ?? "");
+            const text = withoutPseudoToolCalls(String((part as { text?: unknown }).text ?? ""));
             const last = blocks.at(-1);
             if (last?.kind === "text") last.text += text;
             else if (text.trim()) blocks.push({ kind: "text", text });

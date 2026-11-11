@@ -47,13 +47,9 @@ describe("connector catalog", () => {
         expect(new Set(available.map((entry) => entry.endpoint))).toEqual(DOCUMENTED);
     });
 
-    it("gives the vendors with no official server no address", () => {
-        for (const id of ["spotify", "linkedin"]) {
-            const entry = catalogEntry(id);
-            expect(entry?.available).toBe(false);
-            expect(entry && "endpoint" in entry).toBe(false);
-            expect(entry && "docs" in entry).toBe(false);
-        }
+    it("lists no vendor that publishes no server of its own", () => {
+        for (const id of ["spotify", "linkedin"]) expect(catalogEntry(id)).toBeNull();
+        expect(CONNECTOR_CATALOG.every((entry) => entry.available)).toBe(true);
     });
 
     it("fills the Shopify template only with a valid store domain", () => {

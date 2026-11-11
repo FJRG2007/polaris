@@ -16,6 +16,7 @@
  * behind tabs, all of them still following their answers.
  */
 
+import { withoutPseudoToolCalls } from "@/lib/polar/pseudo-tools";
 import { z } from "zod";
 import { useChat } from "@ai-sdk/react";
 import { Columns3, Plus, Square, X } from "lucide-react";
@@ -595,7 +596,7 @@ function ComparisonColumnView(props: ColumnProps) {
 
 function textOf(message: UIMessage): string {
     return message.parts
-        .map((part) => (part.type === "text" ? part.text : ""))
+        .map((part) => (part.type === "text" ? withoutPseudoToolCalls(part.text) : ""))
         .join("")
         .trim();
 }

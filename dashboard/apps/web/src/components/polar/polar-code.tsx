@@ -123,6 +123,8 @@ const MODE_KEY = "polar.mode";
 const OVERVIEW_KEY = "polar.code.overview.v2";
 /** The agent this browser last started a task with. */
 const AGENT_KEY = "polar.code.agent";
+/** The repository picked last, "No repository" included, for the next visit. */
+const REPO_KEY = "polar.code.repo";
 /** How often the history is asked again while Code is on screen. */
 const LIST_MS = 10_000;
 /** How often a live session's thread is asked again. */
@@ -420,14 +422,21 @@ function useCodeChoices(canStart: boolean) {
                 // One past the first page is asked about by id rather than taken
                 // for gone because the page does not hold it.
                 const fallback = loaded.repos[0]?.id ?? NO_REPO;
-                const current = picked.current;
+                // The first load starts on the one picked last, checked like any pick.
+                const current = picked.current || readStored(REPO_KEY) || "";
                 if (current === "") setRepoId(fallback);
-                else if (current !== NO_REPO && !loaded.repos.some((repo) => repo.id === current))
+                else if (current === NO_REPO || loaded.repos.some((repo) => repo.id === current))
+                    setRepoId((now) => now || current);
+                else
                     void readRepo(current)
                         .then((found) => {
-                            if (!found) setRepoId((now) => (now === current ? fallback : now));
+                            setRepoId((now) =>
+                                !found && (now === current || now === "")
+                                    ? fallback
+                                    : now || current
+                            );
                         })
-                        .catch(() => undefined);
+                        .catch(() => setRepoId((now) => now || fallback));
                 // The one picked last; else Polar, which needs nothing started
                 // and so answers at once.
                 const known = (key: string) =>
@@ -449,7 +458,21 @@ function useCodeChoices(canStart: boolean) {
         writeStored(AGENT_KEY, key);
     }, []);
 
-    return { choices, error, refreshing, load, repoId, setRepoId, agentKey, setAgentKey: pickAgent };
+    const pickRepo = useCallback((id: string) => {
+        setRepoId(id);
+        writeStored(REPO_KEY, id);
+    }, []);
+
+    return {
+        choices,
+        error,
+        refreshing,
+        load,
+        repoId,
+        setRepoId: pickRepo,
+        agentKey,
+        setAgentKey: pickAgent
+    };
 }
 
 /**

@@ -12,7 +12,11 @@ import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { SettingsWithSidebar } from "@/app/(app)/polar/settings/settings-sidebar";
-import { POLAR_SETTINGS_SECTIONS, settingsSection, type PolarSettingsSection } from "@/lib/polar/settings-path";
+import {
+    POLAR_SETTINGS_SECTIONS,
+    settingsSection,
+    type PolarSettingsSection
+} from "@/lib/polar/settings-path";
 
 const kept = new Map<string, string>();
 const at = { pathname: "/polar/settings/routing", wide: true };
@@ -62,12 +66,32 @@ describe("the settings page's sidebar", () => {
         expect(screen.getByRole("heading", { name: "Fallbacks page" })).toBeTruthy();
     });
 
+    it("groups the pages under a few headings", () => {
+        draw();
+        const groups = within(pages()).getAllByRole("group");
+        expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual([
+            "You and the chat",
+            "What Polar can use",
+            "Models and usage",
+            "Privacy and data"
+        ]);
+        expect(
+            within(groups[0]!)
+                .getAllByRole("link")
+                .map((link) => link.getAttribute("href"))
+        ).toEqual(
+            ["memory", "display", "extras"].map((id) => settingsSection(id as PolarSettingsSection))
+        );
+    });
+
     it("marks the page on screen, and only that one", () => {
         draw();
         const current = within(pages())
             .getAllByRole("link")
             .filter((link) => link.getAttribute("aria-current") === "page");
-        expect(current.map((link) => link.getAttribute("href"))).toEqual([settingsSection("routing")]);
+        expect(current.map((link) => link.getAttribute("href"))).toEqual([
+            settingsSection("routing")
+        ]);
     });
 
     it("does not offer a page the layout left out", () => {
@@ -80,7 +104,9 @@ describe("the settings page's sidebar", () => {
 
     it("leads back to the chat", () => {
         draw();
-        expect(screen.getByRole("link", { name: "Back to chat" }).getAttribute("href")).toBe("/polar");
+        expect(screen.getByRole("link", { name: "Back to chat" }).getAttribute("href")).toBe(
+            "/polar"
+        );
     });
 
     it("puts the list away and back, remembered like the chat page", () => {
@@ -101,6 +127,8 @@ describe("the settings page's sidebar", () => {
         expect(screen.queryByRole("dialog")).toBeNull();
         fireEvent.click(screen.getByRole("button", { name: "Show settings pages" }));
         const drawer = screen.getByRole("dialog");
-        expect(within(drawer).getAllByRole("link").length).toBeGreaterThan(POLAR_SETTINGS_SECTIONS.length - 1);
+        expect(within(drawer).getAllByRole("link").length).toBeGreaterThan(
+            POLAR_SETTINGS_SECTIONS.length - 1
+        );
     });
 });

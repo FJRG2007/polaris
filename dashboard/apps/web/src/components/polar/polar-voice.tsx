@@ -11,6 +11,7 @@
  * the recording goes - to `/api/polar/transcribe`, never into storage.
  */
 
+import { withoutPseudoToolCalls } from "@/lib/polar/pseudo-tools";
 import type { Payer } from "@/lib/polar/shared";
 import { transcribeAudio, type TranscribeError } from "@/lib/polar/transcribe-audio";
 import type { ChatStatus, UIMessage } from "ai";
@@ -430,7 +431,7 @@ const TICK_MS = 50;
 function replyText(message: UIMessage | undefined): string {
     if (!message || message.role !== "assistant") return "";
     return message.parts
-        .map((part) => (part.type === "text" ? part.text : ""))
+        .map((part) => (part.type === "text" ? withoutPseudoToolCalls(part.text) : ""))
         .filter(Boolean)
         .join("\n\n");
 }

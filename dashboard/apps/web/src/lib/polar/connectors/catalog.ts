@@ -1,9 +1,8 @@
 /**
  * The connector catalog: official remote MCP servers, each one at the address
  * its vendor documents and nowhere else. A vendor that publishes no server of
- * its own is listed as unavailable with no address at all - a third-party
- * listing is somebody else's server, and Polar does not offer it under the
- * vendor's name.
+ * its own is not listed at all - a third-party listing is somebody else's
+ * server, and Polar does not offer it under the vendor's name.
  *
  * Every entry is added through the same path as a custom connector; the
  * catalog only decides the address, how it signs in and what the dialog asks.
@@ -18,9 +17,7 @@ export const CATALOG_CATEGORIES = [
     "developer",
     "commerce",
     "travel",
-    "marketing",
-    "media",
-    "social"
+    "marketing"
 ] as const;
 export type CatalogCategory = (typeof CATALOG_CATEGORIES)[number];
 
@@ -59,11 +56,7 @@ export interface AvailableEntry extends EntryBase {
     docs: string;
 }
 
-export interface UnavailableEntry extends EntryBase {
-    available: false;
-}
-
-export type CatalogEntry = AvailableEntry | UnavailableEntry;
+export type CatalogEntry = AvailableEntry;
 
 const ADOBE_DOCS =
     "https://experienceleague.adobe.com/en/docs/cx-enterprise-agentic-tools/using/tools/mcp-servers";
@@ -180,23 +173,7 @@ export const CONNECTOR_CATALOG: readonly CatalogEntry[] = [
         "Adobe Experience Manager",
         "https://mcp.adobeaemcloud.com/adobe/mcp/aem"
     ),
-    adobe("adobe-marketo", "Adobe Marketo Engage", "https://marketo-mcp.adobe.io/mcp", "marketo"),
-    {
-        id: "spotify",
-        name: "Spotify",
-        vendor: "Spotify",
-        category: "media",
-        logo: "spotify",
-        available: false
-    },
-    {
-        id: "linkedin",
-        name: "LinkedIn",
-        vendor: "LinkedIn",
-        category: "social",
-        logo: "linkedin",
-        available: false
-    }
+    adobe("adobe-marketo", "Adobe Marketo Engage", "https://marketo-mcp.adobe.io/mcp", "marketo")
 ];
 
 export function catalogEntry(id: string | null | undefined): CatalogEntry | null {

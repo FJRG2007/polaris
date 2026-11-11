@@ -58,16 +58,29 @@ const OLD = row("00000000-0000-4000-8000-000000000004", "Old chat", {
     updatedAt: "2024-01-01T00:00:00.000Z"
 });
 
+const CODE_SESSION = {
+    id: "00000000-0000-4000-8000-0000000000c1",
+    title: "Fix the login form",
+    repo: "acme/web",
+    branch: "",
+    state: "stopped",
+    stateLabel: "Stopped",
+    live: false,
+    createdAt: NOW
+};
+
 const calls: Array<{ url: string; method: string; body?: unknown }> = [];
 let refuse = false;
 let pinned = [PINNED];
 let more = false;
+let codeAccess = "none";
 
 beforeEach(() => {
     calls.length = 0;
     refuse = false;
     pinned = [PINNED];
     more = false;
+    codeAccess = "none";
     const stored = new Map<string, string>();
     vi.stubGlobal("localStorage", {
         getItem: (key: string) => stored.get(key) ?? null,
@@ -92,6 +105,11 @@ beforeEach(() => {
                     ]
                 });
             if (url.endsWith("/stream")) return new Response(null, { status: 204 });
+            if (url === "/api/polar/code")
+                return Response.json({
+                    value: { access: codeAccess, sessions: [CODE_SESSION], next: null }
+                });
+            if (url.startsWith("/api/polar/code/")) return Response.json({ value: null });
             if (url === "/api/polar/models")
                 return Response.json({ providers: [], tools: {}, isAdmin: false });
             if (url === "/api/polar/threads")
@@ -171,6 +189,17 @@ describe("chats answering elsewhere", () => {
 });
 
 describe("the sections", () => {
+    it("are the same in Code, with the coding sessions as one more", async () => {
+        codeAccess = "manage";
+        window.localStorage.setItem("polar.mode", "code");
+        await mountPage();
+        expect(screen.getByText("Homelab")).toBeTruthy();
+        expect(screen.getByText("Pinned chat")).toBeTruthy();
+        expect(await screen.findByText("Fix the login form")).toBeTruthy();
+        expect(screen.getByText("Code sessions")).toBeTruthy();
+        expect(screen.getByText("Shared links")).toBeTruthy();
+    });
+
     it("lists pinned chats under Pinned and the rest under Recents", async () => {
         await mountPage();
         expect(within(section("Pinned")).getByText("Pinned chat")).toBeTruthy();

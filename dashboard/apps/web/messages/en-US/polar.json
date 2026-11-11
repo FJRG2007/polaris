@@ -121,7 +121,8 @@
         "bulkDeleteTitle": "Delete {count, plural, one {# conversation} other {# conversations}}?",
         "bulkDeleteQuestion": "{count, plural, one {# conversation and its messages} other {# conversations and their messages}} will be deleted for good.",
         "bulkKind": "conversations",
-        "selectionActions": "Selected conversations"
+        "selectionActions": "Selected conversations",
+        "codeSessions": "Code sessions"
     },
     "actions": {
         "new": "New chat",
@@ -515,9 +516,7 @@
                 "adobe-target": "Activities, audiences and offers in Adobe Target.",
                 "adobe-rtcdp": "Profiles, segments and destinations in Real-Time CDP.",
                 "adobe-experience-manager": "Pages, content and assets in Experience Manager.",
-                "adobe-marketo": "Leads, programs and campaigns in Marketo Engage.",
-                "spotify": "Spotify publishes no MCP server of its own.",
-                "linkedin": "LinkedIn publishes no MCP server of its own."
+                "adobe-marketo": "Leads, programs and campaigns in Marketo Engage."
             },
             "fields": {
                 "shop": "Store domain",
@@ -604,6 +603,12 @@
                     "description": "Steps, expected and actual result, from a vague description."
                 }
             }
+        },
+        "groups": {
+            "personal": "You and the chat",
+            "abilities": "What Polar can use",
+            "models": "Models and usage",
+            "privacy": "Privacy and data"
         }
     },
     "temporary": {
@@ -1343,6 +1348,7 @@
         "banner": "Trying {name}: not saved to your skills yet.",
         "add": "Add skill",
         "added": "Skill added",
-        "addFailed": "Couldn't add the skill."
+        "addFailed": "Couldn't add the skill.",
+        "end": "Stop trying"
     }
 }

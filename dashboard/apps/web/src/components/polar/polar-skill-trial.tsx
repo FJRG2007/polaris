@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import { Button } from "@polaris/ui";
-import { FlaskConical, Plus } from "lucide-react";
+import { FlaskConical, Plus, X } from "lucide-react";
 import { catalogSkill } from "@/lib/polar/skills/catalog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { TRIAL_SKILL_KEY, trialSkillSchema, type TrialSkill } from "@/lib/polar/skills/shared";
@@ -45,7 +45,8 @@ export function trialFromAddress(param: string | null): SkillTrial | null {
     }
 }
 
-export function SkillTrialBar({ trial }: { trial: SkillTrial }) {
+/** `onEnd`: stop trying it, which leaves the temporary chat it was tried in. */
+export function SkillTrialBar({ trial, onEnd }: { trial: SkillTrial; onEnd: () => void }) {
     const t = useTranslations("polar");
     const [state, setState] = useState<"idle" | "pending" | "added">("idle");
     const [error, setError] = useState<string | null>(null);
@@ -93,6 +94,17 @@ export function SkillTrialBar({ trial }: { trial: SkillTrial }) {
                         {t("skillTrial.add")}
                     </Button>
                 )}
+                <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    className="shrink-0"
+                    aria-label={t("skillTrial.end")}
+                    title={t("skillTrial.end")}
+                    onClick={onEnd}
+                >
+                    <X className="size-3.5 shrink-0" />
+                </Button>
             </div>
             {error ? (
                 <p role="alert" className="text-danger">

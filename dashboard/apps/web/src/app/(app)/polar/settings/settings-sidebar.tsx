@@ -50,6 +50,15 @@ const ICONS: Record<PolarSettingsSection, ComponentType<{ className?: string }>>
     data: Database
 };
 
+/** The pages in groups, so the list reads as a few short ones. */
+type GroupId = "personal" | "abilities" | "models" | "privacy";
+const GROUPS: readonly { id: GroupId; sections: readonly PolarSettingsSection[] }[] = [
+    { id: "personal", sections: ["memory", "display", "extras"] },
+    { id: "abilities", sections: ["tools", "connectors", "skills", "browser", "coding-tools"] },
+    { id: "models", sections: ["routing", "usage"] },
+    { id: "privacy", sections: ["permissions", "data"] }
+];
+
 function SettingsNav({
     sections,
     close
@@ -98,25 +107,56 @@ function SettingsNav({
                 aria-label={t("settings.title")}
                 className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain px-2 pb-3"
             >
-                {sections.map((id) => {
-                    const href = settingsSection(id);
-                    const current = pathname === href || pathname.startsWith(`${href}/`);
-                    const Icon = ICONS[id];
+                {[
+                    ...GROUPS,
+                    // A page no group names still shows, at the end.
+                    {
+                        id: null,
+                        sections: sections.filter(
+                            (id) => !GROUPS.some((group) => group.sections.includes(id))
+                        )
+                    }
+                ].map((group) => {
+                    const shown = group.sections.filter((id) => sections.includes(id));
+                    if (shown.length === 0) return null;
+                    const heading = group.id ? t(`settings.groups.${group.id}`) : null;
                     return (
-                        <Link
-                            key={id}
-                            href={href}
-                            aria-current={current ? "page" : undefined}
-                            className={cn(
-                                "flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-card hover:text-foreground",
-                                current ? "bg-card text-foreground" : "text-muted-foreground"
-                            )}
+                        <div
+                            key={group.id ?? "rest"}
+                            role="group"
+                            aria-label={heading ?? undefined}
+                            className="flex flex-col gap-0.5 pt-3 first:pt-0"
                         >
-                            <Icon className="size-4 shrink-0" />
-                            <span className="min-w-0 truncate" title={labels[id]}>
-                                {labels[id]}
-                            </span>
-                        </Link>
+                            {heading ? (
+                                <p className="truncate px-2 pb-1 text-[0.6875rem] font-medium text-foreground-subtle">
+                                    {heading}
+                                </p>
+                            ) : null}
+                            {shown.map((id) => {
+                                const href = settingsSection(id);
+                                const current =
+                                    pathname === href || pathname.startsWith(`${href}/`);
+                                const Icon = ICONS[id];
+                                return (
+                                    <Link
+                                        key={id}
+                                        href={href}
+                                        aria-current={current ? "page" : undefined}
+                                        className={cn(
+                                            "flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-card hover:text-foreground",
+                                            current
+                                                ? "bg-card text-foreground"
+                                                : "text-muted-foreground"
+                                        )}
+                                    >
+                                        <Icon className="size-4 shrink-0" />
+                                        <span className="min-w-0 truncate" title={labels[id]}>
+                                            {labels[id]}
+                                        </span>
+                                    </Link>
+                                );
+                            })}
+                        </div>
                     );
                 })}
             </nav>

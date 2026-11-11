@@ -12,10 +12,10 @@ import config from "../../next.config.mjs";
 import { MessagesWrapper } from "../setup/i18n";
 import { existsSync, readFileSync } from "node:fs";
 import { SettingsBack } from "@/app/(app)/polar/settings/settings-back";
-import { SETTINGS_FROM_CHAT_KEY } from "@/lib/polar/settings-path";
+import { SETTINGS_FROM_CHAT_KEY, chatReturnPath } from "@/lib/polar/settings-path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { groupToolsByServer, offWithServers } from "@/lib/polar/tool-servers";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 
 const kept = new Map<string, string>();
 const pushed: string[] = [];
@@ -272,25 +272,33 @@ describe("the settings page", () => {
         expect(screen.queryByRole("dialog")).toBeNull();
     });
 
-    it("goes back to the chat that opened it, and to Polar's page otherwise", () => {
-        const session = new Map<string, string>([[SETTINGS_FROM_CHAT_KEY, "1"]]);
+    it("goes back to the address the chat was on, however many settings pages were opened", async () => {
+        const session = new Map<string, string>([[SETTINGS_FROM_CHAT_KEY, "/tasks?view=board"]]);
         vi.stubGlobal("sessionStorage", {
             getItem: (key: string) => session.get(key) ?? null,
             setItem: (key: string, value: string) => void session.set(key, value),
             removeItem: (key: string) => void session.delete(key)
         });
-        window.history.pushState({}, "", "/polar/settings");
-        render(<SettingsBack label="Back to chat" />);
-        expect(session.has(SETTINGS_FROM_CHAT_KEY)).toBe(false);
-        fireEvent.click(screen.getByRole("link", { name: "Back to chat" }));
-        expect(wentBack).toBe(true);
-        cleanup();
-        wentBack = false;
         render(<SettingsBack label="Back to chat" />);
         const link = screen.getByRole("link", { name: "Back to chat" });
-        expect(link.getAttribute("href")).toBe("/polar");
+        await waitFor(() => expect(link.getAttribute("href")).toBe("/tasks?view=board"));
         fireEvent.click(link);
         expect(wentBack).toBe(false);
+        expect(session.has(SETTINGS_FROM_CHAT_KEY)).toBe(false);
+        cleanup();
+        render(<SettingsBack label="Back to chat" />);
+        expect(screen.getByRole("link", { name: "Back to chat" }).getAttribute("href")).toBe(
+            "/polar"
+        );
+    });
+
+    it("never goes back to a settings page or off this Polaris", () => {
+        expect(chatReturnPath("/polar/settings/skills")).toBe("/polar");
+        expect(chatReturnPath("/polar/settings")).toBe("/polar");
+        expect(chatReturnPath("//evil.example/x")).toBe("/polar");
+        expect(chatReturnPath("https://evil.example")).toBe("/polar");
+        expect(chatReturnPath(null)).toBe("/polar");
+        expect(chatReturnPath("/polar/c/abc#end")).toBe("/polar/c/abc#end");
     });
 
     it("is a route, and the settings component holds no dialog", () => {

@@ -228,6 +228,28 @@ describe("the Chat / Code switch", () => {
         expect(box.disabled).toBe(true);
     });
 
+    it("keeps No repository picked across a reload", async () => {
+        access = "manage";
+        window.localStorage.setItem("polar.mode", "code");
+        render(<Harness />, { wrapper: MessagesWrapper });
+        const trigger = await screen.findByRole("button", { name: /^Where the agent works: acme.web/ });
+        fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /No repository/ }));
+        await screen.findByRole("button", { name: /^Where the agent works: No repository/ });
+        cleanup();
+        render(<Harness />, { wrapper: MessagesWrapper });
+        expect(await screen.findByRole("button", { name: /^Where the agent works: No repository/ })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: /^Where the agent works: acme.web/ })).toBeNull();
+    });
+
+    it("starts on the first repository when the one picked last is gone", async () => {
+        access = "manage";
+        window.localStorage.setItem("polar.mode", "code");
+        window.localStorage.setItem("polar.code.repo", "99999999-9999-4999-8999-999999999999");
+        render(<Harness />, { wrapper: MessagesWrapper });
+        expect(await screen.findByRole("button", { name: /^Where the agent works: acme.web/ })).toBeTruthy();
+    });
+
     it("does not say the agent is getting ready on a session that ended", async () => {
         access = "manage";
         const row = {

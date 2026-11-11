@@ -121,7 +121,8 @@
         "bulkDeleteTitle": "¿Eliminar {count, plural, one {# conversación} other {# conversaciones}}?",
         "bulkDeleteQuestion": "{count, plural, one {# conversación y sus mensajes se eliminarán} other {# conversaciones y sus mensajes se eliminarán}} para siempre.",
         "bulkKind": "conversaciones",
-        "selectionActions": "Conversaciones seleccionadas"
+        "selectionActions": "Conversaciones seleccionadas",
+        "codeSessions": "Sesiones de Code"
     },
     "actions": {
         "new": "Nuevo chat",
@@ -515,9 +516,7 @@
                 "adobe-target": "Actividades, públicos y ofertas de Adobe Target.",
                 "adobe-rtcdp": "Perfiles, segmentos y destinos de Real-Time CDP.",
                 "adobe-experience-manager": "Contenido y recursos de Experience Manager.",
-                "adobe-marketo": "Leads, programas y campañas de Marketo Engage.",
-                "spotify": "Spotify no publica un servidor MCP propio.",
-                "linkedin": "LinkedIn no publica un servidor MCP propio."
+                "adobe-marketo": "Leads, programas y campañas de Marketo Engage."
             },
             "fields": {
                 "shop": "Dominio",
@@ -604,6 +603,12 @@
                     "description": "Pasos, resultado esperado y real, de una descripción vaga."
                 }
             }
+        },
+        "groups": {
+            "personal": "Tú y el chat",
+            "abilities": "Lo que Polar usa",
+            "models": "Modelos y uso",
+            "privacy": "Privacidad y datos"
         }
     },
     "temporary": {
@@ -1343,6 +1348,7 @@
         "banner": "Probando {name}: aún no está en tus skills.",
         "add": "Añadir skill",
         "added": "Skill añadida",
-        "addFailed": "No se pudo añadir."
+        "addFailed": "No se pudo añadir.",
+        "end": "Dejar de probar"
     }
 }

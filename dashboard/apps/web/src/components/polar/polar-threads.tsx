@@ -131,9 +131,6 @@ export interface PolarThreadsCode {
     /** The session on screen, or null when Code is not. */
     readonly activeId: string | null;
     readonly onOpen: (id: string) => void;
-    /** Whether Code is on screen: then the list is its sessions, and only
-     *  them; otherwise it is the chats, and only them. */
-    readonly first: boolean;
     /** Whether a session can be renamed here: that needs the right to manage
      *  Agents, since the new name shows there too. */
     readonly canRename: boolean;
@@ -200,9 +197,6 @@ export function PolarThreads({
     const [deleting, setDeleting] = useState<PolarThreadRow | null>(null);
     const [sharing, setSharing] = useState<PolarThreadRow | null>(null);
     const [searching, setSearching] = useState(false);
-    /** The words the Code list is narrowed to, or null while its field is shut. */
-    const [codeQuery, setCodeQuery] = useState<string | null>(null);
-    const codeShown = Boolean(code?.first);
     const [managingShares, setManagingShares] = useState(false);
     /** The project dialog: a new one (optionally for a chat to move into it),
      *  or an existing one to edit. */
@@ -283,8 +277,6 @@ export function PolarThreads({
     /** The keys the list hears: Ctrl+A, Escape, the arrows, Delete. A key typed
      *  into a field (renaming) or a menu is left alone. */
     const onListKey = (event: KeyboardEvent<HTMLDivElement>) => {
-        // The Code list has no selection: these keys walk the chats.
-        if (codeShown) return;
         const target = event.target as HTMLElement;
         if (target.closest("input, textarea, [role='menu'], [role='dialog']")) return;
         const focused = target.closest<HTMLElement>("[data-thread-id]")?.dataset.threadId ?? null;
@@ -356,11 +348,7 @@ export function PolarThreads({
                 </span>
                 <IconButton
                     label={t("history.search")}
-                    onClick={() =>
-                        codeShown
-                            ? setCodeQuery((current) => (current === null ? "" : null))
-                            : setSearching(true)
-                    }
+                    onClick={() => setSearching(true)}
                 >
                     <Search className="size-4" />
                 </IconButton>
@@ -368,25 +356,7 @@ export function PolarThreads({
                     <HideIcon className="size-4" />
                 </IconButton>
             </div>
-            {codeShown && codeQuery !== null ? (
-                <div className="shrink-0 px-2 pb-1">
-                    <Input
-                        autoFocus
-                        value={codeQuery}
-                        aria-label={t("code.search")}
-                        placeholder={t("code.search")}
-                        onChange={(event) => setCodeQuery(event.target.value)}
-                        onKeyDown={(event) => {
-                            if (event.key === "Escape") {
-                                event.preventDefault();
-                                setCodeQuery(null);
-                            }
-                        }}
-                        className="h-8"
-                    />
-                </div>
-            ) : null}
-            {!codeShown && chosen.length > 0 ? (
+            {chosen.length > 0 ? (
                 <SelectionBar count={chosen.length} actions={chosenActions} />
             ) : null}
             <div
@@ -397,15 +367,10 @@ export function PolarThreads({
                 <NavRow icon={SquarePen} onClick={() => onNew(null)}>
                     {newLabel ?? t("actions.new")}
                 </NavRow>
-                {code && codeShown ? (
-                    <CodeList code={code} query={codeQuery ?? ""} />
-                ) : null}
-                {codeShown ? null : (
-                    <NavRow icon={Link2} onClick={() => setManagingShares(true)}>
-                        {t("sharing.links")}
-                    </NavRow>
-                )}
-                {codeShown ? null : rows === null ? (
+                <NavRow icon={Link2} onClick={() => setManagingShares(true)}>
+                    {t("sharing.links")}
+                </NavRow>
+                {rows === null ? (
                     <ListSkeleton />
                 ) : (
                     <>
@@ -469,6 +434,9 @@ export function PolarThreads({
                                 </ProjectItem>
                             ))}
                         </Section>
+                        {/* The same list in Chat and in Code: a coding agent's
+                            sessions are one more section of it. */}
+                        {code ? <CodeList code={code} query="" /> : null}
                         <SharedWithYou rowClass={SHARED_ROW} />
                         <div className="pt-4">
                             <button
@@ -706,7 +674,7 @@ function CodeList({ code, query }: { code: PolarThreadsCode; query: string }) {
             if (!ok) toast.show({ title: t("history.renameFailed") });
         });
     return (
-        <Section id="polar-code" label={t("history.recents")}>
+        <Section id="polar-code" label={t("history.codeSessions")}>
             {shown.length === 0 ? (
                 <p className="px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground">
                     {narrowed ? t("history.searchEmpty") : t("code.empty")}
