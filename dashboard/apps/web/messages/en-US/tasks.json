@@ -307,7 +307,9 @@
         "writeSomething": "Write something first",
         "folderGone": "That folder no longer exists",
         "viewGone": "That view no longer exists",
-        "taskGone": "That task no longer exists"
+        "taskGone": "That task no longer exists",
+        "loadReminders": "Could not load your reminders",
+        "cancelReminder": "Could not call off the reminder"
     },
     "schema": {
         "nameRequired": "A name is required",

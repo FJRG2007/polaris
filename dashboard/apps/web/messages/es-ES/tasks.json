@@ -307,7 +307,9 @@
         "writeSomething": "Escribe algo primero",
         "folderGone": "Esa carpeta ya no existe",
         "viewGone": "Esa vista ya no existe",
-        "taskGone": "Esa tarea ya no existe"
+        "taskGone": "Esa tarea ya no existe",
+        "loadReminders": "No se cargaron tus avisos",
+        "cancelReminder": "No se pudo anular el aviso"
     },
     "schema": {
         "nameRequired": "Falta el nombre",

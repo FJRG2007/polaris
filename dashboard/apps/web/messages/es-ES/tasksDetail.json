@@ -225,5 +225,23 @@
         "normal": "Normal",
         "low": "Baja",
         "none": "Sin prioridad"
+    },
+    "reminders": {
+        "remindMe": "Recordármelo",
+        "in15Minutes": "En 15 minutos",
+        "in1Hour": "En 1 hora",
+        "in3Hours": "En 3 horas",
+        "tomorrow": "Mañana",
+        "nextMonday": "Próximo lunes",
+        "custom": "Personalizado...",
+        "set": "Aviso para el {date} a las {time}",
+        "pending": "Tus avisos",
+        "due": "{date} a las {time}",
+        "cancel": "Anular el aviso del {when}",
+        "title": "Recordarme esta tarea",
+        "description": "Recibirás un aviso que abre la tarea.",
+        "confirm": "Programar aviso",
+        "busy": "Guardando...",
+        "summary": "Te avisa el {date} a las {time}."
     }
 }

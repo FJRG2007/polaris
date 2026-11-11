@@ -25,6 +25,7 @@ import { refusalText } from "@/lib/tasks/refusal";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { prisma } from "@polaris/db";
+import { isUuid } from "@/lib/uuid";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { requirePermission, requireUser, sessionCan } from "@/lib/session";
 import { agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
@@ -1311,6 +1312,32 @@ export async function addReminderAction(
         return {};
     } catch (caught) {
         return failure(caught, "errors.setReminder");
+    }
+}
+
+/** The reader's own reminders on a task that have not gone off yet. */
+export async function taskRemindersAction(
+    taskId: string
+): Promise<{ reminders?: { id: string; remindAt: string }[]; error?: string }> {
+    const caller = await actor("tasks.read");
+    if (!isUuid(taskId)) return { error: await errorText("errors.loadReminders") };
+    try {
+        await access.requireTask(caller, taskId, "guest");
+        return { reminders: await details.pendingReminders(caller.id, taskId) };
+    } catch (caught) {
+        return failure(caught, "errors.loadReminders");
+    }
+}
+
+/** Call off one of the reader's own reminders. Somebody else's id deletes nothing. */
+export async function deleteReminderAction(reminderId: string): Promise<{ error?: string }> {
+    const caller = await actor("tasks.read");
+    if (!isUuid(reminderId)) return { error: await errorText("errors.cancelReminder") };
+    try {
+        await details.deleteReminder(caller.id, reminderId);
+        return {};
+    } catch (caught) {
+        return failure(caught, "errors.cancelReminder");
     }
 }
 

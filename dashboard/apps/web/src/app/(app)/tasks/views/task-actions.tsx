@@ -19,6 +19,7 @@ import { useMemo, useRef, useState } from "react";
 import { useAppUrl } from "@/components/app-url";
 import { useDisplayFormat } from "@/components/display-format";
 import { optionLabel } from "../option-label";
+import { ReminderPresetItems, useTaskReminder } from "../task-reminders";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TaskRow } from "@/lib/tasks/facts";
 import type { SpaceContext } from "@/lib/tasks/facts";
@@ -38,6 +39,7 @@ import {
     tagColorFor
 } from "../pickers";
 import {
+    AlarmClock,
     Archive,
     Ban,
     Check,
@@ -394,6 +396,7 @@ export function TaskMenu({
     const baseUrl = useAppUrl();
     const t = useTranslations("tasksViews");
     const tt = useTranslations("tasks");
+    const td = useTranslations("tasksDetail");
     const [drafting, setDrafting] = useState(false);
     /** True while a tag typed into the submenu is being made, so a second enter
      *  in the same tick does not make it twice - the picker inside a task guards
@@ -416,6 +419,7 @@ export function TaskMenu({
     // naming a single task - open it, copy its link, copy its reference - have
     // nothing to name, so they stand down.
     const many = targets.length > 1;
+    const reminder = useTaskReminder(task.id);
 
     /**
      * What the submenus are about to show, worked out once instead of on every
@@ -531,6 +535,7 @@ export function TaskMenu({
 
     return (
         <>
+            {reminder.dialog}
             {drafting && (
                 <CreateStatusDialog onClose={() => setDrafting(false)} onCreate={create} />
             )}
@@ -560,6 +565,22 @@ export function TaskMenu({
                                 <Copy className="size-3.5" />
                                 {t("menu.copyReference", { reference: task.reference })}
                             </ContextMenuItem>
+                            {/* Private to this reader, as on a chat message. */}
+                            <ContextMenuSub>
+                                <ContextMenuSubTrigger>
+                                    <AlarmClock className="size-3.5" />
+                                    {td("reminders.remindMe")}
+                                </ContextMenuSubTrigger>
+                                <ContextMenuSubContent className="w-52">
+                                    <ReminderPresetItems
+                                        Item={ContextMenuItem}
+                                        Separator={ContextMenuSeparator}
+                                        busy={reminder.busy}
+                                        onPick={(when) => void reminder.remind(when)}
+                                        onCustom={reminder.choose}
+                                    />
+                                </ContextMenuSubContent>
+                            </ContextMenuSub>
                         </>
                     )}
 

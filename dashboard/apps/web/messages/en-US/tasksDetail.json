@@ -225,5 +225,23 @@
         "normal": "Normal",
         "low": "Low",
         "none": "No priority"
+    },
+    "reminders": {
+        "remindMe": "Remind me",
+        "in15Minutes": "In 15 minutes",
+        "in1Hour": "In 1 hour",
+        "in3Hours": "In 3 hours",
+        "tomorrow": "Tomorrow",
+        "nextMonday": "Next Monday",
+        "custom": "Custom...",
+        "set": "Reminder for {date} at {time}",
+        "pending": "Your reminders",
+        "due": "{date} at {time}",
+        "cancel": "Call off the reminder for {when}",
+        "title": "Remind me about this task",
+        "description": "You get a notification that opens the task.",
+        "confirm": "Set reminder",
+        "busy": "Saving...",
+        "summary": "Reminds you on {date} at {time}."
     }
 }

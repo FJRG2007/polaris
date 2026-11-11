@@ -559,6 +559,23 @@ export async function addReminder(
     });
 }
 
+/** The most pending reminders one task lists for one person. */
+const TASK_REMINDERS_LISTED = 20;
+
+/** This person's reminders on one task that have not gone off, soonest first. */
+export async function pendingReminders(
+    userId: string,
+    taskId: string
+): Promise<{ id: string; remindAt: string }[]> {
+    const rows = await prisma.taskReminder.findMany({
+        where: { userId, taskId, sentAt: null },
+        orderBy: { remindAt: "asc" },
+        take: TASK_REMINDERS_LISTED,
+        select: { id: true, remindAt: true }
+    });
+    return rows.map((row) => ({ id: row.id, remindAt: row.remindAt.toISOString() }));
+}
+
 export async function deleteReminder(userId: string, reminderId: string): Promise<void> {
     await prisma.taskReminder.deleteMany({ where: { id: reminderId, userId } });
 }

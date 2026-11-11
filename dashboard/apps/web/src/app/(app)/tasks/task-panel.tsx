@@ -28,6 +28,7 @@ import { TaskNameField } from "./task-name-field";
 import { usePolarContext } from "@/components/polar/polar-panel";
 import { CopyButton } from "@/components/copy-button";
 import { HandToAgent } from "./hand-to-agent";
+import { TaskReminderButton } from "./task-reminders";
 import type { TaskDetail } from "@/lib/tasks/task-service";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import { useDisplayFormat } from "@/components/display-format";
@@ -548,6 +549,7 @@ export function TaskPanel({
                                     <Share2 className="size-4" />
                                     <span className="hidden sm:inline">{t("panel.share")}</span>
                                 </Button>
+                                <TaskReminderButton taskId={task.id} />
                                 <button
                                     type="button"
                                     aria-label={
