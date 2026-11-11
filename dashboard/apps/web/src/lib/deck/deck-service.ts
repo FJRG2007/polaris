@@ -12,8 +12,9 @@
 
 import { z } from "zod";
 import { deckChanged } from "./live";
-import { callTool } from "./tool-call";
 import { isDeckScope } from "./scopes";
+import { callTool, mcpCallerFor } from "./tool-call";
+import { MCP_ONLY_SCOPES } from "@/lib/mcp/scope-table";
 import { scopesAvailableTo } from "@polaris/auth";
 import { translatorFor } from "@/lib/i18n/translate";
 import { appDeckActions } from "@/lib/app-extensions/registry";
@@ -52,8 +53,18 @@ interface Resolved {
 /** The most choices one picker carries. */
 const CHOICE_LIMIT = 100;
 
+/** Whether the key carries a scope - a finer one (`calendar.manage`) counts
+ *  as carried when the key holds the permission it stands on, as it does for
+ *  the tool the action then calls. */
 function allowed(scope: string | null, caller: DeckCaller): boolean {
-    return scope === null || caller.scopes.includes(scope);
+    return scope === null || (mcpCallerFor(caller).scopes as string[]).includes(scope);
+}
+
+/** The permission a scope stands on: itself, or a finer one's base. */
+function baseScope(scope: string): string {
+    return scope in MCP_ONLY_SCOPES
+        ? MCP_ONLY_SCOPES[scope as keyof typeof MCP_ONLY_SCOPES].requires
+        : scope;
 }
 
 /**
@@ -64,8 +75,10 @@ function allowed(scope: string | null, caller: DeckCaller): boolean {
  */
 function reconnectable(caller: DeckCaller): (scope: string | null) => Promise<boolean> {
     let held: Promise<Set<string>> | null = null;
-    return async (scope) => {
-        if (scope === null || caller.scopes.includes(scope) || !isDeckScope(scope)) return false;
+    return async (finer) => {
+        if (finer === null || allowed(finer, caller)) return false;
+        const scope = baseScope(finer);
+        if (!isDeckScope(scope)) return false;
         held ??= scopesAvailableTo(caller.userId, caller.isAdmin)
             .then((scopes) => new Set<string>(scopes))
             .catch(() => new Set<string>());
@@ -93,7 +106,7 @@ export async function lockedActions(
             label: action.core
                 ? words(`deck.actions.${action.id.replace(".", "_")}`)
                 : action.app!.label[caller.locale],
-            message: reconnectMessage(action.scope, caller, words)
+            message: reconnectMessage(baseScope(action.scope), caller, words)
         });
     }
     return locked;
@@ -243,7 +256,7 @@ export async function runDeckAction(
             ok: false,
             message:
                 action.scope && (await reconnectable(caller)(action.scope))
-                    ? reconnectMessage(action.scope, caller, words)
+                    ? reconnectMessage(baseScope(action.scope), caller, words)
                     : words("deck.errors.notAllowed")
         };
 

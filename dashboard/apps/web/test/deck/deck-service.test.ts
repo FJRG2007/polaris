@@ -210,6 +210,18 @@ describe("deckCatalogue", () => {
         });
     });
 
+    it("offers an action under a finer scope to a key that holds the permission it stands on", async () => {
+        // Calendar's timer asks for calendar.manage; a deck only ever carries calendar.use.
+        appActions = [{ ...lamp, id: "calendar.timer", scope: "calendar.manage", read: undefined }];
+        const without = await service.deckCatalogue(caller([]), words);
+        expect(without.some((action) => action.id === "calendar.timer")).toBe(false);
+        const offered = await service.deckCatalogue(caller(["calendar.use"]), words);
+        expect(offered.some((action) => action.id === "calendar.timer")).toBe(true);
+        accountScopes = ["calendar.use"];
+        const locked = await service.lockedActions(caller([]), words);
+        expect(locked.map((row) => row.id)).toContain("calendar.timer");
+    });
+
     it("never lets an app take one of core's ids", async () => {
         appActions = [{ ...lamp, id: "chat.send", scope: "home.control" }];
         const offered = await service.deckCatalogue(caller(["home.control", "chat.use"]), words);

@@ -60,7 +60,10 @@ vi.mock("@/lib/cli/sign-in", () => ({
     }
 }));
 // What the service reaches is not this file's business: only its edges are.
-vi.mock("@/lib/deck/tool-call", () => ({ callTool: async () => ({ ok: false, message: null }) }));
+vi.mock("@/lib/deck/tool-call", async (original) => ({
+    ...(await original<typeof import("@/lib/deck/tool-call")>()),
+    callTool: async () => ({ ok: false, message: null })
+}));
 vi.mock("@/lib/app-extensions/registry", () => ({ appDeckActions: async () => [] }));
 vi.mock("@/lib/chat/chat-service", () => ({ unreadTotal: async () => ({ messages: 0 }) }));
 vi.mock("@/lib/presence-service", () => ({}));
