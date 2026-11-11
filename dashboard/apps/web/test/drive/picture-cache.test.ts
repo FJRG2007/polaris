@@ -38,13 +38,19 @@ afterEach(() => {
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+/** Until a preload has landed. Reading a response's blob takes more than one
+ *  turn of the event loop on a busy machine, so one `settle` is not enough to
+ *  wait for it: CI's first shard failed these on every run while they passed
+ *  on a quiet one. */
+const landed = (src: string) => vi.waitFor(() => expect(cachedPicture(src)).not.toBeNull());
+
 describe("the picture cache", () => {
     it("asks for a preload as one, and shows it from the browser once here", async () => {
         const src = "/api/drive/download?c=c1&p=%2Fa.jpg&disposition=inline";
         expect(cachedPicture(src)).toBeNull();
         preloadPicture(src);
         preloadPicture(src);
-        await settle();
+        await landed(src);
         expect(calls.map((call) => call.url)).toEqual([`${src}&purpose=preload`]);
         expect(cachedPicture(src)).toBe("blob:picture-1");
     });
@@ -57,7 +63,7 @@ describe("the picture cache", () => {
 
     it("holds only a few, letting the oldest go", async () => {
         for (let index = 0; index < 10; index += 1) preloadPicture(`/p?n=${index}`);
-        await settle();
+        await landed("/p?n=9");
         expect(cachedPicture("/p?n=0")).toBeNull();
         expect(cachedPicture("/p?n=1")).toBeNull();
         expect(cachedPicture("/p?n=9")).not.toBeNull();
