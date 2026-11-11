@@ -132,13 +132,12 @@ describe("a built-in app's page", () => {
         expect(builtInHref(plain!.id)).toBe(`/admin/apps/${plain!.id}`);
     });
 
-    it("says the update check failed instead of claiming no build", async () => {
-        vi.mocked(appUpdatesAction).mockRejectedValueOnce(new Error("refused"));
+    it("offers no builds of its own for the app Polaris's own sections run in", async () => {
         const host = resolveActiveApp(Object.values(NATIVE_APPS)[0]!).id;
         render(await page(host), { wrapper: MessagesWrapper });
-        expect(await screen.findByText("Could not check for updates")).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Check for app updates" })).toBeTruthy();
-        expect(screen.queryByText("No build of its own")).toBeNull();
+        expect(screen.queryByText("Builds")).toBeNull();
+        expect(screen.queryByText("Could not check for updates")).toBeNull();
+        expect(appUpdatesAction).not.toHaveBeenCalled();
     });
 
     it("is not found for an id nothing knows", async () => {

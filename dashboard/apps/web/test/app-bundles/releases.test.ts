@@ -15,6 +15,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const installed = new Set<string>(["tiny"]);
+/** Apps treated as part of Polaris, updated only with it. */
+const natives = new Set<string>();
+vi.mock("@/lib/apps/native-apps", () => ({ isNativeApp: (id: string) => natives.has(id) }));
 vi.mock("@/lib/apps/install-presence", () => ({
     isAppInstalled: async (id: string) => installed.has(id),
     invalidateInstallPresence: () => undefined
@@ -136,6 +139,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+    natives.clear();
     channel.blob = undefined;
     channel.hostApi = undefined;
     channel.manifest = undefined;
@@ -280,6 +284,25 @@ describe("an app's own updates", () => {
             current: { digest: builds.three!.digest, source: "image" },
             previous: { digest: builds.two!.digest },
             image: builds.three!.digest
+        });
+    });
+
+    it("never updates a native app alone, and gives it the image's build back", async () => {
+        const { updateApp, rollbackApp, appReleaseStatuses } =
+            await import("@/lib/app-bundles/releases");
+        // Updated alone, as an install from before this change could have been.
+        channel.bundle = builds.two;
+        expect(await updateApp("tiny")).toEqual({ ok: true, changed: true });
+        expect(await label()).toBe("two");
+
+        natives.add("tiny");
+        expect(await appReleaseStatuses()).toEqual([]);
+        expect(await updateApp("tiny")).toEqual({ ok: false, code: "unknown" });
+        expect(await rollbackApp("tiny")).toEqual({ ok: false, code: "unknown" });
+        await restart();
+        expect(await label()).toBe("three");
+        expect(readState()).toMatchObject({
+            current: { digest: builds.three!.digest, source: "image" }
         });
     });
 

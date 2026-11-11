@@ -29,8 +29,7 @@ export default async function PolarisAppPage({ params }: { params: Promise<{ app
     const user = await requireAdmin();
     const { appId } = await params;
     const app = findStoreApp(appId);
-    if (!app && findBuiltInApp(appId))
-        return <BuiltInAppDetail appId={appId} canUpdateApps={user.isAdmin} />;
+    if (!app && findBuiltInApp(appId)) return <BuiltInAppDetail appId={appId} />;
     if (!app || app.internal) notFound();
     if (isNativeApp(app.id) && app.opensAt) redirect(app.opensAt);
     if (storeScope(app) !== "polaris") redirect(listingHref(app));

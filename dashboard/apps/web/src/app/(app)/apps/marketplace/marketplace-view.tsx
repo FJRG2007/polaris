@@ -29,7 +29,7 @@ import { ArrowUpCircle, Loader2, Search, Store } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
 import { CAPABILITY_KEYS } from "@/lib/apps/capability-words";
 import { appSettingsHref, builtInSettingsHref } from "@/lib/apps/app-settings";
-import { APP_CATEGORIES, resolveActiveApp } from "@/lib/apps";
+import { APP_CATEGORIES } from "@/lib/apps";
 import { useLocalizeStoreApp } from "./use-store-words";
 import { TemplateDeployDialog } from "./template-deploy-dialog";
 import { BuiltInAlternativeNote } from "./built-in-alternative";
@@ -38,7 +38,6 @@ import { appProvenance } from "@/lib/apps/provenance";
 import { appPreview, builtInPreview } from "@/lib/apps/app-screenshots";
 import {
     canUpdate,
-    newerBuild,
     useAppUpdates,
     type AppUpdates
 } from "@/components/app-bundles/use-app-updates";
@@ -53,7 +52,6 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import type { InstalledAppReaderView } from "@/lib/apps/install-service";
 import { appInstallInputSchema, NAS_CONNECTION_REQUIRED } from "@/lib/apps/install-schema";
 import { findApp, promptedEnvVars, type AppManifest } from "@/lib/apps/catalog";
-import { NATIVE_APPS, NATIVE_APP_IDS } from "@/lib/apps/native-apps";
 import {
     POLARIS_APPS_PATH,
     STORE_SORTS,
@@ -211,10 +209,9 @@ export function MarketplaceView({
     const asksUpdates = scope === "polaris" && canUpdateApps;
     const updates = useAppUpdates({ enabled: asksUpdates });
     const listed = useMemo(() => new Set(all.map((app) => app.id)), [all]);
-    const updatableIds = useMemo(
-        () => (asksUpdates ? new Set([...listed, ...NATIVE_APP_IDS]) : listed),
-        [asksUpdates, listed]
-    );
+    // Security scans and Cloud servers are part of Polaris and update with it,
+    // so they never have an update of their own to offer here.
+    const updatableIds = listed;
     const updatable = (updates.rows ?? []).filter(
         (row) => updatableIds.has(row.id) && canUpdate(row)
     );
@@ -224,10 +221,6 @@ export function MarketplaceView({
         installs: StoreInstallRow[]
     ): CardUpdateState | undefined =>
         asksUpdates && installs.length > 0 ? updateState(app.id) : undefined;
-    // Security scans and Cloud servers run inside a built-in app's screens, so
-    // their updates show on that app's card.
-    const nativeUpdatesFor = (entry: BuiltInListing): NativeUpdate[] =>
-        asksUpdates ? builtInNativeUpdates(entry.id, updates, localize) : [];
 
     // The Polaris apps screen draws every app as a card, installed or not, so
     // its Installed rows are only for an install no card stands for: one of
@@ -415,10 +408,7 @@ export function MarketplaceView({
                                         data-built-in={entry.id}
                                         className="min-w-0"
                                     >
-                                        <BuiltInCard
-                                            entry={entry}
-                                            updates={nativeUpdatesFor(entry)}
-                                        />
+                                        <BuiltInCard entry={entry} />
                                     </div>
                                 ))}
                         </div>
@@ -645,56 +635,13 @@ export function cardUpdateState(updates: AppUpdates, id: string): CardUpdateStat
     };
 }
 
-/** A native app's update, on the built-in app whose screens it runs in. */
-export interface NativeUpdate {
-    readonly id: string;
-    readonly name: string;
-    readonly state: CardUpdateState;
-}
-
-/** The native apps that run inside a built-in app's screens, with their updates. */
-export function builtInNativeUpdates(
-    entryId: string,
-    updates: AppUpdates,
-    localize: (app: AppManifest) => AppManifest
-): NativeUpdate[] {
-    return NATIVE_APP_IDS.filter(
-        (id) => resolveActiveApp(NATIVE_APPS[id] ?? "").id === entryId
-    ).map((id) => {
-        const app = findApp(id);
-        return { id, name: app ? localize(app).name : id, state: cardUpdateState(updates, id) };
-    });
-}
-
-export function NativeUpdateNote({ update }: { update: NativeUpdate }) {
-    const { row, busy, refused } = update.state;
-    if (!busy && !refused && !(row && (newerBuild(row) || row.checkFailed))) return null;
-    return (
-        <div data-native-update={update.id} className="flex min-w-0 items-center gap-2">
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <p className="truncate text-xs text-muted-foreground" title={update.name}>
-                    {update.name}
-                </p>
-                <CardUpdateNote state={update.state} />
-            </div>
-            {leadsWithUpdate(update.state) && <CardUpdateButton state={update.state} />}
-        </div>
-    );
-}
-
 /**
  * An app every Polaris comes with, on the same card as the ones an
  * administrator switches on. Nothing installs it, so nothing can remove it: the
  * menu still lists Uninstall, switched off with the reason, so a reader looking
  * for it learns why rather than wondering where it went.
  */
-function BuiltInCard({
-    entry,
-    updates = []
-}: {
-    entry: BuiltInListing;
-    updates?: readonly NativeUpdate[];
-}) {
+function BuiltInCard({ entry }: { entry: BuiltInListing }) {
     const t = useTranslations("marketplace");
     const navLabel = useNavLabel();
     const locale = useLocale();
@@ -741,15 +688,6 @@ function BuiltInCard({
             }
             byline={t("polaris.builtInBy")}
             summary={entry.summary}
-            note={
-                updates.length > 0 ? (
-                    <>
-                        {updates.map((update) => (
-                            <NativeUpdateNote key={update.id} update={update} />
-                        ))}
-                    </>
-                ) : undefined
-            }
             badges={<Badge>{navLabel(switcherCategory(entry.category))}</Badge>}
             status={<Badge>{t("polaris.builtIn")}</Badge>}
             actions={

@@ -8,7 +8,6 @@
  * for how far it got, so the bar moves while the download runs.
  */
 
-import { isNativeApp } from "@/lib/apps/native-apps";
 import { ArrowUpCircle, RotateCcw, RotateCw } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AppUpdateRow } from "@/lib/app-bundles/actions";
@@ -84,8 +83,6 @@ function AppRow({
     const progress = row.progress;
     const percent = progressPercent(row);
 
-    // A native app is part of every Polaris: it runs a build, nobody installed it.
-    const running = isNativeApp(row.id) ? "appUpdates.builtIn" : "appUpdates.installed";
     let status: string;
     if (!row.installed) status = t("appUpdates.notHere");
     else if (newer && !newer.runs)
@@ -102,7 +99,9 @@ function AppRow({
                         {row.name}
                     </p>
                     <p className="break-words text-xs text-muted-foreground">
-                        {row.installed ? t(running, { version: buildLabel(row.installed) }) : null}
+                        {row.installed
+                            ? t("appUpdates.installed", { version: buildLabel(row.installed) })
+                            : null}
                         {row.installed ? " - " : null}
                         {status}
                     </p>

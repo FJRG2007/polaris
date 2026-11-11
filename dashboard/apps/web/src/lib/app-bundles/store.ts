@@ -21,6 +21,7 @@ import { z } from "zod";
 import { createHash } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { afterPredecessor } from "@/lib/deploy/dashboard-peers";
+import { isNativeApp } from "@/lib/apps/native-apps";
 import { dirname, join, sep } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -366,8 +367,15 @@ export function ensureBundle(id: string): Promise<string> {
         // the image's own bundle - the newest there was when the image was built -
         // and an install from before any of this has no state yet and gets the
         // image's, exactly as it did.
+        // A native app is part of Polaris and runs the image's build, always: a
+        // build of its own left from when it updated alone gives way to it.
         const state = await readBundleState(id);
-        if (state && state.image === ref.digest && state.current.digest !== ref.digest) {
+        if (
+            !isNativeApp(id) &&
+            state &&
+            state.image === ref.digest &&
+            state.current.digest !== ref.digest
+        ) {
             const pinned = bundleDir(id, state.current.digest);
             if (existsSync(join(pinned, "manifest.json"))) return pinned;
         }

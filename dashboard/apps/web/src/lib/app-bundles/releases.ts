@@ -27,6 +27,7 @@ import { createHash } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { clearAppFailure } from "./lifecycle";
 import { isAppInstalled } from "@/lib/apps/install-presence";
+import { isNativeApp } from "@/lib/apps/native-apps";
 import { loadedBundle, stageBundle, swapBundle, type LoadedBundle } from "./loader";
 import { HOST_API, hostApiVerdict } from "@polaris/app-host/version";
 import * as store from "./store";
@@ -272,7 +273,9 @@ async function serve(id: string, dir: string): Promise<UpdateOutcome | null> {
 }
 
 async function guarded(id: string, work: () => Promise<UpdateOutcome>): Promise<UpdateOutcome> {
-    if (!APP_ID.test(id) || !knownApps().includes(id)) return { ok: false, code: "unknown" };
+    // A native app updates with Polaris, never alone.
+    if (!APP_ID.test(id) || !knownApps().includes(id) || isNativeApp(id))
+        return { ok: false, code: "unknown" };
     if (!(await isAppInstalled(id).catch(() => false))) return { ok: false, code: "notInstalled" };
     if (state.updating.has(id)) return { ok: false, code: "busy" };
     state.updating.set(id, { phase: "checking", received: 0, total: 0 });
@@ -389,7 +392,11 @@ export async function appReleaseStatuses({
     check = true
 }: { readonly check?: boolean } = {}): Promise<AppReleaseStatus[]> {
     const ids: string[] = [];
-    for (const id of knownApps()) if (await isAppInstalled(id).catch(() => false)) ids.push(id);
+    for (const id of knownApps()) {
+        // Part of Polaris, updated with it: not an app with builds of its own.
+        if (isNativeApp(id)) continue;
+        if (await isAppInstalled(id).catch(() => false)) ids.push(id);
+    }
     return Promise.all(
         ids.map(async (id): Promise<AppReleaseStatus> => {
             const [pinned, release] = await Promise.all([
