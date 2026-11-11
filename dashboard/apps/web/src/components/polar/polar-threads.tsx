@@ -105,7 +105,7 @@ import {
     SharedWithYou
 } from "@/components/polar/polar-sharing";
 import type { PolarProjectRow, PolarThreadRow } from "@/lib/polar/shared";
-import { StateDot, type PolarCodeHistory } from "@/components/polar/polar-code";
+import type { PolarCodeHistory } from "@/components/polar/polar-code";
 import type { PolarCodeRow } from "@/lib/polar/code";
 import { filterCodeRows } from "@/lib/polar/code-history";
 import dynamic from "next/dynamic";
@@ -664,8 +664,30 @@ function CodeList({ code, query }: { code: PolarThreadsCode; query: string }) {
     const t = useTranslations("polar");
     const toast = useToast();
     const [deleting, setDeleting] = useState<PolarCodeRow | null>(null);
+    const [sharing, setSharing] = useState<PolarCodeRow | null>(null);
+    /** The sessions picked with their boxes, in the order they were picked. */
+    const [chosen, setChosen] = useState<readonly string[]>([]);
+    const [deletingChosen, setDeletingChosen] = useState(false);
     const { rows, more, loadingMore, loadMore } = code.history;
     if (rows === null) return <ListSkeleton />;
+    // A session that left the list (removed elsewhere, or a page reloaded) is
+    // no longer picked.
+    const picked = chosen.filter((id) => rows.some((row) => row.id === id));
+    const toggle = (id: string) =>
+        setChosen((current) =>
+            current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]
+        );
+    // Only a finished session can leave the history; a running one is kept and
+    // said so, the way its own menu says it.
+    const removable = picked.filter((id) => rows.some((row) => row.id === id && !row.live));
+    const removeChosen = () => {
+        const ids = removable;
+        setDeletingChosen(false);
+        setChosen([]);
+        void Promise.all(ids.map((id) => code.history.remove(id))).then((answers) => {
+            if (answers.some((ok) => !ok)) toast.show({ title: t("code.deleteFailed") });
+        });
+    };
     const narrowed = query.trim() !== "";
     const shown = filterCodeRows(rows, query);
     const groups = polarShared.groupThreads(shown.map((row) => ({ ...row, updatedAt: row.createdAt })));
@@ -675,6 +697,39 @@ function CodeList({ code, query }: { code: PolarThreadsCode; query: string }) {
         });
     return (
         <Section id="polar-code" label={t("history.codeSessions")}>
+            {picked.length > 0 ? (
+                <div
+                    role="toolbar"
+                    aria-label={t("history.selectionActions")}
+                    className="mx-2 mb-1 flex min-w-0 shrink-0 items-center gap-0.5 rounded-md bg-primary/10 py-0.5 pl-2 pr-0.5"
+                >
+                    <span
+                        className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-foreground"
+                        aria-live="polite"
+                    >
+                        {t("history.selected", { count: picked.length })}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => setDeletingChosen(true)}
+                        disabled={removable.length === 0}
+                        aria-label={removable.length === 0 ? t("code.deleteLive") : t("history.delete")}
+                        title={removable.length === 0 ? t("code.deleteLive") : t("history.delete")}
+                        className={cn(BAR_ACTION, "disabled:opacity-50")}
+                    >
+                        <Trash2 className="size-4" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setChosen([])}
+                        aria-label={t("history.clearSelection")}
+                        title={t("history.clearSelection")}
+                        className={BAR_ACTION}
+                    >
+                        <X className="size-4" />
+                    </button>
+                </div>
+            ) : null}
             {shown.length === 0 ? (
                 <p className="px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground">
                     {narrowed ? t("history.searchEmpty") : t("code.empty")}
@@ -697,6 +752,10 @@ function CodeList({ code, query }: { code: PolarThreadsCode; query: string }) {
                                 onOpen={() => code.onOpen(row.id)}
                                 onRename={(title) => rename(row, title)}
                                 onDelete={() => setDeleting(row)}
+                                onShare={() => setSharing(row)}
+                                chosen={picked.includes(row.id)}
+                                selecting={picked.length > 0}
+                                onToggle={() => toggle(row.id)}
                             />
                         ))}
                     </div>
@@ -731,6 +790,32 @@ function CodeList({ code, query }: { code: PolarThreadsCode; query: string }) {
                     }}
                 />
             ) : null}
+            {deletingChosen ? (
+                <ConfirmDeleteDialog
+                    open
+                    onOpenChange={(open) => (open ? undefined : setDeletingChosen(false))}
+                    name={t("code.bulkDeleteTitle", { count: removable.length })}
+                    requireTyping={false}
+                    kind={t("code.session")}
+                    title={t("code.bulkDeleteTitle", { count: removable.length })}
+                    question={
+                        removable.length < picked.length
+                            ? `${t("code.bulkDeleteQuestion", { count: removable.length })} ${t("code.bulkDeleteKeepsLive", { count: picked.length - removable.length })}`
+                            : t("code.bulkDeleteQuestion", { count: removable.length })
+                    }
+                    confirmLabel={t("history.deleteConfirm")}
+                    onConfirm={removeChosen}
+                />
+            ) : null}
+            {sharing ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(open) => (open ? undefined : setSharing(null))}
+                    subject="agents.session"
+                    subjectId={sharing.id}
+                    name={sharing.title}
+                />
+            ) : null}
         </Section>
     );
 }
@@ -744,7 +829,11 @@ function CodeItem({
     canRename,
     onOpen,
     onRename,
-    onDelete
+    onDelete,
+    onShare,
+    chosen,
+    selecting,
+    onToggle
 }: {
     row: PolarCodeRow;
     active: boolean;
@@ -752,6 +841,12 @@ function CodeItem({
     onOpen: () => void;
     onRename: (title: string) => void;
     onDelete: () => void;
+    onShare: () => void;
+    /** Picked with its box. */
+    chosen: boolean;
+    /** Something is picked, so every box stays on screen. */
+    selecting: boolean;
+    onToggle: () => void;
 }) {
     const t = useTranslations("polar");
     const [renaming, setRenaming] = useState(false);
@@ -787,6 +882,14 @@ function CodeItem({
                     <ExternalLink />
                     {t("history.openNewTab")}
                 </a>
+            </Item>
+            <Item onSelect={onToggle}>
+                <SquareCheck />
+                {chosen ? t("history.clearSelection") : t("code.select")}
+            </Item>
+            <Item onSelect={take(onShare)}>
+                <Share2 />
+                {t("history.share")}
             </Item>
             {canRename ? (
                 <>
@@ -842,11 +945,27 @@ function CodeItem({
                         />
                     ) : (
                         <>
-                            {/* Where a chat's row has its selection box. */}
+                            {/* The same box a chat's row has, shown on hover
+                                and kept on screen once anything is picked. */}
                             <span
-                                aria-hidden
-                                className="w-6 shrink-0 [@media(hover:none)]:hidden [@media(pointer:coarse)]:w-10"
-                            />
+                                className={cn(
+                                    "flex w-6 shrink-0 items-center justify-center pl-1 transition-opacity duration-fast [@media(pointer:coarse)]:w-10",
+                                    selecting
+                                        ? "opacity-100"
+                                        : "opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:hidden"
+                                )}
+                            >
+                                <Checkbox
+                                    checked={chosen}
+                                    tabIndex={-1}
+                                    aria-label={t("history.selectRow", { title: row.title })}
+                                    onChange={() => undefined}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onToggle();
+                                    }}
+                                />
+                            </span>
                             <button
                                 type="button"
                                 onClick={onOpen}
@@ -859,14 +978,22 @@ function CodeItem({
                             >
                                 {row.title}
                             </button>
-                            <span
-                                role="img"
-                                aria-label={row.stateLabel}
-                                title={row.stateLabel}
-                                className="flex shrink-0 items-center px-1"
-                            >
-                                <StateDot state={row.state} />
-                            </span>
+                            {/* Only while it is at work, as a chat shows its run: a
+                                dot for every other state was noise on every row,
+                                and the state stays in the row's title. */}
+                            {row.state === "working" || row.state === "starting" ? (
+                                <span
+                                    role="img"
+                                    aria-label={row.stateLabel}
+                                    title={row.stateLabel}
+                                    className="flex shrink-0 items-center px-1"
+                                >
+                                    <Loader2
+                                        aria-hidden
+                                        className="size-3.5 text-primary motion-safe:animate-spin"
+                                    />
+                                </span>
+                            ) : null}
                             <span className="mr-1 flex shrink-0 items-center">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
