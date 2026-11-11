@@ -73,7 +73,7 @@ export function BadgeStrip({
     return (
         <>
             <ul
-                className={cn("flex flex-wrap items-center gap-1", className)}
+                className={cn("flex flex-wrap items-center gap-0.5", className)}
                 aria-label={t("title")}
             >
                 {badges.map((badge) => (
@@ -83,13 +83,13 @@ export function BadgeStrip({
                             onClick={() => setOpen(badge)}
                             aria-label={t("openBadge", { name: badgeName(t, badge) })}
                             title={badgeName(t, badge)}
-                            className="flex rounded-md p-0.5 hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:p-2.5"
+                            className="flex rounded p-0.5 hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:p-1"
                         >
                             <BadgeIcon
                                 icon={badge.icon}
                                 kind={badge.kind}
                                 level={badge.level}
-                                className="size-6"
+                                className="size-[18px]"
                             />
                         </button>
                     </li>

@@ -211,10 +211,7 @@ export function ProfileDetails({
                                     <span className="min-w-0 truncate">{profile.username}</span>
                                 </Link>
                             ) : null}
-                            <BadgeStrip
-                                badges={profile.badges}
-                                className="rounded-md bg-muted/40 px-0.5"
-                            />
+                            <BadgeStrip badges={profile.badges} />
                         </div>
                     ) : null}
                     {/* Their name, when it is not already what they are called
