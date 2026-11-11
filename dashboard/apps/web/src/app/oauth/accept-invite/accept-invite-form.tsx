@@ -14,6 +14,7 @@
 import { signIn } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { acceptInviteAction } from "./actions";
+import { refusalMessage, signInRefusal } from "@/app/oauth/sign-in-refusal";
 import { useZodForm } from "@/lib/use-zod-form";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { EnrollView } from "@/app/oauth/enroll/enroll-view";
@@ -98,7 +99,17 @@ export function AcceptInviteForm({
             setError(result.error ?? t("invite.errors.failed"));
             return;
         }
-        await signIn.email({ email: result.email, password: parsed.password });
+        const { error: signInError } = await signIn.email({
+            email: result.email,
+            password: parsed.password
+        });
+        // The account exists now; an address sign-in is refused on would only
+        // land them on a login that refuses them again, so say where to go.
+        if (signInRefusal(signInError) === "address") {
+            setPending(false);
+            setError(await refusalMessage("address", t));
+            return;
+        }
         // Asked now rather than letting the session guard bounce them into the
         // enrollment screen, which is a navigation this password does not survive.
         const owed = await pendingEnrollmentAction().catch(() => null);

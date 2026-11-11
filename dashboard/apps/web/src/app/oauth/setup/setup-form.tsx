@@ -16,6 +16,7 @@ import { signIn } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useZodForm } from "@/lib/use-zod-form";
 import { completeSetupAction } from "./actions";
+import { refusalMessage, signInRefusal } from "@/app/oauth/sign-in-refusal";
 import { useState, type FormEvent } from "react";
 import { EnrollView } from "@/app/oauth/enroll/enroll-view";
 import { usePasswordSafety } from "@/lib/use-password-safety";
@@ -80,7 +81,17 @@ export function SetupForm({
             return;
         }
         // Sign the new administrator straight in - no second login step.
-        await signIn.email({ email: parsed.email, password: parsed.password });
+        const { error: signInError } = await signIn.email({
+            email: parsed.email,
+            password: parsed.password
+        });
+        // The account exists now; an address sign-in is refused on would only
+        // land them on a login that refuses them again, so say where to go.
+        if (signInRefusal(signInError) === "address") {
+            setPending(false);
+            setError(await refusalMessage("address", t));
+            return;
+        }
         // Asked now rather than letting the session guard bounce them into the
         // enrollment screen, which is a navigation this password does not survive.
         const owed = await pendingEnrollmentAction().catch(() => null);

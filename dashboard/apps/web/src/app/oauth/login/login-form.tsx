@@ -8,6 +8,7 @@ import { loginSchema } from "@polaris/core";
 import { useZodForm } from "@/lib/use-zod-form";
 import { IntegrationLogo } from "@/components/logos";
 import { postLoginTarget } from "./post-login-target";
+import { refusalMessage, signInRefusal } from "@/app/oauth/sign-in-refusal";
 import { authClient, signIn } from "@/lib/auth-client";
 import { useEffect, useState, type FormEvent } from "react";
 import { EnrollView } from "@/app/oauth/enroll/enroll-view";
@@ -292,7 +293,7 @@ export function LoginForm({
                 setError(t("login.ssoRequired"));
                 return;
             }
-            setError(t("login.invalid"));
+            setError(await refusalMessage(signInRefusal(signInError) ?? "credentials", t));
             return;
         }
         window.localStorage.setItem(LAST_IDENTIFIER_KEY, parsed.identifier);
