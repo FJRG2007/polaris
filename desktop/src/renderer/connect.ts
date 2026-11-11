@@ -71,12 +71,20 @@ function check(): string | null {
     }
     const listed = rows.find((row) => row.origin === parsed.data);
     if (listed) {
-        input.setAttribute("aria-invalid", "true");
-        note.textContent = `Already on your list as ${describeServer(listed)}.`;
-        note.className = "error";
-        available(submit, false);
-        return null;
+        // Typed again with another name, it is a rename: the host is already
+        // there, so the form saves the name instead of refusing it.
+        const typedName = normalizeServerName(nameInput.value);
+        const renaming = typedName !== null && typedName !== listed.name;
+        input.setAttribute("aria-invalid", String(!renaming));
+        note.textContent = renaming
+            ? `Already on your list as ${describeServer(listed)}. Save to rename it.`
+            : `Already on your list as ${describeServer(listed)}.`;
+        note.className = renaming ? "hint" : "error";
+        if (!busy) submit.textContent = renaming ? "Save name" : "Open";
+        available(submit, renaming && !busy);
+        return renaming ? parsed.data : null;
     }
+    if (!busy) submit.textContent = "Open";
     const found = confirmed === parsed.data;
     available(submit, found && !busy);
     return found ? parsed.data : null;
@@ -416,10 +424,24 @@ input.addEventListener("input", () => {
     ask();
 });
 
+nameInput.addEventListener("input", () => check());
+
 form.addEventListener("submit", (event) => {
     event.preventDefault();
     const address = check();
     if (!address || busy) return;
+    if (rows.some((row) => row.origin === address)) {
+        const name = normalizeServerName(nameInput.value) ?? "";
+        void act(() => window.polarisLocal.connect.rename(address, name)).then(() => {
+            if (failure.hidden) {
+                input.value = "";
+                nameInput.value = "";
+                check();
+                if (known) showForm(false);
+            }
+        });
+        return;
+    }
     busy = true;
     submit.textContent = "Checking...";
     check();
