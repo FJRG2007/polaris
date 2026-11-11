@@ -1791,6 +1791,113 @@ export async function listRepoBranches(
     }
 }
 
+/** An open issue as a picker lists it. */
+export interface RepoIssue {
+    readonly number: number;
+    readonly title: string;
+    readonly labels: readonly string[];
+}
+
+/** An issue with what somebody wrote in it, for a session started from it. */
+export interface RepoIssueDetail extends RepoIssue {
+    readonly body: string;
+    readonly state: "open" | "closed";
+}
+
+const ISSUES_SHOWN = 30;
+
+function issueOf(raw: unknown): RepoIssueDetail | null {
+    const row = raw as {
+        number?: unknown;
+        title?: unknown;
+        body?: unknown;
+        state?: unknown;
+        labels?: unknown;
+        pull_request?: unknown;
+    };
+    // GitHub lists pull requests as issues too; a pull request is not one here.
+    if (!row || row.pull_request || typeof row.number !== "number") return null;
+    const labels = Array.isArray(row.labels)
+        ? row.labels
+              .map((label) => (typeof label === "string" ? label : (label as { name?: unknown })?.name))
+              .filter((name): name is string => typeof name === "string" && name.length > 0)
+        : [];
+    return {
+        number: row.number,
+        title: typeof row.title === "string" ? row.title : `#${row.number}`,
+        labels,
+        body: typeof row.body === "string" ? row.body : "",
+        state: row.state === "closed" ? "closed" : "open"
+    };
+}
+
+/**
+ * A repository's open issues, most recently updated first, or those whose
+ * title or text match `query` - searched by GitHub, never filtered from a page
+ * here. A number (`42` or `#42`) is that issue. Null when GitHub would not say.
+ */
+export async function listOpenIssues(
+    owner: string,
+    repo: string,
+    token: string | null,
+    query: string
+): Promise<RepoIssue[] | null> {
+    const asked = query.trim();
+    const number = /^#?(\d{1,9})$/.exec(asked)?.[1];
+    if (number) {
+        const issue = await readIssue(owner, repo, Number(number), token);
+        return issue ? [issue] : [];
+    }
+    try {
+        // Words only: a qualifier typed here (`repo:`, `org:`, `OR`) would widen
+        // the search past this repository, to anything the token can read.
+        const words = asked
+            .slice(0, 200)
+            .split(/\s+/)
+            .filter((word) => word && !word.includes(":") && !/^(OR|AND|NOT)$/.test(word))
+            .map((word) => word.replace(/["()]/g, ""))
+            .filter(Boolean)
+            .join(" ");
+        if (asked && !words) return [];
+        const url = words
+            ? `${API}/search/issues?per_page=${ISSUES_SHOWN}&q=${encodeURIComponent(
+                  `repo:${owner}/${repo} is:issue is:open ${words}`
+              )}`
+            : `${repoPath(owner, repo)}/issues?state=open&sort=updated&per_page=${ISSUES_SHOWN}`;
+        const res = await fetch(url, { headers: optionalAuthHeaders(token), cache: "no-store" });
+        if (!res.ok) return null;
+        const data = (await res.json()) as unknown;
+        const rows = words ? (data as { items?: unknown }).items : data;
+        if (!Array.isArray(rows)) return null;
+        return rows
+            .map(issueOf)
+            .filter((issue): issue is RepoIssueDetail => issue !== null)
+            .map(({ number: n, title, labels }) => ({ number: n, title, labels }));
+    } catch {
+        return null;
+    }
+}
+
+/** One issue, with its text, or null when it is not there, is a pull request,
+ *  or GitHub would not say. */
+export async function readIssue(
+    owner: string,
+    repo: string,
+    number: number,
+    token: string | null
+): Promise<RepoIssueDetail | null> {
+    try {
+        const res = await fetch(`${repoPath(owner, repo)}/issues/${number}`, {
+            headers: optionalAuthHeaders(token),
+            cache: "no-store"
+        });
+        if (!res.ok) return null;
+        return issueOf(await res.json());
+    } catch {
+        return null;
+    }
+}
+
 /** The branch a repository's pull requests go to by default, or null. */
 export async function repoDefaultBranch(
     owner: string,

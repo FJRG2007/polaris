@@ -26,17 +26,23 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { PolarCodeBranches } from "@/lib/polar/code";
 import { readPoll } from "@/lib/poll-fetch";
 import { MODEL_TRIGGER } from "@/components/polar/elements/model-selector";
+import * as core from "@polaris/core";
 import {
     Bot,
     Check,
     ChevronDown,
     ExternalLink,
     FolderGit2,
+    CircleDot,
     GitBranch,
     Plus,
     RefreshCw,
-    Sparkles
+    ShieldCheck,
+    Sparkles,
+    Wand2,
+    X
 } from "lucide-react";
+import type { RepoIssue } from "@/lib/github-service";
 import {
     cn,
     DropdownMenu,
@@ -675,5 +681,322 @@ export function AgentPicker({
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
+    );
+}
+
+/** Where the picked permission mode is kept, so the next task starts on it. */
+export const PERMISSION_MODE_KEY = "polar.code.permissionMode";
+
+/** The mode a new task starts on: the one picked last, or full access - what a
+ *  session in its own machine always did. */
+export function readPermissionMode(stored: string | null): core.SessionPermissionMode {
+    return core.sessionPermissionMode(stored) ?? "full";
+}
+
+/** How the agent asks before it acts, picked beside the agent. Only for a tool
+ *  whose questions Polaris can answer. */
+export function PermissionModePicker({
+    value,
+    onChange,
+    disabled
+}: {
+    value: core.SessionPermissionMode;
+    onChange: (mode: core.SessionPermissionMode) => void;
+    disabled: boolean;
+}) {
+    const t = useTranslations("polar");
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild disabled={disabled}>
+                <button
+                    type="button"
+                    title={t(`code.mode.${value}.hint`)}
+                    aria-label={`${t("code.mode.label")}: ${t(`code.mode.${value}.name`)}`}
+                    className={cn(MODEL_TRIGGER, "disabled:opacity-60")}
+                >
+                    <ShieldCheck className="size-3.5 shrink-0" aria-hidden />
+                    <span className="truncate text-foreground">
+                        {t(`code.mode.${value}.name`)}
+                    </span>
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-2rem)]">
+                <DropdownMenuLabel>{t("code.mode.label")}</DropdownMenuLabel>
+                {core.SESSION_PERMISSION_MODES.map((mode) => (
+                    <DropdownMenuItem
+                        key={mode}
+                        onSelect={() => onChange(mode)}
+                        className="items-start"
+                    >
+                        <span className="flex min-w-0 flex-col">
+                            <span className="truncate">{t(`code.mode.${mode}.name`)}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t(`code.mode.${mode}.hint`)}
+                            </span>
+                        </span>
+                        <Mark on={mode === value} />
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+const CHIP =
+    "flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-md border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground disabled:opacity-60 [@media(pointer:coarse)]:h-11";
+const CHIP_MENU =
+    "max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain pt-2";
+
+/** An issue the task starts from, as the chip names it. */
+export type PickedIssue = Pick<RepoIssue, "number" | "title">;
+
+/** How long typing settles before GitHub is searched. */
+const ISSUE_SEARCH_MS = 300;
+
+/** The repository's open issues for the chip: GitHub's own search for what is
+ *  typed, asked once the typing settles, the stale answer dropped. */
+function useIssues(repoId: string, query: string, open: boolean) {
+    const [state, setState] = useState<{
+        key: string;
+        items: readonly RepoIssue[] | null;
+        failed: boolean;
+    }>({ key: "", items: null, failed: false });
+    const asked = query.trim();
+    const key = `${repoId}:${asked}`;
+    useEffect(() => {
+        if (!open) return;
+        const controller = new AbortController();
+        const timer = setTimeout(
+            () => {
+                readPoll<{ items: RepoIssue[] } | null>(
+                    "/api/polar/code/issues",
+                    { repo: repoId, q: asked },
+                    controller.signal
+                )
+                    .then((answer) =>
+                        setState({ key, items: answer?.items ?? null, failed: answer === null })
+                    )
+                    .catch(() => {
+                        if (!controller.signal.aborted)
+                            setState({ key, items: null, failed: true });
+                    });
+            },
+            asked ? ISSUE_SEARCH_MS : 0
+        );
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [asked, key, open, repoId]);
+    return state.key === key ? state : { key, items: null, failed: false };
+}
+
+/** Start the task from one of the repository's open issues. */
+export function CodeIssueChip({
+    repoId,
+    issue,
+    onIssue,
+    disabled
+}: {
+    repoId: string;
+    issue: PickedIssue | null;
+    onIssue: (issue: PickedIssue | null) => void;
+    disabled: boolean;
+}) {
+    const t = useTranslations("polar");
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState("");
+    const { items, failed } = useIssues(repoId, query, open);
+    const shown = issue ? `#${issue.number} ${issue.title}` : t("code.issue.label");
+    return (
+        <span className="flex min-w-0 max-w-full items-center gap-0.5">
+            <DropdownMenu
+                open={open}
+                onOpenChange={(next) => {
+                    if (!next) setQuery("");
+                    setOpen(next);
+                }}
+            >
+                <DropdownMenuTrigger asChild disabled={disabled}>
+                    <button
+                        type="button"
+                        aria-label={`${t("code.issue.label")}: ${issue ? shown : t("code.issue.none")}`}
+                        title={issue ? shown : t("code.issue.pick")}
+                        className={CHIP}
+                    >
+                        <CircleDot className="size-3.5 shrink-0" aria-hidden />
+                        <span className="min-w-0 truncate">{shown}</span>
+                        <ChevronDown className="size-3.5 shrink-0" aria-hidden />
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                    align="start"
+                    className={CHIP_MENU}
+                    onEscapeKeyDown={(event) => {
+                        if (!query) return;
+                        event.preventDefault();
+                        setQuery("");
+                    }}
+                >
+                    <MenuSearch
+                        value={query}
+                        onChange={setQuery}
+                        placeholder={t("code.issue.search")}
+                    />
+                    {items === null && !failed ? (
+                        <div className="space-y-1.5 px-2 py-1.5" aria-hidden>
+                            {[0, 1, 2].map((key) => (
+                                <div
+                                    key={key}
+                                    className="h-5 rounded bg-muted motion-safe:animate-pulse"
+                                />
+                            ))}
+                        </div>
+                    ) : null}
+                    {failed ? (
+                        <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                            {t("code.issue.failed")}
+                        </p>
+                    ) : null}
+                    {items?.map((item) => (
+                        <DropdownMenuItem
+                            key={item.number}
+                            onSelect={() => onIssue({ number: item.number, title: item.title })}
+                            className="items-start"
+                        >
+                            <span className="shrink-0 tabular-nums text-muted-foreground">
+                                #{item.number}
+                            </span>
+                            <span className="flex min-w-0 flex-col">
+                                <span className="min-w-0 truncate" title={item.title}>
+                                    {item.title}
+                                </span>
+                                {item.labels.length > 0 ? (
+                                    <span
+                                        className="min-w-0 truncate text-xs text-muted-foreground"
+                                        title={item.labels.join(", ")}
+                                    >
+                                        {item.labels.join(", ")}
+                                    </span>
+                                ) : null}
+                            </span>
+                            <Mark on={issue?.number === item.number} />
+                        </DropdownMenuItem>
+                    ))}
+                    {items !== null && items.length === 0 ? (
+                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                            {query.trim() ? t("code.issue.noMatch") : t("code.issue.empty")}
+                        </p>
+                    ) : null}
+                </DropdownMenuContent>
+            </DropdownMenu>
+            {issue ? (
+                <ChipClear label={t("code.issue.clear")} onClear={() => onIssue(null)} />
+            ) : null}
+        </span>
+    );
+}
+
+/** A skill the composer offers: the person's own, by name. */
+export interface CodeSkillOption {
+    readonly name: string;
+    readonly description: string;
+}
+
+/** Start the task with one of the person's Polar skills as its instructions. */
+export function CodeSkillChip({
+    skills,
+    skill,
+    onSkill,
+    disabled
+}: {
+    skills: readonly CodeSkillOption[];
+    skill: string | null;
+    onSkill: (skill: string | null) => void;
+    disabled: boolean;
+}) {
+    const t = useTranslations("polar");
+    const [query, setQuery] = useState("");
+    const shown = skills.filter((option) =>
+        menuSearchMatches(`${option.name} ${option.description}`, query)
+    );
+    return (
+        <span className="flex min-w-0 max-w-full items-center gap-0.5">
+            <DropdownMenu onOpenChange={(next) => (next ? undefined : setQuery(""))}>
+                <DropdownMenuTrigger asChild disabled={disabled}>
+                    <button
+                        type="button"
+                        aria-label={`${t("code.skill.label")}: ${skill ?? t("code.skill.none")}`}
+                        title={skill ?? t("code.skill.pick")}
+                        className={CHIP}
+                    >
+                        <Wand2 className="size-3.5 shrink-0" aria-hidden />
+                        <span className="min-w-0 truncate">{skill ?? t("code.skill.label")}</span>
+                        <ChevronDown className="size-3.5 shrink-0" aria-hidden />
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className={CHIP_MENU}>
+                    {skills.length > 6 ? (
+                        <MenuSearch
+                            value={query}
+                            onChange={setQuery}
+                            placeholder={t("code.skill.search")}
+                        />
+                    ) : null}
+                    {shown.map((option) => (
+                        <DropdownMenuItem
+                            key={option.name}
+                            onSelect={() => onSkill(option.name)}
+                            className="items-start"
+                        >
+                            <span className="flex min-w-0 flex-col">
+                                <span className="min-w-0 truncate" title={option.name}>
+                                    {option.name}
+                                </span>
+                                {option.description ? (
+                                    <span
+                                        className="line-clamp-2 text-xs text-muted-foreground"
+                                        title={option.description}
+                                    >
+                                        {option.description}
+                                    </span>
+                                ) : null}
+                            </span>
+                            <Mark on={skill === option.name} />
+                        </DropdownMenuItem>
+                    ))}
+                    {skills.length === 0 ? (
+                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                            {t("code.skill.empty")}
+                        </p>
+                    ) : null}
+                    {skills.length > 0 && shown.length === 0 ? (
+                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                            {t("code.skill.noMatch")}
+                        </p>
+                    ) : null}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                        <Link href="/polar/settings/skills">{t("code.skill.manage")}</Link>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            {skill ? (
+                <ChipClear label={t("code.skill.clear")} onClear={() => onSkill(null)} />
+            ) : null}
+        </span>
+    );
+}
+
+function ChipClear({ label, onClear }: { label: string; onClear: () => void }) {
+    return (
+        <button
+            type="button"
+            onClick={onClear}
+            aria-label={label}
+            title={label}
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:size-11"
+        >
+            <X className="size-3.5" aria-hidden />
+        </button>
     );
 }

@@ -378,3 +378,133 @@ describe("the Code thread", () => {
         expect(screen.getByRole("textbox", { name: "Reply to the agent" })).toBeTruthy();
     });
 });
+
+describe("how the agent asks before it acts", () => {
+    const live = {
+        id: "33333333-3333-4333-8333-333333333333",
+        title: "Fix the login form",
+        repo: "acme/web",
+        branch: "",
+        state: "running",
+        stateLabel: "Running",
+        live: true,
+        createdAt: "2026-01-01T00:00:00.000Z"
+    };
+
+    it("starts Claude Code on the mode picked, and starts the next task on it too", async () => {
+        access = "manage";
+        render(<Harness />, { wrapper: MessagesWrapper });
+        const codeOption = await screen.findByRole("radio", { name: /code/i });
+        await waitFor(() => expect((codeOption as HTMLButtonElement).disabled).toBe(false));
+        fireEvent.click(codeOption);
+        const box = await screen.findByRole("textbox", { name: "Task for the agent" });
+        await screen.findByRole("button", { name: /^Where the agent works: acme\/web/ });
+        const mode = screen.getByRole("button", { name: "Permissions: Full access" });
+        fireEvent.pointerDown(mode, { button: 0, ctrlKey: false });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /Ask first/ }));
+        expect(screen.getByRole("button", { name: "Permissions: Ask first" })).toBeTruthy();
+        fireEvent.change(box, { target: { value: "Fix the login form" } });
+        const send = screen.getByRole("button", { name: "Start session" }) as HTMLButtonElement;
+        await waitFor(() => expect(send.disabled).toBe(false));
+        fireEvent.click(send);
+        await waitFor(() => expect(started).toHaveLength(1));
+        expect(started[0]).toMatchObject({ cli: "claude", permissionMode: "ask" });
+        expect(window.localStorage.getItem("polar.code.permissionMode")).toBe("ask");
+    });
+
+    it("puts a waiting question where the reply goes, and sends the answer", async () => {
+        access = "manage";
+        const answered: unknown[] = [];
+        thread = {
+            session: live,
+            entries: [],
+            error: null,
+            canManage: false,
+            permission: {
+                id: "44444444-4444-4444-8444-444444444444",
+                tool: "Bash",
+                detail: "rm -rf build",
+                at: "2026-01-01T00:00:01.000Z"
+            }
+        };
+        vi.mocked(fetch).mockImplementation(async (url, init) => {
+            if (String(url).startsWith("/api/polar/code/thread")) return answer(thread);
+            if (String(url).startsWith("/api/polar/code/choices")) return answer(CHOICES);
+            if (String(url) === "/api/agents/sessions/permission") {
+                answered.push(JSON.parse(String(init?.body)));
+                thread = { ...(thread as object), permission: null };
+                return answer({ status: "deny" });
+            }
+            return answer({ access, sessions: [live], next: null });
+        });
+        window.localStorage.setItem("polar.mode", "code");
+        render(<Harness />, { wrapper: MessagesWrapper });
+        fireEvent.click(await screen.findByRole("button", { name: /Fix the login form/ }));
+        expect(await screen.findByText("The agent wants to use Bash")).toBeTruthy();
+        expect(screen.getByText("rm -rf build")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Deny" }));
+        await waitFor(() =>
+            expect(answered).toEqual([
+                { requestId: "44444444-4444-4444-8444-444444444444", choice: "deny" }
+            ])
+        );
+        await waitFor(() => expect(screen.queryByText("The agent wants to use Bash")).toBeNull());
+    });
+});
+
+describe("starting from an issue or a skill", () => {
+    it("starts from an issue with nothing typed, and names the skill picked", async () => {
+        access = "manage";
+        vi.mocked(fetch).mockImplementation(async (url, init) => {
+            const address = String(url);
+            if (address.startsWith("/api/polar/code/thread")) return answer(thread);
+            if (address.startsWith("/api/polar/code/choices"))
+                return answer({
+                    ...CHOICES,
+                    skills: [{ name: "tdd", description: "Tests first" }]
+                });
+            if (address.startsWith("/api/polar/code/issues"))
+                return answer({
+                    items: [{ number: 42, title: "Login fails on Safari", labels: ["bug"] }]
+                });
+            if (address.startsWith("/api/polar/code/branches"))
+                return answer({ defaultBranch: "main", branches: ["main"] });
+            if (address.startsWith("/api/polar/code/start")) {
+                started.push(JSON.parse(String(init?.body)));
+                return answer({ id: "33333333-3333-4333-8333-333333333333" });
+            }
+            return answer({ access, sessions: [], next: null });
+        });
+        render(<Harness />, { wrapper: MessagesWrapper });
+        const codeOption = await screen.findByRole("radio", { name: /code/i });
+        await waitFor(() => expect((codeOption as HTMLButtonElement).disabled).toBe(false));
+        fireEvent.click(codeOption);
+        await screen.findByRole("button", { name: /^Where the agent works: acme\/web/ });
+        // Nothing typed and no issue: the button is the voice one, not a send.
+        expect(screen.queryByRole("button", { name: "Start session" })).toBeNull();
+
+        fireEvent.pointerDown(screen.getByRole("button", { name: "Issue: none" }), {
+            button: 0,
+            ctrlKey: false
+        });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /Login fails on Safari/ }));
+        expect(screen.getByRole("button", { name: "Issue: #42 Login fails on Safari" })).toBeTruthy();
+
+        fireEvent.pointerDown(screen.getByRole("button", { name: "Skill: none" }), {
+            button: 0,
+            ctrlKey: false
+        });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /tdd/ }));
+
+        const send = screen.getByRole("button", { name: "Start session" }) as HTMLButtonElement;
+        await waitFor(() => expect(send.disabled).toBe(false));
+        fireEvent.click(send);
+        await waitFor(() => expect(started).toHaveLength(1));
+        expect(started[0]).toMatchObject({
+            title: "#42 Login fails on Safari",
+            prompt: "",
+            issueNumber: 42,
+            skill: "tdd"
+        });
+    });
+});

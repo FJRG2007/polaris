@@ -20,17 +20,28 @@ import {
     githubApiToken,
     githubAppInstallationToken,
     githubAppInstallUrl,
+    listOpenIssues,
     listRepoBranches,
-    repoDefaultBranch
+    readIssue,
+    repoDefaultBranch,
+    type RepoIssue
 } from "@/lib/github-service";
+import { agentSkills, listSkills } from "@/lib/polar/skills/store";
+import { codeStartersSchema, starterPrompt, type StarterSkill } from "@/lib/polar/code-starters";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { userHasManage, type SessionUser } from "@/lib/session";
 import { sessionCursor } from "@/lib/agents/session-cursor";
 import { dedupeCodeRows, POLAR_CODE_PAGE, polarCodeEditSchema } from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
 import * as repoOptions from "@/lib/agents/repo-options";
-import { hideSessionFromPolar, renameSession, type SessionView } from "@/lib/agents/session-service";
+import {
+    getSession,
+    hideSessionFromPolar,
+    renameSession,
+    type SessionView
+} from "@/lib/agents/session-service";
 import { keepSpare } from "@/lib/agents/session-spares";
+import { pendingPermission, type PendingPermission } from "@/lib/agents/session-permissions";
 import {
     forkSessionAction,
     listSessionsAction,
@@ -83,6 +94,9 @@ export interface PolarCodeThread {
     /** Whether this reader may steer it: the terminal and the files are only
      *  offered to somebody who could start a session. */
     readonly canManage: boolean;
+    /** The agent's question waiting on an answer, for somebody who may steer
+     *  the session; null when nothing is waiting. */
+    readonly permission: PendingPermission | null;
 }
 
 /** As many lines of activity as the thread shows; the session's own page keeps
@@ -169,6 +183,13 @@ export async function polarCodeThread(
         getTranslations("agents")
     ]);
     if (!detail) return null;
+    // Only for whoever the answer route takes it from: the person who started
+    // the session, while it runs. Somebody it was shared with reads, not steers.
+    const asked =
+        access === "manage" && !core.isSessionOver(detail.session.state)
+            ? await pendingPermission(sessionId)
+            : null;
+    const permission = asked && (await getSession(sessionId, user.id)) ? asked : null;
     const messages: PolarCodeEntry[] = detail.messages.map((message) => ({
         at: message.at,
         type: "message",
@@ -199,7 +220,8 @@ export async function polarCodeThread(
         entries,
         error: detail.session.error ? agentText(t, detail.session.error) : null,
         view: detail.session,
-        canManage: access === "manage"
+        canManage: access === "manage",
+        permission
     };
 }
 
@@ -207,18 +229,25 @@ export type PolarCodeChoices = Awaited<ReturnType<typeof sessionChoicesAction>> 
     /** GitHub's page for installing Polaris's App on more repositories, or null
      *  where no App is set up (a token connection, or none). */
     readonly installUrl: string | null;
+    /** The person's Polar skills a task can start with, by name. */
+    readonly skills: readonly { name: string; description: string }[];
 };
 
 /** What the composer offers - repositories and agents - or null for somebody
  *  who cannot start a session. */
 export async function polarCodeChoices(user: SessionUser): Promise<PolarCodeChoices | null> {
     if ((await accessOf(user)) !== "manage") return null;
-    const [choices, installUrl] = await Promise.all([
+    const [choices, installUrl, skills] = await Promise.all([
         sessionChoicesAction(),
         // Unknown is no button rather than no choices.
-        githubAppInstallUrl().catch(() => null)
+        githubAppInstallUrl().catch(() => null),
+        listSkills(user.id).catch(() => [])
     ]);
-    return { ...choices, installUrl };
+    return {
+        ...choices,
+        installUrl,
+        skills: skills.map(({ name, description }) => ({ name, description }))
+    };
 }
 
 /** A page of the person's connected repositories for the composer's repository
@@ -251,8 +280,28 @@ export async function polarCodeBranches(
     repoId: string
 ): Promise<PolarCodeBranches | null> {
     if ((await accessOf(user)) !== "manage") return null;
+    const reach = await repoReach(user.id, repoId);
+    if (!reach) return null;
+    const { owner, name, token } = reach;
+    const [defaultBranch, listed] = await Promise.all([
+        repoDefaultBranch(owner, name, token),
+        listRepoBranches(owner, name, token)
+    ]);
+    if (listed === null) return null;
+    return { defaultBranch, branches: orderBranches(listed, defaultBranch) };
+}
+
+/**
+ * One of the person's enabled repositories and how to read it on GitHub: the
+ * App's installation, or the connected token where there is no App. Null for
+ * a repository that is not theirs or not enabled.
+ */
+async function repoReach(
+    userId: string,
+    repoId: string
+): Promise<{ owner: string; name: string; fullName: string; token: string | null } | null> {
     const repo = await prisma.agentRepo.findFirst({
-        where: { id: repoId, ownerId: user.id, enabled: true },
+        where: { id: repoId, ownerId: userId, enabled: true },
         select: { repoFullName: true }
     });
     if (!repo) return null;
@@ -261,12 +310,59 @@ export async function polarCodeBranches(
     const token =
         (await githubAppInstallationToken(owner).catch(() => null)) ??
         (await githubApiToken(owner).catch(() => null));
-    const [defaultBranch, listed] = await Promise.all([
-        repoDefaultBranch(owner, name, token),
-        listRepoBranches(owner, name, token)
-    ]);
-    if (listed === null) return null;
-    return { defaultBranch, branches: orderBranches(listed, defaultBranch) };
+    return { owner, name, fullName: repo.repoFullName, token };
+}
+
+/**
+ * The open issues of one of the person's repositories for the composer's issue
+ * chip - the recent ones, or those GitHub finds for `query`. Null where the
+ * repository is not theirs or GitHub would not list them.
+ */
+export async function polarCodeIssues(
+    user: SessionUser,
+    repoId: string,
+    query: string
+): Promise<{ items: readonly RepoIssue[] } | null> {
+    if ((await accessOf(user)) !== "manage") return null;
+    const reach = await repoReach(user.id, repoId);
+    if (!reach) return null;
+    const items = await listOpenIssues(reach.owner, reach.name, reach.token, query);
+    return items ? { items } : null;
+}
+
+/**
+ * The first prompt with the issue and skill the composer named folded in, read
+ * here rather than taken from the browser. A string for the prompt, or the
+ * sentence that says why it could not be built.
+ */
+async function promptWithStarters(
+    user: SessionUser,
+    input: unknown
+): Promise<{ prompt: string } | { error: string } | null> {
+    const parsed = codeStartersSchema.safeParse(input ?? {});
+    if (!parsed.success) return { error: (await getTranslations("polar"))("code.starterGone") };
+    const { issueNumber, skill } = parsed.data;
+    if (issueNumber === null && skill === null) return null;
+    const body = input as { prompt?: unknown; repoId?: unknown };
+    const typed = typeof body.prompt === "string" ? body.prompt : "";
+    let repo = "";
+    let issue = null;
+    if (issueNumber !== null) {
+        const reach =
+            typeof body.repoId === "string" ? await repoReach(user.id, body.repoId) : null;
+        const read = reach
+            ? await readIssue(reach.owner, reach.name, issueNumber, reach.token)
+            : null;
+        if (!reach || !read) return { error: (await getTranslations("polar"))("code.issueGone") };
+        repo = reach.fullName;
+        issue = read;
+    }
+    let picked: StarterSkill | null = null;
+    if (skill !== null) {
+        picked = (await agentSkills(user.id, [skill]))[0] ?? null;
+        if (!picked) return { error: (await getTranslations("polar"))("code.skillGone") };
+    }
+    return { prompt: starterPrompt(typed, repo, issue, picked) };
 }
 
 /** The default branch first, then the rest by name, each once. */
@@ -280,10 +376,13 @@ export function orderBranches(names: readonly string[], defaultBranch: string | 
 /** Start a session: the Agents app's own start, with its own validation. */
 export async function polarCodeStart(
     user: SessionUser,
-    input: unknown
+    raw: unknown
 ): Promise<{ id?: string; error?: string }> {
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
+    const started = await promptWithStarters(user, raw);
+    if (started && "error" in started) return { error: started.error };
+    const input = started ? { ...(raw as object), prompt: started.prompt } : raw;
     // A model picked here is Polar's list, so Polar's rule on whose keys this
     // person may spend holds: the deployment's only where the policy says so.
     const choice = core.sessionModelChoiceSchema.nullable().safeParse(

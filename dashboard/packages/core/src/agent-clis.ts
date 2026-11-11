@@ -1046,6 +1046,57 @@ export function agentRunsUnattended(place: "local" | "host", chosen: boolean | n
 }
 
 /**
+ * How a session's agent asks before it acts, picked when it starts.
+ *
+ * - `ask`: every action that needs a permission is put to the person, on the
+ *   session and on their devices, and nothing happens until they answer.
+ * - `edits`: file edits go ahead; commands and the rest are asked.
+ * - `plan`: the agent reads and plans and changes nothing.
+ * - `full`: it acts without asking, as a session did before this existed.
+ *
+ * Only Claude Code's prompt is answered from Polaris (its hook decision is
+ * Claude Code's own shape), so only Claude Code takes one; for every other tool
+ * the place and Enigma decide, exactly as before.
+ */
+export const SESSION_PERMISSION_MODES = ["ask", "edits", "plan", "full"] as const;
+export type SessionPermissionMode = (typeof SESSION_PERMISSION_MODES)[number];
+
+const CLAUDE_PERMISSION_MODES: Record<SessionPermissionMode, string> = {
+    ask: "default",
+    edits: "acceptEdits",
+    plan: "plan",
+    full: "bypassPermissions"
+};
+
+/** A stored mode read back, or null for one this version does not know. */
+export function sessionPermissionMode(
+    raw: string | null | undefined
+): SessionPermissionMode | null {
+    return (SESSION_PERMISSION_MODES as readonly string[]).includes(raw ?? "")
+        ? (raw as SessionPermissionMode)
+        : null;
+}
+
+/** Whether a tool takes a permission mode from Polaris. */
+export function takesPermissionMode(cliId: string): boolean {
+    return cliId === "claude";
+}
+
+/**
+ * The launch flags a picked mode means, or null when there is none to apply -
+ * no mode picked, or a tool that does not take one - and the place and Enigma
+ * decide. A flag rather than a setting because flags outrank every settings
+ * file, the account's bypass included.
+ */
+export function permissionModeArgs(
+    cliId: string,
+    mode: SessionPermissionMode | null
+): readonly string[] | null {
+    if (!mode || !takesPermissionMode(cliId)) return null;
+    return ["--permission-mode", CLAUDE_PERMISSION_MODES[mode]];
+}
+
+/**
  * Whether POLARIS is the one to append those flags, or whether something else
  * has already settled it.
  *

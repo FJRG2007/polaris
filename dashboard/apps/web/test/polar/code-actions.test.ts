@@ -14,7 +14,12 @@ const state = {
     limit: undefined as number | undefined,
     page: undefined as unknown,
     rows: null as unknown[] | null,
-    detailed: 0
+    detailed: 0,
+    asked: null as unknown,
+    owner: true,
+    startedWith: null as unknown,
+    issue: null as unknown,
+    skills: [] as { name: string; description: string; instructions: string }[]
 };
 
 const session = {
@@ -33,10 +38,36 @@ const USER = { id: "u1", isAdmin: false } as never;
 vi.mock("@/lib/session", () => ({
     userHasManage: async (_user: unknown, permission: string) => state.held.has(permission)
 }));
+vi.mock("@/lib/agents/session-permissions", () => ({
+    pendingPermission: async () => state.asked
+}));
+vi.mock("@/lib/agents/session-service", () => ({
+    getSession: async () => (state.owner ? session : null),
+    hideSessionFromPolar: async () => true,
+    renameSession: async () => true
+}));
 vi.mock("@/lib/i18n/request", () => ({
     getTranslations: async () => (key: string) => `t:${key}`
 }));
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        agentRepo: {
+            findFirst: async ({ where }: { where: { id: string; ownerId: string } }) =>
+                where.id === "r1" && where.ownerId === "u1" ? { repoFullName: "acme/web" } : null
+        }
+    }
+}));
+vi.mock("@/lib/polar/skills/store", () => ({
+    listSkills: async () => state.skills,
+    agentSkills: async (_owner: string, names: string[]) =>
+        state.skills.filter((skill) => names.includes(skill.name))
+}));
 vi.mock("@/lib/github-service", () => ({
+    githubAppInstallationToken: async () => "app-token",
+    githubApiToken: async () => null,
+    readIssue: async (_owner: string, _repo: string, number: number) =>
+        number === 42 ? state.issue : null,
+    listOpenIssues: async () => [],
     githubAppInstallUrl: async () => "https://github.com/apps/polaris-test/installations/new",
     githubAppIsPublic: async () => true,
     githubAppVisibilityUrl: async () => "https://github.com/settings/apps/polaris-test/advanced"
@@ -65,7 +96,10 @@ vi.mock("@/components/agents/sessions/actions", () => ({
         repos: [],
         sharedWorkspace: false
     }),
-    startSessionAction: async () => ({ id: "started" }),
+    startSessionAction: async (input: unknown) => {
+        state.startedWith = input;
+        return { id: "started" };
+    },
     promptSessionAction: async () => ({}),
     sessionDetailAction: async () => {
         state.detailed += 1;
@@ -92,6 +126,19 @@ beforeEach(() => {
     state.detailed = 0;
     state.rows = null;
     state.page = undefined;
+    state.asked = null;
+    state.owner = true;
+    state.startedWith = null;
+    state.issue = {
+        number: 42,
+        title: "Login fails",
+        labels: [],
+        body: "It fails.",
+        state: "open"
+    };
+    state.skills = [
+        { name: "tdd", description: "Tests first", instructions: "Write the test first." }
+    ];
 });
 
 /** A finished session `minutes` after the first, on the same repository. */
@@ -184,6 +231,23 @@ describe("polarCodeThread", () => {
         // A tool line with no detail names the tool.
         expect(thread?.entries[2]?.detail).toBe("Edit");
         expect(thread?.error).toBeNull();
+        expect(thread?.permission).toBeNull();
+    });
+
+    it("carries the agent's waiting question to the person who started it, and to nobody else", async () => {
+        const asked = {
+            id: "q1",
+            tool: "Bash",
+            detail: "npm test",
+            at: "2026-10-20T10:00:05.000Z"
+        };
+        state.asked = asked;
+        state.held.add("agents.read");
+        expect((await polarCodeThread(USER, SESSION))?.permission).toBeNull();
+        state.held.add("agents.manage");
+        expect((await polarCodeThread(USER, SESSION))?.permission).toEqual(asked);
+        state.owner = false;
+        expect((await polarCodeThread(USER, SESSION))?.permission).toBeNull();
     });
 });
 
@@ -197,6 +261,37 @@ describe("polarCodeStart", () => {
         state.held.add("agents.manage");
         expect(await polarCodeStart(USER, {})).toEqual({ id: "started" });
     });
+
+    it("reads the issue and the skill itself and starts with them in the first prompt", async () => {
+        state.held.add("agents.manage");
+        const answer = await polarCodeStart(USER, {
+            repoId: "r1",
+            prompt: "Fix it",
+            issueNumber: 42,
+            skill: "tdd"
+        });
+        expect(answer).toEqual({ id: "started" });
+        const prompt = (state.startedWith as { prompt: string }).prompt;
+        expect(prompt.split(String.fromCharCode(10))[0]).toBe("Fix it");
+        expect(prompt).toContain("Write the test first.");
+        expect(prompt).toContain("Work on issue #42 in acme/web: Login fails");
+        expect(prompt).toContain("It fails.");
+    });
+
+    it("says so, and starts nothing, when the issue or the skill cannot be had", async () => {
+        state.held.add("agents.manage");
+        expect(await polarCodeStart(USER, { repoId: "r1", prompt: "x", issueNumber: 7 })).toEqual({
+            error: "t:code.issueGone"
+        });
+        // Another person's repository reads as no issue at all.
+        expect(await polarCodeStart(USER, { repoId: "r2", prompt: "x", issueNumber: 42 })).toEqual({
+            error: "t:code.issueGone"
+        });
+        expect(await polarCodeStart(USER, { prompt: "x", skill: "gone" })).toEqual({
+            error: "t:code.skillGone"
+        });
+        expect(state.startedWith).toBeNull();
+    });
 });
 
 describe("polarCodeChoices", () => {
@@ -208,6 +303,7 @@ describe("polarCodeChoices", () => {
     it("carries the App's install page, for adding repositories", async () => {
         state.held.add("agents.manage");
         expect(await polarCodeChoices(USER)).toMatchObject({
+            skills: [{ name: "tdd", description: "Tests first" }],
             repos: [],
             installUrl: "https://github.com/apps/polaris-test/installations/new"
         });

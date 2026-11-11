@@ -14,7 +14,7 @@
 import { z } from "zod";
 import { ENIGMA_SCOPES } from "../enigma.js";
 import { AGENT_GATE_MODES } from "../agents.js";
-import { CUSTOM_AGENT_CLI, isKnownAgentCli } from "../agent-clis.js";
+import { CUSTOM_AGENT_CLI, isKnownAgentCli, SESSION_PERMISSION_MODES } from "../agent-clis.js";
 import { AGENT_SESSION_EVENTS, AGENT_SESSION_PLACES } from "../agent-sessions.js";
 
 export const agentSessionPlaceSchema = z.enum(AGENT_SESSION_PLACES);
@@ -140,6 +140,11 @@ export const startAgentSessionSchema = z
          * own server is their machine. See `agentRunsUnattended`.
          */
         unattended: z.boolean().nullable().default(null),
+        /**
+         * How the agent asks before it acts, for a tool whose prompt Polaris
+         * answers (Claude Code). Null leaves it to the place and to Enigma.
+         */
+        permissionMode: z.enum(SESSION_PERMISSION_MODES).nullable().default(null),
         /**
          * Which stored account signs the agent in.
          *

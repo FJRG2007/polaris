@@ -1077,6 +1077,52 @@
         "polarEngine": "Polar",
         "taskOn": "Code: {repo}",
         "taskClear": "Stop reading the repository",
+        "issue": {
+            "label": "Issue",
+            "none": "none",
+            "pick": "Start from an open issue",
+            "search": "Find an issue or type its number",
+            "failed": "GitHub would not list the issues. Try again in a moment.",
+            "empty": "No open issues",
+            "noMatch": "No issue matches",
+            "clear": "Remove the issue"
+        },
+        "skill": {
+            "label": "Skill",
+            "none": "none",
+            "pick": "Start with one of your skills",
+            "search": "Find a skill",
+            "empty": "No skills yet",
+            "noMatch": "No skill matches",
+            "manage": "Manage skills",
+            "clear": "Remove the skill"
+        },
+        "issueGone": "That issue could not be read on GitHub. Pick it again or start without it.",
+        "skillGone": "That skill is no longer yours. Pick another or start without it.",
+        "starterGone": "The issue or skill picked could not be used. Pick it again.",
+        "mode": {
+            "label": "Permissions",
+            "ask": {
+                "name": "Ask first",
+                "hint": "Every action waits for your OK, here and on your devices."
+            },
+            "edits": {
+                "name": "Edit files",
+                "hint": "File edits go ahead. Commands wait for your OK."
+            },
+            "plan": { "name": "Plan only", "hint": "Reads and plans. Changes nothing." },
+            "full": {
+                "name": "Full access",
+                "hint": "Acts without asking, inside its own machine."
+            }
+        },
+        "permission": {
+            "title": "Waiting for your OK",
+            "asks": "The agent wants to use {tool}",
+            "allow": "Allow",
+            "always": "Always allow",
+            "deny": "Deny"
+        },
         "polarEngineHint": "Your chat models. Answers right away and reads the repository.",
         "signIn": "{agent} is not signed in on this account yet.",
         "openSettings": "Sign it in",

@@ -28,6 +28,7 @@ import { readPoll, sendAction, useUnmountSignal } from "@/lib/poll-fetch";
 import { mergeCodeRows } from "@/lib/polar/code-history";
 import { readStored, writeStored } from "@/lib/polar/stored";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
+import { CodeView } from "@/components/json-view";
 import { Work } from "@/components/polar/elements/work";
 import { Shimmer } from "@/components/polar/elements/shimmer";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
@@ -62,13 +63,20 @@ import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-comp
 import {
     AgentPicker,
     CodeBranchChip,
+    CodeIssueChip,
+    CodeSkillChip,
+    type PickedIssue,
     CodeRepoBar,
     CodeSessionBar,
     NO_REPO,
+    PERMISSION_MODE_KEY,
+    PermissionModePicker,
     POLAR_ENGINE,
+    readPermissionMode,
     readRepo,
     useRepoName
 } from "@/components/polar/polar-code-context";
+import type { PendingPermission } from "@/lib/agents/session-permissions";
 import type { PolarCodeTask } from "@/lib/polar/code-task";
 import type {
     PolarCodeAccess,
@@ -79,7 +87,7 @@ import type {
     PolarCodeThread
 } from "@/lib/polar/code";
 import type { SessionView } from "@/lib/agents/session-service";
-import { Code2, MessageSquare, PanelRight, TriangleAlert } from "lucide-react";
+import { Code2, MessageSquare, PanelRight, ShieldCheck, TriangleAlert } from "lucide-react";
 import dynamic from "next/dynamic";
 
 /** Loaded after the thread, not with it: its terminal is not needed to read one. */
@@ -674,6 +682,18 @@ function CodeStart({
     const [busy, startTransition] = useTransition();
     const parts = useCodeComposerParts(busy);
     const [picked, setPicked] = useState<ModelChoice | null>(null);
+    // Full access until the stored pick is read: the server render has no storage.
+    const [mode, setMode] = useState<core.SessionPermissionMode>("full");
+    useEffect(() => setMode(readPermissionMode(readStored(PERMISSION_MODE_KEY))), []);
+    const chooseMode = (next: core.SessionPermissionMode) => {
+        setMode(next);
+        writeStored(PERMISSION_MODE_KEY, next);
+    };
+    // What the task starts from besides the words: an issue of the repository
+    // (dropped when the repository changes) and one of the person's skills.
+    const [issuePick, setIssue] = useState<{ repoId: string; issue: PickedIssue } | null>(null);
+    const issue = issuePick?.repoId === repoId ? issuePick.issue : null;
+    const [skill, setSkill] = useState<string | null>(null);
     // What was just sent, shown at once as the first message of the session
     // while the machine for it comes up, rather than a composer that only
     // greys out for the minute that can take.
@@ -690,6 +710,8 @@ function CodeStart({
     // A tool that takes its model from Polaris signs in with that provider's
     // key, so its own sign-in does not matter.
     const takesModel = agent !== null && core.MODEL_CHOICE_AGENT_CLIS.includes(agent.cli);
+    // Only a tool whose questions are answered from here is given a mode.
+    const asksMode = agent !== null && core.takesPermissionMode(agent.cli);
     // Polar starts on Automatic, as Chat does: the first model listed may be
     // one the key has no credit for. An agent CLI needs a model of its own.
     const model = polar
@@ -709,7 +731,8 @@ function CodeStart({
         (!(takesModel || polar) || model !== null) &&
         !parts.uploads.uploading &&
         !parts.uploads.failed &&
-        prompt.trim().length > 0;
+        // An agent can start from the issue alone; Polar answers words.
+        (prompt.trim().length > 0 || (!polar && issue !== null));
 
     const submit = () => {
         if (!ready || busy) return;
@@ -727,7 +750,8 @@ function CodeStart({
         setError(null);
         setGap(null);
         const text = prompt.trim();
-        setSent(text);
+        const started = { issue, skill };
+        setSent(text || (issue ? `#${issue.number} ${issue.title}` : ""));
         setPrompt("");
         // Back into the composer when the session was not created, so nothing
         // typed is lost to a failure.
@@ -742,7 +766,9 @@ function CodeStart({
                         "/api/polar/code/start",
                         {
                             repoId: workspace ? null : repoId,
-                            title: titleFromPrompt(text),
+                            title: titleFromPrompt(
+                                text || (issue ? `#${issue.number} ${issue.title}` : "")
+                            ),
                             cli: agent.cli,
                             accountId: takesModel ? null : agent.accountId,
                             useMachineLogin: takesModel ? false : agent.machine,
@@ -757,6 +783,9 @@ function CodeStart({
                             prompt: text,
                             taskId: null,
                             unattended: null,
+                            permissionMode: asksMode ? mode : null,
+                            issueNumber: workspace ? null : (started.issue?.number ?? null),
+                            skill: started.skill,
                             // Code in Polar is the harness's work: Enigma on, the
                             // rest following the repository and the instance.
                             enigma: { enabled: true }
@@ -769,6 +798,8 @@ function CodeStart({
                 // Created but not started still opens: the reason is on it.
                 if (result.id) {
                     setSent(null);
+                    setIssue(null);
+                    setSkill(null);
                     parts.uploads.clear();
                     onStarted(result.id, text);
                 }
@@ -806,6 +837,7 @@ function CodeStart({
                 disabled={!canStart || busy}
                 maxLength={PROMPT_MAX}
                 onSubmit={submit}
+                sendable={!polar && issue !== null}
                 picker={
                     canStart ? (
                         <>
@@ -815,6 +847,13 @@ function CodeStart({
                                 onChange={onAgent}
                                 disabled={busy}
                             />
+                            {asksMode ? (
+                                <PermissionModePicker
+                                    value={mode}
+                                    onChange={chooseMode}
+                                    disabled={busy}
+                                />
+                            ) : null}
                             {takesModel || polar ? (
                                 <ModelSelector
                                     providers={providers ?? []}
@@ -836,7 +875,32 @@ function CodeStart({
                     onStop: () => undefined
                 }}
             />
-            {canStart && repoId && repoId !== NO_REPO ? (
+            {canStart && !polar && repoId ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5 px-1">
+                    {repoId !== NO_REPO ? (
+                        <>
+                            <CodeBranchChip
+                                repoId={repoId}
+                                branch={baseRef}
+                                onBranch={onBaseRef}
+                                disabled={busy}
+                            />
+                            <CodeIssueChip
+                                repoId={repoId}
+                                issue={issue}
+                                onIssue={(next) => setIssue(next ? { repoId, issue: next } : null)}
+                                disabled={busy}
+                            />
+                        </>
+                    ) : null}
+                    <CodeSkillChip
+                        skills={choices?.skills ?? []}
+                        skill={skill}
+                        onSkill={setSkill}
+                        disabled={busy}
+                    />
+                </div>
+            ) : canStart && repoId && repoId !== NO_REPO ? (
                 <div className="flex min-w-0 flex-wrap items-center gap-1.5 px-1">
                     <CodeBranchChip
                         repoId={repoId}
@@ -989,6 +1053,13 @@ function CodeThread({
         <Notice>{t("code.readOnly")}</Notice>
     ) : (
         <div className="flex min-w-0 flex-col gap-2">
+            {thread.permission ? (
+                <CodePermission
+                    key={thread.permission.id}
+                    asked={thread.permission}
+                    onAnswered={read}
+                />
+            ) : null}
             <PolarComposer
                 kit={voiceKit}
                 notice={parts.notice}
@@ -1134,6 +1205,81 @@ function CodeThread({
         </>
     );
 }
+/** The agent's question, put where the reply goes: what it wants to do, and
+ *  the three answers its own prompt has. */
+function CodePermission({
+    asked,
+    onAnswered
+}: {
+    asked: PendingPermission;
+    onAnswered: () => void;
+}) {
+    const t = useTranslations("polar");
+    const [error, setError] = useState<string | null>(null);
+    const [busy, startTransition] = useTransition();
+    const answer = (choice: "allow" | "always" | "deny") => {
+        setError(null);
+        startTransition(() => {
+            void runAction(
+                () =>
+                    sendAction<{ status?: string; error?: string }>(
+                        "/api/agents/sessions/permission",
+                        { requestId: asked.id, choice }
+                    ),
+                setError
+            ).then((result) => {
+                if (result?.error) setError(result.error);
+                onAnswered();
+            });
+        });
+    };
+    return (
+        <section
+            aria-label={t("code.permission.title")}
+            className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card p-3"
+        >
+            <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
+                <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden />
+                <span className="min-w-0 truncate">
+                    {t("code.permission.asks", { tool: asked.tool })}
+                </span>
+            </p>
+            {asked.detail ? (
+                <CodeView
+                    value={asked.detail}
+                    language={asked.tool === "Bash" ? "bash" : "plaintext"}
+                    label={asked.tool}
+                    className="max-h-40 min-w-0 text-xs"
+                />
+            ) : null}
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <Button type="button" size="sm" onClick={() => answer("allow")} disabled={busy}>
+                    {t("code.permission.allow")}
+                </Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => answer("always")}
+                    disabled={busy}
+                >
+                    {t("code.permission.always")}
+                </Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => answer("deny")}
+                    disabled={busy}
+                >
+                    {t("code.permission.deny")}
+                </Button>
+            </div>
+            {error ? <Notice error>{error}</Notice> : null}
+        </section>
+    );
+}
+
 /** A message of the session, in Chat's bubbles: the person's words as typed,
  *  the agent's as Markdown. */
 function CodeMessage({ entry }: { entry: PolarCodeEntry }) {

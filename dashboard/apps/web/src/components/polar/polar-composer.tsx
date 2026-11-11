@@ -91,6 +91,7 @@ export function PolarComposer({
     hidden = false,
     inCall = false,
     highlighted = false,
+    sendable = false,
     className
 }: {
     kit: PolarVoiceKit;
@@ -134,6 +135,9 @@ export function PolarComposer({
     inCall?: boolean;
     /** Something is being dragged over it. */
     highlighted?: boolean;
+    /** There is something to send besides the box and the files - an issue a
+     *  task starts from - so the button sends rather than opening voice. */
+    sendable?: boolean;
     className?: string;
 }) {
     const t = useTranslations("polar");
@@ -143,7 +147,7 @@ export function PolarComposer({
     const latest = useRef(value);
     latest.current = value;
     const files = "files" in attach ? attach.files : [];
-    const empty = !value.trim() && files.length === 0;
+    const empty = !value.trim() && files.length === 0 && !sendable;
 
     const setRef = (node: HTMLTextAreaElement | null) => {
         own.current = node;

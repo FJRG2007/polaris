@@ -1077,6 +1077,49 @@
         "polarEngine": "Polar",
         "taskOn": "Code: {repo}",
         "taskClear": "Dejar de leer el repositorio",
+        "issue": {
+            "label": "Issue",
+            "none": "ninguna",
+            "pick": "Partir de una issue abierta",
+            "search": "Busca una issue o su número",
+            "failed": "GitHub no listó las issues. Prueba en un momento.",
+            "empty": "Ninguna abierta",
+            "noMatch": "Sin coincidencias",
+            "clear": "Quitar la issue"
+        },
+        "skill": {
+            "label": "Skill",
+            "none": "ninguna",
+            "pick": "Empezar con una de tus skills",
+            "search": "Buscar skill",
+            "empty": "Aún no hay skills",
+            "noMatch": "Sin coincidencias",
+            "manage": "Gestionar skills",
+            "clear": "Quitar la skill"
+        },
+        "issueGone": "No se pudo leer esa issue en GitHub. Elígela de nuevo o empieza sin ella.",
+        "skillGone": "Esa skill ya no es tuya. Elige otra o empieza sin ella.",
+        "starterGone": "No se pudo usar la issue o skill elegida. Elígela de nuevo.",
+        "mode": {
+            "label": "Permisos",
+            "ask": {
+                "name": "Preguntar",
+                "hint": "Cada acción espera tu OK, aquí y en tus dispositivos."
+            },
+            "edits": {
+                "name": "Ediciones",
+                "hint": "Edita archivos sin preguntar. Los comandos esperan tu OK."
+            },
+            "plan": { "name": "Solo plan", "hint": "Lee y planifica. No cambia nada." },
+            "full": { "name": "Acceso total", "hint": "Actúa sin preguntar, dentro de su máquina." }
+        },
+        "permission": {
+            "title": "Esperando tu OK",
+            "asks": "El agente quiere usar {tool}",
+            "allow": "Permitir",
+            "always": "Siempre",
+            "deny": "Denegar"
+        },
         "polarEngineHint": "Tus modelos del chat. Responde al momento y lee el repositorio.",
         "signIn": "{agent} aún no tiene sesión iniciada en esta cuenta.",
         "openSettings": "Conectarlo",

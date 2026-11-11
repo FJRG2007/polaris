@@ -9005,6 +9005,10 @@ model AgentSession {
     // server is somebody's machine. Nullable rather than defaulted so a session
     // started before this existed is not recorded as having chosen anything.
     unattended  Boolean?
+    // How Claude Code asks before it acts: "ask", "edits" (file edits go
+    // ahead), "plan" (reads and plans, changes nothing) or "full". Null leaves
+    // it to the place and to Enigma, as every session before this did.
+    permissionMode String?
     // The provider, model and payer a multi-provider tool (OpenCode) works
     // with, from the list Polar's chat picks from. Null for every tool that
     // signs in its own way, and for every session started before this existed.

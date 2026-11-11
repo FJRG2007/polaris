@@ -214,9 +214,14 @@ function agentCommandFor(
     // account keeps for its agents, and what the agent may run without asking is
     // one of the things those settle. Adding a flag on top would be Polaris
     // overruling settings somebody keeps so they do not have to say it twice.
-    const args = core.polarisAppliesAutonomy(session.place, session.unattended, enigmaActive)
-        ? cli.autonomyArgs
-        : [];
+    // A mode somebody picked for this session wins over both: it is the one
+    // thing here that was chosen for this work rather than for every session.
+    const chosen = core.permissionModeArgs(cli.id, session.permissionMode);
+    const args =
+        chosen ??
+        (core.polarisAppliesAutonomy(session.place, session.unattended, enigmaActive)
+            ? cli.autonomyArgs
+            : []);
     // Through Enigma where Enigma starts this tool, because that launcher is
     // what makes the settings Polaris just stepped aside for actually apply -
     // and what lets one machine hold several logins. See `enigmaLaunches`. The
@@ -364,7 +369,8 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         },
         // The same decision, for the tools that take a variable rather than a
         // flag. Held to the same rule so the two halves cannot disagree.
-        autonomyEnv: core.polarisAppliesAutonomy(session.place, session.unattended, enigma.enabled)
+        autonomyEnv: core.permissionModeArgs(agent.cli.id, session.permissionMode) === null &&
+            core.polarisAppliesAutonomy(session.place, session.unattended, enigma.enabled)
             ? { ...agent.cli.autonomyEnv }
             : {},
         runAs: session.place === "host" ? "" : commands.CONTAINER_USER,

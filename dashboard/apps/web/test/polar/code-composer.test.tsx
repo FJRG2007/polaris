@@ -167,6 +167,7 @@ describe("Code's composer is Chat's", () => {
             "Dictate",
             "Microphone and model",
             "Agent: Claude Code - This machine's own login",
+            "Permissions: Full access",
             "Voice talks to Polar's chat, not to an agent"
         ]);
         const form = box.closest("form") as HTMLFormElement;

@@ -98,6 +98,8 @@ export interface SessionView {
     /** Whether the agent may run commands without asking, or null for a session
      *  that predates the question. Resolved by `agentRunsUnattended`. */
     readonly unattended: boolean | null;
+    /** How the agent asks before it acts, or null for the place's own rule. */
+    readonly permissionMode: core.SessionPermissionMode | null;
     /** The account picked when the session was started, or null. */
     readonly accountId: string | null;
     /** Whether it was told to sign in with nothing and let the machine's own
@@ -189,6 +191,7 @@ const VIEW_SELECT = {
     place: true,
     sharedHome: true,
     unattended: true,
+    permissionMode: true,
     accountId: true,
     useMachineLogin: true,
     modelProvider: true,
@@ -232,6 +235,7 @@ type SessionRecord = {
     place: string;
     sharedHome: boolean;
     unattended: boolean | null;
+    permissionMode: string | null;
     accountId: string | null;
     useMachineLogin: boolean;
     modelProvider: string | null;
@@ -284,6 +288,7 @@ function toView(record: SessionRecord): SessionView {
         place: record.place === "host" ? "host" : "local",
         sharedHome: record.sharedHome,
         unattended: record.unattended,
+        permissionMode: core.sessionPermissionMode(record.permissionMode),
         accountId: record.accountId,
         useMachineLogin: record.useMachineLogin,
         modelChoice:
@@ -424,6 +429,8 @@ export interface SessionCreateInput {
     readonly place: core.AgentSessionPlace;
     readonly sharedHome: boolean;
     readonly unattended: boolean | null;
+    /** How the agent asks before it acts; absent or null for the place's own rule. */
+    readonly permissionMode?: core.SessionPermissionMode | null;
     /** Which stored account signs the agent in, or null for whichever resolves. */
     readonly accountId: string | null;
     /** Sign it in with nothing, and let the machine's own login answer. */
@@ -470,6 +477,7 @@ export async function createSession(
             place: input.place,
             sharedHome: input.sharedHome,
             unattended: input.unattended,
+            permissionMode: input.permissionMode ?? null,
             accountId: input.accountId,
             useMachineLogin: input.useMachineLogin,
             modelProvider: input.modelChoice?.provider ?? null,
