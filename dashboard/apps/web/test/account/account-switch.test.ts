@@ -148,3 +148,30 @@ describe("leaveAccount", () => {
         expect(assign).toHaveBeenCalledWith("/oauth/login");
     });
 });
+
+describe("the last place in each app", () => {
+    it("survives switching to another account and back", async () => {
+        const { readPlace, rememberPlace } = await import("@/lib/last-place");
+        reconcileAccount("ana");
+        rememberPlace("tasks", "/tasks/l/ana-list");
+        reconcileAccount("ben");
+        expect(readPlace("tasks", "/tasks")).toBeNull();
+        rememberPlace("tasks", "/tasks/l/ben-list");
+        reconcileAccount("ana");
+        expect(readPlace("tasks", "/tasks")).toBe("/tasks/l/ana-list");
+    });
+
+    it("goes with the account when it signs out, and every one with sign out of all", async () => {
+        const { rememberPlace } = await import("@/lib/last-place");
+        reconcileAccount("ben");
+        rememberPlace("tasks", "/tasks/l/ben-list");
+        reconcileAccount("ana");
+        rememberPlace("tasks", "/tasks/l/ana-list");
+        await leaveAccount("/oauth/login", "this");
+        expect(storedKeys().filter((key) => key.startsWith("polaris.places."))).toEqual([
+            "polaris.places.ben.tasks"
+        ]);
+        await leaveAccount("/oauth/login", "all");
+        expect(storedKeys().filter((key) => key.startsWith("polaris.places."))).toEqual([]);
+    });
+});

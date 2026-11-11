@@ -16,17 +16,20 @@
  * code - without each of them having to remember to say so.
  *
  * What a tab keeps of an account between loads goes too: recent places and
- * searches, the last place in each app, the snapshots painted before a read
+ * searches, the snapshots painted before a read
  * lands, the mail kept for offline reading, unsent chat drafts, copied tasks,
  * recent emoji and media, and the photo put behind the camera in a call - all
  * of it the previous account's own, and keying it by account would only keep
- * it on a shared device for longer.
+ * it on a shared device for longer. The one exception is the last place in each
+ * app, which is keyed by account (`last-place.ts`) so switching back lands where
+ * that account was, and which goes when the account signs out instead.
  */
 
 import { dropAllSnapshots } from "@/lib/snapshot-cache";
 import { dropMailCache } from "@/lib/mailbox/mail-cache";
 import { MENU_KEY as APP_MENU_KEY, STORE_KEY as APP_USAGE_KEY } from "@/lib/app-usage";
-import { PREFIX as LAST_PLACE_PREFIX } from "@/lib/last-place";
+import { adoptLegacyPlaces, forgetPlaces, PREFIX as LAST_PLACE_PREFIX } from "@/lib/last-place";
+import { ACCOUNT_MARKER_KEY, currentAccount } from "@/lib/account-marker";
 import { STORE_KEY as RECENT_SEARCH_KEY } from "@/lib/search/recent";
 import { STORE_KEY as RECENT_PLACES_KEY } from "@/lib/overview/recent-places";
 import { SHARED_CURSOR_KEY as MAIL_CURSOR_KEY } from "@/components/mail-unread";
@@ -39,8 +42,7 @@ import {
     KEY as CAMERA_BACKGROUND_KEY
 } from "@/app/(app)/chat/camera-background";
 
-/** The account this browser was last drawn for. */
-export const ACCOUNT_MARKER_KEY = "polaris.account.current";
+export { ACCOUNT_MARKER_KEY };
 
 /** Forget everything this browser kept for the account it was acting as. */
 export async function forgetAccountTraces(): Promise<void> {
@@ -95,8 +97,17 @@ function writeMarker(value: string): void {
 /**
  * Leave for `target` as another account, or as nobody: forget this one's traces,
  * tell the other tabs, and load the page fresh.
+ *
+ * `signedOut` says the account is gone from this browser, not just set aside:
+ * `"this"` for the one acting, `"all"` for every one. Its places in each app go
+ * then; a plain switch keeps them for when it comes back.
  */
-export async function leaveAccount(target: string): Promise<void> {
+export async function leaveAccount(target: string, signedOut?: "this" | "all"): Promise<void> {
+    if (signedOut === "all") forgetPlaces();
+    else if (signedOut === "this") {
+        const account = currentAccount();
+        if (account) forgetPlaces(account);
+    }
     await forgetAccountTraces();
     // Cleared rather than set to the next account, which this tab does not know
     // yet: every other tab reloads and the first page to mount writes it.
@@ -113,7 +124,10 @@ export async function leaveAccount(target: string): Promise<void> {
  */
 export function reconcileAccount(userId: string): void {
     const previous = readMarker();
-    if (previous === userId) return;
+    if (previous === userId) {
+        adoptLegacyPlaces(userId);
+        return;
+    }
     if (previous) void forgetAccountTraces();
     writeMarker(userId);
 }

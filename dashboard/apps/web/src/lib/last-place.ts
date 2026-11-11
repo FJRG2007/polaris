@@ -8,21 +8,37 @@
  * or lists behaves, and the thing whose absence reads as the app having
  * forgotten what you were doing.
  *
- * Per device rather than per account, and never sent anywhere: it is one
- * browser's idea of where its reader was, it changes several times a minute, and
- * nobody else has any business knowing. A screen that has since been deleted is
- * the one failure, and it lands on the app's own not-found page with a way back.
+ * Per account on this device, and never sent anywhere: it is one browser's idea
+ * of where its reader was, it changes several times a minute, and nobody else
+ * has any business knowing. Keyed by the account so switching to another one
+ * and back returns each to its own place - it used to be one entry the switch
+ * had to wipe, so every switch sent both accounts back to the front door. Signing
+ * an account out forgets its places (`forgetPlaces`). A screen that has since
+ * been deleted is the one failure, and it lands on the app's own not-found page
+ * with a way back.
  */
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { currentAccount } from "@/lib/account-marker";
 
+/** The entries from before places were kept per account, one per app. Cleared
+ *  on a change of account, since nobody can say whose they were. */
 export const PREFIX = "polaris.place.";
 
-/** Remember where this app was left. */
+/** Each account's places: `polaris.places.<account>.<app>`. */
+export const ACCOUNT_PREFIX = "polaris.places.";
+
+function placeKey(account: string, appId: string): string {
+    return `${ACCOUNT_PREFIX}${account}.${appId}`;
+}
+
+/** Remember where this app was left, for the account the page is drawn for. */
 export function rememberPlace(appId: string, path: string): void {
+    const account = currentAccount();
+    if (!account) return;
     try {
-        window.localStorage.setItem(PREFIX + appId, path);
+        window.localStorage.setItem(placeKey(account, appId), path);
     } catch {
         // Private browsing refuses the write, and so does a full quota. The app
         // opens on its front door instead, which is where it opened before.
@@ -61,11 +77,54 @@ export function useLastPlaces(
  *  path inside the app is answered: a stored value from another version, or one
  *  somebody edited, must not become somewhere the switcher sends people. */
 export function readPlace(appId: string, root: string): string | null {
+    const account = currentAccount();
+    if (!account) return null;
     try {
-        const stored = window.localStorage.getItem(PREFIX + appId);
+        const stored = window.localStorage.getItem(placeKey(account, appId));
         if (!stored || !stored.startsWith(`${root}/`)) return null;
         return stored;
     } catch {
         return null;
+    }
+}
+
+/** Forget the places kept for one account, or for every account with none named. */
+export function forgetPlaces(account?: string): void {
+    const prefix = account ? `${ACCOUNT_PREFIX}${account}.` : ACCOUNT_PREFIX;
+    try {
+        const doomed: string[] = [];
+        for (let index = 0; index < window.localStorage.length; index += 1) {
+            const key = window.localStorage.key(index);
+            if (key?.startsWith(prefix)) doomed.push(key);
+        }
+        for (const key of doomed) window.localStorage.removeItem(key);
+    } catch {
+        // Storage refused: nothing was kept.
+    }
+}
+
+let adopted = false;
+
+/** Move an entry from before places were per account onto `account`, the one
+ *  this browser was already drawn for when it was written. */
+export function adoptLegacyPlaces(account: string): void {
+    // Once a page load: the frame calls this on every render.
+    if (adopted) return;
+    adopted = true;
+    try {
+        const legacy: string[] = [];
+        for (let index = 0; index < window.localStorage.length; index += 1) {
+            const key = window.localStorage.key(index);
+            if (key?.startsWith(PREFIX)) legacy.push(key);
+        }
+        for (const key of legacy) {
+            const path = window.localStorage.getItem(key);
+            const target = placeKey(account, key.slice(PREFIX.length));
+            if (path && window.localStorage.getItem(target) === null)
+                window.localStorage.setItem(target, path);
+            window.localStorage.removeItem(key);
+        }
+    } catch {
+        // Storage refused: the app opens on its front door, as before.
     }
 }

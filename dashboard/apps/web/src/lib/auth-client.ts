@@ -42,7 +42,7 @@ export async function signOut(): Promise<string | null> {
     try {
         refused = (await signOutAccountAction()).error;
     } finally {
-        if (!refused) await leaveAccount("/oauth/login");
+        if (!refused) await leaveAccount("/oauth/login", "this");
     }
     return refused ?? null;
 }

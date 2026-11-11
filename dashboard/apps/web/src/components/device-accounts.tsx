@@ -14,6 +14,7 @@
 import { signOut } from "@/lib/auth-client";
 import { Avatar } from "@/components/avatar";
 import { leaveAccount } from "@/lib/account-switch";
+import { forgetPlaces } from "@/lib/last-place";
 import { Check, LogOut, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -104,6 +105,7 @@ function useDeviceAccounts(enabled: boolean) {
             }
             const result = await signOutAccountAction(account.id);
             if (result.error) setError(result.error);
+            else forgetPlaces(account.userId);
             setBusy(null);
             await load();
         });
@@ -124,7 +126,7 @@ function useDeviceAccounts(enabled: boolean) {
                 setBusy(null);
                 return;
             }
-            await leaveAccount("/oauth/login");
+            await leaveAccount("/oauth/login", "all");
         });
     }
 
