@@ -1,14 +1,15 @@
 "use client";
 
 /**
- * The one line that installs Polaris, for the visitor's system.
+ * The one line that installs Polaris, for the server that will host it.
  *
- * The page is static, so the first paint shows the macOS and Linux line and the
- * browser swaps in the PowerShell one on Windows. The switch beside it is for
- * the visitor who is reading on one machine and installing on another.
+ * Always opens on the Linux line, never on the reader's own system: the command
+ * runs on a server, and the page is almost always read from another computer.
+ * Picking Windows shows why it is not the recommended host.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { TriangleAlert } from "lucide-react";
 import { CopyButton, SegmentedControl, cn } from "@polaris/ui";
 
 export type InstallSystem = "unix" | "windows";
@@ -17,18 +18,25 @@ export function InstallCommand({
     commands,
     painted,
     labels,
+    requirementsHref,
     className
 }: {
     commands: Readonly<Record<InstallSystem, string>>;
     /** The same lines highlighted at build time; empty falls back to plain text. */
     painted: Readonly<Record<InstallSystem, string>>;
-    labels: { unix: string; windows: string; system: string; copy: string };
+    labels: {
+        unix: string;
+        windows: string;
+        system: string;
+        copy: string;
+        windowsWarning: string;
+        requirements: string;
+    };
+    /** Where the host requirements are explained. */
+    requirementsHref: string;
     className?: string;
 }) {
     const [system, setSystem] = useState<InstallSystem>("unix");
-    useEffect(() => {
-        if (/windows/i.test(navigator.userAgent)) setSystem("windows");
-    }, []);
     const command = commands[system];
     return (
         <div
@@ -74,6 +82,23 @@ export function InstallCommand({
                 )}
                 <CopyButton value={command} label={labels.copy} />
             </div>
+            {system === "windows" && (
+                <p
+                    role="note"
+                    className="flex min-w-0 items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300"
+                >
+                    <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                    <span className="min-w-0">
+                        {labels.windowsWarning}{" "}
+                        <a
+                            href={requirementsHref}
+                            className="font-medium underline underline-offset-2"
+                        >
+                            {labels.requirements}
+                        </a>
+                    </span>
+                </p>
+            )}
         </div>
     );
 }

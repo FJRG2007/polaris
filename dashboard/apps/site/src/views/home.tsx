@@ -90,7 +90,15 @@ export async function HomeView({ locale }: { locale: SiteLocale }) {
         highlightInline(commands.windows, "powershell")
     ]);
     const painted = { unix, windows };
-    const installWords = { unix: t.unix, windows: t.windows, system: t.system, copy: t.copy };
+    const installWords = {
+        unix: t.unix,
+        windows: t.windows,
+        system: t.system,
+        copy: t.copy,
+        windowsWarning: t.windowsWarning,
+        requirements: t.requirements
+    };
+    const requirementsHref = `https://github.com/${data.repo}#requirements`;
     const lead = showcase[0]?.items[0];
     const steps = [
         { icon: TerminalSquare, title: t.step1Title, body: t.step1Body },
@@ -111,9 +119,15 @@ export async function HomeView({ locale }: { locale: SiteLocale }) {
                     commands={commands}
                     painted={painted}
                     labels={installWords}
+                    requirementsHref={requirementsHref}
                     className="max-w-3xl text-left"
                 />
-                <p className="text-xs text-muted-foreground">{t.installHint}</p>
+                <p className="max-w-2xl text-pretty text-xs text-muted-foreground">
+                    {t.installHint}{" "}
+                    <Link href={href(locale, "downloads/")} className="underline underline-offset-2">
+                        {t.installClients}
+                    </Link>
+                </p>
                 <div className="flex flex-wrap justify-center gap-2">
                     <Link
                         href={href(locale, "docs/")}
@@ -241,6 +255,7 @@ export async function HomeView({ locale }: { locale: SiteLocale }) {
                     commands={commands}
                     painted={painted}
                     labels={installWords}
+                    requirementsHref={requirementsHref}
                     className="max-w-3xl text-left"
                 />
                 <div className="flex flex-wrap justify-center gap-2">
