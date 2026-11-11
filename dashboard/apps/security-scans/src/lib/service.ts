@@ -242,7 +242,7 @@ export async function serverOverview(targetId: string) {
         volumesOf(targetId),
         appsOf(targetId),
         prisma.securityScan.findMany({
-            where: { targetId },
+            where: { targetId, ...NOT_OWN_IMAGE },
             orderBy: { createdAt: "desc" },
             take: 40,
             select: {
@@ -318,12 +318,22 @@ export async function scanFindings(scanId: string) {
 const VULN_KINDS = ["image", "deps"];
 
 /**
+ * Scans that are not of Polaris's own images on the machine it runs on:
+ * those are read in Management (`OWN_IMAGES_PATH`), never among a server's.
+ * Spelled out with the null branch because `not` alone also drops a scan
+ * with no source.
+ */
+const NOT_OWN_IMAGE = {
+    OR: [{ source: null }, { source: { not: "polaris" } }, { target: { kind: { not: "local" } } }]
+};
+
+/**
  * The newest finished scan with a critical or high finding that no newer scan
  * of the same app or image has since replaced (see `subjects.newestUnresolved`).
  */
 async function unresolvedScan(): Promise<string | null> {
     const rows = await prisma.securityScan.findMany({
-        where: { kind: { in: VULN_KINDS }, state: "done" },
+        where: { kind: { in: VULN_KINDS }, state: "done", ...NOT_OWN_IMAGE },
         orderBy: { createdAt: "desc" },
         select: { id: true, targetId: true, kind: true, imageId: true, input: true },
         take: 200
@@ -581,8 +591,10 @@ async function imagesOn(target: ScanTarget): Promise<images.ServerImage[] | null
  */
 export async function serverImages(targetId: string) {
     const target = await targetRow(targetId);
-    const found = await imagesOn(target);
-    if (!found) return { available: false as const, images: [] };
+    const listed = await imagesOn(target);
+    if (!listed) return { available: false as const, images: [] };
+    // Polaris's own images on its own machine are read in Management.
+    const found = target.kind === "local" ? listed.filter((image) => !image.polarisOnly) : listed;
     const scans = await prisma.securityScan.findMany({
         where: { targetId, kind: "image", imageId: { in: found.map((image) => image.imageId) } },
         orderBy: { createdAt: "desc" },

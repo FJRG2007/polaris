@@ -130,6 +130,36 @@ describe("server images", () => {
         expect(shared[0]!.source).toBe("polaris");
     });
 
+    it("marks an image only Polaris runs, so Deploy leaves it to Management", () => {
+        const grouped = images.groupImages(listed, new Map(), new Map());
+        const flags = new Map(grouped.map((image) => [image.ref, image.polarisOnly]));
+        expect(flags.get("ghcr.io/example/polaris-web:fixture")).toBe(true);
+        expect(flags.get("polaris-0123abcd:fixture-release")).toBe(false);
+        const part = images.groupImages(
+            listed,
+            new Map(),
+            new Map(),
+            new Set(["polaris-0123abcd"])
+        );
+        expect(
+            part.find((image) => image.ref === "polaris-0123abcd:fixture-release")?.polarisOnly
+        ).toBe(true);
+        const shared = images.groupImages(
+            [
+                {
+                    name: "x",
+                    ref: "node:22",
+                    imageId: id("f"),
+                    project: "polaris-0123abcd",
+                    labels: {}
+                },
+                { name: "y", ref: "node:22", imageId: id("f"), project: "polaris", labels: {} }
+            ],
+            new Map()
+        );
+        expect(shared[0]!.polarisOnly).toBe(false);
+    });
+
     it("never takes a prefix for Polaris's own project", () => {
         expect(
             images.sourceOf({

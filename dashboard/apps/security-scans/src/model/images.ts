@@ -38,6 +38,10 @@ export interface ServerImage {
     /** The Polaris features that started a container from it - a tunnel, say -
      *  one per compose project, so the screen can name each and turn it off. */
     readonly sidecars: readonly Sidecar[];
+    /** Every container on it is part of Polaris itself - none is an app's, an
+     *  agent's or a feature's - so on Polaris's own machine it is read in
+     *  Management rather than beside the apps. */
+    readonly polarisOnly: boolean;
 }
 
 export const IMAGE_ID = /^sha256:[0-9a-f]{64}$/;
@@ -164,6 +168,7 @@ export function groupImages(
             apps: Set<string>;
             parts: Set<string>;
             sidecars: Map<string, Sidecar>;
+            polarisOnly: boolean;
         }
     >();
     for (const container of containers) {
@@ -181,6 +186,7 @@ export function groupImages(
         const appId = listed === "app" && project ? appIds.get(project) : undefined;
         const partId = part ? appId : undefined;
         const sidecar = sidecarOf(container.project, container.ref);
+        const polarisOnly = source === "polaris" && !sidecar;
         const entry = byId.get(container.imageId);
         if (!entry) {
             byId.set(container.imageId, {
@@ -190,7 +196,8 @@ export function groupImages(
                 users: new Set([user]),
                 apps: new Set(appId ? [appId] : []),
                 parts: new Set(partId ? [partId] : []),
-                sidecars: new Map(sidecar ? [[sidecar.project, sidecar]] : [])
+                sidecars: new Map(sidecar ? [[sidecar.project, sidecar]] : []),
+                polarisOnly
             });
             continue;
         }
@@ -198,6 +205,7 @@ export function groupImages(
         if (partId && entry.parts.size < MAX_USERS) entry.parts.add(partId);
         if (sidecar && entry.sidecars.size < MAX_USERS)
             entry.sidecars.set(sidecar.project, sidecar);
+        if (!polarisOnly) entry.polarisOnly = false;
         if (rank[source] < rank[entry.source]) entry.source = source;
         if (entry.refs.size < MAX_USERS) entry.refs.add(container.ref);
         // A ref someone typed reads better than the bare id a container may show.
@@ -216,6 +224,7 @@ export function groupImages(
             sidecars: [...entry.sidecars.values()].sort((a, b) =>
                 a.project.localeCompare(b.project)
             ),
+            polarisOnly: entry.polarisOnly,
             ...(entry.parts.size > 0 ? { part: [...entry.parts].sort()[0] } : {})
         }))
         .sort((a, b) => rank[a.source] - rank[b.source] || a.ref.localeCompare(b.ref));
