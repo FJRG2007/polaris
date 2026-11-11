@@ -17,7 +17,8 @@
  */
 
 import { viewerKind } from "./viewer/kind";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { cachedPicture, recordView } from "@/lib/drive/picture-cache";
 import * as flying from "@polaris/ui/image-flight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { formatBytes } from "@polaris/core";
@@ -148,7 +149,13 @@ function PreviewPicture({
     // was handed in.
     const fromRef = useRef(from);
     fromRef.current = from;
-    const image = useMemo(() => ({ url: src, name: alt }), [src, alt]);
+    // A picture read ahead while the last one was open is shown from this
+    // browser, and its view recorded on its own - see `picture-cache`.
+    const shown = useMemo(() => cachedPicture(src) ?? src, [src]);
+    useEffect(() => {
+        if (shown !== src) recordView(src);
+    }, [shown, src]);
+    const image = useMemo(() => ({ url: shown, name: alt }), [shown, alt]);
     const labels: ViewerLabels = {
         zoomIn: t("picture.zoomIn"),
         zoomOut: t("picture.zoomOut"),

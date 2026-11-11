@@ -19,8 +19,16 @@ export const dynamic = "force-dynamic";
 const RANGE = /^bytes=(\d+)-(\d*)$/;
 
 /** The audit action a read of a file is recorded under. */
-function readAction(inline: boolean, thumbnail: boolean, continuing: boolean): string {
+function readAction(
+    inline: boolean,
+    thumbnail: boolean,
+    continuing: boolean,
+    preload = false
+): string {
     if (thumbnail) return "drive.thumbnail";
+    // The preview fetching the next picture before anybody stepped to it. Not a
+    // view: the view is recorded when it is shown.
+    if (preload) return "drive.preload";
     if (continuing) return "drive.range";
     return inline ? "drive.view" : "drive.download";
 }
@@ -77,9 +85,10 @@ export async function GET(request: Request): Promise<Response> {
         // read leaves a record.
         const start = Number(RANGE.exec(request.headers.get("range") ?? "")?.[1] ?? 0);
         const thumbnail = inline && url.searchParams.get("purpose") === "thumbnail";
+        const preload = inline && url.searchParams.get("purpose") === "preload";
         await recordAudit({
             actorId: user.id,
-            action: readAction(inline, thumbnail, start > 0),
+            action: readAction(inline, thumbnail, start > 0, preload),
             targetType: "connection",
             targetId: connectionId,
             metadata: {

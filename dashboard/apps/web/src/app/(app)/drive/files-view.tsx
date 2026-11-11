@@ -52,7 +52,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { matchesStructured, NAME_SEARCH, parseSearch, PATH_SEARCH } from "./search-query";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { UserProfileDialog } from "@/components/user-profile-dialog";
-import { FilePreview, isViewable, type ViewerTarget } from "./file-viewer";
+import { driveByteUrl, FilePreview, isViewable, viewerKind, type ViewerTarget } from "./file-viewer";
+import { LARGEST as PRELOAD_LARGEST, preloadPicture } from "@/lib/drive/picture-cache";
 import * as targetRules from "./menu-targets";
 import { plainTap } from "@/lib/plain-tap";
 import { filesToItems, gatherDropItems, type UploadItem } from "@/lib/drop-items";
@@ -1870,12 +1871,34 @@ export function FilesView({
     function stepViewer(by: -1 | 1) {
         const next = viewerTarget ? steppedFile(visible, viewerTarget.path, by) : null;
         if (!next) return;
+        stepDirection.current = by;
         const index = visible.indexOf(next);
         cursorRef.current = index;
         lastIndex.current = index;
         openViewer(next);
     }
     const viewerSwipe = useSwipeToStep(viewerTarget?.name ?? "", stepViewer);
+
+    /** Which way the preview last stepped, so reading ahead goes that way. */
+    const stepDirection = useRef<-1 | 1>(1);
+    // The pictures a step or three away, fetched while this one is looked at,
+    // so arrowing through photos on a slow line lands on bytes already here.
+    // Three ahead in the direction of travel and one behind.
+    const viewerPath = viewerTarget?.path ?? null;
+    useEffect(() => {
+        if (!viewerPath || viewerKind(viewerPath) !== "image") return;
+        const index = visible.findIndex((entry) => entry.path === viewerPath);
+        if (index < 0) return;
+        const by = stepDirection.current;
+        for (const offset of [by, 2 * by, 3 * by, -by]) {
+            const entry = visible[index + offset];
+            if (!entry || entry.kind !== "file" || viewerKind(entry.name) !== "image") continue;
+            if (Number(entry.size) > PRELOAD_LARGEST) continue;
+            preloadPicture(
+                driveByteUrl({ connectionId, path: entry.path, name: entry.name }, true)
+            );
+        }
+    }, [viewerPath, visible, connectionId]);
 
     // A different folder, a search, or a switch away from the grid all start it
     // again: what was shown for the last set of files says nothing about this one.

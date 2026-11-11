@@ -74,6 +74,16 @@ describe("reading a drive file", () => {
         expect(recorded()).toEqual([expect.objectContaining({ action: "drive.thumbnail" })]);
     });
 
+    it("records a picture read ahead by the preview apart from a view", async () => {
+        await read("&disposition=inline&purpose=preload");
+        expect(recorded()).toEqual([expect.objectContaining({ action: "drive.preload" })]);
+    });
+
+    it("records the one-byte read a picture shown from the cache sends as a view", async () => {
+        await read("&disposition=inline", "bytes=0-0");
+        expect(recorded()).toEqual([expect.objectContaining({ action: "drive.view" })]);
+    });
+
     it("cannot be asked to leave no record", async () => {
         await read("&purpose=thumbnail", "bytes=1-");
         await read("&disposition=inline&purpose=thumbnail");

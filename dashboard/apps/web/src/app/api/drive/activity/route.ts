@@ -25,7 +25,7 @@ const SCAN_WINDOW = 400;
 /** Events returned for the panel. */
 const MAX_RESULTS = 25;
 /** Reads of a file that only looked at it, kept out of the panel. */
-const LOOKS_ONLY = ["drive.view", "drive.range", "drive.thumbnail"];
+const LOOKS_ONLY = ["drive.view", "drive.range", "drive.thumbnail", "drive.preload"];
 
 /** The source an audit row was about, for the rows whose id is not a uuid and so
  *  lives in the metadata rather than in the column - see `recordAudit`. */
