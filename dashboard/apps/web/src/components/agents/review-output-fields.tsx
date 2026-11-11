@@ -9,9 +9,8 @@
 
 import * as core from "@polaris/core";
 import { Plus, Trash2 } from "lucide-react";
-import { ListField } from "@/components/list-field";
 import { CountField, Field } from "@/components/agents/review-fields";
-import { Button, Input, Select, Textarea } from "@polaris/ui";
+import { Button, Input, ListField, Select, Textarea } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const INHERIT = "__inherit__";

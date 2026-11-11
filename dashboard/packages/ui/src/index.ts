@@ -40,6 +40,7 @@ export { isDirty, sameValue } from "./lib/dirty";
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
 export { Input, type InputProps } from "./components/input";
 export { SizeField, type SizeFieldProps } from "./components/size-field";
+export { ListField, type ListFieldProps } from "./components/list-field";
 export { Textarea, type TextareaProps } from "./components/textarea";
 export { Badge, TagList, statusChipClass, type BadgeProps } from "./components/badge";
 export { CopyButton, CopyIcon, useCopied } from "./components/copy-button";

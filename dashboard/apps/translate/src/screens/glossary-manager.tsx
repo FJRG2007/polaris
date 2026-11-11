@@ -21,6 +21,7 @@ import {
     ENTRIES_MAX,
     GLOSSARIES_MAX,
     KEEP_MAX,
+    TERM_MAX,
     fromCsv,
     glossaryInput,
     keepInput,
@@ -50,7 +51,7 @@ import {
     SearchableSelect,
     Skeleton,
     Switch,
-    Textarea,
+    ListField,
     isDirty,
     useToast
 } from "@polaris/ui";
@@ -339,7 +340,8 @@ export function GlossaryManager() {
     );
 }
 
-/** The words never translated, one per line, saved when changed. */
+/** The words never translated, each one added and removed on its own, saved
+ *  when the list differs from what is stored. */
 function KeepList({
     terms,
     onSaved
@@ -349,13 +351,11 @@ function KeepList({
 }) {
     const t = useTranslateT();
     const toast = useToast();
-    const [text, setText] = useState<string | null>(null);
+    const [draft, setDraft] = useState<string[] | null>(null);
     const [pending, setPending] = useState(false);
-    const loaded = (terms ?? []).join("\n");
-    const shown = text ?? loaded;
-    const lines = shown.split("\n").map(normalizeTerm).filter(Boolean);
-    const parsed = keepInput.safeParse(lines);
-    const changed = terms !== null && isDirty((terms ?? []).join("\n"), lines.join("\n"));
+    const shown = draft ?? terms ?? [];
+    const parsed = keepInput.safeParse(shown);
+    const changed = terms !== null && isDirty(terms.join("\n"), shown.join("\n"));
 
     const save = async () => {
         if (!parsed.success || !changed) return;
@@ -366,7 +366,7 @@ function KeepList({
                 t("glossary.errors.saveFailed")
             );
             onSaved(answer.keep);
-            setText(null);
+            setDraft(null);
         } catch (caught) {
             toast.show({ title: (caught as Error).message });
         } finally {
@@ -384,13 +384,15 @@ function KeepList({
                 <Skeleton className="h-28 w-full" />
             ) : (
                 <Card className="flex min-w-0 flex-col gap-2 p-3">
-                    <Textarea
+                    <ListField
                         aria-label={t("glossary.keepTitle")}
-                        aria-invalid={!parsed.success || undefined}
-                        rows={5}
                         value={shown}
+                        max={KEEP_MAX}
+                        maxLength={TERM_MAX}
+                        caseInsensitive
+                        disabled={pending}
                         placeholder={t("glossary.keepPlaceholder")}
-                        onChange={(event) => setText(event.target.value)}
+                        onChange={(next) => setDraft(next.map(normalizeTerm).filter(Boolean))}
                     />
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <span
@@ -402,9 +404,19 @@ function KeepList({
                             role="status"
                         >
                             {parsed.success
-                                ? t("glossary.keepCount", { count: lines.length, max: KEEP_MAX })
+                                ? t("glossary.keepCount", { count: shown.length, max: KEEP_MAX })
                                 : t("glossary.errors.keepInvalid", { max: KEEP_MAX })}
                         </span>
+                        {draft !== null && changed ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDraft(null)}
+                                disabled={pending}
+                            >
+                                {t("glossary.cancel")}
+                            </Button>
+                        ) : null}
                         <Button
                             size="sm"
                             onClick={() => void save()}

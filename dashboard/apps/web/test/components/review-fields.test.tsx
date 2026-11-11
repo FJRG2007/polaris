@@ -11,7 +11,7 @@
 import { useState } from "react";
 import * as core from "@polaris/core";
 import { MessagesWrapper } from "../setup/i18n";
-import { ListField } from "@/components/list-field";
+import { ListField } from "@polaris/ui";
 import { afterEach, describe, expect, it } from "vitest";
 import { ReviewFields } from "@/components/agents/review-fields";
 import { ReviewOutputFields } from "@/components/agents/review-output-fields";

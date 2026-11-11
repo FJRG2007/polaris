@@ -244,7 +244,7 @@
         "deleteTitle": "Delete this glossary?",
         "deleteQuestion": "{name} and its terms are deleted for good.",
         "keepTitle": "Never translate",
-        "keepHint": "Names and brands kept exactly as written, in every language. One per line.",
+        "keepHint": "Names and brands kept exactly as written, in every language. Press Enter to add one.",
         "keepPlaceholder": "Polaris",
         "keepCount": "{count} of {max}",
         "save": "Save",

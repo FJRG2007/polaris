@@ -10,8 +10,7 @@
  */
 
 import * as core from "@polaris/core";
-import { Button, Input, Select } from "@polaris/ui";
-import { ListField } from "@/components/list-field";
+import { Button, Input, ListField, Select } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const INHERIT = "__inherit__";

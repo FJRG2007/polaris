@@ -11,8 +11,10 @@
 
 import { X } from "lucide-react";
 import { useId, useState } from "react";
-import { Button, Input, cn } from "@polaris/ui";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { cn } from "../lib/cn";
+import { Input } from "./input";
+import { Button } from "./button";
+import { useTranslations } from "../i18n";
 
 export interface ListFieldProps {
     value: readonly string[];

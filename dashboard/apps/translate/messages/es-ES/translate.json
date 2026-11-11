@@ -244,7 +244,7 @@
         "deleteTitle": "¿Eliminar este glosario?",
         "deleteQuestion": "{name} y sus términos se eliminan para siempre.",
         "keepTitle": "No traducir nunca",
-        "keepHint": "Nombres y marcas que se dejan tal cual en todos los idiomas. Uno por línea.",
+        "keepHint": "Nombres y marcas que se dejan tal cual en todos los idiomas. Pulsa Intro para añadir.",
         "keepPlaceholder": "Polaris",
         "keepCount": "{count} de {max}",
         "save": "Guardar",
