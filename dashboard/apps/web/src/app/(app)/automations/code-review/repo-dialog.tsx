@@ -36,6 +36,7 @@ import {
     type ReviewSettings
 } from "@polaris/core";
 import { ReviewFields } from "@/components/agents/review-fields";
+import { ReviewOutputFields } from "@/components/agents/review-output-fields";
 import * as polls from "./repos-polls";
 
 /** Everything about one repository that is worth changing after it is added. */
@@ -219,6 +220,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                             <p className="text-xs text-muted-foreground">{t("review.intro")}</p>
                         </div>
                         <ReviewFields value={review} inherited={inheritedReview} onChange={setReview} />
+                        <ReviewOutputFields value={review} inherited={inheritedReview} onChange={setReview} />
                     </section>
 
                     <div className="space-y-1">

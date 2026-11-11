@@ -21,20 +21,24 @@ const FILE_MOST_BYTES = 64 * 1024;
 const FILE_TIMEOUT_MS = 5_000;
 
 /**
- * The repository's own `.polaris/review.yaml` at `ref`, or null when there is
+ * The repository's own `.polaris/review.yaml` at `ref` (null is the default
+ * branch), or null when there is
  * none, it cannot be read, or it is not a mapping. Never throws: a missing or
  * broken file falls back to the saved settings rather than stopping reviews.
  */
-export async function readReviewFile(repoFullName: string, ref: string): Promise<core.ReviewSettings | null> {
+export async function readReviewFile(
+    repoFullName: string,
+    ref: string | null
+): Promise<core.ReviewSettings | null> {
     const [owner, name] = repoFullName.split("/");
-    if (!owner || !name || !ref) return null;
+    if (!owner || !name) return null;
     const token = await githubAppInstallationToken(owner, {
         repositories: [name],
         permissions: { contents: "read" }
     }).catch(() => null);
     if (!token) return null;
     const path = core.REVIEW_CONFIG_PATH.split("/").map(encodeURIComponent).join("/");
-    const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/contents/${path}?ref=${encodeURIComponent(ref)}`;
+    const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/contents/${path}${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`;
     try {
         const response = await fetch(url, {
             headers: {
@@ -66,8 +70,10 @@ export async function reviewSettingsFor(
     const tiers = await savedReviewTiers(repo.ownerId, repo);
     const saved = core.resolveReview(...tiers);
     if (saved.configSource === "saved") return saved;
-    const ref = saved.configSource === "branch" ? refs.head : refs.defaultBranch;
-    const file = ref ? await readReviewFile(repo.repoFullName, ref) : null;
+    // Without a pull request's head (a run asking for its context knows only
+    // the repository), the branch source falls back to the default branch.
+    const ref = saved.configSource === "branch" ? (refs.head ?? refs.defaultBranch) : refs.defaultBranch;
+    const file = await readReviewFile(repo.repoFullName, ref);
     return file ? { ...core.resolveReview(file, ...tiers), configSource: saved.configSource } : saved;
 }
 

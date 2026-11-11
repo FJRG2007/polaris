@@ -23,6 +23,8 @@ import { appBaseUrl } from "@/lib/domain-service";
 import { authenticateRun } from "@/lib/agents/agent-auth";
 import { buildRunContext } from "@/lib/agents/agent-run-context";
 import { policyForRepo } from "@/lib/agents/agent-defaults-service";
+import { reviewSettingsFor } from "@/lib/agents/review-gate";
+import { DEFAULT_REVIEW, recipeInstructions, reviewInstructions } from "@polaris/core";
 import { issueRunToken, markRunStarted } from "@/lib/agents/agent-run-service";
 
 export const runtime = "nodejs";
@@ -58,7 +60,8 @@ export async function GET(
             ownerId: true,
             pullRequests: true,
             issues: true,
-            gate: true
+            gate: true,
+            review: true
         }
     });
     if (!row?.enabled) {
@@ -74,13 +77,16 @@ export async function GET(
         select: { mode: true, model: true, trigger: true, instructions: true }
     });
 
-    const [instructions, policy, apiUrl] = await Promise.all([
+    const [instructions, policy, apiUrl, review] = await Promise.all([
         // An automation step's own words, when it gave some; else the rules.
         run?.instructions != null
             ? run.instructions.trim()
             : instructionsFor(caller.repoId, run?.trigger ?? null, run?.mode ?? null),
         policyForRepo(row.ownerId, row),
-        appBaseUrl()
+        appBaseUrl(),
+        // The run knows its repository, not its pull request's head, so a
+        // branch-sourced file is read from the default branch here.
+        reviewSettingsFor(row, { defaultBranch: null, head: null }).catch(() => DEFAULT_REVIEW)
     ]);
 
     // Asking for its context is the first thing a run does, so it is also the
@@ -111,7 +117,9 @@ export async function GET(
         // The operator's own words where there are any, and what started the run
         // otherwise. Never text from an issue or a comment: this reaches the
         // gate's review pass as the standard the diff is judged against.
-        intent: instructions || `A ${run?.trigger ?? "manual"} agent run on ${row.repoFullName}.`
+        intent: instructions || `A ${run?.trigger ?? "manual"} agent run on ${row.repoFullName}.`,
+        reviewGuide: reviewInstructions(review),
+        recipes: recipeInstructions(review)
     });
 
     return Response.json(context, { headers: { "cache-control": "no-store" } });

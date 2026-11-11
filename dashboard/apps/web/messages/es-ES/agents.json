@@ -770,5 +770,66 @@
         "ignoreMentionsFrom": "No responder",
         "ignoreMentionsFromHint": "Usuarios de GitHub cuyas menciones se ignoran.",
         "ignoreMentionsFromPlaceholder": "some-bot[bot]"
+    },
+    "reviewOutput": {
+        "title": "Qué dice la revisión",
+        "intro": "Todo empieza apagado: la revisión sale como siempre hasta que actives algo.",
+        "profile": "Perfil",
+        "profiles": {
+            "default": "Equilibrado",
+            "chill": "Solo lo importante",
+            "assertive": "Exhaustivo"
+        },
+        "profileNotes": {
+            "default": "El agente decide qué merece un comentario.",
+            "chill": "Errores, seguridad y fallos. Sin estilo ni gustos.",
+            "assertive": "Todo lo que valga la pena, detalles incluidos."
+        },
+        "bools": {
+            "describePr": "Escribir descripción",
+            "walkthrough": "Recorrido",
+            "collapseWalkthrough": "Plegar recorrido",
+            "changedFiles": "Tabla de archivos",
+            "sequenceDiagrams": "Diagramas de secuencia",
+            "effortEstimate": "Esfuerzo",
+            "linkedIssues": "Revisar issues",
+            "suggestLabels": "Sugerir etiquetas",
+            "applyLabels": "Poner etiquetas",
+            "suggestReviewers": "Sugerir revisores"
+        },
+        "tone": "Tono",
+        "toneHint": "Cómo redactarla: idioma, longitud, voz.",
+        "tonePlaceholder": "Responde en inglés, breve.",
+        "checksTitle": "Checks previos",
+        "checksIntro": "Un aviso es una nota. Un error pide cambios.",
+        "checks": {
+            "titleCheck": "Título",
+            "descriptionCheck": "Descripción",
+            "issueCheck": "Issue enlazada",
+            "docstringCheck": "Docstrings"
+        },
+        "levels": {
+            "off": "No",
+            "warning": "Aviso",
+            "error": "Error"
+        },
+        "docstringThreshold": "% de docstrings",
+        "docstringThresholdHint": "Parte de funciones públicas nuevas que la necesitan.",
+        "customChecks": "Tus checks",
+        "customChecksHint": "Un nombre y qué significa pasarlo, en palabras.",
+        "checkName": "Nombre",
+        "pathFilters": "Excluir",
+        "pathFiltersHint": "Archivos que la revisión salta, como globs.",
+        "pathInstructions": "Por ruta",
+        "pathInstructionsHint": "Instrucciones extra para archivos que casan con un glob.",
+        "path": "Glob",
+        "recipes": "Recetas",
+        "recipesHint": "Trabajos con nombre que quien puede mencionar la app pide por su nombre.",
+        "recipeName": "Nombre",
+        "instructions": "Instrucciones",
+        "add": "Añadir",
+        "removeEntry": "Quitar {name}",
+        "incomplete": "Rellena ambos campos para guardarla.",
+        "count": "{count, plural, one {# entrada} other {# entradas}}"
     }
 }

@@ -770,5 +770,66 @@
         "ignoreMentionsFrom": "Never answer",
         "ignoreMentionsFromHint": "GitHub logins whose mentions are ignored.",
         "ignoreMentionsFromPlaceholder": "some-bot[bot]"
+    },
+    "reviewOutput": {
+        "title": "What the review says",
+        "intro": "Everything here starts off, so a review reads as it always has until you turn something on.",
+        "profile": "Profile",
+        "profiles": {
+            "default": "Balanced",
+            "chill": "Only what matters",
+            "assertive": "Thorough"
+        },
+        "profileNotes": {
+            "default": "The agent's own judgement of what is worth a comment.",
+            "chill": "Bugs, security and broken behaviour. Style and taste stay out.",
+            "assertive": "Anything worth saying, small things included."
+        },
+        "bools": {
+            "describePr": "Write the description",
+            "walkthrough": "Walkthrough",
+            "collapseWalkthrough": "Fold the walkthrough",
+            "changedFiles": "Changed files table",
+            "sequenceDiagrams": "Sequence diagrams",
+            "effortEstimate": "Review effort",
+            "linkedIssues": "Check linked issues",
+            "suggestLabels": "Suggest labels",
+            "applyLabels": "Apply labels",
+            "suggestReviewers": "Suggest reviewers"
+        },
+        "tone": "Tone",
+        "toneHint": "How to phrase it: language, length, voice.",
+        "tonePlaceholder": "Reply in Spanish, keep it short.",
+        "checksTitle": "Pre-merge checks",
+        "checksIntro": "A warning is a note on the review. An error asks for changes.",
+        "checks": {
+            "titleCheck": "Title",
+            "descriptionCheck": "Description",
+            "issueCheck": "Linked issue",
+            "docstringCheck": "Docstrings"
+        },
+        "levels": {
+            "off": "Off",
+            "warning": "Warning",
+            "error": "Error"
+        },
+        "docstringThreshold": "Docstring coverage %",
+        "docstringThresholdHint": "Share of new public functions that need one.",
+        "customChecks": "Your checks",
+        "customChecksHint": "A name and what passing means, in plain words.",
+        "checkName": "Check name",
+        "pathFilters": "Leave out",
+        "pathFiltersHint": "Files the review skips, as globs.",
+        "pathInstructions": "Path rules",
+        "pathInstructionsHint": "Extra instructions for files that match a glob.",
+        "path": "Glob",
+        "recipes": "Recipes",
+        "recipesHint": "Named jobs anyone allowed to mention the app can ask for by name.",
+        "recipeName": "Recipe name",
+        "instructions": "Instructions",
+        "add": "Add",
+        "removeEntry": "Remove {name}",
+        "incomplete": "Needs both fields to be saved.",
+        "count": "{count, plural, one {# entry} other {# entries}}"
     }
 }

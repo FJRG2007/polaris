@@ -3,7 +3,9 @@
 /**
  * The automatic-review fields: a list that inherits says what it inherits and
  * offers to set it here; a list set here adds on Enter or a comma, skips
- * repeats, removes one entry by its button, and goes back to inheriting.
+ * repeats, removes one entry by its button, and goes back to inheriting. The
+ * output fields add rows of a name and instructions, and say when one is only
+ * half filled.
  */
 
 import { useState } from "react";
@@ -12,6 +14,7 @@ import { MessagesWrapper } from "../setup/i18n";
 import { ListField } from "@/components/list-field";
 import { afterEach, describe, expect, it } from "vitest";
 import { ReviewFields } from "@/components/agents/review-fields";
+import { ReviewOutputFields } from "@/components/agents/review-output-fields";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 afterEach(cleanup);
@@ -63,5 +66,32 @@ describe("ReviewFields", () => {
         expect(screen.getByTestId("value").textContent).toBe('["dependabot[bot]"]');
         fireEvent.click(screen.getByRole("button", { name: "Use inherited" }));
         expect(screen.getByTestId("value").textContent).toBe("null");
+    });
+});
+
+describe("ReviewOutputFields", () => {
+    function Output() {
+        const [value, setValue] = useState(core.INHERIT_REVIEW);
+        return (
+            <>
+                <ReviewOutputFields value={value} inherited={core.DEFAULT_REVIEW} onChange={setValue} />
+                <output data-testid="recipes">{JSON.stringify(value.recipes)}</output>
+            </>
+        );
+    }
+
+    it("takes recipes over, adds a row, and flags it until both halves are filled", () => {
+        render(<Output />, { wrapper: MessagesWrapper });
+        // Your checks, leave out, path rules, recipes - in that order.
+        fireEvent.click(screen.getAllByRole("button", { name: "Set here" })[3]!);
+        expect(screen.getByTestId("recipes").textContent).toBe("[]");
+        fireEvent.click(screen.getByRole("button", { name: "Add" }));
+        fireEvent.change(screen.getByLabelText("Recipe name"), { target: { value: "add tests" } });
+        expect(screen.getByText("Needs both fields to be saved.")).toBeTruthy();
+        fireEvent.change(screen.getByLabelText("Instructions"), { target: { value: "Write unit tests." } });
+        expect(screen.queryByText("Needs both fields to be saved.")).toBeNull();
+        expect(screen.getByTestId("recipes").textContent).toBe('[{"name":"add tests","instructions":"Write unit tests."}]');
+        fireEvent.click(screen.getByRole("button", { name: "Remove add tests" }));
+        expect(screen.getByTestId("recipes").textContent).toBe("[]");
     });
 });

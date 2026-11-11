@@ -103,6 +103,11 @@ export interface BuildRunContextInput {
      *  uses to tell a deliberate choice from a mistake. Operator prose and the
      *  automation's instructions, never text from an issue or a comment. */
     intent: string;
+    /** What the operator's review settings ask a review to contain, for Review
+     *  mode (incremental reviews inherit it). Empty adds nothing. */
+    reviewGuide?: string;
+    /** The named jobs people can ask for, as guidance for every mode. */
+    recipes?: string;
 }
 
 /**
@@ -121,6 +126,14 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<RunC
     // spends the money of the person whose repository it is.
     const secrets = await runSecretsFor(input.ownerId);
     const instructions = input.instructions.trim();
+    const join = (...parts: Array<string | undefined>) =>
+        parts.map((part) => part?.trim() ?? "").filter(Boolean).join("\n\n");
+    const modeInstructions: Record<string, string> =
+        input.mode && instructions ? { [input.mode]: instructions } : {};
+    // The runtime looks Review's text up for IncrementalReview too.
+    const review = join(modeInstructions.Review, input.reviewGuide);
+    if (review) modeInstructions.Review = review;
+    const learnings = join(instructions, input.recipes);
 
     return {
         settings: {
@@ -155,8 +168,8 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<RunC
             statusChecks: true,
             // A merge gate must never turn itself on.
             approvalCheck: false,
-            modeInstructions: input.mode && instructions ? { [input.mode]: instructions } : {},
-            learnings: instructions || null,
+            modeInstructions,
+            learnings: learnings || null,
             learningsHeadings: [],
             envAllowlist: null,
             xrepoBrief: null,

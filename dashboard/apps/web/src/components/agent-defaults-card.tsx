@@ -21,6 +21,7 @@ import { useState, useTransition } from "react";
 import { Badge, Button, Card, CardBody, isDirty, Select } from "@polaris/ui";
 import { ModelFallbackList } from "@/components/model-fallback-list";
 import { ReviewFields } from "@/components/agents/review-fields";
+import { ReviewOutputFields } from "@/components/agents/review-output-fields";
 import { ModelPicker, type PickerModel } from "@/components/model-picker";
 import type { AgentDefaultsView } from "@/lib/agents/agent-defaults-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -408,6 +409,11 @@ export function AgentDefaultsCard({
                         <p className="text-xs text-muted-foreground">{t("review.intro")}</p>
                     </div>
                     <ReviewFields
+                        value={tier.review}
+                        inherited={inheritedReview}
+                        onChange={(next) => set("review", next)}
+                    />
+                    <ReviewOutputFields
                         value={tier.review}
                         inherited={inheritedReview}
                         onChange={(next) => set("review", next)}

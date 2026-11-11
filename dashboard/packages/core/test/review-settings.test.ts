@@ -147,3 +147,82 @@ describe("mentionRefusal", () => {
         expect(core.mentionRefusal(settings(), many)).toBeNull();
     });
 });
+
+describe("reviewInstructions", () => {
+    it("adds nothing when every setting is at its default", () => {
+        expect(core.reviewInstructions(core.DEFAULT_REVIEW)).toBe("");
+        expect(core.recipeInstructions(core.DEFAULT_REVIEW)).toBe("");
+    });
+
+    it("words each extra the operator turned on", () => {
+        const text = core.reviewInstructions(
+            settings({
+                profile: "chill",
+                walkthrough: true,
+                collapseWalkthrough: true,
+                suggestLabels: true,
+                applyLabels: true,
+                titleCheck: "error",
+                docstringCheck: "warning",
+                docstringThreshold: 60,
+                customChecks: [{ name: "Changelog", instructions: "CHANGELOG.md has an entry.", level: "error" }],
+                pathFilters: ["dist/**"],
+                pathInstructions: [{ path: "src/api/**", instructions: "Check every input is validated." }]
+            })
+        );
+        expect(text).toContain("Skip style nitpicks");
+        expect(text).toContain("<details><summary>Walkthrough</summary>");
+        expect(text).toContain("apply them with `add_labels`");
+        expect(text).toMatch(/Title: .*request changes/);
+        expect(text).toMatch(/at least 60% .*as a warning/);
+        expect(text).toContain("Changelog: CHANGELOG.md has an entry.");
+        expect(text).toContain("`dist/**`");
+        expect(text).toContain("For files matching `src/api/**`: Check every input is validated.");
+    });
+
+    it("leaves a check that is off out", () => {
+        const text = core.reviewInstructions(
+            settings({ customChecks: [{ name: "Off one", instructions: "x", level: "off" }], titleCheck: "off" })
+        );
+        expect(text).toBe("");
+    });
+
+    it("lists recipes by name", () => {
+        const text = core.recipeInstructions(
+            settings({ recipes: [{ name: "add tests", instructions: "Write unit tests for the change." }] })
+        );
+        expect(text).toContain('"add tests": Write unit tests for the change.');
+    });
+});
+
+describe("the repository file, for the output settings", () => {
+    it("reads nested lists of objects in YAML's names", () => {
+        const read = core.reviewSettingsFromFile({
+            reviews: {
+                profile: "assertive",
+                path_instructions: [{ path: "**/*.sql", instructions: "Look for missing indexes." }],
+                custom_checks: [{ name: "No TODO", instructions: "No TODO left.", level: "warning" }]
+            }
+        });
+        expect(read?.profile).toBe("assertive");
+        expect(read?.pathInstructions).toEqual([{ path: "**/*.sql", instructions: "Look for missing indexes." }]);
+        expect(read?.customChecks?.[0]?.level).toBe("warning");
+    });
+});
+
+describe("rows still being typed", () => {
+    it("drops a row with a blank field instead of refusing the tier", () => {
+        const parsed = core.reviewSettingsSchema.parse({
+            recipes: [
+                { name: "add tests", instructions: "Write unit tests." },
+                { name: "half", instructions: " " },
+                { name: "", instructions: "" }
+            ]
+        });
+        expect(parsed.recipes).toEqual([{ name: "add tests", instructions: "Write unit tests." }]);
+    });
+
+    it("still refuses a row that is not a row", () => {
+        expect(core.reviewSettingsSchema.safeParse({ recipes: ["text"] }).success).toBe(false);
+    });
+});

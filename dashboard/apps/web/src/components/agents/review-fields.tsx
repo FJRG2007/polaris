@@ -169,7 +169,7 @@ export function ReviewFields({
 
 /** A count, or inherit. Kept as text while typed so clearing the
  *  field to type a new number does not snap it back. */
-function CountField({
+export function CountField({
     value,
     inherited,
     max,
@@ -199,7 +199,7 @@ function CountField({
     );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
     return (
         <div className="min-w-0 space-y-1">
             <p className="text-sm font-medium">{label}</p>
