@@ -189,7 +189,7 @@ describe("agentAutomationSchema", () => {
     });
 
     it("rejects a trigger it does not define", () => {
-        expect(agentAutomationSchema.safeParse({ trigger: "pr.merged" }).success).toBe(false);
+        expect(agentAutomationSchema.safeParse({ trigger: "pr.closed" }).success).toBe(false);
     });
 });
 
