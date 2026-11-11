@@ -211,6 +211,15 @@ export interface PolarisDesktop {
      *  untouched, `locked` behind the lock screen. Absent from an older app,
      *  which then never says it is away. */
     systemIdle?(): Promise<"active" | "idle" | "locked" | "unknown">;
+    /** Hold a call's mute and deafen keys system-wide, so they work with
+     *  another program in front; null lets them go. Answers which controls the
+     *  system gave - a key another program holds is not taken, and the page
+     *  keeps listening itself for that one. Absent from an older app. */
+    setCallHotkeys?(
+        input: { readonly mic: readonly string[]; readonly deafen: readonly string[] } | null
+    ): Promise<{ readonly mic: boolean; readonly deafen: boolean }>;
+    /** Hear one of those keys pressed. Answers the way to stop. */
+    onCallHotkey?(listener: (which: "mic" | "deafen") => void): () => void;
     /** The window that adds and switches servers. Absent from an older app. */
     openServers?(): Promise<void>;
     /** Windows' Default apps at Polaris, to pick it for mailto links; false

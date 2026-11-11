@@ -11,6 +11,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import { followTitleBarColors } from "@/shared/title-bar";
 import { readUpdateReady } from "@/shared/update-ready";
 import { readUpdateCheck } from "@/shared/update-check";
+import type { CallHotkey } from "@/shared/call-hotkeys";
 import {
     CHANNELS,
     VERSION_ARGUMENT,
@@ -77,6 +78,14 @@ const bridge: PolarisDesktop = {
     },
     defaultBrowser: () => ipcRenderer.invoke(CHANNELS.defaultBrowser),
     systemIdle: () => ipcRenderer.invoke(CHANNELS.systemIdle),
+    setCallHotkeys: (input) => ipcRenderer.invoke(CHANNELS.callHotkeys, input),
+    onCallHotkey: (listener) => {
+        const heard = (_event: unknown, which: CallHotkey) => listener(which);
+        ipcRenderer.on(CHANNELS.callHotkey, heard);
+        return () => {
+            ipcRenderer.removeListener(CHANNELS.callHotkey, heard);
+        };
+    },
     openServers: () => ipcRenderer.invoke(CHANNELS.openServers),
     openMailDefaults: () => ipcRenderer.invoke(CHANNELS.openMailDefaults),
     setAppBadge: (input) => ipcRenderer.invoke(CHANNELS.appBadge, input),

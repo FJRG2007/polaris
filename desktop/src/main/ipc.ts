@@ -14,6 +14,8 @@ import { runningPrograms } from "./game-detect";
 import { chooseShare, endShare, listShareSources, SOURCE_ID } from "./screen-share";
 import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
 import { strokeSchema } from "@/shared/annotate";
+import { setCallHotkeys } from "./call-hotkeys";
+import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
 import { closeNotice, showNotice } from "./notices";
 import { appBadgeSchema, applyAppBadge } from "./app-badge";
 import { isServerUrl, serverPath } from "./navigation";
@@ -338,6 +340,14 @@ export function registerIpc(host: IpcHost): void {
         } catch {
             return "unknown";
         }
+    });
+
+    // The call's keys, held system-wide while a call is on. A shape that does
+    // not parse lets go of whatever this window held rather than keeping it.
+    ipcMain.handle(CHANNELS.callHotkeys, (event, raw: unknown): CallHotkeysResult => {
+        if (!fromPolaris(event)) return { mic: false, deafen: false };
+        const input = callHotkeysSchema.safeParse(raw);
+        return setCallHotkeys(event.sender, input.success ? input.data : null);
     });
 
     ipcMain.handle(CHANNELS.gameCurrent, (event) => {

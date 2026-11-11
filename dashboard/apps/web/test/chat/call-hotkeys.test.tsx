@@ -97,6 +97,58 @@ describe("the binding", () => {
     });
 });
 
+describe("in the desktop app", () => {
+    function installDesktop(held: { mic: boolean; deafen: boolean }) {
+        let heard: ((which: "mic" | "deafen") => void) | null = null;
+        const setCallHotkeys = vi.fn(async () => held);
+        (window as { polarisDesktop?: unknown }).polarisDesktop = {
+            version: "0.1.21",
+            notify: async () => true,
+            closeNotice: async () => undefined,
+            pickFolder: async () => null,
+            pushLocal: async () => ({ ok: true }),
+            openWindow: async () => ({ ok: true }),
+            setCallHotkeys,
+            onCallHotkey: (listener: (which: "mic" | "deafen") => void) => {
+                heard = listener;
+                return () => {
+                    heard = null;
+                };
+            }
+        };
+        return { setCallHotkeys, fire: (which: "mic" | "deafen") => heard?.(which) };
+    }
+
+    afterEach(() => {
+        delete (window as { polarisDesktop?: unknown }).polarisDesktop;
+    });
+
+    it("hands the keys to the system for the call, and lets them go after", async () => {
+        const desktop = installDesktop({ mic: true, deafen: true });
+        const { unmount } = renderHook(() => useCallHotkeys(controls, true));
+        expect(desktop.setCallHotkeys).toHaveBeenCalledWith({ mic: ["F9"], deafen: ["F10"] });
+        await act(async () => undefined);
+        // A press with another program in front reaches the call.
+        desktop.fire("deafen");
+        expect(controls.toggleDeafen).toHaveBeenCalledTimes(1);
+        // The page does not toggle a second time for a key the system holds.
+        press("F10");
+        expect(controls.toggleDeafen).toHaveBeenCalledTimes(1);
+        unmount();
+        expect(desktop.setCallHotkeys).toHaveBeenLastCalledWith(null);
+    });
+
+    it("keeps listening itself for a key the system could not take", async () => {
+        installDesktop({ mic: true, deafen: false });
+        renderHook(() => useCallHotkeys(controls, true));
+        await act(async () => undefined);
+        press("F10");
+        expect(controls.toggleDeafen).toHaveBeenCalledTimes(1);
+        press("F9");
+        expect(controls.toggleMic).not.toHaveBeenCalled();
+    });
+});
+
 describe("the call's holder", () => {
     function EnterCall() {
         const { enter, leave } = useCallHold();

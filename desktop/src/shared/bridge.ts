@@ -20,6 +20,7 @@ import type { ServerRow } from "./servers";
 import type { InstallRequest, InstallResult } from "./install-tools";
 import type { UpdateReady } from "./update-ready";
 import type { UpdateCheck } from "./update-check";
+import type { CallHotkey, CallHotkeysInput, CallHotkeysResult } from "./call-hotkeys";
 
 export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly error: string; };
 
@@ -118,6 +119,12 @@ export interface PolarisDesktop {
      *  screen. The dashboard lets a browser elsewhere make the sounds while
      *  nobody is here. */
     systemIdle(): Promise<SystemIdle>;
+    /** Hold a call's mute and deafen keys system-wide, so they work with
+     *  another program in front; null lets them go. Says which controls the
+     *  system gave, so the page keeps listening itself for any it did not. */
+    setCallHotkeys(input: CallHotkeysInput): Promise<CallHotkeysResult>;
+    /** Hear one of those keys pressed. Answers the way to stop. */
+    onCallHotkey(listener: (which: CallHotkey) => void): () => void;
     /** Open the app's window for adding and switching servers. */
     openServers(): Promise<void>;
     /** Open Windows' Default apps at Polaris, where it can be picked for mailto
@@ -475,6 +482,8 @@ export const CHANNELS = {
     installTool: "desktop:install-tool",
     defaultBrowser: "desktop:default-browser",
     systemIdle: "desktop:system-idle",
+    callHotkeys: "desktop:call-hotkeys",
+    callHotkey: "desktop:call-hotkey",
     openServers: "desktop:open-servers",
     openMailDefaults: "desktop:open-mail-defaults",
     appBadge: "desktop:app-badge",

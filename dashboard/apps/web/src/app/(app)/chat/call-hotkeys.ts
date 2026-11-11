@@ -24,6 +24,7 @@
 import * as core from "@polaris/core";
 import { shortcutBindings } from "@polaris/ui";
 import { useEffect, useRef } from "react";
+import { desktopBridge } from "@/lib/desktop-bridge";
 
 /** Which control a key press is for, or null for any other key - against the
  *  keys in force, or the defaults when none are given. Pure, so the rule can
@@ -70,14 +71,46 @@ export function useCallHotkeys(
 
     useEffect(() => {
         if (!active) return;
+        const press = (which: "mic" | "deafen") => {
+            if (which === "mic") controls.current.toggleMic();
+            else controls.current.toggleDeafen();
+        };
+        // In the desktop app the system holds the keys, so they work with
+        // another program in front, as in any voice app. A control it held is
+        // not also heard here: the system gives the press to it alone, and two
+        // listeners would each toggle.
+        const desktop = desktopBridge();
+        const global = { mic: false, deafen: false };
+        let stopHearing: (() => void) | null = null;
+        let ended = false;
+        if (desktop?.setCallHotkeys && desktop.onCallHotkey) {
+            const bindings = shortcutBindings();
+            stopHearing = desktop.onCallHotkey(press);
+            void desktop
+                .setCallHotkeys({
+                    mic: core.keysOf(bindings, "chat.toggleMic"),
+                    deafen: core.keysOf(bindings, "chat.toggleDeafen")
+                })
+                .then((held) => {
+                    if (ended) return;
+                    global.mic = held.mic;
+                    global.deafen = held.deafen;
+                })
+                .catch(() => undefined);
+        }
         const onKey = (event: KeyboardEvent) => {
             const which = callHotkey(event, shortcutBindings());
             if (!which) return;
             event.preventDefault();
-            if (which === "mic") controls.current.toggleMic();
-            else controls.current.toggleDeafen();
+            if (global[which]) return;
+            press(which);
         };
         window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
+        return () => {
+            ended = true;
+            window.removeEventListener("keydown", onKey);
+            stopHearing?.();
+            void desktop?.setCallHotkeys?.(null).catch(() => undefined);
+        };
     }, [active]);
 }

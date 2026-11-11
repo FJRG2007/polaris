@@ -20,6 +20,7 @@
 
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
+import { releaseCallHotkeys } from "./call-hotkeys";
 import { DEEP_LINK_SCHEME, deepLinkIn, readDeepLink } from "@/shared/deep-link";
 import { DeepLinks } from "./deep-links";
 import { registerMailHandler } from "./mail-handler";
@@ -792,6 +793,9 @@ function start(): void {
     app.on("window-all-closed", () => {
         if (process.platform !== "darwin") app.quit();
     });
+
+    // Keys held system-wide are the operating system's until let go.
+    app.on("will-quit", () => releaseCallHotkeys());
 
     let confirmedQuit = false;
     app.on("before-quit", (event) => {
