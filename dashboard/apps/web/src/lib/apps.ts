@@ -3386,7 +3386,8 @@ export const ADMIN_APPS_BASE = "/admin/apps";
  *  they have no store listing, so no Details screen. */
 const ADMIN_BUILT_IN_APPS: ReadonlySet<string> = new Set(["chat", "polar"]);
 
-/** The screens of a built-in app's administrator settings beyond the first. */
+/** The screens of a built-in app's administrator settings beyond the first.
+ *  `href` is the screen's segment under the app's settings, "" for the first. */
 const ADMIN_APP_SCREENS: Readonly<Record<string, readonly AppSection[]>> = {
     chat: [
         {
@@ -3398,28 +3399,28 @@ const ADMIN_APP_SCREENS: Readonly<Record<string, readonly AppSection[]>> = {
         },
         {
             label: "Files from Drive", // i18n-ignore
-            href: "/files",
+            href: "files",
             adminOnly: true,
             icon: FolderOpen,
             keywords: ["drive", "attachments", "share", "storage"]
         },
         {
             label: "Organizations", // i18n-ignore
-            href: "/organizations",
+            href: "organizations",
             adminOnly: true,
             icon: Building2,
             keywords: ["org chat", "teams", "isolation"]
         },
         {
             label: "Links", // i18n-ignore
-            href: "/links",
+            href: "links",
             adminOnly: true,
             icon: ShieldCheck,
             keywords: ["links", "phishing", "malware", "previews"]
         },
         {
             label: "Calls", // i18n-ignore
-            href: "/calls",
+            href: "calls",
             adminOnly: true,
             icon: Video,
             keywords: ["call server", "video calls", "meetings"]
@@ -3459,7 +3460,7 @@ export function adminAppSubapp(id: string): AppSubapp {
                   }
               ]),
         ...(screens
-            ? screens.map((screen) => ({ ...screen, href: `${settings}${screen.href}` }))
+            ? screens.map((screen) => ({ ...screen, href: screen.href ? `${settings}/${screen.href}` : settings }))
             : [
                   {
                       label: "Settings", // i18n-ignore

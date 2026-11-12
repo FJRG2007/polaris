@@ -10,10 +10,8 @@ CREATE TABLE IF NOT EXISTS "ChatWebhookAvatar" (
     CONSTRAINT "ChatWebhookAvatar_pkey" PRIMARY KEY ("webhookId")
 );
 
-DO $$ BEGIN
-    ALTER TABLE "ChatWebhookAvatar" ADD CONSTRAINT "ChatWebhookAvatar_webhookId_fkey"
-        FOREIGN KEY ("webhookId") REFERENCES "ChatWebhook"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "ChatWebhookAvatar" DROP CONSTRAINT IF EXISTS "ChatWebhookAvatar_webhookId_fkey";
+ALTER TABLE "ChatWebhookAvatar" ADD CONSTRAINT "ChatWebhookAvatar_webhookId_fkey"
+    FOREIGN KEY ("webhookId") REFERENCES "ChatWebhook"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "ChatMessage" ADD COLUMN IF NOT EXISTS "authorAvatarUrl" TEXT;
