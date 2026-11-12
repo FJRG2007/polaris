@@ -29,6 +29,7 @@ export const POLARIS_ROUTE_ROOTS: readonly string[] = [
     "analytics.js",
     "announcements",
     "api",
+    "app-lock",
     "apple-touch-icon.png",
     "apps",
     "audio",
