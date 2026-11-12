@@ -81,6 +81,44 @@ vi.mock("@/lib/github-service", () => ({
     githubAppIsPublic: async () => true,
     githubAppVisibilityUrl: async () => "https://github.com/settings/apps/polaris-test/advanced"
 }));
+vi.mock("@/lib/agents/agent-readiness", () => ({
+    agentOptionsFor: async () => [
+        {
+            key: "claude:0190c6a0-0000-7000-8000-0000000000a1",
+            cli: "claude",
+            label: "Claude Code",
+            vendor: "Anthropic",
+            docs: "",
+            readiness: "ready",
+            accountId: "0190c6a0-0000-7000-8000-0000000000a1",
+            account: "me@example.test",
+            mine: true,
+            machine: false,
+            apiKey: false,
+            env: "CLAUDE_CODE_OAUTH_TOKEN",
+            missing: []
+        },
+        {
+            key: "opencode",
+            cli: "opencode",
+            label: "OpenCode",
+            vendor: "SST",
+            docs: "",
+            readiness: "missing",
+            accountId: null,
+            account: null,
+            mine: null,
+            machine: false,
+            apiKey: false,
+            env: null,
+            missing: []
+        }
+    ]
+}));
+vi.mock("@/lib/polar/access", async (load) => ({
+    ...(await load<object>()),
+    polarCredentialFor: async () => ({ source: "own" })
+}));
 vi.mock("@/components/agents/sessions/actions", () => ({
     listSessionsAction: async (limit?: number, page?: unknown) => {
         state.listed += 1;
@@ -274,6 +312,56 @@ describe("polarCodeThread", () => {
 });
 
 describe("polarCodeStart", () => {
+    const PLAN = "0190c6a0-0000-7000-8000-0000000000a1";
+
+    it("resolves the engine from the person's own source and ignores a tool the client named", async () => {
+        state.held.add("agents.manage");
+        expect(
+            await polarCodeStart(USER, {
+                prompt: "x",
+                cli: "cursor",
+                accountId: null,
+                pick: { source: `account:${PLAN}`, provider: "anthropic", model: "claude-opus-4-1" }
+            })
+        ).toEqual({ id: "started" });
+        expect(state.startedWith).toMatchObject({
+            cli: "claude",
+            accountId: PLAN,
+            useMachineLogin: false,
+            modelChoice: { provider: "anthropic", model: "claude-opus-4-1", payer: null }
+        });
+    });
+
+    it("runs Polar's own keys on the session tool, with the key Polar resolves", async () => {
+        state.held.add("agents.manage");
+        await polarCodeStart(USER, {
+            prompt: "x",
+            pick: { source: "polar:openrouter", provider: "openrouter", model: "anthropic/claude-opus" }
+        });
+        expect(state.startedWith).toMatchObject({
+            cli: "opencode",
+            modelChoice: { provider: "openrouter", model: "anthropic/claude-opus", payer: "own" }
+        });
+    });
+
+    it("refuses a pick that is not this person's or does not validate", async () => {
+        state.held.add("agents.manage");
+        state.startedWith = null;
+        expect(await polarCodeStart(USER, { prompt: "x", pick: { source: "account:someone-else" } })).toEqual({
+            error: "t:code.noSource"
+        });
+        expect(await polarCodeStart(USER, { prompt: "x", pick: { source: 42 } })).toEqual({
+            error: "t:code.noSource"
+        });
+        expect(state.startedWith).toBeNull();
+    });
+
+    it("reads a start sent the old way as the source it meant", async () => {
+        state.held.add("agents.manage");
+        await polarCodeStart(USER, { prompt: "x", cli: "opencode", accountId: PLAN, useMachineLogin: false });
+        expect(state.startedWith).toMatchObject({ cli: "claude", accountId: PLAN });
+    });
+
     it("refuses, in words, somebody who can only read sessions", async () => {
         state.held.add("agents.read");
         expect(await polarCodeStart(USER, {})).toEqual({ error: "t:code.noAccess" });

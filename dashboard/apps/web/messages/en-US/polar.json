@@ -257,7 +257,13 @@
         "noReasoning": "This model has one fixed level",
         "search": "Find a model",
         "noMatch": "No models match",
-        "more": "Show more"
+        "more": "Show more",
+        "recent": "Recent",
+        "order": "Order providers",
+        "orderDone": "Done",
+        "orderFailed": "Couldn't save the order. Try again.",
+        "moveUp": "Move {name} up",
+        "moveDown": "Move {name} down"
     },
     "intelligence": {
         "fast": "Fast",
@@ -1290,6 +1296,33 @@
                 "unreachable": "The session's server could not be reached just now. Try again in a moment.",
                 "slow": "The server on port {port} took too long to answer."
             }
+        },
+        "noSource": "That model isn't available any more. Pick another one.",
+        "sources": {
+            "default": "Default model",
+            "machine": "This machine's sign-in",
+            "provided": "Provided by Polaris",
+            "sharedAccount": "{account}, shared",
+            "claudePlan": "Claude subscription",
+            "anthropicKey": "Anthropic API key",
+            "chatgptPlan": "ChatGPT plan",
+            "openaiKey": "OpenAI API key",
+            "copilotPlan": "Copilot plan",
+            "githubToken": "GitHub token",
+            "googleAccount": "Google account",
+            "geminiKey": "Gemini API key",
+            "cursorKey": "Cursor API key",
+            "ampKey": "Amp API key",
+            "factoryKey": "Factory API key",
+            "otherKey": "API key",
+            "otherPlan": "Subscription"
+        },
+        "persona": {
+            "label": "Agent",
+            "named": "Agent: {name}",
+            "search": "Find an agent",
+            "noMatch": "No agents match",
+            "clear": "Stop using this agent"
         }
     },
     "compare": {

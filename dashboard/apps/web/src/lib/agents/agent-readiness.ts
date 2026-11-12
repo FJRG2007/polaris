@@ -206,6 +206,9 @@ export interface AgentOption {
     /** True for a provider's API key (billed per use) rather than the tool's
      *  own sign-in, so the picker can say which of the two it is. */
     readonly apiKey: boolean;
+    /** The credential the account or key signs in with; null for the
+     *  machine's own login and for a tool with nothing linked. */
+    readonly env: string | null;
     readonly missing: AgentChoice["missing"];
 }
 
@@ -244,6 +247,7 @@ export async function agentOptionsFor(userId: string | null): Promise<AgentOptio
                 mine: null,
                 machine: true,
                 apiKey: false,
+                env: null,
                 missing: []
             });
         }
@@ -262,6 +266,7 @@ export async function agentOptionsFor(userId: string | null): Promise<AgentOptio
                 mine: null,
                 machine: false,
                 apiKey: false,
+                env: null,
                 missing: choice.missing
             });
         }
@@ -280,6 +285,7 @@ export async function agentOptionsFor(userId: string | null): Promise<AgentOptio
                 mine: account.source === "own",
                 machine: false,
                 apiKey: false,
+                env: account.env,
                 missing: []
             });
         }
@@ -299,6 +305,7 @@ export async function agentOptionsFor(userId: string | null): Promise<AgentOptio
                 mine: key.source === "own",
                 machine: false,
                 apiKey: true,
+                env: key.env,
                 missing: []
             });
         }

@@ -13,10 +13,7 @@ import {
     polarTurnChoices,
     type AgentModel
 } from "@/lib/polar/agents/shared";
-import { storedAgentKey } from "@/components/polar/polar-code";
 import { automaticChoice, type ModelChoice } from "@/lib/polar/shared";
-import type { ComposerAgent } from "@/lib/polar/agents/composer-agents";
-import { defaultAccountPick, toolModels } from "@/components/polar/code-agent-pickers";
 
 const pick = (provider: string, model: string): ModelChoice => ({
     kind: "language",
@@ -140,74 +137,6 @@ describe("a coding tool told its model", () => {
                 modelChoice: { provider: "openai", model: "gpt x" }
             }).success
         ).toBe(false);
-    });
-});
-
-const AGENT: ComposerAgent = {
-    key: "tool:claude",
-    kind: "tool",
-    id: null,
-    name: "Claude Code",
-    description: "",
-    engine: "claude",
-    modelSource: "own",
-    accounts: [
-        {
-            key: "claude:a",
-            kind: "subscription",
-            label: "a@example.com",
-            accountId: "a",
-            machine: false,
-            mine: true,
-            readiness: "missing"
-        },
-        {
-            key: "claude:machine",
-            kind: "machine",
-            label: null,
-            accountId: null,
-            machine: true,
-            mine: null,
-            readiness: "ready"
-        }
-    ],
-    models: listed(["anthropic", "opus"]),
-    modelPolicy: "preferred",
-    catalogue: [
-        { provider: "anthropic", model: "sonnet", name: "Sonnet" },
-        { provider: "anthropic", model: "opus", name: "Opus" }
-    ],
-    readiness: "ready"
-};
-
-describe("the composer's model picker for a tool", () => {
-    it("offers the agent's list first, and only it when the agent keeps to it", () => {
-        expect(toolModels(AGENT).map((model) => model.model)).toEqual(["opus", "sonnet"]);
-        expect(toolModels({ ...AGENT, modelPolicy: "required" }).map((model) => model.name)).toEqual([
-            "Opus"
-        ]);
-        expect(toolModels({ ...AGENT, models: [] }).map((model) => model.model)).toEqual([
-            "sonnet",
-            "opus"
-        ]);
-    });
-
-    it("opens on the preferred model, on the first account that is signed in", () => {
-        expect(defaultAccountPick(AGENT)).toEqual({ account: "claude:machine", model: "opus" });
-        expect(defaultAccountPick({ ...AGENT, models: [] })).toEqual({
-            account: "claude:machine",
-            model: null
-        });
-        expect(defaultAccountPick({ ...AGENT, accounts: [] })).toBeNull();
-    });
-
-    it("opens a pick kept before agents were one row each on its tool", () => {
-        expect(storedAgentKey("claude")).toBe("tool:claude");
-        expect(storedAgentKey("claude:0190c6a0-0000-7000-8000-0000000000a1")).toBe("tool:claude");
-        expect(storedAgentKey("tool:codex")).toBe("tool:codex");
-        expect(storedAgentKey("agent:abc")).toBe("agent:abc");
-        expect(storedAgentKey("polar")).toBe("polar");
-        expect(storedAgentKey("")).toBe("");
     });
 });
 

@@ -13,6 +13,7 @@
  */
 
 import Link from "next/link";
+import { settingsSection } from "@/lib/polar/settings-path";
 import { AgentLogo } from "@/components/logos";
 import type { PolarCodeChoices } from "@/lib/polar/code";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
@@ -1003,6 +1004,85 @@ export function CodeSkillChip({
             {skill ? (
                 <ChipClear label={t("code.skill.clear")} onClear={() => onSkill(null)} />
             ) : null}
+        </span>
+    );
+}
+
+/** One of the person's own agents, as the chip offers it. */
+export interface CodePersonaOption {
+    readonly id: string;
+    readonly name: string;
+    readonly description: string;
+}
+
+/** "Agent: <name>": the person's own agent whose instructions lead the task,
+ *  over whatever model is picked. */
+export function CodePersonaChip({
+    personas,
+    persona,
+    onPersona,
+    disabled
+}: {
+    personas: readonly CodePersonaOption[];
+    persona: string | null;
+    onPersona: (id: string | null) => void;
+    disabled: boolean;
+}) {
+    const t = useTranslations("polar");
+    const [query, setQuery] = useState("");
+    const picked = personas.find((option) => option.id === persona) ?? null;
+    const shown = personas.filter((option) =>
+        menuSearchMatches(`${option.name} ${option.description}`, query)
+    );
+    const label = picked ? t("code.persona.named", { name: picked.name }) : t("code.persona.label");
+    return (
+        <span className="flex min-w-0 max-w-full items-center gap-0.5">
+            <DropdownMenu onOpenChange={(next) => (next ? undefined : setQuery(""))}>
+                <DropdownMenuTrigger asChild disabled={disabled}>
+                    <button type="button" aria-label={label} title={label} className={CHIP}>
+                        <Bot className="size-3.5 shrink-0" aria-hidden />
+                        <span className="min-w-0 truncate">{label}</span>
+                        <ChevronDown className="size-3.5 shrink-0" aria-hidden />
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className={CHIP_MENU}>
+                    {personas.length > 6 ? (
+                        <MenuSearch value={query} onChange={setQuery} placeholder={t("code.persona.search")} />
+                    ) : null}
+                    {shown.map((option) => (
+                        <DropdownMenuItem
+                            key={option.id}
+                            onSelect={() => onPersona(option.id)}
+                            className="items-start"
+                        >
+                            <span className="flex min-w-0 flex-col">
+                                <span className="min-w-0 truncate" title={option.name}>
+                                    {option.name}
+                                </span>
+                                {option.description ? (
+                                    <span
+                                        className="line-clamp-2 text-xs text-muted-foreground"
+                                        title={option.description}
+                                    >
+                                        {option.description}
+                                    </span>
+                                ) : null}
+                            </span>
+                            <Mark on={persona === option.id} />
+                        </DropdownMenuItem>
+                    ))}
+                    {shown.length === 0 ? (
+                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                            {t("code.persona.noMatch")}
+                        </p>
+                    ) : null}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                        <Link href={settingsSection("agents")}>{t("code.editAgents")}</Link>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            {picked ? <ChipClear label={t("code.persona.clear")} onClear={() => onPersona(null)} /> : null}
         </span>
     );
 }

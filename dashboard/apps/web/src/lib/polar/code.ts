@@ -29,7 +29,21 @@ import {
 import { agentSkills, listSkills } from "@/lib/polar/skills/store";
 import { agentFor } from "@/lib/polar/agents/store";
 import { agentTaskPrompt } from "@/lib/polar/agents/shared";
-import { composerAgentsFor, type ComposerAgent } from "@/lib/polar/agents/composer-agents";
+import { codeComposerFor, type CodeComposer } from "@/lib/polar/agents/composer-agents";
+import { agentOptionsFor } from "@/lib/agents/agent-readiness";
+import {
+    codePickSchema,
+    codeSourcesFor,
+    isPolarSource,
+    POLAR_KEYS_ENGINE,
+    POLAR_RUNTIME,
+    resolveCodeEngine,
+    sourceForWork,
+    accountSourceKey,
+    machineSourceKey,
+    polarSourceKey,
+    type CodePick
+} from "@/lib/polar/agents/code-sources";
 import { codeStartersSchema, starterPrompt, type StarterSkill } from "@/lib/polar/code-starters";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { userHasManage, type SessionUser } from "@/lib/session";
@@ -258,9 +272,9 @@ export type PolarCodeChoices = Awaited<ReturnType<typeof sessionChoicesAction>> 
     readonly installUrl: string | null;
     /** The person's Polar skills a task can start with, by name. */
     readonly skills: readonly { name: string; description: string }[];
-    /** The agents the composer offers, one row each, with their accounts and
-     *  models (`composer-agents.ts`). */
-    readonly composer: readonly ComposerAgent[];
+    /** The person's sources and their models, and their own agents as
+     *  personas (`composer-agents.ts`). Never a tool's name. */
+    readonly code: CodeComposer;
 };
 
 /** What the composer offers - repositories and agents - or null for somebody
@@ -273,15 +287,17 @@ export async function polarCodeChoices(user: SessionUser): Promise<PolarCodeChoi
         githubAppInstallUrl().catch(() => null),
         listSkills(user.id).catch(() => [])
     ]);
-    const composer = await composerAgentsFor(user.id, choices.agents).catch((error: unknown) => {
-        console.error("polar: could not list the composer's agents", error);
-        return [];
-    });
+    const code = await codeComposerFor(user.id, choices.agents).catch(
+        (error: unknown): CodeComposer => {
+            console.error("polar: could not list the composer's sources", error);
+            return { sources: [], personas: [], polarPolicy: { models: [], modelPolicy: "preferred" } };
+        }
+    );
     return {
         ...choices,
         installUrl,
         skills: skills.map(({ name, description }) => ({ name, description })),
-        composer
+        code
     };
 }
 
@@ -300,7 +316,9 @@ async function promptWithAgent(
     const body = input as { agentId?: unknown; cli?: unknown } | null;
     if (body?.agentId === undefined || body.agentId === null) return null;
     const agent = typeof body.agentId === "string" ? await agentFor(user.id, body.agentId) : null;
-    if (!agent || agent.engine !== body.cli) {
+    // An agent is a persona over whatever model was picked: its instructions
+    // lead the task on any engine.
+    if (!agent) {
         return { error: (await getTranslations("polar"))("code.agentGone") };
     }
     return { prompt: agentTaskPrompt(agent, prompt) };
@@ -430,6 +448,76 @@ export function orderBranches(names: readonly string[], defaultBranch: string | 
 }
 
 /** Start a session: the Agents app's own start, with its own validation. */
+/** A start sent before Code was model-first named the tool and account; it is
+ *  read as the source they meant, and the engine is resolved again. */
+function legacyPick(body: Record<string, unknown>): CodePick | null {
+    const cli = typeof body.cli === "string" ? body.cli : null;
+    if (!cli) return null;
+    const choice = core.sessionModelChoiceSchema.nullable().safeParse(body.modelChoice ?? null);
+    const model = choice.success && choice.data ? choice.data : null;
+    const source =
+        typeof body.accountId === "string"
+            ? accountSourceKey(body.accountId)
+            : body.useMachineLogin === true
+              ? machineSourceKey(cli)
+              : cli === POLAR_KEYS_ENGINE && model
+                ? polarSourceKey(model.provider)
+                : `tool:${cli}`;
+    return { source, provider: model?.provider ?? "", model: model?.model ?? null };
+}
+
+/**
+ * The start body with the engine the pick resolves to, from this person's own
+ * sources - never a tool the client named. An error when the pick is not one
+ * of theirs any more.
+ */
+async function resolvedStart(
+    user: SessionUser,
+    raw: Record<string, unknown>
+): Promise<{ input: Record<string, unknown> } | { error: string }> {
+    const { pick: rawPick, cli: _cli, accountId: _account, useMachineLogin: _machine, modelChoice: _model, ...rest } = raw;
+    let pick: CodePick | null = null;
+    if (rawPick !== undefined && rawPick !== null) {
+        const parsed = codePickSchema.safeParse(rawPick);
+        if (!parsed.success) return { error: (await getTranslations("polar"))("code.noSource") };
+        pick = parsed.data;
+    } else {
+        pick = legacyPick(raw);
+    }
+    // Nothing picked: the start action says what is missing.
+    if (!pick) return { input: raw };
+    const options = await agentOptionsFor(user.id);
+    const sources = codeSourcesFor(options);
+    const offered = new Set(options.map((option) => option.cli));
+    const source = isPolarSource(pick.source)
+        ? {
+              key: pick.source,
+              engines: [POLAR_RUNTIME, POLAR_KEYS_ENGINE].filter(
+                  (engine) => engine === POLAR_RUNTIME || offered.has(engine)
+              ),
+              accountId: null,
+              machine: false,
+              payer: null,
+              polarProvider: pick.source.slice("polar:".length)
+          }
+        : pick.source.startsWith("tool:")
+          ? sourceForWork(sources, pick.source.slice("tool:".length), null)
+          : (sources.find((entry) => entry.key === pick.source) ?? null);
+    const resolved = source
+        ? resolveCodeEngine(source, { provider: pick.provider, model: pick.model }, { needsSession: true })
+        : null;
+    if (!resolved) return { error: (await getTranslations("polar"))("code.noSource") };
+    return {
+        input: {
+            ...rest,
+            cli: resolved.cli,
+            accountId: resolved.accountId,
+            useMachineLogin: resolved.useMachineLogin,
+            modelChoice: resolved.modelChoice
+        }
+    };
+}
+
 export async function polarCodeStart(
     user: SessionUser,
     raw: unknown
@@ -446,7 +534,10 @@ export async function polarCodeStart(
     const asAgent = await promptWithAgent(user, raw, typed);
     if (asAgent && "error" in asAgent) return { error: asAgent.error };
     const prompt = asAgent?.prompt ?? started?.prompt;
-    const { agentId: _agentId, ...rest } = (raw ?? {}) as { agentId?: unknown };
+    const { agentId: _agentId, ...body } = (raw ?? {}) as { agentId?: unknown } & Record<string, unknown>;
+    const resolved = await resolvedStart(user, body);
+    if ("error" in resolved) return { error: resolved.error };
+    const rest = resolved.input;
     const input = prompt !== undefined ? { ...rest, prompt } : rest;
     // A model picked here is Polar's list, so Polar's rule on whose keys this
     // person may spend holds: the deployment's only where the policy says so.

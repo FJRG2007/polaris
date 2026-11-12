@@ -257,7 +257,13 @@
         "noReasoning": "Este modelo tiene un único nivel",
         "search": "Buscar modelo",
         "noMatch": "Sin coincidencias",
-        "more": "Ver más"
+        "more": "Ver más",
+        "recent": "Recientes",
+        "order": "Ordenar proveedores",
+        "orderDone": "Listo",
+        "orderFailed": "No se guardó el orden. Reinténtalo.",
+        "moveUp": "Subir {name}",
+        "moveDown": "Bajar {name}"
     },
     "intelligence": {
         "fast": "Rápido",
@@ -1290,6 +1296,33 @@
                 "unreachable": "No se pudo llegar al servidor de la sesión ahora. Inténtalo en un momento.",
                 "slow": "El servidor del puerto {port} tardó demasiado en responder."
             }
+        },
+        "noSource": "Ese modelo ya no está disponible. Elige otro.",
+        "sources": {
+            "default": "Por defecto",
+            "machine": "Sesión de esta máquina",
+            "provided": "Lo pone Polaris",
+            "sharedAccount": "{account}, compartida",
+            "claudePlan": "Suscripción a Claude",
+            "anthropicKey": "Clave de Anthropic",
+            "chatgptPlan": "Plan de ChatGPT",
+            "openaiKey": "Clave de OpenAI",
+            "copilotPlan": "Plan de Copilot",
+            "githubToken": "Token de GitHub",
+            "googleAccount": "Cuenta de Google",
+            "geminiKey": "Clave de Gemini",
+            "cursorKey": "Clave de Cursor",
+            "ampKey": "Clave de Amp",
+            "factoryKey": "Clave de Factory",
+            "otherKey": "Clave API",
+            "otherPlan": "Suscripción"
+        },
+        "persona": {
+            "label": "Agente",
+            "named": "Agente: {name}",
+            "search": "Buscar un agente",
+            "noMatch": "Sin agentes",
+            "clear": "Dejar este agente"
         }
     },
     "compare": {

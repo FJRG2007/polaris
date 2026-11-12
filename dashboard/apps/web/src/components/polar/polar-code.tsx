@@ -27,14 +27,21 @@ import { fromWire } from "@/lib/app-bundles/wire";
 import { readPoll, sendAction, useUnmountSignal } from "@/lib/poll-fetch";
 import { mergeCodeRows } from "@/lib/polar/code-history";
 import { readStored, writeStored } from "@/lib/polar/stored";
-import { CODE_AGENT_STORAGE_KEY, toolAgentKey } from "@/lib/polar/agents/shared";
-import type { ComposerAgent } from "@/lib/polar/agents/composer-agents";
+import { CODE_AGENT_STORAGE_KEY, customAgentKey } from "@/lib/polar/agents/shared";
+import type { EnginePolicy } from "@/lib/polar/agents/code-sources";
 import {
-    AccountModelPicker,
-    ComposerAgentPicker,
-    defaultAccountPick,
-    type AccountModelPick
-} from "@/components/polar/code-agent-pickers";
+    AUTOMATIC_PICK,
+    CODE_PICK_STORAGE_KEY,
+    isAutomaticPick,
+    migrateStoredAgent,
+    polarSourcesFor,
+    POLAR_RUNTIME,
+    readStoredPick,
+    resolveCodeEngine,
+    type CodePick,
+    type CodeSource
+} from "@/lib/polar/agents/code-sources";
+import { CodeModelPicker } from "@/components/polar/code-model-picker";
 import { CodeView } from "@/components/json-view";
 import { Work } from "@/components/polar/elements/work";
 import { Shimmer } from "@/components/polar/elements/shimmer";
@@ -62,8 +69,6 @@ import { automaticChoice, type ModelChoice } from "@/lib/polar/shared";
 import { usePolarUploads } from "@/components/polar/polar-uploads";
 import { POLAR_ATTACHMENT_MOST, POLAR_ATTACHMENT_TYPES } from "@/lib/polar/shared";
 import {
-    firstModel,
-    ModelSelector,
     type ModelSelectorProvider
 } from "@/components/polar/elements/model-selector";
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
@@ -72,13 +77,13 @@ import { estimateTokens } from "@/lib/polar/compaction";
 import {
     CodeIssueChip,
     CodeSkillChip,
+    CodePersonaChip,
     type PickedIssue,
     CodeWhereChip,
     CodeSessionBar,
     NO_REPO,
     PERMISSION_MODE_KEY,
     PermissionModePicker,
-    POLAR_ENGINE,
     readPermissionMode,
     readRepo,
     useRepoName
@@ -136,7 +141,8 @@ export interface PolarTask {
 
 const MODE_KEY = "polar.mode";
 const OVERVIEW_KEY = "polar.code.overview.v2";
-/** The agent this browser last started a task with. */
+/** The persona picked last ("agent:<id>"), or a pick kept before Code was
+ *  model-first, migrated on the first load (`migrateStoredAgent`). */
 const AGENT_KEY = CODE_AGENT_STORAGE_KEY;
 /** The repository picked last, "No repository" included, for the next visit. */
 const REPO_KEY = "polar.code.repo";
@@ -412,14 +418,6 @@ export function PolarModeSwitch({ code }: { code: PolarCodeState }) {
     );
 }
 
-/** The agent a stored pick opens on. One kept before agents were one row
- *  each named the tool and its account ("claude:<account>"), and opens on
- *  that tool. */
-export function storedAgentKey(stored: string): string {
-    if (!stored || stored === POLAR_ENGINE || /^(tool|agent):/.test(stored)) return stored;
-    return toolAgentKey(stored.split(":")[0] ?? stored);
-}
-
 /** What a new task offers - repositories and agents - read once Code may start
  *  one, and again on a refresh (after adding repositories on GitHub). */
 function useCodeChoices(canStart: boolean) {
@@ -432,7 +430,8 @@ function useCodeChoices(canStart: boolean) {
     useEffect(() => {
         picked.current = repoId;
     }, [repoId]);
-    const [agentKey, setAgentKey] = useState("");
+    const [pick, setPick] = useState<CodePick | null>(null);
+    const [persona, setPersona] = useState<string | null>(null);
 
     const load = useCallback(() => {
         setRefreshing(true);
@@ -460,14 +459,21 @@ function useCodeChoices(canStart: boolean) {
                             );
                         })
                         .catch(() => setRepoId((now) => now || fallback));
-                // The one picked last; else Polar, which needs nothing started
-                // and so answers at once.
-                const known = (key: string) =>
-                    key === POLAR_ENGINE || (loaded.composer ?? []).some((agent) => agent.key === key);
-                const remembered = storedAgentKey(readStored(AGENT_KEY) ?? "");
-                setAgentKey((current) =>
-                    known(current) ? current : known(remembered) ? remembered : POLAR_ENGINE
+                // The pick kept last; one kept as an agent before Code was
+                // model-first maps to its source; else Automatic, which needs
+                // nothing started. A persona opened from the agent settings
+                // ("New task") brings its own pick.
+                const legacy = readStored(AGENT_KEY) ?? "";
+                const stored = readStoredPick(readStored(CODE_PICK_STORAGE_KEY));
+                const migrated = migrateStoredAgent(legacy, loaded.code?.sources ?? [], loaded.code?.personas ?? []);
+                const opened = legacy.startsWith("agent:") ? migrated : null;
+                setPersona((current) => current ?? opened?.persona ?? null);
+                setPick(
+                    (current) => current ?? opened?.pick ?? stored ?? migrated.pick ?? AUTOMATIC_PICK
                 );
+                if (!stored && migrated.pick) {
+                    writeStored(CODE_PICK_STORAGE_KEY, JSON.stringify(migrated.pick));
+                }
             })
             .finally(() => setRefreshing(false));
     }, []);
@@ -476,9 +482,13 @@ function useCodeChoices(canStart: boolean) {
         if (canStart) load();
     }, [canStart, load]);
 
-    const pickAgent = useCallback((key: string) => {
-        setAgentKey(key);
-        writeStored(AGENT_KEY, key);
+    const choosePick = useCallback((next: CodePick) => {
+        setPick(next);
+        writeStored(CODE_PICK_STORAGE_KEY, JSON.stringify(next));
+    }, []);
+    const choosePersona = useCallback((id: string | null) => {
+        setPersona(id);
+        writeStored(AGENT_KEY, id ? customAgentKey(id) : POLAR_RUNTIME);
     }, []);
 
     const pickRepo = useCallback((id: string) => {
@@ -493,8 +503,10 @@ function useCodeChoices(canStart: boolean) {
         load,
         repoId,
         setRepoId: pickRepo,
-        agentKey,
-        setAgentKey: pickAgent
+        pick,
+        setPick: choosePick,
+        persona,
+        setPersona: choosePersona
     };
 }
 
@@ -566,8 +578,10 @@ export function PolarCodeView({
             refreshing={picks.refreshing}
             baseRef={baseRef}
             onBaseRef={setBaseRef}
-            agentKey={picks.agentKey}
-            onAgent={picks.setAgentKey}
+            pick={picks.pick}
+            onPick={picks.setPick}
+            persona={picks.persona}
+            onPersona={picks.setPersona}
             voiceKit={voiceKit}
             providers={providers}
             onStarted={started}
@@ -644,24 +658,19 @@ function useCodeComposerParts(busy: boolean) {
     };
 }
 
-/** The model index provider a tool with a model of its own runs. */
-function toolProvider(agent: ComposerAgent): string {
-    return core.agentCliById(agent.engine)?.model?.provider ?? agent.engine;
-}
-
-/** Chat's providers, kept to the agent's own list when it must keep to it. */
+/** Chat's providers, kept to Polar's own list when it must keep to it. */
 function narrowProviders(
     providers: ModelSelectorProvider[] | null,
-    agent: ComposerAgent
+    policy: EnginePolicy | null
 ): ModelSelectorProvider[] | null {
-    if (!providers || agent.modelPolicy !== "required" || agent.models.length === 0) {
+    if (!providers || !policy || policy.modelPolicy !== "required" || policy.models.length === 0) {
         return providers;
     }
     return providers
         .map((provider) => ({
             ...provider,
             models: provider.models.filter((model) =>
-                agent.models.some(
+                policy.models.some(
                     (entry) => entry.provider === model.provider && entry.model === model.model
                 )
             )
@@ -669,21 +678,7 @@ function narrowProviders(
         .filter((provider) => provider.models.length > 0);
 }
 
-/** The agent's preferred model, for one that runs on Polar's keys. */
-function listedChoice(agent: ComposerAgent): ModelChoice | null {
-    const first = agent.modelSource === "polar" ? agent.models[0] : undefined;
-    return first
-        ? {
-              kind: "language",
-              provider: first.provider,
-              model: first.model,
-              intelligence: "balanced",
-              payer: null
-          }
-        : null;
-}
-
-/** A new task: Chat's composer, with the agent where Chat has its model. */
+/** A new task: Chat's composer, with one model picker where Chat has its own. */
 function CodeStart({
     canStart,
     pending,
@@ -695,8 +690,10 @@ function CodeStart({
     refreshing,
     baseRef,
     onBaseRef,
-    agentKey,
-    onAgent,
+    pick: picked,
+    onPick,
+    persona: personaId,
+    onPersona,
     voiceKit,
     providers,
     onStarted,
@@ -712,8 +709,10 @@ function CodeStart({
     refreshing: boolean;
     baseRef: string;
     onBaseRef: (branch: string) => void;
-    agentKey: string;
-    onAgent: (key: string) => void;
+    pick: CodePick | null;
+    onPick: (pick: CodePick) => void;
+    persona: string | null;
+    onPersona: (id: string | null) => void;
     voiceKit: PolarVoiceKit;
     /** Chat's own list of providers and models, for an agent that takes one. */
     providers: ModelSelectorProvider[] | null;
@@ -727,7 +726,6 @@ function CodeStart({
     const [gap, setGap] = useState<GithubAppGap | null>(null);
     const [busy, startTransition] = useTransition();
     const parts = useCodeComposerParts(busy);
-    const [picked, setPicked] = useState<ModelChoice | null>(null);
     // Full access until the stored pick is read: the server render has no storage.
     const [mode, setMode] = useState<core.SessionPermissionMode>("full");
     useEffect(() => setMode(readPermissionMode(readStored(PERMISSION_MODE_KEY))), []);
@@ -747,60 +745,67 @@ function CodeStart({
     // Again after a send: the next session gets a spare of its own.
     useSpareWarmup(sent === null);
 
-    // Polar itself, on the chat's models: nothing to start, so it answers at once.
-    const polar = agentKey === POLAR_ENGINE;
-    const agent: ComposerAgent | null =
-        choices?.composer?.find((entry) => entry.key === agentKey) ?? null;
-    // The coding tool that does the work, for every agent but Polar.
-    const tool = agent && agent.kind !== "polar" ? agent : null;
+    // The sources: the person's accounts and keys from the server, and Polar's
+    // own keys from the chat's list (an API key already listed is not twice).
     const workspace = repoId === NO_REPO;
-    // A tool that takes its model from Polaris signs in with that provider's
-    // key, so its own sign-in does not matter.
-    const takesModel = tool !== null && tool.modelSource === "polar";
-    // Any other signs in with an account, and may be told the model to run.
-    const onAccount = tool !== null && !takesModel;
-    // Only a tool whose questions are answered from here is given a mode.
-    const asksMode = tool !== null && core.takesPermissionMode(tool.engine);
-    // A pick belongs to the agent it was made on; another agent opens on its own.
-    const [pickedFor, setPickedFor] = useState<string | null>(null);
-    const [accountPick, setAccountPick] = useState<AccountModelPick | null>(null);
-    const ownPick = pickedFor === agentKey ? picked : null;
-    const pick =
-        onAccount && tool
-            ? ((pickedFor === agentKey ? accountPick : null) ?? defaultAccountPick(tool))
-            : null;
-    const account = tool?.accounts.find((entry) => entry.key === pick?.account) ?? null;
-    const chooseModel = (next: ModelChoice) => {
-        setPickedFor(agentKey);
-        setPicked(next);
-    };
-    const chooseAccount = (next: AccountModelPick) => {
-        setPickedFor(agentKey);
-        setAccountPick(next);
-    };
-    // The models an agent on Polar's keys offers: its own list when it must
-    // keep to it, everything otherwise.
-    const offered = agent ? narrowProviders(providers, agent) : providers;
-    const preferred = agent ? listedChoice(agent) : null;
-    // Polar starts on the agent's first model, else Automatic, as Chat does:
-    // the first model listed may be one the key has no credit for. A tool on
-    // Polar's keys needs a model of its own.
-    const model = polar
-        ? (ownPick ?? preferred ?? automaticChoice())
-        : takesModel
-          ? (ownPick ?? preferred ?? firstModel(offered))
+    const polarSources = useMemo(
+        () =>
+            polarSourcesFor(
+                narrowProviders(providers, choices?.code?.polarPolicy ?? null) ?? [],
+                choices?.code?.sources ?? []
+            ),
+        [providers, choices]
+    );
+    const sources: CodeSource[] | null = choices
+        ? [...(choices.code?.sources ?? []), ...polarSources]
+        : null;
+    const persona = choices?.code?.personas.find((entry) => entry.id === personaId) ?? null;
+    const current = picked ?? AUTOMATIC_PICK;
+    const auto = isAutomaticPick(current);
+    const source = auto ? null : (sources?.find((entry) => entry.key === current.source) ?? null);
+    // A session is needed for anything Polar's chat cannot take: an issue, a
+    // skill, files, or one of the person's agents.
+    const needsSession =
+        issue !== null || skill !== null || persona !== null || parts.uploads.ids.length > 0;
+    // Automatic with a session runs on the first model of Polar's keys.
+    const first = auto && needsSession ? (polarSources[0] ?? null) : null;
+    const runOn = source ?? first;
+    const runModel = source
+        ? { provider: current.provider, model: current.model }
+        : first
+          ? { provider: first.models[0]?.provider ?? "", model: first.models[0]?.model ?? null }
           : null;
+    const resolved = runOn
+        ? resolveCodeEngine(runOn, runModel, { needsSession })
+        : auto && sources !== null && polarSources.length > 0
+          ? { cli: POLAR_RUNTIME, accountId: null, useMachineLogin: false, modelChoice: null }
+          : null;
+    const polar = resolved?.cli === POLAR_RUNTIME;
+    const tool = resolved && !polar ? resolved.cli : null;
+    // Only a tool whose questions are answered from here is given a mode.
+    const asksMode = tool !== null && core.takesPermissionMode(tool);
+    const model: ModelChoice | null = polar
+        ? auto
+            ? automaticChoice()
+            : runOn && runModel?.model
+              ? {
+                    kind: "language",
+                    provider: runOn.polarProvider ?? runModel.provider,
+                    model: runModel.model,
+                    intelligence: "balanced",
+                    payer: runOn.payer
+                }
+              : null
+        : null;
     const fetchedName = useRepoName(repoId, choices?.repos ?? []);
     const repoName = choices?.repos.find((repo) => repo.id === repoId)?.name ?? fetchedName;
-    const unlinked =
-        onAccount && tool && (account?.readiness ?? tool.readiness) === "missing" ? tool : null;
-    const noModel = (takesModel || polar) && model === null && providers !== null;
+    const noModel = choices !== null && providers !== null && resolved === null;
     const ready =
         canStart &&
         choices !== null &&
-        (tool !== null || (polar && (workspace || repoName !== null))) &&
-        !unlinked &&
-        (!(takesModel || polar) || model !== null) &&
+        resolved !== null &&
+        (!polar || model !== null) &&
+        (!polar || workspace || repoName !== null) &&
         !parts.uploads.uploading &&
         !parts.uploads.failed &&
         // An agent can start from the issue alone; Polar answers words.
@@ -818,7 +823,7 @@ function CodeStart({
             });
             return;
         }
-        if (!tool) return;
+        if (!tool || !runOn) return;
         setError(null);
         setGap(null);
         const text = prompt.trim();
@@ -841,17 +846,16 @@ function CodeStart({
                             title: titleFromPrompt(
                                 text || (issue ? `#${issue.number} ${issue.title}` : "")
                             ),
-                            cli: tool.engine,
-                            accountId: takesModel ? null : (account?.accountId ?? null),
-                            useMachineLogin: takesModel ? false : (account?.machine ?? false),
-                            modelChoice: model
-                                ? { provider: model.provider, model: model.model, payer: model.payer }
-                                : tool.modelSource === "own" && pick?.model
-                                  ? { provider: toolProvider(tool), model: pick.model, payer: null }
-                                  : null,
+                            // The source and model; the server resolves the
+                            // engine again from this person's own sources.
+                            pick: {
+                                source: runOn.key,
+                                provider: runModel?.provider ?? "",
+                                model: runModel?.model ?? null
+                            },
                             // One of the person's own agents: its instructions
                             // lead the task (`polarCodeStart`).
-                            agentId: tool.kind === "custom" ? tool.id : null,
+                            agentId: persona?.id ?? null,
                             attachments: parts.uploads.ids,
                             place: "local",
                             sharedHome: false,
@@ -918,32 +922,17 @@ function CodeStart({
                 picker={
                     canStart ? (
                         <>
-                            <ComposerAgentPicker
-                                agents={choices?.composer ?? null}
-                                value={agentKey}
-                                onChange={onAgent}
+                            <CodeModelPicker
+                                sources={sources}
+                                value={current}
+                                onChange={onPick}
+                                automatic={polarSources.length > 0}
                                 disabled={busy}
                             />
                             {asksMode ? (
                                 <PermissionModePicker
                                     value={mode}
                                     onChange={chooseMode}
-                                    disabled={busy}
-                                />
-                            ) : null}
-                            {takesModel || polar ? (
-                                <ModelSelector
-                                    providers={offered ?? []}
-                                    choice={model}
-                                    onChoice={chooseModel}
-                                    // Automatic could land outside a list the agent keeps to.
-                                    forCode={!polar || agent?.modelPolicy === "required"}
-                                />
-                            ) : onAccount && tool ? (
-                                <AccountModelPicker
-                                    agent={tool}
-                                    value={pick}
-                                    onChange={chooseAccount}
                                     disabled={busy}
                                 />
                             ) : null}
@@ -972,7 +961,7 @@ function CodeStart({
                         onBranch={onBaseRef}
                         disabled={busy}
                     />
-                    {!polar && repoId && repoId !== NO_REPO ? (
+                    {repoId && repoId !== NO_REPO ? (
                         <CodeIssueChip
                             repoId={repoId}
                             issue={issue}
@@ -980,11 +969,22 @@ function CodeStart({
                             disabled={busy}
                         />
                     ) : null}
-                    {!polar ? (
-                        <CodeSkillChip
-                            skills={choices?.skills ?? []}
-                            skill={skill}
-                            onSkill={setSkill}
+                    <CodeSkillChip
+                        skills={choices?.skills ?? []}
+                        skill={skill}
+                        onSkill={setSkill}
+                        disabled={busy}
+                    />
+                    {(choices?.code?.personas.length ?? 0) > 0 ? (
+                        <CodePersonaChip
+                            personas={choices?.code?.personas ?? []}
+                            persona={persona?.id ?? null}
+                            onPersona={(id) => {
+                                onPersona(id);
+                                // An agent set up on a model opens on it.
+                                const chosen = choices?.code?.personas.find((entry) => entry.id === id);
+                                if (chosen?.pick) onPick(chosen.pick);
+                            }}
                             disabled={busy}
                         />
                     ) : null}
@@ -996,14 +996,6 @@ function CodeStart({
                     {t("code.noModel")}{" "}
                     <Link href="/account/ai-keys" className="text-primary hover:underline">
                         {t("code.addKey")}
-                    </Link>
-                </Notice>
-            ) : null}
-            {unlinked ? (
-                <Notice>
-                    {t("code.signIn", { agent: unlinked.name })}{" "}
-                    <Link href="/account/ai-keys" className="text-primary hover:underline">
-                        {t("code.openSettings")}
                     </Link>
                 </Notice>
             ) : null}

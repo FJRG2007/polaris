@@ -16400,6 +16400,9 @@ model PolarPreference {
     // list, whether a pinned model falls back, and the model each Claude tier
     // of a coding tool lands on. Null is the deployment's default.
     routing        Json?
+    // The order the model picker lists providers and sources in, as their
+    // keys (`polar:<provider>`, `account:<id>`, ...). Unlisted ones follow.
+    sourceOrder    String[] @default([])
     updatedAt      DateTime @updatedAt
 }
 

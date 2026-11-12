@@ -19,7 +19,7 @@
 
 import Fuse from "fuse.js";
 import Link from "next/link";
-import { Check, Shuffle } from "lucide-react";
+import { ArrowDownUp, Check, History, Shuffle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { IntegrationLogo } from "@/components/logos";
 import {
@@ -32,6 +32,9 @@ import {
     MenuSearch
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { applyOrder, polarSourceKey } from "@/lib/polar/picker-order";
+import { usePickerPrefs } from "@/components/polar/elements/use-picker-prefs";
+import { SourceOrderList } from "@/components/polar/elements/source-order";
 import {
     automaticChoice,
     INTELLIGENCE_LEVELS,
@@ -134,7 +137,7 @@ export function firstModels<T extends { models: readonly unknown[] }>(
 
 /** The foot of the list: draws the next page once it comes near the view, and
  *  stays an item for whoever moves with the keyboard. */
-function MoreModels({ onMore, label }: { onMore: () => void; label: string }) {
+export function MoreModels({ onMore, label }: { onMore: () => void; label: string }) {
     const ref = useRef<HTMLDivElement | null>(null);
     const latest = useRef(onMore);
     latest.current = onMore;
@@ -177,7 +180,7 @@ function Mark({ on }: { on: boolean }) {
 }
 
 export function ModelSelector({
-    providers,
+    providers: given,
     choice,
     onChoice,
     open,
@@ -206,6 +209,24 @@ export function ModelSelector({
     triggerContent?: ReactNode;
 }) {
     const t = useTranslations("polar");
+    const { prefs, setOrder } = usePickerPrefs();
+    const [ordering, setOrdering] = useState(false);
+    // The person's own order, in the list and in the search results alike.
+    const providers = useMemo(
+        () => applyOrder(given, (entry) => polarSourceKey(entry.provider), prefs.order),
+        [given, prefs.order]
+    );
+    const recent = useMemo(
+        () =>
+            prefs.recent.flatMap((pick) => {
+                const owner = providers.find(
+                    (entry) => polarSourceKey(entry.provider) === pick.source
+                );
+                const found = owner?.models.find((model) => model.model === pick.model);
+                return owner && found ? [{ owner, model: found }] : [];
+            }),
+        [prefs.recent, providers]
+    );
     const provider = providers.find((entry) => entry.provider === choice?.provider);
     const model = provider?.models.find((entry) => entry.model === choice?.model);
     const automatic = isAutomatic(choice);
@@ -225,6 +246,7 @@ export function ModelSelector({
             onOpenChange={(next) => {
                 if (!next) {
                     setQuery("");
+                    setOrdering(false);
                     setLimit(MODELS_PAGE);
                 }
                 onOpenChange?.(next);
@@ -265,19 +287,76 @@ export function ModelSelector({
                     setQuery("");
                 }}
             >
-                {providers.length > 0 ? (
+                {ordering ? (
+                    <>
+                        <DropdownMenuLabel>{t("picker.order")}</DropdownMenuLabel>
+                        <SourceOrderList
+                            entries={providers.map((entry) => ({
+                                key: polarSourceKey(entry.provider),
+                                name: entry.name,
+                                icon: (
+                                    <IntegrationLogo
+                                        slug={entry.provider}
+                                        className="size-3.5 shrink-0"
+                                    />
+                                )
+                            }))}
+                            order={prefs.order}
+                            onOrder={setOrder}
+                        />
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            onSelect={(event) => {
+                                event.preventDefault();
+                                setOrdering(false);
+                            }}
+                        >
+                            {t("picker.orderDone")}
+                        </DropdownMenuItem>
+                    </>
+                ) : null}
+                {!ordering && providers.length > 0 ? (
                     <MenuSearch
                         value={query}
                         onChange={setQuery}
                         placeholder={t("picker.search")}
                     />
                 ) : null}
-                {searching && found.length === 0 ? (
+                {!ordering && !searching && recent.length > 0 ? (
+                    <>
+                        <DropdownMenuLabel className="flex items-center gap-1.5">
+                            <History className="size-3.5 shrink-0" aria-hidden />
+                            {t("picker.recent")}
+                        </DropdownMenuLabel>
+                        {recent.map(({ owner, model: option }) => (
+                            <DropdownMenuItem
+                                key={`recent-${owner.provider}-${option.model}`}
+                                onSelect={() =>
+                                    onChoice({
+                                        kind: "language",
+                                        provider: option.provider,
+                                        model: option.model,
+                                        intelligence: choice?.intelligence ?? "balanced",
+                                        payer: null
+                                    })
+                                }
+                            >
+                                <IntegrationLogo slug={owner.provider} className="size-3.5 shrink-0" />
+                                <span className="min-w-0 truncate" title={`${option.name} - ${owner.name}`}>
+                                    {option.name}
+                                </span>
+                                <span className="shrink-0 text-xs text-muted-foreground">{owner.name}</span>
+                            </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuSeparator />
+                    </>
+                ) : null}
+                {!ordering && searching && found.length === 0 ? (
                     <p className="px-2 py-3 text-center text-xs text-muted-foreground">
                         {t("picker.noMatch")}
                     </p>
                 ) : null}
-                {providers.length > 0 && !searching && !forCode ? (
+                {!ordering && providers.length > 0 && !searching && !forCode ? (
                     <>
                         <DropdownMenuItem
                             onSelect={() => onChoice(automaticChoice(choice?.intelligence))}
@@ -295,7 +374,7 @@ export function ModelSelector({
                         <DropdownMenuSeparator />
                     </>
                 ) : null}
-                {shown.map((entry) => (
+                {(ordering ? [] : shown).map((entry) => (
                     <div key={entry.provider}>
                         <DropdownMenuLabel className="flex min-w-0 items-center gap-1.5">
                             <IntegrationLogo slug={entry.provider} className="size-3.5 shrink-0" />
@@ -331,13 +410,13 @@ export function ModelSelector({
                         ))}
                     </div>
                 ))}
-                {more ? (
+                {more && !ordering ? (
                     <MoreModels
                         onMore={() => setLimit((current) => current + MODELS_PAGE)}
                         label={t("picker.more")}
                     />
                 ) : null}
-                {choice && !searching ? (
+                {choice && !searching && !ordering ? (
                     <>
                         <DropdownMenuSeparator />
                         {forCode ? null : (
@@ -376,9 +455,20 @@ export function ModelSelector({
                         )}
                     </>
                 ) : null}
-                {searching ? null : (
+                {searching || ordering ? null : (
                     <>
                         <DropdownMenuSeparator />
+                        {providers.length > 1 ? (
+                            <DropdownMenuItem
+                                onSelect={(event) => {
+                                    event.preventDefault();
+                                    setOrdering(true);
+                                }}
+                            >
+                                <ArrowDownUp className="size-3.5 shrink-0" aria-hidden />
+                                {t("picker.order")}
+                            </DropdownMenuItem>
+                        ) : null}
                         <DropdownMenuItem asChild>
                             <Link href="/account/ai-keys">{t("picker.manage")}</Link>
                         </DropdownMenuItem>

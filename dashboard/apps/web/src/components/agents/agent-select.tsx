@@ -62,6 +62,7 @@ export const CUSTOM_CHOICE: AgentOption = {
     mine: null,
     machine: false,
     apiKey: false,
+    env: null,
     missing: []
 };
 

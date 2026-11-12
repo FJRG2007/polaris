@@ -1,5 +1,9 @@
 /**
- * The agents Polar's composer offers, one row each, with what the model picker
+ * What Code's composer and the agent settings choose from. The composer is
+ * model-first (`codeComposerFor`, `code-sources.ts`); the settings editor
+ * still sets each engine's account and models (`agentEnginesFor`).
+ *
+ * Originally: the agents Polar's composer offers, one row each, with what the model picker
  * beside it needs: the accounts each can sign in with and the models each may
  * use. The shape every multi-provider composer converged on (VS Code's
  * Copilot, Cursor, Zed, Conductor): the agent first, then the model, the model
@@ -16,12 +20,18 @@ import * as core from "@polaris/core";
 import { listAgents } from "@/lib/polar/agents/store";
 import { latestCatalogModels } from "@/lib/agents/model-catalog";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
+import {
+    codeSourcesFor,
+    polarSourceKey,
+    sourceForWork,
+    type CodePersona,
+    type CodePick,
+    type CodeSource,
+    type EnginePolicy
+} from "@/lib/polar/agents/code-sources";
 import { agentDefaultsFor, blankWork } from "@/lib/polar/agents/defaults";
 import {
-    customAgentKey,
-    MACHINE_ACCOUNT,
     POLAR_ENGINE,
-    toolAgentKey,
     type AgentModel,
     type AgentWork,
     type ModelPolicy
@@ -99,12 +109,6 @@ function modelSourceOf(engine: string): ComposerAgent["modelSource"] {
     return core.agentTakesModel(engine) ? "own" : "none";
 }
 
-function readinessOf(accounts: readonly ComposerAccount[]): core.AgentReadiness {
-    if (accounts.some((entry) => entry.readiness === "ready")) return "ready";
-    if (accounts.some((entry) => entry.readiness === "unknown")) return "unknown";
-    return accounts.length > 0 ? "missing" : "unknown";
-}
-
 /** One engine an agent can run on, with everything it can sign in with and
  *  the models its provider offers. What the settings editor chooses from. */
 export interface AgentEngine {
@@ -161,85 +165,56 @@ export async function agentEnginesFor(options: readonly AgentOption[]): Promise<
     });
 }
 
-/** The tool's sign-ins, narrowed to the one the agent names when it is there. */
-function accountsFor(engine: AgentEngine, account: string | null): readonly ComposerAccount[] {
-    if (!account) return engine.accounts;
-    const picked = engine.accounts.filter((entry) =>
-        account === MACHINE_ACCOUNT ? entry.machine : entry.accountId === account
-    );
-    // An account removed since is not a reason to offer nothing.
-    return picked.length > 0 ? picked : engine.accounts;
+/** What Code's composer offers: the person's sources, their own agents as
+ *  personas, and the list Polar's own keys keep to. */
+export interface CodeComposer {
+    readonly sources: readonly CodeSource[];
+    readonly personas: readonly CodePersona[];
+    readonly polarPolicy: EnginePolicy;
 }
 
-export async function composerAgentsFor(
+export async function codeComposerFor(
     userId: string,
     options: readonly AgentOption[]
-): Promise<ComposerAgent[]> {
-    const [defaults, custom, engines] = await Promise.all([
+): Promise<CodeComposer> {
+    const [defaults, custom, catalogue] = await Promise.all([
         agentDefaultsFor(userId).catch(() => new Map<string, AgentWork>()),
         listAgents(userId).catch(() => []),
-        agentEnginesFor(options)
+        toolCatalogue().catch(() => [])
     ]);
-    const toolAgent = (
-        engine: AgentEngine,
-        work: AgentWork,
-        base: Pick<ComposerAgent, "key" | "kind" | "id" | "name" | "description">
-    ): ComposerAgent => {
-        const accounts = accountsFor(engine, work.account);
-        return {
-            ...base,
-            engine: engine.engine,
-            modelSource: engine.modelSource,
-            accounts,
-            models: work.models,
-            modelPolicy: work.modelPolicy,
-            catalogue: engine.catalogue,
-            readiness: readinessOf(accounts)
-        };
-    };
-
-    const polarWork = defaults.get(POLAR_ENGINE) ?? blankWork(POLAR_ENGINE);
-    const agents: ComposerAgent[] = [
-        {
-            key: POLAR_ENGINE,
-            kind: "polar",
-            id: null,
-            name: "Polar",
-            description: "",
-            engine: POLAR_ENGINE,
-            modelSource: "polar",
-            accounts: [],
-            models: polarWork.models,
-            modelPolicy: polarWork.modelPolicy,
-            catalogue: [],
-            readiness: "ready"
+    const policies = new Map<string, EnginePolicy>(
+        [...defaults.entries()].map(([engine, work]) => [
+            engine,
+            { models: work.models, modelPolicy: work.modelPolicy }
+        ])
+    );
+    const sources = codeSourcesFor(options, catalogue, policies);
+    const personas: CodePersona[] = custom.map((agent) => {
+        const first = agent.models[0];
+        let pick: CodePick | null = null;
+        if (agent.engine === POLAR_ENGINE) {
+            pick = first
+                ? { source: polarSourceKey(first.provider), provider: first.provider, model: first.model }
+                : null;
+        } else {
+            const source = sourceForWork(sources, agent.engine, agent.account);
+            pick = source
+                ? {
+                      source: source.key,
+                      provider: source.models[0]?.provider ?? "",
+                      model:
+                          first && source.models.some((entry) => entry.model === first.model)
+                              ? first.model
+                              : null
+                  }
+                : null;
         }
-    ];
-    for (const engine of engines) {
-        agents.push(
-            toolAgent(engine, defaults.get(engine.engine) ?? blankWork(engine.engine), {
-                key: toolAgentKey(engine.engine),
-                kind: "tool",
-                id: null,
-                name: engine.name,
-                description: ""
-            })
-        );
-    }
-    // The person's own agents that run on a coding tool. One on Polar answers
-    // in Chat, where it was always started.
-    for (const agent of custom) {
-        const engine = engines.find((entry) => entry.engine === agent.engine);
-        if (agent.engine === POLAR_ENGINE || !engine) continue;
-        agents.push(
-            toolAgent(engine, agent, {
-                key: customAgentKey(agent.id),
-                kind: "custom",
-                id: agent.id,
-                name: agent.name,
-                description: agent.description
-            })
-        );
-    }
-    return agents;
+        return { id: agent.id, name: agent.name, description: agent.description, pick };
+    });
+    const polarWork = defaults.get(POLAR_ENGINE) ?? blankWork(POLAR_ENGINE);
+    return {
+        sources,
+        personas,
+        polarPolicy: { models: polarWork.models, modelPolicy: polarWork.modelPolicy }
+    };
 }
