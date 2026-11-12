@@ -94,3 +94,16 @@ describe("the API examples", () => {
         expect(curl!.code).not.toContain("Content-Type");
     });
 });
+
+describe("orderByIndex", () => {
+    it("follows the index's links, then lists the rest alphabetically", async () => {
+        const { orderByIndex } = await import("../../src/data/docs");
+        const index = "See [`mcp.md`](mcp.md), then [`analytics.md`](analytics.md) and [x](./mcp.md).";
+        expect(orderByIndex(["telemetry.md", "analytics.md", "zeta.md", "mcp.md"], index)).toEqual([
+            "mcp.md",
+            "analytics.md",
+            "telemetry.md",
+            "zeta.md"
+        ]);
+    });
+});

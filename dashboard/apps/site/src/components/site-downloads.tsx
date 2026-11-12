@@ -13,6 +13,7 @@
 import type { ReactNode } from "react";
 import type { DownloadsData } from "@/data/builders";
 import { EXAMPLE_ORIGIN } from "@/lib/example-origin";
+import { useReaderOrigin } from "@/components/example-host";
 import { SiteTvChecker, SiteTvGallery } from "@/components/site-tv-checker";
 import type { Locale, Namespaces } from "@polaris/core";
 import { I18nContext } from "@polaris/ui/i18n";
@@ -48,6 +49,7 @@ export function SiteDownloads({
     data: DownloadsData;
 }) {
     const { files } = data;
+    const origin = useReaderOrigin() ?? EXAMPLE_ORIGIN;
     return (
         <Messages
             locale={locale === "es" ? "es-ES" : "en-US"}
@@ -56,11 +58,11 @@ export function SiteDownloads({
             <AppHrefProvider value={nowhere}>
                 <DownloadsPage
                     repo={repo}
-                    serverUrl={EXAMPLE_ORIGIN}
+                    serverUrl={origin}
                     extensionFiles={<ExtensionFilesOffer download={files.extension} />}
                     deck={
                         <DeckCard
-                            address={EXAMPLE_ORIGIN}
+                            address={origin}
                             repo={repo}
                             storeUrl={data.storeUrl}
                             pluginFile={

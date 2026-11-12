@@ -190,6 +190,18 @@ export function arrangeSections(
     return out;
 }
 
+/**
+ * Guide files in the order an index page links them (`[mcp.md](mcp.md)`), then
+ * any it does not link, alphabetically - so a new guide is listed without
+ * editing a list, and the index decides where it sits once it links it.
+ */
+export function orderByIndex(files: readonly string[], index: string): string[] {
+    const linked: string[] = [];
+    for (const match of index.matchAll(/\]\((?:\.\/)?([a-z0-9-]+\.md)\)/g))
+        if (files.includes(match[1]!) && !linked.includes(match[1]!)) linked.push(match[1]!);
+    return [...linked, ...files.filter((file) => !linked.includes(file)).sort()];
+}
+
 /** The pages before and after one, across section boundaries. */
 export function docNeighbors(
     sections: readonly DocSection[],

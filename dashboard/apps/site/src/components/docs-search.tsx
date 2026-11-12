@@ -370,7 +370,11 @@ export function DocsSearch({
                                                     />
                                                 </span>
                                                 {row.record.text ? (
-                                                    <span className="line-clamp-2 text-xs text-muted-foreground">
+                                                    // One line under the title, as Polaris's own search draws a result.
+                                                    <span
+                                                        className="block truncate text-xs text-muted-foreground"
+                                                        title={snippet(row.record.text, terms)}
+                                                    >
                                                         <SearchHighlight
                                                             text={snippet(row.record.text, terms)}
                                                             terms={terms}

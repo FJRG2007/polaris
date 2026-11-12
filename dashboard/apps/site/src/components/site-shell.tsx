@@ -1,6 +1,6 @@
 /**
  * The frame of every page: the document, the bar with the four pages and the
- * other language, and the footer pointing at the repository.
+ * language picker, and the footer pointing at the repository.
  */
 
 import "../app/globals.css";
@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import type { SiteLocale } from "@/data/builders";
 import { href, siteData, words } from "@/lib/site";
 import { NavLink } from "@/components/nav-link";
+import { LanguagePicker } from "@/components/language-picker";
 
 const PAGES = [
     { key: "home", page: "" },
@@ -21,7 +22,6 @@ const PAGES = [
 export function SiteShell({ locale, children }: { locale: SiteLocale; children: ReactNode }) {
     const t = words(locale);
     const { repo } = siteData();
-    const other: SiteLocale = locale === "en" ? "es" : "en";
     return (
         // "system": the dashboard's theme class that follows the reader's machine.
         <html lang={locale} className="system">
@@ -55,13 +55,12 @@ export function SiteShell({ locale, children }: { locale: SiteLocale; children: 
                             ))}
                         </div>
                         <span className="flex-1" />
-                        <Link
-                            href={href(other)}
-                            hrefLang={other}
-                            className="shrink-0 px-2.5 py-1.5 text-muted-foreground hover:text-foreground"
-                        >
-                            {t.nav.language}
-                        </Link>
+                        <LanguagePicker
+                            locale={locale}
+                            label={t.nav.language}
+                            search={t.nav.languageSearch}
+                            empty={t.nav.languageEmpty}
+                        />
                         <a
                             href={`https://github.com/${repo}`}
                             className="shrink-0 px-2.5 py-1.5 text-muted-foreground hover:text-foreground"

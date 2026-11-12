@@ -6,12 +6,15 @@
  * only switches which one is visible.
  */
 
+import { withReaderOrigin } from "@/lib/example-origin";
+import { HostedHtml, useReaderOrigin } from "@/components/example-host";
 import { useState } from "react";
 import { CopyButton, cn } from "@polaris/ui";
 import type { HighlightedCode } from "@/lib/highlight";
 
 export function CodeTabs({ samples, copy }: { samples: readonly HighlightedCode[]; copy: string }) {
     const [index, setIndex] = useState(0);
+    const origin = useReaderOrigin();
     const sample = samples[index] ?? samples[0];
     if (!sample) return null;
     return (
@@ -34,12 +37,12 @@ export function CodeTabs({ samples, copy }: { samples: readonly HighlightedCode[
                         </button>
                     ))}
                 </div>
-                <CopyButton value={sample.code} label={copy} />
+                <CopyButton value={withReaderOrigin(sample.code, origin)} label={copy} />
             </div>
-            <div
+            {/* Highlighted at build time from our own text by Shiki, which escapes it. */}
+            <HostedHtml
                 className="code-block overflow-x-auto p-3 text-[13px] leading-relaxed"
-                // Highlighted at build time from our own text by Shiki, which escapes it.
-                dangerouslySetInnerHTML={{ __html: sample.html }}
+                html={sample.html}
             />
         </div>
     );

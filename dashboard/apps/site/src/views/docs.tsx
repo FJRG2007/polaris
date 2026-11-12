@@ -11,6 +11,8 @@ import { href, siteData, words } from "@/lib/site";
 import { ArrowLeft, ArrowRight, ChevronRight } from "lucide-react";
 import { docNeighbors, type DocPage, type DocSection } from "@/data/docs";
 import { DocsSearch, type DocsSearchWords } from "@/components/docs-search";
+import { HostField, HostedHtml } from "@/components/example-host";
+import { EXAMPLE_HOST } from "@/lib/example-origin";
 import { SiteTvChecker, SiteTvGallery } from "@/components/site-tv-checker";
 import { TV_COMPAT_SLUG, TV_PRIVACY_SLUG } from "@/data/builders";
 
@@ -274,11 +276,9 @@ export function DocView({ locale, page }: { locale: SiteLocale; page: DocPage })
                         </ul>
                     </details>
                 ) : null}
-                <div
-                    className="doc-prose"
-                    // Rendered at build time from this repository's own Markdown.
-                    dangerouslySetInnerHTML={{ __html: page.html }}
-                />
+                {page.html.includes(EXAMPLE_HOST) ? <HostField words={words(locale).host} /> : null}
+                {/* Rendered at build time from this repository's own Markdown. */}
+                <HostedHtml className="doc-prose" html={page.html} />
                 {page.slug === TV_COMPAT_SLUG || page.slug === TV_PRIVACY_SLUG ? (
                     <SiteTvChecker
                         locale={locale}

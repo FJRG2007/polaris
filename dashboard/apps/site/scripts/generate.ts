@@ -458,16 +458,26 @@ const featureFiles = readdirSync(featuresDir)
     .filter((file) => file.endsWith(".md") && !file.endsWith(".es.md"))
     .sort();
 // Guides that live outside `docs/features` but belong on the site: setting up
-// the services Polaris connects to, how to connect an assistant, what the MCP
-// server offers it, and how a site or an application reports to Analytics and
-// Telemetry. The Spanish site reads `<name>.es.md` beside each one
-// where it exists, and the English text where it does not.
+// the services Polaris connects to and how to connect an assistant, then every
+// guide in `docs/developers`, in the order that folder's README links them
+// (the README itself is not a page),
+// so a new developer guide is published by adding its file. The Spanish site
+// reads `<name>.es.md` beside each one where it exists, and the English text
+// where it does not.
+const developersDir = join(root, "docs", "developers");
 const extraGuides = [
     "docs/integrations-setup.md",
     "docs/connecting-ai-assistants.md",
-    "docs/developers/mcp.md",
-    "docs/developers/analytics.md",
-    "docs/developers/telemetry.md"
+    ...docs
+        .orderByIndex(
+            (existsSync(developersDir) ? readdirSync(developersDir) : []).filter(
+                (file) => file.endsWith(".md") && !file.endsWith(".es.md") && file !== "README.md"
+            ),
+            existsSync(join(developersDir, "README.md"))
+                ? readFileSync(join(developersDir, "README.md"), "utf8")
+                : ""
+        )
+        .map((file) => `docs/developers/${file}`)
 ].filter((file) => existsSync(join(root, file)));
 /** The guide in the page's language: its `.es.md` sibling on the Spanish site, when there is one. */
 const ownGuide = (file: string, spanish: boolean) => {

@@ -8,6 +8,7 @@
 import { requestSamples } from "@/data/docs";
 import type { SiteLocale } from "@/data/builders";
 import { CodeTabs } from "@/components/code-tabs";
+import { HostField, HostedHtml } from "@/components/example-host";
 import { Badge, buttonVariants } from "@polaris/ui";
 import { SideList, searchWords } from "@/views/docs";
 import { DocsSearch } from "@/components/docs-search";
@@ -87,6 +88,7 @@ export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
                     >
                         {t.download}
                     </a>
+                    <HostField words={words(locale).host} className="pt-2" />
                 </div>
                 <section id="authentication" className="flex scroll-mt-20 flex-col gap-3">
                     <h2 className="text-xl font-semibold">{t.authTitle}</h2>
@@ -149,10 +151,10 @@ export async function ApiDocsView({ locale }: { locale: SiteLocale }) {
                                             <p className="text-xs font-medium text-muted-foreground">
                                                 {t.body}
                                             </p>
-                                            <div
+                                            {/* Highlighted at build time from the generated document. */}
+                                            <HostedHtml
                                                 className="code-block max-h-80 overflow-auto rounded-md border border-border bg-surface p-3 text-xs"
-                                                // Highlighted at build time from the generated document.
-                                                dangerouslySetInnerHTML={{ __html: body }}
+                                                html={body}
                                             />
                                         </div>
                                     ) : null}

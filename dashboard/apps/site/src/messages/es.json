@@ -6,7 +6,9 @@
         "docs": "Docs",
         "api": "API",
         "github": "GitHub",
-        "language": "English",
+        "language": "Idioma",
+        "languageSearch": "Buscar idiomas",
+        "languageEmpty": "Ningún idioma coincide",
         "skip": "Ir al contenido"
     },
     "meta": {
@@ -148,5 +150,11 @@
         "title": "Página no encontrada",
         "intro": "No hay nada en esta dirección. Puede que se moviera al rehacer el sitio.",
         "home": "Ir a la portada"
+    },
+    "host": {
+        "label": "Tu Polaris",
+        "hint": "Los ejemplos de este sitio usan esta dirección. Solo se guarda en este navegador.",
+        "invalid": "Escribe una dirección como polaris.example.com o http://192.168.1.10:3000",
+        "reset": "Restablecer"
     }
 }
