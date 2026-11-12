@@ -32,7 +32,7 @@ export const SearchTrigger = forwardRef<
         aria-haspopup="dialog"
         {...props}
         className={cn(
-            "flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+            "flex h-9 shrink-0 items-center gap-2 rounded-md border border-border bg-surface px-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
             className
         )}
     >
