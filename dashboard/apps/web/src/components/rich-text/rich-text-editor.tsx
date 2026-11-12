@@ -25,6 +25,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { SelectionToolbar } from "./toolbar";
 import type { JSONContent } from "@tiptap/core";
 import { afterComposition } from "./composed-shortcuts";
+import { findFillIn } from "./fill-in";
 import { mentionExtension, popupOpen } from "./suggestion";
 import { EditorMenu, type ListAction } from "./editor-menu";
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
@@ -79,6 +80,12 @@ export interface RichTextEditorProps {
      * caller; the number itself means nothing.
      */
     insert?: { readonly token: number; readonly text: string } | null;
+    /**
+     * A field a rewrite left to fill (`{{label}}`, see `fill-in.ts`) to select
+     * and bring into view, so typing replaces it. Bumped by the caller, like
+     * `insert`; the number itself means nothing.
+     */
+    reveal?: { readonly token: number; readonly label: string } | null;
     /**
      * Where the caret lands when `focusAt` fires.
      *
@@ -234,6 +241,7 @@ export function RichTextEditor({
     autoFocus = false,
     focusAt = 0,
     insert = null,
+    reveal = null,
     focusWhere = "end",
     leadingBlankLine = false,
     onPasteFiles,
@@ -446,6 +454,16 @@ export function RichTextEditor({
     useEffect(() => {
         editor?.setEditable(!disabled);
     }, [editor, disabled]);
+
+    // A field to fill was picked from outside: select it and show it.
+    const revealToken = reveal?.token ?? 0;
+    const revealLabel = reveal?.label ?? "";
+    useEffect(() => {
+        if (!revealToken || !editor || editor.isDestroyed || disabled) return;
+        const range = findFillIn(editor.state.doc, revealLabel);
+        if (!range) return;
+        editor.chain().focus().setTextSelection(range).scrollIntoView().run();
+    }, [revealToken, revealLabel, editor, disabled]);
 
     /**
      * The space's emoji arrived, or changed, after the text was put in.

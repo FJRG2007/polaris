@@ -43,6 +43,9 @@ import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { useRef, useMemo, useState, useEffect, useCallback } from "react";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { ImproveButton } from "@/components/polar/improve-button";
+import { AiRewriting } from "@/components/polar/ai-rewriting";
+import { FillInBar } from "@/components/polar/fill-in-bar";
+import { fillInFields } from "@/lib/polar/improve-draft";
 import { keepSignatureDelimiter, signatureBlock, splitAtSignature, withSignature } from "./signature";
 import { joinComposerBody, trimComposerBody } from "./trimmed-content";
 import { TrimmedPill } from "./trimmed-pill";
@@ -163,6 +166,12 @@ export function Composer() {
     /** The docked panel itself, so it can say how much of the corner it takes. */
     const shell = useRef<HTMLDivElement | null>(null);
     const [insert, setInsert] = useState<{ token: number; text: string } | null>(null);
+    /** Whether "Improve" is rewriting the body, and the field to fill it last picked. */
+    const [rewriting, setRewriting] = useState(false);
+    const [reveal, setReveal] = useState<{ token: number; label: string } | null>(null);
+    /** The body a "fields still to fill" warning was shown for: sending that
+     *  same body again sends it as it is. */
+    const warnedFor = useRef<string | null>(null);
     /**
      * Putting the writer in the message, on a line of their own.
      *
@@ -387,6 +396,16 @@ export function Composer() {
     const send = useCallback(
         (when: Date | null) => {
             setProblem("");
+            // A field the rewrite left to fill goes out as "{{Recipient's
+            // name}}" unless somebody fills it. Said once per body, with the
+            // first one selected; sending again sends it anyway.
+            const unfilled = fillInFields(body);
+            if (unfilled.length > 0 && warnedFor.current !== body) {
+                warnedFor.current = body;
+                setProblem(t("compose.fillInFirst", { count: unfilled.length }));
+                setReveal({ token: Date.now(), label: unfilled[0]! });
+                return;
+            }
             startSending(async () => {
                 const fields: DraftFields = {
                     accountId,
@@ -428,6 +447,8 @@ export function Composer() {
             bcc,
             subject,
             message,
+            body,
+            t,
             files,
             composing,
             refreshMailbox,
@@ -727,10 +748,16 @@ export function Composer() {
                             {/* The body takes whatever is left, so the message is
                                 the biggest thing in the composer rather than a strip
                                 under the headers. */}
-                            <div className="flex min-h-0 flex-1 flex-col px-2 py-2">
+                            <div className="flex min-h-0 flex-1 flex-col gap-2 px-2 py-2">
+                                <AiRewriting
+                                    active={rewriting}
+                                    className="flex min-h-0 flex-1 flex-col"
+                                >
                                 <RichTextEditor
                                     value={body}
                                     framed
+                                    reveal={reveal}
+                                    disabled={rewriting}
                                     onChange={(next) => setBody(keepSignatureDelimiter(next))}
                                     insert={insert}
                                     focusAt={focusAt}
@@ -755,6 +782,11 @@ export function Composer() {
                                         void attach([...dropped]);
                                         return true;
                                     }}
+                                />
+                                </AiRewriting>
+                                <FillInBar
+                                    text={body}
+                                    onReveal={(label) => setReveal({ token: Date.now(), label })}
                                 />
                             </div>
 
@@ -869,6 +901,11 @@ export function Composer() {
                                     size="icon"
                                     purpose="email"
                                     subject={subject}
+                                    orgId={
+                                        accounts.find((account) => account.id === accountId)
+                                            ?.orgId ?? null
+                                    }
+                                    onBusyChange={setRewriting}
                                     value={splitAtSignature(body).head}
                                     onChange={(next) => {
                                         // The blank lines before the signature

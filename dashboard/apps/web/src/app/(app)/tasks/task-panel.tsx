@@ -36,7 +36,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AttachmentSection, CommitSection } from "./task-files";
 import { FieldsSection, PropertyRows } from "./task-properties";
 import { ActivityStream, TimeSection } from "./task-conversation";
-import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
+import { ImprovableRichText } from "@/components/polar/improvable-rich-text";
 import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import { taskOverlay, useLatest, wouldChange, type TaskOverlay } from "./optimistic";
 import { ChecklistSection, DependencySection, SubtaskSection } from "./task-subwork";
@@ -690,10 +690,14 @@ export function TaskPanel({
                                 />
 
                                 <section className="flex flex-col gap-1 border-t border-border pt-4">
-                                    <h3 className="text-sm font-medium">
-                                        {t("create.description")}
-                                    </h3>
-                                    <RichTextEditor
+                                    <ImprovableRichText
+                                        label={
+                                            <h3 className="text-sm font-medium">
+                                                {t("create.description")}
+                                            </h3>
+                                        }
+                                        purpose="task"
+                                        spaceId={context.spaceId}
                                         key={task.id}
                                         value={task.description}
                                         disabled={!context.canEdit}

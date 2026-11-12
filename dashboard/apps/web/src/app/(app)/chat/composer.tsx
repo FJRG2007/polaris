@@ -24,6 +24,10 @@
 import * as core from "@polaris/core";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { EmojiPicker, type PickerCustomEmoji } from "./emoji-picker";
+import { AiRewriting } from "@/components/polar/ai-rewriting";
+import { FillInBar } from "@/components/polar/fill-in-bar";
+import { ImproveButton } from "@/components/polar/improve-button";
+import { usePolarAllowed } from "@/components/polar/polar-allowed";
 import type { CustomEmojiEntry } from "@/components/rich-text/custom-emoji";
 import { asFiles, type KeptPick } from "@/components/file-picker/as-files";
 import type { PickedFile } from "@/components/file-picker/picked-file";
@@ -350,6 +354,11 @@ export function Composer({
     const t = useTranslations("chat");
     const tFiles = useTranslations("components");
     const [body, setBody] = useState("");
+    // "Improve" on the message: whether Polar is this account's, whether it is
+    // rewriting the box now, and the field to fill last picked.
+    const canImprove = usePolarAllowed();
+    const [rewriting, setRewriting] = useState(false);
+    const [reveal, setReveal] = useState<{ token: number; label: string } | null>(null);
     /** What is in the box now, for a send that resolves after an await: the
      *  words typed while it waited are the ones that go. */
     const latestBody = useRef(body);
@@ -1368,14 +1377,15 @@ export function Composer({
                 field, the way every chat client draws it. Buttons in a row
                 underneath read as a form somebody has to fill in and submit. */}
             <div className="rounded-md border border-border bg-field transition-colors focus-within:border-border-strong">
-                <div className="px-3 pt-2">
+                <AiRewriting active={rewriting} className="px-3 pt-2">
                     <RichTextEditor
                         key={generation}
                         framed
                         value={body}
+                        reveal={reveal}
                         insert={handed}
                         focusAt={focusAt}
-                        disabled={disabled}
+                        disabled={disabled || rewriting}
                         placeholder={placeholder}
                         // @ offers the people in this conversation. Not the ones
                         // this account shares a Tasks space with, which is what
@@ -1421,7 +1431,15 @@ export function Composer({
                             {dictation.interim}
                         </p>
                     )}
-                </div>
+                </AiRewriting>
+                {canImprove ? (
+                    <div className="px-3 pt-1 empty:hidden">
+                        <FillInBar
+                            text={body}
+                            onReveal={(label) => setReveal({ token: Date.now(), label })}
+                        />
+                    </div>
+                ) : null}
 
                 <div className="flex items-center gap-0.5 px-2 pb-1.5">
                     {!editing && (
@@ -1524,6 +1542,16 @@ export function Composer({
                                     <BarChart3 className="size-4" />
                                 </button>
                             )}
+                            {canImprove ? (
+                                <ImproveButton
+                                    purpose="text"
+                                    value={body}
+                                    onChange={write}
+                                    onBusyChange={setRewriting}
+                                    disabled={disabled}
+                                    className="text-muted-foreground"
+                                />
+                            ) : null}
                             <EmojiPicker
                                 disabled={disabled}
                                 custom={emoji?.custom ?? null}

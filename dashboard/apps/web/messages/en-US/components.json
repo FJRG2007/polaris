@@ -1903,6 +1903,11 @@
         "noModel": "Add an AI key to improve text.",
         "limit": "The AI usage limit has been reached.",
         "rateLimited": "Too many improvements in a row. Wait a minute.",
-        "notAllowed": "Your account cannot use Polar."
+        "notAllowed": "Your account cannot use Polar.",
+        "task": "Improve the text",
+        "text": "Improve the text",
+        "rewriting": "Rewriting...",
+        "fillIn": "{count, plural, one {1 field to fill:} other {# fields to fill:}}",
+        "fillInField": "Select {field} in the text"
     }
 }

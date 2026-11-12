@@ -33,6 +33,7 @@ import { polarModelOptions } from "@/lib/polar/models";
 import { connectorPolicy, listConnectorViews } from "@/lib/polar/connectors/store";
 import { DisplaySettings } from "@/components/polar/polar-display";
 import { PolarHelperSettings } from "@/components/polar/polar-helper-settings";
+import { PolarWritingSettings } from "@/components/polar/polar-writing-settings";
 import { DataSettings, MemorySettings, PolarToolSettings } from "@/components/polar/polar-settings";
 import {
     FIRST_SETTINGS_SECTION,
@@ -53,6 +54,7 @@ export async function sectionMetadata(id: PolarSettingsSection): Promise<Metadat
         browser: t("settings.browserSites.title"),
         display: t("settings.display.title"),
         extras: t("settings.helper.title"),
+        writing: t("settings.writing.title"),
         routing: t("settings.nav.routing"),
         "coding-tools": t("settings.nav.codingTools"),
         usage: t("settings.nav.usage"),
@@ -93,6 +95,17 @@ async function ConnectorsSection({
 /** The skills, once read; a viewer acting as somebody else reads and never writes. */
 async function SkillsSection({ userId, readOnly }: { userId: string; readOnly: boolean }) {
     return <PolarSkills initial={await listSkills(userId)} readOnly={readOnly} />;
+}
+
+/** The writing settings, with the names of the skills a rewrite may follow. */
+async function WritingSection({ userId, readOnly }: { userId: string; readOnly: boolean }) {
+    const skills = await listSkills(userId);
+    return (
+        <PolarWritingSettings
+            skills={skills.filter((skill) => skill.enabled).map((skill) => skill.name)}
+            readOnly={readOnly}
+        />
+    );
 }
 
 /** The agents, with the skills, connectors and models they can be given. */
@@ -229,6 +242,12 @@ export async function SettingsSectionPage({
             return <DisplaySettings />;
         case "extras":
             return <PolarHelperSettings />;
+        case "writing":
+            return (
+                <Suspense fallback={<ListSkeleton />}>
+                    <WritingSection userId={user.id} readOnly={Boolean(user.viewingAs)} />
+                </Suspense>
+            );
         case "routing":
             return <PolarRoutingSettings part="fallbacks" />;
         case "coding-tools":

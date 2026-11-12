@@ -1,8 +1,9 @@
 /**
  * Polar's per-person settings as one row: memory on or off, what a chat shows
  * (`display.ts`), the model dictation hears with, whether a suggested next
- * message follows each answer, and the model titles and suggestions are
- * written with. No row means every default, and a stored helper model that no
+ * message follows each answer, the model titles and suggestions are
+ * written with, and what "Improve" writes with: its own model, the writer's
+ * context and the skills it follows. No row means every default, and a stored helper model that no
  * longer reads is Automatic. Server-only.
  */
 
@@ -22,12 +23,19 @@ export interface PolarPreferences extends PolarDisplay {
     transcriptionModel: string | null;
     /** Null is Automatic. */
     helperModel: PolarHelperModel | null;
+    /** Null is the helper model. */
+    improveModel: PolarHelperModel | null;
+    writingContext: string;
+    writingSkills: string[];
 }
 
 const SELECTED = {
     memory: true,
     suggestions: true,
     helperModel: true,
+    improveModel: true,
+    writingContext: true,
+    writingSkills: true,
     showTokens: true,
     showCost: true,
     showContextBar: true,
@@ -54,12 +62,20 @@ function preferencesOf(
         suggestions?: unknown;
         transcriptionModel?: unknown;
         helperModel?: unknown;
+        improveModel?: unknown;
+        writingContext?: unknown;
+        writingSkills?: unknown;
     } | null
 ): PolarPreferences {
     return {
         memory: typeof row?.memory === "boolean" ? row.memory : true,
         transcriptionModel: transcriptionOf(row),
         helperModel: helperModelOf(row?.helperModel),
+        improveModel: helperModelOf(row?.improveModel),
+        writingContext: typeof row?.writingContext === "string" ? row.writingContext : "",
+        writingSkills: Array.isArray(row?.writingSkills)
+            ? row.writingSkills.filter((name): name is string => typeof name === "string")
+            : [],
         ...displayOf(row)
     };
 }
@@ -79,7 +95,12 @@ export async function setPolarPreferences(
             : {}),
         ...(patch.helperModel !== undefined
             ? { helperModel: patch.helperModel ?? Prisma.DbNull }
-            : {})
+            : {}),
+        ...(patch.improveModel !== undefined
+            ? { improveModel: patch.improveModel ?? Prisma.DbNull }
+            : {}),
+        ...(patch.writingContext !== undefined ? { writingContext: patch.writingContext } : {}),
+        ...(patch.writingSkills !== undefined ? { writingSkills: patch.writingSkills } : {})
     };
     const row = await prisma.polarPreference.upsert({
         where: { userId },

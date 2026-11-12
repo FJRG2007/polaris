@@ -1903,6 +1903,11 @@
         "noModel": "Añade una clave de IA para mejorar texto.",
         "limit": "Se alcanzó el límite de uso de IA.",
         "rateLimited": "Demasiadas mejoras seguidas. Espera un minuto.",
-        "notAllowed": "Tu cuenta no puede usar Polar."
+        "notAllowed": "Tu cuenta no puede usar Polar.",
+        "task": "Mejorar el texto",
+        "text": "Mejorar el texto",
+        "rewriting": "Reescribiendo...",
+        "fillIn": "{count, plural, one {1 dato por rellenar:} other {# datos por rellenar:}}",
+        "fillInField": "Seleccionar {field} en el texto"
     }
 }

@@ -9,6 +9,7 @@ export const POLAR_SETTINGS_SECTIONS = [
     "memory",
     "display",
     "extras",
+    "writing",
     "tools",
     "connectors",
     "skills",

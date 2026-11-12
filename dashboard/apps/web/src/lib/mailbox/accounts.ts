@@ -79,6 +79,8 @@ export interface MailAccountView {
     readonly vacationEnabled: boolean;
     readonly pollSeconds: number;
     readonly position: number;
+    /** The organization whose work this mailbox is part of, or null. */
+    readonly orgId: string | null;
 }
 
 type AccountRow = Awaited<ReturnType<typeof ownedAccount>>;
@@ -123,7 +125,8 @@ export function accountView(row: AccountRow): MailAccountView {
         delegateSendAs: row.delegateSendAs,
         vacationEnabled: row.vacationEnabled,
         pollSeconds: row.pollSeconds,
-        position: row.position
+        position: row.position,
+        orgId: row.orgId ?? null
     };
 }
 

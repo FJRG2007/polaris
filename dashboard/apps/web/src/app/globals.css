@@ -1053,3 +1053,58 @@ dialog.pdfSlick-dialog .dialogButton {
         opacity: 0.6;
     }
 }
+
+/*
+ * "Improve" rewriting a text (`components/polar/ai-rewriting.tsx`): the text
+ * dims and blurs a little, a band of light sweeps across it, and the field's
+ * edge glows, the way AI writing tools mark text that is being rewritten. The
+ * band is a tile twice the field wide moved by one tile, so the loop has no
+ * seam. Still, as a tint, for anybody who asked the system for less motion.
+ */
+@keyframes polaris-ai-sweep {
+    from {
+        background-position: 200% 0;
+    }
+    to {
+        background-position: 0% 0;
+    }
+}
+
+.ai-rewriting {
+    box-shadow:
+        0 0 0 1px rgb(139 92 246 / 0.45),
+        0 0 18px rgb(139 92 246 / 0.22);
+}
+
+.ai-rewriting-content {
+    filter: blur(0.6px);
+    opacity: 0.55;
+    transition:
+        filter 150ms ease,
+        opacity 150ms ease;
+}
+
+.ai-rewriting-veil {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background-image: linear-gradient(
+        100deg,
+        transparent 25%,
+        rgb(139 92 246 / 0.16) 40%,
+        rgb(56 189 248 / 0.2) 50%,
+        rgb(236 72 153 / 0.14) 60%,
+        transparent 75%
+    );
+    background-size: 200% 100%;
+    animation: polaris-ai-sweep 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-rewriting-veil {
+        animation: none;
+        background-image: none;
+        background-color: rgb(139 92 246 / 0.08);
+    }
+}

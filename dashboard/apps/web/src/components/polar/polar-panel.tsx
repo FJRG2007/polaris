@@ -14,6 +14,7 @@
  */
 
 import Link from "next/link";
+import { PolarAllowedContext } from "./polar-allowed";
 import { PolarFailureNotice } from "./polar-failure";
 import * as polarFailure from "@/lib/polar/provider-failure";
 import { useChat } from "@ai-sdk/react";
@@ -456,7 +457,9 @@ export function PolarProvider({
     );
     return (
         <PolarContext.Provider value={value}>
-            <PolarReachContext.Provider value={value}>{children}</PolarReachContext.Provider>
+            <PolarAllowedContext.Provider value={allowed}>
+                <PolarReachContext.Provider value={value}>{children}</PolarReachContext.Provider>
+            </PolarAllowedContext.Provider>
         </PolarContext.Provider>
     );
 }

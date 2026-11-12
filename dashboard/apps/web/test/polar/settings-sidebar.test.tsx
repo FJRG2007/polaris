@@ -80,7 +80,7 @@ describe("the settings page's sidebar", () => {
                 .getAllByRole("link")
                 .map((link) => link.getAttribute("href"))
         ).toEqual(
-            ["memory", "display", "extras"].map((id) => settingsSection(id as PolarSettingsSection))
+            ["memory", "display", "extras", "writing"].map((id) => settingsSection(id as PolarSettingsSection))
         );
     });
 

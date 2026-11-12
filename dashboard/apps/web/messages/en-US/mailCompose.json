@@ -52,6 +52,7 @@
         "scheduleIt": "Schedule it",
         "sending": "Sending",
         "sendNow": "Send now",
-        "closePill": "Close"
+        "closePill": "Close",
+        "fillInFirst": "{count, plural, one {1 field is still to fill.} other {# fields are still to fill.}} Fill it in, or send again to send it as it is."
     }
 }

@@ -16,6 +16,7 @@ import { Placeholder } from "@tiptap/extensions";
 import { mergeAttributes, Node } from "@tiptap/core";
 import { EditorCodeBlock } from "./editor-code-block";
 import { ComposedShortcuts } from "./composed-shortcuts";
+import { FillIn } from "./fill-in";
 import { MARKDOWN_BLOCK, REFERENCE } from "./markdown";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 
@@ -142,6 +143,7 @@ export function baseExtensions(
         Image,
         Reference,
         MarkdownBlock,
-        ComposedShortcuts
+        ComposedShortcuts,
+        FillIn
     ];
 }

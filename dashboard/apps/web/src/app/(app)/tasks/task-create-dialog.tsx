@@ -51,7 +51,7 @@ import {
 } from "./task-draft-store";
 import { taskOverlay, useLatest } from "./optimistic";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
-import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
+import { ImprovableRichText } from "@/components/polar/improvable-rich-text";
 import type { PersonRef, SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import {
     createdTag,
@@ -462,8 +462,14 @@ export function TaskCreateDialog({
                         />
 
                         <section className="flex flex-col gap-1 border-t border-border pt-4">
-                            <h3 className="text-sm font-medium">{t("create.description")}</h3>
-                            <RichTextEditor
+                            <ImprovableRichText
+                                label={
+                                    <h3 className="text-sm font-medium">
+                                        {t("create.description")}
+                                    </h3>
+                                }
+                                purpose="task"
+                                spaceId={spaceId || null}
                                 value={draft.description}
                                 placeholder={t("create.descriptionPlaceholder")}
                                 onChange={(description) =>

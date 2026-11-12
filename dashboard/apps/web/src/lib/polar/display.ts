@@ -65,13 +65,26 @@ export function helperModelOf(value: unknown): PolarHelperModel | null {
     return parsed.success ? parsed.data : null;
 }
 
+/** Longest writing context a person keeps, in characters. */
+export const WRITING_CONTEXT_MAX = 4_000;
+/** Most skills a rewrite follows at once. */
+export const WRITING_SKILLS_MAX = 5;
+
 /** A change to Polar's settings: any of the display switches, memory, the
- *  dictation model, the suggested next message, and the helper model. */
+ *  dictation model, the suggested next message, the helper model, and what
+ *  "Improve" writes with (its model, the writer's context and skills). */
 export const polarPreferencesPatchSchema = z
     .object({
         memory: z.boolean().optional(),
         suggestions: z.boolean().optional(),
         helperModel: polarHelperModelSchema.nullable().optional(),
+        improveModel: polarHelperModelSchema.nullable().optional(),
+        writingContext: z.string().trim().max(WRITING_CONTEXT_MAX).optional(),
+        writingSkills: z
+            .array(z.string().trim().min(1).max(100))
+            .max(WRITING_SKILLS_MAX)
+            .transform((names) => [...new Set(names)])
+            .optional(),
         showTokens: z.boolean().optional(),
         showCost: z.boolean().optional(),
         showContextBar: z.boolean().optional(),

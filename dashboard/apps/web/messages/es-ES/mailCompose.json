@@ -52,6 +52,7 @@
         "scheduleIt": "Programarlo",
         "sending": "Enviando",
         "sendNow": "Enviar ya",
-        "closePill": "Cerrar"
+        "closePill": "Cerrar",
+        "fillInFirst": "{count, plural, one {Queda 1 dato por rellenar.} other {Quedan # datos por rellenar.}} Rellénalo o vuelve a enviar para mandarlo tal cual."
     }
 }

@@ -256,7 +256,8 @@
         "manage": "Gestionar claves de IA",
         "noReasoning": "Este modelo tiene un único nivel",
         "search": "Buscar modelo",
-        "noMatch": "Sin coincidencias"
+        "noMatch": "Sin coincidencias",
+        "more": "Ver más"
     },
     "intelligence": {
         "fast": "Rápido",
@@ -723,6 +724,35 @@
                 "viewingAs": "Estás viendo como otra persona.",
                 "not_found": "Ese agente ya no existe."
             }
+        },
+        "writing": {
+            "title": "Escritura",
+            "intro": "Cómo reescribe Mejorar el texto en Mail, Tasks, Chat y Polar.",
+            "model": "Modelo",
+            "modelHint": "Automático usa el modelo de las tareas pequeñas. Para reescribir basta uno barato.",
+            "context": "Sobre ti",
+            "contextHint": "Tu puesto, cómo firmas y el tono en que escribes. Cada reescritura lo sigue.",
+            "contextPlaceholder": "Llevo la atención al cliente de una panadería. Escribo cercano y breve, y firmo como Ana.",
+            "save": "Guardar",
+            "skills": "Skills a seguir",
+            "skillsHint": "Hasta {max} de tus skills, como una guía de estilo o una ficha de producto.",
+            "noSkills": "Añade skills en Skills para que las reescrituras las sigan.",
+            "skillsFull": "Quita una para añadir otra",
+            "failed": "No se pudieron guardar los ajustes de escritura.",
+            "orgTitle": "Guías de organización",
+            "orgIntro": "A qué se dedica la empresa y cómo escribe. Los miembros la siguen al escribir desde sus buzones y espacios.",
+            "orgFailed": "No se pudieron cargar las guías.",
+            "orgNone": "No estás en ninguna organización.",
+            "orgReadOnly": "Solo lectura",
+            "orgEmpty": "Aún sin guía.",
+            "orgGuideLabel": "Guía de escritura de {org}",
+            "orgPlaceholder": "Vendemos muebles artesanos en Madrid. Escribe con tono cercano y profesional y firma como el equipo de Acme.",
+            "errors": {
+                "noAccess": "Tu cuenta no puede usar Polar.",
+                "viewingAs": "Estás viendo como otra cuenta.",
+                "tooLong": "La guía es demasiado larga.",
+                "notAllowed": "No puedes cambiar los ajustes de esta organización."
+            }
         }
     },
     "temporary": {
@@ -1146,8 +1176,14 @@
                 "name": "Ediciones",
                 "hint": "Edita archivos sin preguntar. Los comandos esperan tu OK."
             },
-            "plan": { "name": "Solo plan", "hint": "Lee y planifica. No cambia nada." },
-            "full": { "name": "Acceso total", "hint": "Actúa sin preguntar, dentro de su máquina." }
+            "plan": {
+                "name": "Solo plan",
+                "hint": "Lee y planifica. No cambia nada."
+            },
+            "full": {
+                "name": "Acceso total",
+                "hint": "Actúa sin preguntar, dentro de su máquina."
+            }
         },
         "permission": {
             "title": "Esperando tu OK",

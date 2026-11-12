@@ -6704,6 +6704,11 @@ model Organization {
     tagText    String?
     tagEmblem  String  @default("spark")
     tagColor   String  @default("blue")
+    // The organization's shared writing guide: what the company does, its
+    // voice, how it signs. Every member's "Improve" follows it when what they
+    // write belongs to the organization (its mailboxes, its task spaces).
+    // Written by whoever holds settings.manage; empty is none.
+    writingGuide String @default("")
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -16319,6 +16324,16 @@ model PolarPreference {
     // { provider, model, payer }; null is Automatic (the fastest one the
     // person can use). Read through a schema: an unreadable value is Automatic.
     helperModel    Json?
+    // The model "Improve" rewrites drafts with (mail, tasks, prompts), as
+    // { provider, model, payer }; null is the helper model above. Kept apart
+    // because a person may want a cheaper one here, or a better writer.
+    improveModel   Json?
+    // What the rewrite should know about whoever writes: their role, how they
+    // sign, the tone they use. Added to every rewrite this person asks for.
+    writingContext String   @default("")
+    // Names of this person's Polar skills whose instructions every rewrite
+    // follows too (a style guide, a product sheet). Missing names are ignored.
+    writingSkills  String[] @default([])
     // Polar's router for this person (`lib/polar/routing.ts`): the fallback
     // list, whether a pinned model falls back, and the model each Claude tier
     // of a coding tool lands on. Null is the deployment's default.

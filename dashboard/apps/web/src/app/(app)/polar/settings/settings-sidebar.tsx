@@ -16,6 +16,7 @@ import {
     Gauge,
     Globe,
     Menu,
+    PenLine,
     MessageSquare,
     PanelLeftClose,
     PanelLeftOpen,
@@ -46,6 +47,7 @@ const ICONS: Record<PolarSettingsSection, ComponentType<{ className?: string }>>
     browser: Globe,
     display: MessageSquare,
     extras: Sparkles,
+    writing: PenLine,
     routing: Shuffle,
     "coding-tools": SquareTerminal,
     usage: Gauge,
@@ -55,7 +57,7 @@ const ICONS: Record<PolarSettingsSection, ComponentType<{ className?: string }>>
 /** The pages in groups, so the list reads as a few short ones. */
 type GroupId = "personal" | "abilities" | "models" | "privacy";
 const GROUPS: readonly { id: GroupId; sections: readonly PolarSettingsSection[] }[] = [
-    { id: "personal", sections: ["memory", "display", "extras"] },
+    { id: "personal", sections: ["memory", "display", "extras", "writing"] },
     {
         id: "abilities",
         sections: ["tools", "connectors", "skills", "agents", "browser", "coding-tools"]
@@ -83,6 +85,7 @@ function SettingsNav({
         browser: t("settings.browserSites.title"),
         display: t("settings.display.title"),
         extras: t("settings.helper.title"),
+        writing: t("settings.writing.title"),
         routing: t("settings.nav.routing"),
         "coding-tools": t("settings.nav.codingTools"),
         usage: t("settings.nav.usage"),

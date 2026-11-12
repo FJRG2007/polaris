@@ -256,7 +256,8 @@
         "manage": "Manage AI provider keys",
         "noReasoning": "This model has one fixed level",
         "search": "Find a model",
-        "noMatch": "No models match"
+        "noMatch": "No models match",
+        "more": "Show more"
     },
     "intelligence": {
         "fast": "Fast",
@@ -723,6 +724,35 @@
                 "viewingAs": "You're viewing as someone else.",
                 "not_found": "That agent no longer exists."
             }
+        },
+        "writing": {
+            "title": "Writing",
+            "intro": "How Improve rewrites text in Mail, Tasks, Chat and Polar.",
+            "model": "Model",
+            "modelHint": "Automatic uses the model of the small jobs. A cheap one is enough to rewrite text.",
+            "context": "About you",
+            "contextHint": "Your role, how you sign and the tone you write in. Every rewrite follows it.",
+            "contextPlaceholder": "I run support at a small bakery. I write warmly and briefly, and sign as Ana.",
+            "save": "Save",
+            "skills": "Skills to follow",
+            "skillsHint": "Up to {max} of your skills, such as a style guide or a product sheet.",
+            "noSkills": "Add skills in Skills to have rewrites follow them.",
+            "skillsFull": "Turn one off to add another",
+            "failed": "The writing settings could not be saved.",
+            "orgTitle": "Organization guides",
+            "orgIntro": "What the company does and how it writes. Members follow it when writing from its mailboxes and spaces.",
+            "orgFailed": "The organization guides could not be loaded.",
+            "orgNone": "You are not in any organization.",
+            "orgReadOnly": "Read only",
+            "orgEmpty": "No guide yet.",
+            "orgGuideLabel": "Writing guide for {org}",
+            "orgPlaceholder": "We sell handmade furniture in Madrid. Write in a close, professional tone and sign as the Acme team.",
+            "errors": {
+                "noAccess": "Your account cannot use Polar.",
+                "viewingAs": "You are viewing as another account.",
+                "tooLong": "The guide is too long.",
+                "notAllowed": "You cannot change this organization's settings."
+            }
         }
     },
     "temporary": {
@@ -1146,7 +1176,10 @@
                 "name": "Edit files",
                 "hint": "File edits go ahead. Commands wait for your OK."
             },
-            "plan": { "name": "Plan only", "hint": "Reads and plans. Changes nothing." },
+            "plan": {
+                "name": "Plan only",
+                "hint": "Reads and plans. Changes nothing."
+            },
             "full": {
                 "name": "Full access",
                 "hint": "Acts without asking, inside its own machine."

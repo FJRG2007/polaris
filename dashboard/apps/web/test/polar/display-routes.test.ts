@@ -87,7 +87,10 @@ describe("chat display settings", () => {
             reopenLastChat: false,
             transcriptionModel: null,
             suggestions: true,
-            helperModel: null
+            helperModel: null,
+            improveModel: null,
+            writingContext: "",
+            writingSkills: []
         });
     });
 
@@ -101,7 +104,10 @@ describe("chat display settings", () => {
             reopenLastChat: true,
             transcriptionModel: "groq/whisper-large-v3-turbo",
             suggestions: false,
-            helperModel: { provider: "openai", model: "gpt-mini", payer: "own" }
+            helperModel: { provider: "openai", model: "gpt-mini", payer: "own" },
+            improveModel: { provider: "groq", model: "llama-small", payer: null },
+            writingContext: "I sign as Ana.",
+            writingSkills: ["Tone"]
         };
         expect(await (await preferences.GET()).json()).toEqual(state.preference);
     });
