@@ -26,9 +26,16 @@ const resetRateLimit = vi.fn(async () => undefined);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        $transaction: async (run: (tx: unknown) => unknown) => {
+            const { prisma } = await import("@polaris/db");
+            return run(prisma);
+        },
         vaultAccount: { findFirst, findUniqueOrThrow },
         vaultOrgUser: { findMany: orgMembers },
-        vaultDevice: { upsert: upsertDevice },
+        vaultDevice: {
+            findFirst: vi.fn(async () => ({ extensionSessionId: null })),
+            upsert: upsertDevice
+        },
         vaultRefreshToken: { create: createRefresh }
     }
 }));

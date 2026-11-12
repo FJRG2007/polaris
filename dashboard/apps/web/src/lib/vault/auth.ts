@@ -4,9 +4,10 @@
  * Every request from a Bitwarden client carries a bearer token this server
  * issued, and nothing else - no cookie, no Polaris session. So this is the one
  * place that turns a token into a person, and it re-checks on every request the
- * three things a token cannot carry safely: that the account still exists and is
+ * things a token cannot carry safely: that the account still exists and is
  * not banned, that its credentials have not moved since the token was minted,
- * and that it is still allowed to use a vault at all.
+ * that it is still allowed to use a vault at all, and that its device
+ * connection has not been revoked.
  *
  * The stamp check is what makes a password change take effect everywhere at
  * once. A token is good for an hour, so without it, changing a master password
@@ -57,6 +58,18 @@ export async function authenticateVault(request: Request): Promise<VaultPrincipa
     });
     if (!account || account.user.bannedAt) return null;
     if (account.securityStamp !== claims.stamp) return null;
+    if (claims.device) {
+        const device = await prisma.vaultDevice.findUnique({
+            where: { userId_identifier: { userId: claims.sub, identifier: claims.device } },
+            select: { extension: { select: { userId: true, revokedAt: true } } }
+        });
+        if (
+            !device ||
+            (device.extension &&
+                (device.extension.userId !== claims.sub || device.extension.revokedAt))
+        )
+            return null;
+    }
     // The instance can take the vault away from a role at any time, and a client
     // holding an hour-old token must not outlive that decision either.
     if (!(await userHasPermission(claims.sub, "vault.use"))) return null;

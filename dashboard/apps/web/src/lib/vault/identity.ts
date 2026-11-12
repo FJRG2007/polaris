@@ -14,7 +14,7 @@
  * in, with its own rules.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import * as tokens from "@/lib/vault/tokens";
@@ -53,8 +53,8 @@ export type SignInResult =
     | { ok: false; kind: "two_factor"; providers: number[] };
 
 /** The organization claims a client reads off its token. */
-async function orgClaims(userId: string) {
-    const memberships = await prisma.vaultOrgUser.findMany({
+async function orgClaims(userId: string, db: Prisma.TransactionClient = prisma) {
+    const memberships = await db.vaultOrgUser.findMany({
         where: { userId, status: core.ORG_USER_CONFIRMED },
         select: { orgId: true, type: true }
     });
@@ -104,66 +104,86 @@ async function rememberDevice(
 async function tokenBody(
     userId: string,
     deviceId: string | null,
-    deviceIdentifier: string | null
-): Promise<Record<string, unknown>> {
-    const account = await prisma.vaultAccount.findUniqueOrThrow({
-        where: { userId },
-        select: {
-            kdf: true,
-            kdfIterations: true,
-            kdfMemory: true,
-            kdfParallelism: true,
-            protectedKey: true,
-            privateKey: true,
-            securityStamp: true,
-            user: { select: { name: true, email: true, emailVerified: true } }
+    deviceIdentifier: string | null,
+    extensionSessionId: string | null = null
+): Promise<Record<string, unknown> | null> {
+    return prisma.$transaction(async (tx) => {
+        if (deviceId) {
+            const device = await tx.vaultDevice.findFirst({
+                where: { id: deviceId, userId },
+                select: { extensionSessionId: true }
+            });
+            if (!device || (extensionSessionId && device.extensionSessionId !== extensionSessionId))
+                return null;
+            if (device.extensionSessionId) {
+                // A conditional write holds the connection row until the credential
+                // commits. Disconnect marks it revoked before sweeping credentials.
+                const live = await tx.extensionSession.updateMany({
+                    where: { id: device.extensionSessionId, userId, revokedAt: null },
+                    data: { revokedAt: null }
+                });
+                if (live.count !== 1) return null;
+            }
         }
-    });
-    const env = loadEnv();
-    const claims = await orgClaims(userId);
-    const access = tokens.issueAccessToken(
-        {
-            sub: userId,
-            email: account.user.email,
-            emailVerified: account.user.emailVerified,
-            name: account.user.name,
-            stamp: account.securityStamp,
-            device: deviceIdentifier ?? undefined,
-            ...claims
-        },
-        env.POLARIS_AUTH_SECRET,
-        env.POLARIS_APP_URL
-    );
-    const refresh = tokens.issueRefreshToken();
-    await prisma.vaultRefreshToken.create({
-        data: {
-            userId,
-            deviceId,
-            tokenHash: refresh.hash,
-            stamp: account.securityStamp,
-            expiresAt: tokens.refreshTokenExpiry()
-        }
-    });
+        const account = await tx.vaultAccount.findUniqueOrThrow({
+            where: { userId },
+            select: {
+                kdf: true,
+                kdfIterations: true,
+                kdfMemory: true,
+                kdfParallelism: true,
+                protectedKey: true,
+                privateKey: true,
+                securityStamp: true,
+                user: { select: { name: true, email: true, emailVerified: true } }
+            }
+        });
+        const env = loadEnv();
+        const claims = await orgClaims(userId, tx);
+        const access = tokens.issueAccessToken(
+            {
+                sub: userId,
+                email: account.user.email,
+                emailVerified: account.user.emailVerified,
+                name: account.user.name,
+                stamp: account.securityStamp,
+                device: deviceIdentifier ?? undefined,
+                ...claims
+            },
+            env.POLARIS_AUTH_SECRET,
+            env.POLARIS_APP_URL
+        );
+        const refresh = tokens.issueRefreshToken();
+        await tx.vaultRefreshToken.create({
+            data: {
+                userId,
+                deviceId,
+                tokenHash: refresh.hash,
+                stamp: account.securityStamp,
+                expiresAt: tokens.refreshTokenExpiry()
+            }
+        });
 
-    return {
-        access_token: access,
-        expires_in: tokens.ACCESS_TOKEN_TTL_SECONDS,
-        token_type: "Bearer",
-        refresh_token: refresh.token,
-        scope: "api offline_access",
-        // The wrapped keys ride along so a client can unlock without a second
-        // request, which is what makes the first screen after sign-in instant.
-        Key: account.protectedKey,
-        PrivateKey: account.privateKey,
-        Kdf: account.kdf,
-        KdfIterations: account.kdfIterations,
-        KdfMemory: account.kdfMemory,
-        KdfParallelism: account.kdfParallelism,
-        ResetMasterPassword: false,
-        ForcePasswordReset: false,
-        MasterPasswordPolicy: null,
-        UserDecryptionOptions: { HasMasterPassword: true, Object: "userDecryptionOptions" }
-    };
+        return {
+            access_token: access,
+            expires_in: tokens.ACCESS_TOKEN_TTL_SECONDS,
+            token_type: "Bearer",
+            refresh_token: refresh.token,
+            scope: "api offline_access",
+            // The wrapped keys ride along so a client can unlock without a second
+            // request, which is what makes the first screen after sign-in instant.
+            Key: account.protectedKey,
+            PrivateKey: account.privateKey,
+            Kdf: account.kdf,
+            KdfIterations: account.kdfIterations,
+            KdfMemory: account.kdfMemory,
+            KdfParallelism: account.kdfParallelism,
+            ResetMasterPassword: false,
+            ForcePasswordReset: false,
+            MasterPasswordPolicy: null,
+            UserDecryptionOptions: { HasMasterPassword: true, Object: "userDecryptionOptions" }
+        };
+    });
 }
 
 /**
@@ -180,9 +200,10 @@ export async function issueVaultToken(
     userId: string,
     device: SignInInput["device"],
     extensionSessionId: string | null = null
-): Promise<Record<string, unknown>> {
+): Promise<Record<string, unknown> | null> {
+    if (extensionSessionId && !device) return null;
     const deviceId = await rememberDevice(userId, device, extensionSessionId);
-    return tokenBody(userId, deviceId, device?.identifier ?? null);
+    return tokenBody(userId, deviceId, device?.identifier ?? null, extensionSessionId);
 }
 
 /**
@@ -247,10 +268,8 @@ export async function vaultSignIn(input: SignInInput): Promise<SignInResult> {
         targetId: account.userId,
         metadata: { device: input.device?.name ?? null, type: input.device?.type ?? null }
     });
-    return {
-        ok: true,
-        body: await tokenBody(account.userId, deviceId, input.device?.identifier ?? null)
-    };
+    const body = await tokenBody(account.userId, deviceId, input.device?.identifier ?? null);
+    return body ? { ok: true, body } : { ok: false, kind: "invalid" };
 }
 
 /**
@@ -279,7 +298,13 @@ export async function vaultRefresh(
             stamp: true,
             expiresAt: true,
             revokedAt: true,
-            device: { select: { identifier: true } },
+            device: {
+                select: {
+                    identifier: true,
+                    userId: true,
+                    extension: { select: { userId: true, revokedAt: true } }
+                }
+            },
             vault: { select: { securityStamp: true, user: { select: { bannedAt: true } } } }
         }
     });
@@ -289,6 +314,16 @@ export async function vaultRefresh(
     if (row.stamp !== row.vault.securityStamp) return { ok: false, kind: "invalid" };
     if (row.vault.user.bannedAt) return { ok: false, kind: "invalid" };
     if (!(await userHasPermission(row.userId, "vault.use"))) {
+        return { ok: false, kind: "invalid" };
+    }
+
+    if (
+        row.deviceId &&
+        (!row.device ||
+            row.device.userId !== row.userId ||
+            (row.device.extension &&
+                (row.device.extension.userId !== row.userId || row.device.extension.revokedAt)))
+    ) {
         return { ok: false, kind: "invalid" };
     }
 
@@ -308,10 +343,8 @@ export async function vaultRefresh(
         where: { id: row.id },
         data: { revokedAt: new Date() }
     });
-    return {
-        ok: true,
-        body: await tokenBody(row.userId, row.deviceId, row.device?.identifier ?? null)
-    };
+    const body = await tokenBody(row.userId, row.deviceId, row.device?.identifier ?? null);
+    return body ? { ok: true, body } : { ok: false, kind: "invalid" };
 }
 
 /** The body a client reads when it needs a second factor. */

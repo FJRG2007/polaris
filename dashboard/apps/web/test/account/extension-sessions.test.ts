@@ -25,6 +25,7 @@ let devices: Row[] = [];
 let refreshTokens: Row[] = [];
 let users: Row[] = [];
 let securities: Row[] = [];
+let beforeDeviceSweep = () => {};
 
 function match(row: Row, where: Row): boolean {
     return Object.entries(where).every(([key, value]) => {
@@ -128,10 +129,17 @@ vi.mock("@polaris/db", () => ({
             );
         },
         get vaultDevice() {
-            return table(
+            const devicesTable = table(
                 () => devices,
                 (next) => (devices = next)
             );
+            return {
+                ...devicesTable,
+                findMany: async (args: { where?: Row } = {}) => {
+                    beforeDeviceSweep();
+                    return devicesTable.findMany(args);
+                }
+            };
         },
         get vaultRefreshToken() {
             return table(
@@ -425,6 +433,18 @@ describe("the address lock", () => {
 });
 
 describe("ending a connection", () => {
+    it("marks the connection revoked before sweeping vault credentials", async () => {
+        sessions.push({ id: "connection-race", userId: ALICE, revokedAt: null });
+        beforeDeviceSweep = () => {
+            expect(sessions[0]?.["revokedAt"]).toBeInstanceOf(Date);
+        };
+        try {
+            expect((await revokeExtensionSession(ALICE, "connection-race")).revoked).toBe(true);
+        } finally {
+            beforeDeviceSweep = () => {};
+        }
+    });
+
     it("revokes the vault tokens of the client it let in", async () => {
         const { sessionId } = await connect();
         devices.push({
