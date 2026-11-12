@@ -15,8 +15,18 @@ import { CalendarDays, File as FileIcon, Mail, Plus, Unlink } from "lucide-react
 import * as actions from "../actions/activities";
 import { hostUi } from "@polaris/app-host/client";
 import type { CrmObject } from "../model/objects";
-import { useCallback, useId, useState } from "react";
-import { Button, Checkbox, cn, Input, Select, Textarea, useToast, DateInput } from "@polaris/ui";
+import { useCallback, useId, useState, type ReactNode } from "react";
+import {
+    ProductMark,
+    Button,
+    Checkbox,
+    cn,
+    Input,
+    Select,
+    Textarea,
+    useToast,
+    DateInput
+} from "@polaris/ui";
 import * as links from "../model/links";
 
 function Block({ className }: { className?: string }) {
@@ -204,6 +214,7 @@ export function RecordActivities({ object, id, canEdit }: RecordActivitiesProps)
                     canEdit && data ? (
                         <AddToggle
                             label={t("activities.attachFile")}
+                            icon={<ProductMark app="drive" />}
                             onClick={() => setPicking(true)}
                         />
                     ) : null
@@ -451,11 +462,20 @@ function TaskRow({
     );
 }
 
-function AddToggle({ label, onClick }: { label: string; onClick: () => void }) {
+function AddToggle({
+    label,
+    onClick,
+    icon
+}: {
+    label: string;
+    onClick: () => void;
+    /** Drawn in place of the plus, for an add that comes from another product. */
+    icon?: ReactNode;
+}) {
     return (
         <div className="border-t border-border p-1.5">
             <Button variant="ghost" size="sm" onClick={onClick}>
-                <Plus className="size-4" />
+                {icon ?? <Plus className="size-4" />}
                 {label}
             </Button>
         </div>

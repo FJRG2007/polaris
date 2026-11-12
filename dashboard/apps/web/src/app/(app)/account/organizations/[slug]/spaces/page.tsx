@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import { SquareCheckBig } from "lucide-react";
-import { Badge, Card, CardBody } from "@polaris/ui";
+import { ProductMark, Badge, Card, CardBody } from "@polaris/ui";
 import { listOrgSpaces } from "@/lib/orgs/org-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireOrgPage } from "@/lib/orgs/page-access";
@@ -30,7 +30,11 @@ export default async function OrganizationSpacesPage({ params }: { params: Promi
                     <SquareCheckBig className="text-muted-foreground size-6 shrink-0" />
                     <p className="text-sm font-medium">{t("spaces.emptyTitle", { org: org.name })}</p>
                     <p className="text-muted-foreground max-w-md text-sm">{t("spaces.emptyBody", { org: org.name })}</p>
-                    <Link href="/tasks" className="text-sm underline">
+                    <Link
+                        href="/tasks"
+                        className="inline-flex items-center gap-1.5 text-sm underline"
+                    >
+                        <ProductMark app="tasks" />
                         {t("spaces.openTasks")}
                     </Link>
                 </CardBody>

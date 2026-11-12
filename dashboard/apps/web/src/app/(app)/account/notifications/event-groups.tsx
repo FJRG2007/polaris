@@ -25,6 +25,8 @@ import {
     Webhook
 } from "lucide-react";
 import {
+    ProductMark,
+    type PolarisProduct,
     Badge,
     Button,
     Card,
@@ -50,6 +52,15 @@ import type { DestinationView } from "@/lib/notifications/destinations";
 import { eventDescription, eventLabel, groupLabel } from "./event-names";
 
 type Translate = NamespaceTranslator<"accountNotifications">;
+
+/** Groups that are a Polaris product of their own, headed by its logo. */
+const PRODUCT_GROUPS: Partial<Record<core.NotificationGroup, PolarisProduct>> = {
+    tasks: "tasks",
+    calendar: "calendar",
+    drive: "drive",
+    mail: "mail",
+    polar: "polar"
+};
 
 /** Where this browser keeps which groups are open. */
 const OPEN_GROUPS_KEY = "polaris.notifications.openGroups";
@@ -183,6 +194,7 @@ export function EventGroup({
                         )}
                         aria-hidden
                     />
+                    {PRODUCT_GROUPS[group] ? <ProductMark app={PRODUCT_GROUPS[group]} /> : null}
                     <span className="truncate text-sm font-semibold" title={label}>
                         {label}
                     </span>

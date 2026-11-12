@@ -66,6 +66,7 @@ import {
     type ServiceView
 } from "./deploy-view";
 import {
+    ProductMark,
     Button,
     ConfirmDeleteDialog,
     ContextMenu,
@@ -1344,7 +1345,7 @@ export function DeployCanvas({
                                                                 )
                                                             }
                                                         >
-                                                            <HardDrive className="size-4" />{" "}
+                                                            <ProductMark app="drive" />{" "}
                                                             {t("canvas.viewInDrive")}
                                                         </ContextMenuItem>
                                                         {canManage && (

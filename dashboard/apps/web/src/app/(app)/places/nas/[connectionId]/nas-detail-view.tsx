@@ -12,9 +12,10 @@
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { formatBytes } from "@polaris/core";
-import { ArrowLeft, HardDrive, Play, Share2 } from "lucide-react";
+import { ArrowLeft, Play, Share2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+    ProductMark,
     Badge,
     Button,
     Checkbox,
@@ -148,7 +149,7 @@ export function NasDetailView({
                             <>
                                 <Button variant="outline" asChild>
                                     <Link href={`/drive?c=${nas.id}`}>
-                                        <HardDrive className="size-4 shrink-0" aria-hidden />
+                                        <ProductMark app="drive" />
                                         {t("nas.openDrive")}
                                     </Link>
                                 </Button>

@@ -10,7 +10,7 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { HardDrive, Plus, Server, Settings2, Trash2 } from "lucide-react";
-import { Button } from "@polaris/ui";
+import { ProductMark, Button } from "@polaris/ui";
 import { deleteVolumeAction, listVolumesAction } from "./actions";
 import { VolumeForm, type EditVolume } from "./volume-form";
 import { FileAccessPanel } from "./file-access-panel";
@@ -151,7 +151,7 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                                 title={t("volumes.viewInDrive")}
                             >
                                 <Link href={volumeDriveHref(app.id, volume)}>
-                                    <HardDrive className="size-4" />
+                                    <ProductMark app="drive" />
                                 </Link>
                             </Button>
                             {can("volumes.manage") && (

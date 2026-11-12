@@ -46,6 +46,7 @@ import {
     type BookingSeed
 } from "./model";
 import {
+    ProductMark,
     Badge,
     Button,
     Checkbox,
@@ -688,7 +689,10 @@ export function BookingPageEditor({
                         <Section title={t("bookingPage.sectionMeeting")}>
                             <label className="flex items-center justify-between gap-3">
                                 <span className="flex flex-col">
-                                    <span>{t("bookingPage.meetingLink")}</span>
+                                    <span className="flex items-center gap-1.5">
+                                        <ProductMark app="chat" />
+                                        {t("bookingPage.meetingLink")}
+                                    </span>
                                     <span className="text-xs text-foreground-subtle">
                                         {t("bookingPage.meetingLinkHint")}
                                     </span>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@polaris/db";
-import { PageHeader } from "@polaris/ui";
+import { ProductMark, PageHeader } from "@polaris/ui";
 import { grantedSubjects } from "@/lib/access/grants";
 import { getTranslations } from "@/lib/i18n/request";
 import { homePathForUser, requireUser, sessionCanAny } from "@/lib/session";
@@ -36,7 +36,8 @@ export default async function NasListPage() {
             {rows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                     {t("nas.none")}{" "}
-                    <Link href="/drive" className="underline">
+                    <Link href="/drive" className="inline-flex items-center gap-1 underline">
+                        <ProductMark app="drive" size={14} />
                         {t("nas.openDrive")}
                     </Link>
                 </p>

@@ -20,9 +20,9 @@
 import { formatDay } from "./time";
 import { useCalendarT } from "./i18n";
 import { AnchoredPanel, ColorDot } from "./ui";
-import { Button, StatusIcon } from "@polaris/ui";
+import { ProductMark, Button, StatusIcon } from "@polaris/ui";
 import type { CalendarSummary, TaskItemView } from "../lib/wire";
-import { CalendarClock, Copy, Download, ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { CalendarClock, Copy, Download, Pencil, Trash2 } from "lucide-react";
 
 /** The round mark, as a button when the task can be ticked from here. */
 export function TaskMark({
@@ -164,7 +164,7 @@ export function TaskCard({
                 ) : null}
                 <div className="flex items-center gap-1 border-t border-border pt-2">
                     <Button size="sm" variant="secondary" onClick={onEdit}>
-                        {fromCalendar ? <Pencil /> : <ExternalLink />}
+                        {fromCalendar ? <Pencil /> : <ProductMark app="tasks" />}
                         {fromCalendar
                             ? task.editable
                                 ? t("popover.edit")

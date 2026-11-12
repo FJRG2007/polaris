@@ -28,6 +28,7 @@ import {
     setMailboxQuotaAction
 } from "../actions";
 import {
+    ProductMark,
     Badge,
     Button,
     Checkbox,
@@ -445,6 +446,7 @@ function CreateDialog({
                                 checked={addToMyMail}
                                 onChange={(event) => setAddToMyMail(event.target.checked)}
                             />
+                            <ProductMark app="mail" />
                             {t("boxes.addToMyMail")}
                         </label>
                         {error ? <p className="text-xs text-danger">{error}</p> : null}

@@ -73,7 +73,6 @@ import {
     CornerUpLeft,
     Eye,
     EyeOff,
-    HardDrive,
     Image as ImageIcon,
     Mic,
     MicOff,
@@ -85,6 +84,7 @@ import {
     X
 } from "lucide-react";
 import {
+    ProductMark,
     Button,
     cn,
     DropdownMenu,
@@ -1974,7 +1974,7 @@ function StagedFromDrive({
     const t = useTranslations("chat");
     return (
         <li className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
-            <HardDrive className="size-3 shrink-0 text-muted-foreground" />
+            <ProductMark app="drive" size={12} />
             <span
                 className="max-w-[12rem] truncate"
                 title={t("composer.inYourDrive", { name: kept.name })}

@@ -169,6 +169,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { ImageViewer, thumbnailOf, type ViewedImage } from "@/components/image-viewer";
 import { linkProviderName } from "@/components/rich-text/link-providers";
 import {
+    ProductMark,
     cn,
     DropdownMenu,
     DropdownMenuContent,
@@ -2124,9 +2125,10 @@ function DriveMark() {
     const t = useTranslations("chat");
     return (
         <span
-            className="shrink-0 text-muted-foreground"
+            className="inline-flex shrink-0 items-center gap-1 text-muted-foreground"
             title={t("messageList.thisFileLivesInThe")}
         >
+            <ProductMark app="drive" size={12} />
             {t("messageList.inDrive")}
         </span>
     );

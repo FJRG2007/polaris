@@ -15,11 +15,11 @@
 import { saveFile } from "@/components/transfers/move-file";
 import { sendFile } from "@/components/transfers/move-file";
 import Link from "next/link";
-import { Button } from "@polaris/ui";
+import { ProductMark, Button } from "@polaris/ui";
 import { asDirectory, parentDirectory } from "./files-path";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowUp, Download, File as FileIcon, Folder, HardDrive, Upload } from "lucide-react";
+import { ArrowUp, Download, File as FileIcon, Folder, Upload } from "lucide-react";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 interface Entry {
@@ -111,7 +111,7 @@ export function FilesPanel({
                         <Link
                             href={`/drive?c=container:${applicationId}&p=${encodeURIComponent(path.replace(/^\/+|\/+$/g, ""))}`}
                         >
-                            <HardDrive className="size-4" /> {t("files.viewInDrive")}
+                            <ProductMark app="drive" /> {t("files.viewInDrive")}
                         </Link>
                     </Button>
                     <Button

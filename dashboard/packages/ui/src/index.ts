@@ -177,6 +177,7 @@ export {
     hasAppLogo,
     type AppLogoPalette
 } from "./shell/app-logo";
+export { ProductMark, type PolarisProduct } from "./shell/product-mark";
 export {
     AppShell,
     PolarisMark,

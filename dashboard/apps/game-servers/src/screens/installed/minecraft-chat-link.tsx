@@ -8,10 +8,19 @@
  * and the channel shown in the game.
  */
 
-import { Loader2, MessagesSquare } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { GameKey } from "../../../messages";
 import { useGameText } from "../game-text";
-import { Button, Card, CardBody, Select, Skeleton, Switch, isDirty } from "@polaris/ui";
+import {
+    ProductMark,
+    Button,
+    Card,
+    CardBody,
+    Select,
+    Skeleton,
+    Switch,
+    isDirty
+} from "@polaris/ui";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     CHAT_COMMANDS,
@@ -393,7 +402,7 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
                                     href={`/chat/c/${text}`}
                                     className="inline-flex items-center gap-1 font-medium text-foreground underline-offset-2 hover:underline"
                                 >
-                                    <MessagesSquare className="size-3.5 shrink-0" />
+                                    <ProductMark app="chat" size={14} />
                                     {t("chatLink.openInChat")}
                                 </a>
                             ) : (

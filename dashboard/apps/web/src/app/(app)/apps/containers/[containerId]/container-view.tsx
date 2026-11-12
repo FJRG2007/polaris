@@ -34,6 +34,7 @@ import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 import {
+    ProductMark,
     Badge,
     Button,
     Card,
@@ -57,7 +58,6 @@ import {
     ChevronRight,
     Cpu,
     Download,
-    ExternalLink,
     FileText,
     Folder,
     HardDrive,
@@ -879,7 +879,7 @@ function FilesTab({
                 {driveHref ? (
                     <Button size="sm" variant="secondary" asChild className="shrink-0">
                         <Link href={driveHref}>
-                            <ExternalLink className="size-4" />
+                            <ProductMark app="drive" />
                             {t("files.openInDrive")}
                         </Link>
                     </Button>

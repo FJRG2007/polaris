@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { SegmentedControl } from "@polaris/ui";
+import { ProductMark, SegmentedControl } from "@polaris/ui";
 import { setDriveShareAction } from "./actions";
 import type { DriveShare } from "@/lib/chat/drive-share";
 
@@ -38,7 +38,10 @@ export function DriveShareView({ how }: { how: DriveShare }) {
     return (
         <div className="flex flex-col gap-2">
             <div>
-                <p className="text-sm font-medium">{t("chat.driveShare.title")}</p>
+                <p className="flex items-center gap-1.5 text-sm font-medium">
+                    <ProductMark app="drive" />
+                    {t("chat.driveShare.title")}
+                </p>
                 <p className="text-xs text-muted-foreground">
                     {chosen === "copy"
                         ? t("chat.driveShare.copy.hint")

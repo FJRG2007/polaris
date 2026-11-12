@@ -56,6 +56,7 @@ import {
     Video
 } from "lucide-react";
 import {
+    ProductMark,
     Badge,
     Button,
     cn,
@@ -1358,7 +1359,7 @@ function ConferenceField({
                         aria-disabled={busy}
                         onClick={() => void create()}
                     >
-                        <Video />
+                        <ProductMark app="chat" />
                         {busy ? t("editor.addingMeeting") : t("editor.addMeeting")}
                     </Button>
                 ) : null}
