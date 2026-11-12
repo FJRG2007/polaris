@@ -59,21 +59,22 @@ const data = {
 const en = searchRecords(data, "en", "API reference");
 
 describe("the docs search index", () => {
-    it("has a record per page, per heading and per API operation, without the base path", () => {
+    it("has a record per page, per heading, per API group and per API operation, without the base path", () => {
         expect(en.map((record) => record.href)).toEqual([
             "en/docs/drive/",
             "en/docs/drive/#sharing",
             "en/docs/drive/#versions",
             "en/docs/mail/",
             "en/docs/mail/#filters",
-            "en/docs/api/#listTasks"
+            "en/docs/api/tasks/",
+            "en/docs/api/tasks/list-tasks/"
         ]);
         expect(en[1]).toMatchObject({ title: "Sharing", page: "Drive" });
     });
 
     it("builds each locale from its own guides", () => {
         const es = searchRecords(data, "es", "Referencia");
-        expect(es.map((record) => record.title)).toEqual(["Drive", "Compartir", "List tasks"]);
+        expect(es.map((record) => record.title)).toEqual(["Drive", "Compartir", "Tasks", "List tasks"]);
         expect(es.every((record) => record.href.startsWith("es/"))).toBe(true);
     });
 

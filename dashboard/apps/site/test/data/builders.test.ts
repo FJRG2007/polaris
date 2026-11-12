@@ -208,9 +208,11 @@ describe("apiOperations", () => {
             in: "path",
             required: true,
             type: "string",
-            description: ""
+            description: "",
+            constraints: []
         });
         expect(groups[1]!.operations[1]!.body).toContain('"type": "object"');
+        expect(groups[1]!.operations[1]!.bodyShapes).toEqual([{ type: "object", fields: [] }]);
     });
 
     it("fills message placeholders and leaves unknown ones", () => {

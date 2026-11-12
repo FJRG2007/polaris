@@ -15,6 +15,8 @@ import { HostField, HostedHtml } from "@/components/example-host";
 import { EXAMPLE_HOST } from "@/lib/example-origin";
 import { SiteTvChecker, SiteTvGallery } from "@/components/site-tv-checker";
 import { TV_COMPAT_SLUG, TV_PRIVACY_SLUG } from "@/data/builders";
+import { PageToc, PageTocFolded } from "@/components/page-toc";
+import { apiPath } from "@/data/api-pages";
 
 /** The sidebar's groups in a locale, as the site was generated with them. */
 export function docSections(locale: SiteLocale): readonly DocSection[] {
@@ -41,6 +43,70 @@ export function searchWords(locale: SiteLocale): DocsSearchWords {
     };
 }
 
+/**
+ * A docs page: the search and a sidebar list on the left, the page in the
+ * middle and, on a wide screen, `aside` on the right. The guides and the API
+ * reference share it, each with its own list.
+ */
+export function DocsLayout({
+    locale,
+    label,
+    sidebar,
+    aside,
+    children
+}: {
+    locale: SiteLocale;
+    /** The sidebar list's name, read aloud and shown on its folded form. */
+    label: string;
+    sidebar: ReactNode;
+    aside?: ReactNode;
+    children: ReactNode;
+}) {
+    return (
+        <div className="flex flex-col gap-8 lg:flex-row">
+            <nav
+                aria-label={label}
+                className="flex shrink-0 flex-col gap-3 text-sm lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-56 lg:self-start lg:overflow-y-auto"
+            >
+                <DocsSearch locale={locale} words={searchWords(locale)} className="w-full" />
+                <SideList label={label}>{sidebar}</SideList>
+            </nav>
+            <div className="flex min-w-0 flex-1 flex-col gap-6">{children}</div>
+            {aside}
+        </div>
+    );
+}
+
+/** A folding group in a sidebar list, open when it holds the current page. */
+export function SideSection({
+    label,
+    open,
+    children
+}: {
+    label: string;
+    open: boolean;
+    children: ReactNode;
+}) {
+    return (
+        <details open={open} className="group/section">
+            <summary className="flex cursor-pointer select-none list-none items-center gap-1 rounded-md px-2 py-1 text-xs font-medium uppercase tracking-wide text-foreground-subtle hover:text-foreground [&::-webkit-details-marker]:hidden">
+                <ChevronRight
+                    className="size-3.5 shrink-0 transition-transform group-open/section:rotate-90"
+                    aria-hidden="true"
+                />
+                <span className="min-w-0 truncate" title={label}>
+                    {label}
+                </span>
+            </summary>
+            <ul className="mt-0.5 flex flex-col gap-0.5 pl-3">{children}</ul>
+        </details>
+    );
+}
+
+/** A sidebar link, marked when it is the page being read. */
+export const SIDE_LINK =
+    "flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-muted-foreground hover:text-foreground aria-[current=page]:bg-surface aria-[current=page]:text-foreground";
+
 function DocsFrame({
     locale,
     current,
@@ -55,55 +121,42 @@ function DocsFrame({
     const t = words(locale).docs;
     const pages = new Map(siteData().docs[locale].map((page) => [page.slug, page]));
     return (
-        <div className="flex flex-col gap-8 lg:flex-row">
-            <nav
-                aria-label={t.guides}
-                className="flex shrink-0 flex-col gap-3 text-sm lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-56 lg:self-start lg:overflow-y-auto"
-            >
-                <DocsSearch locale={locale} words={searchWords(locale)} className="w-full" />
-                <SideList label={t.guides}>
+        <DocsLayout
+            locale={locale}
+            label={t.guides}
+            aside={aside}
+            sidebar={
+                <>
                     {docSections(locale).map((section) => (
-                        <details
+                        <SideSection
                             key={section.label}
+                            label={section.label}
                             open={current === null || section.slugs.includes(current)}
-                            className="group/section"
                         >
-                            <summary className="flex cursor-pointer select-none list-none items-center gap-1 rounded-md px-2 py-1 text-xs font-medium uppercase tracking-wide text-foreground-subtle hover:text-foreground [&::-webkit-details-marker]:hidden">
-                                <ChevronRight
-                                    className="size-3.5 shrink-0 transition-transform group-open/section:rotate-90"
-                                    aria-hidden="true"
-                                />
-                                <span className="min-w-0 truncate" title={section.label}>
-                                    {section.label}
-                                </span>
-                            </summary>
-                            <ul className="mt-0.5 flex flex-col gap-0.5 pl-3">
-                                {section.slugs.map((slug) => (
-                                    <li key={slug}>
-                                        <Link
-                                            href={href(locale, `docs/${slug}/`)}
-                                            aria-current={slug === current ? "page" : undefined}
-                                            title={pages.get(slug)?.title}
-                                            className="block truncate rounded-md px-2 py-1 text-muted-foreground hover:text-foreground aria-[current=page]:bg-surface aria-[current=page]:text-foreground"
-                                        >
+                            {section.slugs.map((slug) => (
+                                <li key={slug}>
+                                    <Link
+                                        href={href(locale, `docs/${slug}/`)}
+                                        aria-current={slug === current ? "page" : undefined}
+                                        title={pages.get(slug)?.title}
+                                        className={SIDE_LINK}
+                                    >
+                                        <span className="min-w-0 truncate">
                                             {pages.get(slug)?.title ?? slug}
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
-                        </details>
+                                        </span>
+                                    </Link>
+                                </li>
+                            ))}
+                        </SideSection>
                     ))}
-                    <Link
-                        href={href(locale, "docs/api/")}
-                        className="rounded-md px-2 py-1 text-muted-foreground hover:text-foreground"
-                    >
+                    <Link href={href(locale, apiPath.overview())} className={SIDE_LINK}>
                         {words(locale).api.title}
                     </Link>
-                </SideList>
-            </nav>
-            <div className="flex min-w-0 flex-1 flex-col gap-6">{children}</div>
-            {aside}
-        </div>
+                </>
+            }
+        >
+            {children}
+        </DocsLayout>
     );
 }
 
@@ -123,7 +176,7 @@ export function SideList({ label, children }: { label: string; children: ReactNo
     );
 }
 
-const CARD =
+export const CARD =
     "flex h-full min-w-0 flex-col gap-1 rounded-xl border border-border bg-card p-4 hover:border-foreground/30";
 
 export function DocsIndexView({ locale }: { locale: SiteLocale }) {
@@ -155,7 +208,7 @@ export function DocsIndexView({ locale }: { locale: SiteLocale }) {
                     </ul>
                 </section>
             ))}
-            <Link href={href(locale, "docs/api/")} className={CARD}>
+            <Link href={href(locale, apiPath.overview())} className={CARD}>
                 <span className="flex items-center gap-1 font-medium">
                     {words(locale).api.title}
                     <ArrowRight className="size-4 shrink-0" />
@@ -170,21 +223,21 @@ export function findDoc(locale: SiteLocale, slug: string): DocPage | undefined {
     return siteData().docs[locale].find((page) => page.slug === slug);
 }
 
-function Neighbor({
-    locale,
-    slug,
+/** The previous or next page, at the foot of a page. */
+export function NeighborLink({
+    to,
+    title,
     label,
     next
 }: {
-    locale: SiteLocale;
-    slug: string;
+    to: string;
+    title: string;
     label: string;
     next?: boolean;
 }) {
-    const title = findDoc(locale, slug)?.title ?? slug;
     return (
         <Link
-            href={href(locale, `docs/${slug}/`)}
+            href={to}
             rel={next ? "next" : "prev"}
             className={`flex min-w-0 flex-col gap-0.5 rounded-xl border border-border p-3 hover:border-foreground/30 ${next ? "items-end text-right sm:col-start-2" : ""}`}
         >
@@ -200,85 +253,86 @@ function Neighbor({
     );
 }
 
+/** Where a page sits: each step a link but the last, which is the page itself. */
+export function Breadcrumb({
+    label,
+    trail
+}: {
+    label: string;
+    trail: readonly { label: string; to?: string }[];
+}) {
+    return (
+        <nav aria-label={label}>
+            <ol className="flex min-w-0 flex-wrap items-center gap-1 text-sm text-muted-foreground">
+                {trail.map((step, at) => (
+                    <li key={`${at}-${step.label}`} className="flex min-w-0 items-center gap-1">
+                        {at ? (
+                            <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
+                        ) : null}
+                        {at === trail.length - 1 ? (
+                            <span
+                                aria-current="page"
+                                className="truncate text-foreground"
+                                title={step.label}
+                            >
+                                {step.label}
+                            </span>
+                        ) : step.to ? (
+                            <Link
+                                href={step.to}
+                                className="truncate hover:text-foreground"
+                                title={step.label}
+                            >
+                                {step.label}
+                            </Link>
+                        ) : (
+                            <span className="truncate" title={step.label}>
+                                {step.label}
+                            </span>
+                        )}
+                    </li>
+                ))}
+            </ol>
+        </nav>
+    );
+}
+
 export function DocView({ locale, page }: { locale: SiteLocale; page: DocPage }) {
     const t = words(locale).docs;
     const { repo } = siteData();
     const { previous, next, section } = docNeighbors(docSections(locale), page.slug);
+    const neighbor = (slug: string, label: string, isNext?: boolean) => (
+        <NeighborLink
+            to={href(locale, `docs/${slug}/`)}
+            title={findDoc(locale, slug)?.title ?? slug}
+            label={label}
+            next={isNext}
+        />
+    );
     return (
         <DocsFrame
             locale={locale}
             current={page.slug}
             aside={
-                page.headings.length ? (
-                    <nav
-                        aria-label={t.onThisPage}
-                        className="hidden shrink-0 flex-col gap-1 text-sm xl:sticky xl:top-20 xl:flex xl:max-h-[calc(100vh-6rem)] xl:w-48 xl:self-start xl:overflow-y-auto"
-                    >
-                        <p className="text-xs font-medium uppercase tracking-wide text-foreground-subtle">
-                            {t.onThisPage}
-                        </p>
-                        {page.headings.map((heading) => (
-                            <a
-                                key={heading.id}
-                                href={`#${heading.id}`}
-                                className="truncate text-muted-foreground hover:text-foreground"
-                                title={heading.text}
-                            >
-                                {heading.text}
-                            </a>
-                        ))}
-                    </nav>
-                ) : null
+                page.headings.length ? <PageToc label={t.onThisPage} items={page.headings} /> : null
             }
         >
             <article className="flex min-w-0 flex-col gap-4">
-                <nav aria-label={t.breadcrumb}>
-                    <ol className="flex min-w-0 flex-wrap items-center gap-1 text-sm text-muted-foreground">
-                        <li>
-                            <Link href={href(locale, "docs/")} className="hover:text-foreground">
-                                {t.title}
-                            </Link>
-                        </li>
-                        {section ? (
-                            <li className="flex min-w-0 items-center gap-1">
-                                <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
-                                <span className="truncate" title={section}>
-                                    {section}
-                                </span>
-                            </li>
-                        ) : null}
-                        <li className="flex min-w-0 items-center gap-1">
-                            <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
-                            <span aria-current="page" className="truncate text-foreground">
-                                {page.title}
-                            </span>
-                        </li>
-                    </ol>
-                </nav>
+                <Breadcrumb
+                    label={t.breadcrumb}
+                    trail={[
+                        { label: t.title, to: href(locale, "docs/") },
+                        ...(section ? [{ label: section }] : []),
+                        { label: page.title }
+                    ]}
+                />
                 <h1 className="text-3xl font-semibold tracking-tight">{page.title}</h1>
                 {page.headings.length ? (
-                    <details className="rounded-md border border-border text-sm xl:hidden">
-                        <summary className="cursor-pointer select-none px-3 py-2">
-                            {t.onThisPage}
-                        </summary>
-                        <ul className="flex flex-col gap-1 border-t border-border p-3">
-                            {page.headings.map((heading) => (
-                                <li key={heading.id} className="min-w-0">
-                                    <a
-                                        href={`#${heading.id}`}
-                                        className="block truncate text-muted-foreground hover:text-foreground"
-                                        title={heading.text}
-                                    >
-                                        {heading.text}
-                                    </a>
-                                </li>
-                            ))}
-                        </ul>
-                    </details>
+                    <PageTocFolded label={t.onThisPage} items={page.headings} />
                 ) : null}
                 {page.html.includes(EXAMPLE_HOST) ? <HostField words={words(locale).host} /> : null}
                 {/* Rendered at build time from this repository's own Markdown. */}
-                <HostedHtml className="doc-prose" html={page.html} />
+                <HostedHtml className="doc-prose" html={page.html} viewer={words(locale).viewer} />
                 {page.slug === TV_COMPAT_SLUG || page.slug === TV_PRIVACY_SLUG ? (
                     <SiteTvChecker
                         locale={locale}
@@ -291,6 +345,7 @@ export function DocView({ locale, page }: { locale: SiteLocale; page: DocPage })
                         locale={locale}
                         messages={siteData().downloadsPage.messages[locale].tvCompat}
                         items={siteData().downloadsPage.tvGallery ?? []}
+                        viewer={words(locale).viewer}
                     />
                 ) : null}
                 <a
@@ -301,10 +356,8 @@ export function DocView({ locale, page }: { locale: SiteLocale; page: DocPage })
                 </a>
                 {previous || next ? (
                     <nav className="grid grid-cols-1 gap-3 border-t border-border pt-4 sm:grid-cols-2">
-                        {previous ? (
-                            <Neighbor locale={locale} slug={previous} label={t.previous} />
-                        ) : null}
-                        {next ? <Neighbor locale={locale} slug={next} label={t.next} next /> : null}
+                        {previous ? neighbor(previous, t.previous) : null}
+                        {next ? neighbor(next, t.next, true) : null}
                     </nav>
                 ) : null}
             </article>

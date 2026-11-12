@@ -6,6 +6,8 @@
  * sources and the tests feed them fixtures. Nothing here fetches or reads files.
  */
 import type { InventoryRoute } from "@/data/api-inventory";
+// Relative: the generator bundles this file against the dashboard's own `@/` alias.
+import { apiPath } from "./api-pages";
 import type { DocPage, DocSection } from "@/data/docs";
 import type { SearchRecord } from "@/lib/search-index";
 import type { AppDownload } from "@polaris/ui/account-downloads/app-releases";
@@ -291,12 +293,45 @@ export function parseInstallLines(markdown: string): {
 /* API reference                                                               */
 /* -------------------------------------------------------------------------- */
 
+/** One rule a value has to follow, named by its JSON Schema keyword. */
+export interface ApiConstraint {
+    readonly kind:
+        | "default"
+        | "enum"
+        | "const"
+        | "format"
+        | "pattern"
+        | "minLength"
+        | "maxLength"
+        | "minimum"
+        | "maximum"
+        | "minItems"
+        | "maxItems";
+    readonly value: string;
+}
+
 export interface ApiParameter {
     readonly name: string;
     readonly in: string;
     readonly required: boolean;
     readonly type: string;
     readonly description: string;
+    readonly constraints: readonly ApiConstraint[];
+}
+
+/** A field of a request body; a nested one is named by its path (`params.cursor`). */
+export interface ApiField {
+    readonly name: string;
+    readonly type: string;
+    readonly required: boolean;
+    readonly description: string;
+    readonly constraints: readonly ApiConstraint[];
+}
+
+/** One shape a request body may take: most have one, a body that is one of several has each. */
+export interface ApiBodyShape {
+    readonly type: string;
+    readonly fields: readonly ApiField[];
 }
 
 export interface ApiOperation {
@@ -309,10 +344,92 @@ export interface ApiOperation {
     readonly parameters: readonly ApiParameter[];
     /** The request body's JSON schema, pretty-printed, when it has one. */
     readonly body: string | null;
+    /** The same body as tables of fields, one per shape it may take. */
+    readonly bodyShapes: readonly ApiBodyShape[];
     readonly responses: readonly { status: string; description: string }[];
 }
 
 type Json = Record<string, unknown>;
+
+const CONSTRAINT_KINDS: readonly ApiConstraint["kind"][] = [
+    "default",
+    "enum",
+    "const",
+    "format",
+    "pattern",
+    "minLength",
+    "maxLength",
+    "minimum",
+    "maximum",
+    "minItems",
+    "maxItems"
+];
+
+/** A schema with a local `$ref` followed, at most a few hops, so a loop cannot hang the build. */
+function resolveSchema(doc: Json, schema: unknown, hops = 0): Json {
+    const node = (schema ?? {}) as Json;
+    const ref = node.$ref;
+    if (typeof ref !== "string" || !ref.startsWith("#/") || hops > 8) return node;
+    let target: unknown = doc;
+    for (const part of ref.slice(2).split("/")) target = (target as Json | undefined)?.[part];
+    return resolveSchema(doc, target, hops + 1);
+}
+
+/** How a schema's type reads in a table: `string`, `integer[]`, `string | number`. */
+export function schemaType(doc: Json, raw: unknown): string {
+    const schema = resolveSchema(doc, raw);
+    const union = (schema.anyOf ?? schema.oneOf) as unknown[] | undefined;
+    if (Array.isArray(union)) return [...new Set(union.map((one) => schemaType(doc, one)))].join(" | ");
+    if (Array.isArray(schema.type)) return schema.type.map(String).join(" | ");
+    if (schema.type === "array") return `${schemaType(doc, schema.items)}[]`;
+    if (typeof schema.type === "string") return schema.type;
+    if ("const" in schema) return typeof schema.const;
+    if (Array.isArray(schema.enum)) return typeof schema.enum[0];
+    return schema.properties ? "object" : "any";
+}
+
+function constraintsOf(schema: Json): ApiConstraint[] {
+    const show = (value: unknown) => (typeof value === "string" ? value : JSON.stringify(value));
+    return CONSTRAINT_KINDS.filter((kind) => schema[kind] !== undefined).map((kind) => ({
+        kind,
+        value:
+            kind === "enum" && Array.isArray(schema.enum)
+                ? schema.enum.map(show).join(", ")
+                : show(schema[kind])
+    }));
+}
+
+/** The fields of an object schema, nested objects listed under their path, three levels deep. */
+function fieldsOf(doc: Json, raw: unknown, prefix = "", depth = 0): ApiField[] {
+    const schema = resolveSchema(doc, raw);
+    const properties = (schema.properties ?? {}) as Record<string, unknown>;
+    const required = new Set((schema.required as string[] | undefined) ?? []);
+    return Object.entries(properties).flatMap(([name, value]) => {
+        const field = resolveSchema(doc, value);
+        const own: ApiField = {
+            name: `${prefix}${name}`,
+            type: schemaType(doc, field),
+            required: required.has(name),
+            description: String(field.description ?? ""),
+            constraints: constraintsOf(field)
+        };
+        const nested =
+            field.properties && depth < 2 ? fieldsOf(doc, field, `${prefix}${name}.`, depth + 1) : [];
+        return [own, ...nested];
+    });
+}
+
+/** A request body as the shapes it may take, each with its fields. */
+export function bodyShapes(doc: Json, raw: unknown): ApiBodyShape[] {
+    if (!raw) return [];
+    const schema = resolveSchema(doc, raw);
+    const union = (schema.anyOf ?? schema.oneOf) as unknown[] | undefined;
+    const variants = Array.isArray(union) ? union : [schema];
+    return variants.map((variant) => ({
+        type: schemaType(doc, variant),
+        fields: fieldsOf(doc, variant)
+    }));
+}
 
 const METHODS = ["get", "post", "put", "patch", "delete"];
 
@@ -335,14 +452,19 @@ export function apiOperations(doc: Json): { tag: string; operations: ApiOperatio
                 tag: String((op.tags as string[] | undefined)?.[0] ?? "Other"),
                 summary: String(op.summary ?? ""),
                 description: String(op.description ?? ""),
-                parameters: params.map((param) => ({
-                    name: String(param.name ?? ""),
-                    in: String(param.in ?? ""),
-                    required: param.required === true,
-                    type: String((param.schema as Json | undefined)?.type ?? "string"),
-                    description: String(param.description ?? "")
-                })),
+                parameters: params.map((param) => {
+                    const schema = resolveSchema(doc, param.schema);
+                    return {
+                        name: String(param.name ?? ""),
+                        in: String(param.in ?? ""),
+                        required: param.required === true,
+                        type: param.schema ? schemaType(doc, schema) : "string",
+                        description: String(param.description ?? schema.description ?? ""),
+                        constraints: constraintsOf(schema)
+                    };
+                }),
                 body: body?.schema ? JSON.stringify(body.schema, null, 2) : null,
+                bodyShapes: bodyShapes(doc, body?.schema),
                 responses: Object.entries((op.responses ?? {}) as Record<string, Json>).map(
                     ([status, value]) => ({
                         status,
@@ -523,13 +645,20 @@ export function searchRecords(
                     .map((step) => `${step.path} ${privacyWords?.steps?.[step.id] ?? ""}`)
                     .join(" ")
             });
-    for (const group of data.api.groups)
+    for (const group of data.api.groups) {
+        records.push({
+            title: group.tag,
+            page: apiTitle,
+            href: `${locale}/${apiPath.group(group.tag)}`,
+            text: group.operations.map((op) => op.summary || op.path).join(" ")
+        });
         for (const op of group.operations)
             records.push({
                 title: op.summary || op.path,
                 page: apiTitle,
-                href: `${locale}/docs/api/#${op.id}`,
+                href: `${locale}/${apiPath.operation({ id: op.id, tag: group.tag })}`,
                 text: `${op.method} ${op.path} ${group.tag} ${op.description}`
             });
+    }
     return records;
 }

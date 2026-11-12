@@ -11,6 +11,7 @@
  */
 
 import type { SiteData } from "@/data/builders";
+import { apiPath } from "./api-pages";
 
 /** Where things live in the repository, for an agent that has to change one. */
 export const REPOSITORY_MAP: readonly { readonly path: string; readonly what: string }[] = [
@@ -38,7 +39,7 @@ export const REPOSITORY_MAP: readonly { readonly path: string; readonly what: st
  * path and no trailing slash, such as `https://fjrg2007.github.io/polaris`.
  */
 export function llmsText(
-    data: Pick<SiteData, "repo" | "install" | "docs" | "locales">,
+    data: Pick<SiteData, "repo" | "install" | "docs" | "locales"> & { api: Pick<SiteData["api"], "groups"> },
     site: string,
     summary: string
 ): string {
@@ -69,7 +70,13 @@ export function llmsText(
     lines.push(
         "## API",
         "",
-        `- [API reference](${site}/en/docs/api/): every route that answers to an API key, with examples`,
+        `- [API reference](${site}/en/docs/api/): authentication, base address and the errors every call shares`,
+        ...data.api.groups.flatMap((group) => [
+            `- [${group.tag}](${site}/en/${apiPath.group(group.tag)}): ${group.operations.length} call${group.operations.length === 1 ? "" : "s"}`,
+            ...group.operations.map(
+                (op) => `  - [${op.method} ${op.path}](${site}/en/${apiPath.operation(op)})${op.summary ? `: ${op.summary}` : ""}`
+            )
+        ]),
         `- [OpenAPI document](${site}/openapi.json): the same routes as OpenAPI 3`,
         ""
     );

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isLocale, words, pageMetadata } from "@/lib/site";
-import { ApiDocsView } from "@/views/api-docs";
+import { ApiOverviewView } from "@/views/api-docs";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -19,5 +19,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function Page({ params }: Props) {
     const { locale } = await params;
     if (!isLocale(locale)) notFound();
-    return <ApiDocsView locale={locale} />;
+    return <ApiOverviewView locale={locale} />;
 }

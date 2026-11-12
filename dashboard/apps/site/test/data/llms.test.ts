@@ -27,6 +27,14 @@ const data = {
             apps: [{ id: "crm", name: "CRM", summary: "Contacts and deals." }],
             builtIn: [{ id: "drive", name: "Drive", description: "Files." }]
         }
+    },
+    api: {
+        groups: [
+            {
+                tag: "Account",
+                operations: [{ id: "getMe", tag: "Account", method: "GET", path: "/api/v1/me", summary: "Who this key acts as" }]
+            }
+        ]
     }
 } as unknown as Parameters<typeof llmsText>[0];
 
@@ -52,6 +60,14 @@ describe("llms.txt", () => {
         expect(text).toContain("(https://fjrg2007.github.io/polaris/openapi.json)");
         expect(text).toContain("- Linux and macOS: `curl -fsSL https://example.test/install.sh | sh`");
         expect(text).not.toContain("Windows:");
+    });
+
+    it("links the API overview, each group and each call", () => {
+        expect(text).toContain("- [API reference](https://fjrg2007.github.io/polaris/en/docs/api/)");
+        expect(text).toContain("- [Account](https://fjrg2007.github.io/polaris/en/docs/api/account/): 1 call");
+        expect(text).toContain(
+            "  - [GET /api/v1/me](https://fjrg2007.github.io/polaris/en/docs/api/account/get-me/): Who this key acts as"
+        );
     });
 
     it("ends with exactly one newline", () => {

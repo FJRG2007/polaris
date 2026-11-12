@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { appIds } from "@/views/app-page";
 import { SITE_LOCALES } from "@/data/builders";
+import { apiPages } from "@/data/api-pages";
+import { undocumentedRoutes } from "@/views/api-docs";
 import { asset, href, siteData, SITE_ORIGIN } from "@/lib/site";
 
 export const dynamic = "force-static";
@@ -15,7 +17,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
         "marketplace/",
         "downloads/",
         "docs/",
-        "docs/api/",
+        ...apiPages(siteData().api.groups, undocumentedRoutes().length).map((page) => page.path),
         ...siteData().docs.en.map((page) => `docs/${page.slug}/`),
         ...appIds("en").map((id) => `marketplace/${id}/`)
     ];

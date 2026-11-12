@@ -72,3 +72,25 @@ body {
         @apply border-l-2 border-border pl-3 text-muted-foreground;
     }
 }
+
+/* An API table on a phone: each row a small card of its cells, nothing to scroll sideways. */
+@media (max-width: 639px) {
+    .api-table,
+    .api-table tbody,
+    .api-table tr,
+    .api-table td {
+        display: block;
+        width: 100%;
+    }
+    .api-table thead,
+    .api-table colgroup {
+        display: none;
+    }
+    .api-table tr {
+        padding: 0.5rem 0;
+    }
+    .api-table td {
+        padding-top: 0.125rem;
+        padding-bottom: 0.125rem;
+    }
+}
