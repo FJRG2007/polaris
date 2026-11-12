@@ -56,6 +56,7 @@ import { spokenEditWindow, spokenWait } from "./durations";
 import { ageClearedWhere, requireAgeCleared } from "./age-gate";
 import { MAX_REREAD } from "./reread-limit";
 import * as history from "./history-visibility";
+import { webhookFace } from "./webhook-face";
 import { concealedFor, requireUnlocked, unhideOnMessage } from "./chat-lock";
 
 /** One message, with everything the list needs to draw it. */
@@ -69,6 +70,8 @@ export interface ChatMessageView {
      *  webhooks, rather than by a person - drawn with an APP badge, as Discord
      *  does, because the name on it is whatever the sender chose. */
     readonly fromWebhook?: boolean;
+    /** The picture a webhook message is drawn with - see `webhookFace`. */
+    readonly webhookAvatar?: string;
     /** Written by an assistant answering a mention - "polar" - and drawn with
      *  its mark and an AI badge, never as a person. */
     readonly fromAgent?: string;
@@ -1805,6 +1808,7 @@ export const MESSAGE_SELECT = {
     createdAt: true,
     webhookId: true,
     authorLabel: true,
+    authorAvatarUrl: true,
     agent: true,
     translation: true
 } as const;
@@ -1827,6 +1831,7 @@ interface Row {
      *  read that selected its own columns (search) still decorates. */
     webhookId?: string | null;
     authorLabel?: string | null;
+    authorAvatarUrl?: string | null;
     /** The assistant that wrote it, for one answering a mention. */
     agent?: string | null;
     /** `{ from, to, original }` when it was sent translated - see
@@ -2014,6 +2019,25 @@ export async function decorateMessages(
         if (codes.length > 0) invitedTo.set(row.id, codes);
     }
     const inviteCardsFound = await inviteCards(actor, [...invitedTo.values()].flat());
+    // The webhooks on this page that have a picture of their own - asked only
+    // for messages that did not name one, and not at all on most pages.
+    const facelessHooks = [
+        ...new Set(
+            rows
+                .filter((row) => row.webhookId && !row.authorAvatarUrl)
+                .map((row) => row.webhookId!)
+        )
+    ];
+    const hookFaces = new Map(
+        facelessHooks.length
+            ? (
+                  await prisma.chatWebhookAvatar.findMany({
+                      where: { webhookId: { in: facelessHooks } },
+                      select: { webhookId: true, updatedAt: true }
+                  })
+              ).map((face) => [face.webhookId, face.updatedAt] as const)
+            : []
+    );
     const names = new Map(
         [...authors, ...quoteAuthors].map((author) => [
             author.id,
@@ -2121,6 +2145,7 @@ export async function decorateMessages(
                   ? (row.authorLabel ?? null)
                   : null,
             ...(row.webhookId ? { fromWebhook: true } : {}),
+            ...faceOf(webhookFace(row, hookFaces)),
             ...(row.agent ? { fromAgent: row.agent } : {}),
             kind: row.kind as core.ChatMessageKind,
             body: row.deletedAt ? "" : notice ? noticeString(notice) : row.body,
@@ -2330,4 +2355,8 @@ function quoteViewOf(
         deleted: original.deletedAt !== null,
         forwarded: row.forwarded
     };
+}
+
+function faceOf(face: string | null): { webhookAvatar?: string } {
+    return face ? { webhookAvatar: face } : {};
 }

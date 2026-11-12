@@ -9768,8 +9768,22 @@ model ChatWebhook {
     createdAt   DateTime  @default(now())
 
     channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+    avatar  ChatWebhookAvatar?
 
     @@index([channelId, createdAt])
+}
+
+// The picture a webhook's messages carry unless a request names another. The
+// same shape as a channel's picture, through the same service and storage.
+model ChatWebhookAvatar {
+    webhookId    String   @id @db.Uuid
+    connectionId String?
+    path         String
+    mime         String
+    size         Int      @default(0)
+    updatedAt    DateTime @updatedAt
+
+    webhook ChatWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
 }
 
 // A picture somebody kept, so they can send it again.
@@ -10173,6 +10187,10 @@ model ChatMessage {
     // `authorId` outlives an account.
     webhookId    String?   @db.Uuid
     authorLabel  String?
+    // The https address of the picture a webhook request asked to post under
+    // (Discord's `avatar_url`). Never drawn from the reader's browser: it is
+    // fetched through Polaris, addressed by this message.
+    authorAvatarUrl String?
     // Written by an assistant answering a mention rather than by a person or a
     // webhook: "polar" for Polar. Its name is `authorLabel`, and `replyToId` is
     // the message that asked.

@@ -24,6 +24,7 @@ import * as core from "@polaris/core";
 import { unfurlLater } from "./messages";
 import { checkLinksLater } from "./link-safety";
 import { publishChatChange } from "./live";
+import { discardAvatars } from "@/lib/avatar-service";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { rateLimit, type RateLimitResult } from "@/lib/rate-limit-service";
 import {
@@ -48,6 +49,9 @@ export interface ChatWebhookView {
     readonly createdBy: string | null;
     readonly createdAt: string;
     readonly lastUsedAt: string | null;
+    /** When its own picture last changed, or null while it has none - also
+     *  what the picture's address is versioned by. */
+    readonly avatarAt: string | null;
 }
 
 /** A webhook just made or reset: the one moment the secret is known. */
@@ -128,6 +132,8 @@ export async function resetWebhook(
 /** Delete one. What it already posted stays, under the name it posted with. */
 export async function deleteWebhook(actor: ChatActor, webhookId: string): Promise<void> {
     const found = await ownedWebhook(actor, webhookId);
+    // The picture's row cascades with the webhook; its bytes would not.
+    await discardAvatars("webhook", found.id);
     await prisma.chatWebhook.delete({ where: { id: found.id } });
 }
 
@@ -261,7 +267,7 @@ export async function postThroughWebhook(
     // The room's space's emoji and no other, the same as a person's message.
     const body = await confineCustomEmoji(input.content, channel.spaceId);
 
-    const label = input.username?.trim() || webhook.name;
+    const label = input.username ?? webhook.name;
     const id = await prisma.$transaction(async (tx) => {
         const message = await tx.chatMessage.create({
             data: {
@@ -270,7 +276,8 @@ export async function postThroughWebhook(
                 kind: "text",
                 body,
                 webhookId: webhook.id,
-                authorLabel: label
+                authorLabel: label,
+                authorAvatarUrl: input.avatar_url ?? null
             },
             select: { id: true, createdAt: true }
         });
@@ -304,7 +311,8 @@ const SELECT = {
     name: true,
     createdById: true,
     createdAt: true,
-    lastUsedAt: true
+    lastUsedAt: true,
+    avatar: { select: { updatedAt: true } }
 } as const;
 
 /** Managing a channel's webhooks is running the channel: Discord's Manage
@@ -348,6 +356,7 @@ async function viewsOf(
         createdById: string | null;
         createdAt: Date;
         lastUsedAt: Date | null;
+        avatar: { updatedAt: Date } | null;
     }[]
 ): Promise<ChatWebhookView[]> {
     const ids = [
@@ -365,6 +374,7 @@ async function viewsOf(
         name: row.name,
         createdBy: row.createdById ? (names.get(row.createdById) ?? null) : null,
         createdAt: row.createdAt.toISOString(),
-        lastUsedAt: row.lastUsedAt?.toISOString() ?? null
+        lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+        avatarAt: row.avatar?.updatedAt.toISOString() ?? null
     }));
 }

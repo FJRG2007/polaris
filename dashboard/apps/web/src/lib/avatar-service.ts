@@ -161,7 +161,9 @@ export type AvatarOwner =
     /** A chat space - what a Discord server calls its icon. */
     | { readonly kind: "space"; readonly id: string }
     /** One conversation: a group, or a channel inside a space. */
-    | { readonly kind: "channel"; readonly id: string };
+    | { readonly kind: "channel"; readonly id: string }
+    /** A channel's incoming webhook: the face its messages carry. */
+    | { readonly kind: "webhook"; readonly id: string };
 
 interface AvatarRow {
     readonly connectionId: string | null;
@@ -182,6 +184,9 @@ async function readRow(owner: AvatarOwner): Promise<AvatarRow | null> {
     }
     if (owner.kind === "space") {
         return prisma.chatSpaceAvatar.findUnique({ where: { spaceId: owner.id } });
+    }
+    if (owner.kind === "webhook") {
+        return prisma.chatWebhookAvatar.findUnique({ where: { webhookId: owner.id } });
     }
     return prisma.chatChannelAvatar.findUnique({ where: { channelId: owner.id } });
 }
@@ -276,6 +281,12 @@ async function writeRow(
             create: { spaceId: owner.id, ...stored },
             update: stored
         });
+    } else if (owner.kind === "webhook") {
+        await prisma.chatWebhookAvatar.upsert({
+            where: { webhookId: owner.id },
+            create: { webhookId: owner.id, ...stored },
+            update: stored
+        });
     } else {
         await prisma.chatChannelAvatar.upsert({
             where: { channelId: owner.id },
@@ -299,6 +310,8 @@ export async function deleteAvatar(owner: AvatarOwner): Promise<void> {
         await prisma.organizationBanner.delete({ where: { orgId: owner.id } });
     } else if (owner.kind === "space") {
         await prisma.chatSpaceAvatar.delete({ where: { spaceId: owner.id } });
+    } else if (owner.kind === "webhook") {
+        await prisma.chatWebhookAvatar.delete({ where: { webhookId: owner.id } });
     } else {
         await prisma.chatChannelAvatar.delete({ where: { channelId: owner.id } });
     }
@@ -307,7 +320,7 @@ export async function deleteAvatar(owner: AvatarOwner): Promise<void> {
 
 /** The kinds of thing that have a photo and can themselves be deleted. An
  *  account is one subject with two pictures; everything else has one. */
-export type AvatarSubject = "user" | "org" | "space" | "channel";
+export type AvatarSubject = "user" | "org" | "space" | "channel" | "webhook";
 
 /**
  * Take a subject's photos with it, before the rows saying where they are go.
@@ -343,6 +356,13 @@ export async function discardAvatars(subject: AvatarSubject, id: string): Promis
                     { kind: "orgBanner", id }
                 ]
               : [{ kind: subject, id }];
+    // A channel's webhooks cascade with it, and their pictures with them.
+    if (subject === "channel") {
+        const hooks = await prisma.chatWebhookAvatar
+            .findMany({ where: { webhook: { channelId: id } }, select: { webhookId: true } })
+            .catch(() => []);
+        for (const hook of hooks) owners.push({ kind: "webhook", id: hook.webhookId });
+    }
 
     const left: string[] = [];
     for (const owner of owners) {
@@ -730,7 +750,7 @@ export async function resolveOrgBanner(orgId: string): Promise<AvatarRef | null>
  * better than a photo would be for a group of three.
  */
 export async function resolveChatAvatar(
-    kind: "space" | "channel",
+    kind: "space" | "channel" | "webhook",
     id: string
 ): Promise<AvatarRef | null> {
     return uploadedAvatar({ kind, id });

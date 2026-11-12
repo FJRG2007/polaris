@@ -1277,14 +1277,18 @@ export const chatWebhookRenameSchema = z.object({
 
 export type ChatWebhookRenameInput = z.infer<typeof chatWebhookRenameSchema>;
 
+/** The longest picture address a webhook request may name. */
+export const MAX_WEBHOOK_AVATAR_URL = 2048;
+
 /**
  * What something outside Polaris posts to a webhook's address.
  *
  * Discord's body, so a tool that already posts to a Discord webhook posts here
- * by changing the address: `content` is the message and `username` the name it
- * goes out under. Discord's other fields (`avatar_url`, `embeds`, `tts`,
- * `allowed_mentions`) are accepted and ignored rather than refused, because a
- * tool sends them whether or not they are used.
+ * by changing the address: `content` is the message, and `username` and
+ * `avatar_url` the name and picture it goes out under instead of the webhook's
+ * own. Discord's other fields (`embeds`, `tts`, `allowed_mentions`) are
+ * accepted and ignored rather than refused, because a tool sends them whether
+ * or not they are used.
  */
 export const chatWebhookExecuteSchema = z
     .object({
@@ -1292,9 +1296,29 @@ export const chatWebhookExecuteSchema = z
             .string()
             .max(MAX_CHAT_MESSAGE, "That is longer than a message can be")
             .refine((value) => value.trim().length > 0, "Cannot send an empty message"),
-        username: z.string().trim().max(MAX_CHAT_WEBHOOK_NAME).optional()
+        username: z
+            .string()
+            .trim()
+            .min(1, "username must be between 1 and 80 in length")
+            .max(MAX_CHAT_WEBHOOK_NAME, "username must be between 1 and 80 in length")
+            .optional(),
+        avatar_url: z
+            .string()
+            .trim()
+            .max(MAX_WEBHOOK_AVATAR_URL, "avatar_url is too long")
+            .refine(isHttpsUrl, "avatar_url must be an https address")
+            .optional()
     })
     .passthrough();
+
+function isHttpsUrl(value: string): boolean {
+    try {
+        const url = new URL(value);
+        return url.protocol === "https:" && url.hostname.length > 0 && !url.username && !url.password;
+    } catch {
+        return false;
+    }
+}
 
 export type ChatWebhookExecuteInput = z.infer<typeof chatWebhookExecuteSchema>;
 

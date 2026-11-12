@@ -14,10 +14,21 @@ import { channelAccess, picturesAllowed, spaceAccess } from "@/lib/chat/access";
  */
 export async function mayChangeChatPicture(
     userId: string,
-    kind: "space" | "channel",
+    kind: "space" | "channel" | "webhook",
     id: string
 ): Promise<boolean> {
     const actor = { id: userId };
+    if (kind === "webhook") {
+        // Whoever manages the channel's webhooks - the same standing as
+        // renaming one.
+        const hook = await prisma.chatWebhook.findUnique({
+            where: { id },
+            select: { channelId: true }
+        });
+        if (!hook) return false;
+        const access = await channelAccess(actor, hook.channelId);
+        return Boolean(access?.spaceId && access.mayAdminister);
+    }
     if (kind === "space") {
         const access = await spaceAccess(actor, id);
         return access === "owner" || access === "admin";

@@ -16,6 +16,7 @@
  * group photo that changes.
  */
 
+import { prisma } from "@polaris/db";
 import { storageRefusal } from "@/lib/storage-refusal";
 import { apiUser } from "@/lib/api-session";
 import { inviteShowsSpace } from "@/lib/chat/invite-cards";
@@ -45,10 +46,10 @@ const CACHE = "private, no-cache";
  *  picture", so it is not cached as one. */
 const NO_CACHE = "private, no-store";
 
-type Kind = "space" | "channel";
+type Kind = "space" | "channel" | "webhook";
 
 function kindOf(raw: string): Kind | null {
-    return raw === "space" || raw === "channel" ? raw : null;
+    return raw === "space" || raw === "channel" || raw === "webhook" ? raw : null;
 }
 
 export async function GET(
@@ -166,5 +167,13 @@ export async function DELETE(
 async function mayRead(userId: string, kind: Kind, id: string): Promise<boolean> {
     const actor = { id: userId };
     if (kind === "space") return (await spaceAccess(actor, id)) !== null;
+    if (kind === "webhook") {
+        // Anybody who can read the channel it posts into sees its face.
+        const hook = await prisma.chatWebhook.findUnique({
+            where: { id },
+            select: { channelId: true }
+        });
+        return hook !== null && (await channelAccess(actor, hook.channelId)) !== null;
+    }
     return (await channelAccess(actor, id)) !== null;
 }

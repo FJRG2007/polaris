@@ -3,7 +3,7 @@
  *
  * Discord's execute-webhook endpoint, closely enough that a tool already posting
  * to a Discord webhook posts here by changing the address: a JSON body with
- * `content` and an optional `username`, `204 No Content` on success, and with
+ * `content` and an optional `username` and `avatar_url`, `204 No Content` on success, and with
  * `?wait=true` the message back instead. `GET` describes the webhook, as
  * Discord's does.
  *

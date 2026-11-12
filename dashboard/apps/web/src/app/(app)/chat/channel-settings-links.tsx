@@ -35,6 +35,9 @@ import {
     Skeleton
 } from "@polaris/ui";
 import * as polls from "./chat-reads";
+import { WebhookFace } from "./webhook-face";
+import { chatAvatarUrl } from "@/lib/avatar-url";
+import { ChatPictureDialog } from "./picture-dialog";
 
 /** How long a copy button stays ticked. */
 const COPIED_MS = 1600;
@@ -284,6 +287,7 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
     const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
     const [replacing, setReplacing] = useState<ChatWebhookView | null>(null);
     const [deleting, setDeleting] = useState<ChatWebhookView | null>(null);
+    const [picturing, setPicturing] = useState<ChatWebhookView | null>(null);
     const [error, setError] = useState("");
     const [copied, copy] = useCopied();
 
@@ -388,9 +392,15 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
                             className="flex flex-col gap-2 rounded-lg border border-border px-3 py-3"
                         >
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                                    <Webhook className="size-4 shrink-0" />
-                                </span>
+                                <button
+                                    type="button"
+                                    className="inline-flex shrink-0 rounded-full"
+                                    title={t("channelSettings.webhookPicture")}
+                                    aria-label={t("channelSettings.webhookPicture")}
+                                    onClick={() => setPicturing(hook)}
+                                >
+                                    <WebhookFace src={webhookFaceUrl(hook)} size={36} />
+                                </button>
                                 {renaming?.id === hook.id ? (
                                     <form
                                         className="flex min-w-0 flex-1 items-center gap-2"
@@ -528,6 +538,20 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
                 </p>
             )}
 
+            {picturing && (
+                <ChatPictureDialog
+                    open
+                    onOpenChange={(open) => !open && setPicturing(null)}
+                    kind="webhook"
+                    id={picturing.id}
+                    name={picturing.name}
+                    onChanged={() =>
+                        void polls.chatWebhooks(channel.id).then((result) => {
+                            if (result.webhooks) setHooks(result.webhooks);
+                        })
+                    }
+                />
+            )}
             <ConfirmDeleteDialog
                 open={replacing !== null}
                 onOpenChange={(open) => !open && setReplacing(null)}
@@ -610,4 +634,11 @@ function IconButton({
             {children}
         </button>
     );
+}
+
+/** A webhook's own picture, versioned so a change shows at once. */
+function webhookFaceUrl(hook: ChatWebhookView): string | null {
+    return hook.avatarAt
+        ? `${chatAvatarUrl("webhook", hook.id)}?v=${Date.parse(hook.avatarAt)}`
+        : null;
 }

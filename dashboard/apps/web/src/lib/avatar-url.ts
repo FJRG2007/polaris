@@ -38,6 +38,6 @@ export function orgBannerUrl(orgId: string): string {
 /** The picture on a space or a conversation. Answers a transparent pixel when
  *  there is none, and the same pixel when the reader is not in it - so what is
  *  drawn underneath shows through either way. */
-export function chatAvatarUrl(kind: "space" | "channel", id: string): string {
+export function chatAvatarUrl(kind: "space" | "channel" | "webhook", id: string): string {
     return `/api/avatar/chat/${kind}/${id}`;
 }

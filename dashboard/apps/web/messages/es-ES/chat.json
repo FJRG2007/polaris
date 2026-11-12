@@ -1073,7 +1073,8 @@
         "newcomerHistoryOff": "Ocultos",
         "newcomerHistoryDefault": "Por defecto: los nuevos ven los mensajes anteriores",
         "newcomerHistoryDefaultHint": "Se aplica a los canales que usan el valor del servidor.",
-        "newcomerHistoryDefaultLocked": "Solo los admins del servidor cambian esto."
+        "newcomerHistoryDefaultLocked": "Solo los admins del servidor cambian esto.",
+        "webhookPicture": "Cambiar imagen"
     },
     "callMenus": {
         "volume": "Volumen",
@@ -1608,7 +1609,9 @@
         "groupPicture": "Imagen del grupo",
         "shownInTheColumnOn": "Se muestra en la columna de la izquierda, en lugar de las iniciales.",
         "shownWhereverThisConversationAppears": "Se muestra donde aparezca esta conversación. Sin ella, las caras de quienes están.",
-        "pngJpegWebpOrGif": "PNG, JPEG, WebP o GIF. Tú eliges qué parte se usa."
+        "pngJpegWebpOrGif": "PNG, JPEG, WebP o GIF. Tú eliges qué parte se usa.",
+        "webhookPicture": "Imagen del webhook",
+        "webhookPictureHint": "Se muestra en sus mensajes salvo que la petición envíe su avatar_url."
     },
     "micSettings": {
         "microphone": "Micrófono",

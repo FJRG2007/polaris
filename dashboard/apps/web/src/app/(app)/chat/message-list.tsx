@@ -27,6 +27,7 @@ import { VoiceNote } from "./voice-note";
 import { useChat } from "./chat-context";
 import { useHeldCall } from "./call-hold";
 import { Avatar } from "@/components/avatar";
+import { WebhookFace } from "./webhook-face";
 import { PersonName } from "@/components/person-name";
 import { Spoiler } from "./spoiler";
 import { MessageMenu } from "./message-menu";
@@ -192,7 +193,6 @@ import {
     Star,
     Trash2,
     Volume2,
-    Webhook,
     BotMessageSquare
 } from "lucide-react";
 import * as polls from "./chat-reads";
@@ -1005,12 +1005,7 @@ function Message({
                                 <BotMessageSquare className="size-4 shrink-0" />
                             </span>
                         ) : message.fromWebhook ? (
-                            <span
-                                className="inline-flex size-7 items-center justify-center rounded-full bg-primary/15 text-primary"
-                                aria-hidden="true"
-                            >
-                                <Webhook className="size-4 shrink-0" />
-                            </span>
+                            <WebhookFace src={message.webhookAvatar} />
                         ) : (
                             <span className="inline-flex size-7 items-center justify-center rounded-full bg-muted text-[0.625rem] text-muted-foreground">
                                 ?

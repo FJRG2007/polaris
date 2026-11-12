@@ -41,6 +41,7 @@ type Db = Pick<
     | "organizationBanner"
     | "chatSpaceAvatar"
     | "chatChannelAvatar"
+    | "chatWebhookAvatar"
     | "chatAttachment"
     | "chatUpload"
     | "chatScheduledFile"
@@ -71,7 +72,8 @@ const REPOINT: Record<string, (db: Db, path: string, to: string) => Promise<numb
             db.organizationAvatar.updateMany({ where, data }),
             db.organizationBanner.updateMany({ where, data }),
             db.chatSpaceAvatar.updateMany({ where, data }),
-            db.chatChannelAvatar.updateMany({ where, data })
+            db.chatChannelAvatar.updateMany({ where, data }),
+            db.chatWebhookAvatar.updateMany({ where, data })
         ]);
         return total(counts);
     },

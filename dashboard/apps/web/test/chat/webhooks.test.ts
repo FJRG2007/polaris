@@ -45,6 +45,8 @@ function pick(hook: Hook, select?: Record<string, unknown>) {
     return Object.fromEntries(Object.keys(select).map((key) => [key, hook[key as keyof Hook]]));
 }
 
+vi.mock("@/lib/avatar-service", () => ({ discardAvatars: vi.fn(async () => []) }));
+
 vi.mock("@polaris/db", () => {
     const chatWebhook = {
         findMany: async ({
@@ -247,14 +249,22 @@ describe("posting through one", () => {
 
     it("writes a message with no account, under its name or the one asked for", async () => {
         await webhooks.postThroughWebhook(hook, { content: "Build passed https://ci.example" });
-        await webhooks.postThroughWebhook(hook, { content: "Deployed", username: "Deploy bot" });
+        await webhooks.postThroughWebhook(hook, {
+            content: "Deployed",
+            username: "Deploy bot",
+            avatar_url: "https://cdn.example/bot.png"
+        });
         expect(db.messages[0]).toMatchObject({
             authorId: null,
             webhookId: hook.id,
             authorLabel: "CI",
             body: "Build passed https://ci.example"
         });
-        expect(db.messages[1]).toMatchObject({ authorLabel: "Deploy bot" });
+        expect(db.messages[0]).toMatchObject({ authorAvatarUrl: null });
+        expect(db.messages[1]).toMatchObject({
+            authorLabel: "Deploy bot",
+            authorAvatarUrl: "https://cdn.example/bot.png"
+        });
         expect(db.published.map((change) => change.kind)).toEqual(["posted", "posted"]);
         expect(db.unfurled[0]).toContain("https://ci.example");
     });
@@ -320,17 +330,36 @@ describe("an automation posting through one", () => {
 });
 
 describe("Discord's body", () => {
-    it("takes content and username, ignores the rest, and refuses an empty message", () => {
+    it("takes content, username and avatar_url, ignores the rest, and refuses an empty message", () => {
         const schema = core.chatWebhookExecuteSchema;
-        expect(
-            schema.safeParse({ content: "hi", username: "Bot", embeds: [], avatar_url: "x" })
-                .success
-        ).toBe(true);
+        const sent = schema.safeParse({
+            content: "hi",
+            username: "  Bot  ",
+            embeds: [],
+            avatar_url: "https://cdn.example/a.png"
+        });
+        expect(sent.success && sent.data.username).toBe("Bot");
+        expect(sent.success && sent.data.avatar_url).toBe("https://cdn.example/a.png");
         expect(schema.safeParse({ content: "   " }).success).toBe(false);
         expect(schema.safeParse({ username: "Bot" }).success).toBe(false);
         expect(schema.safeParse({ content: "x".repeat(core.MAX_CHAT_MESSAGE + 1) }).success).toBe(
             false
         );
         expect(schema.safeParse({ content: "hi", username: "x".repeat(81) }).success).toBe(false);
+        expect(schema.safeParse({ content: "hi", username: "   " }).success).toBe(false);
+    });
+
+    it("takes a picture address only over https", () => {
+        const schema = core.chatWebhookExecuteSchema;
+        const avatar = (avatar_url: string) => schema.safeParse({ content: "hi", avatar_url }).success;
+        expect(avatar("https://cdn.example/a.png")).toBe(true);
+        expect(avatar("http://cdn.example/a.png")).toBe(false);
+        expect(avatar("javascript:alert(1)")).toBe(false);
+        expect(avatar("data:image/png;base64,AAAA")).toBe(false);
+        expect(avatar("https://user:pass@cdn.example/a.png")).toBe(false);
+        expect(avatar("not a url")).toBe(false);
+        expect(avatar(`https://cdn.example/${"a".repeat(core.MAX_WEBHOOK_AVATAR_URL)}`)).toBe(
+            false
+        );
     });
 });

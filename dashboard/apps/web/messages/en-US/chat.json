@@ -1073,7 +1073,8 @@
         "newcomerHistoryOff": "Hidden",
         "newcomerHistoryDefault": "Server default: new members see earlier messages",
         "newcomerHistoryDefaultHint": "Applies to every channel that uses the server default.",
-        "newcomerHistoryDefaultLocked": "Only server admins can change the default."
+        "newcomerHistoryDefaultLocked": "Only server admins can change the default.",
+        "webhookPicture": "Change picture"
     },
     "callMenus": {
         "volume": "Volume",
@@ -1608,7 +1609,9 @@
         "groupPicture": "Group picture",
         "shownInTheColumnOn": "Shown in the column on the left, in place of the initials.",
         "shownWhereverThisConversationAppears": "Shown wherever this conversation appears. Without one, the faces of the people in it.",
-        "pngJpegWebpOrGif": "PNG, JPEG, WebP or GIF. You choose which part of it is used."
+        "pngJpegWebpOrGif": "PNG, JPEG, WebP or GIF. You choose which part of it is used.",
+        "webhookPicture": "Webhook picture",
+        "webhookPictureHint": "Shown on its messages unless a request sends its own avatar_url."
     },
     "micSettings": {
         "microphone": "Microphone",
