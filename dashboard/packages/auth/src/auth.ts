@@ -25,7 +25,8 @@ import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { emailLinkSignInAllowed, passwordConfirmed } from "./security.js";
 import { newDeviceWaitMessage, sessionDeviceStanding } from "./devices.js";
-import { deviceAuthorization, magicLink, twoFactor } from "better-auth/plugins";
+import { deviceAuthorization, twoFactor } from "better-auth/plugins";
+import { emailLinkPlugin, MAGIC_LINK_VERIFY_PATH } from "./email-link.js";
 import { noteSecondFactor, noteSentCodeAnswered, noteSignIn } from "./sign-in-record.js";
 import { connectionSignInPlugin, CONNECTION_SIGN_IN_PATH } from "./connection-sign-in.js";
 import {
@@ -81,10 +82,6 @@ export const SESSION_UPDATE_AGE = 60 * 60 * 24;
 
 /** The shortest password an account may set, reported by the same evidence. */
 export const MIN_PASSWORD_LENGTH = 10;
-
-/** How long an emailed sign-in link stays good. Short: it is a bearer credential
- *  sitting in an inbox, and the user is asking to sign in right now. */
-const MAGIC_LINK_TTL_SECONDS = 10 * 60;
 
 /**
  * WebAuthn binds a credential to one registrable domain, so the relying party
@@ -425,8 +422,7 @@ function sealDeviceFlow(plugin: BetterAuthPlugin): BetterAuthPlugin {
     };
 }
 
-/** Where an emailed sign-in link is redeemed. */
-export const MAGIC_LINK_VERIFY_PATH = "/magic-link/verify";
+export { MAGIC_LINK_VERIFY_PATH };
 
 /**
  * The sign-ins better-auth's own plugin does not watch, and that raise the
@@ -591,33 +587,8 @@ function buildPlugins(options: AuthOptions, address: string): BetterAuthPlugin[]
     // Registered only when the app can send at all. Whether a channel is
     // nominated right now is the send callback's business.
     if (options.sendMail) {
-        const send = options.sendMail;
         plugins.push(
-            magicLink({
-                expiresIn: MAGIC_LINK_TTL_SECONDS,
-                // Registration is closed here as it is everywhere else: a link to
-                // an address with no account must not conjure one.
-                disableSignUp: true,
-                sendMagicLink: async ({ email, url }) => {
-                    // Off unless the account asked for it. This is the gate, not
-                    // the screen: the endpoint stays open and answers the same
-                    // for every address, so what an account decided about its own
-                    // way in is never readable from the outside. A link that is
-                    // never sent is a link nobody has - the token the plugin has
-                    // already minted expires unused.
-                    if (!(await emailLinkSignInAllowed(email))) return;
-                    const result = await send({
-                        to: email,
-                        subject: "Your Polaris sign-in link",
-                        text: `Sign in to Polaris:\n\n${url}\n\nThe link works once and expires in 10 minutes. If you did not ask to sign in, ignore this message.`,
-                        html: `<p>Sign in to Polaris:</p><p><a href="${url}">Sign in</a></p><p>The link works once and expires in 10 minutes. If you did not ask to sign in, ignore this message.</p>`
-                    });
-                    // Surfacing the reason would tell an unauthenticated caller
-                    // whether the address has an account; the endpoint answers the
-                    // same either way and the failure is logged instead.
-                    if (result.error) console.error("magic link not sent:", result.error);
-                }
-            }) as BetterAuthPlugin
+            emailLinkPlugin({ allowed: emailLinkSignInAllowed, send: options.sendMail })
         );
     }
     // Last, so its hook sees the session every plugin before it settled on: a

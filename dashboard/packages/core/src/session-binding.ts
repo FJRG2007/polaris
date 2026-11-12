@@ -202,10 +202,23 @@ function movedSystem(session: SessionOrigin, request: RequestOrigin): boolean {
     return differs(session.claimedOs ?? session.os, request.claimedOs ?? request.os);
 }
 
+/**
+ * Whether two readings of a client's address say it moved. Exact, because a
+ * looser match (a shared IPv6 prefix, the same network) is a neighbour passing
+ * as the caller. Not knowing at either end is not a move. Shared by every check
+ * that ties something to where it was asked for - a session, an emailed link.
+ */
+export function addressMoved(
+    from: string | null | undefined,
+    to: string | null | undefined
+): boolean {
+    return Boolean(from) && Boolean(to) && from !== to;
+}
+
 /** Whether the request came from somewhere other than where the session was last
- *  seen. Not knowing at either end is not a move. */
+ *  seen. */
 function movedAddress(session: SessionOrigin, request: RequestOrigin): boolean {
-    return session.ip !== null && request.ip !== null && session.ip !== request.ip;
+    return addressMoved(session.ip, request.ip);
 }
 
 /**
