@@ -12747,6 +12747,10 @@ model TelemetryIssue {
     // TelemetryIssueUser per person, and this the count of them, kept on the
     // issue so the list can sort by it without counting.
     userCount   Int       @default(0)
+    // Ignored for a while, or for a number of events: the issue opens itself
+    // again when either is reached. Both null is ignored until somebody says.
+    ignoredUntil    DateTime?
+    ignoreUntilSeen Int?
 
     project    TelemetryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
     resolvedBy User?            @relation("TelemetryResolver", fields: [resolvedById], references: [id], onDelete: SetNull)

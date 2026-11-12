@@ -120,7 +120,7 @@ describe("the issue workflow", () => {
         expect(
             await actions.bulkStatusAction({ issueIds: [ISSUE], status: "resolved", mode: "nextRelease" })
         ).toEqual({});
-        expect(workflow.setStatusMany).toHaveBeenCalledWith(expect.any(Array), "resolved", "0192f0aa-0000-7000-8000-0000000000c1", "nextRelease");
+        expect(workflow.setStatusMany).toHaveBeenCalledWith(expect.any(Array), "resolved", "0192f0aa-0000-7000-8000-0000000000c1", "nextRelease", undefined);
     });
 
     it("makes a task for whoever has the issue, and notes it on the issue", async () => {

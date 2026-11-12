@@ -21,6 +21,9 @@ interface IssueRow {
     status: string;
     resolvedInRelease: string | null;
     lastSeen: Date;
+    timesSeen?: number;
+    ignoredUntil?: Date | null;
+    ignoreUntilSeen?: number | null;
 }
 
 let issue: IssueRow | null = null;
@@ -28,6 +31,7 @@ const update = vi.fn(async (_args: unknown) => ({}));
 const upsertIssue = vi.fn(async (_args: unknown) => ({ id: "i1" }));
 const createEvent = vi.fn(async (_args: unknown) => ({}));
 const upsertDay = vi.fn(async (_args: unknown) => ({}));
+const logActivity = vi.fn(async (_args: unknown) => ({}));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -38,6 +42,7 @@ vi.mock("@polaris/db", () => ({
         },
         telemetryEvent: { create: createEvent },
         telemetryDay: { upsert: upsertDay },
+        telemetryActivity: { create: logActivity },
         telemetryProject: { updateMany: async () => ({ count: 0 }) }
     }
 }));
@@ -167,5 +172,61 @@ describe("when the database will not answer", () => {
         await expect(store.captureEvent(project, event())).resolves.toBeUndefined();
         expect(noise).toHaveBeenCalled();
         noise.mockRestore();
+    });
+});
+
+describe("a fault somebody ignored for a while", () => {
+    it("stays ignored while the time has not passed", async () => {
+        issue = {
+            id: "i1",
+            status: "ignored",
+            resolvedInRelease: null,
+            lastSeen: AT,
+            ignoredUntil: new Date(Date.now() + 3_600_000),
+            ignoreUntilSeen: null
+        };
+        await store.captureEvent(project, event());
+        expect(wrote().status).toBeUndefined();
+        expect(logActivity).not.toHaveBeenCalled();
+    });
+
+    it("opens again once the time has passed, and says so in its log", async () => {
+        issue = {
+            id: "i1",
+            status: "ignored",
+            resolvedInRelease: null,
+            lastSeen: AT,
+            ignoredUntil: new Date(Date.now() - 1000),
+            ignoreUntilSeen: null
+        };
+        await store.captureEvent(project, event());
+        expect(wrote()).toEqual(
+            expect.objectContaining({ status: "unresolved", ignoredUntil: null, ignoreUntilSeen: null })
+        );
+        await vi.waitFor(() =>
+            expect(logActivity).toHaveBeenCalledWith({
+                data: expect.objectContaining({ issueId: "i1", kind: "status", body: "unignored", actorId: null })
+            })
+        );
+    });
+
+    it("opens again on the event it was waiting for", async () => {
+        issue = {
+            id: "i1",
+            status: "ignored",
+            resolvedInRelease: null,
+            lastSeen: AT,
+            timesSeen: 9,
+            ignoredUntil: null,
+            ignoreUntilSeen: 10
+        };
+        await store.captureEvent(project, event());
+        expect(wrote().status).toBe("unresolved");
+    });
+
+    it("an ignore with no condition never ends on its own", async () => {
+        issue = { id: "i1", status: "ignored", resolvedInRelease: null, lastSeen: AT, timesSeen: 5000 };
+        await store.captureEvent(project, event());
+        expect(wrote().status).toBeUndefined();
     });
 });

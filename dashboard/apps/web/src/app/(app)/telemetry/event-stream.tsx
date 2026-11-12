@@ -13,12 +13,12 @@ import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { useCursorList } from "./use-cursor-list";
 import { cn, EmptyState, Skeleton } from "@polaris/ui";
-import { ArrowLeft, Activity, Tag } from "lucide-react";
+import { ArrowLeft, Activity, Layers, Tag } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { EventDetail } from "@/lib/telemetry/report-service";
-import type { EventRow, ReleaseRow } from "@/lib/telemetry/workflow-service";
+import type { EventRow } from "@/lib/telemetry/workflow-service";
 
 const ROW_HEIGHT = 52;
 
@@ -183,27 +183,52 @@ export function EventView({
 }
 
 /** The releases a project's events name, each a way into its issues. */
+interface TagRow {
+    readonly value: string;
+    readonly events: number;
+    readonly lastSeen: string;
+}
+
+/** The rows of either list, in one shape. */
+async function readTags(kind: "release" | "environment", projectId: string): Promise<{ rows: TagRow[]; error?: string }> {
+    if (kind === "environment") {
+        const result = await polls.telemetryEnvironments({ projectId });
+        return {
+            error: result?.error,
+            rows: (result?.environments ?? []).map((row) => ({ ...row, value: row.environment }))
+        };
+    }
+    const result = await polls.telemetryReleases({ projectId });
+    return { error: result?.error, rows: (result?.releases ?? []).map((row) => ({ ...row, value: row.release })) };
+}
+
+/** The releases a project's events name, or with `kind` its environments: each
+ *  one a way into the issues seen there. */
 export function ReleaseList({
     projectId,
-    issuesHref
+    issuesHref,
+    kind = "release"
 }: {
     projectId: string;
-    issuesHref: (release: string) => string;
+    issuesHref: (value: string) => string;
+    kind?: "release" | "environment";
 }) {
     const t = useTranslations("telemetry");
-    const [rows, setRows] = useState<readonly ReleaseRow[] | null>(null);
+    const [rows, setRows] = useState<readonly TagRow[] | null>(null);
     const [error, setError] = useState("");
     useEffect(() => {
         let live = true;
-        void runAction(() => polls.telemetryReleases({ projectId }), setError).then((result) => {
+        setRows(null);
+        void runAction(() => readTags(kind, projectId), setError).then((result) => {
             if (!live || !result) return;
             if (result.error) setError(result.error);
-            setRows(result.releases ?? []);
+            setRows(result.rows);
         });
         return () => {
             live = false;
         };
-    }, [projectId]);
+    }, [projectId, kind]);
+    const Icon = kind === "environment" ? Layers : Tag;
 
     if (rows === null) {
         return (
@@ -217,21 +242,29 @@ export function ReleaseList({
         return (
             <>
                 {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-                <EmptyState icon={<Tag />} title={t("releases.none")} description={t("releases.noneHint")} />
+                {kind === "environment" ? (
+                    <EmptyState
+                        icon={<Layers />}
+                        title={t("environments.none")}
+                        description={t("environments.noneHint")}
+                    />
+                ) : (
+                    <EmptyState icon={<Tag />} title={t("releases.none")} description={t("releases.noneHint")} />
+                )}
             </>
         );
     }
     return (
         <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
             {rows.map((row) => (
-                <li key={row.release}>
+                <li key={row.value}>
                     <Link
-                        href={issuesHref(row.release)}
+                        href={issuesHref(row.value)}
                         className="flex min-w-0 items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted"
                     >
-                        <Tag className="size-3.5 shrink-0 text-muted-foreground" />
-                        <span className="min-w-0 flex-1 truncate font-mono text-sm" title={row.release}>
-                            {row.release}
+                        <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 flex-1 truncate font-mono text-sm" title={row.value}>
+                            {row.value}
                         </span>
                         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                             {t("releases.events", { count: row.events })}

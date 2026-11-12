@@ -81,6 +81,7 @@ vi.mock("@/lib/telemetry/report-service", () => ({
 }));
 vi.mock("@/lib/telemetry/workflow-service", () => ({
     hasReleases: vi.fn(async () => false),
+    hasEnvironments: vi.fn(async () => false),
     issueMeta: vi.fn(async () => ({ assignee: null, resolvedInRelease: null })),
     issuesByIds: vi.fn(async () => [
         { id: "i1", projectId: "0192f0aa-0000-7000-8000-0000000000d1", lastRelease: null, title: "" }

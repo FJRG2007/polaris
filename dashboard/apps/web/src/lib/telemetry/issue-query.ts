@@ -268,12 +268,77 @@ export const issueIdsSchema = z.array(z.string().uuid()).min(1).max(100);
 export const RESOLVE_MODES = ["now", "nextRelease"] as const;
 export type ResolveMode = (typeof RESOLVE_MODES)[number];
 
+/** How long an ignore can be set to last, as Sentry offers it. */
+export const IGNORE_WINDOWS = ["1h", "24h", "7d"] as const;
+export type IgnoreWindow = (typeof IGNORE_WINDOWS)[number];
+const IGNORE_WINDOW_MS: Readonly<Record<IgnoreWindow, number>> = {
+    "1h": 3_600_000,
+    "24h": 86_400_000,
+    "7d": 604_800_000
+};
+
+/** How many more events an ignore can be set to wait for. */
+export const IGNORE_COUNTS = [10, 100, 1000] as const;
+
+/** When an ignore ends on its own. Neither set is "until somebody says". */
+export interface IgnoreCondition {
+    readonly ignoreFor?: IgnoreWindow;
+    readonly ignoreCount?: number;
+}
+
+/** The two columns an ignore writes, from the issue's count as it is now. */
+export function ignoreColumns(
+    condition: IgnoreCondition | undefined,
+    timesSeen: number,
+    now: Date
+): { ignoredUntil: Date | null; ignoreUntilSeen: number | null } {
+    return {
+        ignoredUntil: condition?.ignoreFor ? new Date(now.getTime() + IGNORE_WINDOW_MS[condition.ignoreFor]) : null,
+        ignoreUntilSeen: condition?.ignoreCount ? timesSeen + condition.ignoreCount : null
+    };
+}
+
+/**
+ * Whether one more event opens an issue again, and why.
+ *
+ * Resolved and seen in a release other than the one it was resolved in is a
+ * regression. Ignored with a condition, and the time has passed or this event
+ * is the one it was waiting for, is an ignore that ran out. Pure, so the
+ * ingest's decision can be asserted without a database.
+ */
+export function reopenReason(
+    issue: {
+        readonly status: string;
+        readonly resolvedInRelease: string | null;
+        readonly timesSeen: number;
+        readonly ignoredUntil: Date | null;
+        readonly ignoreUntilSeen: number | null;
+    },
+    release: string | null,
+    now: Date
+): "regressed" | "unignored" | null {
+    if (issue.status === "resolved") {
+        return issue.resolvedInRelease === null || issue.resolvedInRelease !== release ? "regressed" : null;
+    }
+    if (issue.status !== "ignored") return null;
+    if (issue.ignoredUntil && now.getTime() >= issue.ignoredUntil.getTime()) return "unignored";
+    if (issue.ignoreUntilSeen !== null && issue.timesSeen + 1 >= issue.ignoreUntilSeen) return "unignored";
+    return null;
+}
+
 export const bulkStatusSchema = z.object({
     issueIds: issueIdsSchema,
     status: z.enum(core.TELEMETRY_STATUSES),
     /** Only read with "resolved". Left out, a resolve keeps the old meaning: the
      *  release it was last seen in does not reopen it. */
-    mode: z.enum(RESOLVE_MODES).optional()
+    mode: z.enum(RESOLVE_MODES).optional(),
+    /** Only read with "ignored": when the ignore ends on its own. */
+    ignoreFor: z.enum(IGNORE_WINDOWS).optional(),
+    ignoreCount: z
+        .number()
+        .int()
+        .refine((value) => (IGNORE_COUNTS as readonly number[]).includes(value))
+        .optional()
 });
 
 export const assignSchema = z.object({

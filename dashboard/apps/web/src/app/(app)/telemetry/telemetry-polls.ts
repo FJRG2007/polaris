@@ -57,3 +57,6 @@ export const telemetryAlertHistory = inputPoll<typeof telemetryActionsModule.ale
 export const telemetryReleases = inputPoll<typeof telemetryActionsModule.releasesAction>(
     "/api/telemetry/releases"
 );
+export const telemetryEnvironments = inputPoll<typeof telemetryActionsModule.environmentsAction>(
+    "/api/telemetry/environments"
+);

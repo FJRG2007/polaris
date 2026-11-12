@@ -27,6 +27,10 @@
         "alerts": {
             "label": "Alertas",
             "hint": "Quién se entera de incidencias nuevas, frecuentes o que vuelven"
+        },
+        "environments": {
+            "label": "Entornos",
+            "hint": "De dónde llegan los eventos y sus fallos"
         }
     },
     "view": {
@@ -133,7 +137,8 @@
         "listRefused": "No puedes añadir tareas a esa lista.",
         "makeTask": "No se pudo crear la tarea. Reinténtalo.",
         "readActivity": "No se pudo leer la actividad. Reinténtalo.",
-        "comment": "No se pudo guardar el comentario. Reinténtalo."
+        "comment": "No se pudo guardar el comentario. Reinténtalo.",
+        "readEnvironments": "No se pudieron leer los entornos"
     },
     "grid": {
         "count": "{count, plural, one {Un proyecto} other {# proyectos}}",
@@ -141,7 +146,10 @@
         "itself": "el propio Polaris",
         "off": "Inactivo",
         "open": "{count, plural, one {# fallo abierto} other {# fallos abiertos}}",
-        "nothingOpen": "Nada abierto"
+        "nothingOpen": "Nada abierto",
+        "search": "Buscar proyectos",
+        "noMatch": "Sin coincidencias",
+        "noMatchHint": "Prueba otro nombre."
     },
     "event": {
         "hide": "Ocultar este valor",
@@ -323,7 +331,10 @@
         "none": "Aún no hay nada.",
         "someone": "Alguien",
         "more": "Ver más",
-        "retry": "Reintentar"
+        "retry": "Reintentar",
+        "regressed": "Volvió tras resolverse",
+        "unignored": "Terminó el ignorado",
+        "automatic": "Polaris"
     },
     "notify": {
         "assignedOne": "{name} te asignó una incidencia",
@@ -398,5 +409,18 @@
             "gone": "Esa regla ya no existe.",
             "limit": "Este proyecto ya tiene todas las reglas que admite."
         }
+    },
+    "environments": {
+        "none": "Sin entornos",
+        "noneHint": "Envía el entorno con tus eventos para verlos aquí."
+    },
+    "ignore": {
+        "forever": "Hasta que lo pare",
+        "hour": "Por 1 hora",
+        "day": "Por 24 horas",
+        "week": "Por 7 días",
+        "count": "Por {count, plural, one {# evento más} other {# eventos más}}",
+        "until": "Ignorado hasta {at}",
+        "left": "Ignorado por {count, plural, one {# evento más} other {# eventos más}}"
     }
 }

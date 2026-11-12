@@ -59,6 +59,8 @@ export function IssueActivity({
             case "comment":
                 return <p className="whitespace-pre-wrap break-words text-sm">{row.body}</p>;
             case "status":
+                if (row.body === "regressed") return t("activity.regressed");
+                if (row.body === "unignored") return t("activity.unignored");
                 return t("activity.status", {
                     status: t(
                         row.body === "resolvedNextRelease"
@@ -156,7 +158,10 @@ export function IssueActivity({
                         <li key={row.id} className="flex min-w-0 flex-col gap-0.5 rounded-md bg-surface px-3 py-2">
                             <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                                 <span className="truncate font-medium text-foreground">
-                                    {row.actor?.name ?? t("activity.someone")}
+                                    {row.actor?.name ??
+                                        (row.kind === "status" && (row.body === "regressed" || row.body === "unignored")
+                                            ? t("activity.automatic")
+                                            : t("activity.someone"))}
                                 </span>
                                 <RelativeTime iso={row.at} />
                             </span>

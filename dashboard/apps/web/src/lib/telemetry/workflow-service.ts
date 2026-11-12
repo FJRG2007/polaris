@@ -237,6 +237,40 @@ export async function listReleases(projectId: string): Promise<ReleaseRow[]> {
         }));
 }
 
+export interface EnvironmentRow {
+    readonly environment: string;
+    readonly events: number;
+    readonly lastSeen: string;
+}
+
+/** The environments a project's kept events name, most recent first. */
+export async function listEnvironments(projectId: string): Promise<EnvironmentRow[]> {
+    const rows = await prisma.telemetryEvent.groupBy({
+        by: ["environment"],
+        where: { projectId, environment: { not: null } },
+        _count: { _all: true },
+        _max: { at: true },
+        orderBy: { _max: { at: "desc" } },
+        take: 100
+    });
+    return rows
+        .filter((row): row is typeof row & { environment: string } => Boolean(row.environment))
+        .map((row) => ({
+            environment: row.environment,
+            events: row._count._all,
+            lastSeen: (row._max.at ?? new Date(0)).toISOString()
+        }));
+}
+
+/** Whether a project has any environment to list, without listing them. */
+export async function hasEnvironments(projectId: string): Promise<boolean> {
+    const row = await prisma.telemetryEvent.findFirst({
+        where: { projectId, environment: { not: null } },
+        select: { id: true }
+    });
+    return row !== null;
+}
+
 /** Whether a project has any release to list, without listing them. */
 export async function hasReleases(projectId: string): Promise<boolean> {
     const row = await prisma.telemetryEvent.findFirst({
@@ -249,10 +283,10 @@ export async function hasReleases(projectId: string): Promise<boolean> {
 /** The issues behind a set of ids, with the project each sits in. */
 export async function issuesByIds(
     issueIds: readonly string[]
-): Promise<{ id: string; projectId: string; lastRelease: string | null; title: string }[]> {
+): Promise<{ id: string; projectId: string; lastRelease: string | null; title: string; timesSeen: number }[]> {
     return prisma.telemetryIssue.findMany({
         where: { id: { in: [...issueIds] } },
-        select: { id: true, projectId: true, lastRelease: true, title: true },
+        select: { id: true, projectId: true, lastRelease: true, title: true, timesSeen: true },
         take: issueIds.length
     });
 }
@@ -270,32 +304,38 @@ export function statusColumns(
     lastRelease: string | null,
     by: string,
     mode: q.ResolveMode | undefined,
-    now: Date
+    now: Date,
+    ignore?: q.IgnoreCondition,
+    timesSeen = 0
 ): Prisma.TelemetryIssueUncheckedUpdateManyInput {
+    const ignored =
+        status === "ignored" ? q.ignoreColumns(ignore, timesSeen, now) : { ignoredUntil: null, ignoreUntilSeen: null };
     if (status !== "resolved") {
-        return { status, resolvedAt: null, resolvedById: null, resolvedInRelease: null };
+        return { status, resolvedAt: null, resolvedById: null, resolvedInRelease: null, ...ignored };
     }
     return {
         status,
         resolvedAt: now,
         resolvedById: by,
-        resolvedInRelease: mode === "now" ? null : lastRelease
+        resolvedInRelease: mode === "now" ? null : lastRelease,
+        ...ignored
     };
 }
 
 /** Change the status of several issues, and write it in each one's log. */
 export async function setStatusMany(
-    issues: readonly { id: string; projectId: string; lastRelease: string | null }[],
+    issues: readonly { id: string; projectId: string; lastRelease: string | null; timesSeen?: number }[],
     status: core.TelemetryStatus,
     by: string,
-    mode?: q.ResolveMode
+    mode?: q.ResolveMode,
+    ignore?: q.IgnoreCondition
 ): Promise<void> {
     const now = new Date();
     await prisma.$transaction([
         ...issues.map((issue) =>
             prisma.telemetryIssue.updateMany({
                 where: { id: issue.id, projectId: issue.projectId },
-                data: statusColumns(status, issue.lastRelease, by, mode, now)
+                data: statusColumns(status, issue.lastRelease, by, mode, now, ignore, issue.timesSeen ?? 0)
             })
         ),
         prisma.telemetryActivity.createMany({
@@ -366,16 +406,23 @@ export async function notifyAssigned(
 export async function issueMeta(
     projectId: string,
     issueId: string
-): Promise<{ assignee: PersonLabel | null; resolvedInRelease: string | null } | null> {
+): Promise<{
+    assignee: PersonLabel | null;
+    resolvedInRelease: string | null;
+    ignoredUntil: string | null;
+    ignoreUntilSeen: number | null;
+} | null> {
     const row = await prisma.telemetryIssue.findFirst({
         where: { id: issueId, projectId },
-        select: { assignedToId: true, resolvedInRelease: true }
+        select: { assignedToId: true, resolvedInRelease: true, ignoredUntil: true, ignoreUntilSeen: true }
     });
     if (!row) return null;
     const people = await peopleNamed([row.assignedToId]);
     return {
         assignee: row.assignedToId ? (people.get(row.assignedToId) ?? null) : null,
-        resolvedInRelease: row.resolvedInRelease
+        resolvedInRelease: row.resolvedInRelease,
+        ignoredUntil: row.ignoredUntil?.toISOString() ?? null,
+        ignoreUntilSeen: row.ignoreUntilSeen
     };
 }
 

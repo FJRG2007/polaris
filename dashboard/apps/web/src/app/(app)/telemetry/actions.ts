@@ -103,6 +103,7 @@ export interface TelemetryOverview {
     readonly counts: Readonly<Record<string, number>>;
     readonly windowDays: number;
     readonly hasReleases: boolean;
+    readonly hasEnvironments: boolean;
 }
 
 export async function telemetryOverviewAction(input: {
@@ -117,7 +118,8 @@ export async function telemetryOverviewAction(input: {
                     projects: [],
                     counts: {},
                     windowDays: report.TELEMETRY_WINDOW_DAYS,
-                    hasReleases: false
+                    hasReleases: false,
+                    hasEnvironments: false
                 }
             };
         }
@@ -130,16 +132,18 @@ export async function telemetryOverviewAction(input: {
             await projects.requireProject(caller, wanted.data.projectId, lent);
             return await failure(new projects.TelemetryAccessError(), "errors.readProjects");
         }
-        const [counts, releases] = await Promise.all([
+        const [counts, releases, environments] = await Promise.all([
             report.issueCounts(chosen.id),
-            workflow.hasReleases(chosen.id)
+            workflow.hasReleases(chosen.id),
+            workflow.hasEnvironments(chosen.id)
         ]);
         return {
             data: {
                 projects: [{ ...chosen, dsn: projects.dsnFor(chosen, origin) }],
                 counts,
                 windowDays: report.TELEMETRY_WINDOW_DAYS,
-                hasReleases: releases
+                hasReleases: releases,
+                hasEnvironments: environments
             }
         };
     } catch (caught) {
@@ -150,6 +154,9 @@ export async function telemetryOverviewAction(input: {
 export type OpenIssue = report.IssueDetail & {
     readonly assignee: workflow.PersonLabel | null;
     readonly resolvedInRelease: string | null;
+    /** When an ignore ends on its own: at this time, or at this many events. */
+    readonly ignoredUntil: string | null;
+    readonly ignoreUntilSeen: number | null;
 };
 
 export async function openIssueAction(
@@ -499,6 +506,20 @@ export async function releasesAction(
     }
 }
 
+export async function environmentsAction(
+    input: unknown
+): Promise<{ environments?: workflow.EnvironmentRow[]; error?: string }> {
+    const parsed = q.projectRefSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.readEnvironments") };
+    const { actor: caller, lent } = await requireTelemetryReader();
+    try {
+        await projects.requireProject(caller, parsed.data.projectId, lent);
+        return { environments: await workflow.listEnvironments(parsed.data.projectId) };
+    } catch (caught) {
+        return await failure(caught, "errors.readEnvironments");
+    }
+}
+
 export async function bulkStatusAction(input: unknown): Promise<{ error?: string }> {
     const parsed = q.bulkStatusSchema.safeParse(input);
     if (!parsed.success) return { error: await say("errors.badStatus") };
@@ -512,7 +533,11 @@ export async function bulkStatusAction(input: unknown): Promise<{ error?: string
             editable,
             manages
         );
-        await workflow.setStatusMany(found, parsed.data.status, caller.id, parsed.data.mode);
+        const ignore =
+            parsed.data.status === "ignored"
+                ? { ignoreFor: parsed.data.ignoreFor, ignoreCount: parsed.data.ignoreCount }
+                : undefined;
+        await workflow.setStatusMany(found, parsed.data.status, caller.id, parsed.data.mode, ignore);
         revalidatePath(PATH);
         return {};
     } catch (caught) {

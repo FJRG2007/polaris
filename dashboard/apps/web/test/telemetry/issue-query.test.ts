@@ -159,7 +159,9 @@ describe("resolving", () => {
             status: "resolved",
             resolvedAt: now,
             resolvedById: "u1",
-            resolvedInRelease: null
+            resolvedInRelease: null,
+            ignoredUntil: null,
+            ignoreUntilSeen: null
         });
     });
 
@@ -173,7 +175,9 @@ describe("resolving", () => {
             status: "ignored",
             resolvedAt: null,
             resolvedById: null,
-            resolvedInRelease: null
+            resolvedInRelease: null,
+            ignoredUntil: null,
+            ignoreUntilSeen: null
         });
     });
 });

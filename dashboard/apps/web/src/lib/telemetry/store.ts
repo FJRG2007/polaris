@@ -20,6 +20,7 @@
 import { createHash } from "node:crypto";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { reopenReason } from "@/lib/telemetry/issue-query";
 
 /** The project an event is being written into, as the caller resolved it. */
 export interface IngestProject {
@@ -48,11 +49,19 @@ export async function captureEvent(project: IngestProject, event: core.CapturedE
         const title = core.titleOf(event);
         const existing = await prisma.telemetryIssue.findUnique({
             where: { projectId_fingerprint: { projectId: project.id, fingerprint: event.fingerprint } },
-            select: { id: true, status: true, resolvedInRelease: true, lastSeen: true }
+            select: {
+                id: true,
+                status: true,
+                resolvedInRelease: true,
+                lastSeen: true,
+                timesSeen: true,
+                ignoredUntil: true,
+                ignoreUntilSeen: true
+            }
         });
 
         const { issueId, isNew, regressed } = existing
-            ? { ...(await touchIssue(existing, event, title)), isNew: false }
+            ? { ...(await touchIssue(existing, event, title, project.id)), isNew: false }
             : { ...(await openIssue(project.id, event, title)), regressed: false };
 
         await prisma.telemetryEvent.create({
@@ -180,16 +189,35 @@ async function openIssue(
 }
 
 async function touchIssue(
-    existing: { id: string; status: string; resolvedInRelease: string | null; lastSeen: Date },
+    existing: {
+        id: string;
+        status: string;
+        resolvedInRelease: string | null;
+        lastSeen: Date;
+        timesSeen?: number;
+        ignoredUntil?: Date | null;
+        ignoreUntilSeen?: number | null;
+    },
     event: core.CapturedEvent,
-    title: string
+    title: string,
+    projectId: string
 ): Promise<{ issueId: string; regressed: boolean }> {
     // Seen again after being resolved. In the release it was resolved in it is
     // an event from before the fix shipped and is left alone; in any other, the
-    // fix did not hold.
-    const regressed =
-        existing.status === "resolved" &&
-        (existing.resolvedInRelease === null || existing.resolvedInRelease !== event.release);
+    // fix did not hold. Ignored until a time or a count that has now been
+    // reached is open again too.
+    const reason = reopenReason(
+        {
+            status: existing.status,
+            resolvedInRelease: existing.resolvedInRelease,
+            timesSeen: existing.timesSeen ?? 0,
+            ignoredUntil: existing.ignoredUntil ?? null,
+            ignoreUntilSeen: existing.ignoreUntilSeen ?? null
+        },
+        event.release,
+        new Date()
+    );
+    const regressed = reason === "regressed";
 
     await prisma.telemetryIssue.update({
         where: { id: existing.id },
@@ -201,9 +229,28 @@ async function touchIssue(
                 ? { lastSeen: event.at, title, culprit: event.culprit, level: event.level }
                 : {}),
             ...(event.release ? { lastRelease: event.release } : {}),
-            ...(regressed ? { status: "unresolved", resolvedAt: null, resolvedInRelease: null } : {})
+            ...(reason
+                ? {
+                      status: "unresolved",
+                      resolvedAt: null,
+                      resolvedInRelease: null,
+                      ignoredUntil: null,
+                      ignoreUntilSeen: null
+                  }
+                : {})
         }
     });
+    // The log says it opened itself, so the list is not the only place a
+    // returning fault shows. Not waited on, and never allowed to fail the event.
+    if (reason) {
+        void Promise.resolve()
+            .then(() =>
+                prisma.telemetryActivity.create({
+                    data: { projectId, issueId: existing.id, actorId: null, kind: "status", body: reason }
+                })
+            )
+            .catch((error: unknown) => console.error("polaris: could not log a reopened issue:", error));
+    }
     return { issueId: existing.id, regressed };
 }
 

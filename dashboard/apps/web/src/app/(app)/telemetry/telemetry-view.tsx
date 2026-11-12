@@ -30,12 +30,22 @@ import { RelativeTime } from "@/components/relative-time";
 import type { PickedPerson } from "@/components/people-picker";
 import { AssignDialog, CreateTaskDialog } from "./issue-dialogs";
 import { EventStream, EventView, ReleaseList } from "./event-stream";
-import { withFilter, type IssueSort } from "@/lib/telemetry/issue-query";
+import { useDebounced } from "./use-debounced";
+import {
+    IGNORE_COUNTS,
+    IGNORE_WINDOWS,
+    ignoreColumns,
+    withFilter,
+    type IgnoreCondition,
+    type IgnoreWindow,
+    type IssueSort
+} from "@/lib/telemetry/issue-query";
 import {
     ArrowLeft,
     Bug,
     CircleCheck,
     CircleDot,
+    ChevronDown,
     CircleSlash,
     ExternalLink,
     ListTodo,
@@ -43,7 +53,8 @@ import {
     RotateCcw,
     Share2,
     Trash2,
-    UserPlus
+    UserPlus,
+    Search
 } from "lucide-react";
 import { ShareDialog } from "@/components/access/share-dialog";
 import {
@@ -57,7 +68,12 @@ import {
     Skeleton,
     sameValue,
     Checkbox,
-    publicDocHref
+    publicDocHref,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
 } from "@polaris/ui";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -75,9 +91,12 @@ export function ProjectsHome({ mayCreate }: { mayCreate: boolean }) {
     const t = useTranslations("telemetry");
     const on = useShelfScope();
     const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null);
+    const [draft, setDraft] = useState("");
+    // Filtered by the database a page at a time, so it holds with thousands.
+    const query = useDebounced(draft.trim(), 250);
     const list = useCursorList<Project>(
-        (cursor, signal) => polls.telemetryProjects({ query: "", cursor }, signal),
-        `${on}`
+        (cursor, signal) => polls.telemetryProjects({ query, cursor }, signal),
+        `${on}|${query}`
     );
     useEffect(() => {
         if (!sentinel || !list.more) return;
@@ -89,9 +108,23 @@ export function ProjectsHome({ mayCreate }: { mayCreate: boolean }) {
     }, [sentinel, list]);
 
     const action = mayCreate ? <NewProject onDone={async () => list.reload()} /> : null;
+    const search = (
+        <div className="relative w-full max-w-xs">
+            <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                maxLength={80}
+                placeholder={t("grid.search")}
+                aria-label={t("grid.search")}
+                className="h-8 pl-7 text-sm"
+            />
+        </div>
+    );
     if (list.items === null) {
         return (
             <div className="flex flex-col gap-3" aria-busy="true">
+                {(draft || query) && search}
                 <div className="flex items-center justify-between gap-2">
                     <Skeleton className="h-4 w-24" />
                     {action}
@@ -101,6 +134,15 @@ export function ProjectsHome({ mayCreate }: { mayCreate: boolean }) {
                     <Skeleton className="h-24 w-full" />
                     <Skeleton className="h-24 w-full" />
                 </div>
+            </div>
+        );
+    }
+    if (list.items.length === 0 && query) {
+        return (
+            <div className="flex flex-col gap-3">
+                {search}
+                <EmptyState icon={<Search />} title={t("grid.noMatch")} description={t("grid.noMatchHint")} />
+                {list.error && <p role="alert" className="text-sm text-danger">{list.error}</p>}
             </div>
         );
     }
@@ -119,6 +161,7 @@ export function ProjectsHome({ mayCreate }: { mayCreate: boolean }) {
     }
     return (
         <div className="flex flex-col gap-4">
+            {search}
             <ProjectsGrid projects={list.items} hrefFor={(id) => paths.projectHref(id)} action={action} />
             {list.error && <p role="alert" className="text-sm text-danger">{list.error}</p>}
             {list.more && (
@@ -128,6 +171,30 @@ export function ProjectsHome({ mayCreate }: { mayCreate: boolean }) {
             )}
         </div>
     );
+}
+
+const IGNORE_WINDOW_KEYS: Readonly<Record<IgnoreWindow, NamespaceKey<"telemetry">>> = {
+    "1h": "ignore.hour",
+    "24h": "ignore.day",
+    "7d": "ignore.week"
+};
+
+/** What an ignored issue's button says: until when, or for how many more. */
+function ignoredLabel(
+    t: ReturnType<typeof useTranslations<"telemetry">>,
+    issue: Pick<actions.OpenIssue, "ignoredUntil" | "ignoreUntilSeen" | "timesSeen">,
+    locale: string
+): string {
+    if (issue.ignoredUntil) {
+        const at = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
+            new Date(issue.ignoredUntil)
+        );
+        return t("ignore.until", { at });
+    }
+    if (issue.ignoreUntilSeen !== null) {
+        return t("ignore.left", { count: Math.max(1, issue.ignoreUntilSeen - issue.timesSeen) });
+    }
+    return t("issue.ignored");
 }
 
 /** A search's address: the screen it is on, with the search and the order in it. */
@@ -209,7 +276,9 @@ export function TelemetryView({
     const open = sectionFor(section);
     const visible = SECTIONS.filter(
         (entry) =>
-            (!readOnly || entry.readOnly) && (entry.key !== "releases" || data?.hasReleases || open === "releases")
+            (!readOnly || entry.readOnly) &&
+            (entry.key !== "releases" || data?.hasReleases || open === "releases") &&
+            (entry.key !== "environments" || data?.hasEnvironments || open === "environments")
     );
 
     const failure = error && (
@@ -322,7 +391,24 @@ export function TelemetryView({
                             }
                         />
                     )}
-                    {!project && open !== "issues" && open !== "events" && open !== "releases" && (
+                    {open === "environments" && (
+                        <ReleaseList
+                            kind="environment"
+                            projectId={projectId}
+                            issuesHref={(environment) =>
+                                searchHref(
+                                    paths.projectHref(projectId),
+                                    withFilter("", { environment }),
+                                    "lastSeen"
+                                )
+                            }
+                        />
+                    )}
+                    {!project &&
+                        open !== "issues" &&
+                        open !== "events" &&
+                        open !== "releases" &&
+                        open !== "environments" && (
                         <div className="flex flex-col gap-3" aria-busy="true">
                             <Skeleton className="h-8 w-72 max-w-full" />
                             <Skeleton className="h-40 w-full" />
@@ -413,6 +499,7 @@ function IssueScreen({
     onChanged: () => Promise<void>;
 }) {
     const t = useTranslations("telemetry");
+    const locale = useLocale();
     const router = useRouter();
     const [issue, setIssue] = useState<actions.OpenIssue | null>(null);
     const [error, setError] = useState("");
@@ -458,10 +545,24 @@ function IssueScreen({
         change(
             {
                 status: value,
-                resolvedInRelease: value === "resolved" && mode === "nextRelease" ? issue?.lastRelease ?? null : null
+                resolvedInRelease: value === "resolved" && mode === "nextRelease" ? issue?.lastRelease ?? null : null,
+                ignoredUntil: null,
+                ignoreUntilSeen: null
             },
             () => actions.bulkStatusAction({ issueIds: [issueId], status: value, ...(mode ? { mode } : {}) })
         );
+    const ignore = (condition: IgnoreCondition = {}) => {
+        const until = ignoreColumns(condition, issue?.timesSeen ?? 0, new Date());
+        return change(
+            {
+                status: "ignored",
+                resolvedInRelease: null,
+                ignoredUntil: until.ignoredUntil?.toISOString() ?? null,
+                ignoreUntilSeen: until.ignoreUntilSeen
+            },
+            () => actions.bulkStatusAction({ issueIds: [issueId], status: "ignored", ...condition })
+        );
+    };
     const assign = (person: PickedPerson | null) =>
         change({ assignee: person }, () =>
             actions.assignIssuesAction({ issueIds: [issueId], assigneeId: person?.id ?? null })
@@ -545,15 +646,43 @@ function IssueScreen({
                             )}
                         </>
                     )}
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={readOnly}
-                        onClick={() => status(issue.status === "ignored" ? "unresolved" : "ignored")}
-                    >
-                        <CircleSlash className="size-4" />
-                        {issue.status === "ignored" ? t("issue.ignored") : t("issue.ignore")}
-                    </Button>
+                    {issue.status === "ignored" ? (
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={readOnly}
+                            title={t("menu.unignore")}
+                            onClick={() => status("unresolved")}
+                        >
+                            <CircleSlash className="size-4" />
+                            <span className="max-w-56 truncate">{ignoredLabel(t, issue, locale)}</span>
+                        </Button>
+                    ) : (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" disabled={readOnly}>
+                                    <CircleSlash className="size-4" />
+                                    {t("issue.ignore")}
+                                    <ChevronDown className="size-3.5" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => void ignore()}>{t("ignore.forever")}</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {IGNORE_WINDOWS.map((window) => (
+                                    <DropdownMenuItem key={window} onSelect={() => void ignore({ ignoreFor: window })}>
+                                        {t(IGNORE_WINDOW_KEYS[window])}
+                                    </DropdownMenuItem>
+                                ))}
+                                <DropdownMenuSeparator />
+                                {IGNORE_COUNTS.map((count) => (
+                                    <DropdownMenuItem key={count} onSelect={() => void ignore({ ignoreCount: count })}>
+                                        {t("ignore.count", { count })}
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                     <Button size="sm" variant="ghost" disabled={readOnly} onClick={() => setAssigning(true)}>
                         <UserPlus className="size-4" />
                         <span className="max-w-32 truncate">{issue.assignee?.name ?? t("menu.assign")}</span>
