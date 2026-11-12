@@ -351,10 +351,8 @@ function frameDocument(
     setTimeout(tell, 1500);
     // The other thing it says: a right-click on selected text, so Polaris's own
     // selection menu opens over the message as it does everywhere else. Only
-    // the selected text and the point travel; Shift+right-click keeps the
-    // browser's menu, as it does on the rest of the page.
+    // the selected text and the point travel.
     window.addEventListener("contextmenu", function (event) {
-      if (event.shiftKey && event.button === 2) return;
       var selection = window.getSelection();
       var text = selection ? String(selection) : "";
       if (!text.trim() || text.length > ${selectionMenu.FRAMED_SELECTION_MAX}) return;

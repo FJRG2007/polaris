@@ -131,8 +131,8 @@ export function selectionPoint(
 
 /**
  * Whether a `contextmenu` event came from the keyboard (Shift+F10 or the
- * ContextMenu key) rather than from a mouse button. A keyboard one is never
- * the Shift escape hatch - Shift is part of Shift+F10.
+ * ContextMenu key) rather than from a mouse button: the menu then opens under
+ * the selection instead of at the pointer.
  */
 export function fromKeyboard(event: Pick<MouseEvent, "button" | "clientX" | "clientY">): boolean {
     return event.button !== 2 || (event.clientX === 0 && event.clientY === 0);

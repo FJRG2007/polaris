@@ -147,10 +147,11 @@ describe("selection menu", () => {
         expect(rightClick(screen.getByTestId("other"))).toBe(true);
     });
 
-    it("keeps the browser's menu on Shift+right-click", () => {
+    it("opens Polaris's menu on Shift+right-click too, never the browser's", () => {
         page();
         select(screen.getByTestId("text"));
-        expect(rightClick(screen.getByTestId("text"), { shiftKey: true })).toBe(true);
+        expect(rightClick(screen.getByTestId("text"), { shiftKey: true })).toBe(false);
+        expect(screen.getByRole("menuitem", { name: /^Copy/ })).toBeTruthy();
     });
 
     it("takes a field only when text in it is selected, and offers Paste there", () => {
@@ -249,10 +250,10 @@ describe("a link", () => {
         ).toBe("ana@example.com");
     });
 
-    it("leaves a script link, and Shift+right-click, to the browser", () => {
+    it("leaves a script link to the browser, and takes Shift+right-click on a link", () => {
         linkPage();
         expect(rightClick(screen.getByTestId("js"))).toBe(true);
-        expect(rightClick(screen.getByTestId("out"), { shiftKey: true })).toBe(true);
+        expect(rightClick(screen.getByTestId("out"), { shiftKey: true })).toBe(false);
     });
 
     it("lets selected text inside a link win over the link", () => {

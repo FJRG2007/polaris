@@ -9,10 +9,6 @@
  * own calls `preventDefault`, and this reads that and stays out of the way.
  * Those menus get "Ask Polar" and "Copy" added at their foot instead, through
  * the menu extras every `ContextMenuContent` reads.
- *
- * Shift+right-click is left to the browser, on purpose and said on the menu:
- * it is the way back to spelling suggestions, "inspect", and the rest of what
- * only the browser's menu has.
  */
 
 import {
@@ -193,7 +189,6 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
             // Something on the page already answered it with a menu of its own.
             if (event.defaultPrevented) return;
             const keyboard = selectionMenu.fromKeyboard(event);
-            if (!keyboard && event.shiftKey) return;
             const found = selectionMenu.selectionAt(event.target, document);
             if (!found) {
                 // A link, with nothing selected on it: Polaris's own menu for it,
@@ -375,10 +370,6 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
                                 {t("selectionMenu.askPolar")}
                             </DropdownMenuItem>
                         ) : null}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel className="max-w-[min(18rem,70vw)] normal-case tracking-normal">
-                            {t("selectionMenu.browserMenu")}
-                        </DropdownMenuLabel>
                     </DropdownMenuContent>
                 ) : null}
             </DropdownMenu>
@@ -439,10 +430,6 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
                                 {t("selectionMenu.askPolarLink")}
                             </DropdownMenuItem>
                         ) : null}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel className="max-w-[min(18rem,70vw)] normal-case tracking-normal">
-                            {t("selectionMenu.browserMenu")}
-                        </DropdownMenuLabel>
                     </DropdownMenuContent>
                 ) : null}
             </DropdownMenu>
