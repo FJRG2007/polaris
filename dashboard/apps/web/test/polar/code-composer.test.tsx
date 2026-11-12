@@ -202,13 +202,17 @@ describe("Code's composer is Chat's", () => {
     });
 });
 
-describe("the repository bar", () => {
+describe("the repository and branch chip", () => {
     it("names the repository once and offers to add repositories on GitHub", async () => {
         render(<PolarChat />, { wrapper: MessagesWrapper });
         await openCode();
-        const bar = screen.getByRole("button", { name: /^Where the agent works: acme\/web$/ });
-        expect(bar.getAttribute("title")).toBe("acme/web");
+        const bar = await screen.findByRole("button", {
+            name: /^Where the agent works: acme\/web - main$/
+        });
+        expect(bar.getAttribute("title")).toBe("acme/web - main");
         expect(screen.getAllByText("acme/web")).toHaveLength(1);
+        // One chip: no bar of its own above the task, no second chip for the branch.
+        expect(screen.queryByRole("button", { name: /^Branch:/ })).toBeNull();
 
         press(bar);
         const add = await screen.findByRole("menuitem", { name: /Add repositories/ });
@@ -216,8 +220,7 @@ describe("the repository bar", () => {
         expect(add.getAttribute("target")).toBe("_blank");
         expect(screen.getByRole("menuitem", { name: /No repository/ })).toBeTruthy();
         expect(screen.getByRole("menuitem", { name: "Refresh the list" })).toBeTruthy();
-        // The branch is the chip's, not the bar's.
-        expect(screen.queryByRole("textbox", { name: "Branch" })).toBeNull();
+        expect(screen.getByRole("menuitem", { name: "Branch: main" })).toBeTruthy();
     });
 
     it("says why there is nothing to add where no GitHub App is set up", async () => {
@@ -273,12 +276,12 @@ describe("the repository menu past its first page", () => {
         });
         render(<PolarChat />, { wrapper: MessagesWrapper });
         await openCode();
-        press(screen.getByRole("button", { name: /^Where the agent works: acme\/web$/ }));
+        press(await screen.findByRole("button", { name: /^Where the agent works: acme\/web/ }));
         fireEvent.click(await screen.findByRole("menuitem", { name: "Show more" }));
         fireEvent.click(await screen.findByRole("menuitem", { name: /acme\/zz/ }));
         expect(asked[0]).toContain("cursor=after-web");
         const bar = await screen.findByRole("button", {
-            name: /^Where the agent works: acme\/zz$/
+            name: /^Where the agent works: acme\/zz/
         });
 
         // The first page no longer holds the pick: it is read back by id, not dropped.
@@ -287,7 +290,7 @@ describe("the repository menu past its first page", () => {
         await waitFor(() => expect(asked.some((url) => url.includes(`id=${LATER.id}`))).toBe(true));
         expect(
             await screen.findByRole("button", {
-                name: /^Where the agent works: acme\/zz$/,
+                name: /^Where the agent works: acme\/zz/,
                 // The menu is still open over it.
                 hidden: true
             })
@@ -295,39 +298,57 @@ describe("the repository menu past its first page", () => {
     });
 });
 
-describe("the branch chip", () => {
+describe("the branch, in the chip's submenu", () => {
+    async function openBranches() {
+        press(await screen.findByRole("button", { name: /^Where the agent works: acme\/web - main$/ }));
+        fireEvent.click(await screen.findByRole("menuitem", { name: "Branch: main" }));
+        return screen.findByPlaceholderText("Search branches");
+    }
+
     it("names the default branch and lists the branches, the default one first", async () => {
         render(<PolarChat />, { wrapper: MessagesWrapper });
         await openCode();
-        const chip = await screen.findByRole("button", { name: "Branch: main" });
-        press(chip);
-        const items = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
+        const search = await openBranches();
+        const menu = search.closest("[role=menu]") as HTMLElement;
+        const items = within(menu)
+            .getAllByRole("menuitem")
+            .map((item) => item.textContent);
         expect(items).toEqual(["maindefault", "dev", "release/2.0"]);
-        fireEvent.click(screen.getByRole("menuitem", { name: "release/2.0" }));
-        expect(await screen.findByRole("button", { name: "Branch: release/2.0" })).toBeTruthy();
+        fireEvent.click(within(menu).getByRole("menuitem", { name: "release/2.0" }));
+        expect(
+            await screen.findByRole("button", {
+                name: "Where the agent works: acme/web - release/2.0"
+            })
+        ).toBeTruthy();
     });
 
     it("searches the branches and takes one that is not listed", async () => {
         render(<PolarChat />, { wrapper: MessagesWrapper });
         await openCode();
-        press(await screen.findByRole("button", { name: "Branch: main" }));
-        const search = await screen.findByPlaceholderText("Search branches");
+        const search = await openBranches();
+        const menu = search.closest("[role=menu]") as HTMLElement;
         fireEvent.change(search, { target: { value: "rel" } });
-        expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+        expect(within(menu).getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
             "release/2.0",
             'Use "rel"'
         ]);
         fireEvent.change(search, { target: { value: "feat/new" } });
-        fireEvent.click(screen.getByRole("menuitem", { name: 'Use "feat/new"' }));
-        expect(await screen.findByRole("button", { name: "Branch: feat/new" })).toBeTruthy();
+        fireEvent.click(within(menu).getByRole("menuitem", { name: 'Use "feat/new"' }));
+        expect(
+            await screen.findByRole("button", { name: "Where the agent works: acme/web - feat/new" })
+        ).toBeTruthy();
     });
 
-    it("is not there without a repository", async () => {
+    it("is not offered without a repository", async () => {
         render(<PolarChat />, { wrapper: MessagesWrapper });
         await openCode();
-        await screen.findByRole("button", { name: "Branch: main" });
-        press(screen.getByRole("button", { name: /^Where the agent works/ }));
+        press(await screen.findByRole("button", { name: /^Where the agent works: acme\/web - main$/ }));
         fireEvent.click(await screen.findByRole("menuitem", { name: /No repository/ }));
-        await waitFor(() => expect(screen.queryByRole("button", { name: /^Branch:/ })).toBeNull());
+        const chip = await screen.findByRole("button", {
+            name: "Where the agent works: No repository"
+        });
+        press(chip);
+        await screen.findByRole("menuitem", { name: "Refresh the list" });
+        expect(screen.queryByRole("menuitem", { name: /^Branch:/ })).toBeNull();
     });
 });

@@ -3,15 +3,11 @@
 /**
  * Where a Code task works, and who works on it.
  *
- * The repository sits in a bar at the top of the task, so the composer keeps
- * only what Chat's has. The bar opens a menu (a portal with collision
- * handling) to search the connected repositories, pick an empty workspace, and
- * give Polaris's GitHub App more repositories on GitHub - with a refresh for
- * when the person comes back.
- *
- * The branch is a chip under the composer, as the coding agents' own web apps
- * draw it: it opens a searchable list of the repository's branches, the
- * default one first, and takes a name that is not listed yet.
+ * The repository and its branch are one chip under the composer. Its menu (a
+ * portal with collision handling) searches the connected repositories, picks
+ * an empty workspace, gives Polaris's GitHub App more repositories on GitHub -
+ * with a refresh for when the person comes back - and opens the repository's
+ * branches in a submenu.
  *
  * The agent is picked on the composer, in the model picker's place and look.
  */
@@ -50,6 +46,9 @@ import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     MenuSearch,
     menuSearchMatches
@@ -219,161 +218,117 @@ export function useRepoName(repoId: string, known: readonly RepoEntry[]): string
 }
 
 /** A new task's place: the button that opens the repository menu. */
-export function CodeRepoBar({
-    fullPage,
+/** The repository list: search, the empty workspace, every connected
+ *  repository a page at a time, and the ways to connect more. */
+function RepoItems({
     choices,
     repoId,
     onRepo,
     onRefresh,
     refreshing,
-    disabled
+    query,
+    onQuery
 }: {
-    fullPage: boolean;
-    /** Null while the choices are on their way. */
     choices: PolarCodeChoices | null;
     repoId: string;
     onRepo: (id: string) => void;
     onRefresh: () => void;
     refreshing: boolean;
-    disabled: boolean;
+    query: string;
+    onQuery: (query: string) => void;
 }) {
     const t = useTranslations("polar");
-    const [open, setOpen] = useState(false);
-    const [query, setQuery] = useState("");
     const list = useRepoList(choices, query);
     const repos = choices?.repos ?? [];
-    const known = [...repos, ...list.items];
-    const chosen = useRepoName(repoId, known);
-    const name = known.find((entry) => entry.id === repoId)?.name ?? chosen ?? t("code.workspace");
     const shown = list.items;
     const searching = query.trim().length > 0;
-
     return (
-        <BarRow fullPage={fullPage}>
-            <DropdownMenu
-                open={open}
-                onOpenChange={(next) => {
-                    if (!next) setQuery("");
-                    setOpen(next);
-                }}
-            >
-                <DropdownMenuTrigger
-                    asChild
-                    disabled={disabled || (choices === null && refreshing)}
-                >
-                    <button
-                        type="button"
-                        aria-label={`${t("code.where")}: ${name}`}
-                        title={name}
-                        className="-mx-2 flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 hover:bg-card-hover hover:text-foreground disabled:opacity-60"
-                    >
-                        <Where repo={name} />
-                        <ChevronDown className="size-3.5 shrink-0" aria-hidden />
-                    </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                    align="start"
-                    className="max-h-[min(26rem,var(--radix-dropdown-menu-content-available-height))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain pt-2"
-                    onEscapeKeyDown={(event) => {
-                        if (!query) return;
+        <>
+            {repos.length > 0 ? (
+                <MenuSearch value={query} onChange={onQuery} placeholder={t("code.searchRepos")} />
+            ) : null}
+            {searching ? null : (
+                <DropdownMenuItem onSelect={() => onRepo(NO_REPO)} className="items-start">
+                    <FolderGit2 className="mt-0.5 size-3.5 shrink-0" />
+                    <span className="flex min-w-0 flex-col">
+                        <span className="truncate">{t("code.workspace")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("code.workspaceHint")}
+                        </span>
+                    </span>
+                    <Mark on={repoId === NO_REPO} />
+                </DropdownMenuItem>
+            )}
+            {shown.map((entry) => (
+                <DropdownMenuItem key={entry.id} onSelect={() => onRepo(entry.id)}>
+                    <FolderGit2 className="size-3.5 shrink-0" />
+                    <span className="min-w-0 truncate" title={entry.name}>
+                        {entry.name}
+                    </span>
+                    <Mark on={entry.id === repoId} />
+                </DropdownMenuItem>
+            ))}
+            {list.next ? (
+                <DropdownMenuItem
+                    disabled={list.loading}
+                    onSelect={(event) => {
+                        // Stays open: the next page lands right here.
                         event.preventDefault();
-                        setQuery("");
+                        list.more();
                     }}
                 >
-                    {repos.length > 0 ? (
-                        <MenuSearch
-                            value={query}
-                            onChange={setQuery}
-                            placeholder={t("code.searchRepos")}
-                        />
-                    ) : null}
-                    {searching ? null : (
-                        <DropdownMenuItem onSelect={() => onRepo(NO_REPO)} className="items-start">
-                            <FolderGit2 className="mt-0.5 size-3.5 shrink-0" />
-                            <span className="flex min-w-0 flex-col">
-                                <span className="truncate">{t("code.workspace")}</span>
-                                <span className="text-xs text-muted-foreground">
-                                    {t("code.workspaceHint")}
-                                </span>
+                    <ChevronDown className="size-3.5 shrink-0" />
+                    <span className="min-w-0 truncate">{t("code.moreRepos")}</span>
+                </DropdownMenuItem>
+            ) : null}
+            {searching && shown.length === 0 && !list.loading ? (
+                <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                    {t("code.noRepoMatch")}
+                </p>
+            ) : null}
+            <DropdownMenuSeparator />
+            {choices?.installUrl ? (
+                <DropdownMenuItem asChild className="items-start">
+                    <a href={choices.installUrl} target="_blank" rel="noopener noreferrer">
+                        <Plus className="mt-0.5 size-3.5 shrink-0" />
+                        <span className="flex min-w-0 flex-col">
+                            <span className="truncate">{t("code.addRepos")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("code.addReposHint")}
                             </span>
-                            <Mark on={repoId === NO_REPO} />
-                        </DropdownMenuItem>
-                    )}
-                    {shown.map((entry) => (
-                        <DropdownMenuItem key={entry.id} onSelect={() => onRepo(entry.id)}>
-                            <FolderGit2 className="size-3.5 shrink-0" />
-                            <span className="min-w-0 truncate" title={entry.name}>
-                                {entry.name}
-                            </span>
-                            <Mark on={entry.id === repoId} />
-                        </DropdownMenuItem>
-                    ))}
-                    {list.next ? (
-                        <DropdownMenuItem
-                            disabled={list.loading}
-                            onSelect={(event) => {
-                                // Stays open: the next page lands right here.
-                                event.preventDefault();
-                                list.more();
-                            }}
-                        >
-                            <ChevronDown className="size-3.5 shrink-0" />
-                            <span className="min-w-0 truncate">{t("code.moreRepos")}</span>
-                        </DropdownMenuItem>
-                    ) : null}
-                    {searching && shown.length === 0 && !list.loading ? (
-                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                            {t("code.noRepoMatch")}
-                        </p>
-                    ) : null}
-                    <DropdownMenuSeparator />
-                    {choices?.installUrl ? (
-                        <DropdownMenuItem asChild className="items-start">
-                            <a href={choices.installUrl} target="_blank" rel="noopener noreferrer">
-                                <Plus className="mt-0.5 size-3.5 shrink-0" />
-                                <span className="flex min-w-0 flex-col">
-                                    <span className="truncate">{t("code.addRepos")}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                        {t("code.addReposHint")}
-                                    </span>
-                                </span>
-                                <ExternalLink className="ml-auto mt-0.5 size-3.5 shrink-0" />
-                            </a>
-                        </DropdownMenuItem>
-                    ) : (
-                        <DropdownMenuItem disabled className="items-start">
-                            <Plus className="mt-0.5 size-3.5 shrink-0" />
-                            <span className="flex min-w-0 flex-col">
-                                <span className="truncate">{t("code.addRepos")}</span>
-                                <span className="text-xs">{t("code.addReposUnavailable")}</span>
-                            </span>
-                        </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem asChild>
-                        <Link href="/automations/code-review">
-                            <FolderGit2 className="size-3.5 shrink-0" />
-                            <span className="min-w-0 truncate">{t("code.connectInAgents")}</span>
-                        </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                        disabled={refreshing}
-                        onSelect={(event) => {
-                            // Stays open: the list it refreshes is right here.
-                            event.preventDefault();
-                            onRefresh();
-                        }}
-                    >
-                        <RefreshCw
-                            className={cn(
-                                "size-3.5 shrink-0",
-                                refreshing && "motion-safe:animate-spin"
-                            )}
-                        />
-                        <span className="min-w-0 truncate">{t("code.refresh")}</span>
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-        </BarRow>
+                        </span>
+                        <ExternalLink className="ml-auto mt-0.5 size-3.5 shrink-0" />
+                    </a>
+                </DropdownMenuItem>
+            ) : (
+                <DropdownMenuItem disabled className="items-start">
+                    <Plus className="mt-0.5 size-3.5 shrink-0" />
+                    <span className="flex min-w-0 flex-col">
+                        <span className="truncate">{t("code.addRepos")}</span>
+                        <span className="text-xs">{t("code.addReposUnavailable")}</span>
+                    </span>
+                </DropdownMenuItem>
+            )}
+            <DropdownMenuItem asChild>
+                <Link href="/automations/code-review">
+                    <FolderGit2 className="size-3.5 shrink-0" />
+                    <span className="min-w-0 truncate">{t("code.connectInAgents")}</span>
+                </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+                disabled={refreshing}
+                onSelect={(event) => {
+                    // Stays open: the list it refreshes is right here.
+                    event.preventDefault();
+                    onRefresh();
+                }}
+            >
+                <RefreshCw
+                    className={cn("size-3.5 shrink-0", refreshing && "motion-safe:animate-spin")}
+                />
+                <span className="min-w-0 truncate">{t("code.refresh")}</span>
+            </DropdownMenuItem>
+        </>
     );
 }
 
@@ -437,16 +392,28 @@ function useBranches(repoId: string, enabled: boolean) {
 const BRANCHES_SHOWN = 100;
 
 /**
- * The branch a new task starts from, as a chip under the composer. Empty means
- * the repository's default branch, which the chip names once it is known.
+ * Where a new task works, as one chip under the composer: the repository and
+ * the branch it starts from. The menu lists the repositories; the branch is a
+ * submenu at its top, searchable, the default one first, and takes a name that
+ * is not listed yet. An empty branch means the repository's default, which the
+ * chip names once it is known.
  */
-export function CodeBranchChip({
+export function CodeWhereChip({
+    choices,
     repoId,
+    onRepo,
+    onRefresh,
+    refreshing,
     branch,
     onBranch,
     disabled
 }: {
+    /** Null while the choices are on their way. */
+    choices: PolarCodeChoices | null;
     repoId: string;
+    onRepo: (id: string) => void;
+    onRefresh: () => void;
+    refreshing: boolean;
     /** The branch typed or chosen; empty for the default one. */
     branch: string;
     onBranch: (branch: string) => void;
@@ -454,14 +421,21 @@ export function CodeBranchChip({
 }) {
     const t = useTranslations("polar");
     const [open, setOpen] = useState(false);
+    const [repoQuery, setRepoQuery] = useState("");
     const [query, setQuery] = useState("");
-    const { value, failed } = useBranches(repoId, true);
+    const known = choices?.repos ?? [];
+    const chosenRepo = useRepoName(repoId, known);
+    const repoName =
+        known.find((entry) => entry.id === repoId)?.name ?? chosenRepo ?? t("code.workspace");
+    const hasRepo = repoId !== "" && repoId !== NO_REPO;
+    const { value, failed } = useBranches(repoId, hasRepo);
     const fallback = value?.defaultBranch ?? null;
     const chosen = branch.trim();
-    const shownName = chosen || fallback || t("code.branchPlaceholder");
+    const branchName = chosen || fallback || t("code.branchPlaceholder");
     const typed = query.trim();
     const matches = (value?.branches ?? []).filter((name) => menuSearchMatches(name, query));
     const listed = value?.branches.includes(typed) ?? false;
+    const label = hasRepo ? `${repoName} - ${branchName}` : repoName;
     const choose = (name: string) => {
         onBranch(name === fallback ? "" : name);
         setOpen(false);
@@ -471,78 +445,123 @@ export function CodeBranchChip({
         <DropdownMenu
             open={open}
             onOpenChange={(next) => {
-                if (!next) setQuery("");
+                if (!next) {
+                    setRepoQuery("");
+                    setQuery("");
+                }
                 setOpen(next);
             }}
         >
-            <DropdownMenuTrigger asChild disabled={disabled}>
+            <DropdownMenuTrigger asChild disabled={disabled || (choices === null && refreshing)}>
                 <button
                     type="button"
-                    aria-label={`${t("code.branch")}: ${shownName}`}
-                    title={shownName}
+                    aria-label={`${t("code.where")}: ${label}`}
+                    title={label}
                     className="flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-md border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground disabled:opacity-60 [@media(pointer:coarse)]:h-11"
                 >
-                    <GitBranch className="size-3.5 shrink-0" aria-hidden />
-                    <span className="min-w-0 truncate">{shownName}</span>
+                    <FolderGit2 className="size-3.5 shrink-0" aria-hidden />
+                    <span className="min-w-0 truncate text-foreground">{repoName}</span>
+                    {hasRepo ? (
+                        <>
+                            <GitBranch className="size-3.5 shrink-0" aria-hidden />
+                            <span className="min-w-0 max-w-[40%] shrink-[2] truncate">
+                                {branchName}
+                            </span>
+                        </>
+                    ) : null}
                     <ChevronDown className="size-3.5 shrink-0" aria-hidden />
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
                 align="start"
-                className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain pt-2"
+                className="max-h-[min(26rem,var(--radix-dropdown-menu-content-available-height))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain pt-2"
                 onEscapeKeyDown={(event) => {
-                    if (!query) return;
+                    if (!repoQuery) return;
                     event.preventDefault();
-                    setQuery("");
+                    setRepoQuery("");
                 }}
             >
-                <MenuSearch
-                    value={query}
-                    onChange={setQuery}
-                    placeholder={t("code.searchBranches")}
+                {hasRepo && !repoQuery.trim() ? (
+                    <>
+                        <DropdownMenuSub onOpenChange={(next) => (next ? undefined : setQuery(""))}>
+                            <DropdownMenuSubTrigger aria-label={`${t("code.branch")}: ${branchName}`}>
+                                <GitBranch className="size-3.5 shrink-0" />
+                                <span className="min-w-0 truncate" title={branchName}>
+                                    {branchName}
+                                </span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent
+                                className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-72 max-w-[calc(100vw-2rem)] pt-2"
+                                onEscapeKeyDown={(event) => {
+                                    if (!query) return;
+                                    event.preventDefault();
+                                    setQuery("");
+                                }}
+                            >
+                                <MenuSearch
+                                    value={query}
+                                    onChange={setQuery}
+                                    placeholder={t("code.searchBranches")}
+                                />
+                                {value === null && !failed ? (
+                                    <div className="space-y-1.5 px-2 py-1.5" aria-hidden>
+                                        {[0, 1, 2].map((key) => (
+                                            <div
+                                                key={key}
+                                                className="h-5 rounded bg-muted motion-safe:animate-pulse"
+                                            />
+                                        ))}
+                                    </div>
+                                ) : null}
+                                {failed ? (
+                                    <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                                        {t("code.branchesFailed")}
+                                    </p>
+                                ) : null}
+                                {matches.slice(0, BRANCHES_SHOWN).map((name) => (
+                                    <DropdownMenuItem key={name} onSelect={() => choose(name)}>
+                                        <GitBranch className="size-3.5 shrink-0" />
+                                        <span className="min-w-0 truncate" title={name}>
+                                            {name}
+                                        </span>
+                                        {name === fallback ? (
+                                            <span className="shrink-0 rounded bg-muted px-1 text-[0.6875rem] text-muted-foreground">
+                                                {t("code.branchDefault")}
+                                            </span>
+                                        ) : null}
+                                        <Mark on={chosen ? name === chosen : name === fallback} />
+                                    </DropdownMenuItem>
+                                ))}
+                                {value !== null && typed && matches.length === 0 && !listed ? (
+                                    <p className="px-2 py-1.5 text-center text-xs text-muted-foreground">
+                                        {t("code.noBranchMatch")}
+                                    </p>
+                                ) : null}
+                                {typed && !listed ? (
+                                    <DropdownMenuItem onSelect={() => choose(typed)}>
+                                        <Plus className="size-3.5 shrink-0" />
+                                        <span className="min-w-0 truncate" title={typed}>
+                                            {t("code.branchUse", { name: typed })}
+                                        </span>
+                                    </DropdownMenuItem>
+                                ) : null}
+                            </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                        <DropdownMenuSeparator />
+                    </>
+                ) : null}
+                <RepoItems
+                    choices={choices}
+                    repoId={repoId}
+                    onRepo={(id) => {
+                        onRepo(id);
+                        setOpen(false);
+                    }}
+                    onRefresh={onRefresh}
+                    refreshing={refreshing}
+                    query={repoQuery}
+                    onQuery={setRepoQuery}
                 />
-                {value === null && !failed ? (
-                    <div className="space-y-1.5 px-2 py-1.5" aria-hidden>
-                        {[0, 1, 2].map((key) => (
-                            <div
-                                key={key}
-                                className="h-5 rounded bg-muted motion-safe:animate-pulse"
-                            />
-                        ))}
-                    </div>
-                ) : null}
-                {failed ? (
-                    <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                        {t("code.branchesFailed")}
-                    </p>
-                ) : null}
-                {matches.slice(0, BRANCHES_SHOWN).map((name) => (
-                    <DropdownMenuItem key={name} onSelect={() => choose(name)}>
-                        <GitBranch className="size-3.5 shrink-0" />
-                        <span className="min-w-0 truncate" title={name}>
-                            {name}
-                        </span>
-                        {name === fallback ? (
-                            <span className="shrink-0 rounded bg-muted px-1 text-[0.6875rem] text-muted-foreground">
-                                {t("code.branchDefault")}
-                            </span>
-                        ) : null}
-                        <Mark on={chosen ? name === chosen : name === fallback} />
-                    </DropdownMenuItem>
-                ))}
-                {value !== null && typed && matches.length === 0 && listed === false ? (
-                    <p className="px-2 py-1.5 text-center text-xs text-muted-foreground">
-                        {t("code.noBranchMatch")}
-                    </p>
-                ) : null}
-                {typed && !listed ? (
-                    <DropdownMenuItem onSelect={() => choose(typed)}>
-                        <Plus className="size-3.5 shrink-0" />
-                        <span className="min-w-0 truncate" title={typed}>
-                            {t("code.branchUse", { name: typed })}
-                        </span>
-                    </DropdownMenuItem>
-                ) : null}
             </DropdownMenuContent>
         </DropdownMenu>
     );

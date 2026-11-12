@@ -68,11 +68,10 @@ import {
 } from "@/components/polar/elements/model-selector";
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
 import {
-    CodeBranchChip,
     CodeIssueChip,
     CodeSkillChip,
     type PickedIssue,
-    CodeRepoBar,
+    CodeWhereChip,
     CodeSessionBar,
     NO_REPO,
     PERMISSION_MODE_KEY,
@@ -500,8 +499,8 @@ function useCodeChoices(canStart: boolean) {
 /**
  * The Code side, in Chat's own frame: a new task opens on the same welcome as a
  * new chat, and a session reads as a chat thread with the composer under it.
- * Where the task works sits in a bar above it; the history is the sidebar's,
- * beside the chats.
+ * Where the task works is a chip under the composer; the history is the
+ * sidebar's, beside the chats.
  */
 export function PolarCodeView({
     code,
@@ -549,10 +548,12 @@ export function PolarCodeView({
             />
         );
 
-    const bar = canStart ? (
-        <CodeRepoBar
-            fullPage={fullPage}
+    const composer = (
+        <CodeStart
+            canStart={canStart}
+            pending={code.access === null}
             choices={picks.choices}
+            choicesError={picks.error}
             repoId={picks.repoId}
             onRepo={(id) => {
                 // A branch belongs to the repository it was picked in.
@@ -561,16 +562,6 @@ export function PolarCodeView({
             }}
             onRefresh={picks.load}
             refreshing={picks.refreshing}
-            disabled={false}
-        />
-    ) : null;
-    const composer = (
-        <CodeStart
-            canStart={canStart}
-            pending={code.access === null}
-            choices={picks.choices}
-            choicesError={picks.error}
-            repoId={picks.repoId}
             baseRef={baseRef}
             onBaseRef={setBaseRef}
             agentKey={picks.agentKey}
@@ -583,20 +574,14 @@ export function PolarCodeView({
     );
     if (fullPage)
         return (
-            <>
-                {bar}
-                <PolarWelcome avatar={avatar} title={t("code.heading")}>
-                    {composer}
-                </PolarWelcome>
-            </>
+            <PolarWelcome avatar={avatar} title={t("code.heading")}>
+                {composer}
+            </PolarWelcome>
         );
     return (
-        <>
-            {bar}
-            <PolarThreadFrame fullPage={false} dock={composer}>
-                <ConversationEmptyState icon={avatar} description={t("code.heading")} />
-            </PolarThreadFrame>
-        </>
+        <PolarThreadFrame fullPage={false} dock={composer}>
+            <ConversationEmptyState icon={avatar} description={t("code.heading")} />
+        </PolarThreadFrame>
     );
 }
 
@@ -703,6 +688,9 @@ function CodeStart({
     choices,
     choicesError,
     repoId,
+    onRepo,
+    onRefresh,
+    refreshing,
     baseRef,
     onBaseRef,
     agentKey,
@@ -717,6 +705,9 @@ function CodeStart({
     choices: Choices | null;
     choicesError: string | null;
     repoId: string;
+    onRepo: (id: string) => void;
+    onRefresh: () => void;
+    refreshing: boolean;
     baseRef: string;
     onBaseRef: (branch: string) => void;
     agentKey: string;
@@ -967,39 +958,34 @@ function CodeStart({
                     onStop: () => undefined
                 }}
             />
-            {canStart && !polar && repoId ? (
+            {canStart ? (
                 <div className="flex min-w-0 flex-wrap items-center gap-1.5 px-1">
-                    {repoId !== NO_REPO ? (
-                        <>
-                            <CodeBranchChip
-                                repoId={repoId}
-                                branch={baseRef}
-                                onBranch={onBaseRef}
-                                disabled={busy}
-                            />
-                            <CodeIssueChip
-                                repoId={repoId}
-                                issue={issue}
-                                onIssue={(next) => setIssue(next ? { repoId, issue: next } : null)}
-                                disabled={busy}
-                            />
-                        </>
-                    ) : null}
-                    <CodeSkillChip
-                        skills={choices?.skills ?? []}
-                        skill={skill}
-                        onSkill={setSkill}
-                        disabled={busy}
-                    />
-                </div>
-            ) : canStart && repoId && repoId !== NO_REPO ? (
-                <div className="flex min-w-0 flex-wrap items-center gap-1.5 px-1">
-                    <CodeBranchChip
+                    <CodeWhereChip
+                        choices={choices}
                         repoId={repoId}
+                        onRepo={onRepo}
+                        onRefresh={onRefresh}
+                        refreshing={refreshing}
                         branch={baseRef}
                         onBranch={onBaseRef}
                         disabled={busy}
                     />
+                    {!polar && repoId && repoId !== NO_REPO ? (
+                        <CodeIssueChip
+                            repoId={repoId}
+                            issue={issue}
+                            onIssue={(next) => setIssue(next ? { repoId, issue: next } : null)}
+                            disabled={busy}
+                        />
+                    ) : null}
+                    {!polar ? (
+                        <CodeSkillChip
+                            skills={choices?.skills ?? []}
+                            skill={skill}
+                            onSkill={setSkill}
+                            disabled={busy}
+                        />
+                    ) : null}
                 </div>
             ) : null}
             {!canStart && !pending ? <Notice>{t("code.readOnly")}</Notice> : null}
