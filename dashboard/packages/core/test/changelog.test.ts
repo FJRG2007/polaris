@@ -125,6 +125,31 @@ describe("the security update policy", () => {
         expect(at).toEqual(new Date(2026, 10, 13, 3, 0));
     });
 
+    it("installs every day at the time picked for that severity", () => {
+        const policy = {
+            ...DEFAULT_SECURITY_UPDATE,
+            medium: "daily" as const,
+            low: "daily" as const,
+            times: { medium: "22:30" }
+        };
+        const seen = new Date(2026, 10, 12, 14, 0);
+        expect(securityUpdateRunsAt(policy, "medium", seen, 4)).toEqual(new Date(2026, 10, 12, 22, 30));
+        // No time picked: the default, never the quiet hour silently.
+        expect(securityUpdateRunsAt(policy, "low", seen, 4)).toEqual(new Date(2026, 10, 13, 5, 0));
+    });
+
+    it("reads a policy saved before daily times existed, and refuses a malformed time", () => {
+        const old = { critical: "immediate", high: "immediate", medium: "quiet", low: "off", riskAccepted: null };
+        expect(parseSecurityUpdatePolicy(JSON.stringify(old))).toEqual({ ...old, times: {} });
+        const bad = { ...old, low: "daily", times: { low: "25:00" } };
+        expect(parseSecurityUpdatePolicy(JSON.stringify(bad))).toEqual(DEFAULT_SECURITY_UPDATE);
+    });
+
+    it("counts a daily time as waiting, like the quiet hour", () => {
+        expect(securityPolicyLowers(DEFAULT_SECURITY_UPDATE, { critical: "daily", high: "immediate" })).toBe(true);
+        expect(securityPolicyLowers({ critical: "quiet", high: "immediate" }, { critical: "daily", high: "immediate" })).toBe(false);
+    });
+
     it("falls back to the safe default for anything unreadable or unaccepted", () => {
         expect(parseSecurityUpdatePolicy("{")).toEqual(DEFAULT_SECURITY_UPDATE);
         expect(parseSecurityUpdatePolicy(JSON.stringify({ critical: "later" }))).toEqual(

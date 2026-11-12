@@ -2,7 +2,8 @@
 
 /**
  * When an update that fixes a vulnerability installs itself, one answer per
- * severity: at once, at this deployment's quietest hour, or only tell me.
+ * severity: at once, at this deployment's quietest hour, every day at a time
+ * picked here (as the general "every day at" above), or only tell me.
  *
  * Critical and high install at once by default. Leaving either to wait is
  * allowed, but it is accepting a known hole, so the change is not saved until
@@ -16,6 +17,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     Checkbox,
+    DateInput,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -26,6 +28,7 @@ import {
     Skeleton
 } from "@polaris/ui";
 import {
+    DEFAULT_SECURITY_DAILY_AT,
     SECURITY_SEVERITIES,
     SECURITY_UPDATE_TIMINGS,
     securityPolicyLowers,
@@ -35,7 +38,10 @@ import {
 } from "@polaris/core";
 import { saveSecurityUpdateAction, securityUpdatePolicyAction } from "./actions";
 
-type Timings = Pick<SecurityUpdatePolicy, SecuritySeverity>;
+type Timings = Pick<SecurityUpdatePolicy, SecuritySeverity | "times">;
+
+/** A complete 24-hour time. The time field reports "" until one is typed. */
+const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
     const t = useTranslations("admin");
@@ -45,6 +51,8 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
     const [pendingRisk, setPendingRisk] = useState<Timings | null>(null);
     const [accepted, setAccepted] = useState(false);
     const [saving, setSaving] = useState(false);
+    // What is typed in each time field, which is half a time while it is typed.
+    const [drafts, setDrafts] = useState<Partial<Record<SecuritySeverity, string>>>({});
 
     useEffect(() => {
         let live = true;
@@ -85,15 +93,24 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
         setPolicy(result.policy);
     }
 
+    function timesOf(current: SecurityUpdatePolicy): Timings {
+        return {
+            critical: current.critical,
+            high: current.high,
+            medium: current.medium,
+            low: current.low,
+            times: current.times
+        };
+    }
+
     function change(severity: SecuritySeverity, value: SecurityUpdateTiming) {
         if (!policy || policy[severity] === value) return;
-        const next: Timings = {
-            critical: policy.critical,
-            high: policy.high,
-            medium: policy.medium,
-            low: policy.low,
-            [severity]: value
-        };
+        const next: Timings = { ...timesOf(policy), [severity]: value };
+        // Switched to "every day at" with no time picked yet: the quiet hour is
+        // the sensible first answer, and it is saved, so what shows is what runs.
+        if (value === "daily" && !policy.times[severity]) {
+            next.times = { ...policy.times, [severity]: at };
+        }
         if (securityPolicyLowers(policy, next)) {
             setAccepted(false);
             setPendingRisk(next);
@@ -102,19 +119,27 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
         void save(next, false);
     }
 
+    function changeTime(severity: SecuritySeverity, typed: string) {
+        setDrafts((current) => ({ ...current, [severity]: typed }));
+        // Only a complete time is a schedule; the half-typed states are not.
+        if (!policy || !TIME_OF_DAY.test(typed) || policy.times[severity] === typed) return;
+        void save({ ...timesOf(policy), times: { ...policy.times, [severity]: typed } }, false);
+    }
+
     return (
         <div className="flex flex-col gap-2 border-t border-border pt-3">
             <div>
                 <p className="text-sm">{t("settings.security.title")}</p>
                 <p className="text-xs text-muted-foreground">{t("settings.security.description")}</p>
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
                 {SECURITY_SEVERITIES.map((severity) => (
-                    <div key={severity} className="flex min-w-0 items-center justify-between gap-2">
-                        <span className="min-w-0 truncate text-sm">
+                    <div key={severity} className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="w-20 min-w-0 truncate text-sm">
                             {t(`settings.security.severity.${severity}`)}
                         </span>
                         {policy ? (
+                            <>
                             <Select
                                 aria-label={t("settings.security.ariaLabel", {
                                     severity: t(`settings.security.severity.${severity}`)
@@ -122,11 +147,28 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
                                 value={policy[severity]}
                                 onValueChange={(value) => change(severity, value as SecurityUpdateTiming)}
                                 options={choices}
-                                className="w-52 shrink-0"
+                                className="w-60 max-w-full shrink-0"
                                 disabled={disabled || saving}
                             />
+                            {policy[severity] === "daily" ? (
+                                <DateInput
+                                    mode="time"
+                                    aria-label={t("settings.security.timeLabel", {
+                                        severity: t(`settings.security.severity.${severity}`)
+                                    })}
+                                    className="w-32"
+                                    value={
+                                        drafts[severity] ??
+                                        policy.times[severity] ??
+                                        DEFAULT_SECURITY_DAILY_AT
+                                    }
+                                    disabled={disabled}
+                                    onChange={(event) => changeTime(severity, event.target.value)}
+                                />
+                            ) : null}
+                            </>
                         ) : (
-                            <Skeleton className="h-8 w-52 shrink-0" />
+                            <Skeleton className="h-8 w-60 max-w-full shrink-0" />
                         )}
                     </div>
                 ))}

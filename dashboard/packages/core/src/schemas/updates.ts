@@ -108,6 +108,8 @@ export function autoUpdateRunsAt(policy: AutoUpdatePolicy, availableSince: Date)
  *   immediate - as soon as the build that fixes it is published.
  *   quiet     - at the hour this deployment is least used (`quietHour`), so the
  *               restart lands when nobody notices it.
+ *   daily     - every day at a time the administrator picks (`times`), as the
+ *               general policy's "every day at" does.
  *   off       - only tell the operator, as any other update.
  *
  * Critical and high install at once by default. Taking either below that is
@@ -116,17 +118,35 @@ export function autoUpdateRunsAt(policy: AutoUpdatePolicy, availableSince: Date)
  * before saving. Medium and low wait for the quiet hour, so the restart
  * lands when nobody notices it; "off" is there for whoever wants to choose.
  */
-export const SECURITY_UPDATE_TIMINGS = ["immediate", "quiet", "off"] as const;
+export const SECURITY_UPDATE_TIMINGS = ["immediate", "quiet", "daily", "off"] as const;
 
 export type SecurityUpdateTiming = (typeof SECURITY_UPDATE_TIMINGS)[number];
 
 const timing = z.enum(SECURITY_UPDATE_TIMINGS);
+
+/** The time a severity set to `daily` installs at, when none was picked. */
+export const DEFAULT_SECURITY_DAILY_AT = "05:00";
+
+/** "HH:MM" per severity, for the ones set to `daily`. A policy saved before this
+ *  existed has none, and a severity without one uses the default. */
+export const securityUpdateTimesSchema = z
+    .object({
+        critical: z.string().regex(TIME_OF_DAY),
+        high: z.string().regex(TIME_OF_DAY),
+        medium: z.string().regex(TIME_OF_DAY),
+        low: z.string().regex(TIME_OF_DAY)
+    })
+    .partial()
+    .strict();
+
+export type SecurityUpdateTimes = z.infer<typeof securityUpdateTimesSchema>;
 
 export const securityUpdatePolicySchema = z.object({
     critical: timing,
     high: timing,
     medium: timing,
     low: timing,
+    times: securityUpdateTimesSchema.default({}),
     /** Who took critical or high below `immediate`, and when. Null while both
      *  install at once. */
     riskAccepted: z
@@ -141,6 +161,7 @@ export const DEFAULT_SECURITY_UPDATE: SecurityUpdatePolicy = {
     high: "immediate",
     medium: "quiet",
     low: "quiet",
+    times: {},
     riskAccepted: null
 };
 
@@ -150,7 +171,12 @@ export function securityPolicyTakesRisk(policy: Pick<SecurityUpdatePolicy, "crit
 }
 
 /** How long a timing leaves a fix waiting, shortest first. */
-const WAIT_RANK: Readonly<Record<SecurityUpdateTiming, number>> = { immediate: 0, quiet: 1, off: 2 };
+const WAIT_RANK: Readonly<Record<SecurityUpdateTiming, number>> = {
+    immediate: 0,
+    quiet: 1,
+    daily: 1,
+    off: 2
+};
 
 /** Whether `next` leaves a critical or high fix waiting longer than `previous`. */
 export function securityPolicyLowers(
@@ -194,6 +220,9 @@ export function securityUpdateRunsAt(
     const answer = policy[severity];
     if (answer === "off") return null;
     if (answer === "immediate") return availableSince;
+    if (answer === "daily") {
+        return nextDailyRun(policy.times[severity] ?? DEFAULT_SECURITY_DAILY_AT, availableSince);
+    }
     const hour = Math.min(23, Math.max(0, Math.trunc(quietHour)));
     return nextDailyRun(`${String(hour).padStart(2, "0")}:00`, availableSince);
 }

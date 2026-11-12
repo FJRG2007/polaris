@@ -193,6 +193,7 @@
         "planNow": "Se está instalando ahora.",
         "planSecurityNow": "Corrige una vulnerabilidad {severity}, así que se está instalando ahora.",
         "planSecurityQuiet": "Corrige una vulnerabilidad {severity}, así que se instala sola a las {at}, la hora más tranquila aquí.",
+        "planSecurityDaily": "Corrige una vulnerabilidad {severity}, así que se instala sola a las {at}.",
         "severity": {"critical": "crítica", "high": "alta", "medium": "media", "low": "baja"},
         "planManual": "Instálala desde Ajustes, donde también puedes ver qué ha cambiado.",
         "installingTitle": "Polaris instala una actualización",

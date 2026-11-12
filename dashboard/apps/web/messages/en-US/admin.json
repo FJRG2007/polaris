@@ -3769,6 +3769,7 @@
             "title": "Security fixes",
             "description": "An update that fixes a vulnerability installs itself on this schedule, whatever the setting above says.",
             "ariaLabel": "When an update fixing a {severity} vulnerability installs",
+            "timeLabel": "Time a {severity} fix installs",
             "severity": {
                 "critical": "Critical",
                 "high": "High",
@@ -3778,6 +3779,7 @@
             "timing": {
                 "immediate": "Immediately",
                 "quiet": "At the quietest hour ({at})",
+                "daily": "Every day at",
                 "off": "Only tell me"
             },
             "riskStanding": "A critical or high fix can wait here. An administrator accepted that risk.",

@@ -79,6 +79,25 @@ describe("saving how security fixes install", () => {
         expect(back.policy?.riskAccepted).toBeNull();
     });
 
+    it("saves a daily time per severity, and keeps it when switched away and back", async () => {
+        const daily = await saveSecurityUpdateAction({ ...SAFE, low: "daily", times: { low: "23:15" } });
+        expect(daily.policy).toMatchObject({ low: "daily", times: { low: "23:15" } });
+        const away = await saveSecurityUpdateAction({ ...SAFE, low: "quiet" });
+        expect(away.policy).toMatchObject({ low: "quiet", times: { low: "23:15" } });
+        expect((await saveSecurityUpdateAction({ ...SAFE, low: "daily" })).policy?.times.low).toBe("23:15");
+    });
+
+    it("refuses a time that is not one", async () => {
+        const result = await saveSecurityUpdateAction({ ...SAFE, low: "daily", times: { low: "7pm" } });
+        expect(result.error).toBe("settings.security.errors.invalid");
+        expect(stored.policy).toBeNull();
+    });
+
+    it("asks for the risk to be accepted for a critical fix set to a daily time", async () => {
+        const refused = await saveSecurityUpdateAction({ ...SAFE, critical: "daily", times: { critical: "03:00" } });
+        expect(refused.error).toBe("settings.security.errors.riskNotAccepted");
+    });
+
     it("refuses what is not a schedule", async () => {
         expect((await saveSecurityUpdateAction({ ...SAFE, critical: "later" })).error).toBe(
             "settings.security.errors.invalid"

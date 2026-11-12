@@ -3769,6 +3769,7 @@
             "title": "Seguridad",
             "description": "Una actualización que corrige una vulnerabilidad se instala sola según esto, diga lo que diga el ajuste de arriba.",
             "ariaLabel": "Cuándo se instala una actualización que corrige una vulnerabilidad {severity}",
+            "timeLabel": "Hora de instalación de un arreglo {severity}",
             "severity": {
                 "critical": "Crítica",
                 "high": "Alta",
@@ -3778,6 +3779,7 @@
             "timing": {
                 "immediate": "Al momento",
                 "quiet": "En la hora más tranquila ({at})",
+                "daily": "A diario a las",
                 "off": "Solo avisarme"
             },
             "riskStanding": "Aquí una corrección crítica o alta puede esperar. Un administrador aceptó ese riesgo.",

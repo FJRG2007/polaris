@@ -62,7 +62,7 @@ import {
     quietHour,
     updateChangelog
 } from "@/lib/update-changelog";
-import { securityUpdateRunsAt, type SecuritySeverity } from "@polaris/core";
+import { DEFAULT_SECURITY_DAILY_AT, securityUpdateRunsAt, type SecuritySeverity } from "@polaris/core";
 
 /** Who is told about an update - the same people allowed to install one. */
 const UPDATE_PERMISSION: Permission = "system.manage";
@@ -232,7 +232,7 @@ async function firstSeen(
                             ? t("update.planSecurityNow", {
                                   severity: t(`update.severity.${security.severity}`)
                               })
-                            : t("update.planSecurityQuiet", {
+                            : t(security.quiet ? "update.planSecurityQuiet" : "update.planSecurityDaily", {
                                   severity: t(`update.severity.${security.severity}`),
                                   at: security.at
                               })
@@ -380,8 +380,11 @@ interface SecurityPlan {
     readonly policy: Awaited<ReturnType<typeof getSecurityUpdatePolicy>>;
     /** The quiet hour, for a severity set to wait for it. */
     readonly hour: number;
-    /** "HH:00" when it waits for the quiet hour, null when it installs at once. */
+    /** "HH:MM" when it waits - for the quiet hour or a picked time - and null
+     *  when it installs at once. */
     readonly at: string | null;
+    /** Whether `at` is the quiet hour rather than a time somebody picked. */
+    readonly quiet: boolean;
 }
 
 /**
@@ -402,7 +405,13 @@ async function securityPlan(current: string | null, sha: string): Promise<Securi
         severity,
         policy,
         hour,
-        at: timing === "quiet" ? `${String(hour).padStart(2, "0")}:00` : null
+        at:
+            timing === "quiet"
+                ? `${String(hour).padStart(2, "0")}:00`
+                : timing === "daily"
+                  ? (policy.times[severity] ?? DEFAULT_SECURITY_DAILY_AT)
+                  : null,
+        quiet: timing === "quiet"
     };
 }
 

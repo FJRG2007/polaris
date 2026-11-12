@@ -26,6 +26,7 @@ import {
 import { z } from "zod";
 import {
     SECURITY_UPDATE_TIMINGS,
+    securityUpdateTimesSchema,
     autoUpdatePolicySchema,
     securityPolicyLowers,
     securityPolicyTakesRisk,
@@ -123,6 +124,8 @@ const securityUpdateInput = z.object({
     high: timing,
     medium: timing,
     low: timing,
+    /** The time each severity set to "every day at" installs at. */
+    times: securityUpdateTimesSchema.default({}),
     /** The administrator said, in so many words, that they accept leaving a
      *  critical or high fix waiting. Required for exactly that. */
     acceptRisk: z.boolean().default(false)
@@ -152,6 +155,9 @@ export async function saveSecurityUpdateAction(
     if (lowered && !acceptRisk) return { error: t("settings.security.errors.riskNotAccepted") };
     const policy: SecurityUpdatePolicy = {
         ...timings,
+        // A time picked for a severity is kept when it is switched away from
+        // "every day at", so switching back does not lose it.
+        times: { ...previous.times, ...timings.times },
         riskAccepted: !risky
             ? null
             : lowered || !previous.riskAccepted
