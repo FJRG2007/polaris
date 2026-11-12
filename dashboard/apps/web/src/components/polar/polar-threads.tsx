@@ -26,6 +26,7 @@ import {
     useState,
     type ComponentType,
     type KeyboardEvent,
+    type MouseEvent,
     type ReactNode
 } from "react";
 import {
@@ -209,6 +210,9 @@ export function PolarThreads({
     const [folded, setFolded] = useState(false);
     useEffect(() => setFolded(readFolded()), []);
     const [selection, setSelection] = useState<ThreadSelection>(NO_SELECTION);
+    /** Counts the presses on empty list space: the Code sessions let their own
+     *  selection go on each, as the chats do. */
+    const [emptyPresses, setEmptyPresses] = useState(0);
     const [deletingMany, setDeletingMany] = useState<string[] | null>(null);
     const [dropProject, setDropProject] = useState<string | null>(null);
     // A drag only where there is a mouse: on a touch screen a long press is
@@ -362,6 +366,11 @@ export function PolarThreads({
             <div
                 ref={list}
                 onKeyDown={onListKey}
+                onMouseDown={(event) => {
+                    if (!pressedEmptySpace(event)) return;
+                    setSelection(NO_SELECTION);
+                    setEmptyPresses((count) => count + 1);
+                }}
                 className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2"
             >
                 <NavRow icon={SquarePen} onClick={() => onNew(null)}>
@@ -436,7 +445,9 @@ export function PolarThreads({
                         </Section>
                         {/* The same list in Chat and in Code: a coding agent's
                             sessions are one more section of it. */}
-                        {code ? <CodeList code={code} query="" /> : null}
+                        {code ? (
+                            <CodeList code={code} query="" emptyPresses={emptyPresses} />
+                        ) : null}
                         <SharedWithYou rowClass={SHARED_ROW} />
                         <div className="pt-4">
                             <button
@@ -647,6 +658,23 @@ function Section({ id, label, children }: { id: string; label: string; children:
     );
 }
 
+/** Whether a press landed on the list's empty space - not on a row, a control,
+ *  a menu or the selection bar - so it lets the selection go, as Drive's does.
+ *  Only a plain left press: with Ctrl, Cmd or Shift it keeps what is chosen. */
+function pressedEmptySpace(event: MouseEvent<HTMLElement>): boolean {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey) return false;
+    const target = event.target as HTMLElement;
+    return !target.closest(
+        "button, a, input, textarea, label, [role='menu'], [role='dialog'], [role='toolbar'], [data-thread-id], [data-code-id]"
+    );
+}
+
+/** A Shift press on a row stretches the selection; without this the browser
+ *  would also highlight the text between the two presses. */
+function holdShiftPress(event: MouseEvent<HTMLElement>): void {
+    if (event.shiftKey) event.preventDefault();
+}
+
 /** Rows still on their way, in the shape they will take. */
 function ListSkeleton() {
     return (
@@ -660,107 +688,164 @@ function ListSkeleton() {
 
 /** The person's Code sessions, drawn the way the chats are: grouped by day,
  *  each row with the same menu, and Delete behind the same dialog. */
-function CodeList({ code, query }: { code: PolarThreadsCode; query: string }) {
+function CodeList({
+    code,
+    query,
+    emptyPresses
+}: {
+    code: PolarThreadsCode;
+    query: string;
+    /** Changes on every press on the list's empty space, which lets the
+     *  selection go. */
+    emptyPresses: number;
+}) {
     const t = useTranslations("polar");
     const toast = useToast();
     const [deleting, setDeleting] = useState<PolarCodeRow | null>(null);
     const [sharing, setSharing] = useState<PolarCodeRow | null>(null);
-    /** The sessions picked with their boxes, in the order they were picked. */
-    const [chosen, setChosen] = useState<readonly string[]>([]);
+    /** Chosen the way the chats are (`thread-selection`): Ctrl/Cmd and Shift
+     *  with a press, the boxes, Ctrl+A, the arrows. */
+    const [selection, setSelection] = useState<ThreadSelection>(NO_SELECTION);
     const [deletingChosen, setDeletingChosen] = useState(false);
+    const box = useRef<HTMLDivElement>(null);
     const { rows, more, loadingMore, loadMore } = code.history;
-    if (rows === null) return <ListSkeleton />;
+    const shown = rows === null ? [] : filterCodeRows(rows, query);
+    const groups = polarShared.groupThreads(shown.map((row) => ({ ...row, updatedAt: row.createdAt })));
+    /** The sessions as the list draws them, top to bottom: what a stretch and
+     *  the arrows walk. */
+    const orderKey = groups.flatMap((group) => group.rows.map((row) => row.id)).join(",");
+    const order = useMemo(() => (orderKey === "" ? [] : orderKey.split(",")), [orderKey]);
     // A session that left the list (removed elsewhere, or a page reloaded) is
-    // no longer picked.
-    const picked = chosen.filter((id) => rows.some((row) => row.id === id));
-    const toggle = (id: string) =>
-        setChosen((current) =>
-            current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]
-        );
+    // no longer chosen.
+    useEffect(() => setSelection((current) => keepVisible(order, current)), [order]);
+    useEffect(() => {
+        if (emptyPresses > 0) setSelection(NO_SELECTION);
+    }, [emptyPresses]);
+    if (rows === null) return <ListSkeleton />;
+    const picked = selection.chosen.filter((id) => order.includes(id));
+    const byId = new Map(rows.map((row) => [row.id, row]));
     // Only a finished session can leave the history; a running one is kept and
     // said so, the way its own menu says it.
-    const removable = picked.filter((id) => rows.some((row) => row.id === id && !row.live));
+    const removable = picked.filter((id) => byId.get(id)?.live === false);
     const removeChosen = () => {
         const ids = removable;
         setDeletingChosen(false);
-        setChosen([]);
+        setSelection(NO_SELECTION);
         void Promise.all(ids.map((id) => code.history.remove(id))).then((answers) => {
             if (answers.some((ok) => !ok)) toast.show({ title: t("code.deleteFailed") });
         });
     };
+    const press = (id: string, keys: SelectKeys, toggle: boolean) => {
+        const next = pressThread(order, selection, id, keys, toggle);
+        if (next !== "open") {
+            setSelection(next);
+            return;
+        }
+        // A plain press opens the session and lets the selection go; it is
+        // where the next Shift press stretches from.
+        setSelection({ chosen: [], anchor: id });
+        code.onOpen(id);
+    };
+    /** The same keys the chats hear. Kept here, never passed on: the chats'
+     *  handler would read them as keys on a chat. */
+    const onKey = (event: KeyboardEvent<HTMLDivElement>) => {
+        const target = event.target as HTMLElement;
+        if (target.closest("input, textarea, [role='menu'], [role='dialog']")) return;
+        event.stopPropagation();
+        const focused = target.closest<HTMLElement>("[data-code-id]")?.dataset.codeId ?? null;
+        const result = threadListKey(order, selection, focused, event.key, event);
+        if (!result) return;
+        event.preventDefault();
+        if (result.kind === "delete") {
+            if (picked.length > 0) setDeletingChosen(true);
+            else {
+                const row = focused ? byId.get(focused) : undefined;
+                if (row && !row.live) setDeleting(row);
+            }
+            return;
+        }
+        if (result.kind === "select") setSelection(result.selection);
+        if (result.focus) {
+            const button = box.current?.querySelector<HTMLElement>(
+                `[data-code-id="${CSS.escape(result.focus)}"] [data-code-open]`
+            );
+            button?.focus();
+            button?.scrollIntoView?.({ block: "nearest" });
+        }
+    };
     const narrowed = query.trim() !== "";
-    const shown = filterCodeRows(rows, query);
-    const groups = polarShared.groupThreads(shown.map((row) => ({ ...row, updatedAt: row.createdAt })));
     const rename = (row: PolarCodeRow, title: string) =>
         void code.history.rename(row.id, title).then((ok) => {
             if (!ok) toast.show({ title: t("history.renameFailed") });
         });
     return (
         <Section id="polar-code" label={t("history.codeSessions")}>
-            {picked.length > 0 ? (
-                <div
-                    role="toolbar"
-                    aria-label={t("history.selectionActions")}
-                    className="mx-2 mb-1 flex min-w-0 shrink-0 items-center gap-0.5 rounded-md bg-primary/10 py-0.5 pl-2 pr-0.5"
-                >
-                    <span
-                        className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-foreground"
-                        aria-live="polite"
+            <div ref={box} onKeyDown={onKey}>
+                {picked.length > 0 ? (
+                    <div
+                        role="toolbar"
+                        aria-label={t("history.selectionActions")}
+                        className="mx-2 mb-1 flex min-w-0 shrink-0 items-center gap-0.5 rounded-md bg-primary/10 py-0.5 pl-2 pr-0.5"
                     >
-                        {t("history.selected", { count: picked.length })}
-                    </span>
-                    <button
-                        type="button"
-                        onClick={() => setDeletingChosen(true)}
-                        disabled={removable.length === 0}
-                        aria-label={removable.length === 0 ? t("code.deleteLive") : t("history.delete")}
-                        title={removable.length === 0 ? t("code.deleteLive") : t("history.delete")}
-                        className={cn(BAR_ACTION, "disabled:opacity-50")}
-                    >
-                        <Trash2 className="size-4" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setChosen([])}
-                        aria-label={t("history.clearSelection")}
-                        title={t("history.clearSelection")}
-                        className={BAR_ACTION}
-                    >
-                        <X className="size-4" />
-                    </button>
-                </div>
-            ) : null}
-            {shown.length === 0 ? (
-                <p className="px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground">
-                    {narrowed ? t("history.searchEmpty") : t("code.empty")}
-                </p>
-            ) : (
-                groups.map(({ group, rows: list }) => (
-                    <div key={group} role="group" aria-labelledby={`polar-code-group-${group}`}>
-                        <p
-                            id={`polar-code-group-${group}`}
-                            className="px-2 pb-1 pt-2 text-[0.6875rem] text-foreground-subtle"
+                        <span
+                            className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-foreground"
+                            aria-live="polite"
                         >
-                            {t(`history.groups.${group}`)}
-                        </p>
-                        {list.map((row) => (
-                            <CodeItem
-                                key={row.id}
-                                row={row}
-                                active={row.id === code.activeId}
-                                canRename={code.canRename}
-                                onOpen={() => code.onOpen(row.id)}
-                                onRename={(title) => rename(row, title)}
-                                onDelete={() => setDeleting(row)}
-                                onShare={() => setSharing(row)}
-                                chosen={picked.includes(row.id)}
-                                selecting={picked.length > 0}
-                                onToggle={() => toggle(row.id)}
-                            />
-                        ))}
+                            {t("history.selected", { count: picked.length })}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setDeletingChosen(true)}
+                            disabled={removable.length === 0}
+                            aria-label={removable.length === 0 ? t("code.deleteLive") : t("history.delete")}
+                            title={removable.length === 0 ? t("code.deleteLive") : t("history.delete")}
+                            className={cn(BAR_ACTION, "disabled:opacity-50")}
+                        >
+                            <Trash2 className="size-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setSelection(NO_SELECTION)}
+                            aria-label={t("history.clearSelection")}
+                            title={t("history.clearSelection")}
+                            className={BAR_ACTION}
+                        >
+                            <X className="size-4" />
+                        </button>
                     </div>
-                ))
-            )}
+                ) : null}
+                {shown.length === 0 ? (
+                    <p className="px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground">
+                        {narrowed ? t("history.searchEmpty") : t("code.empty")}
+                    </p>
+                ) : (
+                    groups.map(({ group, rows: list }) => (
+                        <div key={group} role="group" aria-labelledby={`polar-code-group-${group}`}>
+                            <p
+                                id={`polar-code-group-${group}`}
+                                className="px-2 pb-1 pt-2 text-[0.6875rem] text-foreground-subtle"
+                            >
+                                {t(`history.groups.${group}`)}
+                            </p>
+                            {list.map((row) => (
+                                <CodeItem
+                                    key={row.id}
+                                    row={row}
+                                    active={row.id === code.activeId}
+                                    canRename={code.canRename}
+                                    onOpen={() => code.onOpen(row.id)}
+                                    onRename={(title) => rename(row, title)}
+                                    onDelete={() => setDeleting(row)}
+                                    onShare={() => setSharing(row)}
+                                    chosen={picked.includes(row.id)}
+                                    selecting={picked.length > 0}
+                                    onPress={(keys, toggle) => press(row.id, keys, toggle)}
+                                />
+                            ))}
+                        </div>
+                    ))
+                )}
+            </div>
             {more ? (
                 <button
                     type="button"
@@ -833,7 +918,7 @@ function CodeItem({
     onShare,
     chosen,
     selecting,
-    onToggle
+    onPress
 }: {
     row: PolarCodeRow;
     active: boolean;
@@ -846,7 +931,8 @@ function CodeItem({
     chosen: boolean;
     /** Something is picked, so every box stays on screen. */
     selecting: boolean;
-    onToggle: () => void;
+    /** A press on the row (`toggle` for its box or the menu's Select). */
+    onPress: (keys: SelectKeys, toggle: boolean) => void;
 }) {
     const t = useTranslations("polar");
     const [renaming, setRenaming] = useState(false);
@@ -883,7 +969,7 @@ function CodeItem({
                     {t("history.openNewTab")}
                 </a>
             </Item>
-            <Item onSelect={onToggle}>
+            <Item onSelect={() => onPress({ ctrlKey: true }, true)}>
                 <SquareCheck />
                 {chosen ? t("history.clearSelection") : t("code.select")}
             </Item>
@@ -918,9 +1004,14 @@ function CodeItem({
             <ContextMenuTrigger asChild disabled={renaming}>
                 <div
                     data-code-id={row.id}
+                    onMouseDown={holdShiftPress}
                     className={cn(
                         "group/row flex min-w-0 items-center rounded-md",
-                        active ? "bg-primary/15" : "hover:bg-card-hover focus-within:bg-card-hover"
+                        chosen
+                            ? "bg-primary/10 ring-1 ring-inset ring-primary/40"
+                            : active
+                              ? "bg-primary/15"
+                              : "hover:bg-card-hover focus-within:bg-card-hover"
                     )}
                 >
                     {renaming ? (
@@ -962,14 +1053,21 @@ function CodeItem({
                                     onChange={() => undefined}
                                     onClick={(event) => {
                                         event.stopPropagation();
-                                        onToggle();
+                                        onPress(event, true);
                                     }}
                                 />
                             </span>
                             <button
                                 type="button"
-                                onClick={onOpen}
+                                data-code-open=""
+                                onClick={(event) => {
+                                    // A Shift press kept the focus where it was
+                                    // (so no text is highlighted); it lands here.
+                                    event.currentTarget.focus();
+                                    onPress(event, false);
+                                }}
                                 aria-current={active ? "page" : undefined}
+                                aria-pressed={selecting ? chosen : undefined}
                                 title={`${row.title} (${row.stateLabel}, ${row.repo || t("code.workspace")})`}
                                 className={cn(
                                     "min-w-0 flex-1 truncate py-1.5 pl-1 pr-2 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none [@media(hover:none)]:pl-2",
@@ -1595,6 +1693,7 @@ function ThreadItem({
             <ContextMenuTrigger asChild disabled={renaming}>
                 <div
                     data-thread-id={row.id}
+                    onMouseDown={holdShiftPress}
                     draggable={pick.draggable && !renaming}
                     onDragStart={(event) => {
                         event.dataTransfer.setData(DRAG_TYPE, JSON.stringify(pick.dragged()));
@@ -1654,7 +1753,12 @@ function ThreadItem({
                         <button
                             type="button"
                             data-thread-open=""
-                            onClick={(event) => pick.press(event, false)}
+                            onClick={(event) => {
+                                // A Shift press kept the focus where it was (so
+                                // no text is highlighted); it lands here.
+                                event.currentTarget.focus();
+                                pick.press(event, false);
+                            }}
                             aria-current={active ? "page" : undefined}
                             aria-pressed={pick.selecting ? pick.chosen : undefined}
                             title={row.title}

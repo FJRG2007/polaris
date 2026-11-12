@@ -75,6 +75,7 @@ function sidebar() {
 
 function list(rows: PolarCodeRow[]) {
     const remove = vi.fn(async () => true);
+    const onOpen = vi.fn();
     render(
         <PolarThreads
             sidebar={sidebar()}
@@ -92,13 +93,13 @@ function list(rows: PolarCodeRow[]) {
                     rename: vi.fn(async () => true)
                 },
                 activeId: null,
-                onOpen: vi.fn(),
+                onOpen,
                 canRename: true
             }}
         />,
         { wrapper: MessagesWrapper }
     );
-    return { remove };
+    return { remove, onOpen };
 }
 
 describe("Code sessions in Polar's list", () => {
@@ -133,6 +134,56 @@ describe("Code sessions in Polar's list", () => {
         fireEvent.keyDown(menu, { key: "Enter" });
         fireEvent.click(screen.getByRole("menuitem", { name: "Share" }));
         expect(screen.getByTestId("share-dialog").textContent).toBe("agents.session:a");
+    });
+
+    it("chooses with Ctrl and Shift presses the way the chats do", () => {
+        const { onOpen } = list([session("a"), session("b"), session("c"), session("d")]);
+        const open = (id: string) =>
+            screen.getByRole("button", { name: `Task ${id}` }) as HTMLButtonElement;
+        // A plain press opens and becomes the anchor.
+        fireEvent.click(open("a"));
+        expect(onOpen).toHaveBeenCalledWith("a");
+        fireEvent.click(open("c"), { shiftKey: true });
+        expect(screen.getByText("3 selected")).toBeTruthy();
+        expect(open("b").getAttribute("aria-pressed")).toBe("true");
+        expect(open("d").getAttribute("aria-pressed")).toBe("false");
+        fireEvent.click(open("b"), { ctrlKey: true });
+        expect(screen.getByText("2 selected")).toBeTruthy();
+        expect(onOpen).toHaveBeenCalledTimes(1);
+        // The press that stretched also took the focus.
+        expect(document.activeElement).toBe(open("b"));
+    });
+
+    it("hears its own keys and keeps them from the chats", () => {
+        list([session("a"), session("b"), session("c")]);
+        const open = (id: string) => screen.getByRole("button", { name: `Task ${id}` });
+        open("a").focus();
+        fireEvent.keyDown(open("a"), { key: "ArrowDown", shiftKey: true });
+        expect(screen.getByText("2 selected")).toBeTruthy();
+        expect(document.activeElement).toBe(open("b"));
+        fireEvent.keyDown(open("b"), { key: "a", ctrlKey: true });
+        expect(screen.getByText("3 selected")).toBeTruthy();
+        fireEvent.keyDown(open("b"), { key: "Escape" });
+        expect(screen.queryByText(/selected$/)).toBeNull();
+    });
+
+    it("lets the selection go on a press on empty list space", () => {
+        list([session("a"), session("b")]);
+        fireEvent.click(screen.getByRole("checkbox", { name: 'Select "Task a"' }));
+        fireEvent.click(screen.getByRole("checkbox", { name: 'Select "Task b"' }));
+        // With Ctrl held a press on empty space keeps it.
+        fireEvent.mouseDown(screen.getByText("Code sessions"), { ctrlKey: true });
+        expect(screen.getByText("2 selected")).toBeTruthy();
+        fireEvent.mouseDown(screen.getByText("Code sessions"));
+        expect(screen.queryByText("2 selected")).toBeNull();
+    });
+
+    it("keeps a Shift press from highlighting text", () => {
+        list([session("a")]);
+        const row = screen.getByRole("button", { name: "Task a" });
+        const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, shiftKey: true });
+        row.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(true);
     });
 
     it("draws no state dot on a row that is not at work", () => {

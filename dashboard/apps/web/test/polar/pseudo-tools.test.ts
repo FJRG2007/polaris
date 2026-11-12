@@ -21,6 +21,27 @@ describe("tool calls written as text", () => {
         );
     });
 
+    it("are taken out in an attribute's shape, with no closing bracket", () => {
+        // What a stand-in model wrote in Code, verbatim: an "=" and no ">".
+        expect(withoutPseudoToolCalls('<polar_tools={"category": "home", "intent": ""}')).toBe("");
+        expect(withoutPseudoToolCalls('<polar_tools={"category":"home","intent":""}')).toBe("");
+        expect(withoutPseudoToolCalls('<polar_tools {"category": "home"}/>\nListo.')).toBe("Listo.");
+        expect(withoutPseudoToolCalls('Vale. <polar_tools = {"category": "home"}>')).toBe("Vale.");
+        expect(withoutPseudoToolCalls("Hecho <polar_tools/>")).toBe("Hecho");
+    });
+
+    it("leave a turn made only of such a call with nothing to read", async () => {
+        const { answeredNothing } = await import("@/lib/polar/unanswered");
+        expect(
+            answeredNothing([{ type: "text", text: '<polar_tools={"category": "home", "intent": ""}' }])
+        ).toBe(true);
+    });
+
+    it("hold back a call whose arguments are still arriving", () => {
+        expect(withoutPseudoToolCalls('Hola <polar_tools={"category": "ho')).toBe("Hola");
+        expect(withoutPseudoToolCalls("Hola <polar_tools=")).toBe("Hola");
+    });
+
     it("hold back a tag still arriving at the end", () => {
         expect(withoutPseudoToolCalls("Hola <polar_rem")).toBe("Hola");
         expect(withoutPseudoToolCalls("Hola <")).toBe("Hola");
@@ -29,6 +50,8 @@ describe("tool calls written as text", () => {
     it("keep every other tag and plain text as it is", () => {
         const html = 'Use <div> and <span class="x"> here, or <polarity>.';
         expect(withoutPseudoToolCalls(html)).toBe(html);
+        const attrs = '<input value={"a": 1}> and <polarity={"x": 2}>';
+        expect(withoutPseudoToolCalls(attrs)).toBe(attrs);
         expect(withoutPseudoToolCalls("a < b and c > d")).toBe("a < b and c > d");
         expect(withoutPseudoToolCalls("plain")).toBe("plain");
     });
