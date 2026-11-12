@@ -14,7 +14,13 @@
 import { z } from "zod";
 import { ENIGMA_SCOPES } from "../enigma.js";
 import { AGENT_GATE_MODES } from "../agents.js";
-import { CUSTOM_AGENT_CLI, isKnownAgentCli, SESSION_PERMISSION_MODES } from "../agent-clis.js";
+import {
+    agentTakesModel,
+    CUSTOM_AGENT_CLI,
+    isKnownAgentCli,
+    SAFE_MODEL_ID,
+    SESSION_PERMISSION_MODES
+} from "../agent-clis.js";
 import { AGENT_SESSION_EVENTS, AGENT_SESSION_PLACES } from "../agent-sessions.js";
 
 export const agentSessionPlaceSchema = z.enum(AGENT_SESSION_PLACES);
@@ -212,12 +218,24 @@ export const startAgentSessionSchema = z
         message: "Pick an account or the machine's own login, not both",
         path: ["accountId"]
     })
-    // A model is a thing only some tools take from outside; Claude Code and the
-    // rest sign in their own way, and a model sent with them would be ignored.
-    .refine((value) => !value.modelChoice || MODEL_CHOICE_AGENT_CLIS.includes(value.cli), {
-        message: "This agent picks its own model",
-        path: ["modelChoice"]
-    })
+    // A model is a thing only some tools take from outside: a multi-provider
+    // tool from Polaris's keys, and a tool whose documentation names the flag
+    // or variable for it. Anything else would ignore it.
+    .refine(
+        (value) =>
+            !value.modelChoice ||
+            MODEL_CHOICE_AGENT_CLIS.includes(value.cli) ||
+            agentTakesModel(value.cli),
+        { message: "This agent picks its own model", path: ["modelChoice"] }
+    )
+    // A model handed to a tool's own flag or variable goes on its command line.
+    .refine(
+        (value) =>
+            !value.modelChoice ||
+            MODEL_CHOICE_AGENT_CLIS.includes(value.cli) ||
+            SAFE_MODEL_ID.test(value.modelChoice.model),
+        { message: "That is not a model id", path: ["modelChoice"] }
+    )
     .refine((value) => value.attachments.length === 0 || Boolean(value.prompt), {
         message: "Say something with the files",
         path: ["prompt"]

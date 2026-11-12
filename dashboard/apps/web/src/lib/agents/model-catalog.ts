@@ -179,6 +179,17 @@ export async function listCatalogModels(providers?: readonly string[]): Promise<
     return rows.map(toModel);
 }
 
+/** The newest models of one provider, at most `take`: what a picker lists. */
+export async function latestCatalogModels(provider: string, take: number): Promise<CatalogModel[]> {
+    const rows = await prisma.agentModel.findMany({
+        where: { provider },
+        select: SELECT,
+        orderBy: [{ releaseDate: "desc" }, { name: "asc" }],
+        take
+    });
+    return rows.map(toModel);
+}
+
 /** One model by its slug, or null when the catalogue does not carry it - a raw
  *  specifier somebody typed, or a provider Polaris does not index. */
 export async function getCatalogModel(slug: string): Promise<CatalogModel | null> {

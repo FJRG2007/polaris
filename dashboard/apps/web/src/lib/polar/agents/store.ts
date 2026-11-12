@@ -7,9 +7,18 @@
  */
 
 import { z } from "zod";
+import * as core from "@polaris/core";
 import { Prisma, prisma } from "@polaris/db";
-import { modelChoiceSchema } from "@/lib/polar/shared";
-import { AGENT_LIMIT, agentInputSchema, type AgentView } from "@/lib/polar/agents/shared";
+import { modelChoiceSchema, type ModelChoice } from "@/lib/polar/shared";
+import {
+    AGENT_LIMIT,
+    agentInputSchema,
+    agentModelSchema,
+    MODEL_POLICIES,
+    POLAR_ENGINE,
+    type AgentModel,
+    type AgentView
+} from "@/lib/polar/agents/shared";
 
 const SELECT = {
     id: true,
@@ -19,7 +28,11 @@ const SELECT = {
     skills: true,
     connectorIds: true,
     web: true,
-    choice: true
+    choice: true,
+    engine: true,
+    account: true,
+    models: true,
+    modelPolicy: true
 } as const;
 
 const uuidSchema = z.string().uuid();
@@ -30,13 +43,42 @@ function isUniqueViolation(error: unknown): boolean {
     return (error as { code?: unknown })?.code === "P2002";
 }
 
+/** A stored models list, read whole: an entry that no longer reads is left
+ *  out rather than failing the agent. */
+export function modelsOf(raw: unknown): AgentModel[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.flatMap((entry) => {
+        const parsed = agentModelSchema.safeParse(entry);
+        return parsed.success ? [parsed.data] : [];
+    });
+}
+
+export function policyOf(raw: unknown): AgentView["modelPolicy"] {
+    return MODEL_POLICIES.includes(raw as AgentView["modelPolicy"])
+        ? (raw as AgentView["modelPolicy"])
+        : "preferred";
+}
+
+/** Whether an engine is one an agent can run on: Polar, or a coding tool the
+ *  catalogue knows (a custom command is not one). */
+export function isAgentEngine(engine: string): boolean {
+    return engine === POLAR_ENGINE || (engine !== core.CUSTOM_AGENT_CLI && core.isKnownAgentCli(engine));
+}
+
 function viewOf(row: Prisma.PolarAgentGetPayload<{ select: typeof SELECT }>): AgentView {
+    const choice = modelChoiceSchema
+        .nullable()
+        .catch(null)
+        .parse(row.choice ?? null);
+    const models = modelsOf(row.models);
     return {
         ...row,
-        choice: modelChoiceSchema
-            .nullable()
-            .catch(null)
-            .parse(row.choice ?? null)
+        choice,
+        engine: isAgentEngine(row.engine) ? row.engine : POLAR_ENGINE,
+        // An agent saved before it had a list answered on its one model.
+        models:
+            models.length > 0 || !choice ? models : [{ provider: choice.provider, model: choice.model }],
+        modelPolicy: policyOf(row.modelPolicy)
     };
 }
 
@@ -76,9 +118,17 @@ export async function polarThreadAgent(
 }
 
 function dataOf(input: z.infer<typeof agentInputSchema>) {
+    // What reads an agent's one model reads the first of the list, on Polar.
+    const first = input.models[0];
+    // An emptied list is "any model", not the one it had before.
+    const choice: ModelChoice | null =
+        input.engine === POLAR_ENGINE && first
+            ? { kind: "language", ...first, intelligence: "balanced", payer: null }
+            : null;
     return {
         ...input,
-        choice: input.choice ? (input.choice as unknown as Prisma.InputJsonValue) : Prisma.DbNull
+        choice: choice ? (choice as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+        models: input.models as unknown as Prisma.InputJsonValue
     };
 }
 
@@ -87,7 +137,7 @@ export async function createAgent(
     raw: unknown
 ): Promise<AgentView | AgentRefusal> {
     const input = agentInputSchema.safeParse(raw);
-    if (!input.success) return "invalid";
+    if (!input.success || !isAgentEngine(input.data.engine)) return "invalid";
     const held = await prisma.polarAgent.count({ where: { ownerId } });
     if (held >= AGENT_LIMIT) return "limit";
     try {
@@ -110,7 +160,7 @@ export async function updateAgent(
 ): Promise<AgentView | AgentRefusal> {
     if (!uuidSchema.safeParse(id).success) return "not_found";
     const input = agentInputSchema.safeParse(raw);
-    if (!input.success) return "invalid";
+    if (!input.success || !isAgentEngine(input.data.engine)) return "invalid";
     try {
         const { count } = await prisma.polarAgent.updateMany({
             where: { id, ownerId },

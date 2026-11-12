@@ -51,6 +51,7 @@ const state = {
 
 vi.mock("@/lib/polar/skills/store", () => ({ enabledSkills: async () => [], agentSkills: async () => [] }));
 vi.mock("@/lib/polar/agents/store", () => ({ polarThreadAgent: async () => null }));
+vi.mock("@/lib/polar/agents/defaults", () => ({ polarAgentDefault: async () => null }));
 vi.mock("@/lib/polar/access", async () => ({
     ...(await (await import("./fixtures/open-polar-access")).openPolarAccess()),
     polarAccessFor: async () => ({ use: true, spend: true, web: state.web })

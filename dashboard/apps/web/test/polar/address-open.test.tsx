@@ -76,7 +76,7 @@ beforeEach(() => {
             }
             if (url.startsWith("/api/polar/code/choices")) {
                 return Response.json({
-                    value: { sharedWorkspace: false, repos: [], hosts: [], agents: [] }
+                    value: { sharedWorkspace: false, repos: [], hosts: [], agents: [], composer: [] }
                 });
             }
             if (url.startsWith("/api/polar/code")) {

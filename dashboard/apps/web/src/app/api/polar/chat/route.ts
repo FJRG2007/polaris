@@ -47,7 +47,8 @@ import {
 import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
 import { agentSkills, enabledSkills } from "@/lib/polar/skills/store";
 import { polarThreadAgent } from "@/lib/polar/agents/store";
-import { agentPrompt } from "@/lib/polar/agents/shared";
+import { agentPrompt, agentTurnChoices, polarTurnChoices } from "@/lib/polar/agents/shared";
+import { polarAgentDefault } from "@/lib/polar/agents/defaults";
 import { trialSkillSchema } from "@/lib/polar/skills/shared";
 import {
     USE_SKILL,
@@ -306,12 +307,27 @@ export async function POST(request: Request): Promise<Response> {
 
     // A thread whose model has since been retired by its provider falls back to
     // the first model this person can use, and the answer says so.
-    // An agent with a model of its own answers on it.
-    let choice: ModelChoice = agent?.choice ?? body.data.choice;
+    // An agent answers on its own models, the first that can be used
+    // (`agentTurnChoices`); one that keeps to its list goes no further.
+    const polarWork = agent ? null : await polarAgentDefault(user.id);
+    const tries = agent
+        ? agentTurnChoices(agent, body.data.choice)
+        : polarTurnChoices(polarWork, body.data.choice);
+    const listed = agent ?? polarWork;
+    const keepsToList = listed?.modelPolicy === "required" && listed.models.length > 0;
+    let choice: ModelChoice = tries[0] ?? body.data.choice;
     const signals = turnSignals(messages);
     let resolved = await resolvePolarModel(user.id, choice, signals, access);
+    for (const next of tries.slice(1)) {
+        if (typeof resolved !== "string") break;
+        const attempt = await resolvePolarModel(user.id, next, signals, access);
+        if (typeof attempt !== "string") {
+            choice = next;
+            resolved = attempt;
+        }
+    }
     let fellBackFrom: string | null = null;
-    if (resolved === "unknown_model") {
+    if (resolved === "unknown_model" && !keepsToList) {
         const first = (await polarModelOptions(user.id, access))[0]?.models[0];
         if (first) {
             fellBackFrom = choice.model;

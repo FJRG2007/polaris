@@ -405,6 +405,50 @@ export interface AgentCli {
      * documentation, and such a tool keeps its interactive terminal.
      */
     readonly headless?: readonly string[];
+    /**
+     * How the tool is told which model to run on, where its own documentation
+     * says so: the variable it reads or the flag it takes, and the provider in
+     * the public model index whose models it can run. Absent where nothing has
+     * been sourced; such a tool runs on whatever its own sign-in defaults to.
+     */
+    readonly model?: AgentModelSupport;
+}
+
+/** See `AgentCli.model`. Exactly one of `env` and `flag`. */
+export interface AgentModelSupport {
+    /** The provider's id in the public model index (models.dev). */
+    readonly provider: string;
+    readonly env?: string;
+    readonly flag?: string;
+    /** Where the variable or flag is documented. */
+    readonly docs: string;
+}
+
+/**
+ * A model id that can go on a command line as it is: letters, digits and the
+ * punctuation model ids use. Anything else is refused before a session starts.
+ */
+export const SAFE_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/@\[\]-]{0,199}$/;
+
+/** Whether this tool can be given a model by Polaris at all. */
+export function agentTakesModel(cliId: string): boolean {
+    return Boolean(agentCliById(cliId)?.model);
+}
+
+/** The variable that tells a tool its model, or nothing for one that is
+ *  told on its command line, takes none, or was handed an unsafe id. */
+export function agentModelEnv(cliId: string, model: string | null | undefined): Record<string, string> {
+    const support = agentCliById(cliId)?.model;
+    if (!support?.env || !model || !SAFE_MODEL_ID.test(model)) return {};
+    return { [support.env]: model };
+}
+
+/** The words that tell a tool its model on its command line; none for one
+ *  told by a variable, one that takes none, or an unsafe id. */
+export function agentModelArgs(cliId: string, model: string | null | undefined): string[] {
+    const support = agentCliById(cliId)?.model;
+    if (!support?.flag || !model || !SAFE_MODEL_ID.test(model)) return [];
+    return [support.flag, model];
 }
 
 /**
@@ -492,7 +536,12 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         // code.claude.com/docs/en/headless: `-p` reads the prompt from standard
         // input, runs hooks from `--settings`, and shows no trust dialog.
-        headless: ["-p"]
+        headless: ["-p"],
+        model: {
+            provider: "anthropic",
+            env: "ANTHROPIC_MODEL",
+            docs: "https://code.claude.com/docs/en/model-config"
+        }
     },
     {
         id: "codex",
@@ -527,7 +576,12 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         autonomyEnv: {},
         // No wizard to answer - the trust question is what the autonomy flag
         // covers - only the hooks that let Polaris see its turns.
-        firstRun: [{ file: ".codex/hooks.json", assert: codexHooks() }]
+        firstRun: [{ file: ".codex/hooks.json", assert: codexHooks() }],
+        model: {
+            provider: "openai",
+            flag: "--model",
+            docs: "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+        }
     },
     {
         id: "opencode",
@@ -596,7 +650,12 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         firstRun: [
             { file: ".gemini/settings.json", json: { ui: { theme: "Default" } } },
             { file: ".gemini/settings.json", assert: geminiHooks() }
-        ]
+        ],
+        model: {
+            provider: "google",
+            env: "GEMINI_MODEL",
+            docs: "https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/configuration.md"
+        }
     },
     {
         id: "copilot",

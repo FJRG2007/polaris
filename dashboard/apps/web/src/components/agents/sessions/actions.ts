@@ -243,7 +243,10 @@ async function startParsed(
     // so refusing it here would refuse the case the option exists for.
     // A model picked on the form signs the tool in with that provider's key,
     // which is checked here rather than the tool's own sign-in.
-    if (value.modelChoice) {
+    // Only for a tool that runs on a provider's key; one that only takes the
+    // model's name signs in with its own account, checked below.
+    const keyed = Boolean(value.modelChoice) && core.MODEL_CHOICE_AGENT_CLIS.includes(value.cli);
+    if (value.modelChoice && keyed) {
         const credential = await chatCredentialFor(
             user.id,
             value.modelChoice.provider,
@@ -255,7 +258,7 @@ async function startParsed(
     if ("refusal" in files) return { error: t(`sessions.errors.files.${files.refusal}`) };
 
     const blocked =
-        value.accountId || value.useMachineLogin || value.modelChoice
+        value.accountId || value.useMachineLogin || keyed
             ? undefined
             : (await agentChoicesFor(user.id)).find(
                   (agent) => agent.id === value.cli && agent.readiness === "missing"

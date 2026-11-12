@@ -1,17 +1,19 @@
 "use client";
 
 /**
- * Agents on Polar's settings: the person's own custom agents, as ChatGPT's
- * GPTs - a name, instructions, the skills and connectors it may use, whether
- * it reads the web and the model it answers on. Each starts a chat of its own
- * and can be a step of an automation.
+ * Agents on Polar's settings. Everything that works for the person is an agent
+ * here: the ones that come with Polaris (Polar itself, Claude Code, Codex...),
+ * edited for the account each signs in with and the models it may use, and
+ * the person's own, as ChatGPT's GPTs - a name, instructions, what it runs on
+ * (Polar or one of those tools), its account and its models, and on Polar the
+ * skills, connectors and web it may use.
  *
  * Every change is optimistic and put back when the server refuses it.
  */
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { Bot, MessageSquarePlus, Pencil, Plus, Trash2 } from "lucide-react";
+import { Bot, Code2, MessageSquarePlus, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import {
     Button,
     Card,
@@ -29,54 +31,141 @@ import {
     Switch,
     Textarea
 } from "@polaris/ui";
+import { AgentLogo } from "@/components/logos";
+import { writeStored } from "@/lib/polar/stored";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { AgentEngine } from "@/lib/polar/agents/composer-agents";
 import {
     AGENT_DESCRIPTION_MAX,
     AGENT_INSTRUCTIONS_MAX,
     AGENT_NAME_MAX,
     agentFieldError,
     agentInputSchema,
+    CODE_AGENT_STORAGE_KEY,
+    customAgentKey,
+    POLAR_ENGINE,
     type AgentInput,
     type AgentTextField,
-    type AgentView
+    type AgentView,
+    type AgentWork
 } from "@/lib/polar/agents/shared";
-import { deleteAgentAction, saveAgentAction } from "./agents-actions";
+import {
+    accountLabel,
+    accountValue,
+    AgentWorkFields,
+    modelOptionsFor,
+    type AgentModelOption
+} from "./agent-work-fields";
+import { deleteAgentAction, saveAgentAction, saveAgentDefaultAction } from "./agents-actions";
 
-/** A model the agent can be pinned to, as the picker lists it. */
-export interface AgentModelOption {
-    provider: string;
-    model: string;
-    label: string;
-}
+export type { AgentModelOption } from "./agent-work-fields";
 
 export interface AgentPicks {
     skills: string[];
     connectors: { id: string; name: string }[];
+    /** Polar's own models, for Polar and a tool that runs on its keys. */
     models: AgentModelOption[];
+    /** The coding tools an agent can run on, with their accounts and models. */
+    engines: AgentEngine[];
 }
-
-const AUTOMATIC = "auto";
-const keyOf = (provider: string, model: string) => `${provider}\u0000${model}`;
 
 /** Where a chat with the agent starts. */
 export function agentChatHref(id: string): string {
     return `/polar?new=1&agent=${encodeURIComponent(id)}`;
 }
 
+/** Where a new Code task starts; the agent is what Code opens on. */
+const CODE_TASK_HREF = "/polar?session=new";
+
+type Translate = ReturnType<typeof useTranslations>;
+
+/** One line on what an agent works with: its account and preferred model. */
+function workSummary(
+    work: AgentWork,
+    engines: readonly AgentEngine[],
+    polarModels: readonly AgentModelOption[],
+    t: Translate
+): string {
+    const engine = engines.find((entry) => entry.engine === work.engine);
+    const account = work.account
+        ? engine?.accounts.find((entry) => accountValue(entry) === work.account)
+        : null;
+    const accountText =
+        work.engine === POLAR_ENGINE
+            ? null
+            : work.account
+              ? account
+                  ? accountLabel(account, t)
+                  : t("settings.agents.work.accountGone")
+              : t("settings.agents.work.anyAccount");
+    const first = work.models[0];
+    const firstLabel = first
+        ? (modelOptionsFor(work.engine, engines, polarModels).find(
+              (option) => option.provider === first.provider && option.model === first.model
+          )?.label ?? first.model)
+        : null;
+    const modelText =
+        engine?.modelSource === "none"
+            ? t("settings.agents.work.ownModelShort")
+            : firstLabel
+              ? work.models.length > 1
+                  ? t("settings.agents.work.modelsCount", {
+                        model: firstLabel,
+                        count: work.models.length - 1
+                    })
+                  : firstLabel
+              : t("settings.agents.work.anyModelShort");
+    return [accountText, modelText].filter(Boolean).join(" - ");
+}
+
+function EngineMark({ engine, name }: { engine: string; name: string }) {
+    return (
+        <span
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+            aria-hidden="true"
+        >
+            {engine === POLAR_ENGINE ? (
+                <Sparkles className="size-4 shrink-0" />
+            ) : (
+                <AgentLogo id={engine} label={name} className="size-4 shrink-0" />
+            )}
+        </span>
+    );
+}
+
 export function PolarAgents({
     initial,
+    defaults,
     picks,
     readOnly
 }: {
     initial: AgentView[];
+    /** The saved settings of the agents that come with Polaris, by engine. */
+    defaults: AgentWork[];
     picks: AgentPicks;
     readOnly: boolean;
 }) {
     const t = useTranslations("polar");
     const [rows, setRows] = useState(initial);
+    const [works, setWorks] = useState(defaults);
     const [error, setError] = useState<string | null>(null);
     const [editing, setEditing] = useState<AgentView | "new" | null>(null);
+    const [tuning, setTuning] = useState<{ engine: string; name: string } | null>(null);
     const [removing, setRemoving] = useState<AgentView | null>(null);
+
+    const workOf = (engine: string): AgentWork =>
+        works.find((entry) => entry.engine === engine) ?? {
+            engine,
+            account: null,
+            models: [],
+            modelPolicy: "preferred"
+        };
+    const builtIns = [
+        { engine: POLAR_ENGINE, name: "Polar" },
+        ...picks.engines.map((entry) => ({ engine: entry.engine, name: entry.name }))
+    ];
+    const engineName = (engine: string) =>
+        builtIns.find((entry) => entry.engine === engine)?.name ?? engine;
 
     async function remove(row: AgentView) {
         setError(null);
@@ -89,93 +178,177 @@ export function PolarAgents({
         }
     }
 
+    async function saveWork(next: AgentWork): Promise<string | null> {
+        const before = works;
+        setWorks((current) => [...current.filter((entry) => entry.engine !== next.engine), next]);
+        const answer = await saveAgentDefaultAction(next);
+        if (answer.ok) return null;
+        setWorks(before);
+        return answer.error;
+    }
+
     return (
-        <section className="flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-3">
+        <section className="flex flex-col gap-6">
+            <div className="flex flex-col gap-3">
                 <div className="min-w-0">
-                    <h2 className="text-sm font-semibold">{t("settings.agents.title")}</h2>
-                    <p className="text-sm text-muted-foreground">{t("settings.agents.intro")}</p>
+                    <h2 className="text-sm font-semibold">{t("settings.agents.builtInTitle")}</h2>
+                    <p className="text-sm text-muted-foreground">{t("settings.agents.builtInIntro")}</p>
                 </div>
-                {!readOnly ? (
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0"
-                        onClick={() => setEditing("new")}
-                    >
-                        <Plus className="h-3.5 w-3.5 shrink-0" />
-                        {t("settings.agents.create")}
-                    </Button>
-                ) : null}
-            </div>
-            {error ? (
-                <p role="alert" className="text-sm text-danger">
-                    {error}
-                </p>
-            ) : null}
-            {rows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("settings.agents.empty")}</p>
-            ) : (
                 <Card>
                     <CardBody className="flex flex-col divide-y divide-border p-0">
-                        {rows.map((row) => (
-                            <div key={row.id} className="flex items-center gap-3 px-4 py-3">
-                                <span
-                                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
-                                    aria-hidden="true"
-                                >
-                                    <Bot className="size-4 shrink-0" />
-                                </span>
+                        {builtIns.map((entry) => (
+                            <div key={entry.engine} className="flex items-center gap-3 px-4 py-3">
+                                <EngineMark engine={entry.engine} name={entry.name} />
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium" title={row.name}>
-                                        {row.name}
+                                    <p className="truncate text-sm font-medium" title={entry.name}>
+                                        {entry.name}
                                     </p>
-                                    <p
-                                        className="line-clamp-2 text-xs text-muted-foreground"
-                                        title={row.description || row.instructions}
-                                    >
-                                        {row.description || row.instructions}
+                                    <p className="truncate text-xs text-muted-foreground">
+                                        {workSummary(workOf(entry.engine), picks.engines, picks.models, t)}
                                     </p>
                                 </div>
-                                <Button asChild size="sm" variant="outline" className="shrink-0">
-                                    <Link href={agentChatHref(row.id)}>
-                                        <MessageSquarePlus className="h-3.5 w-3.5 shrink-0" />
-                                        {t("settings.agents.chat")}
-                                    </Link>
-                                </Button>
                                 {!readOnly ? (
-                                    <>
-                                        <Button
-                                            type="button"
-                                            size="icon-sm"
-                                            variant="ghost"
-                                            aria-label={t("settings.agents.edit")}
-                                            title={t("settings.agents.edit")}
-                                            onClick={() => setEditing(row)}
-                                        >
-                                            <Pencil className="size-4 shrink-0" />
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            size="icon-sm"
-                                            variant="ghost"
-                                            aria-label={t("settings.agents.delete")}
-                                            title={t("settings.agents.delete")}
-                                            onClick={() => setRemoving(row)}
-                                        >
-                                            <Trash2 className="size-4 shrink-0" />
-                                        </Button>
-                                    </>
+                                    <Button
+                                        type="button"
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        aria-label={t("settings.agents.editNamed", { name: entry.name })}
+                                        title={t("settings.agents.edit")}
+                                        onClick={() => setTuning(entry)}
+                                    >
+                                        <Pencil className="size-4 shrink-0" />
+                                    </Button>
                                 ) : null}
                             </div>
                         ))}
                     </CardBody>
                 </Card>
-            )}
+            </div>
+            <div className="flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <h2 className="text-sm font-semibold">{t("settings.agents.title")}</h2>
+                        <p className="text-sm text-muted-foreground">{t("settings.agents.intro")}</p>
+                    </div>
+                    {!readOnly ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="shrink-0"
+                            onClick={() => setEditing("new")}
+                        >
+                            <Plus className="h-3.5 w-3.5 shrink-0" />
+                            {t("settings.agents.create")}
+                        </Button>
+                    ) : null}
+                </div>
+                {error ? (
+                    <p role="alert" className="text-sm text-danger">
+                        {error}
+                    </p>
+                ) : null}
+                {rows.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t("settings.agents.empty")}</p>
+                ) : (
+                    <Card>
+                        <CardBody className="flex flex-col divide-y divide-border p-0">
+                            {rows.map((row) => {
+                                const onPolar = row.engine === POLAR_ENGINE;
+                                return (
+                                    <div key={row.id} className="flex items-center gap-3 px-4 py-3">
+                                        {onPolar ? (
+                                            <span
+                                                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+                                                aria-hidden="true"
+                                            >
+                                                <Bot className="size-4 shrink-0" />
+                                            </span>
+                                        ) : (
+                                            <EngineMark engine={row.engine} name={engineName(row.engine)} />
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-medium" title={row.name}>
+                                                {row.name}
+                                            </p>
+                                            <p
+                                                className="truncate text-xs text-muted-foreground"
+                                                title={row.description || row.instructions}
+                                            >
+                                                {row.description || row.instructions}
+                                            </p>
+                                            <p className="truncate text-xs text-muted-foreground">
+                                                {[
+                                                    t("settings.agents.runsOn", {
+                                                        engine: engineName(row.engine)
+                                                    }),
+                                                    workSummary(row, picks.engines, picks.models, t)
+                                                ].join(" - ")}
+                                            </p>
+                                        </div>
+                                        <Button asChild size="sm" variant="outline" className="shrink-0">
+                                            {onPolar ? (
+                                                <Link href={agentChatHref(row.id)}>
+                                                    <MessageSquarePlus className="h-3.5 w-3.5 shrink-0" />
+                                                    {t("settings.agents.chat")}
+                                                </Link>
+                                            ) : (
+                                                <Link
+                                                    href={CODE_TASK_HREF}
+                                                    onClick={() =>
+                                                        writeStored(
+                                                            CODE_AGENT_STORAGE_KEY,
+                                                            customAgentKey(row.id)
+                                                        )
+                                                    }
+                                                >
+                                                    <Code2 className="h-3.5 w-3.5 shrink-0" />
+                                                    {t("settings.agents.newTask")}
+                                                </Link>
+                                            )}
+                                        </Button>
+                                        {!readOnly ? (
+                                            <>
+                                                <Button
+                                                    type="button"
+                                                    size="icon-sm"
+                                                    variant="ghost"
+                                                    aria-label={t("settings.agents.edit")}
+                                                    title={t("settings.agents.edit")}
+                                                    onClick={() => setEditing(row)}
+                                                >
+                                                    <Pencil className="size-4 shrink-0" />
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="icon-sm"
+                                                    variant="ghost"
+                                                    aria-label={t("settings.agents.delete")}
+                                                    title={t("settings.agents.delete")}
+                                                    onClick={() => setRemoving(row)}
+                                                >
+                                                    <Trash2 className="size-4 shrink-0" />
+                                                </Button>
+                                            </>
+                                        ) : null}
+                                    </div>
+                                );
+                            })}
+                        </CardBody>
+                    </Card>
+                )}
+            </div>
+            <WorkEditor
+                tuning={tuning}
+                initial={tuning ? workOf(tuning.engine) : null}
+                picks={picks}
+                onClose={() => setTuning(null)}
+                onSave={saveWork}
+            />
             <AgentEditor
                 editing={editing}
                 picks={picks}
+                engineName={engineName}
                 onClose={() => setEditing(null)}
                 onSaved={(view) => {
                     setError(null);
@@ -199,6 +372,84 @@ export function PolarAgents({
     );
 }
 
+/** The account and models of an agent that comes with Polaris. */
+function WorkEditor({
+    tuning,
+    initial,
+    picks,
+    onClose,
+    onSave
+}: {
+    tuning: { engine: string; name: string } | null;
+    initial: AgentWork | null;
+    picks: AgentPicks;
+    onClose: () => void;
+    onSave: (work: AgentWork) => Promise<string | null>;
+}) {
+    const t = useTranslations("polar");
+    const [values, setValues] = useState<AgentWork | null>(null);
+    const [loadedFor, setLoadedFor] = useState<string | null>(null);
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const engine = tuning?.engine ?? null;
+    if (engine !== loadedFor) {
+        setLoadedFor(engine);
+        setError(null);
+        setValues(initial);
+    }
+    const unchanged = values === null || JSON.stringify(values) === JSON.stringify(initial);
+
+    async function submit(event: FormEvent) {
+        event.preventDefault();
+        if (!values || unchanged || pending) return;
+        setPending(true);
+        setError(null);
+        const refused = await onSave(values);
+        setPending(false);
+        if (refused) setError(refused);
+        else onClose();
+    }
+
+    return (
+        <Dialog open={tuning !== null} onOpenChange={(next) => !next && !pending && onClose()}>
+            <DialogContent className="sm:max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>{tuning?.name ?? ""}</DialogTitle>
+                    <DialogDescription>{t("settings.agents.work.body")}</DialogDescription>
+                </DialogHeader>
+                <form
+                    className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto overscroll-contain pr-1"
+                    onSubmit={(event) => void submit(event)}
+                >
+                    {values ? (
+                        <AgentWorkFields
+                            value={values}
+                            onChange={setValues}
+                            engines={picks.engines}
+                            polarModels={picks.models}
+                            idPrefix="builtin"
+                        />
+                    ) : null}
+                    {error ? (
+                        <p role="alert" className="text-sm text-danger">
+                            {error}
+                        </p>
+                    ) : null}
+                    <DialogFooter>
+                        <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>
+                            {t("settings.agents.cancel")}
+                        </Button>
+                        <Button type="submit" aria-disabled={unchanged || pending} disabled={pending}>
+                            {t("settings.agents.save")}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 const EMPTY: AgentInput = {
     name: "",
     description: "",
@@ -206,7 +457,11 @@ const EMPTY: AgentInput = {
     skills: [],
     connectorIds: [],
     web: true,
-    choice: null
+    choice: null,
+    engine: POLAR_ENGINE,
+    account: null,
+    models: [],
+    modelPolicy: "preferred"
 };
 
 function valuesOf(editing: AgentView | "new" | null): AgentInput {
@@ -215,18 +470,24 @@ function valuesOf(editing: AgentView | "new" | null): AgentInput {
     return values;
 }
 
+/** The fields that are the agent's, without `choice`, which the server
+ *  writes from the first of the models. */
 function same(a: AgentInput, b: AgentInput): boolean {
-    return JSON.stringify(a) === JSON.stringify(b);
+    const { choice: _a, ...left } = a;
+    const { choice: _b, ...right } = b;
+    return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function AgentEditor({
     editing,
     picks,
+    engineName,
     onClose,
     onSaved
 }: {
     editing: AgentView | "new" | null;
     picks: AgentPicks;
+    engineName: (engine: string) => string;
     onClose: () => void;
     onSaved: (view: AgentView) => void;
 }) {
@@ -245,6 +506,7 @@ function AgentEditor({
     const checked = agentInputSchema.safeParse(values);
     const unchanged = editing !== null && editing !== "new" && same(values, valuesOf(editing));
     const complete = checked.success && !unchanged;
+    const onPolar = values.engine === POLAR_ENGINE;
     const set = <K extends keyof AgentInput>(field: K, value: AgentInput[K]) =>
         setValues((current) => ({ ...current, [field]: value }));
     const toggleIn = (field: "skills" | "connectorIds", item: string, on: boolean) =>
@@ -286,23 +548,12 @@ function AgentEditor({
             required: false
         }
     ];
-    const modelValue = values.choice
-        ? keyOf(values.choice.provider, values.choice.model)
-        : AUTOMATIC;
-    const modelOptions = [
-        { value: AUTOMATIC, label: t("settings.agents.editor.automatic") },
-        ...picks.models.map((option) => ({
-            value: keyOf(option.provider, option.model),
-            label: option.label
-        })),
-        // A model the agent was pinned to that this person can no longer reach
-        // still shows as what it is.
-        ...(values.choice &&
-        !picks.models.some(
-            (option) =>
-                option.provider === values.choice?.provider && option.model === values.choice?.model
-        )
-            ? [{ value: modelValue, label: values.choice.model }]
+    const engineOptions = [
+        { value: POLAR_ENGINE, label: "Polar" },
+        ...picks.engines.map((entry) => ({ value: entry.engine, label: entry.name })),
+        // A tool no longer offered here still reads as what it was.
+        ...(!onPolar && !picks.engines.some((entry) => entry.engine === values.engine)
+            ? [{ value: values.engine, label: engineName(values.engine) }]
             : [])
     ];
     const instructionsProblem = agentFieldError("instructions", values.instructions);
@@ -352,6 +603,27 @@ function AgentEditor({
                         );
                     })}
                     <div className="flex flex-col gap-1 text-sm">
+                        <label htmlFor="agent-engine">{t("settings.agents.editor.engine")}</label>
+                        <Select
+                            id="agent-engine"
+                            value={values.engine}
+                            options={engineOptions}
+                            onValueChange={(engine) =>
+                                // Another tool has other accounts and models.
+                                setValues((current) =>
+                                    current.engine === engine
+                                        ? current
+                                        : { ...current, engine, account: null, models: [], modelPolicy: "preferred" }
+                                )
+                            }
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            {onPolar
+                                ? t("settings.agents.editor.enginePolarHint")
+                                : t("settings.agents.editor.engineToolHint")}
+                        </span>
+                    </div>
+                    <div className="flex flex-col gap-1 text-sm">
                         <label htmlFor="agent-instructions">
                             {t("settings.agents.editor.instructions")} *
                         </label>
@@ -376,58 +648,49 @@ function AgentEditor({
                                 : t("settings.agents.editor.instructionsHint")}
                         </span>
                     </div>
-                    <div className="flex flex-col gap-1 text-sm">
-                        <label htmlFor="agent-model">{t("settings.agents.editor.model")}</label>
-                        <Select
-                            id="agent-model"
-                            value={modelValue}
-                            options={modelOptions}
-                            onValueChange={(value) => {
-                                if (value === AUTOMATIC) return set("choice", null);
-                                const [provider, model] = value.split("\u0000");
-                                if (!provider || !model) return;
-                                set("choice", {
-                                    kind: "language",
-                                    provider,
-                                    model,
-                                    intelligence: "balanced",
-                                    payer: null
-                                });
-                            }}
-                        />
-                    </div>
-                    <label className="flex items-center justify-between gap-3 text-sm">
-                        <span className="min-w-0">
-                            <span className="block">{t("settings.agents.editor.web")}</span>
-                            <span className="block text-xs text-muted-foreground">
-                                {t("settings.agents.editor.webHint")}
-                            </span>
-                        </span>
-                        <Switch
-                            checked={values.web}
-                            aria-label={t("settings.agents.editor.web")}
-                            onChange={(on) => set("web", on)}
-                        />
-                    </label>
-                    <PickList
-                        title={t("settings.agents.editor.skills")}
-                        hint={t("settings.agents.editor.picksHint")}
-                        empty={t("settings.agents.editor.noSkills")}
-                        items={picks.skills.map((name) => ({ id: name, label: name }))}
-                        chosen={values.skills}
-                        onToggle={(item, on) => toggleIn("skills", item, on)}
+                    <AgentWorkFields
+                        value={values}
+                        onChange={(work) => setValues((current) => ({ ...current, ...work }))}
+                        engines={picks.engines}
+                        polarModels={picks.models}
+                        idPrefix="agent"
                     />
-                    <PickList
-                        title={t("settings.agents.editor.connectors")}
-                        hint={t("settings.agents.editor.picksHint")}
-                        empty={t("settings.agents.editor.noConnectors")}
-                        items={picks.connectors.map((entry) => ({
-                            id: entry.id,
-                            label: entry.name
-                        }))}
-                        chosen={values.connectorIds}
-                        onToggle={(item, on) => toggleIn("connectorIds", item, on)}
-                    />
+                    {onPolar ? (
+                        <>
+                            <label className="flex items-center justify-between gap-3 text-sm">
+                                <span className="min-w-0">
+                                    <span className="block">{t("settings.agents.editor.web")}</span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {t("settings.agents.editor.webHint")}
+                                    </span>
+                                </span>
+                                <Switch
+                                    checked={values.web}
+                                    aria-label={t("settings.agents.editor.web")}
+                                    onChange={(on) => set("web", on)}
+                                />
+                            </label>
+                            <PickList
+                                title={t("settings.agents.editor.skills")}
+                                hint={t("settings.agents.editor.picksHint")}
+                                empty={t("settings.agents.editor.noSkills")}
+                                items={picks.skills.map((name) => ({ id: name, label: name }))}
+                                chosen={values.skills}
+                                onToggle={(item, on) => toggleIn("skills", item, on)}
+                            />
+                            <PickList
+                                title={t("settings.agents.editor.connectors")}
+                                hint={t("settings.agents.editor.picksHint")}
+                                empty={t("settings.agents.editor.noConnectors")}
+                                items={picks.connectors.map((entry) => ({
+                                    id: entry.id,
+                                    label: entry.name
+                                }))}
+                                chosen={values.connectorIds}
+                                onToggle={(item, on) => toggleIn("connectorIds", item, on)}
+                            />
+                        </>
+                    ) : null}
                     {error ? (
                         <p role="alert" className="text-sm text-danger">
                             {error}

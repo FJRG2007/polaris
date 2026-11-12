@@ -229,10 +229,13 @@ function agentCommandFor(
     // installing it is best effort and a missing launcher would otherwise be an
     // agent that exits in the same second it starts.
     const launcher = enigmaActive && core.enigmaLaunches(cli.id) ? "enigma" : "";
+    // The model picked for this session, on the flag the tool documents. Held
+    // to SAFE_MODEL_ID again there: the command is one line of words.
+    const modelArgs = core.agentModelArgs(cli.id, session.modelChoice?.model);
     return {
         cli,
         binary,
-        command: [binary, ...args].join(" "),
+        command: [binary, ...args, ...modelArgs].join(" "),
         install: cli.install ?? "",
         launcher
     };
@@ -387,7 +390,11 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
  */
 async function modelEnvFor(session: SessionView): Promise<Record<string, string>> {
     const choice = session.modelChoice;
-    if (!choice || !core.MODEL_CHOICE_AGENT_CLIS.includes(session.cli)) return {};
+    if (!choice) return {};
+    // A tool that signs in its own way and only needs to be told the model:
+    // the variable its documentation names, and nothing about keys.
+    if (core.agentCliById(session.cli)?.model?.env) return core.agentModelEnv(session.cli, choice.model);
+    if (!core.MODEL_CHOICE_AGENT_CLIS.includes(session.cli)) return {};
     const credential = session.ownerId
         ? await chatCredentialFor(session.ownerId, choice.provider, choice.payer)
         : null;

@@ -18,6 +18,22 @@ const CHOICES = {
     installUrl: "https://github.com/apps/polaris-test/installations/new",
     repos: [{ id: "22222222-2222-4222-8222-222222222222", name: "acme/web" }],
     hosts: [],
+    composer: [
+        {
+            key: "tool:claude",
+            kind: "tool",
+            id: null,
+            name: "Claude Code",
+            description: "",
+            engine: "claude",
+            modelSource: "own",
+            accounts: [{ key: "claude", kind: "any", label: null, accountId: null, machine: false, mine: null, readiness: "ready" }],
+            models: [],
+            modelPolicy: "preferred",
+            catalogue: [],
+            readiness: "ready"
+        }
+    ],
     agents: [
         {
             key: "claude",
@@ -119,7 +135,7 @@ beforeEach(() => {
         });
     }
     // These follow a coding agent's session; Polar's own answers are tested on their own.
-    window.localStorage.setItem("polar.code.agent", "claude");
+    window.localStorage.setItem("polar.code.agent", "tool:claude");
     vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string, init?: RequestInit) => {

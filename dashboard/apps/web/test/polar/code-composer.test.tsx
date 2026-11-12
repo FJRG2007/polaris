@@ -21,6 +21,22 @@ const CHOICES = {
     installUrl: INSTALL as string | null,
     repos: [{ id: "22222222-2222-4222-8222-222222222222", name: "acme/web" }],
     hosts: [],
+    composer: [
+        {
+            key: "tool:claude",
+            kind: "tool",
+            id: null,
+            name: "Claude Code",
+            description: "",
+            engine: "claude",
+            modelSource: "own",
+            accounts: [{ key: "claude:machine", kind: "machine", label: null, accountId: null, machine: true, mine: null, readiness: "ready" }],
+            models: [],
+            modelPolicy: "preferred",
+            catalogue: [],
+            readiness: "ready"
+        }
+    ],
     agents: [
         {
             key: "claude",
@@ -80,7 +96,7 @@ beforeEach(() => {
         });
     }
     // These follow a coding agent's session; Polar's own answers are tested on their own.
-    window.localStorage.setItem("polar.code.agent", "claude");
+    window.localStorage.setItem("polar.code.agent", "tool:claude");
     vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) => {
@@ -168,8 +184,9 @@ describe("Code's composer is Chat's", () => {
             "Dictate",
             "Microphone and model",
             "Write something to improve it",
-            "Agent: Claude Code - This machine's own login",
+            "Agent: Claude Code",
             "Permissions: Full access",
+            "Model: Account's default model - This machine's own sign-in",
             "Voice talks to Polar's chat, not to an agent"
         ]);
         const form = box.closest("form") as HTMLFormElement;

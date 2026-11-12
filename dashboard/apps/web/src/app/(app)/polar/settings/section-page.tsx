@@ -25,6 +25,10 @@ import { PolarSkills } from "./polar-skills";
 import { listSkills } from "@/lib/polar/skills/store";
 import { PolarAgents } from "./polar-agents";
 import { listAgents } from "@/lib/polar/agents/store";
+import type { AgentWork } from "@/lib/polar/agents/shared";
+import { agentOptionsFor } from "@/lib/agents/agent-readiness";
+import { agentDefaultsFor } from "@/lib/polar/agents/defaults";
+import { agentEnginesFor } from "@/lib/polar/agents/composer-agents";
 import { polarModelOptions } from "@/lib/polar/models";
 import { connectorPolicy, listConnectorViews } from "@/lib/polar/connectors/store";
 import { DisplaySettings } from "@/components/polar/polar-display";
@@ -94,11 +98,15 @@ async function SkillsSection({ userId, readOnly }: { userId: string; readOnly: b
 /** The agents, with the skills, connectors and models they can be given. */
 async function AgentsSection({ userId, readOnly }: { userId: string; readOnly: boolean }) {
     const access = await polarAccessFor(userId);
-    const [agents, skills, connectors, providers] = await Promise.all([
+    const [agents, skills, connectors, providers, engines, defaults] = await Promise.all([
         listAgents(userId),
         listSkills(userId),
         access.connectors ? listConnectorViews(userId) : Promise.resolve([]),
-        polarModelOptions(userId, access).catch(() => [])
+        polarModelOptions(userId, access).catch(() => []),
+        agentOptionsFor(userId)
+            .then(agentEnginesFor)
+            .catch(() => []),
+        agentDefaultsFor(userId).catch(() => new Map<string, AgentWork>())
     ]);
     const models = providers
         .flatMap((provider) =>
@@ -112,11 +120,13 @@ async function AgentsSection({ userId, readOnly }: { userId: string; readOnly: b
     return (
         <PolarAgents
             initial={agents}
+            defaults={[...defaults.values()]}
             readOnly={readOnly}
             picks={{
                 skills: skills.map((skill) => skill.name),
                 connectors: connectors.map((entry) => ({ id: entry.id, name: entry.name })),
-                models
+                models,
+                engines
             }}
         />
     );

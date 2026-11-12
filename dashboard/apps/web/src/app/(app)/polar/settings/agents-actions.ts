@@ -12,7 +12,8 @@ import { requireUser } from "@/lib/session";
 import * as store from "@/lib/polar/agents/store";
 import { polarAccessFor } from "@/lib/polar/access";
 import { getTranslations } from "@/lib/i18n/request";
-import { agentInputSchema, type AgentView } from "@/lib/polar/agents/shared";
+import { setAgentDefault } from "@/lib/polar/agents/defaults";
+import { agentInputSchema, type AgentView, type AgentWork } from "@/lib/polar/agents/shared";
 
 type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -74,4 +75,15 @@ export async function deleteAgentAction(input: unknown): Promise<Result<null>> {
     // Already gone is what was asked for.
     await store.deleteAgent(who.id, parsed.data.id);
     return { ok: true, value: null };
+}
+
+/** The account and models of an agent that comes with Polaris (Polar itself,
+ *  Claude Code, Codex...), which is edited and never deleted. */
+export async function saveAgentDefaultAction(input: unknown): Promise<Result<AgentWork>> {
+    const who = await caller(true);
+    if ("error" in who) return { ok: false, error: who.error };
+    const saved = await setAgentDefault(who.id, input);
+    if (saved) return { ok: true, value: saved };
+    const t = await getTranslations("polar");
+    return { ok: false, error: t("settings.agents.errors.failed") };
 }

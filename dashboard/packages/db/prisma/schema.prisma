@@ -44,6 +44,7 @@ model User {
     polarConnectors   PolarConnector[]
     polarSkills       PolarSkill[]
     polarAgents       PolarAgent[]
+    polarAgentDefaults PolarAgentDefault[]
     polarAttachments  PolarAttachment[]
     polarMemories     PolarMemory[]
     polarPreference   PolarPreference?
@@ -16220,11 +16221,36 @@ model PolarAgent {
     connectorIds String[]      @default([])
     web          Boolean       @default(true)
     choice       Json?
+    // What does the work: "polar", or the id of a coding tool in the agent
+    // catalogue (claude, codex, gemini, ...).
+    engine       String        @default("polar")
+    // The account it signs in with: a UserModelKey id, "machine" for the
+    // machine's own login, or null for the first one that works.
+    account      String?
+    // The models it may use, best first, as [{ provider, model }].
+    models       Json?
+    // "preferred" lets the composer pick another; "required" keeps to `models`.
+    modelPolicy  String        @default("preferred")
     createdAt    DateTime      @default(now())
     updatedAt    DateTime      @updatedAt
     threads      PolarThread[]
 
     @@unique([ownerId, name])
+}
+
+// A person's settings for one of the agents that come with Polaris (Polar
+// itself, Claude Code, Codex, ...): the account and the models it uses. No
+// row is the defaults.
+model PolarAgentDefault {
+    userId      String   @db.Uuid
+    user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    engine      String
+    account     String?
+    models      Json?
+    modelPolicy String   @default("preferred")
+    updatedAt   DateTime @updatedAt
+
+    @@id([userId, engine])
 }
 
 // A folder of Polar chats. Its instructions are added to the system context of

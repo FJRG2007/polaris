@@ -66,7 +66,7 @@ describe("session start schema", () => {
         const choice = { provider: "openai", model: "gpt-x" };
         expect(core.startAgentSessionSchema.safeParse({ ...start, modelChoice: choice }).success).toBe(true);
         expect(
-            core.startAgentSessionSchema.safeParse({ ...start, cli: "claude", modelChoice: choice }).success
+            core.startAgentSessionSchema.safeParse({ ...start, cli: "aider", modelChoice: choice }).success
         ).toBe(false);
     });
     it("bounds attachments and wants a prompt with them", () => {

@@ -27,6 +27,9 @@ import {
     type RepoIssue
 } from "@/lib/github-service";
 import { agentSkills, listSkills } from "@/lib/polar/skills/store";
+import { agentFor } from "@/lib/polar/agents/store";
+import { agentTaskPrompt } from "@/lib/polar/agents/shared";
+import { composerAgentsFor, type ComposerAgent } from "@/lib/polar/agents/composer-agents";
 import { codeStartersSchema, starterPrompt, type StarterSkill } from "@/lib/polar/code-starters";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { userHasManage, type SessionUser } from "@/lib/session";
@@ -231,6 +234,9 @@ export type PolarCodeChoices = Awaited<ReturnType<typeof sessionChoicesAction>> 
     readonly installUrl: string | null;
     /** The person's Polar skills a task can start with, by name. */
     readonly skills: readonly { name: string; description: string }[];
+    /** The agents the composer offers, one row each, with their accounts and
+     *  models (`composer-agents.ts`). */
+    readonly composer: readonly ComposerAgent[];
 };
 
 /** What the composer offers - repositories and agents - or null for somebody
@@ -243,11 +249,37 @@ export async function polarCodeChoices(user: SessionUser): Promise<PolarCodeChoi
         githubAppInstallUrl().catch(() => null),
         listSkills(user.id).catch(() => [])
     ]);
+    const composer = await composerAgentsFor(user.id, choices.agents).catch((error: unknown) => {
+        console.error("polar: could not list the composer's agents", error);
+        return [];
+    });
     return {
         ...choices,
         installUrl,
-        skills: skills.map(({ name, description }) => ({ name, description }))
+        skills: skills.map(({ name, description }) => ({ name, description })),
+        composer
     };
+}
+
+/**
+ * The prompt a task on one of the person's own agents starts with: its
+ * instructions in front of what was typed, so a coding tool that has no
+ * place for a system prompt still works the way the agent was set up to.
+ * Null when there is no agent; an error when it is gone or runs on another
+ * tool than the one asked for.
+ */
+async function promptWithAgent(
+    user: SessionUser,
+    input: unknown,
+    prompt: string
+): Promise<{ prompt: string } | { error: string } | null> {
+    const body = input as { agentId?: unknown; cli?: unknown } | null;
+    if (body?.agentId === undefined || body.agentId === null) return null;
+    const agent = typeof body.agentId === "string" ? await agentFor(user.id, body.agentId) : null;
+    if (!agent || agent.engine !== body.cli) {
+        return { error: (await getTranslations("polar"))("code.agentGone") };
+    }
+    return { prompt: agentTaskPrompt(agent, prompt) };
 }
 
 /** A page of the person's connected repositories for the composer's repository
@@ -382,13 +414,26 @@ export async function polarCodeStart(
         return { error: (await getTranslations("polar"))("code.noAccess") };
     const started = await promptWithStarters(user, raw);
     if (started && "error" in started) return { error: started.error };
-    const input = started ? { ...(raw as object), prompt: started.prompt } : raw;
+    const typed = started
+        ? started.prompt
+        : typeof (raw as { prompt?: unknown } | null)?.prompt === "string"
+          ? (raw as { prompt: string }).prompt
+          : "";
+    const asAgent = await promptWithAgent(user, raw, typed);
+    if (asAgent && "error" in asAgent) return { error: asAgent.error };
+    const prompt = asAgent?.prompt ?? started?.prompt;
+    const { agentId: _agentId, ...rest } = (raw ?? {}) as { agentId?: unknown };
+    const input = prompt !== undefined ? { ...rest, prompt } : rest;
     // A model picked here is Polar's list, so Polar's rule on whose keys this
     // person may spend holds: the deployment's only where the policy says so.
     const choice = core.sessionModelChoiceSchema.nullable().safeParse(
         (input as { modelChoice?: unknown } | null)?.modelChoice ?? null
     );
-    if (choice.success && choice.data) {
+    // A tool that only takes the model's name (Claude Code, Codex, Gemini)
+    // signs in with its own account, so there is no key to resolve for it.
+    const cli = (input as { cli?: unknown } | null)?.cli;
+    const keyed = typeof cli === "string" && core.MODEL_CHOICE_AGENT_CLIS.includes(cli);
+    if (keyed && choice.success && choice.data) {
         const credential = await polarCredentialFor(
             user.id,
             choice.data.provider,
