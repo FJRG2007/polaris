@@ -152,13 +152,14 @@ export const panelStyleSchema = z.object({
 export type PanelStyle = z.infer<typeof panelStyleSchema>;
 
 /** A panel nobody styled: the reader's own theme, as panels always looked,
- *  and the screensaver after ten minutes without a touch. */
+ *  and no screensaver - a wall left on a camera keeps showing the camera until
+ *  somebody picks a delay in Style. */
 export const DEFAULT_PANEL_STYLE: PanelStyle = {
     theme: "auto",
     accent: "default",
     density: "comfortable",
     background: "plain",
-    screensaver: 10
+    screensaver: 0
 };
 
 const storedStyleSchema = z.object({
