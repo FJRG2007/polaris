@@ -33,6 +33,8 @@ const ALLOWED: Record<string, string> = {
         "recovery codes in the clear; the vault reads them only in the browser, and a Drive or address pick is fetched through the server",
     "apps/web/src/app/(app)/vault/settings/vault-import.tsx":
         "a password export in the clear; the vault reads it only in the browser, and a Drive or address pick is fetched through the server",
+    "apps/extension/src/entrypoints/popup/host-transfer.tsx":
+        "the extension's list of hosts, read from a file on this device before any Polaris is signed in to",
     "packages/genoffice-pdf/src/renderer/App.tsx":
         "ported editor not mounted in Polaris: no signed-in host to pick from",
     "packages/genoffice-pdf/src/renderer/SignatureDialog.tsx":
