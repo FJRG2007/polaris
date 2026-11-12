@@ -21,7 +21,12 @@
         "start": "Open on entry",
         "notStart": "Stop opening on entry",
         "markRead": "Mark as read",
-        "markSeen": "Mark as seen"
+        "markSeen": "Mark as seen",
+        "lockApp": "Lock with PIN",
+        "unlockApp": "Remove PIN lock",
+        "lockNeedsPin": "Set a PIN to lock apps",
+        "lockNeedsPinFirst": "Set a PIN in Security first.",
+        "lockFailed": "The lock could not be saved. Try again."
     },
     "waiting": {
         "unread": "{count, plural, one {# unread message} other {# unread messages}}",
@@ -466,5 +471,10 @@
         "bar": "Previewing {season} - only you see this",
         "stop": "Stop",
         "notStopped": "The preview could not stop. Try again in a moment."
+    },
+    "appLock": {
+        "title": "{app} is locked",
+        "description": "Enter your PIN to open it.",
+        "failed": "Could not check the PIN. Try again."
     }
 }

@@ -16,6 +16,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { guardSession, type SessionVerdict } from "@/lib/session-guard";
+import { appLockRedirect } from "@/lib/app-lock-service";
 import { canAny, userHasPermission } from "@polaris/auth";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import { hasPermission, type GrantSubject, type Permission } from "@polaris/core";
@@ -103,6 +104,13 @@ const clearedSession = cache(async function clearedSession(
         touch
     });
     if (!verdict.ok) return { redirect: verdict.redirect };
+    // A PIN-locked app is checked on the screens and actions a person drives,
+    // never on a background poll, which must not count as activity in it.
+    if (touch) {
+        const path = (await headers()).get("x-polaris-path");
+        const locked = path ? await appLockRedirect(resolved.id, resolved.sessionId, path) : null;
+        if (locked) return { redirect: locked };
+    }
     return { user: await identityFor(resolved, verdict.view) };
 });
 

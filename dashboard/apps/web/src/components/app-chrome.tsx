@@ -20,6 +20,8 @@ import { AppNav } from "@/components/app-nav";
 import { FavoriteAppsProvider } from "@/components/favorite-apps";
 import { NO_LAUNCHER_PREFS } from "@/lib/app-launcher";
 import { getLauncherPrefs } from "@/lib/app-launcher-service";
+import { getAppLocks } from "@/lib/app-lock-service";
+import { AppLocksProvider } from "@/components/app-locks";
 import { getShortcutOverrides } from "@/lib/shortcuts-service";
 import { appBaseUrl } from "@/lib/domain-service";
 import { getCapabilities } from "@polaris/config";
@@ -177,6 +179,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         status,
         soundVolume,
         launcherPrefs,
+        appLocks,
         shortcuts,
         chatUnread,
         mailUnread,
@@ -206,6 +209,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         getSoundVolume(user.id).catch(() => DEFAULT_SOUND_VOLUME),
         // The favorites and the order of the app menu. Never worth a failed page.
         getLauncherPrefs(user.id).catch(() => NO_LAUNCHER_PREFS),
+        // The apps kept behind the PIN. Never worth a failed page: the server
+        // guard is what keeps them shut, the menu only offers the switch.
+        getAppLocks(user.viewingAs?.actorId ?? user.id).catch(() => ({ locked: [], hasPin: false })),
         // The keys this account moved. The defaults are a working keyboard.
         getShortcutOverrides(user.id).catch(() => NO_SHORTCUT_OVERRIDES),
         chatWaiting,
@@ -269,6 +275,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                             initialOrder={launcherPrefs.order}
                                                             initialHome={launcherPrefs.home}
                                                         >
+                                                            <AppLocksProvider initial={appLocks.locked} hasPin={appLocks.hasPin}>
                                                             <ShortcutsProvider
                                                                 overrides={shortcuts}
                                                             >
@@ -599,6 +606,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                     </PresenceProvider>
                                                                 </KeyNamesProvider>
                                                             </ShortcutsProvider>
+                                                            </AppLocksProvider>
                                                         </FavoriteAppsProvider>
                                                     </SelectionMenu>
                                                 </ToastProvider>

@@ -19,6 +19,8 @@ import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { launcherPrefsSchema } from "@/lib/app-launcher";
 import { getLauncherPrefs, saveLauncherPrefs } from "@/lib/app-launcher-service";
+import { setAppLock } from "@/lib/app-lock-service";
+import { setAppLockSchema } from "@/lib/app-locks";
 
 export async function saveFavoriteAppsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
@@ -33,4 +35,19 @@ export async function saveFavoriteAppsAction(input: unknown): Promise<{ error?: 
         : { ...parsed.data, home: parsed.data.home === undefined ? stored.home : parsed.data.home };
     await saveLauncherPrefs(user.id, prefs);
     return {};
+}
+
+/**
+ * Keep an app behind the account's PIN, or stop. Acts on the real account
+ * behind the session, never one an administrator is viewing as. Refused
+ * without a PIN, and for the account and Settings (see `app-locks`).
+ */
+export async function setAppLockAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const t = await getTranslations("nav");
+    const parsed = setAppLockSchema.safeParse(input);
+    if (!parsed.success) return { error: t("switcher.lockFailed") };
+    const owner = user.viewingAs?.actorId ?? user.id;
+    const saved = await setAppLock(owner, parsed.data.appId, parsed.data.locked);
+    return saved ? {} : { error: t("switcher.lockNeedsPinFirst") };
 }

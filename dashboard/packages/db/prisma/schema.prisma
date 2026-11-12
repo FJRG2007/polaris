@@ -1223,6 +1223,9 @@ model UserSecurity {
     // password, so its low entropy never guards the account itself.
     pinHash              String?
     pinUpdatedAt         DateTime?
+    // The apps this account keeps behind its PIN (app ids). Ignored while no
+    // PIN is set, so clearing the PIN can never shut somebody out of an app.
+    lockedApps           String[]  @default([])
     // Minutes of inactivity before the dashboard locks. 0 disables the lock.
     idleLockMinutes      Int       @default(0)
     // Absolute session lifetime in minutes, after which the session is signed
@@ -1798,6 +1801,9 @@ model SessionState {
     approval   String    @default("approved")
     // Set when inactivity locked the dashboard; cleared by a PIN/password unlock.
     lockedAt   DateTime?
+    // The PIN-locked apps this session unlocked: app id -> last activity in
+    // epoch milliseconds. An entry idle past the relock window counts as locked.
+    appUnlocks Json      @default("{}")
     lastSeenAt DateTime  @default(now())
     // The address the session was last evaluated from; a change re-runs the
     // account's network rules instead of trusting the first decision forever.

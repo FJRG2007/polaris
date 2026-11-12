@@ -21,7 +21,12 @@
         "start": "Abrir al entrar",
         "notStart": "Dejar de abrir al entrar",
         "markRead": "Marcar leído",
-        "markSeen": "Marcar visto"
+        "markSeen": "Marcar visto",
+        "lockApp": "Bloquear con PIN",
+        "unlockApp": "Quitar el PIN",
+        "lockNeedsPin": "Crea un PIN para bloquear",
+        "lockNeedsPinFirst": "Crea primero un PIN en Seguridad.",
+        "lockFailed": "No se pudo guardar el bloqueo. Reinténtalo."
     },
     "waiting": {
         "unread": "{count, plural, one {# mensaje sin leer} other {# mensajes sin leer}}",
@@ -466,5 +471,10 @@
         "bar": "Vista previa de {season}: solo la ves tú",
         "stop": "Parar",
         "notStopped": "La vista previa no pudo parar. Inténtalo de nuevo en un momento."
+    },
+    "appLock": {
+        "title": "{app} está bloqueada",
+        "description": "Escribe tu PIN para abrirla.",
+        "failed": "No se pudo comprobar el PIN. Reinténtalo."
     }
 }
