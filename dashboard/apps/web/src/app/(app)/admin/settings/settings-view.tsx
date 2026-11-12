@@ -19,6 +19,8 @@
  * case the automatic answer is not wanted: it forces past the shared cache.
  */
 
+import { SecurityUpdates } from "./security-updates";
+import { UpdateChangelog } from "./update-changelog";
 import type { SettingsOverview } from "./overview";
 import { checkForNewBuild } from "@/lib/new-build";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
@@ -934,7 +936,11 @@ export function SettingsView({
                         {policyError ? <p className="text-xs text-danger">{policyError}</p> : null}
                     </div>
 
+                    <SecurityUpdates disabled={updating} />
+
                     <OwnVulnerabilitiesLine available={available} />
+
+                    {available && status?.latest ? <UpdateChangelog head={status.latest} /> : null}
 
                     {available || updating || logText ? (
                         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">

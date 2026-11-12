@@ -126,7 +126,8 @@ function short(sha: string): string {
     return sha.slice(0, 7);
 }
 
-async function github(path: string): Promise<unknown> {
+/** One read of the GitHub API, unauthenticated, with the timeout every caller wants. */
+export async function github(path: string): Promise<unknown> {
     const response = await fetch(`https://api.github.com${path}`, {
         headers: { accept: "application/vnd.github+json", "user-agent": "polaris-dashboard" },
         // Never let a slow API call hang a page render or the poll endpoint.

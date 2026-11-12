@@ -3757,6 +3757,52 @@
             "imageHint": "Downloads the build GitHub already made. Fastest, and it is the build every other deployment runs.",
             "buildHint": "Advances the checkout on the host and builds the image there. Slower, and it needs room to build, but it installs the branch as it stands instead of waiting for a published build."
         },
+        "security": {
+            "title": "Security fixes",
+            "description": "An update that fixes a vulnerability installs itself on this schedule, whatever the setting above says.",
+            "ariaLabel": "When an update fixing a {severity} vulnerability installs",
+            "severity": {
+                "critical": "Critical",
+                "high": "High",
+                "medium": "Medium",
+                "low": "Low"
+            },
+            "timing": {
+                "immediate": "Immediately",
+                "quiet": "At the quietest hour ({at})",
+                "off": "Only tell me"
+            },
+            "riskStanding": "A critical or high fix can wait here. An administrator accepted that risk.",
+            "risk": {
+                "title": "Leave known vulnerabilities open?",
+                "description": "A critical or high vulnerability that a published build already fixes would stay open on this deployment until somebody installs the update, or until the quiet hour.",
+                "accept": "I accept the risk of running with a known vulnerability for longer.",
+                "keep": "Keep installing at once",
+                "confirm": "Accept and save"
+            },
+            "errors": {
+                "invalid": "That is not a schedule Polaris knows.",
+                "riskNotAccepted": "Accept the risk before letting a critical or high fix wait.",
+                "load": "Could not read the security update schedule. Reload the page.",
+                "save": "Could not save. Try again."
+            }
+        },
+        "changelog": {
+            "title": "What this update carries",
+            "kinds": {
+                "security": "Security",
+                "feature": "New",
+                "fix": "Fixed",
+                "performance": "Faster",
+                "other": "Other changes"
+            },
+            "showAll": "Show all {count}",
+            "showLess": "Show less",
+            "openCommit": "Open this commit on GitHub",
+            "rest": "{more, plural, =0 {} one {# more change, } other {# more changes, }}{hidden, plural, =0 {} one {# internal commit not listed. } other {# internal commits not listed. }}<link>See everything on GitHub</link>",
+            "unavailable": "GitHub could not be reached to read what changed. The update can still be installed.",
+            "nothingVisible": "Only internal changes: tests, CI and tooling."
+        },
         "schedule": {
             "label": "Install updates",
             "ariaLabel": "When updates install themselves",

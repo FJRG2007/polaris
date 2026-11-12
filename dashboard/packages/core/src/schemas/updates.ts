@@ -98,3 +98,101 @@ export function autoUpdateRunsAt(policy: AutoUpdatePolicy, availableSince: Date)
     if (policy.mode === "immediate") return availableSince;
     return nextDailyRun(policy.at, availableSince);
 }
+
+/**
+ * Installing an update on its own because it fixes a vulnerability, whatever the
+ * general policy above says.
+ *
+ * Each severity has its own answer:
+ *
+ *   immediate - as soon as the build that fixes it is published.
+ *   quiet     - at the hour this deployment is least used (`quietHour`), so the
+ *               restart lands when nobody notices it.
+ *   off       - only tell the operator, as any other update.
+ *
+ * Critical and high install at once by default. Taking either below that is
+ * allowed, but it is accepting a known risk, so it is recorded with who accepted
+ * it and when (`riskAccepted`), and the settings screen asks for that in words
+ * before saving. Medium and low are off until somebody asks for them.
+ */
+export const SECURITY_UPDATE_TIMINGS = ["immediate", "quiet", "off"] as const;
+
+export type SecurityUpdateTiming = (typeof SECURITY_UPDATE_TIMINGS)[number];
+
+const timing = z.enum(SECURITY_UPDATE_TIMINGS);
+
+export const securityUpdatePolicySchema = z.object({
+    critical: timing,
+    high: timing,
+    medium: timing,
+    low: timing,
+    /** Who took critical or high below `immediate`, and when. Null while both
+     *  install at once. */
+    riskAccepted: z
+        .object({ by: z.string().min(1).max(200), at: z.string().datetime() })
+        .nullable()
+});
+
+export type SecurityUpdatePolicy = z.infer<typeof securityUpdatePolicySchema>;
+
+export const DEFAULT_SECURITY_UPDATE: SecurityUpdatePolicy = {
+    critical: "immediate",
+    high: "immediate",
+    medium: "off",
+    low: "off",
+    riskAccepted: null
+};
+
+/** Whether this policy leaves a critical or high fix waiting on somebody. */
+export function securityPolicyTakesRisk(policy: Pick<SecurityUpdatePolicy, "critical" | "high">): boolean {
+    return policy.critical !== "immediate" || policy.high !== "immediate";
+}
+
+/** How long a timing leaves a fix waiting, shortest first. */
+const WAIT_RANK: Readonly<Record<SecurityUpdateTiming, number>> = { immediate: 0, quiet: 1, off: 2 };
+
+/** Whether `next` leaves a critical or high fix waiting longer than `previous`. */
+export function securityPolicyLowers(
+    previous: Pick<SecurityUpdatePolicy, "critical" | "high">,
+    next: Pick<SecurityUpdatePolicy, "critical" | "high">
+): boolean {
+    return (["critical", "high"] as const).some(
+        (severity) => WAIT_RANK[next[severity]] > WAIT_RANK[previous[severity]]
+    );
+}
+
+/** Read the stored policy, falling back to the default (the safe one) rather
+ *  than failing - an unreadable setting must never switch these off. */
+export function parseSecurityUpdatePolicy(raw: string | null | undefined): SecurityUpdatePolicy {
+    if (!raw) return DEFAULT_SECURITY_UPDATE;
+    try {
+        const parsed = securityUpdatePolicySchema.safeParse(JSON.parse(raw));
+        if (!parsed.success) return DEFAULT_SECURITY_UPDATE;
+        // A risk with nobody recorded as accepting it was never accepted.
+        if (securityPolicyTakesRisk(parsed.data) && !parsed.data.riskAccepted) {
+            return DEFAULT_SECURITY_UPDATE;
+        }
+        return parsed.data;
+    } catch {
+        return DEFAULT_SECURITY_UPDATE;
+    }
+}
+
+/**
+ * When an update that fixes a vulnerability of `severity`, first seen at
+ * `availableSince`, installs itself, or null when this policy leaves it to the
+ * operator. `quietHour` is the hour (0-23, server time) this deployment is least
+ * used.
+ */
+export function securityUpdateRunsAt(
+    policy: SecurityUpdatePolicy,
+    severity: "critical" | "high" | "medium" | "low",
+    availableSince: Date,
+    quietHour: number
+): Date | null {
+    const answer = policy[severity];
+    if (answer === "off") return null;
+    if (answer === "immediate") return availableSince;
+    const hour = Math.min(23, Math.max(0, Math.trunc(quietHour)));
+    return nextDailyRun(`${String(hour).padStart(2, "0")}:00`, availableSince);
+}

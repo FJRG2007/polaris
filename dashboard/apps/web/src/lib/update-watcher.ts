@@ -55,6 +55,13 @@ import {
     type Permission
 } from "@polaris/core";
 import { internetOffline } from "@/lib/offline/outbound-lookup";
+import {
+    DEFAULT_QUIET_HOUR,
+    getSecurityUpdatePolicy,
+    quietHour,
+    updateChangelog
+} from "@/lib/update-changelog";
+import { securityUpdateRunsAt, type SecuritySeverity } from "@polaris/core";
 
 /** Who is told about an update - the same people allowed to install one. */
 const UPDATE_PERMISSION: Permission = "system.manage";
@@ -196,7 +203,11 @@ async function recipientsFor(now: Date, earlier: string | null): Promise<string[
  * schedule counts from. Announces it on the way, if this container is the one
  * that noticed.
  */
-async function firstSeen(sha: string, policy: AutoUpdatePolicy): Promise<Date> {
+async function firstSeen(
+    sha: string,
+    policy: AutoUpdatePolicy,
+    security: SecurityPlan | null
+): Promise<Date> {
     const now = new Date();
     const earlier = await getSetting(ANNOUNCED_KEY);
     if (await claim(ANNOUNCED_KEY, sha, `${sha} ${now.toISOString()}`)) {
@@ -215,15 +226,23 @@ async function firstSeen(sha: string, policy: AutoUpdatePolicy): Promise<Date> {
                 title: t("update.readyTitle"),
                 body: t("update.readyBody", {
                     sha,
-                    plan:
-                        policy.mode === "daily"
+                    plan: security
+                        ? security.at === null
+                            ? t("update.planSecurityNow", {
+                                  severity: t(`update.severity.${security.severity}`)
+                              })
+                            : t("update.planSecurityQuiet", {
+                                  severity: t(`update.severity.${security.severity}`),
+                                  at: security.at
+                              })
+                        : policy.mode === "daily"
                             ? t("update.planDaily", { at: policy.at })
                             : policy.mode === "immediate"
                               ? t("update.planNow")
                               : t("update.planManual")
                 })
             })),
-            actionRequired: policy.mode === "off"
+            actionRequired: policy.mode === "off" && !security
         });
         return now;
     }
@@ -351,6 +370,44 @@ async function retireLandedNotices(status: UpdateStatus): Promise<void> {
     await markNotificationsReadByType(UPDATE_EVENTS);
 }
 
+/** What a security fix in the build on offer asks of this deployment. */
+interface SecurityPlan {
+    readonly severity: SecuritySeverity;
+    readonly policy: Awaited<ReturnType<typeof getSecurityUpdatePolicy>>;
+    /** The quiet hour, for a severity set to wait for it. */
+    readonly hour: number;
+    /** "HH:00" when it waits for the quiet hour, null when it installs at once. */
+    readonly at: string | null;
+}
+
+/**
+ * The security rule for the range from the running build to `sha`, or null
+ * when the range fixes nothing this deployment installs on its own for. Reading
+ * the range is best-effort: GitHub out of reach means the general policy alone
+ * decides, as it did before this rule existed.
+ */
+async function securityPlan(current: string | null, sha: string): Promise<SecurityPlan | null> {
+    const changelog = await updateChangelog(current, sha).catch(() => null);
+    const severity = changelog?.security ?? null;
+    if (!severity) return null;
+    const policy = await getSecurityUpdatePolicy();
+    const timing = policy[severity];
+    if (timing === "off") return null;
+    const hour = timing === "quiet" ? await quietHour().catch(() => DEFAULT_QUIET_HOUR) : 0;
+    return {
+        severity,
+        policy,
+        hour,
+        at: timing === "quiet" ? `${String(hour).padStart(2, "0")}:00` : null
+    };
+}
+
+function earliest(a: Date | null, b: Date | null): Date | null {
+    if (!a) return b;
+    if (!b) return a;
+    return a.getTime() <= b.getTime() ? a : b;
+}
+
 /** One pass: notice, then install if it is time to. */
 export async function checkForUpdate(): Promise<void> {
     // An update waiting is shown on the Apps list, never on the bell (the
@@ -375,9 +432,16 @@ export async function checkForUpdate(): Promise<void> {
     const sha = status.latest;
 
     const policy = await getAutoUpdatePolicy();
-    const seen = await firstSeen(sha, policy);
+    const security = await securityPlan(status.current, sha);
+    const seen = await firstSeen(sha, policy, security);
 
-    const runsAt = autoUpdateRunsAt(policy, seen);
+    // Whichever comes first: the general schedule, or the one a security fix in
+    // this build asks for. A fix never waits longer than the operator's own
+    // schedule would have.
+    const runsAt = earliest(
+        autoUpdateRunsAt(policy, seen),
+        security ? securityUpdateRunsAt(security.policy, security.severity, seen, security.hour) : null
+    );
     if (!runsAt || Date.now() < runsAt.getTime()) return;
 
     // The moment goes in the row: it is what tells this run's result from the one

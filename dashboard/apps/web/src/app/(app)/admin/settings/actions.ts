@@ -16,10 +16,24 @@ import { type UpdateTrigger } from "@/lib/update-runner";
 import { collectUpdateReport, issueUrl } from "@/lib/update-report";
 import { getUpdateStatus, resetUpdateStatus, type UpdateStatus } from "@/lib/update-service";
 import { getAutoUpdatePolicy, saveAutoUpdatePolicy, startUpdate } from "@/lib/update-watcher";
+import { recordAudit } from "@/lib/audit-service";
 import {
+    DEFAULT_QUIET_HOUR,
+    getSecurityUpdatePolicy,
+    quietHour,
+    saveSecurityUpdatePolicy,
+    updateChangelog,
+    type UpdateChangelog
+} from "@/lib/update-changelog";
+import { z } from "zod";
+import {
+    SECURITY_UPDATE_TIMINGS,
     autoUpdatePolicySchema,
+    securityPolicyLowers,
+    securityPolicyTakesRisk,
     updateSourceSchema,
     type AutoUpdatePolicy,
+    type SecurityUpdatePolicy,
     type UpdateSource
 } from "@polaris/core";
 
@@ -85,6 +99,74 @@ export async function saveAutoUpdateAction(
         };
     await saveAutoUpdatePolicy(parsed.data);
     return { policy: parsed.data };
+}
+
+/** What the update on offer carries, read from its commits; null when there is
+ *  nothing on offer or GitHub could not be read. */
+export async function updateChangelogAction(): Promise<UpdateChangelog | null> {
+    await requireAdmin();
+    const status = await getUpdateStatus();
+    return updateChangelog(status.current, status.latest).catch(() => null);
+}
+
+/** How a security fix installs itself here, and the hour "quiet" means. */
+export async function securityUpdatePolicyAction(): Promise<{
+    policy: SecurityUpdatePolicy;
+    quietHour: number;
+}> {
+    await requireAdmin();
+    const [policy, hour] = await Promise.all([getSecurityUpdatePolicy(), quietHour().catch(() => DEFAULT_QUIET_HOUR)]);
+    return { policy, quietHour: hour };
+}
+
+const timing = z.enum(SECURITY_UPDATE_TIMINGS);
+const securityUpdateInput = z.object({
+    critical: timing,
+    high: timing,
+    medium: timing,
+    low: timing,
+    /** The administrator said, in so many words, that they accept leaving a
+     *  critical or high fix waiting. Required for exactly that. */
+    acceptRisk: z.boolean().default(false)
+});
+
+/**
+ * Change how security fixes install themselves.
+ *
+ * Taking critical or high below "immediately" is refused unless the request
+ * carries the administrator's acceptance of the risk, and is recorded - who
+ * and when - in the policy and the audit log. Everything else needs nothing.
+ */
+export async function saveSecurityUpdateAction(
+    input: unknown
+): Promise<{ policy?: SecurityUpdatePolicy; error?: string }> {
+    const user = await requireAdmin();
+    const parsed = securityUpdateInput.safeParse(input);
+    const t = await getTranslations("admin");
+    if (!parsed.success) return { error: t("settings.security.errors.invalid") };
+    const { acceptRisk, ...timings } = parsed.data;
+    const previous = await getSecurityUpdatePolicy();
+    const risky = securityPolicyTakesRisk(timings);
+    // Only a change that leaves a critical or high fix waiting longer than it
+    // did asks for the acceptance again; saving medium or low beside a risk
+    // already accepted keeps that acceptance as it was.
+    const lowered = securityPolicyLowers(previous, timings);
+    if (lowered && !acceptRisk) return { error: t("settings.security.errors.riskNotAccepted") };
+    const policy: SecurityUpdatePolicy = {
+        ...timings,
+        riskAccepted: !risky
+            ? null
+            : lowered || !previous.riskAccepted
+              ? { by: user.id, at: new Date().toISOString() }
+              : previous.riskAccepted
+    };
+    await saveSecurityUpdatePolicy(policy);
+    await recordAudit({
+        actorId: user.id,
+        action: "system.security-updates",
+        metadata: { ...timings, riskAccepted: risky }
+    });
+    return { policy };
 }
 
 /**

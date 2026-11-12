@@ -3757,6 +3757,52 @@
             "imageHint": "Descarga la compilación que GitHub ya ha hecho. Es lo más rápido, y es la misma compilación que usan todos los demás despliegues.",
             "buildHint": "Avanza el repositorio en el servidor y compila allí la imagen. Es más lento y necesita espacio para compilar, pero instala la rama tal como está en vez de esperar a una compilación publicada."
         },
+        "security": {
+            "title": "Seguridad",
+            "description": "Una actualización que corrige una vulnerabilidad se instala sola según esto, diga lo que diga el ajuste de arriba.",
+            "ariaLabel": "Cuándo se instala una actualización que corrige una vulnerabilidad {severity}",
+            "severity": {
+                "critical": "Crítica",
+                "high": "Alta",
+                "medium": "Media",
+                "low": "Baja"
+            },
+            "timing": {
+                "immediate": "Al momento",
+                "quiet": "En la hora más tranquila ({at})",
+                "off": "Solo avisarme"
+            },
+            "riskStanding": "Aquí una corrección crítica o alta puede esperar. Un administrador aceptó ese riesgo.",
+            "risk": {
+                "title": "¿Dejar abiertas vulnerabilidades conocidas?",
+                "description": "Una vulnerabilidad crítica o alta que ya corrige una build publicada seguiría abierta en este despliegue hasta que alguien instale la actualización, o hasta la hora tranquila.",
+                "accept": "Acepto el riesgo de funcionar más tiempo con una vulnerabilidad conocida.",
+                "keep": "Seguir instalando al momento",
+                "confirm": "Aceptar y guardar"
+            },
+            "errors": {
+                "invalid": "Polaris no conoce ese horario.",
+                "riskNotAccepted": "Acepta el riesgo antes de dejar esperar una corrección crítica o alta.",
+                "load": "No se pudo leer el horario de seguridad. Recarga la página.",
+                "save": "No se pudo guardar. Inténtalo de nuevo."
+            }
+        },
+        "changelog": {
+            "title": "Qué trae esta actualización",
+            "kinds": {
+                "security": "Seguridad",
+                "feature": "Nuevo",
+                "fix": "Resuelto",
+                "performance": "Más ágil",
+                "other": "Otros cambios"
+            },
+            "showAll": "Ver los {count}",
+            "showLess": "Ver menos",
+            "openCommit": "Abrir este commit en GitHub",
+            "rest": "{more, plural, =0 {} one {# cambio más, } other {# cambios más, }}{hidden, plural, =0 {} one {# commit interno sin listar. } other {# commits internos sin listar. }}<link>Ver todo en GitHub</link>",
+            "unavailable": "No se pudo contactar con GitHub para leer qué ha cambiado. La actualización se puede instalar igualmente.",
+            "nothingVisible": "Solo cambios internos: tests, CI y herramientas."
+        },
         "schedule": {
             "label": "Instalar versiones",
             "ariaLabel": "Cuándo se instalan las versiones",

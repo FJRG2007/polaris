@@ -68,6 +68,21 @@ Contributions to Polaris are welcome. Here is how you can contribute:
    [Conventional Commits](https://www.conventionalcommits.org) with a leading emoji,
    as in the history: `✨ feat(chat): ...`, `🐛 fix(deploy): ...`.
 
+   The changelog an operator sees before updating is read from these commits.
+   `feat`, `fix`, `perf` and the rest appear; `test`, `ci`, `chore`, `docs`,
+   `style` and `build` do not. Two trailers in the commit body change that:
+
+   ```text
+   Security: high VULN-0041
+   Changelog: skip
+   ```
+
+   `Security: <critical|high|medium|low> [VULN-NNNN ...]` marks a vulnerability
+   fix. It is always listed, whatever the commit type, and it decides whether the
+   update installs itself (by default critical and high install at once). A
+   write-up in `docs/vulnerabilities/` with `status: fixed` counts the same way.
+   `Changelog: skip` leaves a commit out.
+
 ## Working with a coding agent
 
 Contributions made with an AI coding agent - Claude Code, OpenAI Codex, opencode,

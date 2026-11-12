@@ -208,6 +208,7 @@ export * from "./schemas/notification-holds.js";
 export * from "./schemas/legal.js";
 export * from "./schemas/sms.js";
 export * from "./schemas/updates.js";
+export * from "./changelog.js";
 export * from "./schemas/analytics.js";
 export * from "./schemas/tasks.js";
 export * from "./schemas/notes.js";
