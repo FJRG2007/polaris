@@ -429,7 +429,11 @@
         "World clock": "Reloj mundial",
         "Agent runs": "Trabajos",
         "Code review": "Revisiones",
-        "Review settings": "Ajustes de revisión"
+        "Review settings": "Ajustes de revisión",
+        "Details": "Detalles",
+        "Files from Drive": "Archivos de Drive",
+        "Links": "Enlaces",
+        "Calls": "Llamadas"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

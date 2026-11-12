@@ -38,6 +38,10 @@ vi.mock("@/app/(app)/admin/apps/[appId]/settings/app-services-panel", () => ({
     AppServicesSkeleton: () => null
 }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
+// The page draws the first of Chat's screens through this.
+vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/chat-screen", () => ({
+    ChatSettingsPage: ChatAdminSettings
+}));
 vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/chat-settings", () => ({
     ChatAdminSettings
 }));

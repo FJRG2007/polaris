@@ -429,7 +429,11 @@
         "World clock": "World clock",
         "Agent runs": "Agent runs",
         "Code review": "Code review",
-        "Review settings": "Review settings"
+        "Review settings": "Review settings",
+        "Details": "Details",
+        "Files from Drive": "Files from Drive",
+        "Links": "Links",
+        "Calls": "Calls"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

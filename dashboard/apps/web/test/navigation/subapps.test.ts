@@ -13,6 +13,7 @@
 import { describe, expect, it } from "vitest";
 import { navigationEntries } from "@/lib/search/entries";
 import {
+    adminAppIdForPath,
     APP_SECTIONS,
     APP_SUBAPPS,
     isSectionActive,
@@ -63,6 +64,9 @@ describe("every subject with its own rail", () => {
     it("keeps every screen inside the subject it belongs to", () => {
         for (const subapp of APP_SUBAPPS) {
             for (const section of subapp.sections) {
+                // A search-only entry for an app's settings lands in that app's
+                // own rail under Polaris apps (`adminAppSubapp`).
+                if (section.hidden && adminAppIdForPath(section.href)) continue;
                 expect(resolveSubapp(section.href)?.id, section.href).toBe(subapp.id);
             }
         }

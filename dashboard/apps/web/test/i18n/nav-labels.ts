@@ -28,6 +28,11 @@ export function navLabels(): Set<string> {
         labels.add(subapp.parent.label);
         sections(subapp.sections);
     }
+    for (const id of ["chat", "example"]) {
+        const adminApp = nav.adminAppSubapp(id);
+        labels.add(adminApp.parent.label);
+        sections(adminApp.sections);
+    }
     const org = nav.orgSubapp("example");
     labels.add(org.parent.label);
     sections(org.sections);

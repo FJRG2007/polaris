@@ -3357,6 +3357,108 @@ export function installedAppIdForPath(pathname: string): string | null {
     return id ? decodeURIComponent(id) : null;
 }
 
+/** Where an app's administrator screens live: Polaris apps > the app. */
+export const ADMIN_APPS_BASE = "/admin/apps";
+
+/** Apps every Polaris comes with: their settings are Polaris's own pages and
+ *  they have no store listing, so no Details screen. */
+const ADMIN_BUILT_IN_APPS: ReadonlySet<string> = new Set(["chat", "polar"]);
+
+/** The screens of a built-in app's administrator settings beyond the first. */
+const ADMIN_APP_SCREENS: Readonly<Record<string, readonly AppSection[]>> = {
+    chat: [
+        {
+            label: "Rules", // i18n-ignore
+            href: "",
+            adminOnly: true,
+            icon: Scale,
+            keywords: ["messages", "limits", "edit history", "delete", "attachments", "rate limit"]
+        },
+        {
+            label: "Files from Drive", // i18n-ignore
+            href: "/files",
+            adminOnly: true,
+            icon: FolderOpen,
+            keywords: ["drive", "attachments", "share", "storage"]
+        },
+        {
+            label: "Organizations", // i18n-ignore
+            href: "/organizations",
+            adminOnly: true,
+            icon: Building2,
+            keywords: ["org chat", "teams", "isolation"]
+        },
+        {
+            label: "Links", // i18n-ignore
+            href: "/links",
+            adminOnly: true,
+            icon: ShieldCheck,
+            keywords: ["links", "phishing", "malware", "previews"]
+        },
+        {
+            label: "Calls", // i18n-ignore
+            href: "/calls",
+            adminOnly: true,
+            icon: Video,
+            keywords: ["call server", "video calls", "meetings"]
+        }
+    ]
+};
+
+/** The app id in a path under Polaris apps (`/admin/apps/<id>/...`), or null. */
+export function adminAppIdForPath(pathname: string): string | null {
+    if (!pathname.startsWith(`${ADMIN_APPS_BASE}/`)) return null;
+    const id = pathname.slice(ADMIN_APPS_BASE.length + 1).split("/")[0] ?? "";
+    return id ? decodeURIComponent(id) : null;
+}
+
+/**
+ * One app's administrator screens as a rail of their own: its details and its
+ * settings, and for a built-in app with several settings screens, each of
+ * them. Back goes to Polaris apps. Named by the catalogue's label where the app
+ * is one of Polaris's own, and by its id otherwise - the rail is drawn from the
+ * path alone, and the app's own name is on the page it opens.
+ */
+export function adminAppSubapp(id: string): AppSubapp {
+    const base = `${ADMIN_APPS_BASE}/${encodeURIComponent(id)}`;
+    const settings = `${base}/settings`;
+    const entry = POLARIS_APPS.find((app) => app.id === id);
+    const screens = ADMIN_APP_SCREENS[id];
+    const sections: AppSection[] = [
+        ...(ADMIN_BUILT_IN_APPS.has(id)
+            ? []
+            : [
+                  {
+                      label: "Details", // i18n-ignore
+                      href: base,
+                      adminOnly: true,
+                      icon: Store,
+                      keywords: ["version", "uninstall", "about"]
+                  }
+              ]),
+        ...(screens
+            ? screens.map((screen) => ({ ...screen, href: `${settings}${screen.href}` }))
+            : [
+                  {
+                      label: "Settings", // i18n-ignore
+                      href: settings,
+                      adminOnly: true,
+                      icon: Settings,
+                      keywords: ["defaults", "configuration"]
+                  }
+              ])
+    ];
+    return {
+        id: `admin-app:${id}`,
+        label: entry?.label ?? id,
+        icon: entry?.icon ?? Store,
+        base,
+        parent: { label: "Polaris apps", href: ADMIN_APPS_BASE }, // i18n-ignore
+        parentAppId: "admin",
+        sections
+    };
+}
+
 /** Where an organization's own screens live. */
 export const ORG_BASE = "/account/organizations";
 
@@ -3492,6 +3594,8 @@ export function orgSlugForPath(pathname: string): string | null {
 export function resolveSubapp(pathname: string): AppSubapp | null {
     const slug = orgSlugForPath(pathname);
     if (slug) return orgSubapp(slug);
+    const adminApp = adminAppIdForPath(pathname);
+    if (adminApp) return adminAppSubapp(adminApp);
     return (
         APP_SUBAPPS.find((sub) =>
             [sub.base, ...(sub.match ?? [])].some(

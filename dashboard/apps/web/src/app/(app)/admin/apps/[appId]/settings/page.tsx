@@ -13,7 +13,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { builtInHasSettings } from "@/lib/apps/app-settings";
-import { ChatAdminSettings } from "./_chat/chat-settings";
+import { ChatSettingsPage } from "./_chat/chat-screen";
 import { PolarAdminSettings } from "./_polar/polar-settings";
 import { Suspense } from "react";
 import { PageHeader, Skeleton } from "@polaris/ui";
@@ -85,28 +85,9 @@ async function AppOwnSettings({
 }
 
 async function BuiltInSettings({ appId }: { appId: string }) {
-    const [t, admin] = await Promise.all([
-        getTranslations("marketplace"),
-        getTranslations("admin")
-    ]);
     if (appId === "polar") return <PolarSettings />;
     if (appId !== "chat") notFound();
-    return (
-        <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-4">
-            <Link
-                href="/admin/apps"
-                className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
-            >
-                <ArrowLeft className="size-4" />
-                {t("polaris.title")}
-            </Link>
-            <PageHeader
-                title={admin("chat.page.title")}
-                description={admin("chat.page.description")}
-            />
-            <ChatAdminSettings />
-        </div>
-    );
+    return <ChatSettingsPage screen="" />;
 }
 
 /** Polar's: the header now, the settings when they are read. */
