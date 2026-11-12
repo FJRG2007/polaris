@@ -33,6 +33,26 @@ describe("lastMessages", () => {
         expect([...found.keys()]).toEqual(["c1", "c2"]);
         expect(found.get("c1")).toMatchObject({ body: "hello", receipts: false });
     });
+
+    it("reads as plain text, never the stored Markdown", async () => {
+        const link = "https://polaris.example.com/some/page";
+        queryRaw.mockResolvedValue([
+            { ...row, body: `look [${link}](${link})` },
+            { ...row, channelId: "c2", body: "**bold** and `code`\n\n- one" },
+            { ...row, channelId: "c3", body: "", deleted: true }
+        ]);
+        const found = await lastMessages(["c1", "c2", "c3"]);
+        expect(found.get("c1")?.body).toBe(`look ${link}`);
+        expect(found.get("c2")?.body).toBe("bold and code one");
+        expect(found.get("c3")?.body).toBe("");
+    });
+
+    it("cuts a long message to one row's worth", async () => {
+        queryRaw.mockResolvedValue([{ ...row, body: "word ".repeat(200) }]);
+        const body = (await lastMessages(["c1"])).get("c1")?.body ?? "";
+        expect(body.length).toBeLessThanOrEqual(163);
+        expect(body.endsWith("...")).toBe(true);
+    });
 });
 
 describe("withReceipt", () => {

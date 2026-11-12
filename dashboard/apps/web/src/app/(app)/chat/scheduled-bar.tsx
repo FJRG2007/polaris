@@ -19,6 +19,7 @@ import { useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
+import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { CalendarClock, SendHorizontal, Trash2 } from "lucide-react";
 import {
     Button,
@@ -31,7 +32,7 @@ import {
 
 /** What a waiting message says it is, when it is only files. */
 function summarize(entry: ScheduledMessageView): string {
-    const text = entry.body.trim();
+    const text = plainExcerpt(entry.body, 160);
     if (text) return text;
     if (entry.files.length === 1) return entry.files[0]!.name;
     return `${entry.files.length} files`;

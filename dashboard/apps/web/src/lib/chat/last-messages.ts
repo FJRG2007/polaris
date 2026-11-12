@@ -1,11 +1,14 @@
 import { prisma } from "@polaris/db";
 import type { MessageReceipt } from "@polaris/core";
+import { plainExcerpt } from "@/components/rich-text/excerpt";
 
 /** The newest top-level message in a conversation, as its row in the list shows it. */
 export interface ChatLastMessage {
     readonly authorId: string | null;
     readonly kind: string;
-    /** Cut short: the row shows one line of it. Empty for a deleted message. */
+    /** Plain text, cut short: the row shows one line of it. Never the stored
+     *  Markdown - a link read `[https://...](https://...)` in the list. Empty
+     *  for a deleted message. */
     readonly body: string;
     readonly at: string;
     /** Whether the ticks may be drawn at all: the reader's own message in a
@@ -34,6 +37,13 @@ interface Row {
 const PREVIEW_CHARS = 160;
 
 /**
+ * How much of the stored Markdown is read to make that line. More than the line
+ * itself, since the marks around a link or a code block take room and a cut
+ * through the middle of one would leave half of it showing as text.
+ */
+const SOURCE_CHARS = 2000;
+
+/**
  * The last message of each conversation, in one round trip.
  *
  * One lateral lookup per id, each answered from the
@@ -52,7 +62,7 @@ export async function lastMessages(
     if (channelIds.length === 0) return new Map();
     const rows = await prisma.$queryRaw<Row[]>`
         SELECT c.id::text AS "channelId", m."authorId"::text AS "authorId", m.kind,
-               CASE WHEN m."deletedAt" IS NULL THEN left(m.body, ${PREVIEW_CHARS}::int) ELSE '' END AS body,
+               CASE WHEN m."deletedAt" IS NULL THEN left(m.body, ${SOURCE_CHARS}::int) ELSE '' END AS body,
                m."createdAt", m."deliveredAt" IS NOT NULL AS delivered,
                m."readAt" IS NOT NULL AS read, m."deletedAt" IS NOT NULL AS deleted
         FROM unnest(${[...channelIds]}::uuid[]) AS c(id)
@@ -69,7 +79,7 @@ export async function lastMessages(
             {
                 authorId: row.authorId,
                 kind: row.kind,
-                body: row.body,
+                body: row.deleted ? "" : plainExcerpt(row.body, PREVIEW_CHARS),
                 at: row.createdAt.toISOString(),
                 receipts: false,
                 delivered: row.delivered,

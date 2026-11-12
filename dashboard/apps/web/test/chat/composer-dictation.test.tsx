@@ -144,20 +144,32 @@ function toolbar(): string[] {
 }
 
 describe("the toolbar", () => {
-    it("shows every attach button in its place, with no + menu", async () => {
+    it("shows one attach button, with no + menu and no separate photo button", async () => {
         withRecorder();
         chatBox();
         await screen.findByRole("button", { name: "Record a voice message" });
         const names = toolbar();
-        const order = [
-            "Attach a file",
-            "Send a photo or video",
-            "Record a voice message",
-            "Microphone settings",
-            "Create a poll"
-        ];
+        const order = ["Attach a file", "Create a poll", "Record a voice message", "Microphone settings"];
         expect(names.filter((name) => order.includes(name))).toEqual(order);
+        expect(screen.queryByRole("button", { name: "Send a photo or video" })).toBeNull();
         expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+    });
+
+    it("puts the voice message where Send is while there is nothing to send", async () => {
+        withRecorder();
+        chatBox();
+        await screen.findByRole("button", { name: "Record a voice message" });
+        // Sending later sits behind Send, so it is not offered for an empty box.
+        expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "More ways to send" })).toBeNull();
+    });
+
+    it("brings Send back, and takes the voice message away, once there is text", async () => {
+        withRecorder();
+        keepDraft(KEY, "already written");
+        chatBox();
+        await screen.findByRole("button", { name: "Send" });
+        expect(screen.queryByRole("button", { name: "Record a voice message" })).toBeNull();
     });
 
     it("keeps only the poll where files are not allowed", () => {

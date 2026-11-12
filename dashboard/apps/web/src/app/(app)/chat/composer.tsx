@@ -68,12 +68,10 @@ import {
 } from "./voice-recorder";
 import {
     BarChart3,
-    Camera,
     ChevronDown,
     CornerUpLeft,
     Eye,
     EyeOff,
-    Image as ImageIcon,
     Mic,
     MicOff,
     Paperclip,
@@ -414,8 +412,6 @@ export function Composer({
     // promise the room cannot keep.
     const mayAttach = attachable && rules.maxAttachments > 0;
     const [dragging, setDragging] = useState(false);
-    const gallery = useRef<HTMLInputElement>(null);
-    const camera = useRef<HTMLInputElement>(null);
     // Whether this is something held in a hand, which is the only place a camera
     // button belongs: `capture` on a laptop opens the same file dialog as every
     // other picker, so the button would be a second paperclip wearing a camera.
@@ -680,6 +676,7 @@ export function Composer({
     // than of the stored source. Spaces and line breaks alone are not a message,
     // and they do not always serialize to an empty string.
     const blank = useMemo(() => isBlankMarkdown(body), [body]);
+    const voiceFirst = mayAttach && recordable && !inCall && blank && files.length === 0;
 
     const staged = files.length > 0 || kept.length > 0 || scheduleBusy || pollBusy;
     useEffect(() => (staged ? holdReload() : undefined), [staged]);
@@ -1039,13 +1036,6 @@ export function Composer({
         setRefused(notes.join(" "));
         if (accepted.length > 0) setFiles((current) => [...current, ...accepted]);
         return accepted.length;
-    };
-
-    /** What every picker does with what came back. Cleared afterwards so
-     *  choosing the same file twice in a row still fires a change. */
-    const picked = (event: React.ChangeEvent<HTMLInputElement>): void => {
-        stage(event.target.files);
-        event.target.value = "";
     };
 
     const announce = () => {
@@ -1459,51 +1449,6 @@ export function Composer({
                                     <Paperclip className="size-4" />
                                 </button>
                             )}
-                            {/* A picture is most of what anybody sends, and
-                                finding it through a file dialog that offers
-                                every document on the device is the long way
-                                round. Filtered to images and video, which is
-                                what a phone answers with its gallery. */}
-                            {mayAttach && (
-                                <button
-                                    type="button"
-                                    disabled={disabled || files.length >= rules.maxAttachments}
-                                    onClick={() => gallery.current?.click()}
-                                    aria-label={t("composer.sendAPhotoOrVideo")}
-                                    title={t("composer.photoOrVideo")}
-                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                                >
-                                    <ImageIcon className="size-4" />
-                                </button>
-                            )}
-                            {/* Straight to the camera, on the devices that have
-                                one worth opening. The picture is staged like any
-                                other so it can still be thought better of. */}
-                            {mayAttach && handheld && (
-                                <button
-                                    type="button"
-                                    disabled={disabled || files.length >= rules.maxAttachments}
-                                    onClick={() => camera.current?.click()}
-                                    aria-label={t("composer.takeAPhotoOrVideo")}
-                                    title={t("composer.camera")}
-                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                                >
-                                    <Camera className="size-4" />
-                                </button>
-                            )}
-                            {/* Only where a file may be sent at all, since a
-                                recording is one - and only in a browser that can
-                                record, rather than as a button that apologises
-                                when it is pressed. */}
-                            {mayAttach && recordable && !inCall && (
-                                <MicButton
-                                    disabled={disabled || files.length >= rules.maxAttachments}
-                                    onStart={() => {
-                                        dictation.stop();
-                                        voice.start();
-                                    }}
-                                />
-                            )}
                             {/* Beside the microphone, because it is the same
                                 offer one step further: some things are faster
                                 said than typed, and some are faster shown than
@@ -1632,8 +1577,25 @@ export function Composer({
                                         }
                                     />
                                 )}
-                                {/* Sending later and putting it aside are behind
-                                    the chevron - see `SendButton`. */}
+                                {/* The microphone stands where Send does while
+                                    there is nothing to send, and Send comes back
+                                    with the first character or file - one button
+                                    that is always the next thing to do, rather
+                                    than two side by side with one of them dead.
+                                    Only where a file may be sent at all, since a
+                                    recording is one, and only in a browser that
+                                    can record. Sending later and putting it aside
+                                    are behind Send's chevron - see `SendButton` -
+                                    so neither is offered with nothing to send. */}
+                                {voiceFirst ? (
+                                    <MicButton
+                                        disabled={disabled}
+                                        onStart={() => {
+                                            dictation.stop();
+                                            voice.start();
+                                        }}
+                                    />
+                                ) : (
                                 <SendButton
                                     disabled={disabled || tooLong || (blank && files.length === 0)}
                                     onSend={() => void submit(body)}
@@ -1654,35 +1616,13 @@ export function Composer({
                                               : undefined
                                     }
                                 />
+                                )}
                             </>
                         )}
                     </span>
                 </div>
             </div>
 
-            {/* The phone's own gallery and camera, which only the browser's
-                chooser opens - everything else goes through the shared picker.
-                Two inputs rather than one that is reconfigured: setting
-                `accept` and `capture` on the way to a click is a change the
-                browser is not obliged to have applied by the time the dialog
-                opens, and on a phone that is the difference between the gallery
-                and the camera. */}
-            <input
-                ref={gallery}
-                type="file"
-                multiple
-                accept="image/*,video/*"
-                className="hidden"
-                onChange={picked}
-            />
-            <input
-                ref={camera}
-                type="file"
-                accept="image/*,video/*"
-                capture="environment"
-                className="hidden"
-                onChange={picked}
-            />
 
             {/* Mounted only while it is open, so the dialog reads the clock at
                 the moment it is asked rather than at the moment the composer was
@@ -1705,6 +1645,8 @@ export function Composer({
 
             {picking && (
                 <FilePickerDialog
+                    // Most of what is attached comes straight off the device.
+                    initialTab="upload"
                     title={t("composer.attachToThisMessage")}
                     onClose={() => setPicking(false)}
                     onPick={(picked) => void takePicked(picked)}
