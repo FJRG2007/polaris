@@ -102,9 +102,10 @@ FROM deps AS builder
 # does not clobber the installed dependencies above).
 COPY . .
 
-# Generate the Prisma client (output: packages/db/generated/client) and build
-# all packages, then the app. `npm run build` fans out across the workspaces.
-RUN npm run db:generate
+# Build all packages, then the app. `npm run build` fans out across the
+# workspaces, and @polaris/db's own build generates the Prisma client (output:
+# packages/db/generated/client) before any package that depends on it starts, so
+# a separate `db:generate` step here only ran the generator twice.
 # Extra heap for the Next build, passed by CI where the runner has the memory for
 # it (the default ~4 GB is what the app build now peaks at). Empty on an
 # operator's machine, which keeps Node's own limit for the RAM that box has.
