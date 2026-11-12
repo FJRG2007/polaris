@@ -4,6 +4,7 @@ import { chat } from "./chat";
 import {
     chatChannelSettings,
     chatDirect,
+    chatGroup,
     chatMedia,
     chatPoll,
     chatPrivacy,
@@ -48,6 +49,7 @@ export const SCENES: readonly SceneDefinition[] = [
     chatMedia,
     chatPoll,
     chatDirect,
+    chatGroup,
     chatChannelSettings,
     chatRules,
     chatPrivacy,

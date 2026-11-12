@@ -76,6 +76,14 @@ Conversaciones de uno a uno y de grupo, con marcas de leído y entregado. El
 panel de perfil muestra la biografía, los pronombres, los amigos y espacios en
 común, y la decoración y el banner de esa persona.
 
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/chat-group-light-es-desktop.webp">
+  <img src="../assets/media/chat-group-dark-es-desktop.webp" alt="Una conversación de grupo de cuatro personas con sus miembros al lado">
+</picture>
+
+Una conversación de grupo muestra a sus miembros junto a los mensajes, y
+cualquiera en ella puede llamar a todo el grupo o añadir a alguien más.
+
 ## Ajustes del canal
 
 <picture>

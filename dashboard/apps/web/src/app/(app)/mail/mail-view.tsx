@@ -1301,7 +1301,7 @@ export function MailView({
                       act(
                           onRow.starred ? "unstar" : "star",
                           rowMessageIds,
-                          onRow.starred ? "Unstarred." : "Starred."
+                          onRow.starred ? t("thread.announce.unstarred") : t("thread.announce.starred")
                       );
                   },
                   markUnread: () => act("unread", rowMessageIds, t("thread.announce.unread")),
@@ -1903,8 +1903,8 @@ export function MailView({
                                                     shown(thread).starred ? "unstar" : "star",
                                                     [thread.leadMessageId],
                                                     shown(thread).starred
-                                                        ? "Unstarred."
-                                                        : "Starred."
+                                                        ? t("thread.announce.unstarred")
+                                                        : t("thread.announce.starred")
                                                 )
                                             }
                                         />

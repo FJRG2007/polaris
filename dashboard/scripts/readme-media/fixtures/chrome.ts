@@ -37,7 +37,9 @@ export function chromeActions(): Record<string, ActionFixture> {
         presenceNowAction: () => ({
             held: { choice: "online", until: null },
             status: { text: "", until: null }
-        })
+        }),
+        // Chat asks whether any conversation is locked; nobody here locked one.
+        lockStateAction: () => ({ hasCode: false, hideLocked: false, unlockMinutes: 5, codeLength: null })
     };
 }
 
@@ -83,6 +85,8 @@ export function chromeApi(ctx: SceneContext): Record<string, ApiFixture> {
         "POST /api/avatar/access": ({ body }) => ({
             allowed: (body as { ids?: string[] } | null)?.ids ?? []
         }),
+        // Nobody here wears a name tag.
+        "POST /api/profile/name-tags": () => ({ tags: {} }),
         "GET /api/mail/arrivals": () => ({
             cursor: new Date(ctx.now).toISOString(),
             named: [],

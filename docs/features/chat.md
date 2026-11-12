@@ -73,6 +73,14 @@ One-to-one and group conversations, with read and delivered ticks. The profile
 panel shows the person's bio, pronouns, the friends and spaces you share, and
 their decoration and banner.
 
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/chat-group-light-en-desktop.webp">
+  <img src="../assets/media/chat-group-dark-en-desktop.webp" alt="A group conversation of four people with its members beside it">
+</picture>
+
+A group conversation lists its members beside the messages, and anybody in it
+can call the whole group or add somebody else.
+
 ## Channel settings
 
 <picture>

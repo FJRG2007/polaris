@@ -786,6 +786,25 @@ export function groupConversation(ctx: SceneContext): ChatMessageView[] {
                 "Llamo ahora. Alex, ¿lo grabas para Yuki?"
             ),
             at
+        ),
+        message(
+            ctx,
+            73,
+            CREW.mateo,
+            9,
+            say("On the train, joining with audio only.", "En el tren, entro solo con audio."),
+            at
+        ),
+        message(
+            ctx,
+            74,
+            VIEWER,
+            3,
+            say(
+                "Recording. Yuki, the link will be here after.",
+                "Grabando. Yuki, el enlace estará aquí después."
+            ),
+            { ...at, receipt: "read" }
         )
     ];
 }
@@ -849,7 +868,11 @@ export function profileOf(ctx: SceneContext, userId: string): ChatProfile {
             }
         },
         role: null,
-        restricted: false
+        restricted: false,
+        badges: [],
+        recent: null,
+        memberSince: new Date(ctx.now - 400 * 24 * 60 * 60 * 1000).toISOString(),
+        friendship: "friends"
     };
 }
 
