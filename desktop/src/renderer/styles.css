@@ -685,3 +685,8 @@ button.icon svg {
         animation: none;
     }
 }
+
+.switch:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

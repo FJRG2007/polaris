@@ -47,12 +47,12 @@ await build({
     minify: true,
     logLevel: "info",
     legalComments: "none",
-    entryPoints: ["connect", "api-key", "push", "tv", "usb", "overlay", "updating"].map((page) => join(ROOT, "src/renderer", `${page}.ts`)),
+    entryPoints: ["connect", "api-key", "push", "tv", "usb", "overlay", "voice-widget", "updating"].map((page) => join(ROOT, "src/renderer", `${page}.ts`)),
     outdir: join(DIST, "renderer")
 });
 
 mkdirSync(join(DIST, "renderer"), { recursive: true });
-for (const file of ["connect.html", "api-key.html", "push.html", "tv.html", "usb.html", "overlay.html", "updating.html", "styles.css", "mark.svg"]) {
+for (const file of ["connect.html", "api-key.html", "push.html", "tv.html", "usb.html", "overlay.html", "voice-widget.html", "updating.html", "styles.css", "mark.svg"]) {
     copyFileSync(join(ROOT, "src/renderer", file), join(DIST, "renderer", file));
 }
 // The window icon on Linux - Windows and macOS take theirs from the executable -

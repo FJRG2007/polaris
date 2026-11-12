@@ -53,7 +53,14 @@ const settingsSchema = z.object({
     minimizeToTray: z.boolean().catch(true),
     // Off unless somebody turned it on: opened with the computer, it stays in
     // the tray instead of putting a window in front of everything.
-    startMinimized: z.boolean().catch(false)
+    startMinimized: z.boolean().catch(false),
+    // On unless somebody turned it off: the call's people over every window
+    // while a call is on.
+    voiceWidget: z.boolean().catch(true),
+    // Off unless somebody turned it on: the widget only while a game runs.
+    voiceWidgetGameOnly: z.boolean().catch(false),
+    // Where the widget was dragged to, or null for its corner.
+    voiceWidgetPlace: z.object({ x: z.number().int(), y: z.number().int() }).nullable().catch(null)
 });
 
 type Settings = z.infer<typeof settingsSchema>;
@@ -67,7 +74,10 @@ const EMPTY: Settings = {
     openAtLogin: true,
     hardwareAcceleration: true,
     minimizeToTray: true,
-    startMinimized: false
+    startMinimized: false,
+    voiceWidget: true,
+    voiceWidgetGameOnly: false,
+    voiceWidgetPlace: null
 };
 
 function file(): string {
@@ -160,7 +170,7 @@ export function rememberHardwareAcceleration(on: boolean): void {
 }
 
 /** The switches kept as they are and read when they matter. */
-export const TOGGLES = ["minimizeToTray", "startMinimized"] as const;
+export const TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly"] as const;
 
 export type Toggle = (typeof TOGGLES)[number];
 
@@ -170,6 +180,15 @@ export function toggle(name: Toggle): boolean {
 
 export function rememberToggle(name: Toggle, on: boolean): void {
     save({ ...load(), [name]: on });
+}
+
+/** Where the voice widget was dragged to, or null for its corner. */
+export function voiceWidgetPlace(): { x: number; y: number } | null {
+    return load().voiceWidgetPlace;
+}
+
+export function rememberVoiceWidgetPlace(place: { x: number; y: number }): void {
+    save({ ...load(), voiceWidgetPlace: place });
 }
 
 /** What was used the last time this service was pushed from here. */

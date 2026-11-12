@@ -71,6 +71,27 @@ export function holdsCall(contents: WebContents): boolean {
     return holder === contents && !contents.isDestroyed();
 }
 
+/**
+ * Hold one key system-wide for `press`. Answers the way to let it go, or null
+ * when another program already holds it.
+ */
+export function holdGlobalKey(accelerator: string, press: () => void): (() => void) | null {
+    let ok = false;
+    try {
+        ok = globalShortcut.register(accelerator, press);
+    } catch {
+        ok = false;
+    }
+    if (!ok) return null;
+    return () => {
+        try {
+            globalShortcut.unregister(accelerator);
+        } catch {
+            // Already gone with the app.
+        }
+    };
+}
+
 /** Let every key go, as the app quits. */
 export function releaseCallHotkeys(): void {
     release();

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+        />
+        <title>Voice - Polaris</title>
+        <style>
+            html,
+            body {
+                margin: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background: transparent;
+                font: 13px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
+                color: #f4f4f6;
+                user-select: none;
+            }
+            #panel {
+                box-sizing: border-box;
+                height: 100%;
+                padding: 8px;
+                border-radius: 10px;
+                background: rgba(11, 12, 14, 0.55);
+                display: flex;
+                flex-direction: column;
+            }
+            #panel.unlocked {
+                background: rgba(11, 12, 14, 0.85);
+                outline: 1px dashed rgba(255, 255, 255, 0.35);
+                outline-offset: -1px;
+                -webkit-app-region: drag;
+            }
+            .row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                height: 34px;
+                min-width: 0;
+            }
+            .face {
+                flex: none;
+                width: 26px;
+                height: 26px;
+                border-radius: 50%;
+                display: grid;
+                place-items: center;
+                font-size: 11px;
+                font-weight: 600;
+                color: #fff;
+                box-shadow: 0 0 0 2px transparent;
+                transition: box-shadow 80ms linear;
+            }
+            .face.speaking {
+                box-shadow: 0 0 0 2px #3ba55d;
+            }
+            .name {
+                flex: 1 1 auto;
+                min-width: 0;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+            }
+            .state {
+                flex: none;
+                display: flex;
+                gap: 2px;
+                color: #ed4245;
+            }
+            svg {
+                width: 14px;
+                height: 14px;
+                flex: none;
+                fill: none;
+                stroke: currentColor;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+            }
+            .more {
+                height: 22px;
+                font-size: 12px;
+                opacity: 0.75;
+            }
+            #controls {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                height: 44px;
+                padding-top: 6px;
+                box-sizing: border-box;
+            }
+            #controls[hidden] {
+                display: none;
+            }
+            button {
+                -webkit-app-region: no-drag;
+                display: grid;
+                place-items: center;
+                width: 32px;
+                height: 32px;
+                border: 0;
+                border-radius: 8px;
+                background: rgba(255, 255, 255, 0.12);
+                color: #f4f4f6;
+                cursor: pointer;
+            }
+            button:hover {
+                background: rgba(255, 255, 255, 0.22);
+            }
+            button.on {
+                color: #ed4245;
+            }
+            button.leave {
+                background: #da373c;
+            }
+            button svg {
+                width: 16px;
+                height: 16px;
+            }
+            .hint {
+                flex: 1 1 auto;
+                min-width: 0;
+                text-align: right;
+                font-size: 11px;
+                opacity: 0.7;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="panel">
+            <div id="people"></div>
+            <div id="controls" hidden>
+                <button id="mic" type="button"></button>
+                <button id="deafen" type="button"></button>
+                <button id="leave" class="leave" type="button"></button>
+                <span id="lock-hint" class="hint"></span>
+            </div>
+        </div>
+        <script src="voice-widget.js"></script>
+    </body>
+</html>

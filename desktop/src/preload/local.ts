@@ -9,6 +9,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { readUpdateCheck } from "@/shared/update-check";
 import type { StrokeInput } from "@/shared/annotate";
+import type { WidgetView } from "@/shared/voice-widget";
 import { CHANNELS, type PolarisLocal, type PushEvent, type TvInstallState } from "@/shared/bridge";
 
 const bridge: PolarisLocal = {
@@ -65,6 +66,14 @@ const bridge: PolarisLocal = {
             ipcRenderer.on(CHANNELS.overlayStroke, handler);
             return () => ipcRenderer.removeListener(CHANNELS.overlayStroke, handler);
         }
+    },
+    voiceWidget: {
+        onView: (listener) => {
+            const handler = (_event: IpcRendererEvent, view: WidgetView | null) => listener(view);
+            ipcRenderer.on(CHANNELS.widgetView, handler);
+            return () => ipcRenderer.removeListener(CHANNELS.widgetView, handler);
+        },
+        act: (action) => ipcRenderer.invoke(CHANNELS.widgetAction, action)
     }
 };
 

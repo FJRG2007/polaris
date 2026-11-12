@@ -39,7 +39,9 @@ const openAtLogin = byId<HTMLInputElement>("open-at-login");
 const hardwareAcceleration = byId<HTMLInputElement>("hardware-acceleration");
 const toggles = {
     minimizeToTray: byId<HTMLInputElement>("minimize-to-tray"),
-    startMinimized: byId<HTMLInputElement>("start-minimized")
+    startMinimized: byId<HTMLInputElement>("start-minimized"),
+    voiceWidget: byId<HTMLInputElement>("voice-widget"),
+    voiceWidgetGameOnly: byId<HTMLInputElement>("voice-widget-game-only")
 } as const;
 const restartDialog = byId<HTMLDialogElement>("confirm-restart");
 const restartFailure = byId<HTMLParagraphElement>("restart-failure");
@@ -334,16 +336,22 @@ openAtLogin.addEventListener("change", () => {
             say(failure, "Polaris could not change this on this computer.");
         });
 });
+/** "Only while a game is running" means nothing with the widget off. */
+function followVoiceWidget(): void {
+    toggles.voiceWidgetGameOnly.disabled = !toggles.voiceWidget.checked;
+}
 for (const [name, input] of Object.entries(toggles) as [keyof typeof toggles, HTMLInputElement][]) {
     input.addEventListener("change", () => {
         const wanted = input.checked;
         say(failure, null);
+        followVoiceWidget();
         void window.polarisLocal.connect
             .setToggle(name, wanted)
             .catch(() => false)
             .then((kept) => {
                 if (kept) return;
                 input.checked = !wanted;
+                followVoiceWidget();
                 say(failure, "Polaris could not save this setting. Try again.");
             });
     });
@@ -390,6 +398,9 @@ void window.polarisLocal.connect.preferences().catch(() => null).then((preferenc
     hardwareAcceleration.checked = preferences.hardwareAcceleration;
     toggles.minimizeToTray.checked = preferences.minimizeToTray;
     toggles.startMinimized.checked = preferences.startMinimized;
+    toggles.voiceWidget.checked = preferences.voiceWidget;
+    toggles.voiceWidgetGameOnly.checked = preferences.voiceWidgetGameOnly;
+    followVoiceWidget();
     restartPending.hidden = !preferences.restartPending;
     byId("version").textContent = `Polaris ${preferences.version}`;
 });

@@ -25,6 +25,7 @@ import { useCall } from "./use-call";
 import { CallAudio } from "./call-audio";
 import { Button, cn, useShortcutHint, useToast } from "@polaris/ui";
 import { useCallHotkeys } from "./call-hotkeys";
+import { useDesktopVoiceWidget } from "./desktop-voice-widget";
 import { useCallRecorder } from "./call-recorder";
 import { useCallRemote } from "./call-remote-hook";
 import { useChatStream } from "./use-chat-stream";
@@ -98,6 +99,8 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
     }, []);
     // A deck key's mute, camera, record or hang-up, done in this tab.
     useCallRemote(session?.meetingId ?? null, call, recording, leave);
+    // The desktop app's voice widget, over every window while the call is on.
+    useDesktopVoiceWidget(call, session !== null, leave);
 
     /**
      * Everybody's face, asked again, the moment this browser joins or leaves.

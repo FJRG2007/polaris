@@ -12,6 +12,7 @@ import { followTitleBarColors } from "@/shared/title-bar";
 import { readUpdateReady } from "@/shared/update-ready";
 import { readUpdateCheck } from "@/shared/update-check";
 import type { CallHotkey } from "@/shared/call-hotkeys";
+import type { VoiceAction } from "@/shared/voice-widget";
 import {
     CHANNELS,
     VERSION_ARGUMENT,
@@ -84,6 +85,14 @@ const bridge: PolarisDesktop = {
         ipcRenderer.on(CHANNELS.callHotkey, heard);
         return () => {
             ipcRenderer.removeListener(CHANNELS.callHotkey, heard);
+        };
+    },
+    setVoiceState: (state) => ipcRenderer.invoke(CHANNELS.voiceState, state),
+    onVoiceAction: (listener) => {
+        const heard = (_event: unknown, action: VoiceAction) => listener(action);
+        ipcRenderer.on(CHANNELS.voiceAction, heard);
+        return () => {
+            ipcRenderer.removeListener(CHANNELS.voiceAction, heard);
         };
     },
     openServers: () => ipcRenderer.invoke(CHANNELS.openServers),

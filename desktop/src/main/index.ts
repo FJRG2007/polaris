@@ -21,6 +21,7 @@
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
 import { holdsCall, releaseCallHotkeys } from "./call-hotkeys";
+import { closeVoiceWidget, refreshVoiceWidget, setVoiceWidgetGame } from "./voice-widget";
 import { DEEP_LINK_SCHEME, deepLinkIn, readDeepLink } from "@/shared/deep-link";
 import { DeepLinks } from "./deep-links";
 import { registerMailHandler } from "./mail-handler";
@@ -75,6 +76,7 @@ let loadError: string | null = null;
  * soon as it asks (`gameCurrent`).
  */
 const games = new GameWatcher((game) => {
+    setVoiceWidgetGame(game !== null);
     if (main && !main.isDestroyed()) main.webContents.send(CHANNELS.gameActivity, game);
 });
 
@@ -676,6 +678,8 @@ function start(): void {
                     restartPending: hardwareAcceleration !== accelerated,
                     minimizeToTray: settings.toggle("minimizeToTray"),
                     startMinimized: settings.toggle("startMinimized"),
+                    voiceWidget: settings.toggle("voiceWidget"),
+                    voiceWidgetGameOnly: settings.toggle("voiceWidgetGameOnly"),
                     version: app.getVersion()
                 };
             },
@@ -690,6 +694,7 @@ function start(): void {
             },
             setToggle: (name, on) => {
                 settings.rememberToggle(name, on);
+                refreshVoiceWidget();
                 return true;
             },
             relaunch: () => {
@@ -833,7 +838,10 @@ function start(): void {
     });
 
     // Keys held system-wide are the operating system's until let go.
-    app.on("will-quit", () => releaseCallHotkeys());
+    app.on("will-quit", () => {
+        releaseCallHotkeys();
+        closeVoiceWidget();
+    });
 
     // An update closes every window before it quits, and none may stay in the tray.
     autoUpdater.on("before-quit-for-update", () => {

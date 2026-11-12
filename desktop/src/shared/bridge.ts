@@ -21,6 +21,7 @@ import type { InstallRequest, InstallResult } from "./install-tools";
 import type { UpdateReady } from "./update-ready";
 import type { UpdateCheck } from "./update-check";
 import type { CallHotkey, CallHotkeysInput, CallHotkeysResult } from "./call-hotkeys";
+import type { VoiceAction, VoiceState, WidgetView } from "./voice-widget";
 
 export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly error: string; };
 
@@ -125,6 +126,11 @@ export interface PolarisDesktop {
     setCallHotkeys(input: CallHotkeysInput): Promise<CallHotkeysResult>;
     /** Hear one of those keys pressed. Answers the way to stop. */
     onCallHotkey(listener: (which: CallHotkey) => void): () => void;
+    /** Who is in the call and who is speaking, for the voice widget; null once
+     *  the call ends. Whether the app took it. */
+    setVoiceState(state: VoiceState): Promise<boolean>;
+    /** Hear a press on the voice widget's buttons. Answers the way to stop. */
+    onVoiceAction(listener: (action: VoiceAction) => void): () => void;
     /** Open the app's window for adding and switching servers. */
     openServers(): Promise<void>;
     /** Open Windows' Default apps at Polaris, where it can be picked for mailto
@@ -255,11 +261,17 @@ export interface Preferences {
     readonly minimizeToTray: boolean;
     /** Opened with the computer, it starts in the tray. */
     readonly startMinimized: boolean;
+    /** The call's people over every window while a call is on. */
+    readonly voiceWidget: boolean;
+    /** That widget only while a game is running. */
+    readonly voiceWidgetGameOnly: boolean;
     readonly version: string;
 }
 
 /** The switches the settings window keeps with one call. */
-export type PreferenceToggle = "minimizeToTray" | "startMinimized";
+export const PREFERENCE_TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly"] as const;
+
+export type PreferenceToggle = (typeof PREFERENCE_TOGGLES)[number];
 
 export interface PolarisLocal {
     readonly connect: {
@@ -311,6 +323,10 @@ export interface PolarisLocal {
     readonly tv: TvInstallBridge;
     readonly overlay: {
         onStroke(listener: (stroke: StrokeInput) => void): () => void;
+    };
+    readonly voiceWidget: {
+        onView(listener: (view: WidgetView | null) => void): () => void;
+        act(action: VoiceAction): Promise<boolean>;
     };
 }
 
@@ -493,6 +509,10 @@ export const CHANNELS = {
     systemIdle: "desktop:system-idle",
     callHotkeys: "desktop:call-hotkeys",
     callHotkey: "desktop:call-hotkey",
+    voiceState: "desktop:voice-state",
+    voiceAction: "desktop:voice-action",
+    widgetView: "desktop:widget-view",
+    widgetAction: "desktop:widget-action",
     openServers: "desktop:open-servers",
     openMailDefaults: "desktop:open-mail-defaults",
     appBadge: "desktop:app-badge",

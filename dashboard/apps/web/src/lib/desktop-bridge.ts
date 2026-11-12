@@ -116,6 +116,20 @@ export interface DesktopTv {
     onState(listener: (state: DesktopTvState) => void): () => void;
 }
 
+/** What the desktop app's voice widget draws: the call's people and the
+ *  reader's own mute and deafen. */
+export interface DesktopVoiceState {
+    readonly participants: readonly {
+        readonly id: string;
+        readonly name: string;
+        readonly speaking: boolean;
+        readonly muted: boolean;
+        readonly deafened: boolean;
+    }[];
+    readonly selfMuted: boolean;
+    readonly selfDeafened: boolean;
+}
+
 export interface PolarisDesktop {
     readonly version: string;
     /** Absent on an app older than Polaris TV. */
@@ -220,6 +234,11 @@ export interface PolarisDesktop {
     ): Promise<{ readonly mic: boolean; readonly deafen: boolean }>;
     /** Hear one of those keys pressed. Answers the way to stop. */
     onCallHotkey?(listener: (which: "mic" | "deafen") => void): () => void;
+    /** Who is in the call and who is talking, for the app's voice widget over
+     *  every window; null once the call ends. Absent from an older app. */
+    setVoiceState?(state: DesktopVoiceState | null): Promise<boolean>;
+    /** Hear a press on the voice widget's buttons. Answers the way to stop. */
+    onVoiceAction?(listener: (action: "mic" | "deafen" | "leave") => void): () => void;
     /** The window that adds and switches servers. Absent from an older app. */
     openServers?(): Promise<void>;
     /** Windows' Default apps at Polaris, to pick it for mailto links; false

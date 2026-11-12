@@ -15,6 +15,8 @@ import { chooseShare, endShare, listShareSources, SOURCE_ID } from "./screen-sha
 import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
 import { strokeSchema } from "@/shared/annotate";
 import { setCallHotkeys } from "./call-hotkeys";
+import { setVoiceState, voiceWidgetAction } from "./voice-widget";
+import { voiceActionSchema, voiceStateSchema } from "@/shared/voice-widget";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
 import { closeNotice, showNotice } from "./notices";
 import { appBadgeSchema, applyAppBadge } from "./app-badge";
@@ -29,6 +31,7 @@ import { browserFromName, installRequestSchema, type InstallResult } from "@/sha
 import {
     type AddressCheck,
     CHANNELS,
+    PREFERENCE_TOGGLES,
     type CustomGameInput,
     type GameActivity,
     type Outcome,
@@ -352,6 +355,20 @@ export function registerIpc(host: IpcHost): void {
         return setCallHotkeys(event.sender, input.success ? input.data : null);
     });
 
+    // Who is in the call, for the voice widget. A shape that does not parse
+    // ends what this page had shown rather than keeping it.
+    ipcMain.handle(CHANNELS.voiceState, (event, raw: unknown): boolean => {
+        if (!fromPolaris(event)) return false;
+        const input = voiceStateSchema.safeParse(raw);
+        setVoiceState(event.sender, input.success ? input.data : null);
+        return input.success;
+    });
+    // A press on the widget, for the page in the call.
+    ipcMain.handle(CHANNELS.widgetAction, (event, raw: unknown): boolean => {
+        const action = voiceActionSchema.safeParse(raw);
+        return from(event, "voice-widget") && action.success && voiceWidgetAction(action.data);
+    });
+
     ipcMain.handle(CHANNELS.gameCurrent, (event) => {
         if (!fromPolaris(event)) return { game: null, reporter: false };
         return { game: host.runningGame(), reporter: host.isReporter(event.sender) };
@@ -540,7 +557,7 @@ export function registerIpc(host: IpcHost): void {
     });
     ipcMain.handle(CHANNELS.connectToggle, (event, raw: unknown): boolean => {
         const input = z
-            .object({ name: z.enum(["minimizeToTray", "startMinimized"]), on: z.boolean() })
+            .object({ name: z.enum(PREFERENCE_TOGGLES), on: z.boolean() })
             .safeParse(raw);
         return from(event, "connect") && input.success && host.setToggle(input.data.name, input.data.on);
     });

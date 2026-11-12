@@ -32,7 +32,7 @@ import {
     type WebPreferences
 } from "electron";
 
-export type WindowKind = "polaris" | "connect" | "api-key" | "push" | "tv" | "overlay" | "updating";
+export type WindowKind = "polaris" | "connect" | "api-key" | "push" | "tv" | "overlay" | "voice-widget" | "updating";
 
 const kinds = new Map<number, WindowKind>();
 
@@ -273,6 +273,42 @@ export function openOverlayWindow(bounds: { readonly x: number; readonly y: numb
     window.webContents.on("will-navigate", (event) => event.preventDefault());
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     void window.loadFile(join(__dirname, "..", "renderer", "overlay.html"));
+    return window;
+}
+
+/**
+ * The voice widget's window: small, see-through, over everything - a game
+ * running windowed or borderless included - and never in the taskbar. It takes
+ * no focus, so a press on it does not take the keyboard from the game, and
+ * clicks go through it until it is unlocked (`voice-widget`). Kept out of
+ * screen captures where the system allows it, like the drawing overlay, so a
+ * share does not show it.
+ */
+export function openVoiceWidgetWindow(bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number; }): BrowserWindow {
+    const window = new BrowserWindow({
+        ...bounds,
+        show: false,
+        frame: false,
+        transparent: true,
+        backgroundColor: "#00000000",
+        hasShadow: false,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        fullscreenable: false,
+        focusable: false,
+        skipTaskbar: true,
+        alwaysOnTop: true,
+        webPreferences: preferences("local.js")
+    });
+    register(window.webContents, "voice-widget");
+    window.setIgnoreMouseEvents(true, { forward: true });
+    if (process.platform !== "win32" || windowsBuild() >= 19041) window.setContentProtection(true);
+    window.setAlwaysOnTop(true, "screen-saver");
+    window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    window.webContents.on("will-navigate", (event) => event.preventDefault());
+    window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    void window.loadFile(join(__dirname, "..", "renderer", "voice-widget.html"));
     return window;
 }
 
