@@ -47,6 +47,16 @@ export interface EdgePageFact {
     readonly value: string;
 }
 
+/** A way out the page offers. `href` is a link; without one it is a button the
+ *  page's own script drives, found by `id`. Both strings are prepared text. */
+export interface EdgePageAction {
+    readonly label: string;
+    readonly href?: string;
+    readonly id?: string;
+    /** Drawn as the main action rather than beside it. */
+    readonly primary?: boolean;
+}
+
 /** What the shell renders. Every string is already prepared text (see `edgeText`). */
 export interface EdgePageInput {
     /** Browser tab title. */
@@ -63,6 +73,8 @@ export interface EdgePageInput {
     readonly facts: readonly EdgePageFact[];
     /** The last footer item, which carries no value of its own. */
     readonly note: string;
+    /** Buttons and links under the reasons, in order. */
+    readonly actions?: readonly EdgePageAction[];
     /** A script the page runs, allowed by the nonce in the response's own CSP. Only
      *  the challenge page has one; every other edge page is inert markup. */
     readonly script?: { readonly nonce: string; readonly source: string };
@@ -78,6 +90,15 @@ export function edgePage(input: EdgePageInput): string {
             (section) =>
                 `<section>\n<h2>${section.heading}</h2>\n<p>${section.body}</p>\n</section>`
         )
+        .join("\n");
+    const actions = (input.actions ?? [])
+        .map((action) => {
+            const kind = action.primary ? "action primary" : "action";
+            const id = action.id ? ` id="${action.id}"` : "";
+            return action.href
+                ? `<a class="${kind}"${id} href="${action.href}">${action.label}</a>`
+                : `<button type="button" class="${kind}"${id}>${action.label}</button>`;
+        })
         .join("\n");
     const facts = input.facts
         .filter((fact) => fact.value !== "")
@@ -151,6 +172,26 @@ h2 { margin: 0 0 0.25rem; font-size: 0.9375rem; }
 p { margin: 0; color: hsl(var(--muted)); font-size: 0.9375rem; }
 .lead { margin-bottom: 2rem; }
 section { margin-bottom: 1.5rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: -0.25rem 0 1.5rem; }
+.action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.25rem;
+    padding: 0 0.875rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+    background: transparent;
+    color: hsl(var(--fg));
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+}
+.action.primary { background: hsl(var(--fg)); color: hsl(var(--card)); border-color: transparent; }
+.action:disabled { cursor: default; opacity: 0.6; }
+.action:focus-visible { outline: 2px solid hsl(var(--fg)); outline-offset: 2px; }
 footer {
     display: flex;
     flex-wrap: wrap;
@@ -173,7 +214,7 @@ code {
 <h1>${input.heading}</h1>
 <p class="lead">${input.lead}</p>
 ${sections}
-<footer>
+${actions ? `<div class="actions">\n${actions}\n</div>\n` : ""}<footer>
 ${facts}
 <span>${input.note}</span>
 </footer>

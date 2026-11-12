@@ -14,7 +14,7 @@
  */
 
 import { parseHttpLogs } from "@polaris/deploy";
-import { addressesSignedIn } from "@/lib/address-accounts";
+import { addressesSignedIn, addressesTrusted } from "@/lib/address-accounts";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { EDGE_LOG_RECENT_WINDOW_BYTES, readEdgeLogTail } from "@/lib/edge-access-log";
 import { DEFAULT_WAF_JAILS, detectWafBans, jailBansSignedIn, type WafJail } from "@polaris/core";
@@ -77,6 +77,33 @@ export async function setWafJails(jails: readonly WafJailSettings[]): Promise<vo
  * assert on it. Never throws: this runs on a timer and a bad pass must not stop the
  * next one.
  */
+/** How long a credential probe from a trusted address is held at the browser
+ *  check, in place of the permanent block a stranger gets. */
+const CHALLENGE_HOLD_MS = 86_400_000;
+
+/**
+ * Whether a jail's verdict is answered with the browser check rather than a refusal.
+ *
+ * A firewall that refuses people is a firewall operators switch off, and an address
+ * is not a person: a household, an office, a phone network and the operator's own
+ * desktop app all arrive as one. So the refusal is kept for what only a program
+ * does, from an address nobody here has signed in from:
+ *
+ *   - SSH failures are never a browser, and a challenge page means nothing to one.
+ *   - Exploit and credential probes from a stranger are refused, as before.
+ *   - The same probes from an address an account in good standing uses get the
+ *     check: the person passes it without noticing, a scanner on their machine
+ *     does not.
+ *   - Everything else - not-found floods, rate limits, failed sign-ins, subdomain
+ *     listing - is what a misbehaving tab, a crawler or a person mistyping a
+ *     password also looks like, so it is the check for everybody.
+ */
+export function jailAnswersWithChallenge(jail: WafJail["id"], trusted: boolean): boolean {
+    if (jail === "ssh-auth") return false;
+    if (jail === "probes") return trusted;
+    return true;
+}
+
 export async function runWafJails(now = Date.now()): Promise<{ scanned: number; banned: number }> {
     try {
         const [jails, ignore] = await Promise.all([getWafJails(), wafTrustedAddresses()]);
@@ -103,10 +130,14 @@ export async function runWafJails(now = Date.now()): Promise<{ scanned: number; 
         // to that. The jails that name an exploit or a credential store are
         // unmoved and do not appear here.
         const sparing = verdicts.filter((verdict) => !jailBansSignedIn(verdict.jail));
-        const members =
+        const [members, trusted] = await Promise.all([
             sparing.length > 0
-                ? await addressesSignedIn(sparing.map((v) => v.ip))
-                : new Set<string>();
+                ? addressesSignedIn(sparing.map((v) => v.ip))
+                : Promise.resolve(new Set<string>()),
+            verdicts.length > 0
+                ? addressesTrusted(verdicts.map((v) => v.ip), now)
+                : Promise.resolve(new Set<string>())
+        ]);
 
         let banned = 0;
         for (const verdict of verdicts) {
@@ -120,6 +151,7 @@ export async function runWafJails(now = Date.now()): Promise<{ scanned: number; 
                 );
                 continue;
             }
+            const challenge = jailAnswersWithChallenge(verdict.jail, trusted.has(verdict.ip));
             await recordWafBan({
                 ip: verdict.ip,
                 reason: "ban",
@@ -127,7 +159,15 @@ export async function runWafJails(now = Date.now()): Promise<{ scanned: number; 
                 note: verdict.note,
                 // Null travels through as null: a credential probe is held until an
                 // operator lifts it, and the intel snapshot already understands that.
-                until: verdict.until === null ? null : new Date(verdict.until)
+                // A challenge never stands forever - it is for a person, who is let
+                // through by passing it, and the evidence ages out like any other.
+                until:
+                    verdict.until === null
+                        ? challenge
+                            ? new Date(now + CHALLENGE_HOLD_MS)
+                            : null
+                        : new Date(verdict.until),
+                challenge
             });
             banned += 1;
         }

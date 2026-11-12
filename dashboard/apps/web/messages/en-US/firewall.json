@@ -578,6 +578,22 @@
         "assetMax": "Asset fetches",
         "variantMax": "Query variants"
     },
+    "lookup": {
+        "title": "Look up a block",
+        "intro": "Paste the reference from a block page to see what refused it.",
+        "placeholder": "Reference ID",
+        "submit": "Look up",
+        "invalid": "A reference looks like 3418858b-784f-463f-84ef-8b9013fbd592.",
+        "unknown": "The edge does not hold this reference. It keeps the latest 5,000 blocks since it last started.",
+        "outdated": "The edge is older than this lookup. Update Polaris from Settings to use it.",
+        "unreachable": "The edge did not answer. Try again in a moment.",
+        "reason": "Refused by",
+        "address": "Address",
+        "site": "Site",
+        "request": "Request",
+        "when": "When",
+        "browser": "Browser"
+    },
     "bans": {
         "title": "Blocked right now",
         "none": "Nobody is banned. Addresses appear here when they trip a jail below, or when a reputation provider flags them.",
@@ -587,6 +603,8 @@
             "until": "Until"
         },
         "offences": "{count}x",
+        "challenge": "Browser check",
+        "challengeHint": "Not refused: a browser passes the check by itself, a script does not.",
         "untilLifted": "Until you lift it",
         "liftNamed": "Lift the ban on {ip}",
         "lift": "Lift this ban",

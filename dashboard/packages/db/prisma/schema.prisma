@@ -6141,6 +6141,10 @@ model WafBan {
     until    DateTime?
     /// Times this address has been banned, so a repeat offender is held longer.
     offences Int      @default(1)
+    /// Answered with the browser check rather than refused: what the address did
+    /// cannot be told apart from a person, so a browser gets through and a script
+    /// does not.
+    challenge Boolean @default(false)
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt

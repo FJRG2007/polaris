@@ -24,12 +24,13 @@ import { scopeKindLabel } from "./scope-kinds";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 import type { WafAnomalySettings } from "@/lib/waf-anomaly-service";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import type { WafAnomaly, WafJail, WafTrafficSummary } from "@polaris/core";
 import {
     Activity,
     Ban,
     Globe,
+    Search,
     RadarIcon,
     RefreshCw,
     ShieldCheck,
@@ -41,6 +42,7 @@ import {
     getWafAddressActivityAction,
     getWafOverviewAction,
     liftWafBanAction,
+    lookupWafBlockAction,
     setAddressListedAction,
     setWafAnomalySettingsAction,
     setWafIgnoreListAction,
@@ -198,6 +200,7 @@ export function FirewallInstancePanels({
                 callerIp={callerIp}
                 onSaved={() => load(hours)}
             />
+            <BlockLookupPanel callerIp={callerIp} onInspect={setInspecting} />
             <BansPanel
                 bans={data?.bans}
                 loading={!data}
@@ -618,6 +621,124 @@ function AnomaliesPanel({
     );
 }
 
+/** A block page's reference shape, checked as it is typed. */
+const REFERENCE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type BlockLookupResult = Awaited<ReturnType<typeof lookupWafBlockAction>>;
+
+/**
+ * Where a reference a visitor quoted is turned back into what refused them. The
+ * address opens the same dialog as everywhere else, which is where a ban is lifted
+ * or the address trusted - the two things the answer usually leads to.
+ */
+function BlockLookupPanel({
+    callerIp,
+    onInspect
+}: {
+    callerIp?: string | null;
+    onInspect: (ip: string) => void;
+}) {
+    const t = useTranslations("firewall");
+    const format = useDisplayFormat();
+    const [value, setValue] = useState("");
+    const [result, setResult] = useState<BlockLookupResult | null>(null);
+    const [pending, startLookup] = useTransition();
+    const reference = value.trim();
+    const valid = REFERENCE.test(reference);
+    // Wrong only once there is something to be wrong: an empty field is unfinished.
+    const wrong = reference.length > 0 && !valid && reference.length >= 36;
+
+    const submit = () => {
+        if (!valid || pending) return;
+        startLookup(async () => {
+            setResult(
+                await lookupWafBlockAction(reference).catch(() => ({
+                    lookup: { state: "unreachable" as const }
+                }))
+            );
+        });
+    };
+
+    const lookup = result?.lookup;
+    const block = lookup?.state === "found" ? lookup.block : null;
+    const rows: [string, ReactNode][] = block
+        ? [
+              [t("lookup.reason"), block.reason],
+              [
+                  t("lookup.address"),
+                  block.ip ? (
+                      <AddressLink ip={block.ip} callerIp={callerIp} onInspect={onInspect} />
+                  ) : null
+              ],
+              [t("lookup.site"), block.host],
+              [
+                  t("lookup.request"),
+                  block.uri ? `${block.method ?? "GET"} ${block.uri}` : null
+              ],
+              [t("lookup.when"), format.dateTime(block.at)],
+              [t("lookup.browser"), block.userAgent]
+          ]
+        : [];
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Search className="size-4 text-muted-foreground" />
+                    {t("lookup.title")}
+                </CardTitle>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-3">
+                <p className="text-sm text-muted-foreground">{t("lookup.intro")}</p>
+                <form
+                    className="flex flex-col gap-2 sm:flex-row"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        submit();
+                    }}
+                >
+                    <Input
+                        value={value}
+                        onChange={(event) => {
+                            setValue(event.target.value);
+                            setResult(null);
+                        }}
+                        placeholder={t("lookup.placeholder")}
+                        aria-label={t("lookup.placeholder")}
+                        aria-invalid={wrong || undefined}
+                        spellCheck={false}
+                        autoComplete="off"
+                        className="h-9 min-w-0 flex-1 font-mono"
+                    />
+                    <Button type="submit" aria-disabled={!valid || pending} disabled={pending}>
+                        {t("lookup.submit")}
+                    </Button>
+                </form>
+                {wrong ? <p className="text-xs text-danger">{t("lookup.invalid")}</p> : null}
+                {pending ? <Skeleton className="h-24 w-full" /> : null}
+                {!pending && result?.error ? (
+                    <p className="text-sm text-danger">{result.error}</p>
+                ) : null}
+                {!pending && lookup && lookup.state !== "found" ? (
+                    <p className="text-sm text-muted-foreground">{t(`lookup.${lookup.state}`)}</p>
+                ) : null}
+                {!pending && block ? (
+                    <dl className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
+                        {rows
+                            .filter(([, shown]) => shown !== null && shown !== "")
+                            .map(([label, shown]) => (
+                                <div key={label} className="contents">
+                                    <dt className="truncate text-muted-foreground">{label}</dt>
+                                    <dd className="min-w-0 break-words">{shown}</dd>
+                                </div>
+                            ))}
+                    </dl>
+                ) : null}
+            </CardBody>
+        </Card>
+    );
+}
+
 function BansPanel({
     bans,
     loading,
@@ -706,6 +827,14 @@ function BansPanel({
                                             {ban.offences > 1 ? (
                                                 <span className="ml-2 text-muted-foreground">
                                                     {t("bans.offences", { count: ban.offences })}
+                                                </span>
+                                            ) : null}
+                                            {ban.challenge ? (
+                                                <span
+                                                    className="ml-2"
+                                                    title={t("bans.challengeHint")}
+                                                >
+                                                    <Badge>{t("bans.challenge")}</Badge>
                                                 </span>
                                             ) : null}
                                         </td>

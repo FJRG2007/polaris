@@ -53,4 +53,34 @@ describe("wafBlockPage", () => {
         expect(page).toContain("Your account does not have access to this service.");
         expect(page).not.toContain("This site runs a firewall.");
     });
+
+    it("offers Try again only with a nonce, and runs nothing without one", () => {
+        const inert = wafBlockPage({ reference: REFERENCE });
+        expect(inert).not.toContain("<script");
+        expect(inert).not.toContain("edge-retry");
+        const live = wafBlockPage({ reference: REFERENCE, retryNonce: "abc123" });
+        expect(live).toContain('id="edge-retry"');
+        expect(live).toContain('<script nonce="abc123">');
+        expect(live).toContain("sessionStorage");
+    });
+
+    it("says when an automatic ban lifts and links the sign-in that lifts it now", () => {
+        const until = Date.parse("2026-11-13T09:30:00.000Z");
+        const page = wafBlockPage({
+            reference: REFERENCE,
+            release: { until, signIn: "/oauth/login" }
+        });
+        expect(page).toContain('datetime="2026-11-13T09:30:00.000Z"');
+        expect(page).toContain('href="/oauth/login"');
+        expect(page).toContain("Sign in");
+    });
+
+    it("escapes a sign-in link and offers none for a ban that does not lift", () => {
+        const page = wafBlockPage({
+            reference: REFERENCE,
+            release: { until: null, signIn: '"><script>x</script>' }
+        });
+        expect(page).not.toContain("<script>x");
+        expect(wafBlockPage({ reference: REFERENCE })).not.toContain("Sign in");
+    });
 });

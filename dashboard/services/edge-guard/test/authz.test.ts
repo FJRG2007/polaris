@@ -577,15 +577,42 @@ describe("evaluate - address intelligence", () => {
             expect(at("/oauth/login", reputation, app).status).toBe(403);
         });
 
-        it("spares nothing for a jail, Tor or manual entry", () => {
+        it("keeps the sign-in open for a jail ban that lifts by itself", () => {
+            // Signing in lifts it, so the way to sign in has to stay reachable.
+            expect(at("/oauth/login", ban)).toEqual({ status: 200 });
+            expect(at("/drive", ban).status).toBe(403);
+        });
+
+        it("spares nothing for a permanent ban, Tor or a manual entry", () => {
             for (const entry of [
-                ban,
+                { reason: "ban", until: null } as const,
                 { reason: "tor", until: null } as const,
                 { reason: "manual", until: null } as const
             ]) {
                 expect(at("/oauth/login", entry).status).toBe(403);
                 expect(at("/api/auth/sign-in/email", entry).status).toBe(403);
             }
+        });
+
+        it("tells a timed ban when it lifts and where signing in lifts it now", () => {
+            expect(at("/drive", ban)).toMatchObject({
+                status: 403,
+                release: { until: ban.until, signIn: "/oauth/login" }
+            });
+            const app = encodeGuardRule({ deny: [], requireLogin: false, rules: [] });
+            expect(at("/", ban, app)).toMatchObject({ release: { signIn: null } });
+        });
+
+        it("offers no way out of a ban that does not lift", () => {
+            const decision = at("/drive", { reason: "manual", until: null });
+            expect(decision.status).toBe(403);
+            expect("release" in decision).toBe(false);
+        });
+
+        it("sends the browser check, not a refusal, for a ban marked as one", () => {
+            const decision = at("/drive", { ...ban, challenge: true });
+            expect(decision.status).toBe(503);
+            expect(decision).toHaveProperty("challenge");
         });
 
         it("spares nothing when a stricter entry covers the address too", () => {
@@ -985,5 +1012,33 @@ describe("evaluate - an account Polaris re-decided", () => {
             status: 200
         });
         expect(evaluate({ wafHeader, forwardedHost: HOST, cookie: aged }, cfg).status).toBe(302);
+    });
+});
+
+describe("evaluate - Polaris's own paths", () => {
+    const pack = (dashboard: boolean) =>
+        encodeGuardRule({
+            deny: [],
+            requireLogin: false,
+            presets: ["cms-probes"],
+            rules: [],
+            ...(dashboard ? { dashboard: true } : {})
+        });
+    const at = (uri: string, dashboard: boolean) =>
+        evaluate({ wafHeader: pack(dashboard), forwardedHost: HOST, forwardedUri: uri }, cfg);
+
+    it("never blocks the dashboard's own Marketplace logo or page", () => {
+        expect(at("/logos/apps/phpmyadmin.svg", true)).toEqual({ status: 200 });
+        expect(at("/apps/marketplace/template-phpmyadmin", true)).toEqual({ status: 200 });
+    });
+
+    it("never blocks a picture, whatever its name, on any route", () => {
+        expect(at("/img/phpmyadmin.png", false)).toEqual({ status: 200 });
+    });
+
+    it("still blocks the probe itself, on the dashboard and elsewhere", () => {
+        expect(at("/phpmyadmin/index.php", true).status).toBe(403);
+        expect(at("/phpmyadmin/", false).status).toBe(403);
+        expect(at("/logos/../phpmyadmin/", true).status).toBe(403);
     });
 });

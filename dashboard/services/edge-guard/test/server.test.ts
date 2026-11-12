@@ -8,7 +8,7 @@
 import { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import type { GuardConfig } from "../src/authz.js";
-import { encodeGuardRule } from "@polaris/core/waf";
+import { encodeGuardRule, wafBlockLookupToken } from "@polaris/core/waf";
 import { createGuardServer } from "../src/server.js";
 import { describe, expect, it, afterAll, beforeAll } from "vitest";
 
@@ -121,5 +121,40 @@ describe("the tailnet cookie filter", () => {
         expect(response.status).toBe(200);
         expect(response.headers.get("cookie")).toBeNull();
         expect((await filter()).headers.get("cookie")).toBeNull();
+    });
+});
+
+describe("looking a block up by its reference", () => {
+    const lookup = (reference: string, token?: string) =>
+        fetch(`${guardUrl}/v1/blocks/${reference}`, {
+            headers: token ? { authorization: `Bearer ${token}` } : {}
+        });
+
+    it("answers Polaris with what the block was", async () => {
+        const blocked = await check({ ...DENIED, accept: "application/json" });
+        const reference = /Reference ID: (\S+)/.exec(await blocked.text())?.[1] ?? "";
+        const response = await lookup(reference, wafBlockLookupToken(cfg.secret));
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+            reference,
+            ip: "203.0.113.5",
+            host: "app.example.com"
+        });
+    });
+
+    it("answers nobody else", async () => {
+        const response = await lookup("3418858b-784f-463f-84ef-8b9013fbd592");
+        expect(response.status).toBe(401);
+        const forged = await lookup("3418858b-784f-463f-84ef-8b9013fbd592", "guess");
+        expect(forged.status).toBe(401);
+    });
+
+    it("says it does not hold a reference it never issued", async () => {
+        const response = await lookup(
+            "3418858b-784f-463f-84ef-8b9013fbd592",
+            wafBlockLookupToken(cfg.secret)
+        );
+        expect(response.status).toBe(404);
+        expect(response.headers.get("content-type")).toContain("application/json");
     });
 });

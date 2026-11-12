@@ -142,6 +142,67 @@ export async function addressesSignedIn(ips: readonly string[]): Promise<Set<str
     return found;
 }
 
+/** How recently an account has to have signed in from an address for the firewall
+ *  to count it as theirs. A month covers somebody who signs in from home every few
+ *  weeks; an address nobody has signed in from since is a stranger's again. */
+export const TRUSTED_SIGN_IN_DAYS = 30;
+
+/**
+ * Which of these addresses belong to people: somebody is signed in from it now, or
+ * an account in good standing signed in from it within `TRUSTED_SIGN_IN_DAYS`.
+ *
+ * The firewall's answer to "is this an attacker or one of ours having a bad
+ * minute". A trusted address that trips a jail is sent the browser check instead
+ * of being refused: a person passes it without noticing, and a scanner running
+ * from a member's compromised machine does not. Wider than `addressesSignedIn` on
+ * purpose - a desktop app whose session ended overnight is still on the address
+ * it signed in from yesterday, and it must not come back to a ban it has no way
+ * out of. The sign-ins are read from the activity log, which outlives sessions and
+ * holds the address hashed, so each address is hashed and looked up by its index.
+ *
+ * Bounded by the input: indexed reads grouped in the database, never a scan.
+ */
+export async function addressesTrusted(
+    ips: readonly string[],
+    now = Date.now()
+): Promise<Set<string>> {
+    const wanted = [...new Set(ips.filter(Boolean))];
+    if (wanted.length === 0) return new Set();
+    const byHash = new Map(wanted.map((ip) => [auditIpHash(ip), ip] as const));
+    const [live, groups] = await Promise.all([
+        addressesSignedIn(wanted),
+        prisma.auditLog.groupBy({
+            by: ["ipHash", "actorId"],
+            where: {
+                ipHash: { in: [...byHash.keys()] },
+                action: "account.signin",
+                actorId: { not: null },
+                at: { gt: new Date(now - TRUSTED_SIGN_IN_DAYS * 86_400_000) }
+            },
+            // Most recent first, and enough accounts per address to find one in
+            // good standing.
+            _max: { at: true },
+            orderBy: { _max: { at: "desc" } },
+            take: wanted.length * 20
+        })
+    ]);
+    const actors = [...new Set(groups.map((group) => group.actorId).filter(Boolean))] as string[];
+    if (actors.length === 0) return live;
+    const standing = new Set(
+        (
+            await prisma.user.findMany({
+                where: { id: { in: actors }, bannedAt: null },
+                select: { id: true }
+            })
+        ).map((user) => user.id)
+    );
+    for (const group of groups) {
+        const ip = group.ipHash ? byHash.get(group.ipHash) : undefined;
+        if (ip && group.actorId && standing.has(group.actorId)) live.add(ip);
+    }
+    return live;
+}
+
 /** Newest first and bounded, so the union of the two reads below can be cut to
  *  the same ceiling and still be the newest sessions the address has held. */
 async function sessionRowsMatching(

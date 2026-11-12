@@ -16,6 +16,8 @@
  * Pure: given log entries and jail settings, produce bans.
  */
 
+import { isPolarisOwnPath, isStaticAssetPath, pathHasSegment } from "./waf-own-paths.js";
+
 /** The part of an access-log entry a jail reads. Structural on purpose: the parser
  *  lives in @polaris/deploy and core does not depend on it. */
 export interface HttpLogLike {
@@ -77,7 +79,12 @@ const VACANT_ROUTER = "polaris-vacant";
  *  The probes jail counts these regardless of the status they returned - a scan that
  *  happens to hit a 200 is still a scan. */
 const PROBE_MARKERS = [
-    "/wp-",
+    "/wp-admin",
+    "/wp-login",
+    "/wp-content",
+    "/wp-includes",
+    "/wp-json",
+    "/wp-config",
     "/xmlrpc.php",
     "/phpmyadmin",
     "/.env",
@@ -129,10 +136,19 @@ const CREDENTIAL_MARKERS = [
     "/secrets.json"
 ];
 
-/** Whether a request was reaching for a credential store. */
-function credentialProbe(path: string): string | null {
+/** Whether a request was reaching for a credential store. A marker names a whole
+ *  segment (`/.env`, not `/.environment`), except one that is a file-name prefix
+ *  (`/.ssh/id_`). Polaris's own routes on the dashboard are never one: Polaris
+ *  answers them, and holds nothing at those names. */
+function credentialProbe(entry: HttpLogLike): string | null {
+    const path = entry.path ?? "";
+    if (path === "" || (onDashboard(entry) && isPolarisOwnPath(path))) return null;
     const lowered = path.toLowerCase();
-    return CREDENTIAL_MARKERS.find((marker) => lowered.includes(marker)) ?? null;
+    return (
+        CREDENTIAL_MARKERS.find((marker) =>
+            marker.endsWith("_") ? lowered.includes(marker) : pathHasSegment(path, marker)
+        ) ?? null
+    );
 }
 
 /** The hostname a request was for, lowercased and without its port, or "" for a log
@@ -224,6 +240,25 @@ function submittedToAPage(method: string | null | undefined, path: string): bool
     return !last.includes(".");
 }
 
+/** The routers that serve Polaris itself (`domain-edge.ts`): the dashboard's
+ *  hostnames, over HTTPS and over plain HTTP. */
+function onDashboard(entry: HttpLogLike): boolean {
+    return (entry.router ?? "").startsWith("polaris-dashboard");
+}
+
+/**
+ * Whether a request was something looking for an exploit. A marker has to be a
+ * whole segment of the path (`/phpmyadmin/`, not `/logos/phpmyadmin.svg`), a
+ * picture or a font is never one, and on the dashboard a route Polaris serves
+ * is never one: Polaris browsing its own Marketplace is not a scan.
+ */
+function isProbe(entry: HttpLogLike): boolean {
+    const path = entry.path ?? "";
+    if (path === "" || isStaticAssetPath(path)) return false;
+    if (onDashboard(entry) && isPolarisOwnPath(path)) return false;
+    return PROBE_MARKERS.some((marker) => pathHasSegment(path, marker));
+}
+
 /** Whether a log entry counts as a failure for a jail. */
 function counts(jail: WafJailId, entry: HttpLogLike): boolean {
     switch (jail) {
@@ -235,10 +270,8 @@ function counts(jail: WafJailId, entry: HttpLogLike): boolean {
             return entry.status === 429;
         case "auth-failed":
             return entry.status === 401 || entry.status === 403;
-        case "probes": {
-            const path = entry.path?.toLowerCase() ?? "";
-            return path !== "" && PROBE_MARKERS.some((marker) => path.includes(marker));
-        }
+        case "probes":
+            return isProbe(entry);
         case "ssh-auth":
             // Fed only by the auth-log reader, which presents a refused SSH or SFTP
             // login in this shape (see authAttemptsAsEntries). Matched on the path so
@@ -439,7 +472,7 @@ export function detectWafBans(input: WafJailInput): WafBanVerdict[] {
         // Inside the probes window like any other evidence. A permanent ban that could
         // be re-derived from a log line indefinitely would undo an operator lifting it.
         if (probes && at >= now - probes.findTimeSec * 1000) {
-            const marker = credentialProbe(entry.path ?? "");
+            const marker = credentialProbe(entry);
             if (marker) {
                 const seen = credentials.get(ip);
                 if (seen) seen.hits += 1;

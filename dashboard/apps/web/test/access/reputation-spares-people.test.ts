@@ -5,7 +5,8 @@
  * provider's FRAUD verdict about that address - a verdict about everybody else on it -
  * and every request after the invite page answered 403. These pin the fix: no
  * reputation ban for an address somebody is signed in from, the ban is lifted when an
- * account signs in or accepts an invite from it, and only reputation is ever lifted.
+ * account signs in or accepts an invite from it, and a timed jail ban goes with it
+ * only for an account that predates the ban.
  */
 
 import { join } from "node:path";
@@ -19,12 +20,14 @@ interface BanRow {
     note: string | null;
     until: Date | null;
     offences: number;
+    createdAt?: Date;
 }
 
 let bans: BanRow[] = [];
 let signedIn = new Set<string>();
 let audits: { action: string; targetId: string; actorId: string }[] = [];
 let asked: string[] = [];
+let accounts: Record<string, { createdAt: Date; bannedAt: Date | null }> = {};
 
 // Lifting a ban republishes the snapshot; it goes somewhere harmless.
 process.env.POLARIS_EDGE_INTEL_FILE = join(
@@ -57,6 +60,8 @@ vi.mock("@/lib/integrations/dymo", () => ({
 }));
 vi.mock("@/lib/address-accounts", () => ({
     addressesSignedIn: async (ips: readonly string[]) =>
+        new Set(ips.filter((ip) => signedIn.has(ip))),
+    addressesTrusted: async (ips: readonly string[]) =>
         new Set(ips.filter((ip) => signedIn.has(ip)))
 }));
 vi.mock("@/lib/audit-service", () => ({
@@ -82,11 +87,14 @@ vi.mock("@polaris/db", () => ({
             }
         },
         wafIpFeed: { findUnique: async () => null, upsert: async () => undefined },
-        user: { findMany: async () => [] }
+        user: {
+            findMany: async () => [],
+            findUnique: async ({ where }: { where: { id: string } }) => accounts[where.id] ?? null
+        }
     }
 }));
 
-const { checkReputation, liftReputationBanOnSignIn } = await import("@/lib/waf-intel-service");
+const { checkReputation, liftBanOnSignIn } = await import("@/lib/waf-intel-service");
 
 const SHARED = "203.0.113.20";
 const OTHER = "203.0.113.21";
@@ -97,6 +105,7 @@ beforeEach(() => {
     signedIn = new Set();
     audits = [];
     asked = [];
+    accounts = {};
 });
 
 describe("reputation and the people signed in", () => {
@@ -118,7 +127,7 @@ describe("reputation and the people signed in", () => {
                 offences: 1
             }
         ];
-        expect(await liftReputationBanOnSignIn(SHARED, "user-1")).toBe(true);
+        expect(await liftBanOnSignIn(SHARED, "user-1")).toBe(true);
         expect(bans).toEqual([]);
         expect(audits).toEqual([
             expect.objectContaining({
@@ -140,23 +149,61 @@ describe("reputation and the people signed in", () => {
                 offences: 1
             }
         ];
-        expect(await liftReputationBanOnSignIn(SHARED, "user-2", "invite")).toBe(true);
+        expect(await liftBanOnSignIn(SHARED, "user-2", "invite")).toBe(true);
         expect(bans).toEqual([]);
     });
 
-    it("leaves a jail, Tor or manual ban exactly where it is", async () => {
-        for (const reason of ["ban", "tor", "manual"]) {
+    it("leaves Tor, a manual ban and a permanent jail ban exactly where they are", async () => {
+        accounts = { "user-1": { createdAt: new Date(0), bannedAt: null } };
+        for (const [reason, until] of [
+            ["tor", later()],
+            ["manual", later()],
+            ["ban", null]
+        ] as const) {
             bans = [
-                { ip: SHARED, reason, source: "probes", note: null, until: later(), offences: 1 }
+                { ip: SHARED, reason, source: "probes", note: null, until, offences: 1, createdAt: new Date() }
             ];
-            expect(await liftReputationBanOnSignIn(SHARED, "user-1")).toBe(false);
+            expect(await liftBanOnSignIn(SHARED, "user-1")).toBe(false);
             expect(bans).toHaveLength(1);
         }
         expect(audits).toEqual([]);
     });
 
+    it("lifts a timed jail ban for an account older than the ban", async () => {
+        accounts = { "user-1": { createdAt: new Date(0), bannedAt: null } };
+        bans = [
+            { ip: SHARED, reason: "ban", source: "probes", note: null, until: later(), offences: 1, createdAt: new Date() }
+        ];
+        expect(await liftBanOnSignIn(SHARED, "user-1")).toBe(true);
+        expect(bans).toEqual([]);
+        expect(audits).toEqual([expect.objectContaining({ action: "waf.ban.lift.signin", targetId: SHARED })]);
+    });
+
+    it("keeps a jail ban for an account made after it, or one that is banned", async () => {
+        const banned = new Date(Date.now() - 60_000);
+        accounts = {
+            fresh: { createdAt: new Date(), bannedAt: null },
+            suspended: { createdAt: new Date(0), bannedAt: new Date() }
+        };
+        for (const user of ["fresh", "suspended", "missing"]) {
+            bans = [
+                { ip: SHARED, reason: "ban", source: "probes", note: null, until: later(), offences: 1, createdAt: banned }
+            ];
+            expect(await liftBanOnSignIn(SHARED, user)).toBe(false);
+            expect(bans).toHaveLength(1);
+        }
+    });
+
+    it("lets an accepted invite lift a jail ban for a brand-new account", async () => {
+        bans = [
+            { ip: SHARED, reason: "ban", source: "probes", note: null, until: later(), offences: 1, createdAt: new Date(Date.now() - 60_000) }
+        ];
+        expect(await liftBanOnSignIn(SHARED, "invited", "invite")).toBe(true);
+        expect(bans).toEqual([]);
+    });
+
     it("does nothing for an address with no ban, or no address at all", async () => {
-        expect(await liftReputationBanOnSignIn(SHARED, "user-1")).toBe(false);
-        expect(await liftReputationBanOnSignIn(null, "user-1")).toBe(false);
+        expect(await liftBanOnSignIn(SHARED, "user-1")).toBe(false);
+        expect(await liftBanOnSignIn(null, "user-1")).toBe(false);
     });
 });

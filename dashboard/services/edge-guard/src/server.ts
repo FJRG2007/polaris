@@ -7,11 +7,17 @@
  */
 
 import { sendRedirect } from "./redirect.js";
-import { sendBlocked } from "./block-page.js";
+import { blockLog, sendBlocked } from "./block-page.js";
 import { sendSignInUnavailable } from "./signin-unavailable.js";
 import { sendChallenge } from "./challenge-page.js";
 import { clientIp, evaluate, type GuardConfig } from "./authz.js";
-import { TAILNET_COOKIES_PATH, tailnetAppCookies } from "@polaris/core/waf";
+import {
+    TAILNET_COOKIES_PATH,
+    WAF_BLOCK_LOOKUP_PATH,
+    isWafBlockReference,
+    tailnetAppCookies,
+    wafBlockLookupAllowed
+} from "@polaris/core/waf";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 
 /** The header `/health` names this guard's optional abilities in, comma-separated. */
@@ -19,7 +25,7 @@ export const GUARD_FEATURES_HEADER = "x-polaris-guard-features";
 
 /** What this guard enforces beyond the rules every guard has always read. `frame` is
  *  the proxy merging framing protection into the app's own response headers. */
-export const GUARD_FEATURES = "challenge,frame,ed25519";
+export const GUARD_FEATURES = "challenge,frame,ed25519,blocks";
 
 /** First value of a request header (Node lower-cases header names). */
 function header(req: IncomingMessage, name: string): string | undefined {
@@ -41,6 +47,22 @@ export function createGuardServer(config: () => GuardConfig): Server {
                 [GUARD_FEATURES_HEADER]: GUARD_FEATURES
             });
             res.end("ok");
+            return;
+        }
+        if (url.startsWith(WAF_BLOCK_LOOKUP_PATH)) {
+            // The Firewall screen asking what one block was. Never reached by a
+            // visitor - Traefik calls this server at its forwardAuth address only -
+            // but a deployed app shares the network, so it answers only to Polaris.
+            const reference = url.slice(WAF_BLOCK_LOOKUP_PATH.length).toLowerCase();
+            const json = { "content-type": "application/json", "cache-control": "no-store" };
+            if (!wafBlockLookupAllowed(header(req, "authorization"), config().secret)) {
+                res.writeHead(401, json);
+                res.end('{"error":"unauthorized"}');
+                return;
+            }
+            const found = isWafBlockReference(reference) ? blockLog.find(reference) : null;
+            res.writeHead(found ? 200 : 404, json);
+            res.end(found ? JSON.stringify(found) : `{"error":"unknown","held":${blockLog.size}}`);
             return;
         }
         if (url === TAILNET_COOKIES_PATH) {
@@ -104,7 +126,8 @@ export function createGuardServer(config: () => GuardConfig): Server {
                 reason: decision.reason,
                 uri: header(req, "x-forwarded-uri"),
                 method: header(req, "x-forwarded-method"),
-                userAgent: header(req, "user-agent")
+                userAgent: header(req, "user-agent"),
+                release: decision.release
             });
             return;
         }

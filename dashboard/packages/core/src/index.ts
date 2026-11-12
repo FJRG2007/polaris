@@ -122,6 +122,7 @@ export * from "./waf-email.js";
 export * from "./waf-integrity.js";
 export * from "./waf-injection.js";
 export * from "./waf-jails.js";
+export * from "./waf-own-paths.js";
 export * from "./waf-auth-log.js";
 export * from "./waf-anomalies.js";
 export * from "./analytics-visit.js";

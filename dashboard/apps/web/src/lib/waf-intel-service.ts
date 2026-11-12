@@ -214,14 +214,14 @@ export async function checkReputation(ips: readonly string[]): Promise<void> {
             })
         ).map((row) => row.ip)
     );
-    // The same rule the jails follow: an address somebody is signed in from right now
-    // is not banned on a provider's say-so. A reputation verdict on a shared address -
+    // The same rule the jails follow: an address somebody is signed in from, or
+    // signed in from this month, is not banned on a provider's say-so. A reputation verdict on a shared address -
     // a VPN, WARP, a relay, a carrier's NAT - is about other people on it, and banning
     // it took the instance away from the member using it.
     // Imported when needed: both reach the request context and the audit log, which
     // nothing else in this module does and which its callers should not have to load.
-    const { addressesSignedIn } = await import("@/lib/address-accounts");
-    const signedIn = await addressesSignedIn(candidates.filter((ip) => !banned.has(ip)));
+    const { addressesTrusted } = await import("@/lib/address-accounts");
+    const signedIn = await addressesTrusted(candidates.filter((ip) => !banned.has(ip)));
 
     let asked = 0;
     for (const ip of candidates) {
@@ -281,6 +281,8 @@ export interface WafBanInput {
     readonly note?: string;
     /** Null for an entry that stands until it is removed by hand. */
     readonly until: Date | null;
+    /** Answer it with the browser check rather than a refusal. */
+    readonly challenge?: boolean;
 }
 
 /**
@@ -316,13 +318,15 @@ export async function recordWafBan(input: WafBanInput): Promise<void> {
             reason: input.reason,
             source: input.source,
             note: input.note ?? null,
-            until: input.until
+            until: input.until,
+            challenge: input.challenge ?? false
         },
         update: {
             reason: input.reason,
             source: input.source,
             note: input.note ?? null,
             until: input.until,
+            challenge: input.challenge ?? false,
             offences
         }
     });
@@ -347,16 +351,25 @@ export async function wafBanFor(ip: string) {
 }
 
 /**
- * Lift a REPUTATION ban on the address an account just signed in from.
+ * Lift the automatic ban on the address an account just signed in from.
  *
- * Signing in is the evidence a provider's verdict lacked: somebody with an account is
- * using the address. Only reputation is lifted. A jail, probe, Tor or manual entry names
- * something the address itself did or an operator's decision, and a stolen password
- * must not be a way to erase it. Recorded in the audit log against the account, so the
+ * Signing in is the evidence the ban lacked: a person with an account is on that
+ * address. Two kinds are lifted, the same two the edge's block page offers a sign-in
+ * for (`signInLiftsBan`):
+ *
+ *   - reputation, which is a provider's verdict about whoever else shares the address;
+ *   - a jail ban that expires by itself. The jails count paths and failures, and the
+ *     person they caught first was the operator browsing their own Marketplace.
+ *
+ * Kept where it is: a permanent ban (a credential probe), Tor, and an operator's own
+ * manual entry. And a jail ban is only lifted by an account that existed before the
+ * ban did, in good standing - otherwise a scanner that can register would sign up and
+ * walk out of its own ban. An accepted invite is the operator vouching for the
+ * person, so it lifts both. Recorded in the audit log against the account, so the
  * operator can see why a ban disappeared. Never throws - signing in must not fail
  * because the firewall could not be updated.
  */
-export async function liftReputationBanOnSignIn(
+export async function liftBanOnSignIn(
     ip: string | null | undefined,
     userId: string,
     via: "sign-in" | "invite" = "sign-in"
@@ -365,11 +378,21 @@ export async function liftReputationBanOnSignIn(
     try {
         const ban = await prisma.wafBan.findUnique({
             where: { ip },
-            select: { reason: true, source: true, note: true, until: true }
+            select: { reason: true, source: true, note: true, until: true, createdAt: true }
         });
-        if (!ban || ban.reason !== "reputation") return false;
-        if (ban.until !== null && ban.until <= new Date()) return false;
-        const { count } = await prisma.wafBan.deleteMany({ where: { ip, reason: "reputation" } });
+        if (!ban || (ban.reason !== "reputation" && ban.reason !== "ban")) return false;
+        if (ban.until === null) {
+            if (ban.reason === "ban") return false;
+        } else if (ban.until <= new Date()) return false;
+        if (ban.reason === "ban" && via === "sign-in") {
+            const account = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { createdAt: true, bannedAt: true }
+            });
+            if (!account || account.bannedAt !== null) return false;
+            if (ban.createdAt && account.createdAt >= ban.createdAt) return false;
+        }
+        const { count } = await prisma.wafBan.deleteMany({ where: { ip, reason: ban.reason } });
         if (count === 0) return false;
         await publishWafIntel();
         const { recordAudit } = await import("@/lib/audit-service");
@@ -378,12 +401,12 @@ export async function liftReputationBanOnSignIn(
             action: "waf.ban.lift.signin",
             targetType: "ip",
             targetId: ip,
-            metadata: { via, source: ban.source, note: ban.note }
+            metadata: { via, reason: ban.reason, source: ban.source, note: ban.note }
         });
         return true;
     } catch (caught) {
         console.error(
-            "polaris: could not lift a reputation ban after a sign-in:",
+            "polaris: could not lift a ban after a sign-in:",
             caught instanceof Error ? caught.message : caught
         );
         return false;
@@ -492,7 +515,7 @@ export async function publishWafIntel(): Promise<void> {
 
     const bans = await prisma.wafBan.findMany({
         where: { OR: [{ until: null }, { until: { gt: new Date(now) } }] },
-        select: { ip: true, reason: true, note: true, until: true }
+        select: { ip: true, reason: true, note: true, until: true, challenge: true }
     });
     for (const ban of bans) {
         entries.push([
@@ -500,7 +523,8 @@ export async function publishWafIntel(): Promise<void> {
             {
                 reason: (ban.reason as WafIntelReason) ?? "ban",
                 until: ban.until ? ban.until.getTime() : null,
-                ...(ban.note ? { note: ban.note } : {})
+                ...(ban.note ? { note: ban.note } : {}),
+                ...(ban.challenge ? { challenge: true } : {})
             }
         ]);
     }

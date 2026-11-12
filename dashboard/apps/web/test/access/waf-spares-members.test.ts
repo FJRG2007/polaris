@@ -11,7 +11,12 @@
  * router it does not stop at the person who tripped it. So the jails whose
  * signal a member's own browser can produce by accident let a signed-in address
  * through, and the ones that name an exploit or a credential store do not - a
- * member reading for `/.git/config` is banned exactly as fast as a stranger.
+ * member reading for `/.git/config` is caught exactly as fast as a stranger.
+ *
+ * What catching means is graded. A stranger probing for exploits is refused; the
+ * same probe from an address an account signed in from is sent the browser check,
+ * which the person passes and a scanner on their machine does not; and the jails a
+ * misbehaving tab can trip send everybody the check rather than a refusal.
  */
 
 import { tmpdir } from "node:os";
@@ -21,8 +26,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Addresses somebody is signed in from, which each test sets. */
 let signedIn: string[] = [];
+/** Addresses an account signed in from this month, without a session now. */
+let recent: string[] = [];
 /** What was actually written to the ban list. */
-let banned: { ip: string; source: string }[] = [];
+let banned: { ip: string; source: string; challenge: boolean; until: Date | null }[] = [];
 
 const LOG_FILE = join(tmpdir(), `polaris-waf-access-${process.pid}.log`);
 process.env.POLARIS_TRAEFIK_ACCESSLOG = LOG_FILE;
@@ -33,15 +40,27 @@ vi.mock("@/lib/setting-store", () => ({
 }));
 vi.mock("@/lib/address-accounts", () => ({
     addressesSignedIn: async (ips: readonly string[]) =>
-        new Set(ips.filter((ip) => signedIn.includes(ip)))
+        new Set(ips.filter((ip) => signedIn.includes(ip))),
+    addressesTrusted: async (ips: readonly string[]) =>
+        new Set(ips.filter((ip) => signedIn.includes(ip) || recent.includes(ip)))
 }));
 vi.mock("@/lib/waf-intel-service", () => ({
     wafTrustedAddresses: async () => [],
     priorBanCounts: async () => new Map(),
     checkReputation: async () => undefined,
     publishWafIntel: async () => undefined,
-    recordWafBan: async (ban: { ip: string; source: string }) => {
-        banned.push({ ip: ban.ip, source: ban.source });
+    recordWafBan: async (ban: {
+        ip: string;
+        source: string;
+        challenge?: boolean;
+        until: Date | null;
+    }) => {
+        banned.push({
+            ip: ban.ip,
+            source: ban.source,
+            challenge: ban.challenge === true,
+            until: ban.until
+        });
     }
 }));
 
@@ -83,6 +102,7 @@ async function withLog(lines: string[]): Promise<{ scanned: number; banned: numb
 
 beforeEach(() => {
     signedIn = [];
+    recent = [];
     banned = [];
 });
 
@@ -117,11 +137,40 @@ describe("a flood from an address somebody is signed in from", () => {
         signedIn = [MEMBER];
         await withLog(flood(MEMBER, 3, { path: "/.git/config" }));
         expect(banned.map((row) => row.source)).toContain("probes");
+        // Caught, and sent the browser check rather than locked out for good: a
+        // scanner fails it, the member does not.
+        expect(banned.every((row) => row.challenge && row.until !== null)).toBe(true);
     });
 
     it("bans a member sweeping for exploits", async () => {
         signedIn = [MEMBER];
         await withLog(flood(MEMBER, 9, { path: "/wp-login.php" }));
         expect(banned.map((row) => row.source)).toContain("probes");
+    });
+});
+
+describe("how hard the firewall answers", () => {
+    it("refuses a stranger sweeping for exploits", async () => {
+        await withLog(flood(STRANGER, 9, { path: "/wp-login.php" }));
+        expect(banned).toEqual([expect.objectContaining({ ip: STRANGER, challenge: false })]);
+    });
+
+    it("refuses a stranger reading for a credential store for good", async () => {
+        await withLog(flood(STRANGER, 3, { path: "/.git/config" }));
+        expect(banned).toEqual([
+            expect.objectContaining({ ip: STRANGER, challenge: false, until: null })
+        ]);
+    });
+
+    it("sends the check to an address an account signed in from this month", async () => {
+        // A desktop app whose session ended overnight is on yesterday's address.
+        recent = [MEMBER];
+        await withLog(flood(MEMBER, 9, { path: "/wp-login.php" }));
+        expect(banned).toEqual([expect.objectContaining({ ip: MEMBER, challenge: true })]);
+    });
+
+    it("sends a stranger's not-found flood the check, not a refusal", async () => {
+        await withLog(flood(STRANGER, 12));
+        expect(banned).toEqual([expect.objectContaining({ ip: STRANGER, challenge: true })]);
     });
 });

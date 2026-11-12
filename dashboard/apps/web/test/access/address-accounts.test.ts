@@ -24,7 +24,8 @@ interface SessionRow {
 
 interface AuditGroup {
     actorId: string | null;
-    action: string;
+    action?: string;
+    ipHash?: string;
     _count: { _all: number };
     _max: { at: Date | null };
 }
@@ -68,15 +69,23 @@ vi.mock("@polaris/db", () => ({
             }
         },
         user: {
-            findMany: async ({ where }: { where: { id: { in: string[] } } }) => {
+            findMany: async ({
+                where
+            }: {
+                where: { id: { in: string[] }; bannedAt?: null };
+            }) => {
                 userQuery = where;
-                return PEOPLE.filter((person) => where.id.in.includes(person.id));
+                return PEOPLE.filter(
+                    (person) =>
+                        where.id.in.includes(person.id) &&
+                        (where.bannedAt !== null || person.bannedAt === null)
+                );
             }
         }
     }
 }));
 
-const { accountsAtAddress } = await import("../../src/lib/address-accounts");
+const { accountsAtAddress, addressesTrusted } = await import("../../src/lib/address-accounts");
 
 const NOW = Date.parse("2026-08-04T12:00:00Z");
 
@@ -259,5 +268,38 @@ describe("accounts at an address", () => {
         ];
         await accountsAtAddress("198.51.100.88", NOW);
         expect(userQuery?.id.in).toContain("user-1");
+    });
+});
+
+describe("addresses the firewall trusts", () => {
+    beforeEach(() => {
+        sessionRows = [];
+        movedRows = [];
+        auditGroups = [];
+        auditQuery = null;
+    });
+
+    it("trusts an address an account in good standing signed in from this month", async () => {
+        auditGroups = [
+            { ipHash: "hashed:198.51.100.7", actorId: "user-1", _count: { _all: 1 }, _max: { at: null } }
+        ];
+        const trusted = await addressesTrusted(["198.51.100.7", "203.0.113.9"], Date.parse("2026-11-12T00:00:00Z"));
+        expect([...trusted]).toEqual(["198.51.100.7"]);
+        const where = (auditQuery as { where: Record<string, unknown> } | null)?.where;
+        expect(where?.action).toBe("account.signin");
+        expect(where?.ipHash).toEqual({ in: ["hashed:198.51.100.7", "hashed:203.0.113.9"] });
+        expect(where?.at).toEqual({ gt: new Date("2026-10-13T00:00:00Z") });
+    });
+
+    it("does not trust an address only a banned account signed in from", async () => {
+        auditGroups = [
+            { ipHash: "hashed:198.51.100.7", actorId: "user-2", _count: { _all: 1 }, _max: { at: null } }
+        ];
+        expect([...(await addressesTrusted(["198.51.100.7"]))]).toEqual([]);
+    });
+
+    it("asks nothing for no addresses", async () => {
+        expect([...(await addressesTrusted([]))]).toEqual([]);
+        expect(auditQuery).toBeNull();
     });
 });

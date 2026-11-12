@@ -578,6 +578,22 @@
         "assetMax": "Recursos pedidos",
         "variantMax": "Variantes"
     },
+    "lookup": {
+        "title": "Buscar un bloqueo",
+        "intro": "Pega la referencia de una página de bloqueo para ver qué la rechazó.",
+        "placeholder": "Referencia",
+        "submit": "Buscar",
+        "invalid": "Una referencia tiene esta forma: 3418858b-784f-463f-84ef-8b9013fbd592.",
+        "unknown": "El edge no tiene esta referencia. Guarda los últimos 5.000 bloqueos desde que arrancó.",
+        "outdated": "El edge es anterior a esta búsqueda. Actualiza Polaris desde Ajustes para usarla.",
+        "unreachable": "El edge no respondió. Inténtalo de nuevo en un momento.",
+        "reason": "Rechazado por",
+        "address": "Dirección",
+        "site": "Sitio",
+        "request": "Petición",
+        "when": "Cuándo",
+        "browser": "Navegador"
+    },
     "bans": {
         "title": "Bloqueadas ahora",
         "none": "No hay nadie bloqueado. Las direcciones aparecen aquí cuando saltan un bloqueo automático de abajo o cuando las marca un proveedor de reputación.",
@@ -587,6 +603,8 @@
             "until": "Hasta"
         },
         "offences": "{count}x",
+        "challenge": "Verificación",
+        "challengeHint": "No se rechaza: un navegador pasa la verificación solo, un script no.",
         "untilLifted": "Hasta que lo levantes",
         "liftNamed": "Levantar el bloqueo de {ip}",
         "lift": "Desbloquear",

@@ -6,7 +6,7 @@
 
 import type { ServerResponse } from "node:http";
 import { describe, expect, it, vi } from "vitest";
-import { sendBlocked } from "../src/block-page.js";
+import { blockLog, sendBlocked } from "../src/block-page.js";
 
 /** A ServerResponse stand-in that records what was written to it. */
 function capture() {
@@ -103,5 +103,36 @@ describe("sendBlocked", () => {
         for (const reference of references) {
             expect(reference).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
         }
+    });
+
+    it("lets the page run its Try again button and nothing else", () => {
+        const { res, written } = capture();
+
+        sendBlocked(res, { accept: HTML, host: "app.example.com" });
+
+        const csp = written.headers["content-security-policy"] ?? "";
+        const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
+        expect(nonce).toBeTruthy();
+        expect(csp).toContain("default-src 'none'");
+        expect(written.body).toContain(`<script nonce="${nonce}">`);
+        expect(written.body).toContain('id="edge-retry"');
+    });
+
+    it("says how a ban lifts, as a page and as text", () => {
+        const release = { until: Date.parse("2026-11-13T09:30:00.000Z"), signIn: "/oauth/login" };
+        const page = capture();
+        sendBlocked(page.res, { accept: HTML, release });
+        expect(page.written.body).toContain('href="/oauth/login"');
+        const text = capture();
+        sendBlocked(text.res, { accept: "*/*", release });
+        expect(text.written.body).toContain("Unblocked at: 2026-11-13T09:30:00.000Z");
+        expect(text.written.body).toContain("/oauth/login");
+    });
+
+    it("remembers the block under the reference it showed", () => {
+        const { res, written } = capture();
+        sendBlocked(res, { accept: "*/*", reason: "rule: test", ip: "203.0.113.9" });
+        const reference = /Reference ID: (\S+)/.exec(written.body)?.[1] ?? "";
+        expect(blockLog.find(reference)).toMatchObject({ reason: "rule: test", ip: "203.0.113.9" });
     });
 });

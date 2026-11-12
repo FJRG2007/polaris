@@ -14,8 +14,9 @@
  * that hit one first was the operator's own.
  */
 
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { wafBlockPage } from "@polaris/core";
+import { createWafBlockLog } from "@polaris/core/waf";
 import type { ServerResponse } from "node:http";
 
 /** The request facts the page shows. All of them arrive in headers. */
@@ -34,11 +35,25 @@ export interface BlockContext {
     readonly uri?: string;
     readonly method?: string;
     readonly userAgent?: string;
+    /** For an automatic ban that lifts: when, and where signing in lifts it now. */
+    readonly release?: { readonly until: number | null; readonly signIn: string | null };
 }
+
+/** The most recent blocks, for the Firewall screen to look a reference up in. */
+export const blockLog = createWafBlockLog();
 
 /** True when the client asked for a document rather than data. */
 function wantsDocument(accept: string | undefined): boolean {
     return (accept ?? "").toLowerCase().includes("text/html");
+}
+
+/** The same way out, for a client that reads text. */
+function plainRelease(release: BlockContext["release"]): string {
+    if (!release) return "";
+    const lines: string[] = [];
+    if (release.until !== null) lines.push(`Unblocked at: ${new Date(release.until).toISOString()}`);
+    if (release.signIn) lines.push(`Signing in unblocks it now: ${release.signIn}`);
+    return lines.length > 0 ? `${lines.join("\n")}\n` : "";
 }
 
 /**
@@ -50,21 +65,28 @@ export function sendBlocked(res: ServerResponse, ctx: BlockContext): void {
     const document = wantsDocument(ctx.accept);
     // One line, so `docker logs` and a grep for the reference answer the question the
     // block page tells the visitor to ask.
-    console.log(
-        JSON.stringify({
-            event: "waf.block",
-            reference,
-            reason: ctx.reason ?? "unknown",
-            ip: ctx.ip ?? null,
-            host: ctx.host ?? null,
-            uri: ctx.uri ?? null,
-            method: ctx.method ?? null,
-            userAgent: ctx.userAgent ?? null,
-            at: new Date().toISOString()
-        })
-    );
+    const record = {
+        reference,
+        reason: ctx.reason ?? "unknown",
+        ip: ctx.ip ?? null,
+        host: ctx.host ?? null,
+        uri: ctx.uri ?? null,
+        method: ctx.method ?? null,
+        userAgent: ctx.userAgent ?? null,
+        at: new Date().toISOString()
+    };
+    console.log(JSON.stringify({ event: "waf.block", ...record }));
+    blockLog.add(record);
+    // The page's one script is its Try again button, allowed by this nonce and
+    // nothing else.
+    const nonce = randomBytes(16).toString("base64");
     res.writeHead(403, {
         "content-type": document ? "text/html; charset=utf-8" : "text/plain; charset=utf-8",
+        ...(document
+            ? {
+                  "content-security-policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
+              }
+            : {}),
         "cache-control": "no-store",
         "x-content-type-options": "nosniff",
         // A refusal is never something to show inside another site's page.
@@ -72,7 +94,7 @@ export function sendBlocked(res: ServerResponse, ctx: BlockContext): void {
     });
     res.end(
         document
-            ? wafBlockPage({ reference, host: ctx.host, ip: ctx.ip })
-            : `Blocked by the firewall.\nReference ID: ${reference}\n`
+            ? wafBlockPage({ reference, host: ctx.host, ip: ctx.ip, release: ctx.release, retryNonce: nonce })
+            : `Blocked by the firewall.\nReference ID: ${reference}\n${plainRelease(ctx.release)}`
     );
 }

@@ -225,6 +225,44 @@ describe("detectWafBans", () => {
         expect(bans[0]!.until).toBe(NOW + 86400 * 1000);
     });
 
+    it("does not count Polaris's own Marketplace logos as probes", () => {
+        // The incident: three phpMyAdmin logos in a minute banned the operator.
+        const entries = hits("198.51.100.9", 6, {
+            status: 200,
+            path: "/logos/apps/phpmyadmin.svg"
+        }).map((entry) => ({ ...entry, router: "polaris-dashboard-https@file" }));
+        expect(detectWafBans({ entries, jails: [PROBES], now: NOW })).toEqual([]);
+    });
+
+    it("does not count a picture named like a probe on any site", () => {
+        const entries = hits("198.51.100.9", 6, { status: 200, path: "/img/wp-login.png" });
+        expect(detectWafBans({ entries, jails: [PROBES], now: NOW })).toEqual([]);
+    });
+
+    it("does not count Polaris's own pages on the dashboard", () => {
+        const entries = hits("198.51.100.9", 6, {
+            status: 200,
+            path: "/apps/marketplace/template-phpmyadmin"
+        }).map((entry) => ({ ...entry, router: "polaris-dashboard-https@file" }));
+        expect(detectWafBans({ entries, jails: [PROBES], now: NOW })).toEqual([]);
+    });
+
+    it("still counts the same probe on a deployed app's own domain", () => {
+        const entries = hits("198.51.100.9", 3, { status: 404, path: "/phpmyadmin/index.php" }).map(
+            (entry) => ({ ...entry, router: "app-shop@file" })
+        );
+        expect(detectWafBans({ entries, jails: [PROBES], now: NOW })[0]).toMatchObject({
+            jail: "probes"
+        });
+    });
+
+    it("matches a probe by whole segment, so /.github is not /.git", () => {
+        const github = hits("198.51.100.10", 3, { status: 404, path: "/.github/workflows/ci.yml" });
+        expect(detectWafBans({ entries: github, jails: [PROBES], now: NOW })).toEqual([]);
+        const git = hits("198.51.100.11", 3, { status: 404, path: "/.git/HEAD" });
+        expect(detectWafBans({ entries: git, jails: [PROBES], now: NOW })).toHaveLength(1);
+    });
+
     it("holds a credential probe permanently, on one request", () => {
         const entries = hits("198.51.100.4", 1, { status: 404, path: "/.env" });
         const bans = detectWafBans({ entries, jails: [PROBES], now: NOW });

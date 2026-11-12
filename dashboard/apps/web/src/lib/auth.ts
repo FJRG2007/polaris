@@ -66,8 +66,8 @@ const requestAuth = createRequestAuth({
     // an account is on that address. Lazily imported like the rest - the firewall
     // service reaches the database and the edge snapshot.
     onSessionCreated: async (session) => {
-        const { liftReputationBanOnSignIn } = await import("./waf-intel-service");
-        await liftReputationBanOnSignIn(session.ipAddress, session.userId);
+        const { liftBanOnSignIn } = await import("./waf-intel-service");
+        await liftBanOnSignIn(session.ipAddress, session.userId);
     }
 });
 

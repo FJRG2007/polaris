@@ -933,3 +933,5 @@ export function tailnetAppCookies(header: string | undefined | null): string | n
         });
     return kept.length > 0 ? kept.join("; ") : null;
 }
+
+export * from "./waf-block-log.js";

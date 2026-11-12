@@ -35,6 +35,75 @@ export interface WafBlockPageInput {
     readonly ip?: string | null;
     /** Replaces the default "why", for a block whose reason is safe to state. */
     readonly explanation?: string;
+    /** For an automatic ban the visitor can get out of: when it lifts by itself
+     *  (epoch ms, or null for never) and where to sign in to lift it now. Says how,
+     *  without saying which rule. */
+    readonly release?: { readonly until: number | null; readonly signIn: string | null };
+    /**
+     * The nonce the response's CSP allows, for the Try again button's script. A
+     * desktop app or an installed page has no reload button, and a person who was
+     * let back in has to be able to find out without restarting anything. Without
+     * it the page is inert and has no button.
+     */
+    readonly retryNonce?: string;
+}
+
+/**
+ * How long Try again waits after each go: 5 seconds, doubling, never more than a
+ * minute, starting over after ten quiet minutes. Kept in the tab, so a reload
+ * that lands on this page again picks up the wait instead of resetting it.
+ */
+const RETRY_SCRIPT = `(function () {
+  var button = document.getElementById("edge-retry");
+  if (!button) return;
+  var key = "polaris.edge.retry";
+  var label = button.textContent;
+  function read() {
+    try { return JSON.parse(sessionStorage.getItem(key) || "{}") || {}; } catch (e) { return {}; }
+  }
+  function write(value) {
+    try { sessionStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+  }
+  var state = read();
+  if (!state.at || Date.now() - state.at > 600000) state = {};
+  function tick() {
+    var left = Math.ceil(((state.next || 0) - Date.now()) / 1000);
+    if (left > 0) {
+      button.disabled = true;
+      button.textContent = label + " (" + left + "s)";
+      setTimeout(tick, 500);
+    } else {
+      button.disabled = false;
+      button.textContent = label;
+    }
+  }
+  button.addEventListener("click", function () {
+    if (button.disabled) return;
+    var count = (state.count || 0) + 1;
+    var wait = Math.min(60, 5 * Math.pow(2, count - 1));
+    state = { count: count, at: Date.now(), next: Date.now() + wait * 1000 };
+    write(state);
+    location.reload();
+  });
+  var when = document.getElementById("edge-until");
+  if (when) {
+    var at = new Date(when.getAttribute("datetime") || "");
+    if (!isNaN(at.getTime())) when.textContent = at.toLocaleString();
+  }
+  tick();
+})();`;
+
+/** The sentence for a ban that lifts, with the time it does. */
+function releaseText(release: NonNullable<WafBlockPageInput["release"]>): string {
+    const parts = ["This address was blocked automatically for what was sent from it."];
+    if (release.until !== null && Number.isFinite(release.until)) {
+        const iso = new Date(release.until).toISOString();
+        parts.push(
+            `It is unblocked by itself at <time id="edge-until" datetime="${iso}">${iso.replace("T", " ").slice(0, 16)} UTC</time>.`
+        );
+    }
+    if (release.signIn) parts.push("If you have an account here, sign in and it is unblocked now.");
+    return parts.join(" ");
 }
 
 /** The default "why", which describes the class of blocks rather than the rule. */
@@ -61,13 +130,22 @@ export function wafBlockPage(input: WafBlockPageInput): string {
             },
             {
                 heading: "What can I do about it?",
-                body: "If the site is yours, review its firewall rules. Otherwise contact the site owner and quote the reference below."
+                body: input.release
+                    ? `${releaseText(input.release)} Otherwise contact the site owner and quote the reference below.`
+                    : "If the site is yours, review its firewall rules. Otherwise contact the site owner and quote the reference below."
             }
+        ],
+        actions: [
+            ...(input.release?.signIn
+                ? [{ label: "Sign in", href: edgeText(input.release.signIn, "", 400), primary: true }]
+                : []),
+            ...(input.retryNonce ? [{ label: "Try again", id: "edge-retry" }] : [])
         ],
         facts: [
             { label: "Reference ID", value: edgeText(input.reference, "unavailable", 64) },
             { label: "Your IP", value: edgeText(input.ip, "") }
         ],
-        note: "Protected by Polaris"
+        note: "Protected by Polaris",
+        ...(input.retryNonce ? { script: { nonce: input.retryNonce, source: RETRY_SCRIPT } } : {})
     });
 }

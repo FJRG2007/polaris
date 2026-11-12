@@ -11,7 +11,7 @@
 
 import { prisma } from "@polaris/db";
 import { clientIp } from "@/lib/request-context";
-import { liftReputationBanOnSignIn } from "@/lib/waf-intel-service";
+import { liftBanOnSignIn } from "@/lib/waf-intel-service";
 import { passwordIsBreached } from "@/lib/pwned-passwords";
 import { claimInvite, resolveInvite } from "@/lib/invite-service";
 import { getTranslations } from "@/lib/i18n/request";
@@ -81,7 +81,7 @@ export async function acceptInviteAction(
             where: { email: result.email },
             select: { id: true }
         });
-        if (account) await liftReputationBanOnSignIn(ip, account.id, "invite");
+        if (account) await liftBanOnSignIn(ip, account.id, "invite");
     }
     return { email: result.email };
 }

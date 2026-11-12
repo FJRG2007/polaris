@@ -50,7 +50,10 @@ import {
     evaluateWafRules,
     injectionFailure,
     ipAllowed,
+    isPolarisOwnPath,
+    isStaticAssetPath,
     reputationSparesPath,
+    signInLiftsBan,
     type WafIntelIndex
 } from "@polaris/core";
 import {
@@ -66,6 +69,24 @@ import {
     verifyEdgeTokenFor,
     type GuardRule
 } from "@polaris/core/waf";
+
+/** Polaris's sign-in page, relative to where Polaris answers. */
+const SIGN_IN_PAGE = "/oauth/login";
+
+/** True when the visitor holds a valid pass from the browser check, else the
+ *  challenge to solve for one. */
+function passesChallenge(cfg: GuardConfig, req: GuardRequest, host: string): true | GuardDecision {
+    const secret = cfg.challengeSecret || cfg.secret;
+    const ip = clientIp(req.forwardedFor);
+    if (verifyEdgePass(readCookie(req.cookie, EDGE_PASS_COOKIE), secret, cfg.now, host, ip)) {
+        return true;
+    }
+    return {
+        status: 503,
+        challenge: issueEdgeChallenge({ host, ip, now: cfg.now, nonce: cfg.nonce ?? "" }, secret),
+        bits: EDGE_CHALLENGE_BITS
+    };
+}
 
 /** Path (on the app's own domain) the login handoff returns to. */
 const CALLBACK_PATH = "/edge/callback";
@@ -124,7 +145,13 @@ export interface GuardConfig {
 
 export type GuardDecision =
     | { readonly status: 200 }
-    | { readonly status: 403; readonly reason: string }
+    | {
+          readonly status: 403;
+          readonly reason: string;
+          /** For a ban the visitor can get out of: when it lifts by itself (epoch
+           *  ms), and where to sign in to lift it now. Absent for every other block. */
+          readonly release?: { readonly until: number | null; readonly signIn: string | null };
+      }
     | { readonly status: 302; readonly location: string; readonly setCookie?: string }
     | { readonly status: 503; readonly challenge: string; readonly bits: number }
     | { readonly status: 503; readonly signInUnavailable: true };
@@ -269,11 +296,34 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
             hit !== null &&
             rule.dashboard === true &&
             reputationSparesPath(hit, parseUri(req.forwardedUri, proto, host)?.pathname ?? null);
-        if (hit && !spared)
+        if (hit && !spared && hit.challenge === true && host) {
+            // A verdict the evidence cannot tell from a person: the browser check, which
+            // a browser passes by itself and a script does not, instead of a refusal.
+            const passed = passesChallenge(cfg, req, host);
+            if (passed !== true) return passed;
+        } else if (hit && !spared) {
+            const liftable = signInLiftsBan(hit);
             return {
                 status: 403,
-                reason: `intel: ${hit.reason}${hit.note ? ` (${hit.note})` : ""}`
+                reason: `intel: ${hit.reason}${hit.note ? ` (${hit.note})` : ""}`,
+                ...(liftable
+                    ? {
+                          release: {
+                              until: hit.until,
+                              // On the dashboard the sign-in is its own page; elsewhere
+                              // only where the route names its Polaris, because the
+                              // environment's fallback may be a LAN name.
+                              signIn:
+                                  rule.dashboard === true
+                                      ? SIGN_IN_PAGE
+                                      : rule.loginUrl
+                                        ? `${rule.loginUrl}${SIGN_IN_PAGE}`
+                                        : null
+                          }
+                      }
+                    : {})
             };
+        }
     }
 
     // Custom rules next, before the login handoff: a rule that admits a request is
@@ -308,8 +358,14 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
         if (own.verdict?.action === "allow") return { status: 200 };
 
         // The packs, unless a rule above stepped over them. They are only ever `block`
-        // rules, so their outcome cannot skip anything further.
-        if (!skipped.has("managed_rules") && managed.length > 0) {
+        // rules, so their outcome cannot skip anything further. They look for other
+        // software's paths, so they never judge a picture or a font, nor - on the
+        // dashboard - a route Polaris serves itself (`waf-own-paths.ts`): its own
+        // Marketplace shows a phpMyAdmin logo, and that is not a scan.
+        const ownPath =
+            isStaticAssetPath(facts.path) ||
+            (rule.dashboard === true && isPolarisOwnPath(facts.path));
+        if (!skipped.has("managed_rules") && managed.length > 0 && !ownPath) {
             const verdict = evaluateWafRules(managed, facts).verdict;
             if (verdict?.action === "block")
                 return { status: 403, reason: `rule: ${verdict.rule.name}` };
@@ -363,18 +419,8 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
     // otherwise shut out entirely.
     if (!skipped.has("challenge") && rule.challenge === true) {
         if (!host) return { status: 403, reason: "host unknown" };
-        const secret = cfg.challengeSecret || cfg.secret;
-        const ip = clientIp(req.forwardedFor);
-        if (!verifyEdgePass(readCookie(req.cookie, EDGE_PASS_COOKIE), secret, cfg.now, host, ip)) {
-            return {
-                status: 503,
-                challenge: issueEdgeChallenge(
-                    { host, ip, now: cfg.now, nonce: cfg.nonce ?? "" },
-                    secret
-                ),
-                bits: EDGE_CHALLENGE_BITS
-            };
-        }
+        const passed = passesChallenge(cfg, req, host);
+        if (passed !== true) return passed;
     }
 
     if (rule.requireLogin) {

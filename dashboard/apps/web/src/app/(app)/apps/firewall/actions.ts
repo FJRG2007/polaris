@@ -20,6 +20,7 @@ import { syncDashboardRoute } from "@/lib/domain-edge";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { accountsAtAddress, type AddressAccounts } from "@/lib/address-accounts";
 import { liftHostBlocks } from "@/lib/waf-ssh-service";
+import { lookupWafBlock, type WafBlockLookup } from "@/lib/waf-block-lookup";
 import { getWafJails, setWafJails, type WafJailSettings } from "@/lib/waf-ban-service";
 import { wafAddressActivity, wafLogWindow, wafTraffic } from "@/lib/waf-analytics-service";
 import {
@@ -551,7 +552,8 @@ export async function getWafOverviewAction(hours = 24): Promise<{
                 source: ban.source,
                 note: ban.note,
                 until: ban.until ? ban.until.toISOString() : null,
-                offences: ban.offences
+                offences: ban.offences,
+                challenge: ban.challenge
             })),
             jails,
             trusted,
@@ -573,6 +575,8 @@ export interface WafBanView {
     readonly note: string | null;
     readonly until: string | null;
     readonly offences: number;
+    /** Answered with the browser check rather than refused. */
+    readonly challenge: boolean;
 }
 
 function countEntries(json: string | undefined): number {
@@ -707,6 +711,19 @@ export async function setWafIgnoreListAction(entries: string[]): Promise<{ error
     } catch (caught) {
         return { error: await failure(caught, "errors.listSave") };
     }
+}
+
+/**
+ * What one block page's reference was: the rule or ban that refused it, the address,
+ * the request. The answer to the visitor who quoted it, without a terminal.
+ */
+export async function lookupWafBlockAction(
+    reference: string
+): Promise<{ lookup?: WafBlockLookup; error?: string }> {
+    await requirePermission("system.manage");
+    const parsed = z.string().trim().toLowerCase().uuid().safeParse(reference);
+    if (!parsed.success) return { error: await say("lookup.invalid") };
+    return { lookup: await lookupWafBlock(parsed.data) };
 }
 
 /** Lift a ban by hand. The address can be banned again the moment it re-offends,

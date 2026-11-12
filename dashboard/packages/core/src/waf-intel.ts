@@ -41,6 +41,14 @@ export interface WafIntelEntry {
     readonly until: number | null;
     /** Short human-readable cause ("404 flood", "CriminalIP: scanner"). */
     readonly note?: string;
+    /**
+     * Answer with the browser check rather than a refusal. For what the evidence
+     * cannot tell from a person - a 404 burst, a rate-limit flood, or any automatic
+     * verdict on an address an account in good standing uses - so a browser passes
+     * on its own and a script does not. A guard that predates this drops the field
+     * and blocks, which is what every guard did before.
+     */
+    readonly challenge?: boolean;
 }
 
 export interface WafIntelSnapshot {
@@ -169,7 +177,8 @@ function asEntry(value: unknown): WafIntelEntry | null {
     return {
         reason: raw.reason as WafIntelReason,
         until,
-        ...(typeof raw.note === "string" ? { note: raw.note } : {})
+        ...(typeof raw.note === "string" ? { note: raw.note } : {}),
+        ...(raw.challenge === true ? { challenge: true } : {})
     };
 }
 
@@ -180,10 +189,11 @@ function asEntry(value: unknown): WafIntelEntry | null {
  * A reputation provider describes an address, and a shared one - a VPN, WARP, iCloud
  * Private Relay, a carrier's NAT - is described by what other people did from it. A
  * ban on that evidence used to take the whole dashboard away, the sign-in page with it,
- * from somebody who had never been seen before. Jail, probe, Tor and manual entries
- * keep blocking everything: those are about the address's own behaviour or the
- * operator's own decision. Once the person signs in, Polaris lifts the reputation ban
- * itself, so the rest of the dashboard follows.
+ * from somebody who had never been seen before. A jail ban that lifts on its own is
+ * treated the same way (`signInLiftsBan`): the person on the address may not be the
+ * one who tripped it. A permanent ban, a Tor exit and a manual entry keep blocking
+ * everything: those are a credential hunt or the operator's own decision. Once the
+ * person signs in, Polaris lifts the ban itself, so the rest of the dashboard follows.
  *
  * Prefixes, matched against the path alone. `/api/auth/` is the sign-in API,
  * `/oauth/` the sign-in, invite, enrolment and recovery pages (server actions post to
@@ -212,13 +222,24 @@ const SIGN_IN_EXACT = new Set([
     "/robots.txt"
 ]);
 
-/** Whether a reputation entry is to be stepped over for this request path. Only
- *  reputation, only these paths, and never a path that walks out of them with `..`. */
+/**
+ * Whether a ban that lifts on its own leaves the way to sign in open. It is about
+ * what the address did, but a person on it - behind the same router as whoever did
+ * it, or whose own tab misbehaved - has to be able to show they have an account,
+ * and signing in lifts it (`liftBanOnSignIn`). A ban that stands until an operator
+ * lifts it (a credential probe) does not, nor does a Tor exit or a manual entry.
+ */
+export function signInLiftsBan(entry: WafIntelEntry): boolean {
+    return entry.reason === "reputation" || (entry.reason === "ban" && entry.until !== null);
+}
+
+/** Whether an entry is to be stepped over for this request path: one that signing
+ *  in lifts, only these paths, and never a path that walks out of them with `..`. */
 export function reputationSparesPath(
     entry: WafIntelEntry,
     path: string | null | undefined
 ): boolean {
-    if (entry.reason !== "reputation" || !path) return false;
+    if (!signInLiftsBan(entry) || !path) return false;
     if (path.includes("..") || path.includes("%2e") || path.includes("%2E")) return false;
     return SIGN_IN_EXACT.has(path) || SIGN_IN_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
