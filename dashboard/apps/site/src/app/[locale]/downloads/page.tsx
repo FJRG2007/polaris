@@ -20,5 +20,5 @@ export default async function Page({ params }: Props) {
     const { locale } = await params;
     if (!isLocale(locale)) notFound();
     const data = siteData();
-    return <SiteDownloads locale={locale} repo={data.repo} data={data.downloadsPage} />;
+    return <SiteDownloads locale={locale} repo={data.repo} data={data.downloadsPage} viewer={words(locale).viewer} />;
 }

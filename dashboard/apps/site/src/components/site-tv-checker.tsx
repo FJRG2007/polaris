@@ -11,6 +11,8 @@ import { I18nContext } from "@polaris/ui/i18n";
 import type { Locale, Namespaces } from "@polaris/core";
 import { useEffect, useState, type ReactNode } from "react";
 import { TvGallery, type TvGalleryItem } from "@polaris/ui/tv-gallery";
+import { ImageViewer, type ViewedImage } from "@polaris/ui/image-viewer";
+import { viewerLabels, type ViewerWords } from "@/components/shot-gallery";
 import { TV_GUIDE_SLUGS, TvChecker, TvPrivacyGuide, type TvGuide } from "@polaris/ui/tv-checker";
 
 function TvWords({
@@ -63,17 +65,36 @@ export function SiteTvChecker({
 export function SiteTvGallery({
     locale,
     messages,
-    items
+    items,
+    viewer
 }: {
     locale: "en" | "es";
     messages: Record<string, unknown>;
     items: readonly TvGalleryItem[];
+    /** The picture viewer's words; each screenshot opens in it. */
+    viewer: ViewerWords;
 }) {
+    const [open, setOpen] = useState<ViewedImage | null>(null);
     if (!items.length) return null;
     const base = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/tv-gallery/`;
+    const picture = (item: TvGalleryItem): ViewedImage => ({
+        url: `${base}${item.screenshot}`,
+        name: item.name
+    });
     return (
         <TvWords locale={locale} messages={messages}>
-            <TvGallery items={items} screenshotSrc={(item) => `${base}${item.screenshot}`} />
+            <TvGallery
+                items={items}
+                screenshotSrc={(item) => `${base}${item.screenshot}`}
+                onOpen={(item) => setOpen(picture(item))}
+            />
+            <ImageViewer
+                image={open}
+                onClose={() => setOpen(null)}
+                gallery={open ? items.map(picture) : undefined}
+                onNavigate={setOpen}
+                labels={viewerLabels(viewer)}
+            />
         </TvWords>
     );
 }

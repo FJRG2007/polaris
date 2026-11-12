@@ -50,12 +50,15 @@ export function TvGallery({
     items,
     screenshotSrc,
     action,
+    onOpen,
     heading = true
 }: {
     items: readonly TvGalleryItem[];
     screenshotSrc: (item: TvGalleryItem) => string;
     /** What a card offers under its text, such as picking it for a TV. */
     action?: (item: TvGalleryItem) => ReactNode;
+    /** Opens a screenshot larger; without it the screenshots are plain pictures. */
+    onOpen?: (item: TvGalleryItem) => void;
     /** Its own title and how-to-pick line, for a page with no title of its own for it. */
     heading?: boolean;
 }) {
@@ -110,12 +113,27 @@ export function TvGallery({
                             key={`${item.kind}/${item.id}`}
                             className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-border"
                         >
-                            <img
-                                src={screenshotSrc(item)}
-                                alt={t("gallery.screenshot", { name: item.name })}
-                                loading="lazy"
-                                className="aspect-video w-full bg-muted object-cover"
-                            />
+                            {onOpen ? (
+                                <button
+                                    type="button"
+                                    onClick={() => onOpen(item)}
+                                    className="block w-full cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                                >
+                                    <img
+                                        src={screenshotSrc(item)}
+                                        alt={t("gallery.screenshot", { name: item.name })}
+                                        loading="lazy"
+                                        className="aspect-video w-full bg-muted object-cover"
+                                    />
+                                </button>
+                            ) : (
+                                <img
+                                    src={screenshotSrc(item)}
+                                    alt={t("gallery.screenshot", { name: item.name })}
+                                    loading="lazy"
+                                    className="aspect-video w-full bg-muted object-cover"
+                                />
+                            )}
                             <div className="flex min-w-0 flex-col gap-2 p-3">
                                 <div className="flex min-w-0 items-center gap-2">
                                     <h3 className="min-w-0 truncate font-medium" title={item.name}>

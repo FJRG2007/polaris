@@ -9,7 +9,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Button, cn } from "@polaris/ui";
-import { ImageViewer, type ViewedImage } from "@polaris/ui/image-viewer";
+import { ImageViewer, type ViewedImage, type ViewerLabels } from "@polaris/ui/image-viewer";
 
 export interface Shot {
     readonly name: string;
@@ -36,6 +36,15 @@ export interface ViewerWords {
     /** "{index} of {count}". */
     readonly position: string;
     readonly open: string;
+}
+
+/** The viewer's labels from the site's words, with "{index} of {count}" filled in. */
+export function viewerLabels(words: ViewerWords): ViewerLabels {
+    return {
+        ...words,
+        position: (index, count) =>
+            words.position.replace("{index}", String(index)).replace("{count}", String(count))
+    };
 }
 
 /** The picture that matches the theme the page is drawn in. */
@@ -89,13 +98,7 @@ export function useShotViewer(shots: readonly Shot[], words: ViewerWords) {
             onClose={() => setOpen(null)}
             gallery={open ? gallery() : undefined}
             onNavigate={setOpen}
-            labels={{
-                ...words,
-                position: (index, count) =>
-                    words.position
-                        .replace("{index}", String(index))
-                        .replace("{count}", String(count))
-            }}
+            labels={viewerLabels(words)}
         />
     );
     return { viewer, open: (shot: Shot) => setOpen({ url: shown(shot), name: shot.name }) };

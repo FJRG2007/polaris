@@ -10,6 +10,7 @@
  * defaults, drawn when no slot is passed.
  */
 
+import type { ViewerWords } from "@/components/shot-gallery";
 import type { ReactNode } from "react";
 import type { DownloadsData } from "@/data/builders";
 import { EXAMPLE_ORIGIN } from "@/lib/example-origin";
@@ -42,11 +43,14 @@ function Messages({
 export function SiteDownloads({
     locale,
     repo,
-    data
+    data,
+    viewer
 }: {
     locale: "en" | "es";
     repo: string;
     data: DownloadsData;
+    /** The picture viewer's words, for the TV gallery's screenshots. */
+    viewer: ViewerWords;
 }) {
     const { files } = data;
     const origin = useReaderOrigin() ?? EXAMPLE_ORIGIN;
@@ -88,6 +92,7 @@ export function SiteDownloads({
                     locale={locale}
                     messages={data.messages[locale].tvCompat}
                     items={data.tvGallery ?? []}
+                    viewer={viewer}
                 />
             </section>
         </Messages>
