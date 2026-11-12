@@ -9,9 +9,9 @@
  * directions fail here.
  */
 
-import { readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { readFileSync, readdirSync } from "node:fs";
 import { POLARIS_ROUTE_ROOTS, isPolarisOwnPath } from "@polaris/core";
 
 const WEB = resolve(__dirname, "../..");
@@ -52,7 +52,19 @@ function routeRoots(dir: string): string[] {
     return found;
 }
 
-const actual = new Set([...routeRoots(APP), ...readdirSync(PUBLIC), ...FRAMEWORK]);
+/**
+ * The public folders the build stages from packages (pdf.js, Bergamot, the
+ * worklets...). They are ignored by git, so a fresh checkout - CI's - does not
+ * have them, yet every deployed image serves them. The ignore file is where each
+ * one is declared, so it is read rather than repeated here.
+ */
+function stagedPublicRoots(): string[] {
+    const ignore = readFileSync(resolve(WEB, "../../../.gitignore"), "utf8");
+    const staged = /^dashboard\/apps\/web\/public\/([^/\s*]+)\/?\s*$/gm;
+    return [...ignore.matchAll(staged)].map((match) => match[1]);
+}
+
+const actual = new Set([...routeRoots(APP), ...readdirSync(PUBLIC), ...stagedPublicRoots(), ...FRAMEWORK]);
 
 describe("Polaris's own paths, as the firewall knows them", () => {
     it("names every top-level route and public file the app serves", () => {
