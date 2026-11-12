@@ -9,7 +9,9 @@ import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
+    firstModels,
     ModelSelector,
+    MODELS_PAGE,
     type ModelSelectorProvider
 } from "@/components/polar/elements/model-selector";
 
@@ -92,5 +94,46 @@ describe("the model search", () => {
         expect(screen.getByText("GPT-5")).toBeTruthy();
         fireEvent.keyDown(field, { key: "Escape" });
         await waitFor(() => expect(screen.queryByLabelText("Find a model")).toBeNull());
+    });
+});
+
+describe("a long catalogue", () => {
+    const many: ModelSelectorProvider[] = [
+        {
+            provider: "openrouter",
+            name: "OpenRouter",
+            payers: ["own"],
+            models: Array.from({ length: MODELS_PAGE + 15 }, (_, index) => ({
+                provider: "openrouter",
+                model: `m-${index}`,
+                name: `Model ${index}`,
+                reasoning: false
+            }))
+        }
+    ];
+
+    it("draws a page of models, the rest as the list is scrolled to its end", async () => {
+        render(<ModelSelector providers={many} choice={null} onChoice={vi.fn()} />, {
+            wrapper: MessagesWrapper
+        });
+        fireEvent.pointerDown(screen.getByTitle("Model, intelligence and key"), {
+            button: 0,
+            ctrlKey: false,
+            pointerType: "mouse"
+        });
+        await screen.findByText("Model 0");
+        expect(screen.queryByText(`Model ${MODELS_PAGE}`)).toBeNull();
+        fireEvent.click(screen.getByRole("menuitem", { name: "Show more" }));
+        expect(await screen.findByText(`Model ${MODELS_PAGE + 14}`)).toBeTruthy();
+        expect(screen.queryByRole("menuitem", { name: "Show more" })).toBeNull();
+    });
+
+    it("cuts the providers to the first models in their order", () => {
+        const { shown, more } = firstModels(PROVIDERS, 2);
+        expect(shown.map((entry) => [entry.provider, entry.models.length])).toEqual([
+            ["anthropic", 2]
+        ]);
+        expect(more).toBe(true);
+        expect(firstModels(PROVIDERS, 3).more).toBe(false);
     });
 });

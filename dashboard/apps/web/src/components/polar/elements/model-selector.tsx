@@ -20,7 +20,8 @@
 import Fuse from "fuse.js";
 import Link from "next/link";
 import { Check, Shuffle } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { IntegrationLogo } from "@/components/logos";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -106,6 +107,64 @@ export function modelIndex(providers: ModelSelectorProvider[]): Fuse<ModelEntry>
 }
 
 /** The picker's button on the composer's tool row; Code's agent picker wears it too. */
+/** Model rows drawn at first, and added each time the end of the list comes
+ *  into view: a catalogue of every provider is thousands of rows, and a menu
+ *  only ever shows a screenful of them. */
+export const MODELS_PAGE = 60;
+
+/** The providers, cut to the first `limit` models in their order. */
+export function firstModels<T extends { models: readonly unknown[] }>(
+    providers: readonly T[],
+    limit: number
+): { shown: T[]; more: boolean } {
+    const shown: T[] = [];
+    let left = limit;
+    for (const entry of providers) {
+        if (left <= 0) return { shown, more: true };
+        if (entry.models.length <= left) {
+            shown.push(entry);
+            left -= entry.models.length;
+        } else {
+            shown.push({ ...entry, models: entry.models.slice(0, left) });
+            return { shown, more: true };
+        }
+    }
+    return { shown, more: false };
+}
+
+/** The foot of the list: draws the next page once it comes near the view, and
+ *  stays an item for whoever moves with the keyboard. */
+function MoreModels({ onMore, label }: { onMore: () => void; label: string }) {
+    const ref = useRef<HTMLDivElement | null>(null);
+    const latest = useRef(onMore);
+    latest.current = onMore;
+    useEffect(() => {
+        const node = ref.current;
+        if (!node || typeof IntersectionObserver === "undefined") return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) latest.current();
+            },
+            { rootMargin: "200px 0px" }
+        );
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, []);
+    return (
+        <DropdownMenuItem
+            ref={ref}
+            onSelect={(event) => {
+                // Stays open: the next rows land right here.
+                event.preventDefault();
+                onMore();
+            }}
+            className="justify-center text-xs text-muted-foreground"
+        >
+            {label}
+        </DropdownMenuItem>
+    );
+}
+
 export const MODEL_TRIGGER =
     "inline-flex h-7 min-w-0 max-w-[60%] items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground";
 
@@ -155,12 +214,19 @@ export function ModelSelector({
     const [query, setQuery] = useState("");
     const index = useMemo(() => modelIndex(providers), [providers]);
     const searching = query.trim().length > 0;
-    const shown = useMemo(() => searchModels(providers, index, query), [providers, index, query]);
+    const found = useMemo(() => searchModels(providers, index, query), [providers, index, query]);
+    const [limit, setLimit] = useState(MODELS_PAGE);
+    // A new search starts again at the top of its results.
+    useEffect(() => setLimit(MODELS_PAGE), [query]);
+    const { shown, more } = useMemo(() => firstModels(found, limit), [found, limit]);
     return (
         <DropdownMenu
             open={open}
             onOpenChange={(next) => {
-                if (!next) setQuery("");
+                if (!next) {
+                    setQuery("");
+                    setLimit(MODELS_PAGE);
+                }
                 onOpenChange?.(next);
             }}
         >
@@ -175,6 +241,9 @@ export function ModelSelector({
                     }
                     className={triggerClassName ?? MODEL_TRIGGER}
                 >
+                    {!triggerContent && provider && !automatic ? (
+                        <IntegrationLogo slug={provider.provider} className="size-3.5 shrink-0" />
+                    ) : null}
                     {triggerContent ?? (
                         <span className="min-w-0 truncate text-foreground">
                             {automatic ? t("picker.automatic") : (model?.name ?? t("picker.none"))}
@@ -203,7 +272,7 @@ export function ModelSelector({
                         placeholder={t("picker.search")}
                     />
                 ) : null}
-                {searching && shown.length === 0 ? (
+                {searching && found.length === 0 ? (
                     <p className="px-2 py-3 text-center text-xs text-muted-foreground">
                         {t("picker.noMatch")}
                     </p>
@@ -228,7 +297,10 @@ export function ModelSelector({
                 ) : null}
                 {shown.map((entry) => (
                     <div key={entry.provider}>
-                        <DropdownMenuLabel>{entry.name}</DropdownMenuLabel>
+                        <DropdownMenuLabel className="flex min-w-0 items-center gap-1.5">
+                            <IntegrationLogo slug={entry.provider} className="size-3.5 shrink-0" />
+                            <span className="min-w-0 truncate">{entry.name}</span>
+                        </DropdownMenuLabel>
                         {entry.models.map((option) => (
                             <DropdownMenuItem
                                 key={option.model}
@@ -242,6 +314,10 @@ export function ModelSelector({
                                     })
                                 }
                             >
+                                <IntegrationLogo
+                                    slug={option.provider}
+                                    className="size-3.5 shrink-0"
+                                />
                                 <span className="min-w-0 truncate" title={option.name}>
                                     {option.name}
                                 </span>
@@ -255,6 +331,12 @@ export function ModelSelector({
                         ))}
                     </div>
                 ))}
+                {more ? (
+                    <MoreModels
+                        onMore={() => setLimit((current) => current + MODELS_PAGE)}
+                        label={t("picker.more")}
+                    />
+                ) : null}
                 {choice && !searching ? (
                     <>
                         <DropdownMenuSeparator />
