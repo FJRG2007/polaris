@@ -13,47 +13,43 @@ import type { ReactNode } from "react";
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { codeSourcesFor } from "@/lib/polar/agents/code-sources";
 
 const INSTALL = "https://github.com/apps/polaris-test/installations/new";
+
+/** Claude Code signed in on the machine itself: the machine's sign-in source. */
+const AGENTS = [
+    {
+        key: "claude",
+        cli: "claude",
+        label: "Claude Code",
+        vendor: "Anthropic",
+        docs: "",
+        readiness: "ready" as const,
+        accountId: null,
+        account: "This machine's own login",
+        mine: null,
+        machine: true,
+        apiKey: false,
+        missing: []
+    }
+];
 
 const CHOICES = {
     sharedWorkspace: false,
     installUrl: INSTALL as string | null,
     repos: [{ id: "22222222-2222-4222-8222-222222222222", name: "acme/web" }],
     hosts: [],
-    composer: [
-        {
-            key: "tool:claude",
-            kind: "tool",
-            id: null,
-            name: "Claude Code",
-            description: "",
-            engine: "claude",
-            modelSource: "own",
-            accounts: [{ key: "claude:machine", kind: "machine", label: null, accountId: null, machine: true, mine: null, readiness: "ready" }],
-            models: [],
-            modelPolicy: "preferred",
-            catalogue: [],
-            readiness: "ready"
-        }
-    ],
-    agents: [
-        {
-            key: "claude",
-            cli: "claude",
-            label: "Claude Code",
-            vendor: "Anthropic",
-            docs: "",
-            readiness: "ready",
-            accountId: null,
-            account: "This machine's own login",
-            mine: null,
-            machine: true,
-            apiKey: false,
-            missing: []
-        }
-    ]
+    agents: AGENTS,
+    code: {
+        sources: codeSourcesFor(AGENTS),
+        personas: [],
+        polarPolicy: { models: [], modelPolicy: "preferred" }
+    }
 };
+
+/** The model picker on a Claude source, on its own default model. */
+const PICKED = "Model: Default model - Claude subscription";
 
 vi.mock("@ai-sdk/react", () => ({
     useChat: () => ({
@@ -95,7 +91,8 @@ beforeEach(() => {
             clear: () => stored.clear()
         });
     }
-    // These follow a coding agent's session; Polar's own answers are tested on their own.
+    // These follow a coding agent's session; Polar's own answers are tested on their
+    // own. Kept as it was before Code was model-first: read as the machine's sign-in.
     window.localStorage.setItem("polar.code.agent", "tool:claude");
     vi.stubGlobal(
         "fetch",
@@ -154,7 +151,7 @@ async function openCode() {
     await waitFor(() => expect((codeOption as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(codeOption);
     const box = await screen.findByRole("textbox", { name: "Task for the agent" });
-    await screen.findByRole("button", { name: /^Agent: Claude Code/ });
+    await screen.findByRole("button", { name: PICKED });
     return box;
 }
 
@@ -184,9 +181,9 @@ describe("Code's composer is Chat's", () => {
             "Dictate",
             "Microphone and model",
             "Write something to improve it",
-            "Agent: Claude Code",
+            PICKED,
+            // A Claude source runs on Claude Code, whose questions are answered here.
             "Permissions: Full access",
-            "Model: Account's default model - This machine's own sign-in",
             "Voice talks to Polar's chat, not to an agent"
         ]);
         const form = box.closest("form") as HTMLFormElement;
@@ -196,8 +193,10 @@ describe("Code's composer is Chat's", () => {
         expect(attach.getAttribute("aria-disabled")).not.toBe("true");
         const voice = within(form).getByRole("button", { name: /not to an agent/ });
         expect(voice.getAttribute("aria-disabled")).toBe("true");
-        // Neither picker sits in the composer twice, and the repository is not in it.
-        expect(within(form).getAllByText("Claude Code")).toHaveLength(1);
+        // The picker sits in the composer once, no tool is named, and the
+        // repository is not in it.
+        expect(within(form).getAllByText("Default model - Claude subscription")).toHaveLength(1);
+        expect(within(form).queryByText(/Claude Code/)).toBeNull();
         expect(within(form).queryByText("acme/web")).toBeNull();
     });
 });

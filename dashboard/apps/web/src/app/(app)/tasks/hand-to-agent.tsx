@@ -10,9 +10,10 @@
  * "what is happening with this" without anybody updating it.
  *
  * Only the two things that cannot be inferred are asked for. Which repository,
- * because a task does not name one, and which agent, because that is a
- * preference. Everything else - the title, the prompt, the branch - comes from
- * the task.
+ * because a task does not name one, and which model, because that is a
+ * preference - picked from the person's sources as in Polar Code; the server
+ * works out which tool runs it. Everything else - the title, the prompt, the
+ * branch - comes from the task.
  */
 
 import { useRouter } from "next/navigation";
@@ -24,13 +25,9 @@ import { PagedPicker } from "@/components/paged-picker";
 import type { RepoOption } from "@/lib/agents/repo-options";
 import { agentHandoffRepoOptionsAction, handTaskToAgentAction } from "./actions";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
-import {
-    accountOf,
-    agentOf,
-    AgentSelect,
-    machineOf,
-    SignInNotice
-} from "@/components/agents/agent-select";
+import { SignInNotice } from "@/components/agents/agent-select";
+import { CodeModelPicker } from "@/components/polar/code-model-picker";
+import type { CodePick, CodeSource } from "@/lib/polar/agents/code-sources";
 import {
     Button,
     Dialog,
@@ -89,8 +86,9 @@ function HandOffDialog({
     const tc = useTranslations("common");
     const [repos, setRepos] = useState<{ id: string; name: string }[] | null>(null);
     const [agents, setAgents] = useState<AgentOption[]>([]);
+    const [sources, setSources] = useState<CodeSource[] | null>(null);
     const [repoId, setRepoId] = useState("");
-    const [cli, setCli] = useState("claude");
+    const [pick, setPick] = useState<CodePick | null>(null);
     // Seeded from the task and then editable. What a task says is usually the
     // right brief and occasionally needs a sentence of context that would have
     // been noise on the board.
@@ -107,6 +105,17 @@ function HandOffDialog({
         void polls.handoffChoices().then((choices) => {
             setRepos(choices.repos);
             setAgents(choices.agents);
+            setSources(choices.sources);
+            // A source that can sign in first; its own default model.
+            const first =
+                choices.sources.find((source) => source.readiness === "ready") ?? choices.sources[0];
+            setPick(
+                (current) =>
+                    current ??
+                    (first
+                        ? { source: first.key, provider: first.models[0]?.provider ?? "", model: null }
+                        : null)
+            );
             setRepoId((current) => current || (choices.repos[0]?.id ?? ""));
         });
     }, []);
@@ -118,9 +127,8 @@ function HandOffDialog({
                     handTaskToAgentAction({
                         repoId,
                         title: `${reference} ${name}`.slice(0, 80),
-                        cli: agentOf(cli),
-                        accountId: accountOf(cli),
-                        useMachineLogin: machineOf(cli),
+                        // The server resolves the tool from this.
+                        pick,
                         place: "local",
                         hostId: null,
                         baseRef: "",
@@ -140,8 +148,16 @@ function HandOffDialog({
     // The chosen tool, when nothing here can sign it in. A handoff is always a
     // session on this box, so there is no "already signed in on that server"
     // case to leave room for: it would come up at a login prompt, full stop.
+    const source = sources?.find((entry) => entry.key === pick?.source) ?? null;
     const unlinked =
-        agents.find((agent) => agent.key === cli && agent.readiness === "missing") ?? null;
+        source?.readiness === "missing"
+            ? (agents.find(
+                  (agent) =>
+                      agent.cli === source.engines[0] &&
+                      (agent.accountId ?? null) === source.accountId &&
+                      agent.readiness === "missing"
+              ) ?? null)
+            : null;
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -175,11 +191,12 @@ function HandOffDialog({
                             <span className="text-xs text-muted-foreground">
                                 {t("agent.agent")}
                             </span>
-                            <AgentSelect
-                                options={agents}
-                                value={cli}
-                                onChange={setCli}
-                                disabled={agents.length === 0}
+                            <CodeModelPicker
+                                sources={sources}
+                                value={pick}
+                                onChange={setPick}
+                                automatic={false}
+                                disabled={busy || sources?.length === 0}
                             />
                         </label>
                         {unlinked ? <SignInNotice agent={unlinked} /> : null}
@@ -203,7 +220,14 @@ function HandOffDialog({
                     </Button>
                     <Button
                         onClick={submit}
-                        disabled={busy || noRepos || !repoId || !prompt.trim() || unlinked !== null}
+                        disabled={
+                            busy ||
+                            noRepos ||
+                            !repoId ||
+                            !prompt.trim() ||
+                            pick === null ||
+                            source?.readiness === "missing"
+                        }
                     >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         {t("agent.start")}

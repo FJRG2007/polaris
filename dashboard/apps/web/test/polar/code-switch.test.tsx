@@ -10,46 +10,41 @@ import type { ReactNode } from "react";
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { accountSourceKey, codeSourcesFor } from "@/lib/polar/agents/code-sources";
 
 const started: unknown[] = [];
+
+/** A Claude subscription linked on Account > AI keys: Claude Code runs it. */
+const PLAN = "0190c6a0-0000-7000-8000-0000000000a1";
+const AGENTS = [
+    {
+        key: `claude:${PLAN}`,
+        cli: "claude",
+        label: "Claude Code",
+        vendor: "Anthropic",
+        docs: "",
+        readiness: "ready" as const,
+        accountId: PLAN,
+        account: "me@example.test",
+        mine: true,
+        machine: false,
+        apiKey: false,
+        env: "CLAUDE_CODE_OAUTH_TOKEN",
+        missing: []
+    }
+];
 
 const CHOICES = {
     sharedWorkspace: false,
     installUrl: "https://github.com/apps/polaris-test/installations/new",
     repos: [{ id: "22222222-2222-4222-8222-222222222222", name: "acme/web" }],
     hosts: [],
-    composer: [
-        {
-            key: "tool:claude",
-            kind: "tool",
-            id: null,
-            name: "Claude Code",
-            description: "",
-            engine: "claude",
-            modelSource: "own",
-            accounts: [{ key: "claude", kind: "any", label: null, accountId: null, machine: false, mine: null, readiness: "ready" }],
-            models: [],
-            modelPolicy: "preferred",
-            catalogue: [],
-            readiness: "ready"
-        }
-    ],
-    agents: [
-        {
-            key: "claude",
-            cli: "claude",
-            label: "Claude Code",
-            vendor: "Anthropic",
-            docs: "",
-            readiness: "ready",
-            accountId: null,
-            account: null,
-            mine: null,
-            machine: false,
-            apiKey: false,
-            missing: []
-        }
-    ]
+    agents: AGENTS,
+    code: {
+        sources: codeSourcesFor(AGENTS),
+        personas: [],
+        polarPolicy: { models: [], modelPolicy: "preferred" }
+    }
 };
 
 function answer(value: unknown): Response {
@@ -134,7 +129,8 @@ beforeEach(() => {
             clear: () => stored.clear()
         });
     }
-    // These follow a coding agent's session; Polar's own answers are tested on their own.
+    // These follow a coding agent's session; Polar's own answers are tested on their
+    // own. Kept as it was before Code was model-first: read as the subscription.
     window.localStorage.setItem("polar.code.agent", "tool:claude");
     vi.stubGlobal(
         "fetch",
@@ -191,7 +187,8 @@ describe("the Chat / Code switch", () => {
         expect(started[0]).toMatchObject({
             repoId: "22222222-2222-4222-8222-222222222222",
             title: "Fix the login form",
-            cli: "claude",
+            // The source and model, never the tool: the server resolves that.
+            pick: { source: accountSourceKey(PLAN), model: null },
             prompt: "Fix the login form\nwith tests",
             enigma: { enabled: true }
         });
@@ -216,7 +213,7 @@ describe("the Chat / Code switch", () => {
         await waitFor(() => expect((codeOption as HTMLButtonElement).disabled).toBe(false));
         fireEvent.click(codeOption);
         const box = await screen.findByRole("textbox", { name: "Task for the agent" });
-        await screen.findByRole("button", { name: /^Agent: Polar/ });
+        await screen.findByRole("button", { name: /^Model: Automatic/ });
         await screen.findByRole("button", { name: /^Where the agent works: acme\/web/ });
         fireEvent.change(box, { target: { value: "What does the login form validate?" } });
         const send = screen.getByRole("button", { name: "Send (Enter)" }) as HTMLButtonElement;
@@ -424,7 +421,11 @@ describe("how the agent asks before it acts", () => {
         await waitFor(() => expect(send.disabled).toBe(false));
         fireEvent.click(send);
         await waitFor(() => expect(started).toHaveLength(1));
-        expect(started[0]).toMatchObject({ cli: "claude", permissionMode: "ask" });
+        expect(started[0]).toMatchObject({
+            pick: { source: accountSourceKey(PLAN) },
+            permissionMode: "ask"
+        });
+        expect(started[0]).not.toHaveProperty("cli");
         expect(window.localStorage.getItem("polar.code.permissionMode")).toBe("ask");
     });
 

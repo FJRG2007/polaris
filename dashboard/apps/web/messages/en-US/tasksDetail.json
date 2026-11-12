@@ -9,7 +9,7 @@
         "pickRepository": "Pick a repository",
         "repoSearch": "Search repositories",
         "repoEmpty": "No repository matches",
-        "agent": "Agent",
+        "agent": "Model",
         "prompt": "What it is being asked",
         "start": "Start"
     },

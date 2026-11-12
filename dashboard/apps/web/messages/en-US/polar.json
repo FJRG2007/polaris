@@ -1144,8 +1144,6 @@
         "repository": "Repository",
         "branch": "Branch",
         "branchPlaceholder": "Default branch",
-        "agent": "Agent",
-        "polarEngine": "Polar",
         "taskOn": "Code: {repo}",
         "taskClear": "Stop reading the repository",
         "issue": {
@@ -1197,7 +1195,6 @@
             "always": "Always allow",
             "deny": "Deny"
         },
-        "polarEngineHint": "Your chat models. Answers right away and reads the repository.",
         "signIn": "{agent} is not signed in on this account yet.",
         "openSettings": "Sign it in",
         "noRepos": "No repository is connected, so a session opens as an empty workspace.",
@@ -1235,11 +1232,6 @@
         "connectInAgents": "Connect a repository",
         "refresh": "Refresh the list",
         "notSignedIn": "Not signed in",
-        "apiKeyAccount": "API key: {account}",
-        "machineAccount": "This machine's login",
-        "apiKeys": "Keys and sign-ins",
-        "searchAgents": "Find an agent",
-        "noAgentMatch": "No agents match",
         "noVoice": "Voice talks to Polar's chat, not to an agent",
         "noModel": "Add an AI key to pick a model for OpenCode.",
         "addKey": "Add a key",

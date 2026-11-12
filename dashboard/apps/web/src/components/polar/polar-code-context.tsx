@@ -8,17 +8,12 @@
  * an empty workspace, gives Polaris's GitHub App more repositories on GitHub -
  * with a refresh for when the person comes back - and opens the repository's
  * branches in a submenu.
- *
- * The agent is picked on the composer, in the model picker's place and look.
  */
 
 import Link from "next/link";
 import { settingsSection } from "@/lib/polar/settings-path";
-import { AgentLogo } from "@/components/logos";
 import type { PolarCodeChoices } from "@/lib/polar/code";
-import type { AgentOption } from "@/lib/agents/agent-readiness";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useEffect, useState, type ReactNode } from "react";
 import type { PolarCodeBranches } from "@/lib/polar/code";
 import { readPoll } from "@/lib/poll-fetch";
@@ -35,7 +30,6 @@ import {
     Plus,
     RefreshCw,
     ShieldCheck,
-    Sparkles,
     Wand2,
     X
 } from "lucide-react";
@@ -57,9 +51,6 @@ import {
 
 /** The repository picker's "none": a workspace with nothing checked out. */
 export const NO_REPO = "workspace";
-
-/** The picker's row for Polar itself, answering on the chat's own models. */
-export const POLAR_ENGINE = "polar";
 
 /** The bar's row, drawn the same for a new task and a session. */
 function BarRow({ fullPage, children }: { fullPage: boolean; children: ReactNode }) {
@@ -570,139 +561,6 @@ export function CodeWhereChip({
 
 function Mark({ on }: { on: boolean }) {
     return <Check className={cn("ml-auto size-3.5 shrink-0 text-primary", !on && "opacity-0")} />;
-}
-
-type PolarT = NamespaceTranslator<"polar">;
-
-/** The account an option names, said as an API key where it is one. */
-function accountName(option: AgentOption, t: PolarT): string | null {
-    if (!option.account) return null;
-    if (option.machine) return t("code.machineAccount");
-    return option.apiKey ? t("code.apiKeyAccount", { account: option.account }) : option.account;
-}
-
-/** What an agent option is called: its name, and the account where one is named. */
-function agentName(option: AgentOption, t: PolarT): string {
-    const account = accountName(option, t);
-    return account ? `${option.label} - ${account}` : option.label;
-}
-
-/** The agent, on the composer where Chat has its model picker, in the same look. */
-export function AgentPicker({
-    agents,
-    value,
-    onChange,
-    disabled
-}: {
-    /** Null while the choices are on their way. */
-    agents: readonly AgentOption[] | null;
-    value: string;
-    onChange: (key: string) => void;
-    disabled: boolean;
-}) {
-    const t = useTranslations("polar");
-    const [query, setQuery] = useState("");
-    const polar = value === POLAR_ENGINE;
-    const picked = polar ? null : (agents?.find((option) => option.key === value) ?? null);
-    const shown = (agents ?? []).filter((option) =>
-        menuSearchMatches(agentName(option, t), query)
-    );
-    const searchable = (agents?.length ?? 0) > 6;
-    return (
-        <DropdownMenu onOpenChange={(next) => (next ? undefined : setQuery(""))}>
-            <DropdownMenuTrigger asChild disabled={disabled || agents === null}>
-                <button
-                    type="button"
-                    title={polar ? t("code.polarEngine") : picked ? agentName(picked, t) : t("code.agent")}
-                    aria-label={`${t("code.agent")}: ${polar ? t("code.polarEngine") : picked ? agentName(picked, t) : ""}`}
-                    className={cn(MODEL_TRIGGER, "disabled:opacity-60")}
-                >
-                    {polar ? (
-                        <Sparkles className="size-3.5 shrink-0" aria-hidden />
-                    ) : picked ? (
-                        <AgentLogo
-                            id={picked.cli}
-                            label={picked.label}
-                            className="size-3.5 shrink-0"
-                        />
-                    ) : (
-                        <Bot className="size-3.5 shrink-0" aria-hidden />
-                    )}
-                    <span className="truncate text-foreground">
-                        {polar ? t("code.polarEngine") : (picked?.label ?? t("code.agent"))}
-                    </span>
-                    {picked?.account ? (
-                        <span className="min-w-0 truncate" title={accountName(picked, t) ?? undefined}>
-                            {accountName(picked, t)}
-                        </span>
-                    ) : null}
-                </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-                align="start"
-                className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain pt-2"
-            >
-                {searchable ? (
-                    <MenuSearch
-                        value={query}
-                        onChange={setQuery}
-                        placeholder={t("code.searchAgents")}
-                    />
-                ) : null}
-                <DropdownMenuLabel>{t("code.agent")}</DropdownMenuLabel>
-                {menuSearchMatches(t("code.polarEngine"), query) ? (
-                    <DropdownMenuItem onSelect={() => onChange(POLAR_ENGINE)} className="items-start">
-                        <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                        <span className="flex min-w-0 flex-col">
-                            <span className="truncate">{t("code.polarEngine")}</span>
-                            <span className="text-xs text-muted-foreground">
-                                {t("code.polarEngineHint")}
-                            </span>
-                        </span>
-                        <Mark on={polar} />
-                    </DropdownMenuItem>
-                ) : null}
-                {shown.map((option) => (
-                    <DropdownMenuItem
-                        key={option.key}
-                        onSelect={() => onChange(option.key)}
-                        className="items-start"
-                    >
-                        <AgentLogo
-                            id={option.cli}
-                            label={option.label}
-                            className="mt-0.5 size-3.5 shrink-0"
-                        />
-                        <span className="flex min-w-0 flex-col">
-                            <span className="truncate" title={option.label}>
-                                {option.label}
-                            </span>
-                            {option.account || option.readiness === "missing" ? (
-                                <span
-                                    className="truncate text-xs text-muted-foreground"
-                                    title={accountName(option, t) ?? undefined}
-                                >
-                                    {option.readiness === "missing"
-                                        ? t("code.notSignedIn")
-                                        : accountName(option, t)}
-                                </span>
-                            ) : null}
-                        </span>
-                        <Mark on={option.key === value} />
-                    </DropdownMenuItem>
-                ))}
-                {searchable && query.trim() && shown.length === 0 ? (
-                    <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                        {t("code.noAgentMatch")}
-                    </p>
-                ) : null}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                    <Link href="/account/ai-keys">{t("code.apiKeys")}</Link>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
 }
 
 /** Where the picked permission mode is kept, so the next task starts on it. */

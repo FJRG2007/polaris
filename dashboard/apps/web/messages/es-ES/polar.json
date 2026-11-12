@@ -1144,8 +1144,6 @@
         "repository": "Repositorio",
         "branch": "Rama",
         "branchPlaceholder": "Rama principal",
-        "agent": "Agente",
-        "polarEngine": "Polar",
         "taskOn": "Code: {repo}",
         "taskClear": "Dejar de leer el repositorio",
         "issue": {
@@ -1197,7 +1195,6 @@
             "always": "Siempre",
             "deny": "Denegar"
         },
-        "polarEngineHint": "Tus modelos del chat. Responde al momento y lee el repositorio.",
         "signIn": "{agent} aún no tiene sesión iniciada en esta cuenta.",
         "openSettings": "Conectarlo",
         "noRepos": "No hay repositorio conectado, así que la sesión abre un espacio vacío.",
@@ -1235,11 +1232,6 @@
         "connectInAgents": "Conectar repositorio",
         "refresh": "Recargar lista",
         "notSignedIn": "Sin conectar",
-        "apiKeyAccount": "Clave API: {account}",
-        "machineAccount": "Login de este equipo",
-        "apiKeys": "Claves y accesos",
-        "searchAgents": "Buscar agente",
-        "noAgentMatch": "Ningún agente",
         "noVoice": "La voz va al chat de Polar, no a un agente",
         "noModel": "Añade una clave de IA para elegir modelo.",
         "addKey": "Añadir",

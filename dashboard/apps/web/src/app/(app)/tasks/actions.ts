@@ -13,6 +13,7 @@
  * replace the whole screen over one refused write (see run-action).
  */
 
+import { z } from "zod";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import * as access from "@/lib/tasks/access";
@@ -29,6 +30,8 @@ import { isUuid } from "@/lib/uuid";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { requirePermission, requireUser, sessionCan } from "@/lib/session";
 import { agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
+import { codeSourcesFor, type CodeSource } from "@/lib/polar/agents/code-sources";
+import { resolvedStart } from "@/lib/polar/agents/resolve-start";
 import * as repoOptions from "@/lib/agents/repo-options";
 import { startSessionAction } from "@/components/agents/sessions/actions";
 import * as tasks from "@/lib/tasks/task-service";
@@ -2070,23 +2073,25 @@ export async function deleteFormAction(
 export async function agentHandoffChoicesAction(): Promise<{
     repos: { id: string; name: string }[];
     agents: AgentOption[];
+    /** The same rows as the sources Code's model picker lists. */
+    sources: CodeSource[];
 }> {
     const user = await requirePermission("tasks.read");
     // An account with no standing in the Agents app is offered nothing rather
     // than being refused: the button is beside every task, and most people who
     // press it once are finding out what it does.
     const allowed = await sessionCan(user, "agents.manage");
-    if (!allowed) return { repos: [], agents: [] };
+    if (!allowed) return { repos: [], agents: [], sources: [] };
     // The first page only: the default and whether there are any. The picker
     // reads the rest through `agentHandoffRepoOptionsAction`.
-    const repos = await repoOptions.firstRepoPage(user.id);
-    return {
-        repos: repos.items,
+    const [repos, agents] = await Promise.all([
+        repoOptions.firstRepoPage(user.id),
         // With whether this account can sign each one in, for the same reason the
         // sessions screen carries it: a task handed to an agent nobody can sign
         // in is a task that goes quiet, and the board never learns why.
-        agents: await agentOptionsFor(user.id)
-    };
+        agentOptionsFor(user.id)
+    ]);
+    return { repos: repos.items, agents, sources: codeSourcesFor(agents) };
 }
 
 /** A page of the repositories a task can be handed to an agent on. */
@@ -2100,10 +2105,20 @@ export async function agentHandoffRepoOptionsAction(
     return repoOptions.repoOptionsPage(user.id, parsed.data);
 }
 
+/** Any object: the pick is checked by `resolvedStart`, the rest by the start. */
+const handoffBodySchema = z.record(z.string(), z.unknown());
+
 /** Start a session on a task. The Agents app owns what that means; this is the
- *  door to it from a task, and it is the same door the sessions screen uses. */
+ *  door to it from a task, and it is the same door the sessions screen uses.
+ *  The engine is resolved here from the picked source and model, as Polar Code
+ *  does, never taken from the client. */
 export async function handTaskToAgentAction(
     input: unknown
 ): Promise<{ id?: string; error?: string }> {
-    return startSessionAction(input);
+    const user = await requirePermission("tasks.read");
+    const body = handoffBodySchema.safeParse(input ?? {});
+    if (!body.success) return startSessionAction(input);
+    const resolved = await resolvedStart(user, body.data);
+    if ("error" in resolved) return { error: resolved.error };
+    return startSessionAction(resolved.input);
 }
