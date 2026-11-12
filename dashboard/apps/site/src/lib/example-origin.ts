@@ -1,3 +1,5 @@
+import { parseHostAddress } from "./host-store";
+
 /** Where an installed Polaris answers, in examples: a placeholder, never a real host. */
 export const EXAMPLE_ORIGIN = "https://polaris.example.com";
 export const EXAMPLE_HOST = new URL(EXAMPLE_ORIGIN).host;
@@ -7,22 +9,7 @@ export const EXAMPLE_HOST = new URL(EXAMPLE_ORIGIN).host;
  * or null when it is not one. A bare host means https; only http and https are
  * accepted, and nothing but the origin is kept - no path, query or credentials.
  */
-export function readerOrigin(typed: string): string | null {
-    const text = typed.trim();
-    if (!text || text.length > 253 || /\s/.test(text)) return null;
-    const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`;
-    let url: URL;
-    try {
-        url = new URL(withScheme);
-    } catch {
-        return null;
-    }
-    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    if (url.username || url.password || !url.hostname) return null;
-    if (url.pathname !== "/" || url.search || url.hash) return null;
-    if (!/^[a-z0-9.\-[\]:]+$/i.test(url.hostname)) return null;
-    return url.origin;
-}
+export const readerOrigin = parseHostAddress;
 
 const escapeHtml = (text: string) =>
     text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
