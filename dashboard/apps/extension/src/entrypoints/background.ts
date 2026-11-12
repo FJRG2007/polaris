@@ -21,7 +21,15 @@ import type { SymmetricKey } from "@polaris/vault-crypto";
 import { ACCOUNT_LOCALE, words } from "@/lib/locale-store";
 import { offerFor, type CaptureOffer } from "@/lib/capture";
 import { generatePassword } from "@polaris/core/password-generator";
-import { EMAIL_FIELD, hostOf, readUriMatch, type UriMatch } from "@polaris/core";
+import {
+    EMAIL_FIELD,
+    hostOf,
+    mergeHostLists,
+    readHostList,
+    readUriMatch,
+    type UriMatch
+} from "@polaris/core";
+import { z } from "zod";
 import { PERSON_FIELDS, readPerson } from "@polaris/core/identity-person";
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
@@ -135,6 +143,10 @@ let open: OpenVault | null = null;
 async function say(key: WordKey, params?: Record<string, string | number>): Promise<string> {
     return (await words())(key, params);
 }
+
+/** A list of hosts as the popup or the scan page sends it: text, and never more
+ *  than a full list could take. */
+const HOST_LIST_TEXT = z.string().max(64 * 1024);
 
 const serverCheck = createServerCheck();
 
@@ -3594,6 +3606,27 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 await inTurn(() => removeServer(request.origin));
                 await badge();
                 return { ok: true, status: await status() };
+            }
+
+            case "importHosts": {
+                const text = HOST_LIST_TEXT.safeParse(request.text);
+                const incoming = text.success ? readHostList(text.data) : null;
+                if (!incoming) return { ok: false, error: await say("errors.notAHostList") };
+                // Merged in turn, so a rename or an add sent at the same moment
+                // is never written over by a list read before it. No permission
+                // is asked for: `grant` does that on the switch to each one.
+                const imported = await inTurn(async () => {
+                    const merged = mergeHostLists(
+                        await savedServers(),
+                        incoming,
+                        servers.SERVERS_MAX
+                    );
+                    if (merged.added + merged.named > 0) {
+                        await saveServers(servers.readServers(merged.hosts));
+                    }
+                    return { added: merged.added, named: merged.named, skipped: merged.skipped };
+                });
+                return { ok: true, imported };
             }
 
             case "setShelf": {

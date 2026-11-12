@@ -44,7 +44,8 @@
         "silentWorker": "Polaris no respondió. Vuelve a abrir esto.",
         "unknownServer": "Ese host ya no está en la lista.",
         "serverNameTooLong": "Un nombre puede tener hasta {max} caracteres.",
-        "vaultUnreachable": "No se pudo contactar con Polaris. Sigues con la sesión iniciada; inténtalo de nuevo en un momento."
+        "vaultUnreachable": "No se pudo contactar con Polaris. Sigues con la sesión iniciada; inténtalo de nuevo en un momento.",
+        "notAHostList": "Eso no es una lista de hosts de Polaris."
     },
     "menu": {
         "fill": "Rellenar el acceso de este sitio",
@@ -338,6 +339,41 @@
             "unreachable": "{host} no responde. Revisa la dirección o que el servidor esté encendido.",
             "starting": "Polaris en {host} está arrancando. Prueba en un minuto.",
             "unconfirmed": "Responde; el navegador lo comprueba cuando permitas la dirección."
+        },
+        "transfer": {
+            "title": "Mover tus hosts",
+            "open": "Ver",
+            "hint": "Lleva esta lista a otro dispositivo o trae una aquí.",
+            "showQr": "Ver QR",
+            "scanQr": "Leer QR",
+            "copy": "Copiar código",
+            "paste": "Pegar código",
+            "exportFile": "Exportar archivo",
+            "importFile": "Importar archivo",
+            "noHosts": "Aún no hay hosts.",
+            "qrLabel": "Código QR de tus {count, plural, one {# host} other {# hosts}}",
+            "qrHint": "Escanéalo desde Polaris en el otro dispositivo.",
+            "qrTooMany": "Demasiados hosts para un QR. Copia el código o exporta un archivo.",
+            "pasteLabel": "Código del otro dispositivo",
+            "pasteButton": "Añadir hosts",
+            "pasteFirst": "Pega un código antes",
+            "copied": "{count, plural, one {Código de # host copiado.} other {Código de # hosts copiado.}} Pégalo en el otro dispositivo.",
+            "copyFailed": "No se pudo copiar el código.",
+            "exported": "Hosts exportados.",
+            "fileTooBig": "Archivo demasiado grande para una lista de hosts.",
+            "fileUnread": "No se pudo leer ese archivo.",
+            "added": "{count, plural, one {# host añadido} other {# hosts añadidos}}",
+            "named": "{count, plural, one {# host con nombre} other {# hosts con nombre}}",
+            "skipped": "{count} fuera: la lista está llena",
+            "nothing": "Todos sus hosts ya estaban en tu lista.",
+            "scanTitle": "Leer una lista de hosts",
+            "scanStarting": "Iniciando la cámara...",
+            "scanHint": "Acerca el QR del otro dispositivo a la cámara.",
+            "scanReading": "Añadiendo los hosts...",
+            "scanNoCamera": "Polaris no pudo usar una cámara. Permítela en esta página o pega el código.",
+            "scanWrongQr": "Ese QR no es una lista de hosts de Polaris.",
+            "scanRetry": "Reintentar",
+            "scanClose": "Cerrar"
         }
     },
     "polar": {

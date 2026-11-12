@@ -504,11 +504,26 @@ export type Request =
      */
     | { readonly kind: "removeServer"; readonly origin: string }
     /**
+     * Take in a list of hosts from another device: a code, a link or a file's
+     * text, read by `readHostList` and merged into this browser's list. No
+     * permission is asked for here - each host is granted when somebody first
+     * switches to it, from that press.
+     */
+    | { readonly kind: "importHosts"; readonly text: string }
+    /**
      * Start the version the updater put on disk now, rather than waiting for
      * the vault to lock. Only from a press in the popup: it restarts the
      * extension, which signs out of the vault the way a browser restart does.
      */
     | { readonly kind: "restartNow" };
+
+/** Hosts a list added, unnamed rows it gave a name, and rows left out because
+ *  the list was full. */
+export interface HostImport {
+    readonly added: number;
+    readonly named: number;
+    readonly skipped: number;
+}
 
 export type Reply =
     | { readonly ok: true; readonly status: VaultStatus }
@@ -577,6 +592,8 @@ export type Reply =
           /** How often to ask, already held to something this client will wait. */
           readonly pollMs: number;
       }
+    /** What a list of hosts taken in did to this browser's own. */
+    | { readonly ok: true; readonly imported: HostImport }
     | { readonly ok: true }
     /** `locked` when the refusal is only the vault being locked, so a page's list
      *  can offer the way to unlock instead of a sentence alone. */

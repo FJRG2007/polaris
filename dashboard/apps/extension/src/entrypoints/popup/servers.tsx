@@ -17,6 +17,7 @@
 
 import { useWords } from "./words";
 import { BinMark, PencilMark } from "./marks";
+import { HostTransfer } from "./host-transfer";
 import { useEffect, useRef, useState } from "react";
 import { readOrigin } from "@/lib/address";
 import { addable, AddressNote, useAddressCheck, useSameInstance } from "./server-check";
@@ -172,6 +173,7 @@ export function ServersPanel({
                 onAdd={async (typed, name) => act({ kind: "addServer", typed, name })}
                 onRefused={setRefused}
             />
+            <HostTransfer servers={status.servers} onChange={onChange} />
             {removing ? (
                 <ConfirmRemove
                     server={removing}

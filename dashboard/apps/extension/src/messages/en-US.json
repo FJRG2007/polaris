@@ -44,7 +44,8 @@
         "silentWorker": "Polaris did not answer. Open this again.",
         "unknownServer": "That host is not on the list any more.",
         "serverNameTooLong": "A name can be up to {max} characters.",
-        "vaultUnreachable": "Polaris could not be reached. You are still signed in; try again in a moment."
+        "vaultUnreachable": "Polaris could not be reached. You are still signed in; try again in a moment.",
+        "notAHostList": "That is not a list of Polaris hosts."
     },
     "menu": {
         "fill": "Fill the login for this site",
@@ -338,6 +339,41 @@
             "unreachable": "{host} did not answer. Check the address, or that the server is on.",
             "starting": "Polaris at {host} is starting. Try again in a minute.",
             "unconfirmed": "Answers, but the browser checks it once you allow the address."
+        },
+        "transfer": {
+            "title": "Move your hosts",
+            "open": "Show",
+            "hint": "Take this list to another device, or bring one here.",
+            "showQr": "Show QR",
+            "scanQr": "Scan QR",
+            "copy": "Copy as code",
+            "paste": "Paste a code",
+            "exportFile": "Export to file",
+            "importFile": "Import from file",
+            "noHosts": "No hosts to move yet.",
+            "qrLabel": "QR code of your {count, plural, one {# host} other {# hosts}}",
+            "qrHint": "Scan it from Polaris on the other device.",
+            "qrTooMany": "Too many hosts for one QR. Copy the code or export a file instead.",
+            "pasteLabel": "Code from the other device",
+            "pasteButton": "Add hosts",
+            "pasteFirst": "Paste a code first",
+            "copied": "{count, plural, one {Code for # host copied.} other {Code for # hosts copied.}} Paste it on the other device.",
+            "copyFailed": "Could not copy the code.",
+            "exported": "Hosts exported.",
+            "fileTooBig": "That file is too large to be a list of hosts.",
+            "fileUnread": "Could not read that file.",
+            "added": "{count, plural, one {# host added} other {# hosts added}}",
+            "named": "{count, plural, one {# host named} other {# hosts named}}",
+            "skipped": "{count} left out: the list is full",
+            "nothing": "Every host in it was already on your list.",
+            "scanTitle": "Scan a list of hosts",
+            "scanStarting": "Starting the camera...",
+            "scanHint": "Hold the other device's QR up to the camera.",
+            "scanReading": "Adding the hosts...",
+            "scanNoCamera": "Polaris could not use a camera. Allow it for this page, or paste the code instead.",
+            "scanWrongQr": "That QR is not a list of Polaris hosts.",
+            "scanRetry": "Try again",
+            "scanClose": "Close"
         }
     },
     "polar": {

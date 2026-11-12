@@ -1264,6 +1264,77 @@ button.copied {
     margin: 0;
 }
 
+/* Moving the hosts list: six buttons that wrap, and the QR or paste under them. */
+.transfer-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 10px 8px;
+    min-width: 0;
+}
+
+.transfer-body > p {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.transfer-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.transfer-acts > button[aria-pressed="true"] {
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border-strong));
+    background: hsl(var(--elevated));
+}
+
+.host-qr {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+
+.host-qr svg {
+    width: 220px;
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+}
+
+textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    background: hsl(var(--field));
+    color: inherit;
+    resize: vertical;
+    overflow-wrap: anywhere;
+}
+
+.scan-page {
+    gap: 10px;
+    padding: 16px;
+}
+
+.scan-page h1 {
+    margin: 0;
+    font-size: 15px;
+}
+
+.scan-video {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: var(--radius);
+    background: #000000;
+}
+
 button[aria-disabled="true"] {
     opacity: 0.55;
     cursor: default;

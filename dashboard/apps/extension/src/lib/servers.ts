@@ -18,6 +18,7 @@
  * asserted without a browser.
  */
 
+import { HOST_LIST_MAX } from "@polaris/core";
 import { accountHost } from "@/lib/accounts";
 
 /** One server as it is stored: an address, and what somebody called it. */
@@ -40,6 +41,10 @@ export interface ServerRef {
 
 /** The longest name a server may be given - a row in a 360-pixel popup. */
 export const SERVER_NAME_MAX = 40;
+
+/** The most servers a list taken in from another device fills this one to.
+ *  The same cap a list travels with, so one device's whole list always fits. */
+export const SERVERS_MAX = HOST_LIST_MAX;
 
 /**
  * A typed name, in the form it is stored and compared in: surrounding space
