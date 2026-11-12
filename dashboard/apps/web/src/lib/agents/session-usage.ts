@@ -25,6 +25,9 @@ export interface TurnUsage {
     readonly output: number;
     readonly cacheRead: number;
     readonly cacheWrite: number;
+    /** A sub-agent's turn: it runs in a conversation of its own, so it is
+     *  spent like any other but says nothing about the main one's size. */
+    readonly sidechain: boolean;
 }
 
 const count = z.number().int().nonnegative().max(100_000_000).catch(0).default(0);
@@ -63,8 +66,25 @@ export function claudeLineUsage(line: string): TurnUsage | null {
         input: message.usage.input_tokens,
         output: message.usage.output_tokens,
         cacheRead: message.usage.cache_read_input_tokens,
-        cacheWrite: message.usage.cache_creation_input_tokens
+        cacheWrite: message.usage.cache_creation_input_tokens,
+        sidechain: parsed.data.isSidechain === true
     };
+}
+
+/** The main conversation's size after the last of these turns, or null when
+ *  none of them is the main conversation's. Pure. */
+export function contextAfter(
+    lines: readonly TurnUsage[]
+): { tokens: number; model: string } | null {
+    for (let index = lines.length - 1; index >= 0; index--) {
+        const turn = lines[index]!;
+        if (turn.sidechain) continue;
+        return {
+            tokens: turn.input + turn.cacheRead + turn.cacheWrite + turn.output,
+            model: turn.model
+        };
+    }
+    return null;
 }
 
 /**
@@ -133,6 +153,7 @@ export async function recordSessionUsage(
     if (!row) return;
     const { turns, last } = foldTurns(lines, row.usageMessageId);
     if (turns.length === 0 && last === row.usageMessageId) return;
+    const context = contextAfter(lines);
 
     const prices = new Map<string, ModelPrice | null>();
     let tokensIn = 0;
@@ -155,6 +176,7 @@ export async function recordSessionUsage(
             tokensIn: { increment: tokensIn },
             tokensOut: { increment: tokensOut },
             usageMessageId: last,
+            ...(context ? { contextTokens: context.tokens, contextModel: context.model } : {}),
             ...(priced ? { costUsd: (row.costUsd ?? 0) + cost } : {})
         }
     });

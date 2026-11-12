@@ -34,6 +34,8 @@ import { codeStartersSchema, starterPrompt, type StarterSkill } from "@/lib/pola
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { userHasManage, type SessionUser } from "@/lib/session";
 import { sessionCursor } from "@/lib/agents/session-cursor";
+import { priceSlugs } from "@/lib/agents/session-usage";
+import { getCatalogModel } from "@/lib/agents/model-catalog";
 import { dedupeCodeRows, POLAR_CODE_PAGE, polarCodeEditSchema } from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
 import * as repoOptions from "@/lib/agents/repo-options";
@@ -100,6 +102,26 @@ export interface PolarCodeThread {
     /** The agent's question waiting on an answer, for somebody who may steer
      *  the session; null when nothing is waiting. */
     readonly permission: PendingPermission | null;
+    /** How full the agent's context is, as its last turn reported it; null
+     *  when no turn was read or the model's window is not known. */
+    readonly context: { readonly used: number; readonly window: number } | null;
+}
+
+/** The session's last reported size against its model's window, or null. */
+async function contextOf(sessionId: string): Promise<PolarCodeThread["context"]> {
+    const row = await prisma.agentSession
+        .findUnique({
+            where: { id: sessionId },
+            select: { contextTokens: true, contextModel: true }
+        })
+        .catch(() => null);
+    if (!row?.contextTokens || !row.contextModel) return null;
+    for (const slug of priceSlugs(row.contextModel)) {
+        const model = await getCatalogModel(slug).catch(() => null);
+        if (model && model.contextTokens > 0)
+            return { used: row.contextTokens, window: model.contextTokens };
+    }
+    return null;
 }
 
 /** As many lines of activity as the thread shows; the session's own page keeps
@@ -181,9 +203,10 @@ export async function polarCodeThread(
 ): Promise<PolarCodeThread | null> {
     const access = await accessOf(user);
     if (access === "none") return null;
-    const [detail, t] = await Promise.all([
+    const [detail, t, context] = await Promise.all([
         sessionDetailAction(sessionId),
-        getTranslations("agents")
+        getTranslations("agents"),
+        contextOf(sessionId)
     ]);
     if (!detail) return null;
     // Only for whoever the answer route takes it from: the person who started
@@ -224,7 +247,8 @@ export async function polarCodeThread(
         error: detail.session.error ? agentText(t, detail.session.error) : null,
         view: detail.session,
         canManage: access === "manage",
-        permission
+        permission,
+        context
     };
 }
 

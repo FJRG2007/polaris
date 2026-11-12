@@ -49,8 +49,17 @@ vi.mock("@/lib/agents/session-service", () => ({
 vi.mock("@/lib/i18n/request", () => ({
     getTranslations: async () => (key: string) => `t:${key}`
 }));
+const contextRow = vi.hoisted(() => ({
+    value: null as { contextTokens: number; contextModel: string } | null
+}));
+vi.mock("@/lib/agents/model-catalog", () => ({
+    getCatalogModel: async (slug: string) =>
+        slug === "anthropic/claude-sonnet-4-5" ? { contextTokens: 200_000 } : null
+}));
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // No turn read yet unless a test says one was: no context bar.
+        agentSession: { findUnique: async () => contextRow.value },
         agentRepo: {
             findFirst: async ({ where }: { where: { id: string; ownerId: string } }) =>
                 where.id === "r1" && where.ownerId === "u1" ? { repoFullName: "acme/web" } : null
@@ -232,6 +241,19 @@ describe("polarCodeThread", () => {
         expect(thread?.entries[2]?.detail).toBe("Edit");
         expect(thread?.error).toBeNull();
         expect(thread?.permission).toBeNull();
+    });
+
+    it("says how full the agent's context is, against its model's window", async () => {
+        state.held.add("agents.read");
+        contextRow.value = { contextTokens: 50_000, contextModel: "claude-sonnet-4-5-20250929" };
+        expect((await polarCodeThread(USER, SESSION))?.context).toEqual({
+            used: 50_000,
+            window: 200_000
+        });
+        // A model the catalogue does not know has no window to measure against.
+        contextRow.value = { contextTokens: 50_000, contextModel: "made-up" };
+        expect((await polarCodeThread(USER, SESSION))?.context).toBeNull();
+        contextRow.value = null;
     });
 
     it("carries the agent's waiting question to the person who started it, and to nobody else", async () => {

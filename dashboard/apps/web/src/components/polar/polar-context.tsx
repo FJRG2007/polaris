@@ -213,7 +213,9 @@ export function ContextBar({
     draft: number;
     window: number | null;
     canCompact: boolean;
-    onCompact: () => void;
+    /** Null where the conversation is compacted by somebody else (a coding
+     *  agent does its own): the bar warns, and offers nothing to press. */
+    onCompact: (() => void) | null;
 }) {
     const t = useTranslations("polar");
     const locale = useLocale();
@@ -254,10 +256,12 @@ export function ContextBar({
                     className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-danger-ink"
                 >
                     <span className="min-w-0 flex-1">{t("contextBar.over")}</span>
-                    <Button size="xs" variant="outline" disabled={!canCompact} onClick={onCompact}>
-                        <Minimize2 />
-                        {t("compact.now")}
-                    </Button>
+                    {onCompact ? (
+                        <Button size="xs" variant="outline" disabled={!canCompact} onClick={onCompact}>
+                            <Minimize2 />
+                            {t("compact.now")}
+                        </Button>
+                    ) : null}
                 </div>
             ) : null}
         </div>

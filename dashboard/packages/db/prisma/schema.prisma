@@ -9043,6 +9043,12 @@ model AgentSession {
     modelProvider String?
     model         String?
     modelPayer    String?
+    // How much of its context window the agent's own conversation took at its
+    // last turn (input, cache and output of that response), and the model that
+    // turn ran on, from the tool's transcript. Null until a turn is read, and
+    // for every tool whose transcript reports no usage.
+    contextTokens Int?
+    contextModel  String?
     // When the person who started it took it out of Polar's Code history. The
     // session stays, listed in Agents: it is a record of work that happened.
     polarHiddenAt DateTime?

@@ -67,6 +67,8 @@ import {
     type ModelSelectorProvider
 } from "@/components/polar/elements/model-selector";
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
+import { ContextBar } from "@/components/polar/polar-context";
+import { estimateTokens } from "@/lib/polar/compaction";
 import {
     CodeIssueChip,
     CodeSkillChip,
@@ -1136,6 +1138,17 @@ function CodeThread({
                     key={thread.permission.id}
                     asked={thread.permission}
                     onAnswered={read}
+                />
+            ) : null}
+            {thread.context ? (
+                // How full the agent's own conversation is: the tool compacts it
+                // itself, so there is nothing here to press.
+                <ContextBar
+                    used={thread.context.used}
+                    draft={estimateTokens(reply)}
+                    window={thread.context.window}
+                    canCompact={false}
+                    onCompact={null}
                 />
             ) : null}
             <PolarComposer

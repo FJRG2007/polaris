@@ -37,6 +37,7 @@ import {
     priceSlugs,
     recordSessionUsage,
     turnCost,
+    contextAfter,
     type TurnUsage
 } from "@/lib/agents/session-usage";
 
@@ -50,6 +51,7 @@ const turn = (messageId: string, over: Partial<TurnUsage> = {}): TurnUsage => ({
     output: 5,
     cacheRead: 0,
     cacheWrite: 0,
+    sidechain: false,
     ...over
 });
 
@@ -76,7 +78,8 @@ describe("claudeLineUsage", () => {
             input: 3,
             output: 40,
             cacheRead: 1000,
-            cacheWrite: 200
+            cacheWrite: 200,
+            sidechain: false
         });
     });
 
@@ -152,5 +155,21 @@ describe("recordSessionUsage", () => {
         await recordSessionUsage("s-1", [turn("a")]);
         await recordSessionUsage("s-1", []);
         expect(state.updates).toHaveLength(0);
+    });
+});
+
+describe("contextAfter", () => {
+    it("is the last main-thread turn's whole size, skipping a sub-agent's", () => {
+        expect(
+            contextAfter([
+                turn("a", { input: 5, cacheRead: 1000, cacheWrite: 200, output: 40 }),
+                turn("b", { input: 1, output: 1, sidechain: true })
+            ])
+        ).toEqual({ tokens: 1245, model: "claude-sonnet-4-5" });
+    });
+
+    it("says nothing when only sub-agents spoke", () => {
+        expect(contextAfter([turn("a", { sidechain: true })])).toBeNull();
+        expect(contextAfter([])).toBeNull();
     });
 });
