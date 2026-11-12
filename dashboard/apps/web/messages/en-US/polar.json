@@ -742,7 +742,6 @@
             "orgTitle": "Organization guides",
             "orgIntro": "What the company does and how it writes. Members follow it when writing from its mailboxes and spaces.",
             "orgFailed": "The organization guides could not be loaded.",
-            "orgNone": "You are not in any organization.",
             "orgReadOnly": "Read only",
             "orgEmpty": "No guide yet.",
             "orgGuideLabel": "Writing guide for {org}",

@@ -266,6 +266,9 @@ function OrgGuides({ readOnly }: { readOnly: boolean }) {
         };
     }, []);
 
+    // Working from the personal shelf, there is no organization's guide to show.
+    if (Array.isArray(guides) && guides.length === 0) return null;
+
     return (
         <section className="flex flex-col gap-2">
             <div className="min-w-0">
@@ -278,8 +281,6 @@ function OrgGuides({ readOnly }: { readOnly: boolean }) {
                 <Skeleton className="h-24 w-full" />
             ) : guides === null ? (
                 <p className="text-xs text-danger">{t("settings.writing.orgFailed")}</p>
-            ) : guides.length === 0 ? (
-                <p className="text-xs text-muted-foreground">{t("settings.writing.orgNone")}</p>
             ) : (
                 <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                     {guides.map((guide) => (

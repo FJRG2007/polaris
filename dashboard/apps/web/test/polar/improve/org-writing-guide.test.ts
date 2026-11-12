@@ -24,6 +24,8 @@ vi.mock("@/lib/audit-service", () => ({ recordAudit }));
 vi.mock("@/lib/session", () => ({ requireUser: async () => viewer.value }));
 vi.mock("@/lib/polar/access", () => ({ polarAccessFor: async () => ({ use: true }) }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
+const scope = vi.hoisted(() => ({ org: "a" as string | null }));
+vi.mock("@/lib/workspace-scope", () => ({ scopeOrgIdFor: async () => scope.org }));
 
 const { orgWritingGuidesAction, saveOrgWritingGuideAction } = await import(
     "@/app/(app)/polar/settings/writing-actions"
@@ -34,10 +36,17 @@ const ORG = "0190a3a0-0000-7000-8000-000000000001";
 beforeEach(() => {
     vi.clearAllMocks();
     viewer.value = { id: "u1", isAdmin: false };
+    scope.org = "a";
 });
 
 describe("reading the guides", () => {
-    it("lists the organizations this person works in, with who may edit", async () => {
+    it("shows none from the personal shelf", async () => {
+        scope.org = null;
+        expect(await orgWritingGuidesAction()).toEqual({ ok: true, value: [] });
+        expect(orgs.listMyOrgs).not.toHaveBeenCalled();
+    });
+
+    it("shows only the organization being worked in, with whether it may be edited", async () => {
         orgs.listMyOrgs.mockResolvedValue([
             { id: "a", name: "Acme", restricted: false, role: "admin" },
             { id: "b", name: "Beta", restricted: false, role: "member" },
@@ -53,10 +62,7 @@ describe("reading the guides", () => {
         const result = await orgWritingGuidesAction();
         expect(result).toEqual({
             ok: true,
-            value: [
-                { id: "a", name: "Acme", guide: "Sign as Acme.", canEdit: true },
-                { id: "b", name: "Beta", guide: "", canEdit: false }
-            ]
+            value: [{ id: "a", name: "Acme", guide: "Sign as Acme.", canEdit: true }]
         });
     });
 });

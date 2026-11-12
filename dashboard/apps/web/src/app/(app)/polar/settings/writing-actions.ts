@@ -14,6 +14,7 @@ import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { polarAccessFor } from "@/lib/polar/access";
 import { getTranslations } from "@/lib/i18n/request";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { listMyOrgs, orgCan, requireOrgPermission, resolveOrgAccess } from "@/lib/orgs/org-service";
 
 /** Longest guide an organization keeps, in characters. */
@@ -34,9 +35,13 @@ export async function orgWritingGuidesAction(): Promise<Result<OrgWritingGuide[]
     if (!(await polarAccessFor(user.id)).use) {
         return { ok: false, error: t("settings.writing.errors.noAccess") };
     }
+    // Only the organization being worked in: its guide belongs to its shelf, the
+    // way its tasks and mailboxes do, and the personal one shows none.
+    const scoped = await scopeOrgIdFor(user.id);
+    if (!scoped) return { ok: true, value: [] };
     // A restricted member opens nothing in the organization, so not this either.
     const orgs = (await listMyOrgs(user.id)).filter(
-        (org) => !org.restricted && org.role !== "successor"
+        (org) => org.id === scoped && !org.restricted && org.role !== "successor"
     );
     if (orgs.length === 0) return { ok: true, value: [] };
     const [rows, access] = await Promise.all([

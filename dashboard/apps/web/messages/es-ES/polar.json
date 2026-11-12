@@ -742,7 +742,6 @@
             "orgTitle": "Guías de organización",
             "orgIntro": "A qué se dedica la empresa y cómo escribe. Los miembros la siguen al escribir desde sus buzones y espacios.",
             "orgFailed": "No se pudieron cargar las guías.",
-            "orgNone": "No estás en ninguna organización.",
             "orgReadOnly": "Solo lectura",
             "orgEmpty": "Aún sin guía.",
             "orgGuideLabel": "Guía de escritura de {org}",
