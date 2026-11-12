@@ -212,20 +212,34 @@ describe("a build that fixes a vulnerability", () => {
         expect(startHostUpdate).toHaveBeenCalledTimes(1);
     });
 
-    it("only tells for a medium or low fix, by default", async () => {
+    it("waits for the quietest hour for a medium or low fix, by default", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
         for (const severity of ["medium", "low"] as const) {
             rows.clear();
+            startHostUpdate.mockClear();
+            vi.setSystemTime(new Date(2026, 10, 12, 14, 0));
             await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });
             changelog.security = severity;
+            changelog.hour = 3;
             await checkForUpdate();
+            expect(startHostUpdate, severity).not.toHaveBeenCalled();
+            vi.setSystemTime(new Date(2026, 10, 13, 3, 1));
+            await checkForUpdate();
+            expect(startHostUpdate, severity).toHaveBeenCalledTimes(1);
         }
+    });
+
+    it("only tells for a medium fix when it is set to", async () => {
+        await saveSecurityUpdatePolicy({ ...core.DEFAULT_SECURITY_UPDATE, medium: "off" });
+        changelog.security = "medium";
+        await checkForUpdate();
         expect(startHostUpdate).not.toHaveBeenCalled();
     });
 
     it("waits for the quietest hour when the severity is set to", async () => {
         vi.useFakeTimers({ toFake: ["Date"] });
         vi.setSystemTime(new Date(2026, 10, 12, 14, 0));
-        await saveSecurityUpdatePolicy({ ...core.DEFAULT_SECURITY_UPDATE, medium: "quiet" });
+        await saveSecurityUpdatePolicy({ ...core.DEFAULT_SECURITY_UPDATE, medium: "quiet", low: "off" });
         changelog.security = "medium";
         changelog.hour = 3;
         await checkForUpdate();

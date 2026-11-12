@@ -113,7 +113,8 @@ export function autoUpdateRunsAt(policy: AutoUpdatePolicy, availableSince: Date)
  * Critical and high install at once by default. Taking either below that is
  * allowed, but it is accepting a known risk, so it is recorded with who accepted
  * it and when (`riskAccepted`), and the settings screen asks for that in words
- * before saving. Medium and low are off until somebody asks for them.
+ * before saving. Medium and low wait for the quiet hour, so the restart
+ * lands when nobody notices it; "off" is there for whoever wants to choose.
  */
 export const SECURITY_UPDATE_TIMINGS = ["immediate", "quiet", "off"] as const;
 
@@ -138,8 +139,8 @@ export type SecurityUpdatePolicy = z.infer<typeof securityUpdatePolicySchema>;
 export const DEFAULT_SECURITY_UPDATE: SecurityUpdatePolicy = {
     critical: "immediate",
     high: "immediate",
-    medium: "off",
-    low: "off",
+    medium: "quiet",
+    low: "quiet",
     riskAccepted: null
 };
 

@@ -105,12 +105,18 @@ describe("a vulnerability write-up", () => {
 });
 
 describe("the security update policy", () => {
-    it("installs critical and high at once by default, and nothing else", () => {
+    it("installs critical and high at once by default, medium and low at the quiet hour", () => {
         const seen = new Date(2026, 10, 12, 14, 0);
+        const quiet = new Date(2026, 10, 13, 4, 0);
         expect(securityUpdateRunsAt(DEFAULT_SECURITY_UPDATE, "critical", seen, 4)).toEqual(seen);
         expect(securityUpdateRunsAt(DEFAULT_SECURITY_UPDATE, "high", seen, 4)).toEqual(seen);
-        expect(securityUpdateRunsAt(DEFAULT_SECURITY_UPDATE, "medium", seen, 4)).toBeNull();
-        expect(securityUpdateRunsAt(DEFAULT_SECURITY_UPDATE, "low", seen, 4)).toBeNull();
+        expect(securityUpdateRunsAt(DEFAULT_SECURITY_UPDATE, "medium", seen, 4)).toEqual(quiet);
+        expect(securityUpdateRunsAt(DEFAULT_SECURITY_UPDATE, "low", seen, 4)).toEqual(quiet);
+    });
+
+    it("only tells about a severity set to off", () => {
+        const policy = { ...DEFAULT_SECURITY_UPDATE, low: "off" as const };
+        expect(securityUpdateRunsAt(policy, "low", new Date(2026, 10, 12, 14, 0), 4)).toBeNull();
     });
 
     it("waits for the next quiet hour", () => {
