@@ -179,13 +179,31 @@ describe("the terminal the agent is started on", () => {
             // standard input is the pipe, already at end of file, and every
             // process it starts inherits it - the agent included.
             expect(line).not.toMatch(/base64 -d \s*\|\s*sh/);
-            expect(line).toContain("base64 -d)");
+            expect(line).toContain(`sh '$POLARIS_SETUP_FILE'`);
         }
     });
 
-    it("decodes the setup through a substitution, so only the decoding reads a pipe", () => {
-        const line = setupOf(commands.SESSION_BOOT);
-        expect(line).toMatch(/sh -c 'eval "\$\(echo [A-Za-z0-9+/=]+ \| base64 -d\)"'/);
+    it("writes the setup to a file first, and hands tmux only its name", () => {
+        for (const boot of [commands.SESSION_BOOT, commands.SESSION_BOOT_FOR_HOST]) {
+            const lines = boot.split("
+");
+            const written = lines.findIndex((line) => line.includes('base64 -d > "$POLARIS_SETUP_FILE"'));
+            const started = lines.findIndex((line) => line.includes("tmux new-session"));
+            expect(written).toBeGreaterThan(-1);
+            expect(written).toBeLessThan(started);
+            // What the file holds is the setup, whole.
+            const encoded = /^echo ([A-Za-z0-9+/=]+) \| base64 -d/.exec(lines[written]!)?.[1] ?? "";
+            expect(Buffer.from(encoded, "base64").toString("utf8")).toBe(commands.SESSION_SETUP);
+        }
+    });
+
+    it("keeps the line tmux is handed far under the size tmux refuses", () => {
+        // tmux caps one client message near 16 KB and answers "command too
+        // long" past it; a setup inlined there grew to 18 KB and no session
+        // started. Only a file name crosses now, however long the setup gets.
+        for (const boot of [commands.SESSION_BOOT, commands.SESSION_BOOT_FOR_HOST]) {
+            expect(setupOf(boot).length).toBeLessThan(512);
+        }
     });
 
     it("never asks a person on a machine they cannot see for a password", () => {

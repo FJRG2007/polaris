@@ -1085,7 +1085,31 @@ export const SESSION_SETUP = [
  * pipe is confined to the substitution that decodes it, and the shell that then
  * runs it keeps the terminal on all three descriptors.
  */
-const SETUP_COMMAND = `sh -c 'eval "$(echo ${Buffer.from(SESSION_SETUP, "utf8").toString("base64")} | base64 -d)"'`;
+const SETUP_BASE64 = Buffer.from(SESSION_SETUP, "utf8").toString("base64");
+
+/**
+ * The setup written to a file before tmux is asked to run it, and tmux handed
+ * only the file's name.
+ *
+ * tmux sends a command from its client to its server as one message, and a
+ * message is capped near 16 KB. The setup grew past that (18 KB encoded) and
+ * every session after it sat on "Starting" with its container restarting in a
+ * loop on tmux's own `command too long`, which reached nobody. A path is a few
+ * dozen bytes however long the setup gets.
+ *
+ * Run as `sh <file>`, which keeps the pane's terminal on all three descriptors
+ * the way the `eval` this replaced did, and never as `... | sh`, whose pipe is
+ * what once left the agent with no terminal to read (see above). In a temporary
+ * file of its own so two sessions on one server never share it; the script is
+ * fixed text and holds no secret, which all arrive in the environment.
+ */
+const WRITE_SETUP = [
+    'POLARIS_SETUP_FILE="$(mktemp "${TMPDIR:-/tmp}/polaris-setup.XXXXXX")"',
+    `echo ${SETUP_BASE64} | base64 -d > "$POLARIS_SETUP_FILE"`
+];
+
+/** tmux's argument: the file's name, expanded by the shell that calls tmux. */
+export const SETUP_COMMAND = `"sh '$POLARIS_SETUP_FILE'"`;
 
 /**
  * What a `local` session's container does when it starts.
@@ -1109,6 +1133,7 @@ export const SESSION_BOOT = [
     ...REQUIRE_TMUX,
     'mkdir -p "$(dirname "$POLARIS_WORKDIR")"',
     // Everything else happens in there, where it can be watched.
+    ...WRITE_SETUP,
     `tmux new-session -d -s "$POLARIS_TMUX" -x "$POLARIS_COLS" -y "$POLARIS_ROWS" ${SETUP_COMMAND}`,
     // Park. See above: the container outlives the agent inside it.
     "exec tail -f /dev/null"
@@ -1171,6 +1196,7 @@ export const SESSION_BOOT_FOR_HOST = [
     // somebody opens has to show the setup rather than nothing until it
     // finishes. Polaris installs no agent here - a server is somebody's machine
     // - so the setup inside says what is missing instead.
+    ...WRITE_SETUP,
     `tmux new-session -d -s "$POLARIS_TMUX" -x "$POLARIS_COLS" -y "$POLARIS_ROWS" ${SETUP_COMMAND}`
 ].join("\n");
 
