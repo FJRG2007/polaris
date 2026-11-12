@@ -1,18 +1,14 @@
 "use client";
 
-/** A target language, named in the reader's own language. */
+/** A target language, named in the reader's own language and found by any of its names. */
 
 import { useMemo } from "react";
-import { Select } from "@polaris/ui";
-import { useLocale } from "@/components/i18n/i18n-provider";
+import { LanguageSelect as Picker, languageName } from "@polaris/ui";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { TARGET_LANGUAGES } from "@/lib/text-translation/logic";
 
 export function languageLabel(code: string, locale: string): string {
-    try {
-        return new Intl.DisplayNames([locale], { type: "language" }).of(code) ?? code;
-    } catch {
-        return code;
-    }
+    return languageName(code, locale);
 }
 
 export function LanguageSelect({
@@ -27,19 +23,24 @@ export function LanguageSelect({
     className?: string;
 }) {
     const locale = useLocale();
-    const options = useMemo(
+    const t = useTranslations("common");
+    const languages = useMemo(
         () =>
             TARGET_LANGUAGES.map((code) => ({
                 value: code,
+                tag: code,
                 label: languageLabel(code, locale)
-            })).sort((one, other) => String(one.label).localeCompare(String(other.label), locale)),
+            })).sort((one, other) => one.label.localeCompare(other.label, locale)),
         [locale]
     );
     return (
-        <Select
+        <Picker
             value={value}
             onValueChange={onChange}
-            options={options}
+            languages={languages}
+            readerLocale={locale}
+            searchPlaceholder={t("languagePicker.search")}
+            emptyText={t("languagePicker.empty")}
             aria-label={label}
             className={className}
         />

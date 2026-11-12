@@ -165,6 +165,10 @@
         "areaCount": "{count} de {total}",
         "areaAll": "Todos los permisos de {area}"
     },
+    "languagePicker": {
+        "search": "Buscar idiomas",
+        "empty": "Ningún idioma coincide"
+    },
     "textTranslation": {
         "translate": "Traducir",
         "translateSelection": "Traducir lo marcado",

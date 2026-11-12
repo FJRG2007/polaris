@@ -136,6 +136,13 @@ export {
     type SearchableSelectProps
 } from "./components/searchable-select";
 export {
+    LanguageSelect,
+    languageName,
+    languageOptions,
+    type LanguageChoice,
+    type LanguageSelectProps
+} from "./components/language-select";
+export {
     AsyncSelect,
     AsyncMultiSelect,
     type AsyncFixedOption,

@@ -39,8 +39,8 @@ vi.mock("@/app/(app)/account/preferences/actions", () => ({
 }));
 vi.mock("@polaris/ui", async (original) => ({
     ...(await original<typeof import("@polaris/ui")>()),
-    // A native dropdown in place of the design system's, so the test can pick
-    // from it. Only the language card is operated through it.
+    // Native dropdowns in place of the design system's, so the test can read
+    // and pick from them. Only the language card is operated through one.
     Select: ({
         value,
         onValueChange,
@@ -63,6 +63,32 @@ vi.mock("@polaris/ui", async (original) => ({
             {options.map((option) => (
                 <option key={option.value} value={option.value}>
                     {option.label}
+                </option>
+            ))}
+        </select>
+    ),
+    LanguageSelect: ({
+        value,
+        onValueChange,
+        languages,
+        disabled,
+        "aria-label": label
+    }: {
+        value: string;
+        onValueChange: (value: string) => void;
+        languages: { value: string; label?: string }[];
+        disabled?: boolean;
+        "aria-label"?: string;
+    }) => (
+        <select
+            aria-label={label}
+            value={value}
+            disabled={disabled}
+            onChange={(event) => onValueChange(event.target.value)}
+        >
+            {languages.map((language) => (
+                <option key={language.value} value={language.value}>
+                    {language.label}
                 </option>
             ))}
         </select>

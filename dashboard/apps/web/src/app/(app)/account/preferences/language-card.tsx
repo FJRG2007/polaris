@@ -9,16 +9,20 @@
  * Every other tab the account has open follows on its own (`LocaleWatcher`).
  *
  * Each language is listed in itself, so somebody who picked the wrong one by
- * mistake can still find their own.
+ * mistake can still find their own - and found by typing its English name too.
  */
 
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Card, CardBody, Select } from "@polaris/ui";
+import { Card, CardBody, LanguageSelect } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { isLocale, LOCALE_INFO, LOCALES, type Locale } from "@polaris/core";
 
-const OPTIONS = LOCALES.map((locale) => ({ value: locale, label: LOCALE_INFO[locale].name }));
+const LANGUAGES = LOCALES.map((locale) => ({
+    value: locale,
+    tag: locale,
+    label: LOCALE_INFO[locale].name
+}));
 
 export function LanguageCard({
     current,
@@ -29,6 +33,7 @@ export function LanguageCard({
     save: (locale: Locale) => Promise<{ error?: string }>;
 }) {
     const t = useTranslations("account");
+    const common = useTranslations("common");
     const [chosen, setChosen] = useState<Locale>(current);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -57,10 +62,13 @@ export function LanguageCard({
                     <p className="mt-0.5 text-xs text-muted-foreground">{t("language.hint")}</p>
                     {error ? <p className="mt-1 text-xs text-danger">{error}</p> : null}
                 </div>
-                <Select
+                <LanguageSelect
                     value={chosen}
                     onValueChange={(value) => void pick(value)}
-                    options={OPTIONS}
+                    languages={LANGUAGES}
+                    readerLocale={chosen}
+                    searchPlaceholder={common("languagePicker.search")}
+                    emptyText={common("languagePicker.empty")}
                     disabled={saving}
                     aria-label={t("language.title")}
                     className="sm:w-56"

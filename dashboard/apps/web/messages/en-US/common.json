@@ -165,6 +165,10 @@
         "areaCount": "{count} of {total}",
         "areaAll": "All of {area}"
     },
+    "languagePicker": {
+        "search": "Search languages",
+        "empty": "No language matches"
+    },
     "textTranslation": {
         "translate": "Translate",
         "translateSelection": "Translate selection",
