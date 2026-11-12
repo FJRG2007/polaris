@@ -214,7 +214,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         getLauncherPrefs(user.id).catch(() => NO_LAUNCHER_PREFS),
         // The apps kept behind the PIN. Never worth a failed page: the server
         // guard is what keeps them shut, the menu only offers the switch.
-        getAppLocks(user.viewingAs?.actorId ?? user.id).catch(() => ({ locked: [], hasPin: false })),
+        getAppLocks(user.viewingAs?.actorId ?? user.id).catch(() => ({ locked: [], hasPin: false, pinLength: null })),
         // The apps muted from the app menu. Never worth a failed page: dispatch
         // is what holds the alerts back, the menu only offers the switch.
         getNotificationHolds(user.id).catch(() => ({ mutes: {}, schedules: {} })),

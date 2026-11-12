@@ -27,6 +27,9 @@ import {
 /** The effective settings for a user, with the defaults an absent row implies. */
 export interface UserSecuritySettings {
     hasPin: boolean;
+    /** How many digits the PIN has, or null when none is set or it is not
+     *  known yet. Not a secret: the prompt shows it, as a phone does. */
+    pinLength: number | null;
     idleLockMinutes: number;
     sessionMaxMinutes: number;
     requireLoginApproval: boolean;
@@ -66,6 +69,7 @@ export interface UserSecuritySettings {
 
 const DEFAULTS: UserSecuritySettings = {
     hasPin: false,
+    pinLength: null,
     idleLockMinutes: 0,
     sessionMaxMinutes: 0,
     requireLoginApproval: false,
@@ -143,6 +147,7 @@ export async function getUserSecurity(userId: string): Promise<UserSecuritySetti
     if (!row) return { ...DEFAULTS, groupIds };
     return {
         hasPin: row.pinHash !== null,
+        pinLength: row.pinHash !== null ? row.pinLength : null,
         idleLockMinutes: row.idleLockMinutes,
         sessionMaxMinutes: row.sessionMaxMinutes,
         requireLoginApproval: row.requireLoginApproval,
@@ -437,6 +442,7 @@ export async function setQuickPin(
     }
     await upsertSecurity(userId, {
         pinHash: await hashSecret(auth, pin),
+        pinLength: pin.length,
         pinUpdatedAt: new Date()
     });
     return {};
@@ -451,7 +457,7 @@ export async function clearQuickPin(
     if (!(await verifyPassword(auth, userId, currentPassword))) {
         return { error: "Current password is incorrect." };
     }
-    await upsertSecurity(userId, { pinHash: null, pinUpdatedAt: null });
+    await upsertSecurity(userId, { pinHash: null, pinLength: null, pinUpdatedAt: null });
     return {};
 }
 
@@ -459,15 +465,26 @@ export async function clearQuickPin(
  * Check a PIN against the stored hash. Returns false when no PIN is set, so a
  * caller can never unlock an account that never armed one. Guess-throttling is
  * the caller's responsibility - a 4-digit secret needs it.
+ *
+ * A PIN set before its length was kept records it here, the first time it is
+ * typed right, so the prompts learn it without anybody setting it again. Only
+ * for the PIN that was just checked: a change in between leaves it alone.
  */
 export async function verifyQuickPin(auth: Auth, userId: string, pin: string): Promise<boolean> {
     const row = await prisma.userSecurity.findUnique({
         where: { userId },
-        select: { pinHash: true }
+        select: { pinHash: true, pinLength: true }
     });
     if (!row?.pinHash) return false;
     const ctx = await auth.$context;
-    return ctx.password.verify({ hash: row.pinHash, password: pin });
+    const matched = await ctx.password.verify({ hash: row.pinHash, password: pin });
+    if (matched && row.pinLength === null) {
+        await prisma.userSecurity.updateMany({
+            where: { userId, pinHash: row.pinHash, pinLength: null },
+            data: { pinLength: pin.length }
+        });
+    }
+    return matched;
 }
 
 /** Whether the account password matches - the fallback unlock and the gate on

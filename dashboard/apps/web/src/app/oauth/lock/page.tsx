@@ -27,5 +27,5 @@ export default async function LockPage() {
     if (!state?.lockedAt) redirect("/");
 
     const settings = await getUserSecurity(session.id);
-    return <LockView name={session.name} email={session.email} hasPin={settings.hasPin} />;
+    return <LockView name={session.name} email={session.email} hasPin={settings.hasPin} pinLength={settings.pinLength} />;
 }

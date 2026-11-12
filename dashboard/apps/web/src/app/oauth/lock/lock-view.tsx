@@ -6,37 +6,51 @@
  * PIN never becomes a dead end.
  */
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 import { signOut } from "@/lib/auth-client";
 import { unlockSessionAction } from "./actions";
+import { QuickPinInput, pinReady } from "@/components/quick-pin-input";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function LockView({
     name,
     email,
-    hasPin
+    hasPin,
+    pinLength
 }: {
     name: string;
     email: string;
     hasPin: boolean;
+    pinLength: number | null;
 }) {
     const router = useRouter();
     const t = useTranslations("auth");
     const [method, setMethod] = useState<"pin" | "password">(hasPin ? "pin" : "password");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [pin, setPin] = useState("");
+    const box = useRef<HTMLInputElement>(null);
+    // One check per PIN: the last digit and the button can both ask.
+    const checking = useRef(false);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        const secret = String(new FormData(event.currentTarget).get("secret") ?? "");
+        const secret = method === "pin" ? pin : String(new FormData(event.currentTarget).get("secret") ?? "");
+        if (checking.current || (method === "pin" && !pinReady(pin, pinLength))) return;
+        checking.current = true;
         setPending(true);
         setError(null);
         const result = await unlockSessionAction(secret, method);
         setPending(false);
+        checking.current = false;
         if (result.error) {
             setError(result.error);
+            if (method === "pin") {
+                setPin("");
+                box.current?.focus();
+            }
             return;
         }
         router.push("/");
@@ -63,18 +77,29 @@ export function LockView({
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
                             {method === "pin" ? t("lock.pin") : t("lock.password")}
-                            <Input
-                                name="secret"
-                                type="password"
-                                autoFocus
-                                inputMode={method === "pin" ? "numeric" : "text"}
-                                maxLength={method === "pin" ? 6 : undefined}
-                                autoComplete={method === "pin" ? "off" : "current-password"}
-                                required
-                            />
+                            {method === "pin" ? (
+                                <QuickPinInput
+                                    ref={box}
+                                    name="secret"
+                                    autoFocus
+                                    length={pinLength}
+                                    value={pin}
+                                    readOnly={pending}
+                                    onValueChange={setPin}
+                                    required
+                                />
+                            ) : (
+                                <Input
+                                    name="secret"
+                                    type="password"
+                                    autoFocus
+                                    autoComplete="current-password"
+                                    required
+                                />
+                            )}
                         </label>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <Button type="submit" disabled={pending}>
+                        <Button type="submit" disabled={pending || (method === "pin" && !pinReady(pin, pinLength))}>
                             {pending ? t("lock.unlocking") : t("lock.unlock")}
                         </Button>
                     </form>
@@ -85,6 +110,7 @@ export function LockView({
                                 className="text-muted-foreground underline-offset-2 hover:underline"
                                 onClick={() => {
                                     setMethod(method === "pin" ? "password" : "pin");
+                                    setPin("");
                                     setError(null);
                                 }}
                             >

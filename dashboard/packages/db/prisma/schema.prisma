@@ -1223,6 +1223,10 @@ model UserSecurity {
     // password, so its low entropy never guards the account itself.
     pinHash              String?
     pinUpdatedAt         DateTime?
+    // How many digits the PIN has, so a prompt can check it on the last one.
+    // Null while unknown: a PIN set before this was kept records it the next
+    // time it is typed right.
+    pinLength            Int?
     // The apps this account keeps behind its PIN (app ids). Ignored while no
     // PIN is set, so clearing the PIN can never shut somebody out of an app.
     lockedApps           String[]  @default([])

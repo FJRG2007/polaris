@@ -23,11 +23,11 @@ export default async function AppLockPage({
     const app = id.success ? POLARIS_APPS.find((entry) => entry.id === id.data) : undefined;
     if (!app) redirect("/");
     const next = safeReturnPath(params.next, app.href);
-    const { locked, hasPin } = await getAppLocks(user.viewingAs?.actorId ?? user.id);
+    const { locked, hasPin, pinLength } = await getAppLocks(user.viewingAs?.actorId ?? user.id);
     if (!hasPin || !locked.includes(app.id)) redirect(next);
     return (
         <Messages namespaces={["auth"]}>
-            <AppUnlockView appId={app.id} label={app.label} next={next} />
+            <AppUnlockView appId={app.id} label={app.label} next={next} pinLength={pinLength} />
         </Messages>
     );
 }

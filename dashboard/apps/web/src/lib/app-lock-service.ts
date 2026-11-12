@@ -13,16 +13,19 @@ import * as locks from "@/lib/app-locks";
 export interface AppLocks {
     readonly locked: string[];
     readonly hasPin: boolean;
+    /** The PIN's length, null when unknown - see `UserSecurity.pinLength`. */
+    readonly pinLength: number | null;
 }
 
 export async function getAppLocks(userId: string): Promise<AppLocks> {
     const row = await prisma.userSecurity.findUnique({
         where: { userId },
-        select: { lockedApps: true, pinHash: true }
+        select: { lockedApps: true, pinHash: true, pinLength: true }
     });
     return {
         locked: (row?.lockedApps ?? []).filter(locks.lockableApp),
-        hasPin: Boolean(row?.pinHash)
+        hasPin: Boolean(row?.pinHash),
+        pinLength: row?.pinHash ? row.pinLength : null
     };
 }
 

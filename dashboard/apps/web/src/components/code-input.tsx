@@ -14,6 +14,7 @@
  * the form asks for: a form with another field after it waits for its button.
  */
 
+import type { Ref } from "react";
 import { Input, type InputProps } from "@polaris/ui";
 
 /** How many digits a code has. `otpCodeField` in `@polaris/core` is the rule. */
@@ -52,6 +53,7 @@ export function CodeInput({
 }: Omit<InputProps, "value" | "onChange" | "type" | "maxLength"> & {
     value: string;
     onValueChange: (value: string) => void;
+    ref?: Ref<HTMLInputElement>;
     /** How many digits the code has. */
     length?: number;
     /** Drawn as dots, with the show/hide toggle - for a code that is a secret. */

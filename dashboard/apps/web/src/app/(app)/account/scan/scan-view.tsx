@@ -19,7 +19,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { scanTarget } from "@/lib/scan-target";
 import { decideQrSignInAction } from "./actions";
-import { codeDigits } from "@/components/code-input";
+import { QuickPinInput, pinReady } from "@/components/quick-pin-input";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
@@ -34,14 +34,17 @@ const SCAN_INTERVAL_MS = 200;
 export function ScanView({
     request,
     scanned,
-    hasPin
+    hasPin,
+    pinLength
 }: {
     request: QrSignInRequest | null;
     /** Whether a code was in the address at all, so a dead one can say so. */
     scanned: boolean;
     hasPin: boolean;
+    /** The PIN's length, null when unknown, so the PIN is checked on its last digit. */
+    pinLength: number | null;
 }) {
-    if (request) return <DecideCard request={request} hasPin={hasPin} />;
+    if (request) return <DecideCard request={request} hasPin={hasPin} pinLength={pinLength} />;
     return <ReadCard stale={scanned} />;
 }
 
@@ -191,9 +194,20 @@ function ReadCard({ stale }: { stale: boolean }) {
 }
 
 /** What is asking to be let in, and the PIN that lets it. */
-function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boolean }) {
+function DecideCard({
+    request,
+    hasPin,
+    pinLength
+}: {
+    request: QrSignInRequest;
+    hasPin: boolean;
+    pinLength: number | null;
+}) {
     const t = useTranslations("account");
     const [pin, setPin] = useState("");
+    const box = useRef<HTMLInputElement>(null);
+    // One answer at a time: the last digit and the button can both ask.
+    const deciding = useRef(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState<"approved" | "denied" | null>(null);
@@ -210,12 +224,19 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
     }, [request.expiresAt, done]);
 
     async function decide(approve: boolean) {
+        if (deciding.current || (approve && !pinReady(pin, pinLength))) return;
+        deciding.current = true;
         setBusy(true);
         setError(null);
         const result = await decideQrSignInAction({ userCode: request.userCode, approve, pin });
         setBusy(false);
+        deciding.current = false;
         if (result.error) {
             setError(result.error);
+            if (approve) {
+                setPin("");
+                box.current?.focus();
+            }
             return;
         }
         setPin("");
@@ -290,17 +311,23 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
                 </dl>
 
                 {hasPin ? (
-                    <label className="flex flex-col gap-1 text-sm">
-                        {t("scan.decide.pin")}
-                        <Input
-                            type="password"
-                            inputMode="numeric"
-                            maxLength={6}
-                            autoComplete="off"
-                            value={pin}
-                            onChange={(event) => setPin(codeDigits(event.target.value))}
-                        />
-                    </label>
+                    <form
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            void decide(true);
+                        }}
+                    >
+                        <label className="flex flex-col gap-1 text-sm">
+                            {t("scan.decide.pin")}
+                            <QuickPinInput
+                                ref={box}
+                                length={pinLength}
+                                value={pin}
+                                readOnly={busy}
+                                onValueChange={setPin}
+                            />
+                        </label>
+                    </form>
                 ) : (
                     <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                         {t.rich("scan.decide.needsPin", {
@@ -325,7 +352,7 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
                         {t("scan.decide.refuse")}
                     </Button>
                     <Button
-                        disabled={busy || !hasPin || pin.length < 4}
+                        disabled={busy || !hasPin || !pinReady(pin, pinLength)}
                         onClick={() => void decide(true)}
                     >
                         <Check className="size-4" />

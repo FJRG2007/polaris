@@ -14,8 +14,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
-import { useState, type FormEvent } from "react";
-import { codeDigits } from "@/components/code-input";
+import { useRef, useState, type FormEvent } from "react";
+import { QuickPinInput, pinReady } from "@/components/quick-pin-input";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Check, LogOut, ScanLine, X } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
@@ -45,8 +45,7 @@ import {
     DialogContent,
     DialogDescription,
     DialogHeader,
-    DialogTitle,
-    Input
+    DialogTitle
 } from "@polaris/ui";
 
 function Origin({ session }: { session: SessionView }) {
@@ -81,7 +80,8 @@ export function SessionsView({
     trusted,
     extensions,
     clients,
-    cliSessions
+    cliSessions,
+    pinLength
 }: {
     sessions: SessionView[];
     /** Browsers allowed to skip the second-factor challenge. Empty on an account
@@ -97,6 +97,8 @@ export function SessionsView({
     clients: VaultClientRow[];
     /** The command-line sign-ins, listed and ended like any other session. */
     cliSessions: CliSessionView[];
+    /** The PIN's length, null when unknown, so approving checks it on its last digit. */
+    pinLength: number | null;
 }) {
     const router = useRouter();
     const t = useTranslations("accountSecurity");
@@ -365,6 +367,7 @@ export function SessionsView({
             {trusted.length > 0 ? <TrustedDevicesCard devices={trusted} /> : null}
 
             <ApproveSignInDialog
+                pinLength={pinLength}
                 session={approving}
                 onOpenChange={(open) => {
                     if (!open) setApproving(null);
@@ -385,12 +388,14 @@ export function SessionsView({
  * the person at it is the account owner, so letting a new device in asks for the
  * quick-unlock PIN - the same secret that reopens a locked session.
  */
-function ApproveSignInDialog({
+export function ApproveSignInDialog({
     session,
+    pinLength,
     onOpenChange,
     onApproved
 }: {
     session: SessionView | null;
+    pinLength: number | null;
     onOpenChange: (open: boolean) => void;
     onApproved: () => void;
 }) {
@@ -399,16 +404,23 @@ function ApproveSignInDialog({
     const [pin, setPin] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const box = useRef<HTMLInputElement>(null);
+    // One check per PIN: the last digit and the button can both ask.
+    const checking = useRef(false);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        if (!session) return;
+        if (!session || checking.current || !pinReady(pin, pinLength)) return;
+        checking.current = true;
         setBusy(true);
         setError(null);
         const result = await decideLoginApprovalAction(session.id, true, pin);
         setBusy(false);
+        checking.current = false;
         if (result.error) {
             setError(result.error);
+            setPin("");
+            box.current?.focus();
             return;
         }
         setPin("");
@@ -436,13 +448,13 @@ function ApproveSignInDialog({
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         {t("sessions.approve.pin")}
-                        <Input
-                            type="password"
-                            inputMode="numeric"
-                            maxLength={6}
-                            autoComplete="off"
+                        <QuickPinInput
+                            ref={box}
+                            autoFocus
+                            length={pinLength}
                             value={pin}
-                            onChange={(event) => setPin(codeDigits(event.target.value))}
+                            readOnly={busy}
+                            onValueChange={setPin}
                             required
                         />
                     </label>
@@ -451,7 +463,7 @@ function ApproveSignInDialog({
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                             {tc("actions.cancel")}
                         </Button>
-                        <Button type="submit" disabled={busy || pin.length < 4}>
+                        <Button type="submit" disabled={busy || !pinReady(pin, pinLength)}>
                             {busy ? t("sessions.approve.checking") : t("sessions.pending.approve")}
                         </Button>
                     </div>

@@ -57,7 +57,7 @@ export default async function ScanPage({
                 </h1>
                 <p className="text-sm text-muted-foreground">{t("scan.page.intro")}</p>
             </div>
-            <ScanView request={request} scanned={raw !== null} hasPin={security.hasPin} />
+            <ScanView request={request} scanned={raw !== null} hasPin={security.hasPin} pinLength={security.pinLength} />
             {/* Every code this account has answered, under the thing that answers
                 them. A code allowed by mistake is noticed here or not at all: the
                 session it opened looks like any other sign-in on the list. */}
