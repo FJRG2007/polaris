@@ -179,6 +179,13 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
                         {error}
                     </p>
                 ) : null}
+                {/* Searching for a skill comes first: it is what most visits are for. */}
+                <SkillDirectory
+                    held={{ names: heldNames, sources: held }}
+                    readOnly={readOnly}
+                    onReview={(review) => setImporting({ review })}
+                    onTry={(draft) => router.push(trySkillHref({ draft }))}
+                />
                 <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {t("settings.skills.mine")}
                 </h3>
@@ -325,13 +332,6 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
                     })}
                 </ul>
             </div>
-
-            <SkillDirectory
-                held={{ names: heldNames, sources: held }}
-                readOnly={readOnly}
-                onReview={(review) => setImporting({ review })}
-                onTry={(draft) => router.push(trySkillHref({ draft }))}
-            />
 
             <SkillImportDialog
                 open={importing !== null}
