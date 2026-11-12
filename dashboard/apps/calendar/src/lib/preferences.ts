@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { cleanText } from "./schemas";
 import { DEFAULT_POMODORO, pomodoroConfigSchema } from "./clock/model";
 
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
@@ -52,6 +53,12 @@ const fields = {
      *  area's list and its meeting planner, and the comparison under an event's
      *  times. */
     worldClock: z.array(zone).max(WORLD_CLOCK_MAX),
+    /** The name somebody chose for a world clock entry, by its zone: a town
+     *  found by name ("Alcobendas, Madrid, Spain") rather than the zone's city.
+     *  A zone with no entry shows its own city. */
+    worldClockNames: z
+        .record(zone, z.string().max(200).transform(cleanText).pipe(z.string().max(120)))
+        .refine((names) => Object.keys(names).length <= WORLD_CLOCK_MAX),
     /** Length of a new event, in minutes. */
     defaultDuration: z
         .number()
@@ -112,6 +119,7 @@ export const DEFAULT_PREFERENCES: CalendarPreferences = {
     timezone: "auto",
     secondaryTimezone: null,
     worldClock: [],
+    worldClockNames: {},
     defaultDuration: 60,
     speedyMeetings: false,
     defaultAlarms: { timed: [-10], allDay: [-900] },

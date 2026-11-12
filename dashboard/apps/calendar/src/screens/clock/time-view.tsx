@@ -100,13 +100,16 @@ export function TimeView() {
                     hour12={hour12}
                     preferences={preferences}
                     ready={preferencesRead.data !== null}
-                    onCities={async (worldClock) => {
+                    onCities={async (worldClock, worldClockNames) => {
                         const before = preferencesRead.data;
                         if (!before) return;
-                        preferencesRead.replace({ ...before, worldClock });
+                        preferencesRead.replace({ ...before, worldClock, worldClockNames });
                         try {
                             const answer = await unwrap(
-                                () => preferenceActions.savePreferencesAction({ worldClock }),
+                                () => preferenceActions.savePreferencesAction({
+                                        worldClock,
+                                        worldClockNames
+                                    }),
                                 t("screen.failed")
                             );
                             preferencesRead.replace(answer.preferences);

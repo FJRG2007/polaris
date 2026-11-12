@@ -14,7 +14,7 @@ import { useNow } from "../ui";
 import { useState } from "react";
 import * as words from "./words";
 import { useCalendarT } from "../i18n";
-import { ZonePicker } from "../zone-picker";
+import { PlaceSearch, type PickedPlace } from "./place-search";
 import * as cities from "../../lib/clock/cities";
 import { hostUi } from "@polaris/app-host/client";
 import { MeetingPlanner } from "./meeting-planner";
@@ -43,7 +43,7 @@ export function WorldPanel({
     preferences: CalendarPreferences;
     /** The settings have been read: until then the list is not known. */
     ready: boolean;
-    onCities: (zones: string[]) => Promise<void>;
+    onCities: (zones: string[], names: Record<string, string>) => Promise<void>;
 }) {
     const t = useCalendarT();
     const toast = useToast();
@@ -51,11 +51,16 @@ export function WorldPanel({
     const now = useNow(15_000);
     const [adding, setAdding] = useState(false);
     const saved = preferences.worldClock;
+    const names = preferences.worldClockNames;
     const options = cities.cityOptions(locale, now);
     const byZone = new Map(options.map((option) => [option.zone, option]));
 
-    const save = (next: string[]) =>
-        void onCities(next).catch((caught: unknown) =>
+    const save = (next: string[], nextNames: Record<string, string> = names) =>
+        void onCities(
+            next,
+            // Only the names of zones still listed are kept.
+            Object.fromEntries(Object.entries(nextNames).filter(([key]) => next.includes(key)))
+        ).catch((caught: unknown) =>
             toast.show({
                 key: "calendar-time",
                 title:
@@ -108,15 +113,19 @@ export function WorldPanel({
                 </div>
                 {adding ? (
                     <div className="w-full sm:max-w-md">
-                        <ZonePicker
-                            value=""
-                            cities
-                            label={t("time.world.add")}
-                            placeholder={t("time.world.searchHint")}
-                            onChange={(picked) => {
+                        <PlaceSearch
+                            onPick={(picked: PickedPlace) => {
                                 setAdding(false);
-                                if (picked && !saved.includes(picked) && picked !== zone)
-                                    save([...saved, picked]);
+                                if (picked.zone === zone && !picked.label) return;
+                                const nextNames = { ...names };
+                                if (picked.label) nextNames[picked.zone] = picked.label;
+                                else delete nextNames[picked.zone];
+                                // A zone already listed takes the new name rather
+                                // than a second row with the same time.
+                                save(
+                                    saved.includes(picked.zone) ? saved : [...saved, picked.zone],
+                                    nextNames
+                                );
                             }}
                         />
                     </div>
@@ -144,7 +153,8 @@ export function WorldPanel({
                     <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card">
                         {saved.map((cityZone, index) => {
                             const option = byZone.get(cityZone);
-                            const name = option?.city ?? cities.cityOf(cityZone);
+                            const named = names[cityZone];
+                            const name = named || (option?.city ?? cities.cityOf(cityZone));
                             let time = "-";
                             try {
                                 time = words.instantTimeText(now, locale, cityZone, hour12);
@@ -164,7 +174,7 @@ export function WorldPanel({
                                             title={cityZone}
                                         >
                                             {name}
-                                            {option?.country ? (
+                                            {!named && option?.country ? (
                                                 <span className="font-normal text-muted-foreground">{`, ${option.country}`}</span>
                                             ) : null}
                                         </p>
