@@ -37,6 +37,10 @@ const removeDialog = byId<HTMLDialogElement>("confirm-remove");
 const removeTitle = byId<HTMLParagraphElement>("remove-title");
 const openAtLogin = byId<HTMLInputElement>("open-at-login");
 const hardwareAcceleration = byId<HTMLInputElement>("hardware-acceleration");
+const toggles = {
+    minimizeToTray: byId<HTMLInputElement>("minimize-to-tray"),
+    startMinimized: byId<HTMLInputElement>("start-minimized")
+} as const;
 const restartDialog = byId<HTMLDialogElement>("confirm-restart");
 const restartFailure = byId<HTMLParagraphElement>("restart-failure");
 const restartPending = byId<HTMLElement>("restart-pending");
@@ -330,6 +334,20 @@ openAtLogin.addEventListener("change", () => {
             say(failure, "Polaris could not change this on this computer.");
         });
 });
+for (const [name, input] of Object.entries(toggles) as [keyof typeof toggles, HTMLInputElement][]) {
+    input.addEventListener("change", () => {
+        const wanted = input.checked;
+        say(failure, null);
+        void window.polarisLocal.connect
+            .setToggle(name, wanted)
+            .catch(() => false)
+            .then((kept) => {
+                if (kept) return;
+                input.checked = !wanted;
+                say(failure, "Polaris could not save this setting. Try again.");
+            });
+    });
+}
 /** Close and open the app again; on a refusal, say why where the press was. */
 function relaunch(): void {
     say(restartFailure, null);
@@ -370,6 +388,8 @@ void window.polarisLocal.connect.preferences().catch(() => null).then((preferenc
     if (!preferences) return;
     openAtLogin.checked = preferences.openAtLogin;
     hardwareAcceleration.checked = preferences.hardwareAcceleration;
+    toggles.minimizeToTray.checked = preferences.minimizeToTray;
+    toggles.startMinimized.checked = preferences.startMinimized;
     restartPending.hidden = !preferences.restartPending;
     byId("version").textContent = `Polaris ${preferences.version}`;
 });

@@ -13,6 +13,21 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 
 const NAME = "Polaris";
 
+/** On the command line of a start the computer made, so the app can tell it
+ *  apart from somebody opening it. */
+export const LOGIN_ARG = "--hidden";
+
+/** Whether this run was started by signing in to the computer. */
+export function startedAtLogin(argv: readonly string[]): boolean {
+    if (argv.includes(LOGIN_ARG)) return true;
+    if (process.platform !== "darwin") return false;
+    try {
+        return app.getLoginItemSettings().wasOpenedAtLogin === true;
+    } catch {
+        return false;
+    }
+}
+
 function linuxEntry(): string {
     return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "autostart", "polaris.desktop");
 }
@@ -24,7 +39,7 @@ function setLinux(open: boolean): void {
     const command = process.env.APPIMAGE ?? process.execPath;
     writeFileSync(
         entry,
-        `[Desktop Entry]\nType=Application\nName=${NAME}\nExec="${command.replace(/(["\\$`])/g, "\\$1")}"\nX-GNOME-Autostart-enabled=true\n`
+        `[Desktop Entry]\nType=Application\nName=${NAME}\nExec="${command.replace(/(["\\$`])/g, "\\$1")}" ${LOGIN_ARG}\nX-GNOME-Autostart-enabled=true\n`
     );
 }
 
@@ -35,7 +50,7 @@ function apply(open: boolean): void {
             name: NAME,
             openAtLogin: open,
             path: join(dirname(process.execPath), "..", "Update.exe"),
-            args: ["--processStart", basename(process.execPath)]
+            args: ["--processStart", basename(process.execPath), "--process-start-args", LOGIN_ARG]
         });
         return;
     }

@@ -251,8 +251,15 @@ export interface Preferences {
     readonly hardwareAcceleration: boolean;
     /** True when the kept choice differs from the one this run started with. */
     readonly restartPending: boolean;
+    /** Closing the window keeps Polaris running in the tray. */
+    readonly minimizeToTray: boolean;
+    /** Opened with the computer, it starts in the tray. */
+    readonly startMinimized: boolean;
     readonly version: string;
 }
+
+/** The switches the settings window keeps with one call. */
+export type PreferenceToggle = "minimizeToTray" | "startMinimized";
 
 export interface PolarisLocal {
     readonly connect: {
@@ -273,6 +280,8 @@ export interface PolarisLocal {
         setOpenAtLogin(open: boolean): Promise<boolean>;
         /** Keep whether the graphics card is used. It applies from the next start. */
         setHardwareAcceleration(on: boolean): Promise<boolean>;
+        /** Keep one of the plain switches. Whether it took. */
+        setToggle(name: PreferenceToggle, on: boolean): Promise<boolean>;
         /** Close and open the app again, so a setting read at start applies. */
         relaunch(): Promise<Outcome>;
         /** Put the settings away. */
@@ -510,6 +519,7 @@ export const CHANNELS = {
     connectPreferences: "local:connect-preferences",
     connectOpenAtLogin: "local:connect-open-at-login",
     connectHardwareAcceleration: "local:connect-hardware-acceleration",
+    connectToggle: "local:connect-toggle",
     connectRelaunch: "local:connect-relaunch",
     connectSwitch: "local:connect-switch",
     connectRename: "local:connect-rename",

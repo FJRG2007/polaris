@@ -42,13 +42,15 @@ function event(kind: string) {
 
 const host = {
     setHardwareAcceleration: vi.fn((_on: boolean) => true),
-    relaunch: vi.fn(() => ({ ok: true as const }))
+    relaunch: vi.fn(() => ({ ok: true as const })),
+    setToggle: vi.fn((_name: string, _on: boolean) => true)
 };
 
 beforeEach(async () => {
     handlers.clear();
     host.setHardwareAcceleration.mockClear();
     host.relaunch.mockClear();
+    host.setToggle.mockClear();
     const { registerIpc } = await import("@/main/ipc");
     registerIpc({ server: () => ORIGIN, ...host } as unknown as IpcHost);
 });
@@ -67,6 +69,26 @@ describe("hardware acceleration", () => {
     it("refuses any window but the settings window", () => {
         expect(handlers.get(CHANNELS.connectHardwareAcceleration)?.(event("polaris"), false)).toBe(false);
         expect(host.setHardwareAcceleration).not.toHaveBeenCalled();
+    });
+});
+
+describe("the tray switches", () => {
+    it.each([["minimizeToTray"], ["startMinimized"]])("keeps %s from the settings window", (name) => {
+        expect(handlers.get(CHANNELS.connectToggle)?.(event("connect"), { name, on: false })).toBe(true);
+        expect(host.setToggle).toHaveBeenCalledWith(name, false);
+    });
+
+    it.each([[{ name: "openAtLogin", on: true }], [{ name: "startMinimized", on: "yes" }], [null]])(
+        "refuses %j",
+        (raw) => {
+            expect(handlers.get(CHANNELS.connectToggle)?.(event("connect"), raw)).toBe(false);
+            expect(host.setToggle).not.toHaveBeenCalled();
+        }
+    );
+
+    it("refuses any window but the settings window", () => {
+        expect(handlers.get(CHANNELS.connectToggle)?.(event("polaris"), { name: "startMinimized", on: true })).toBe(false);
+        expect(host.setToggle).not.toHaveBeenCalled();
     });
 });
 

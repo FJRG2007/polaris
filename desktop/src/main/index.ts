@@ -40,13 +40,13 @@ import { installTray } from "./tray";
 import { appItems, hideMenuBar, installMenu, type MenuActions, type MenuUpdate } from "./menu";
 import { serverAddressSchema } from "@/shared/server-address";
 import { listServers, normalizeServerName, renameServer, sameInstanceWords, SERVER_NAME_MAX, withoutServer } from "@/shared/servers";
-import { setOpenAtLogin } from "./login-item";
+import { setOpenAtLogin, startedAtLogin } from "./login-item";
 import { restoredPlace } from "@/shared/window-place";
 import * as settings from "./settings";
 import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpdateAttempted, updateAttempted } from "./settings";
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, type LocalSheet } from "./windows";
-import { app, BrowserWindow, dialog, net, screen, session, shell } from "electron";
+import { app, autoUpdater, BrowserWindow, dialog, net, screen, session, shell } from "electron";
 import { describeNetError, finishedLoad, isCertificateError, netErrorCode } from "./reachability";
 import { sameInstanceAs } from "./same-instance";
 import { addressWords, failoverFor, instanceRecordFor } from "./polaris-api";
@@ -319,10 +319,33 @@ async function failOver(window: BrowserWindow, failedUrl: string): Promise<"move
     return found?.untrusted ? "untrusted" : "none";
 }
 
+/** Whether the app is on its way out, when closing a window must close it. */
+let quitting = false;
+
+/** Started by the computer with "Start minimized" on: the first window waits in
+ *  the tray. Read once. */
+let startHidden = false;
+
 function openMain(url: string): void {
-    const window = openPolarisWindow(url, server, savedPlace());
+    const hidden = startHidden;
+    startHidden = false;
+    const window = openPolarisWindow(url, server, { ...savedPlace(), hidden });
     main = window;
     rememberPlace(window);
+    // Closing the window somebody uses keeps Polaris in the tray, the way a chat
+    // app does, so a call or a notification is not lost to a click on the X.
+    // A window closed on purpose - leaving the server, giving up on it - is no
+    // longer `main` by then, and quitting closes it for real.
+    window.on("close", (event) => {
+        if (quitting || main !== window || !settings.toggle("minimizeToTray")) return;
+        event.preventDefault();
+        if (window.isFullScreen()) {
+            window.once("leave-full-screen", () => window.hide());
+            window.setFullScreen(false);
+            return;
+        }
+        window.hide();
+    });
     let offline = false;
     let failingOver = false;
 
@@ -518,8 +541,8 @@ async function connectSubmit(raw: unknown, typedName = ""): Promise<Outcome> {
  *  origin the navigation rules no longer allow. */
 function leaveServer(): void {
     sheet?.close();
-    for (const window of BrowserWindow.getAllWindows()) if (window !== connect) window.close();
     main = null;
+    for (const window of BrowserWindow.getAllWindows()) if (window !== connect) window.close();
     updating = null;
 }
 
@@ -593,6 +616,7 @@ function start(): void {
     accelerated = settings.hardwareAcceleration();
     if (!accelerated) app.disableHardwareAcceleration();
     current = serverAddress();
+    startHidden = startedAtLogin(process.argv) && settings.toggle("startMinimized");
 
     app.on("browser-window-created", (_event, window) => hideMenuBar(window));
 
@@ -650,6 +674,8 @@ function start(): void {
                     openAtLogin: settings.openAtLogin(),
                     hardwareAcceleration,
                     restartPending: hardwareAcceleration !== accelerated,
+                    minimizeToTray: settings.toggle("minimizeToTray"),
+                    startMinimized: settings.toggle("startMinimized"),
                     version: app.getVersion()
                 };
             },
@@ -660,6 +686,10 @@ function start(): void {
             },
             setHardwareAcceleration: (on) => {
                 settings.rememberHardwareAcceleration(on);
+                return true;
+            },
+            setToggle: (name, on) => {
+                settings.rememberToggle(name, on);
                 return true;
             },
             relaunch: () => {
@@ -769,7 +799,9 @@ function start(): void {
             .catch((): Opening => "open")
             .then((opening) => {
                 app.on("activate", () => {
-                    if (BrowserWindow.getAllWindows().length === 0) showOpening();
+                    // A window kept in the tray is still a window: the Dock brings it back.
+                    if (main && !main.isDestroyed() && !main.isVisible()) showPolaris();
+                    else if (BrowserWindow.getAllWindows().length === 0) showOpening();
                 });
                 if (opening !== "open") {
                     deepLinks.opened();
@@ -803,9 +835,16 @@ function start(): void {
     // Keys held system-wide are the operating system's until let go.
     app.on("will-quit", () => releaseCallHotkeys());
 
+    // An update closes every window before it quits, and none may stay in the tray.
+    autoUpdater.on("before-quit-for-update", () => {
+        quitting = true;
+    });
+
     let confirmedQuit = false;
     app.on("before-quit", (event) => {
+        quitting = true;
         if (confirmedQuit || !pushRunning()) return;
+        quitting = false;
         event.preventDefault();
         const choice = dialog.showMessageBoxSync({
             type: "warning",

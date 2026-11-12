@@ -192,6 +192,8 @@ export function openPolarisWindow(
         readonly x?: number;
         readonly y?: number;
         readonly maximized?: boolean;
+        /** Made but kept off screen until somebody asks for it (the tray). */
+        readonly hidden?: boolean;
     } = {}
 ): BrowserWindow {
     const window = new BrowserWindow(
@@ -211,12 +213,17 @@ export function openPolarisWindow(
     // The page's own <title> is kept for the main window; a window opened for one
     // job keeps the name it was given, so two log windows can be told apart.
     if (options.title) window.on("page-title-updated", (event) => event.preventDefault());
-    const { x, y, width, height, maximized } = options;
+    const { x, y, width, height, maximized, hidden } = options;
     window.once("ready-to-show", () => {
         // Asked again now it exists: a window made on a monitor of another scale
         // takes its size from the one it was made on. It is not on screen yet.
         if (x !== undefined && y !== undefined && width && height) {
             window.setBounds({ x, y, width, height });
+        }
+        if (hidden) {
+            // Maximizing shows a window, so it waits for the first time it is.
+            if (maximized) window.once("show", () => window.maximize());
+            return;
         }
         if (maximized) window.maximize();
         window.show();

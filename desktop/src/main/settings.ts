@@ -47,7 +47,13 @@ const settingsSchema = z.object({
     openAtLogin: z.boolean().catch(true),
     // On unless somebody turned it off: a file without it, or with anything but a
     // boolean, keeps the graphics card in use.
-    hardwareAcceleration: z.boolean().catch(true)
+    hardwareAcceleration: z.boolean().catch(true),
+    // On unless somebody turned it off: closing the window keeps Polaris in the
+    // tray, so calls and notifications carry on.
+    minimizeToTray: z.boolean().catch(true),
+    // Off unless somebody turned it on: opened with the computer, it stays in
+    // the tray instead of putting a window in front of everything.
+    startMinimized: z.boolean().catch(false)
 });
 
 type Settings = z.infer<typeof settingsSchema>;
@@ -59,7 +65,9 @@ const EMPTY: Settings = {
     updateAttempted: null,
     windowPlace: null,
     openAtLogin: true,
-    hardwareAcceleration: true
+    hardwareAcceleration: true,
+    minimizeToTray: true,
+    startMinimized: false
 };
 
 function file(): string {
@@ -149,6 +157,19 @@ export function hardwareAcceleration(): boolean {
 
 export function rememberHardwareAcceleration(on: boolean): void {
     save({ ...load(), hardwareAcceleration: on });
+}
+
+/** The switches kept as they are and read when they matter. */
+export const TOGGLES = ["minimizeToTray", "startMinimized"] as const;
+
+export type Toggle = (typeof TOGGLES)[number];
+
+export function toggle(name: Toggle): boolean {
+    return load()[name];
+}
+
+export function rememberToggle(name: Toggle, on: boolean): void {
+    save({ ...load(), [name]: on });
 }
 
 /** What was used the last time this service was pushed from here. */

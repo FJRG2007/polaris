@@ -34,6 +34,7 @@ import {
     type Outcome,
     type PickedFolder,
     type Preferences,
+    type PreferenceToggle,
     type SystemIdle
 } from "@/shared/bridge";
 import type { ServerRow } from "@/shared/servers";
@@ -66,6 +67,7 @@ export interface IpcHost extends PushHost {
     readonly setOpenAtLogin: (open: boolean) => boolean;
     /** Keep whether the graphics card is used from the next start. */
     readonly setHardwareAcceleration: (on: boolean) => boolean;
+    readonly setToggle: (name: PreferenceToggle, on: boolean) => boolean;
     /** Close and open the app again, unless something running would be lost. */
     readonly relaunch: () => Outcome;
     readonly connectState: () => { address: string | null; error: string | null; servers: ServerRow[]; };
@@ -535,6 +537,12 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.connectHardwareAcceleration, (event, raw: unknown): boolean => {
         const on = z.boolean().safeParse(raw);
         return from(event, "connect") && on.success && host.setHardwareAcceleration(on.data);
+    });
+    ipcMain.handle(CHANNELS.connectToggle, (event, raw: unknown): boolean => {
+        const input = z
+            .object({ name: z.enum(["minimizeToTray", "startMinimized"]), on: z.boolean() })
+            .safeParse(raw);
+        return from(event, "connect") && input.success && host.setToggle(input.data.name, input.data.on);
     });
     // Takes nothing from the page.
     ipcMain.handle(CHANNELS.connectRelaunch, (event) => (from(event, "connect") ? host.relaunch() : REFUSED));

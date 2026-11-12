@@ -22,6 +22,7 @@ const bridge: PolarisLocal = {
         preferences: () => ipcRenderer.invoke(CHANNELS.connectPreferences),
         setOpenAtLogin: (open) => ipcRenderer.invoke(CHANNELS.connectOpenAtLogin, open),
         setHardwareAcceleration: (on) => ipcRenderer.invoke(CHANNELS.connectHardwareAcceleration, on),
+        setToggle: (name, on) => ipcRenderer.invoke(CHANNELS.connectToggle, { name, on }),
         relaunch: () => ipcRenderer.invoke(CHANNELS.connectRelaunch),
         close: () => ipcRenderer.invoke(CHANNELS.connectClose),
         checkForUpdates: async () => readUpdateCheck(await ipcRenderer.invoke(CHANNELS.connectCheckUpdates)),

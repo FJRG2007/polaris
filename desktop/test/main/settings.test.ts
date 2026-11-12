@@ -12,8 +12,15 @@ const folder = vi.hoisted(() => ({ path: "" }));
 
 vi.mock("electron", () => ({ app: { getPath: () => folder.path } }));
 
-const { hardwareAcceleration, rememberHardwareAcceleration, serverAddress, setUpdateAttempted, updateAttempted } =
-    await import("@/main/settings");
+const {
+    hardwareAcceleration,
+    rememberHardwareAcceleration,
+    rememberToggle,
+    serverAddress,
+    setUpdateAttempted,
+    toggle,
+    updateAttempted
+} = await import("@/main/settings");
 
 beforeEach(() => {
     folder.path = mkdtempSync(join(tmpdir(), "polaris-settings-"));
@@ -49,6 +56,21 @@ describe("hardware acceleration, read at start", () => {
         expect(serverAddress()).toBe(origin);
         rememberHardwareAcceleration(true);
         expect(hardwareAcceleration()).toBe(true);
+    });
+});
+
+describe("the tray", () => {
+    it("minimizes to it and starts in front by default, from a file written before either existed", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ server: null, servers: [], pushes: {} }));
+        expect(toggle("minimizeToTray")).toBe(true);
+        expect(toggle("startMinimized")).toBe(false);
+    });
+
+    it("keeps what was chosen", () => {
+        rememberToggle("minimizeToTray", false);
+        rememberToggle("startMinimized", true);
+        expect(toggle("minimizeToTray")).toBe(false);
+        expect(toggle("startMinimized")).toBe(true);
     });
 });
 
