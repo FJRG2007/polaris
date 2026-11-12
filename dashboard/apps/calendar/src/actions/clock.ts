@@ -171,3 +171,24 @@ export async function changeStopwatchAction(input: unknown): Promise<Snapshot> {
     if (!parsed.success) return invalid(parsed.error.issues);
     return answer((userId) => clock.changeStopwatch(userId, parsed.data.change));
 }
+
+const laneSchema = z.discriminatedUnion("change", [
+    z.object({ change: z.literal("add"), label: model.laneLabelSchema }),
+    z.object({ change: z.literal("rename"), id, label: model.laneLabelSchema }),
+    z.object({ change: z.enum(model.LANE_CHANGES), id }),
+    z.object({ change: z.literal("all"), to: z.enum(model.LANE_BULK_CHANGES) })
+]);
+
+/** The named stopwatches: add, rename, one lane's change, or all of them at once. */
+export async function changeLaneAction(input: unknown): Promise<Snapshot> {
+    const parsed = laneSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error.issues);
+    const request = parsed.data;
+    return answer(async (userId) => {
+        if (request.change === "add") await clock.addLane(userId, request.label);
+        else if (request.change === "rename")
+            await clock.renameLane(userId, request.id, request.label);
+        else if (request.change === "all") await clock.changeAllLanes(userId, request.to);
+        else await clock.changeLane(userId, request.id, request.change);
+    });
+}

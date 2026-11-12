@@ -123,7 +123,7 @@
             "here": "Your time",
             "cities": "Cities",
             "add": "Add a city",
-            "searchHint": "City, country or zone",
+            "searchHint": "City, town, country or zone",
             "emptyTitle": "No cities yet",
             "emptyBody": "Add the places you work with to see their time and plan meetings across them.",
             "today": "Today",
@@ -136,7 +136,10 @@
             "clocksChange": "Clocks change {when}",
             "moveUp": "Move up",
             "moveDown": "Move down",
-            "remove": "Remove"
+            "remove": "Remove",
+            "searching": "Looking up places...",
+            "searchFailed": "Places could not be looked up right now. The list above still works.",
+            "keepTyping": "Type at least two letters to look up any place."
         },
         "planner": {
             "title": "Meeting planner",
@@ -182,7 +185,8 @@
             "tooManyAlarms": "You have 50 alarms, the most there can be. Delete one to add another.",
             "tooManyTimers": "You have 30 timers, the most there can be. Delete one to add another.",
             "tooManyLaps": "The stopwatch keeps 500 laps at most. Reset it to start again.",
-            "notACommand": "Write it like \"timer 10m\", \"alarm 7:30\" or \"stopwatch\"."
+            "notACommand": "Write it like \"timer 10m\", \"alarm 7:30\" or \"stopwatch\".",
+            "tooManyLanes": "You have 50 stopwatches, the most there can be. Remove one to add another."
         },
         "duplicate": "Duplicate",
         "rename": "Edit name",
@@ -204,6 +208,31 @@
         "timerEdit": {
             "title": "Change the timer's settings",
             "restarts": "Changing the length starts it over."
+        },
+        "lanes": {
+            "title": "More stopwatches",
+            "add": "Add stopwatch",
+            "empty": "Add stopwatches to time several things at once. Start all starts them at the same instant.",
+            "defaultName": "Stopwatch {number}",
+            "startAll": "Start all",
+            "stopAll": "Stop all",
+            "resetAll": "Reset all",
+            "resetAllTitle": "Reset all stopwatches?",
+            "resetAllBody": "Every time and lap in this list goes back to zero.",
+            "rank": "Rank",
+            "position": "Position {position}",
+            "rename": "Rename {name}",
+            "nameLabel": "Name",
+            "reading": "{name}: {time}",
+            "lapOf": "Lap on {name}",
+            "resetOf": "Reset {name}",
+            "startOf": "Start {name}",
+            "pauseOf": "Pause {name}",
+            "removeOf": "Remove {name}",
+            "remove": "Remove",
+            "removeTitle": "Remove {name}?",
+            "removeBody": "Its time and laps are deleted.",
+            "lapNumber": "Lap {lap}"
         }
     }
 }

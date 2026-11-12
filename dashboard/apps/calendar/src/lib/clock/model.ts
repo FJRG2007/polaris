@@ -295,6 +295,9 @@ export interface ClockSnapshot {
     readonly alarms: readonly AlarmView[];
     readonly timers: readonly TimerView[];
     readonly stopwatch: StopwatchView;
+    /** The named stopwatches beside the main one, oldest first. Absent from a
+     *  snapshot a tab kept from before they existed. */
+    readonly lanes?: readonly StopwatchLaneView[];
     /** The server's clock when this was read, so a screen on a device whose own
      *  clock is off still counts down to the same second. */
     readonly serverNow: string;
@@ -304,4 +307,63 @@ export const EMPTY_STOPWATCH: StopwatchView = { startedAt: null, elapsedMs: 0, l
 
 export function asSound(value: string): ClockSound {
     return (CLOCK_SOUNDS as readonly string[]).includes(value) ? (value as ClockSound) : "chime";
+}
+
+// ---------------------------------------------------------------------------
+// More stopwatches: a named list beside the main one, for timing several
+// things at once - a race's runners, a kitchen's dishes. Started together they
+// share one start instant, so their readings compare exactly.
+
+export const MAX_LANES = 50;
+
+export const LANE_CHANGES = ["start", "pause", "reset", "lap", "delete"] as const;
+export type LaneChange = (typeof LANE_CHANGES)[number];
+
+export const LANE_BULK_CHANGES = ["start", "pause", "reset"] as const;
+export type LaneBulkChange = (typeof LANE_BULK_CHANGES)[number];
+
+export const laneLabelSchema = label;
+
+export interface StopwatchLaneView extends StopwatchView {
+    readonly id: string;
+    readonly label: string;
+}
+
+/** A lane as the screen draws it after a change, before the server answers. */
+export function changedLane(
+    lane: StopwatchLaneView,
+    change: Exclude<LaneChange, "delete">,
+    at: number
+): StopwatchLaneView {
+    const elapsed = stopwatchElapsed(lane, at);
+    if (change === "start")
+        return lane.startedAt ? lane : { ...lane, startedAt: new Date(at).toISOString() };
+    if (change === "pause")
+        return lane.startedAt ? { ...lane, startedAt: null, elapsedMs: elapsed } : lane;
+    if (change === "reset") return { ...lane, startedAt: null, elapsedMs: 0, laps: [] };
+    return lane.startedAt && lane.laps.length < MAX_LAPS
+        ? { ...lane, laps: [...lane.laps, Math.round(elapsed)] }
+        : lane;
+}
+
+/**
+ * The lanes in finishing order: stopped ones with a time first, quickest
+ * first; then the ones still running, furthest along first; then the ones
+ * never started. Ties keep the list's order.
+ */
+export function rankLanes(
+    lanes: readonly StopwatchLaneView[],
+    now: number
+): StopwatchLaneView[] {
+    const group = (lane: StopwatchLaneView) =>
+        lane.startedAt === null ? (lane.elapsedMs > 0 ? 0 : 2) : 1;
+    return lanes
+        .map((lane, index) => ({ lane, index, time: stopwatchElapsed(lane, now) }))
+        .sort((a, b) => {
+            const byGroup = group(a.lane) - group(b.lane);
+            if (byGroup !== 0) return byGroup;
+            const byTime = group(a.lane) === 1 ? b.time - a.time : a.time - b.time;
+            return byTime !== 0 ? byTime : a.index - b.index;
+        })
+        .map(({ lane }) => lane);
 }

@@ -123,7 +123,7 @@
             "here": "Tu hora",
             "cities": "Ciudades",
             "add": "Añadir ciudad",
-            "searchHint": "Ciudad, país o zona",
+            "searchHint": "Ciudad, pueblo, país o zona",
             "emptyTitle": "Sin ciudades",
             "emptyBody": "Añade los lugares con los que trabajas para ver su hora y planear reuniones entre ellos.",
             "today": "Hoy",
@@ -136,7 +136,10 @@
             "clocksChange": "Cambio de hora el {when}",
             "moveUp": "Subir",
             "moveDown": "Bajar",
-            "remove": "Quitar"
+            "remove": "Quitar",
+            "searching": "Buscando lugares...",
+            "searchFailed": "Ahora no se pueden buscar lugares. La lista de arriba sigue funcionando.",
+            "keepTyping": "Escribe al menos dos letras para buscar un lugar."
         },
         "planner": {
             "title": "Planificador",
@@ -182,7 +185,8 @@
             "tooManyAlarms": "Tienes 50 alarmas, el máximo. Elimina una para añadir otra.",
             "tooManyTimers": "Tienes 30 temporizadores, el máximo. Elimina uno para añadir otro.",
             "tooManyLaps": "El cronómetro guarda 500 vueltas como máximo. Reinícialo para empezar de nuevo.",
-            "notACommand": "Escríbelo como \"temporizador 10m\", \"alarma 7:30\" o \"cronómetro\"."
+            "notACommand": "Escríbelo como \"temporizador 10m\", \"alarma 7:30\" o \"cronómetro\".",
+            "tooManyLanes": "Tienes 50 cronómetros, el máximo. Quita uno para añadir otro."
         },
         "duplicate": "Duplicar",
         "rename": "Renombrar",
@@ -204,6 +208,31 @@
         "timerEdit": {
             "title": "Editar el temporizador",
             "restarts": "Cambiar la duración lo reinicia."
+        },
+        "lanes": {
+            "title": "Más cronómetros",
+            "add": "Añadir cronómetro",
+            "empty": "Añade cronómetros para medir varias cosas a la vez. Dar salida los arranca en el mismo instante.",
+            "defaultName": "Cronómetro {number}",
+            "startAll": "Dar salida",
+            "stopAll": "Parar todos",
+            "resetAll": "Todo a cero",
+            "resetAllTitle": "¿Reiniciar todos?",
+            "resetAllBody": "Cada tiempo y vuelta de la lista vuelve a cero.",
+            "rank": "Ranking",
+            "position": "Puesto {position}",
+            "rename": "Renombrar {name}",
+            "nameLabel": "Nombre",
+            "reading": "{name}: {time}",
+            "lapOf": "Vuelta en {name}",
+            "resetOf": "Reiniciar {name}",
+            "startOf": "Iniciar {name}",
+            "pauseOf": "Pausar {name}",
+            "removeOf": "Quitar {name}",
+            "remove": "Quitar",
+            "removeTitle": "¿Quitar {name}?",
+            "removeBody": "Se borran su tiempo y vueltas.",
+            "lapNumber": "Vuelta {lap}"
         }
     }
 }

@@ -14,6 +14,7 @@ import { useCalendarT } from "../i18n";
 import { useEffect, useState } from "react";
 import * as model from "../../lib/clock/model";
 import { mutate, type ClockRead } from "./store";
+import { StopwatchLanes } from "./stopwatch-lanes";
 import * as clockActions from "../../actions/clock";
 import {
     Button,
@@ -314,6 +315,7 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
                     </div>
                 </div>
             ) : null}
+            <StopwatchLanes clock={clock} />
         </section>
     );
 }

@@ -347,6 +347,21 @@ const MODELS: Record<string, Model> = {
         relations: { user: { model: "user", kind: "one", foreignKey: "userId", references: "id" } },
         unique: [["userId"]],
         updatedAt: true
+    },
+    clockStopwatchLane: {
+        fields: {
+            id: uuid,
+            userId: undefined,
+            label: "",
+            startedAt: null,
+            elapsedMs: 0,
+            laps: "[]",
+            createdAt: now,
+            updatedAt: now
+        },
+        relations: { user: { model: "user", kind: "one", foreignKey: "userId", references: "id" } },
+        unique: [["id"]],
+        updatedAt: true
     }
 };
 
@@ -880,6 +895,7 @@ export function createFakeDb() {
         clockAlarm: delegate("clockAlarm"),
         clockTimer: delegate("clockTimer"),
         clockStopwatch: delegate("clockStopwatch"),
+        clockStopwatchLane: delegate("clockStopwatchLane"),
         $transaction: async (work: unknown): Promise<unknown> => {
             if (Array.isArray(work)) {
                 const results: unknown[] = [];

@@ -449,6 +449,7 @@ model User {
     clockAlarms          ClockAlarm[]
     clockTimers          ClockTimer[]
     clockStopwatch       ClockStopwatch?
+    clockStopwatchLanes  ClockStopwatchLane[]
 
     // The people directory reads accounts a page at a time, oldest first, and
     // resumes after the last one it showed - see `pagination/cursor`.
@@ -14448,6 +14449,25 @@ model ClockStopwatch {
     updatedAt DateTime  @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// The named stopwatches beside the main one in Calendar's Time area, for
+/// timing several things at once. Same reading as `ClockStopwatch`: counted
+/// from `startedAt`, never by ticks.
+model ClockStopwatchLane {
+    id        String    @id @default(uuid()) @db.Uuid
+    userId    String    @db.Uuid
+    label     String    @default("")
+    startedAt DateTime?
+    elapsedMs Float     @default(0)
+    /// Each lap's total at the moment it was taken, in milliseconds, as JSON.
+    laps      String    @default("[]")
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, createdAt])
 }
 
 /// A file that was meant for a storage and was kept on this server instead,

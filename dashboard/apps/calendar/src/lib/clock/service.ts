@@ -121,7 +121,7 @@ export async function clockSnapshot(
     userId: string,
     now = new Date()
 ): Promise<model.ClockSnapshot> {
-    const [alarms, timers, watch] = await Promise.all([
+    const [alarms, timers, watch, lanes] = await Promise.all([
         prisma.clockAlarm.findMany({
             where: { userId },
             orderBy: [{ time: "asc" }, { createdAt: "asc" }],
@@ -137,6 +137,12 @@ export async function clockSnapshot(
         prisma.clockStopwatch.findUnique({
             where: { userId },
             select: { startedAt: true, elapsedMs: true, laps: true }
+        }),
+        prisma.clockStopwatchLane.findMany({
+            where: { userId },
+            orderBy: { createdAt: "asc" },
+            take: model.MAX_LANES,
+            select: LANE_SELECT
         })
     ]);
     const stopwatch: model.StopwatchView = watch
@@ -150,6 +156,7 @@ export async function clockSnapshot(
         alarms: alarms.map(alarmView),
         timers: timers.map(timerView),
         stopwatch,
+        lanes: lanes.map(laneView),
         serverNow: now.toISOString()
     };
 }
@@ -609,6 +616,141 @@ export async function changeStopwatch(
         data
     });
     if (changed.count === 0) await refusal(userId, "time.errors.changed");
+}
+
+// ---------------------------------------------------------------------------
+// More stopwatches
+
+const LANE_SELECT = {
+    id: true,
+    label: true,
+    startedAt: true,
+    elapsedMs: true,
+    laps: true,
+    updatedAt: true
+} as const;
+
+type LaneRow = {
+    id: string;
+    label: string;
+    startedAt: Date | null;
+    elapsedMs: number;
+    laps: string;
+    updatedAt: Date;
+};
+
+function laneView(row: LaneRow): model.StopwatchLaneView {
+    return {
+        id: row.id,
+        label: row.label,
+        startedAt: row.startedAt?.toISOString() ?? null,
+        elapsedMs: row.elapsedMs,
+        laps: model.readLaps(row.laps)
+    };
+}
+
+/** Add a named stopwatch, stopped at zero. Answers its id. */
+export async function addLane(userId: string, label: string): Promise<string> {
+    const count = await prisma.clockStopwatchLane.count({ where: { userId } });
+    if (count >= model.MAX_LANES) await refusal(userId, "time.errors.tooManyLanes");
+    const row = await prisma.clockStopwatchLane.create({
+        data: { userId, label, startedAt: null, elapsedMs: 0, laps: "[]" },
+        select: { id: true }
+    });
+    return row.id;
+}
+
+export async function renameLane(userId: string, id: string, label: string): Promise<void> {
+    const changed = await prisma.clockStopwatchLane.updateMany({
+        where: { id, userId },
+        data: { label }
+    });
+    if (changed.count === 0) await refusal(userId, "time.errors.gone");
+}
+
+/** The write a change makes to one lane at `now`, or null when it is a no-op. */
+async function laneWrite(
+    userId: string,
+    lane: LaneRow,
+    change: Exclude<model.LaneChange, "delete">,
+    now: Date
+): Promise<{ startedAt?: Date | null; elapsedMs?: number; laps?: string } | null> {
+    const elapsed = model.stopwatchElapsed(lane, now.getTime());
+    if (change === "start") return lane.startedAt ? null : { startedAt: now };
+    if (change === "pause") return lane.startedAt ? { startedAt: null, elapsedMs: elapsed } : null;
+    if (change === "reset") return { startedAt: null, elapsedMs: 0, laps: "[]" };
+    if (!lane.startedAt) return null;
+    const laps = model.readLaps(lane.laps);
+    if (laps.length >= model.MAX_LAPS) await refusal(userId, "time.errors.tooManyLaps");
+    return { laps: JSON.stringify([...laps, Math.round(elapsed)]) };
+}
+
+export async function changeLane(
+    userId: string,
+    id: string,
+    change: model.LaneChange,
+    now = new Date()
+): Promise<void> {
+    if (change === "delete") {
+        await prisma.clockStopwatchLane.deleteMany({ where: { id, userId } });
+        return;
+    }
+    const lane = await prisma.clockStopwatchLane.findFirst({
+        where: { id, userId },
+        select: LANE_SELECT
+    });
+    if (!lane) return refusal(userId, "time.errors.gone");
+    const data = await laneWrite(userId, lane, change, now);
+    if (!data) return;
+    // Conditional on the row this read, like the main stopwatch.
+    const changed = await prisma.clockStopwatchLane.updateMany({
+        where: { id, userId, updatedAt: lane.updatedAt },
+        data
+    });
+    if (changed.count === 0) await refusal(userId, "time.errors.changed");
+}
+
+/**
+ * Start, stop or reset every lane at once. Starting is one write with one
+ * instant, so every lane it starts reads from exactly the same moment; stopping
+ * reads each lane against the same `now`, so they stop together too.
+ */
+export async function changeAllLanes(
+    userId: string,
+    change: model.LaneBulkChange,
+    now = new Date()
+): Promise<void> {
+    if (change === "start") {
+        await prisma.clockStopwatchLane.updateMany({
+            where: { userId, startedAt: null },
+            data: { startedAt: now }
+        });
+        return;
+    }
+    if (change === "reset") {
+        await prisma.clockStopwatchLane.updateMany({
+            where: { userId },
+            data: { startedAt: null, elapsedMs: 0, laps: "[]" }
+        });
+        return;
+    }
+    const running = await prisma.clockStopwatchLane.findMany({
+        where: { userId, startedAt: { not: null } },
+        take: model.MAX_LANES,
+        select: LANE_SELECT
+    });
+    if (running.length === 0) return;
+    await prisma.$transaction(
+        running.map((lane) =>
+            prisma.clockStopwatchLane.updateMany({
+                where: { id: lane.id, userId, startedAt: lane.startedAt },
+                data: {
+                    startedAt: null,
+                    elapsedMs: model.stopwatchElapsed(lane, now.getTime())
+                }
+            })
+        )
+    );
 }
 
 // ---------------------------------------------------------------------------
