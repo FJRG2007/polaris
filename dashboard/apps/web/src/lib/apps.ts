@@ -7,7 +7,7 @@
  * join the switcher once somebody installs them (`requiresApp`).
  */
 
-import type { GrantSubject, OrgPermission, Permission } from "@polaris/core";
+import type { GrantSubject, NotificationGroup, OrgPermission, Permission } from "@polaris/core";
 import {
     AlarmClock,
     BatteryCharging,
@@ -211,6 +211,10 @@ export interface AppEntry {
      *  belongs under that app's path and needs nothing here; see
      *  `test/navigation/app-paths.test.ts`. */
     match?: string[];
+    /** The notification groups whose alerts are this app's, which its "Mute
+     *  notifications" holds back. A group belongs to one app at most, so muting
+     *  one app never silences another. See `lib/app-mutes`. */
+    notificationGroups?: readonly NotificationGroup[];
 }
 
 /** The landing screen's own app id. It is the one app whose rail is the others. */
@@ -234,6 +238,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "drive",
+        notificationGroups: ["drive"],
         category: "work",
         label: "Drive", // i18n-ignore
         description: "Files across every NAS", // i18n-ignore
@@ -252,6 +257,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "apps",
+        notificationGroups: ["deploy", "agents"],
         category: "infrastructure",
         label: "Apps", // i18n-ignore
         description: "Install & run apps: deploys, servers, assistants", // i18n-ignore
@@ -277,6 +283,7 @@ export const POLARIS_APPS: AppEntry[] = [
          * of those installs to rename a word on screen.
          */
         id: "home",
+        notificationGroups: ["places"],
         category: "home",
         label: "Places", // i18n-ignore
         description:
@@ -353,6 +360,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "router",
+        notificationGroups: ["network"],
         category: "infrastructure",
         label: "Router", // i18n-ignore
         description: "Run a Linux machine as your network's router", // i18n-ignore
@@ -414,6 +422,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "tasks",
+        notificationGroups: ["tasks"],
         category: "work",
         label: "Tasks", // i18n-ignore
         description: "Plan and track work: spaces, lists, boards & goals", // i18n-ignore
@@ -442,6 +451,7 @@ export const POLARIS_APPS: AppEntry[] = [
          * second-class version of the other.
          */
         id: "mail",
+        notificationGroups: ["mail"],
         category: "communication",
         label: "Mail", // i18n-ignore
         description: "Your mailboxes, read and answered here", // i18n-ignore
@@ -457,6 +467,7 @@ export const POLARIS_APPS: AppEntry[] = [
          * anything in carries no menu entry for it.
          */
         id: "calendar",
+        notificationGroups: ["calendar"],
         category: "work",
         label: "Calendar", // i18n-ignore
         description: "Your calendars and the ones you link, in one place", // i18n-ignore
@@ -532,6 +543,7 @@ export const POLARIS_APPS: AppEntry[] = [
          * deployment's Polar access under Management > Agents.
          */
         id: "polar",
+        notificationGroups: ["polar"],
         category: "work",
         label: "Polar", // i18n-ignore
         description: "Ask about any page, and have things done with your access", // i18n-ignore
@@ -575,6 +587,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "watch",
+        notificationGroups: ["watch"],
         category: "infrastructure",
         label: "Watch", // i18n-ignore
         description: "Alarms on app health, spikes and outages", // i18n-ignore

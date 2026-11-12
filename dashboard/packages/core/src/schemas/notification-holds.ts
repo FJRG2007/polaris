@@ -16,18 +16,30 @@ import { z } from "zod";
 import { EVERY_DAY, MINUTES_IN_DAY, weeklyWindow } from "./presence-schedule.js";
 import { NOTIFICATION_GROUPS, notificationEvent } from "./notifications.js";
 
-/** What a mute or a schedule is set on: one event, or every event in a group. */
+/**
+ * Apps whose alerts are not catalogue events, so a mute on the whole app is a
+ * hold of its own: Chat's messages, sounds and mentions have their own delivery
+ * and read `appHoldMuted` there.
+ */
+export const APP_HOLD_IDS = ["chat"] as const;
+
+export type AppHoldId = (typeof APP_HOLD_IDS)[number];
+
+/** What a mute or a schedule is set on: one event, every event in a group, or
+ *  an app whose alerts are not events (see `APP_HOLD_IDS`). */
 export const holdTargetSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("event"),
         id: z.string().refine((id) => notificationEvent(id) !== null, "Unknown event")
     }),
-    z.object({ kind: z.literal("group"), id: z.enum(NOTIFICATION_GROUPS) })
+    z.object({ kind: z.literal("group"), id: z.enum(NOTIFICATION_GROUPS) }),
+    z.object({ kind: z.literal("app"), id: z.enum(APP_HOLD_IDS) })
 ]);
 
 export type HoldTarget = z.infer<typeof holdTargetSchema>;
 
-/** The key a target is stored under: `event:deploy.failed`, `group:deploy`. */
+/** The key a target is stored under: `event:deploy.failed`, `group:deploy`,
+ *  `app:chat`. */
 export function holdKey(target: HoldTarget): string {
     return `${target.kind}:${target.id}`;
 }
@@ -187,6 +199,12 @@ function holdKeys(eventId: string): { own: string; group: string } | null {
         own: holdKey({ kind: "event", id: eventId }),
         group: holdKey({ kind: "group", id: event.group })
     };
+}
+
+/** Whether a mute on a whole app (see `APP_HOLD_IDS`) holds it back at `now`.
+ *  A critical event is never one of these: they go through the catalogue. */
+export function appHoldMuted(holds: NotificationHolds, appId: AppHoldId, now: Date): boolean {
+    return muteActive(holds.mutes[holdKey({ kind: "app", id: appId })], now);
 }
 
 /** Whether a mute on the event or its group holds it back at `now`. */

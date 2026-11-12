@@ -798,5 +798,9 @@
             "denied": "{clientKind, select, desktop {The system blocks notices from Polaris. Allow them in the system settings.} other {This browser blocks notices from Polaris. Allow them in its site settings.}}",
             "unsupported": "{clientKind, select, desktop {This app cannot receive notices with Polaris closed.} other {This browser cannot receive notices with Polaris closed.}}"
         }
+    },
+    "appHolds": {
+        "chat": "Chat",
+        "chatHint": "Messages, sounds and mentions"
     }
 }

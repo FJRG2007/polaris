@@ -26,7 +26,19 @@
         "unlockApp": "Remove PIN lock",
         "lockNeedsPin": "Set a PIN to lock apps",
         "lockNeedsPinFirst": "Set a PIN in Security first.",
-        "lockFailed": "The lock could not be saved. Try again."
+        "lockFailed": "The lock could not be saved. Try again.",
+        "muteApp": "Mute notifications",
+        "unmuteApp": "Unmute notifications",
+        "unmuteAppUntil": "Unmute (until {time})",
+        "mutedApp": "Notifications muted",
+        "muteFailed": "The mute could not be saved. Try again.",
+        "muteFor": {
+            "1h": "For 1 hour",
+            "8h": "For 8 hours",
+            "24h": "For 24 hours",
+            "1w": "For 1 week",
+            "off": "Until I turn it back on"
+        }
     },
     "waiting": {
         "unread": "{count, plural, one {# unread message} other {# unread messages}}",

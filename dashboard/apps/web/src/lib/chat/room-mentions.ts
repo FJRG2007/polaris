@@ -35,6 +35,7 @@ import { prisma } from "@polaris/db";
 import { lockedFor } from "./chat-lock";
 import * as core from "@polaris/core";
 import { silencedIn } from "./notify";
+import { chatMutedUsers } from "./app-mute";
 import { blockersOf } from "@/lib/blocks";
 import { onlineUserIds } from "@/lib/notifications/presence";
 import { createNotification } from "@/lib/notification-service";
@@ -134,6 +135,8 @@ export async function announceRoomMention(
     const label = everyone ? "@everyone" : "@here";
 
     const quiet = await mutedIn(channelId);
+    // Chat muted as a whole is the conversation's mute, everywhere at once.
+    const appMuted = await chatMutedUsers(audience);
     const silenced = await silencedIn(channelId, [...audience]);
     const shut = await blockersOf(authorId, [...audience]);
     const where = channel.spaceId ? `#${channel.name}` : channel.name;
@@ -150,6 +153,7 @@ export async function announceRoomMention(
         [...audience]
             .filter((userId) => userId !== authorId)
             .filter((userId) => !quiet.has(userId))
+            .filter((userId) => !appMuted.has(userId))
             .filter((userId) => !silenced.has(userId))
             .filter((userId) => !shut.has(userId))
             .filter((userId) => online === null || online.has(userId))

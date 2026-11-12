@@ -6,7 +6,7 @@
  * me" is nearly always one click away from the alert that did not arrive.
  */
 
-import type { NotificationHolds, QuietHours } from "@polaris/core";
+import type { AppHoldId, NotificationHolds, QuietHours } from "@polaris/core";
 import { useState } from "react";
 import { Bell, SlidersHorizontal } from "lucide-react";
 import { cn, ScrollRow } from "@polaris/ui";
@@ -32,6 +32,7 @@ export function NotificationsPageView({
     quiet = null,
     paused = null,
     holds,
+    appHolds = [],
     timeZone
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
@@ -50,6 +51,8 @@ export function NotificationsPageView({
     paused?: DoNotDisturbView | null;
     /** Mutes and schedules per event or group. */
     holds?: NotificationHolds;
+    /** The apps muted as a whole that this account can open (see `APP_HOLD_IDS`). */
+    appHolds?: readonly AppHoldId[];
     /** The zone schedules are read in. */
     timeZone?: string;
 }) {
@@ -114,6 +117,7 @@ export function NotificationsPageView({
                     badgesClearOnVisit={badgesClearOnVisit}
                     quiet={quiet}
                     holds={holds}
+                    appHolds={appHolds}
                     timeZone={timeZone}
                 />
             ) : null}

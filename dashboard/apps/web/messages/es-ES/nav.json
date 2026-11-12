@@ -26,7 +26,19 @@
         "unlockApp": "Quitar el PIN",
         "lockNeedsPin": "Crea un PIN para bloquear",
         "lockNeedsPinFirst": "Crea primero un PIN en Seguridad.",
-        "lockFailed": "No se pudo guardar el bloqueo. Reinténtalo."
+        "lockFailed": "No se pudo guardar el bloqueo. Reinténtalo.",
+        "muteApp": "Silenciar avisos",
+        "unmuteApp": "Reactivar avisos",
+        "unmuteAppUntil": "Reactivar (hasta {time})",
+        "mutedApp": "Avisos silenciados",
+        "muteFailed": "No se pudo guardar el silencio. Reinténtalo.",
+        "muteFor": {
+            "1h": "Por 1 hora",
+            "8h": "Por 8 horas",
+            "24h": "Por 24 horas",
+            "1w": "Por 1 semana",
+            "off": "Hasta que lo reactive"
+        }
     },
     "waiting": {
         "unread": "{count, plural, one {# mensaje sin leer} other {# mensajes sin leer}}",

@@ -88,6 +88,7 @@ import {
     muteUntil,
     type HoldTarget,
     type NotificationMuteDuration,
+    type AppHoldId,
     type NotificationHolds,
     type NotificationRule,
     type NotificationSchedule
@@ -103,6 +104,7 @@ export function NotificationSettingsView({
     badgesClearOnVisit = null,
     quiet = null,
     holds: initialHolds = EMPTY_NOTIFICATION_HOLDS,
+    appHolds = [],
     timeZone = "UTC"
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
@@ -121,6 +123,8 @@ export function NotificationSettingsView({
     quiet?: { hours: QuietHours; timeZone: string } | null;
     /** Mutes and schedules per event or group. */
     holds?: NotificationHolds;
+    /** The apps muted as a whole that this account can open (see `APP_HOLD_IDS`). */
+    appHolds?: readonly AppHoldId[];
     /** The zone schedules are read in. */
     timeZone?: string;
 }) {
@@ -206,6 +210,7 @@ export function NotificationSettingsView({
                 destinations={destinations}
                 onChange={update}
                 hold={{ holds, timeZone, onMute: mute, onSchedule: schedule }}
+                appHolds={appHolds}
             />
 
             {/* What installed apps add. Absent, heading and all, until one does:

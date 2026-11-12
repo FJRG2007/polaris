@@ -37,6 +37,7 @@ import { reachableChannelIds, type ChatActor } from "./access";
 import { isInlineImage, isPlayableMedia } from "./attachments";
 import { mentionsReader, notifyLevels, readerTeams } from "./notify";
 import * as history from "./history-visibility";
+import { chatMutedUsers } from "./app-mute";
 
 /** How much of a message the toast carries. A line, like every other
  *  notification anywhere. */
@@ -221,6 +222,8 @@ export async function messageToasts(
         .filter((id) => reachable.has(id))
         .slice(0, MOST_CHANNELS);
     if (asked.length === 0) return [];
+    // Chat muted as a whole: no toast, chime or desktop notice for any of them.
+    if ((await chatMutedUsers([actor.id])).has(actor.id)) return [];
 
     const memberships = await prisma.chatChannelMember.findMany({
         where: { userId: actor.id, channelId: { in: asked } },

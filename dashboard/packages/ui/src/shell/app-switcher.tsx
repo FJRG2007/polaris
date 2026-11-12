@@ -34,7 +34,7 @@
 
 import { cn } from "../lib/cn";
 import { MenuSearch } from "../components/menu-search";
-import { ChevronDown, Lock, type LucideIcon } from "lucide-react";
+import { BellOff, ChevronDown, Lock, type LucideIcon } from "lucide-react";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 import {
     Fragment,
@@ -66,6 +66,9 @@ export interface PolarisApp {
      *  a count, or "9+". The switcher only draws it; what counts as waiting is
      *  the app's business. */
     readonly badge?: string;
+    /** Set while the app's notifications are muted: the words that say so, as
+     *  the accessible name and tooltip of the small bell drawn on the tile. */
+    readonly muted?: string;
     /** More words the search finds this app by - its name in another language,
      *  its category. Never drawn. */
     readonly keywords?: readonly string[];
@@ -620,6 +623,17 @@ function AppTile({
                         ) : null}
                         {app.locked ? (
                             <Lock className="absolute -bottom-1 -right-1 !size-3.5 rounded-full bg-elevated p-0.5 text-muted-foreground" />
+                        ) : null}
+                        {app.muted ? (
+                            <span
+                                role="img"
+                                aria-label={app.muted}
+                                title={app.muted}
+                                data-app-muted=""
+                                className="absolute -bottom-1 -left-1 grid place-items-center rounded-full bg-elevated p-0.5 text-muted-foreground"
+                            >
+                                <BellOff className="!size-2.5" aria-hidden="true" />
+                            </span>
                         ) : null}
                     </span>
                     <span

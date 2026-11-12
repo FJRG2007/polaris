@@ -9,7 +9,9 @@
  *
  * Each row is one line where it fits: the name, the delivery chips, and a menu
  * to mute the event for a while or give it hours. The same menu on a card's
- * header does it for the whole group.
+ * header does it for the whole group. An app whose alerts are not events -
+ * Chat - has a card of its own, muted the same way and from its right click
+ * in the app menu.
  */
 
 import * as core from "@polaris/core";
@@ -110,12 +112,15 @@ export function EventGroups({
     state,
     destinations,
     onChange,
-    hold
+    hold,
+    appHolds = []
 }: {
     state: Map<string, core.NotificationRule>;
     destinations: DestinationView[];
     onChange: (event: string, rule: core.NotificationRule) => void;
     hold: HoldControls;
+    /** The apps muted as a whole that this account can open. */
+    appHolds?: readonly core.AppHoldId[];
 }) {
     // Folded until this browser says otherwise. Read after mount, so the
     // server's markup and the first client render agree.
@@ -149,7 +154,36 @@ export function EventGroups({
                     hold={hold}
                 />
             ))}
+            {appHolds.map((app) => (
+                <AppHoldCard key={app} app={app} hold={hold} />
+            ))}
         </div>
+    );
+}
+
+/** An app muted as a whole, with no events to list: its name, what the mute
+ *  covers, whether it is muted, and the menu that mutes it. */
+function AppHoldCard({ app, hold }: { app: core.AppHoldId; hold: HoldControls }) {
+    const t = useTranslations("accountNotifications");
+    const target: core.HoldTarget = { kind: "app", id: app };
+    const label = t(`appHolds.${app}`);
+    const hint = t(`appHolds.${app}Hint`);
+    return (
+        <Card className="overflow-visible">
+            <div className="flex items-center gap-1 pr-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2 py-2.5 pl-9 pr-3">
+                    <ProductMark app={app} />
+                    <span className="truncate text-sm font-semibold" title={label}>
+                        {label}
+                    </span>
+                    <span className="hidden truncate text-xs text-muted-foreground sm:inline" title={hint}>
+                        {hint}
+                    </span>
+                </div>
+                <HoldState target={target} hold={hold} compact />
+                <HoldMenu target={target} name={label} hold={hold} schedulable={false} />
+            </div>
+        </Card>
     );
 }
 
@@ -374,11 +408,14 @@ export function describeSchedule(
 function HoldMenu({
     target,
     name,
-    hold
+    hold,
+    schedulable = true
 }: {
     target: core.HoldTarget;
     name: string;
     hold: HoldControls;
+    /** False for a whole app's hold, which is a mute only. */
+    schedulable?: boolean;
 }) {
     const t = useTranslations("accountNotifications");
     const [editing, setEditing] = useState(false);
@@ -417,11 +454,15 @@ function HoldMenu({
                             {t(`holds.durations.${duration}`)}
                         </DropdownMenuItem>
                     ))}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => setEditing(true)}>
-                        <CalendarClock />
-                        {schedule ? t("holds.editSchedule") : t("holds.setSchedule")}
-                    </DropdownMenuItem>
+                    {schedulable ? (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={() => setEditing(true)}>
+                                <CalendarClock />
+                                {schedule ? t("holds.editSchedule") : t("holds.setSchedule")}
+                            </DropdownMenuItem>
+                        </>
+                    ) : null}
                 </DropdownMenuContent>
             </DropdownMenu>
             {/* Mounted only while open, so it starts from what is saved each time. */}

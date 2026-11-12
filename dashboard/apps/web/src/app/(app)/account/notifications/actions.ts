@@ -308,7 +308,8 @@ export async function setNotificationMuteAction(
 }
 
 const scheduleInputSchema = z.object({
-    target: holdTargetSchema,
+    // A whole app's hold (Chat) is a mute only: nothing reads hours for it.
+    target: holdTargetSchema.refine((target) => target.kind !== "app"),
     /** The hours it may ring in, or null to let it ring any time again. */
     schedule: notificationScheduleSchema.nullable()
 });

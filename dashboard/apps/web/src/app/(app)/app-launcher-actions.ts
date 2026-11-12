@@ -21,6 +21,9 @@ import { launcherPrefsSchema } from "@/lib/app-launcher";
 import { getLauncherPrefs, saveLauncherPrefs } from "@/lib/app-launcher-service";
 import { setAppLock } from "@/lib/app-lock-service";
 import { setAppLockSchema } from "@/lib/app-locks";
+import type { NotificationHolds } from "@polaris/core";
+import { updateNotificationHolds } from "@/lib/notifications/preferences";
+import { applyAppMute, mutableApp, setAppMuteSchema } from "@/lib/app-mutes";
 
 export async function saveFavoriteAppsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
@@ -50,4 +53,24 @@ export async function setAppLockAction(input: unknown): Promise<{ error?: string
     const owner = user.viewingAs?.actorId ?? user.id;
     const saved = await setAppLock(owner, parsed.data.appId, parsed.data.locked);
     return saved ? {} : { error: t("switcher.lockNeedsPinFirst") };
+}
+
+/**
+ * Mute a whole app's notifications for a while, or unmute it. Saved in the
+ * account's notification holds, so Account > Notifications lists it and lifts
+ * it too. The end is worked out on the server's clock; an app with no alerts
+ * is refused.
+ */
+export async function setAppMuteAction(
+    input: unknown
+): Promise<{ holds?: NotificationHolds; error?: string }> {
+    const user = await requireUser();
+    const t = await getTranslations("nav");
+    const parsed = setAppMuteSchema.safeParse(input);
+    if (!parsed.success || !mutableApp(parsed.data.appId)) return { error: t("switcher.muteFailed") };
+    const { appId, duration } = parsed.data;
+    const holds = await updateNotificationHolds(user.id, (current) =>
+        applyAppMute(current, appId, duration, new Date())
+    );
+    return { holds };
 }

@@ -27,6 +27,7 @@ import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { SMALL_GROUP_SIZE, inGameChoice } from "./in-game-choice";
 import { messageable, reachableChannelIds } from "./access";
 import { mentionsReader, notifyLevels, readerTeams } from "./notify";
+import { chatMutedUsers } from "./app-mute";
 
 /** How much of a message goes into the game: a line of chat, not an essay. */
 export const RELAY_EXCERPT = 200;
@@ -164,13 +165,17 @@ async function readersOf(
         }
     }
     if (reading.length === 0) return [];
+    // Chat muted as a whole holds every conversation back, in a game as well.
+    const appMuted = await chatMutedUsers(reading);
+    const listening = reading.filter((userId) => !appMuted.has(userId));
+    if (listening.length === 0) return [];
 
     const rows = await prisma.chatChannelMember.findMany({
-        where: { channelId, userId: { in: reading } },
+        where: { channelId, userId: { in: listening } },
         select: { userId: true, muted: true, mutedUntil: true }
     });
     const muting = new Map(rows.map((row) => [row.userId, row]));
-    return reading.map((userId) => ({
+    return listening.map((userId) => ({
         userId,
         muted: muting.get(userId)?.muted ?? false,
         mutedUntil: muting.get(userId)?.mutedUntil ?? null

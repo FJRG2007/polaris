@@ -37,6 +37,8 @@ import { readMenuUsage } from "@/lib/app-usage";
 import { ArrowUpDown, CheckCheck, Store } from "lucide-react";
 import { badgeLabel } from "@/lib/notification-badge";
 import { AppActionsMenu } from "@/components/app-actions-menu";
+import { appMuteState } from "@/lib/app-mutes";
+import { useAppMutes } from "@/components/app-mutes-context";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
 import { useInstalledNav } from "@/components/use-installed-nav";
 import { anythingWaiting, useAppUnread } from "@/components/app-unread";
@@ -87,6 +89,7 @@ export function AppNav({
     const asGuest = new Set(guestAppIds);
     const asOtherwise = new Set(otherwiseAppIds);
     const waiting = useAppUnread();
+    const { holds } = useAppMutes();
     const places = useLastPlaces(nav.POLARIS_APPS);
     const [usage, setUsage] = useState<{ usage: AppUsage; at: number }>({ usage: {}, at: 0 });
     // A game server's own screens live with the installed apps, and belong to
@@ -125,7 +128,12 @@ export function AppNav({
         // Whatever that app has waiting, whichever app it is. Naming them
         // here is what left Mail with a number and no dot beside it.
         const badge = badgeLabel(waiting[app.id] ?? 0);
-        return badge ? { ...entry, badge } : entry;
+        const muted = appMuteState(holds, app.id, new Date()).muted;
+        return {
+            ...entry,
+            ...(badge ? { badge } : {}),
+            ...(muted ? { muted: t("switcher.mutedApp") } : {})
+        };
     });
     const isGameServer = installedId !== null && installed !== null && installed.tabs.length > 0;
     const active = isGameServer

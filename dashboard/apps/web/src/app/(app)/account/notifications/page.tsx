@@ -7,7 +7,7 @@
 
 import { doNotDisturbOf } from "@/lib/presence-service";
 import { getTranslations } from "@/lib/i18n/request";
-import { requireUser } from "@/lib/session";
+import { requireUser, sessionCan } from "@/lib/session";
 import { listDeliveries } from "@/lib/notification-service";
 import {
     describeNotificationRules,
@@ -39,7 +39,8 @@ export default async function NotificationsPage() {
         quietHours,
         display,
         paused,
-        holds
+        holds,
+        chatAllowed
     ] = await Promise.all([
         describeNotificationRules(user.id),
         listDestinations(user.id),
@@ -59,7 +60,8 @@ export default async function NotificationsPage() {
         // question somebody in do not disturb opens it with.
         doNotDisturbOf(user.id).catch(() => null),
         // Optional on the page: unreadable, it only means none are drawn.
-        getNotificationHolds(user.id).catch(() => undefined)
+        getNotificationHolds(user.id).catch(() => undefined),
+        sessionCan(user, "chat.use").catch(() => false)
     ]);
 
     return (
@@ -80,6 +82,7 @@ export default async function NotificationsPage() {
                 quiet={{ hours: quietHours, timeZone: display.timeZone }}
                 paused={paused?.on ? paused : null}
                 holds={holds}
+                appHolds={chatAllowed ? ["chat"] : []}
                 timeZone={display.timeZone}
                 // Only an administrator has a badge a visit can clear: the
                 // Management queue. Chat and Mail clear by being read.
