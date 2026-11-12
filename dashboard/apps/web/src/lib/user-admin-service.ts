@@ -33,6 +33,7 @@ import { parseStringList, type AccessRulesInput } from "@polaris/core";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import { revokeCliSession, revokeCliSessions } from "@/lib/cli/sessions";
 import { revokeExtensionSessions } from "@/lib/extension/sessions";
+import { endTerminalSessions } from "@/lib/terminal-sessions";
 import { markPrincipalsMoved, updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
@@ -281,6 +282,9 @@ async function dropSessions(userId: string): Promise<number> {
     const { count } = await prisma.session.deleteMany({ where: { userId } });
     const extensions = await revokeExtensionSessions(userId);
     const terminals = await revokeCliSessions(userId);
+    // The shells it has open on servers and containers, which no sign-in check
+    // reaches once they are attached (VULN-0038).
+    await endTerminalSessions(userId);
     await markPrincipalsMoved([userId]);
     return count + extensions + terminals;
 }

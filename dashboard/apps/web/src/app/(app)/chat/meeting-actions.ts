@@ -725,15 +725,28 @@ export async function transferHostAction(
     );
 }
 
-/** Show somebody out of a meeting. */
+/**
+ * Show somebody out of a meeting.
+ *
+ * The seat is refused here, and the media server is told to drop the
+ * connection too: the seat is only what Polaris believes, and a browser that
+ * ignores the roster would otherwise keep hearing and sending (VULN-0039). When
+ * the media server does not confirm it, the host is told so rather than shown a
+ * removal that has not happened yet.
+ */
 export async function removeFromMeetingAction(
     meetingId: string,
     participantId: string
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("chat.use");
-    return guard(() =>
+    const removed = await guard(() =>
         meetings.removeFromMeeting({ id: user.id }, String(meetingId), String(participantId))
     );
+    if (removed.error) return { error: removed.error };
+    const enforced = await calls.applyToSeat(String(meetingId), String(participantId), {
+        kind: "remove"
+    });
+    return enforced ? {} : { warning: moderation.REMOVAL_NOT_ENFORCED };
 }
 
 /** End a meeting for everybody, and shut its link. */

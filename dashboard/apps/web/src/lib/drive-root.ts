@@ -66,6 +66,25 @@ export function reachesLocalHost(input: {
     return input.managesServers && input.localHostId !== null && input.localHostId === input.hostId;
 }
 
+/**
+ * Whether this account may hold a "Local folder" connection: a folder of this
+ * server's own disk, opened with everything the web process can read and
+ * write - other people's drives and Polaris's own data among it. That is the
+ * server, not a storage somebody brought along, so it takes what managing
+ * servers takes (VULN-0037).
+ *
+ * Read from the account itself, never a previewed role: it is asked whenever
+ * such a connection opens, which is also from a shared link or a background job
+ * with no session to preview anything in.
+ */
+export async function holdsServerFolders(userId: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
+    if (!user) return false;
+    if (user.isAdmin) return true;
+    const { userHasPermission } = await import("@polaris/auth");
+    return userHasPermission(userId, "system.manage");
+}
+
 /** Whether this viewer manages servers - an administrator, or the permission the
  *  Servers app manages them with. */
 export async function managesServers(userId: string): Promise<boolean> {

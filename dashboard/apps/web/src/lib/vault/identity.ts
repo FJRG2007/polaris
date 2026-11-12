@@ -97,6 +97,16 @@ async function rememberDevice(
         },
         select: { id: true }
     });
+    // A client signing in with the master password has proved itself on its
+    // own. Left bound to a connection that was ended, every token it is issued
+    // would be refused (that ended connection is what refuses it), and the
+    // device could never sign in again: it is let go of that connection instead.
+    if (!extensionSessionId) {
+        await prisma.vaultDevice.updateMany({
+            where: { id: row.id, extension: { is: { revokedAt: { not: null } } } },
+            data: { extensionSessionId: null }
+        });
+    }
     return row.id;
 }
 

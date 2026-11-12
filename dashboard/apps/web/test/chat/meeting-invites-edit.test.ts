@@ -157,8 +157,10 @@ const handled: Record<string, Record<string, (args: never) => unknown>> = {
         }
     },
     meetingParticipant: {
-        findFirst: async ({ where }: { where: Where }) =>
-            seats.find((seat) => matchSeat(seat, where)) ?? null,
+        findFirst: async ({ where }: { where: Where }) => {
+            const seat = seats.find((row) => matchSeat(row, where));
+            return seat ? { ...seat, meeting: { channelId: meeting.channelId } } : null;
+        },
         create: async ({
             data
         }: {

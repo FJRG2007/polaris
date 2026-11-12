@@ -3,6 +3,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { DriveExplorer } from "./drive-explorer";
 import { requirePermission } from "@/lib/session";
+import { managesServers } from "@/lib/drive-root";
 import { driveAbilities } from "@/lib/drive-authz";
 import { loadDrivePreferences } from "@/lib/drive-preferences";
 import { isSavedConnection, type ConnectionSummary } from "./types";
@@ -158,11 +159,12 @@ export default async function DrivePage({
     // to somebody with read-only access lies four times and then shows an error,
     // which reads as Polaris being broken rather than as a permission they do not
     // have.
-    const [abilities, preferences] = await Promise.all([
+    const [abilities, preferences, serverFolders] = await Promise.all([
         connectionId
             ? driveAbilities(user.id, connectionId, path)
             : { read: true, write: false, remove: false },
-        loadDrivePreferences(user.id)
+        loadDrivePreferences(user.id),
+        managesServers(user.id)
     ]);
 
     return (
@@ -175,6 +177,7 @@ export default async function DrivePage({
                 notice={driveNotice}
                 abilities={abilities}
                 confirmTrash={preferences.confirmTrash}
+                serverFolders={serverFolders}
             />
         </>
     );

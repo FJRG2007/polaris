@@ -96,17 +96,23 @@ export function ProviderMark({ entry }: { entry: ProviderEntry }) {
 export function ProviderPicker({
     label,
     description,
-    onChoose
+    onChoose,
+    hidden
 }: {
     label: (kind: PickerKind) => string;
     description: (kind: PickerKind) => string;
     onChoose: (kind: PickerKind) => void;
+    /** Kinds this reader may not connect, left out of the list. */
+    hidden?: readonly PickerKind[];
 }) {
     const t = useTranslations("drive");
     const [query, setQuery] = useState("");
     const shown = useMemo(
-        () => matchProviders(query, (kind) => `${label(kind)} ${description(kind)}`),
-        [query, label, description]
+        () =>
+            matchProviders(query, (kind) => `${label(kind)} ${description(kind)}`).filter(
+                (entry) => !hidden?.includes(entry.kind)
+            ),
+        [query, label, description, hidden]
     );
 
     return (

@@ -159,7 +159,8 @@ export function DriveExplorer({
     path,
     notice,
     abilities,
-    confirmTrash: askBeforeTrash
+    confirmTrash: askBeforeTrash,
+    serverFolders = false
 }: {
     connections: ConnectionSummary[];
     connectionId: string | null;
@@ -173,6 +174,9 @@ export function DriveExplorer({
     /** Whether moving something to the bin asks first. The reader turns it off
      *  from the question itself and back on in Drive > Settings. */
     confirmTrash: boolean;
+    /** Whether "Local folder" is offered: a folder of the server's own disk is
+     *  only for somebody who manages servers. */
+    serverFolders?: boolean;
 }) {
     const router = useRouter();
     const t = useTranslations("drive");
@@ -893,7 +897,7 @@ export function DriveExplorer({
                                 <RefreshCw className={cn("size-4", rechecking && "animate-spin")} />
                             </Button>
                         ) : null}
-                        <ConnectionDialog />
+                        <ConnectionDialog serverFolders={serverFolders} />
                     </div>
                 </div>
                 <nav className="flex flex-col gap-1">

@@ -171,3 +171,30 @@ describe("a credential that could not be written", () => {
         expect(deleteApiKey).not.toHaveBeenCalled();
     });
 });
+
+describe("ending a connection", () => {
+    it("takes back the credential each of its clients was handed, and only those", async () => {
+        const { revokeClientKeys } = await import("@/lib/vault/client-key");
+        listApiKeys.mockResolvedValueOnce([
+            HELD,
+            { id: "key-other", description: clientKeyMark("device-other"), createdAt: HELD.createdAt },
+            { id: "key-own", description: "My script", createdAt: HELD.createdAt }
+        ]);
+        expect(await revokeClientKeys("user-1", [DEVICE.identifier])).toBe(1);
+        expect(deleteApiKey).toHaveBeenCalledTimes(1);
+        expect(deleteApiKey).toHaveBeenCalledWith("user-1", "key-held");
+    });
+
+    it("tries every one and then says it could not remove one", async () => {
+        const { revokeClientKeys } = await import("@/lib/vault/client-key");
+        listApiKeys.mockResolvedValueOnce([
+            HELD,
+            { ...HELD, id: "key-held-2" }
+        ]);
+        deleteApiKey.mockRejectedValueOnce(new Error("database gone"));
+        await expect(revokeClientKeys("user-1", [DEVICE.identifier])).rejects.toThrow(
+            "database gone"
+        );
+        expect(deleteApiKey).toHaveBeenCalledTimes(2);
+    });
+});

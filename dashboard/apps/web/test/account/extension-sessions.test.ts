@@ -164,6 +164,8 @@ vi.mock("@polaris/db", () => ({
 
 const audited: Row[] = [];
 const closed: Row[] = [];
+const revokeClientKeys = vi.fn(async () => 0);
+vi.mock("@/lib/vault/client-key", () => ({ revokeClientKeys }));
 vi.mock("@/lib/audit-service", () => ({
     recordAudit: async (entry: Row) => void audited.push(entry)
 }));
@@ -459,6 +461,8 @@ describe("ending a connection", () => {
 
         expect(ended.revoked).toBe(true);
         expect(refreshTokens[0]?.["revokedAt"]).toBeInstanceOf(Date);
+        // And the account credential it was handed, which no token sweep reaches.
+        expect(revokeClientKeys).toHaveBeenCalledWith(ALICE, ["install-1"]);
     });
 
     it("belongs to its owner and nobody else", async () => {

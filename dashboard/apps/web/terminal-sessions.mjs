@@ -33,6 +33,38 @@ export const DEFAULT_IDLE_MINUTES = 60;
 export const DEFAULT_SCROLLBACK_BYTES = 256 * 1024;
 export const MAX_NAME_LENGTH = 60;
 
+/**
+ * Output waiting for a viewer that is not reading it. Past the high mark the
+ * shell's stream is paused, so a command printing without end is held in the
+ * shell rather than in this process; it resumes once the socket has drained to
+ * half of it. A single write that leaves more than the ceiling queued ends the
+ * socket instead (VULN-0042).
+ */
+export const OUTPUT_HIGH_WATER = 1024 * 1024;
+export const OUTPUT_MAX_QUEUED = 16 * 1024 * 1024;
+
+/** Close code for a terminal whose account was ended (banned, signed out by an
+ *  administrator, deleted) while it was open. */
+export const ACCOUNT_ENDED = 4003;
+
+/**
+ * Send one chunk of a shell's output to a socket, pacing the shell to the
+ * socket: `stream` is paused while the socket is behind and resumed when it
+ * catches up. Works on any socket with `send(data, callback)`,
+ * `bufferedAmount` and `readyState`, and any stream with `pause`/`resume`.
+ */
+export function sendPaced(ws, stream, chunk) {
+    if (ws.readyState !== ws.OPEN) return;
+    ws.send(chunk, () => {
+        if (stream?.isPaused?.() && ws.bufferedAmount < OUTPUT_HIGH_WATER / 2) stream.resume();
+    });
+    if (ws.bufferedAmount > OUTPUT_MAX_QUEUED) {
+        ws.close(1013, "terminal output not read");
+        return;
+    }
+    if (ws.bufferedAmount > OUTPUT_HIGH_WATER) stream?.pause?.();
+}
+
 /** A positive integer from the environment, or the fallback. */
 export function positiveInt(value, fallback) {
     const n = Number(value);
@@ -178,6 +210,9 @@ export function createSessionRegistry(options = {}) {
             if (session.sink !== sink) return;
             session.sink = null;
             session.detachedAt = now();
+            // Paused for a slow viewer, it would never resume: with nobody
+            // watching, the output goes to the bounded scrollback.
+            if (session.stream?.isPaused?.()) session.stream.resume();
         },
 
         input(session, data) {
@@ -214,6 +249,23 @@ export function createSessionRegistry(options = {}) {
             if (!session || session.userId !== userId || session.hostId !== hostId) return false;
             end(session, 4006, "session ended");
             return true;
+        },
+
+        /** End every session this account holds, on every server - its
+         *  account was ended while they were open (VULN-0038). */
+        endUser(userId) {
+            let ended = 0;
+            for (const session of [...sessions.values()]) {
+                if (session.userId !== userId) continue;
+                end(session, ACCOUNT_ENDED, "account ended");
+                ended += 1;
+            }
+            return ended;
+        },
+
+        /** Every account holding a session, for the periodic standing check. */
+        userIds() {
+            return [...new Set([...sessions.values()].map((s) => s.userId))];
         },
 
         /** End every session left detached past the idle limit. */
@@ -285,7 +337,7 @@ export async function attachServerShell(sessions, openSshSession, ticket, ws) {
     }
 
     const sink = {
-        send: (chunk) => ws.readyState === ws.OPEN && ws.send(chunk),
+        send: (chunk) => sendPaced(ws, session.stream, chunk),
         close: (code, reason) => ws.close(code, reason)
     };
     ws.send(JSON.stringify({ session: { id: session.id, number: session.number } }));
@@ -317,9 +369,13 @@ export async function attachServerShell(sessions, openSshSession, ticket, ws) {
  *
  * @param {ReturnType<typeof createSessionRegistry>} sessions
  * @param {string} internalKey
+ * `endUser` ends an account's terminals of every kind; without it, only the
+ * server shells this registry holds.
+ *
  * @param {{ method?: string, url: URL, key: string, readBody: () => Promise<string> }} request
+ * @param {{ endUser?: (userId: string) => number }} [hooks]
  */
-export async function sessionsRequest(sessions, internalKey, request) {
+export async function sessionsRequest(sessions, internalKey, request, hooks = {}) {
     const { method, url, key } = request;
     if (url.pathname !== "/internal/terminal-sessions") {
         return { status: 404, body: { error: "not found" } };
@@ -350,6 +406,11 @@ export async function sessionsRequest(sessions, internalKey, request) {
         return { status: 400, body: { error: "invalid body" } };
     }
     const userId = typeof body?.userId === "string" ? body.userId : "";
+    if (body?.action === "end-user") {
+        if (!userId) return { status: 400, body: { error: "userId required" } };
+        const ended = (hooks.endUser ?? ((id) => sessions.endUser(id)))(userId);
+        return { status: 200, body: { ok: true, ended } };
+    }
     const hostId = typeof body?.hostId === "string" ? body.hostId : "";
     const id = typeof body?.id === "string" ? body.id : "";
     if (!userId || !hostId || !id) {

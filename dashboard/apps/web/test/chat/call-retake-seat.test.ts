@@ -39,7 +39,8 @@ vi.mock("@/lib/chat/meeting-events", () => ({
 }));
 vi.mock("@/lib/chat/access", async (original) => ({
     ...(await original<typeof import("@/lib/chat/access")>()),
-    requireChannel: async () => ({ mayModerate: false })
+    requireChannel: async () => ({ mayModerate: false }),
+    channelAccess: async () => ({ mayModerate: false })
 }));
 
 type Where = Partial<{
@@ -76,7 +77,10 @@ vi.mock("@polaris/db", () => ({
             findUnique: async () => ({ ...state.meeting, channel: { kind: "text", userLimit: 0 } })
         },
         meetingParticipant: {
-            findFirst: async ({ where }: { where: Where }) => latest(where),
+            findFirst: async ({ where }: { where: Where }) => {
+                const row = latest(where);
+                return row ? { ...row, meeting: { channelId: state.meeting.channelId } } : null;
+            },
             updateMany: async ({ where, data }: { where: Where; data: Partial<Row> }) => {
                 if (!where.id) return { count: 0 };
                 const found = state.rows.filter((row) => matches(row, where));

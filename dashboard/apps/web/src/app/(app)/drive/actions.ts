@@ -19,6 +19,7 @@ import { runBackupTask, writeFanProfile } from "@/lib/unifi-unas-control";
 import { listLocks } from "@/lib/access-lock-service";
 import { listConnections } from "@/lib/connections/store";
 import { requirePermission, requireUser } from "@/lib/session";
+import { managesServers } from "@/lib/drive-root";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { deletableChildren, deleteDriveEntry } from "@/lib/drive-delete";
@@ -201,6 +202,11 @@ export async function createConnectionAction(input: unknown): Promise<{ error?: 
                 parsed.error.issues[0]?.message ??
                 (await getTranslations("drive"))("errors.invalidConnection")
         };
+    // A folder of the server's own disk is the server's, not a storage of the
+    // caller's: only somebody who manages servers connects one (VULN-0037).
+    if (parsed.data.config.kind === "local" && !(await managesServers(user.id))) {
+        return { error: (await getTranslations("drive"))("errors.serverFolderAdmin") };
+    }
     const created = await createConnection(
         user.id,
         parsed.data.name,
@@ -240,6 +246,10 @@ export async function updateConnectionAction(
                 config.error.issues[0]?.message ??
                 (await getTranslations("drive"))("errors.invalidSettings")
         };
+    // Repointing one at another folder of the server is the same decision.
+    if (config.data.kind === "local" && !(await managesServers(user.id))) {
+        return { error: (await getTranslations("drive"))("errors.serverFolderAdmin") };
+    }
 
     // Only validate/replace credentials when the form actually supplied some; a
     // payload of just { kind } means "keep the existing secret".

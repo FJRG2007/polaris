@@ -1125,14 +1125,31 @@ export async function ownVoice(
     });
 }
 
-/** Resolve an account's seat in a meeting they say they are in. */
+/**
+ * Resolve an account's seat in a meeting they say they are in.
+ *
+ * A call in a conversation is only for whoever can still read it. The seat was
+ * taken when they could, and a seat is what a media ticket and a heartbeat are
+ * proved by - so one somebody kept after leaving the conversation (removed,
+ * left the space, lost the role) would go on minting tickets for its call
+ * (VULN-0040). Asked here, on every request that resolves the seat, so it holds
+ * for whichever way the access was taken away: the seat is closed and the media
+ * server told to drop the connection it still holds.
+ */
 export async function seatForUser(userId: string, meetingId: string): Promise<MeetingSeat | null> {
     const participant = await prisma.meetingParticipant.findFirst({
         where: { meetingId, userId, leftAt: null },
         orderBy: { joinedAt: "desc" },
-        select: { id: true, admission: true }
+        select: { id: true, admission: true, meeting: { select: { channelId: true } } }
     });
     if (!participant) return null;
+    const channelId = participant.meeting.channelId;
+    if (channelId && !(await channelAccess({ id: userId }, channelId))) {
+        await leave({ meetingId, participantId: participant.id });
+        const { applyToSeat } = await import("./call-server");
+        await applyToSeat(meetingId, participant.id, { kind: "remove" }).catch(() => false);
+        return null;
+    }
     return {
         meetingId,
         participantId: participant.id,

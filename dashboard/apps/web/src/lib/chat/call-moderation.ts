@@ -40,6 +40,12 @@ export interface ModerationResult {
 export const NOT_ENFORCED_YET =
     "Saved, but the call server did not confirm it. It applies as soon as they reconnect.";
 
+/** Said to a host whose removal the media server did not confirm. The seat is
+ *  refused either way, so they cannot come back; what is not confirmed is that
+ *  the connection they already hold was closed. */
+export const REMOVAL_NOT_ENFORCED =
+    "Removed, but the call server did not confirm it. They may still hear the call until their connection drops.";
+
 export async function moderateSeat(
     actor: ChatActor,
     participantId: string,

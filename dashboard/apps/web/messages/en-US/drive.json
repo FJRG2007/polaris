@@ -618,6 +618,7 @@
         "consolePassword": "Enter the console password",
         "detectHost": "Enter an IP or hostname first",
         "detectFailed": "Detection failed",
+        "serverFolderAdmin": "Only an administrator who manages servers can connect a folder on the server itself.",
         "invalidConnection": "Invalid connection",
         "connectionName": "Enter a connection name",
         "invalidSettings": "Invalid connection settings",

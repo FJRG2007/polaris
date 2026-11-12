@@ -37,7 +37,12 @@ import {
     listHosts,
     type HostConnection
 } from "@/lib/host-service";
-import { hostRootAccess, managesServers, reachesLocalHost } from "@/lib/drive-root";
+import {
+    holdsServerFolders,
+    hostRootAccess,
+    managesServers,
+    reachesLocalHost
+} from "@/lib/drive-root";
 import {
     borrowSftp,
     borrowSmb,
@@ -223,7 +228,13 @@ type ConnectionRow = {
     credentialNonce: Uint8Array | null;
     credentialKeyId: string | null;
     deviceIdentity?: unknown;
+    /** Whose connection it is; a "Local folder" opens only while they may hold one. */
+    ownerId?: string | null;
 };
+
+/** Said when a "Local folder" connection belongs to somebody who may not hold one. */
+export const SERVER_FOLDER_REFUSED =
+    "This connection opens a folder on the server itself, which only an administrator who manages servers can connect.";
 
 /** Decrypt a row's credentials, whatever kind it is. */
 function credentialsOf(row: ConnectionRow): StorageCredentials {
@@ -415,6 +426,12 @@ function pooledSmbSession(
 /** Decrypt a row's credentials and build a connected driver for it. */
 async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
     const config = JSON.parse(row.config) as StorageConfig;
+
+    // Checked where every connection opens - the owner's Drive, a share, a
+    // background job - so one made before the rule existed is refused too.
+    if (row.kind === "local" && !(row.ownerId && (await holdsServerFolders(row.ownerId)))) {
+        throw new Error(SERVER_FOLDER_REFUSED);
+    }
 
     // Somebody's own drive is a folder on a storage that is already connected,
     // so it has no credentials of its own and never reaches the registry: the

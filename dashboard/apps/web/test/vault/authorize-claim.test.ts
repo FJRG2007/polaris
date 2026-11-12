@@ -29,7 +29,9 @@ const issueVaultToken = vi.fn(async (): Promise<Record<string, unknown> | null> 
 
 const access = vi.hoisted(() => ({ vault: true }));
 
-vi.mock("@polaris/db", () => ({ prisma: {} }));
+const findConnection = vi.fn(async (): Promise<{ revokedAt: Date | null } | null> => ({ revokedAt: null }));
+const revokeClientKeys = vi.fn(async () => 1);
+vi.mock("@polaris/db", () => ({ prisma: { extensionSession: { findUnique: findConnection } } }));
 vi.mock("@polaris/auth", async (actual) => ({
     ...(await actual<typeof import("@polaris/auth")>()),
     userHasPermission: vi.fn(async () => access.vault)
@@ -49,7 +51,7 @@ vi.mock("@/lib/vault/authorization", () => ({
     openVaultAuthorization: vi.fn(),
     claimVaultAuthorization
 }));
-vi.mock("@/lib/vault/client-key", () => ({ issueClientKey }));
+vi.mock("@/lib/vault/client-key", () => ({ issueClientKey, revokeClientKeys }));
 vi.mock("@/lib/vault/identity", () => ({
     issueVaultToken,
     twoFactorChallengeBody: vi.fn(),
@@ -75,6 +77,27 @@ beforeEach(() => {
 });
 
 describe("collecting an approval", () => {
+    it("takes the account key back when the connection ended while it was being written", async () => {
+        claimVaultAuthorization.mockResolvedValueOnce({
+            status: "approved",
+            claimed: { userId: "user-1", device: DEVICE, wrappedKey: "sealed", extensionSessionId: "connection-1" } as never
+        });
+        findConnection.mockResolvedValueOnce({ revokedAt: new Date() });
+        const response = await connectAuthorizeClaim(claim());
+        await expect(response.json()).resolves.toEqual({ status: "denied" });
+        expect(revokeClientKeys).toHaveBeenCalledWith("user-1", [DEVICE.identifier]);
+    });
+
+    it("keeps the account key while the connection is live", async () => {
+        claimVaultAuthorization.mockResolvedValueOnce({
+            status: "approved",
+            claimed: { userId: "user-1", device: DEVICE, wrappedKey: "sealed", extensionSessionId: "connection-1" } as never
+        });
+        const response = await connectAuthorizeClaim(claim());
+        await expect(response.json()).resolves.toMatchObject({ status: "approved", accountKey: "pol.secret" });
+        expect(revokeClientKeys).not.toHaveBeenCalled();
+    });
+
     it("denies a claim revoked during token issuance and hands over no account key", async () => {
         issueVaultToken.mockResolvedValueOnce(null);
         const response = await connectAuthorizeClaim(claim());

@@ -618,6 +618,7 @@
         "consolePassword": "Escribe la clave de la consola",
         "detectHost": "Escribe antes una IP o un host",
         "detectFailed": "Falló la detección",
+        "serverFolderAdmin": "Solo un administrador que gestiona servidores puede conectar una carpeta del propio servidor.",
         "invalidConnection": "Conexión no válida",
         "connectionName": "Ponle nombre a la conexión",
         "invalidSettings": "Ajustes de conexión no válidos",

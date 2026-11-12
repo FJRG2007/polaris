@@ -64,7 +64,8 @@ import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuTrigger,
-    cn
+    cn,
+    useToast
 } from "@polaris/ui";
 import {
     endMeetingAction,
@@ -92,6 +93,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
     const [joining, setJoining] = useState(false);
     const [waiting, setWaiting] = useState(false);
     const [error, setError] = useState("");
+    const toast = useToast();
     const [inviting, setInviting] = useState(false);
     const [ending, setEnding] = useState(false);
     /** Whether the name and hour are being changed. */
@@ -472,6 +474,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                         () => removeFromMeetingAction(meetingId, person.id),
                         setError
                     );
+                    if (result?.warning) toast.show({ title: result.warning });
                     if (!result?.error) await load();
                 }}
             />

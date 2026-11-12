@@ -586,7 +586,15 @@ export function EditConnectionDialog({
     );
 }
 
-export function ConnectionDialog() {
+/** Offered only to somebody who manages servers. */
+const SERVER_ONLY_KINDS = ["local"] as const;
+
+export function ConnectionDialog({
+    serverFolders = false
+}: {
+    /** Whether "Local folder" is offered (see `holdsServerFolders`). */
+    serverFolders?: boolean;
+} = {}) {
     const router = useRouter();
     const t = useTranslations("drive");
     const [open, setOpen] = useState(false);
@@ -744,6 +752,7 @@ export function ConnectionDialog() {
                             label={(value) => t(LABELS[value])}
                             description={(value) => t(DESCRIPTIONS[value])}
                             onChoose={chooseProvider}
+                            hidden={serverFolders ? undefined : SERVER_ONLY_KINDS}
                         />
                     </div>
                 ) : (

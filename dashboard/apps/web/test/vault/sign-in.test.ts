@@ -23,6 +23,7 @@ const verifyTotp = vi.fn(async () => true);
 const hasPermission = vi.fn(async () => true);
 const rateLimit = vi.fn(async () => ({ ok: true }));
 const resetRateLimit = vi.fn(async () => undefined);
+const unbindDevice = vi.fn(async () => ({ count: 0 }));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -34,7 +35,8 @@ vi.mock("@polaris/db", () => ({
         vaultOrgUser: { findMany: orgMembers },
         vaultDevice: {
             findFirst: vi.fn(async () => ({ extensionSessionId: null })),
-            upsert: upsertDevice
+            upsert: upsertDevice,
+            updateMany: unbindDevice
         },
         vaultRefreshToken: { create: createRefresh }
     }
@@ -115,6 +117,17 @@ describe("vaultSignIn", () => {
                 where: { userId_identifier: { userId: USER, identifier: "device-abc" } }
             })
         );
+    });
+
+    it("lets go of a connection that was ended, so the device can sign in again", async () => {
+        await vaultSignIn(INPUT);
+        expect(unbindDevice).toHaveBeenCalledWith({
+            where: {
+                id: expect.any(String),
+                extension: { is: { revokedAt: { not: null } } }
+            },
+            data: { extensionSessionId: null }
+        });
     });
 
     it("answers an unknown address exactly as it answers a wrong password", async () => {

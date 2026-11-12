@@ -552,13 +552,21 @@ async function endConnections(
     }
     const devices = await prisma.vaultDevice.findMany({
         where: { extensionSessionId: { in: [...ids] } },
-        select: { id: true }
+        select: { id: true, identifier: true }
     });
     if (devices.length > 0) {
         await prisma.vaultRefreshToken.updateMany({
             where: { deviceId: { in: devices.map((device) => device.id) }, revokedAt: null },
             data: { revokedAt: now }
         });
+        // The account credential each of those clients was handed with its
+        // approval is an API key of its own, which no token sweep reaches
+        // (VULN-0041).
+        const { revokeClientKeys } = await import("@/lib/vault/client-key");
+        await revokeClientKeys(
+            userId,
+            devices.map((device) => device.identifier)
+        );
     }
 }
 

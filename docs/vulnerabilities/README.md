@@ -8,6 +8,7 @@ a regression. Entries are sorted open/regressed first, then by severity.
 | ID | Title | Severity | Status | Location | CWE | Discovered |
 |----|-------|----------|--------|----------|-----|------------|
 | VULN-0003 | Game server player lookup exposes any user's session IP addresses | Medium | Accepted risk | dashboard/apps/game-servers/src/screens/installed/minecraft-actions.ts | CWE-359 | 2026-09-28 |
+| VULN-0037 | Any member connects a "Local folder" at the server's root and reads or writes everything the web process can | Critical | Fixed | dashboard/apps/web/src/app/(app)/drive/actions.ts | CWE-862 | 2026-11-12 |
 | VULN-0006 | Sign-in approval gate bypassed through better-auth HTTP endpoints (2FA enable, revoke-other-sessions) | High | Fixed | dashboard/packages/auth/src/auth.ts:869 | CWE-863 | 2026-09-28 |
 | VULN-0007 | Organization members with people.manage or roles.manage can grant themselves admin | High | Fixed | dashboard/apps/web/src/app/(app)/account/organizations/actions.ts | CWE-269 | 2026-09-28 |
 | VULN-0008 | Unauthenticated stored XSS through vault website icons served from the Polaris origin | High | Fixed | dashboard/apps/web/src/lib/vault/icons.ts:121 | CWE-79 | 2026-09-28 |
@@ -22,6 +23,9 @@ a regression. Entries are sorted open/regressed first, then by severity.
 | VULN-0017 | Any comment on the instance can be deleted or resolved by id | High | Fixed | dashboard/apps/web/src/lib/comments/comments.ts | CWE-639 | 2026-09-28 |
 | VULN-0018 | Task automations, forms, sprints, checklists, dependencies and time entries changed across spaces by id | High | Fixed | dashboard/apps/web/src/app/(app)/tasks/actions.ts | CWE-639 | 2026-09-28 |
 | VULN-0019 | Former members keep reading space channels through search and the live stream | High | Fixed | dashboard/apps/web/src/lib/chat/access.ts | CWE-285 | 2026-09-28 |
+| VULN-0039 | A participant removed from a meeting keeps hearing and sending through the media server | High | Fixed | dashboard/apps/web/src/lib/chat/meetings.ts | CWE-863 | 2026-11-12 |
+| VULN-0040 | A seat kept after losing access to a conversation goes on minting tickets for its call | High | Fixed | dashboard/apps/web/src/lib/chat/meetings.ts | CWE-863 | 2026-11-12 |
+| VULN-0041 | Vault access token and client key keep working after the extension is disconnected | High | Fixed | dashboard/apps/web/src/lib/vault/auth.ts | CWE-613 | 2026-11-12 |
 | VULN-0020 | Bind volumes of different accounts collide on the shared volume root (same project slug or typed path) | Medium | Fixed | dashboard/apps/web/src/lib/deploy-volume-service.ts | CWE-639 | 2026-09-28 |
 | VULN-0021 | Office link pass works forever and survives revoking the link | Medium | Fixed | dashboard/apps/web/src/lib/office/links.ts:295 | CWE-613 | 2026-09-28 |
 | VULN-0022 | SSRF through notification webhook destinations | Medium | Fixed | dashboard/apps/web/src/lib/notifications/webhook-sender.ts:127 | CWE-918 | 2026-09-28 |
@@ -35,6 +39,8 @@ a regression. Entries are sorted open/regressed first, then by severity.
 | VULN-0002 | UniFi UNAS Home Assistant add-on does not verify the NAS SSH host key | Medium | Fixed | plugins/unifi-unas/homeassistant/custom_components/unifi_unas/ssh_manager.py:121 | CWE-295 | 2026-09-28 |
 | VULN-0004 | Private GitHub repositories can be built through the instance GitHub App by any deploy member | Medium | Fixed | dashboard/apps/web/src/lib/github-access.ts | CWE-863 | 2026-09-28 |
 | VULN-0001 | SSRF via DNS rebinding (TOCTOU) in safe-fetch link unfurl | Medium | Fixed | dashboard/apps/web/src/lib/safe-fetch.ts:118 | CWE-918 | 2026-08-16 |
+| VULN-0038 | An open terminal keeps running commands after its account is banned or signed out | Medium | Fixed | dashboard/apps/web/ws-server.mjs | CWE-613 | 2026-11-12 |
+| VULN-0042 | A terminal that stops reading makes the sidecar queue shell output without limit | Medium | Fixed | dashboard/apps/web/ws-server.mjs | CWE-770 | 2026-11-12 |
 | VULN-0030 | Vault login saved for an IP address offered and filled on other IP addresses | Low | Fixed | dashboard/packages/core/src/vault-uris.ts:125 | CWE-697 | 2026-09-28 |
 | VULN-0031 | Vault item-use history readable across the instance via an object item id | Low | Fixed | dashboard/apps/web/src/lib/vault/access-log.ts | CWE-943 | 2026-09-28 |
 | VULN-0032 | Server metrics answered from cache before the ownership check | Low | Fixed | dashboard/apps/web/src/lib/server-metrics-service.ts | CWE-285 | 2026-09-28 |

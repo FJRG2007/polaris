@@ -79,3 +79,29 @@ export async function changeTerminalSession(
     if (!res.ok) throw new SidecarUnavailable();
     return true;
 }
+
+/**
+ * Close every terminal this account has open, of every kind - its account was
+ * banned or its sessions ended (VULN-0038). Best effort: a sidecar that cannot
+ * be reached finds out on its own within a minute (`endedTerminalAccounts`).
+ */
+export async function endTerminalSessions(userId: string): Promise<void> {
+    await fetch(sidecarUrl(), {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ action: "end-user", userId }),
+        signal: AbortSignal.timeout(5_000)
+    }).catch(() => null);
+}
+
+/** Which of these accounts may no longer hold a terminal: banned, or gone. */
+export async function endedTerminalAccounts(userIds: readonly string[]): Promise<string[]> {
+    if (userIds.length === 0) return [];
+    const { prisma } = await import("@polaris/db");
+    const standing = await prisma.user.findMany({
+        where: { id: { in: [...userIds] }, bannedAt: null },
+        select: { id: true }
+    });
+    const fine = new Set(standing.map((user) => user.id));
+    return userIds.filter((id) => !fine.has(id));
+}

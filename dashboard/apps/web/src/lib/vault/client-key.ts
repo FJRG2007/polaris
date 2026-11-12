@@ -158,5 +158,30 @@ async function clearOlderClientKeys(
     }
 }
 
+/**
+ * Remove every credential issued to these clients - the connection that let
+ * them in was ended (VULN-0041). Each is tried even when one fails, and a
+ * failure is thrown after the rest, so disconnecting never reports success over
+ * a credential that still answers.
+ */
+export async function revokeClientKeys(
+    userId: string,
+    deviceIdentifiers: readonly string[]
+): Promise<number> {
+    if (deviceIdentifiers.length === 0) return 0;
+    const held = await listApiKeys(userId);
+    const doomed = held.filter((key) =>
+        deviceIdentifiers.some((identifier) => isClientKeyFor(key.description, identifier))
+    );
+    let failure: unknown = null;
+    for (const key of doomed) {
+        await deleteApiKey(userId, key.id).catch((error: unknown) => {
+            failure = error;
+        });
+    }
+    if (failure) throw failure;
+    return doomed.length;
+}
+
 /** The scope this issues, so a caller can assert it without restating it. */
 export const CLIENT_KEY_SCOPES = CLIENT_SCOPES;

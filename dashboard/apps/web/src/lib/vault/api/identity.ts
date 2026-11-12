@@ -17,7 +17,8 @@ import { userHasPermission } from "@polaris/auth";
 import { preloginFor } from "@/lib/vault/account";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { readExtensionToken } from "@/lib/extension/sessions";
-import { issueClientKey } from "@/lib/vault/client-key";
+import { prisma } from "@polaris/db";
+import { issueClientKey, revokeClientKeys } from "@/lib/vault/client-key";
 import { readAnyBody, readJsonBody, type VaultContext } from "@/lib/vault/api/router";
 import { clientHost, clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
 import { claimVaultAuthorization, openVaultAuthorization } from "@/lib/vault/authorization";
@@ -296,6 +297,20 @@ export async function connectAuthorizeClaim(context: VaultContext): Promise<Resp
     // nothing can revive, telling a client that requires it the account had lost
     // vault access - when asking again was all it needed to do.
     const accountKey = await issueClientKey(claim.claimed.userId, claim.claimed.device);
+    // Asked again once the key exists: a disconnect that landed after the token
+    // was issued swept that token, but this key was not there yet to be swept.
+    // The disconnect marks the connection first, so whichever way the two
+    // interleave one of them sees the other (VULN-0041).
+    if (accountKey && claim.claimed.extensionSessionId) {
+        const connection = await prisma.extensionSession.findUnique({
+            where: { id: claim.claimed.extensionSessionId },
+            select: { revokedAt: true }
+        });
+        if (!connection || connection.revokedAt) {
+            await revokeClientKeys(claim.claimed.userId, [claim.claimed.device.identifier]);
+            return Response.json({ status: "denied" });
+        }
+    }
     return Response.json({
         status: "approved",
         // The account's vault key, sealed to the public half this extension sent.

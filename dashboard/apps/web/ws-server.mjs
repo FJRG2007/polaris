@@ -35,9 +35,11 @@ import {
     tcpTransport
 } from "@polaris/docker";
 import {
+    ACCOUNT_ENDED,
     DEFAULT_IDLE_MINUTES,
     DEFAULT_SCROLLBACK_BYTES,
     attachServerShell,
+    sendPaced,
     createSessionRegistry,
     positiveInt,
     sessionsRequest
@@ -60,6 +62,50 @@ const sessions = createSessionRegistry({
     )
 });
 setInterval(() => sessions.sweep(), 60_000).unref();
+
+/**
+ * The container and agent terminals open right now, by the account that opened
+ * them. Server shells are in `sessions`; these end with their socket, so they
+ * are only tracked while it is open.
+ *
+ * Either kind is ended when its account is (VULN-0038): the web app says so
+ * when it bans an account or ends its sessions (`end-user` below), and in case
+ * that call never arrives - this process restarting, the web app's call
+ * failing - every account holding a terminal is asked about once a minute.
+ */
+const liveTerminals = new Map();
+
+function endUser(userId) {
+    let ended = sessions.endUser(userId);
+    for (const [ws, owner] of liveTerminals) {
+        if (owner !== userId) continue;
+        liveTerminals.delete(ws);
+        ws.close(ACCOUNT_ENDED, "account ended");
+        ended += 1;
+    }
+    return ended;
+}
+
+setInterval(() => void checkStanding(), 60_000).unref();
+
+async function checkStanding() {
+    const userIds = [...new Set([...sessions.userIds(), ...liveTerminals.values()])];
+    if (userIds.length === 0) return;
+    try {
+        const res = await fetch(`http://127.0.0.1:${appPort}/api/deploy/terminal/standing`, {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-internal-key": internalKey },
+            body: JSON.stringify({ userIds }),
+            signal: AbortSignal.timeout(10_000)
+        });
+        if (!res.ok) return;
+        const body = await res.json();
+        const ended = Array.isArray(body?.ended) ? body.ended : [];
+        for (const userId of ended) if (typeof userId === "string") endUser(userId);
+    } catch {
+        // The web app is restarting or busy: asked again in a minute.
+    }
+}
 
 // The same port also answers the web app's loopback calls that list, rename and
 // close a user's sessions - the sidecar is the only process holding them.
@@ -102,10 +148,9 @@ wss.on("connection", async (ws, req) => {
               ? await openDockerSession(ticket, ws, ATTACH_TO_AGENT)
               : await openContainerSession(ticket, ws, ticket.mode === "agent");
     if (!session) return;
+    liveTerminals.set(ws, ticket.userId);
 
-    session.stream.on("data", (chunk) => {
-        if (ws.readyState === ws.OPEN) ws.send(chunk);
-    });
+    session.stream.on("data", (chunk) => sendPaced(ws, session.stream, chunk));
     session.stream.on("close", () => ws.close());
     session.stream.on("error", () => ws.close());
 
@@ -126,7 +171,10 @@ wss.on("connection", async (ws, req) => {
         session.stream.write(data);
     });
 
-    ws.on("close", () => session.close());
+    ws.on("close", () => {
+        liveTerminals.delete(ws);
+        session.close();
+    });
 });
 
 /** The web app's loopback calls on a user's sessions (see `sessionsRequest`). */
@@ -136,7 +184,7 @@ async function handleInternal(req, res) {
         url: new URL(req.url ?? "/", "http://sidecar"),
         key: String(req.headers["x-internal-key"] ?? ""),
         readBody: () => readBody(req)
-    });
+    }, { endUser });
     res.writeHead(status, { "content-type": "application/json" });
     res.end(JSON.stringify(body));
 }
