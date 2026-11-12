@@ -35,6 +35,7 @@ import {
     sharingRightsFor
 } from "@/lib/apps/install-access";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { announceGameServerAccess } from "@/lib/chat/game-server-card-post";
 
 /** How many people one account may bring in per hour, per server. */
 const SHARE_LIMIT = 10;
@@ -242,6 +243,14 @@ export async function shareInstall(input: ShareInstallInput): Promise<ShareInsta
                 canShare,
                 expiresAt: expiresAt?.toISOString() ?? null
             }
+        });
+        // The card with the address and how to join, in a message from the sharer.
+        await announceGameServerAccess({
+            sharer: { id: user.id, name: user.name },
+            targetId: target.id,
+            ownerId: access.ownerId,
+            installedAppId: input.installedAppId,
+            serverName: access.install.name
         });
         return { granted: true };
     }

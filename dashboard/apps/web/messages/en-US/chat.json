@@ -2346,5 +2346,24 @@
         "limitReached": "You've reached your limit on this Polaris's shared key. [Add a key of your own](/account/ai-keys) to keep asking.",
         "failed": "I couldn't answer that just now. Try again in a moment.",
         "badge": "AI"
+    },
+    "gameServerCard": {
+        "gameServer": "Game server",
+        "version": "Version {version}",
+        "stopped": "Stopped",
+        "denied": "You no longer have access to this server",
+        "copyAddress": "Copy the address",
+        "noAddress": "The address is not ready yet.",
+        "howToJoin": "How to join",
+        "open": "Open in Polaris",
+        "notification": "{name} added you to {server}",
+        "guide": {
+            "minecraftJava": "1. Open Minecraft Java Edition {version}.\n2. Multiplayer > Add Server.\n3. Paste {address} as the address and press Done.\n4. Pick the server and Join Server.",
+            "minecraftBedrock": "1. Open Minecraft (Bedrock).\n2. Play > Servers > Add Server.\n3. Address {host}, port {port}.\n4. Save, then pick the server to join.",
+            "ark": "1. Open ARK and choose Join Game.\n2. Turn on Show Player Servers.\n3. Search for {name} and join.",
+            "fivem": "1. Install FiveM and press Join here.\n2. Or open FiveM, press F8 and type: connect {address}",
+            "hytale": "1. Open Hytale and go to Servers.\n2. Add a server with the address {address}.\n3. Pick it and join.",
+            "other": "Open the game and connect to {address}."
+        }
     }
 }

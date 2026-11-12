@@ -57,6 +57,21 @@ export interface GameServerSummary {
     readonly online?: number | null;
 }
 
+/** What a chat card says about one game server: how to reach it and with what. */
+export interface GameServerCardFacts {
+    readonly id: string;
+    readonly name: string;
+    /** The game it plays (`minecraft`, `fivem`...), or null when none claims it. */
+    readonly game: string | null;
+    /** java | bedrock for Minecraft, null for the games with one edition. */
+    readonly edition: string | null;
+    /** What a player types to connect, or null while there is none yet. */
+    readonly address: string | null;
+    /** The release a client has to match, for the games where that matters. */
+    readonly release: string | null;
+    readonly running: boolean;
+}
+
 /** One event coming up, as the Overview card lists it. */
 export interface UpcomingEvent {
     readonly id: string;
@@ -280,6 +295,13 @@ export interface AppExtension {
 
     /** Its servers, for the overview card. */
     readonly gameServerSummaries?: (userId: string) => Promise<readonly GameServerSummary[]>;
+
+    /** One server's address and release, for the card a person gets in Chat when
+     *  they are let onto it. The caller has already checked who may read it. */
+    readonly gameServerCard?: (
+        ownerId: string,
+        installedAppId: string
+    ) => Promise<GameServerCardFacts | null>;
 
     /**
      * The tools it offers connected assistants over MCP. Listed, callable and

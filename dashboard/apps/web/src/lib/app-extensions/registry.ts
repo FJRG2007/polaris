@@ -36,6 +36,7 @@ import type {
     LegacyRunRow,
     GameSanction,
     GameServerSummary,
+    GameServerCardFacts,
     PlayedRecently,
     PlayingNow,
     RelayedChannelMessage,
@@ -359,6 +360,18 @@ export async function gameServerSummaries(userId: string): Promise<GameServerSum
         extensions().map((extension) => extension.gameServerSummaries?.(userId) ?? [])
     );
     return lists.flat();
+}
+
+/** One game server's facts for its chat card, from whichever app runs it. */
+export async function gameServerCardFacts(
+    ownerId: string,
+    installedAppId: string
+): Promise<GameServerCardFacts | null> {
+    for (const extension of extensions()) {
+        const facts = await extension.gameServerCard?.(ownerId, installedAppId);
+        if (facts) return facts;
+    }
+    return null;
 }
 
 /** Every card the installed apps offer for the Overview, with the app it is

@@ -64,6 +64,8 @@ import { RelativeTime } from "@/components/relative-time";
 import { MessageTime } from "@/components/message-time";
 import { ActivityCard } from "./activity-card";
 import { activityIdIn } from "@/lib/chat/activity-card";
+import { GameServerCard } from "./game-server-card";
+import { gameServerIdIn } from "@/lib/chat/game-server-card";
 import { MessageInfoDialog } from "./message-info-dialog";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import type { ChatMessageView, ChatQuoteView } from "@/lib/chat/messages";
@@ -853,6 +855,9 @@ function Message({
         // A game played in this conversation's call: drawn as its card.
         const activity = activityIdIn(message.body);
         if (activity) return <ActivityCard sessionId={activity} message={message} />;
+        // A game server somebody was let onto: its address and how to join.
+        const server = gameServerIdIn(message.body);
+        if (server) return <GameServerCard serverId={server} message={message} />;
         return (
             <p className="py-1 pl-14 pr-4 text-xs text-muted-foreground">
                 <NoticeText message={message} /> <MessageTime iso={message.createdAt} />

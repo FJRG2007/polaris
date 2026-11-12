@@ -190,6 +190,20 @@ export const gameServersExtension: AppExtension = {
         }));
     },
 
+    gameServerCard: async (ownerId, installedAppId) => {
+        const server = await (await games()).gameServerFacts(ownerId, installedAppId);
+        if (!server) return null;
+        return {
+            id: server.id,
+            name: server.name,
+            game: server.game,
+            edition: server.edition,
+            address: server.address,
+            release: server.release,
+            running: server.running
+        };
+    },
+
     forwardedPorts: async () => (await games()).listGamePorts(),
 
     readForwardedPorts: async (probe) => (await games()).readGamePorts(probe),

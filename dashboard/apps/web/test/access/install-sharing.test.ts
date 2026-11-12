@@ -26,7 +26,13 @@ let target: { id: string; name: string } | null = null;
 
 let written: Record<string, unknown> | null = null;
 let invited: Record<string, unknown> | null = null;
+let announced: Record<string, unknown>[] = [];
 
+vi.mock("@/lib/chat/game-server-card-post", () => ({
+    announceGameServerAccess: async (input: Record<string, unknown>) => {
+        announced.push(input);
+    }
+}));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true, retryAfterMs: 0 }) }));
 vi.mock("@/lib/invite-service", () => ({
@@ -86,6 +92,7 @@ beforeEach(() => {
     target = { id: BOB, name: "Bob" };
     written = null;
     invited = null;
+    announced = [];
 });
 
 describe("what a sharer may hand out", () => {
@@ -229,5 +236,39 @@ describe("an address with no account", () => {
             expiresInDays: null
         });
         expect(result.error).toBe("No account matches that. Invite them by email address.");
+    });
+});
+
+describe("telling the person let in", () => {
+    it("sends them the server's card when an account is granted access", async () => {
+        target = { id: ALICE.replace("1111-4111", "3333-4333"), name: "Carol" };
+        isOwner = true;
+        const result = await shareInstall({
+            installedAppId: SERVER,
+            identifier: "carol@example.com",
+            actions: ["games.read"],
+            canShare: false,
+            expiresInDays: null
+        });
+        expect(result.granted).toBe(true);
+        expect(announced).toEqual([
+            expect.objectContaining({
+                targetId: target.id,
+                installedAppId: SERVER,
+                serverName: "Survival"
+            })
+        ]);
+    });
+
+    it("sends nothing when the share is refused", async () => {
+        held = ["games.read"];
+        await shareInstall({
+            installedAppId: SERVER,
+            identifier: "bob@example.com",
+            actions: ["games.manage"],
+            canShare: false,
+            expiresInDays: null
+        });
+        expect(announced).toEqual([]);
     });
 });
