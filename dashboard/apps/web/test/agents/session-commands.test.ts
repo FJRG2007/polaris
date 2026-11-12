@@ -185,8 +185,7 @@ describe("the terminal the agent is started on", () => {
 
     it("writes the setup to a file first, and hands tmux only its name", () => {
         for (const boot of [commands.SESSION_BOOT, commands.SESSION_BOOT_FOR_HOST]) {
-            const lines = boot.split("
-");
+            const lines = boot.split("\n");
             const written = lines.findIndex((line) => line.includes('base64 -d > "$POLARIS_SETUP_FILE"'));
             const started = lines.findIndex((line) => line.includes("tmux new-session"));
             expect(written).toBeGreaterThan(-1);
