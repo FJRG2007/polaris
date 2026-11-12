@@ -55,7 +55,8 @@ describe("a field with Improve", () => {
         answer(new Response(JSON.stringify({ text: "Fix the login for {{Customer}}." })));
         await waitFor(() => expect(onBlur).toHaveBeenCalledWith("Fix the login for {{Customer}}."));
         expect(onChange).toHaveBeenCalledWith("Fix the login for {{Customer}}.");
-        expect(screen.queryByText("Rewriting...")).toBeNull();
+        // The status clears in the render after the text is handed over.
+        await waitFor(() => expect(screen.queryByText("Rewriting...")).toBeNull());
         expect(screen.getByRole("button", { name: "Customer" })).toBeTruthy();
     });
 

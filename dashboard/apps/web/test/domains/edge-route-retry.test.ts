@@ -11,7 +11,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { publishEdgeRoutes } = await import("@/instrumentation");
+const { publishEdgeRoutes } = await import("@/instrumentation-node");
 
 afterEach(() => {
     vi.useRealTimers();
