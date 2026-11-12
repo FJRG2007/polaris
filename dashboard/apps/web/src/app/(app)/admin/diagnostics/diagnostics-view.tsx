@@ -32,6 +32,7 @@ const BADGE: Record<CheckStatus, "success" | "warning" | "danger" | "neutral"> =
 
 const LINK_LABEL: Partial<Record<string, Key>> = {
     "/admin/settings": "fix.openSettings",
+    "/admin/updates": "fix.openUpdates",
     "/admin/domains": "fix.openDomains",
     "/admin/domains/certificates": "fix.openCertificates"
 };

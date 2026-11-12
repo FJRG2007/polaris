@@ -54,7 +54,7 @@ vi.mock("react", async (original) => ({
     cache: <T>(fn: T) => fn
 }));
 
-const actions = await import("@/app/(app)/admin/settings/seasonal-actions");
+const actions = await import("@/app/(app)/admin/seasonal-themes/seasonal-actions");
 const service = await import("@/lib/seasonal-service");
 const preview = await import("@/lib/seasonal-preview");
 const own = await import("@/app/(app)/account/preferences/seasonal-actions");

@@ -23,7 +23,9 @@ import * as models from "./integrations/models/data";
 import * as overview from "./overview-data";
 import * as retention from "./retention/data";
 import * as safety from "./safety/data";
+import * as seasonal from "./seasonal-themes/data";
 import * as settings from "./settings/data";
+import * as updates from "./updates/data";
 import * as uploads from "./uploads/data";
 import * as user from "./users/[id]/data";
 
@@ -66,8 +68,10 @@ export const PAINT_READS = {
     safety: read(z.object({ status: z.string().trim().max(40).optional() }), ({ status }) =>
         safety.loadSafetyAction(status)
     ),
+    seasonal: read(none, () => seasonal.loadSeasonalAdminAction()),
     settings: read(none, () => settings.loadSettingsAdminAction()),
     "settings.cards": read(none, () => settings.loadSettingsCardsAction()),
+    updates: read(none, () => updates.loadUpdatesAdminAction()),
     uploads: read(none, () => uploads.loadUploadsAction())
 };
 

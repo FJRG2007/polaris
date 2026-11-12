@@ -6,7 +6,7 @@
  */
 
 import { readPoll } from "@/lib/poll-fetch";
-import type * as settingsActionsModule from "@/app/(app)/admin/settings/actions";
+import type * as settingsActionsModule from "@/app/(app)/admin/updates/actions";
 import type * as retentionActionsModule from "@/app/(app)/admin/retention/actions";
 import type * as inboxActionsModule from "@/app/(app)/admin/inbox/actions";
 import type * as domainsActionsModule from "@/app/(app)/admin/domains/actions";

@@ -83,7 +83,8 @@
         "openDomains": "Open domains",
         "openCertificates": "Open certificates",
         "done": "Done. The check was run again.",
-        "failed": "That did not work. The check below shows where it stands."
+        "failed": "That did not work. The check below shows where it stands.",
+        "openUpdates": "Open updates"
     },
     "speed": {
         "heading": "Speed test",

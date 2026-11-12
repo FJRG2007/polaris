@@ -178,7 +178,7 @@ function EdgeLine({
             <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
                 {t.rich("domains.acme.edge.outdated", {
                     link: (chunks) => (
-                        <Link key="link" href="/admin/settings" className="text-primary hover:underline">
+                        <Link key="link" href="/admin/updates" className="text-primary hover:underline">
                             {chunks}
                         </Link>
                     )

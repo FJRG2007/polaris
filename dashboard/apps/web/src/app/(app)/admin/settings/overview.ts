@@ -19,3 +19,7 @@ export interface SettingsOverview {
      *  inside. Null as a whole when the network status did not answer. */
     readonly network: { readonly publicIp: string | null; readonly serverIp: string | null } | null;
 }
+
+/** The parts a screen can ask for on its own; every part when none are named. */
+export const OVERVIEW_PARTS = ["status", "addresses", "network"] as const;
+export type OverviewPart = (typeof OVERVIEW_PARTS)[number];

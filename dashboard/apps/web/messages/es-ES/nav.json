@@ -357,7 +357,6 @@
         "Tools": "Herramientas",
         "Trash": "Papelera",
         "Tunnels": "Túneles",
-        "Updates & settings": "Versiones y ajustes",
         "Uploads": "Subidas",
         "Usage": "Uso",
         "Usage & health": "Uso y estado",
@@ -433,7 +432,10 @@
         "Details": "Detalles",
         "Files from Drive": "Archivos de Drive",
         "Links": "Enlaces",
-        "Calls": "Llamadas"
+        "Calls": "Llamadas",
+        "Updates": "Versiones",
+        "General settings": "Ajustes generales",
+        "Seasonal themes": "Temas de temporada"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

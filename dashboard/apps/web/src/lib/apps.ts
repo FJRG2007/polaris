@@ -77,6 +77,7 @@ import {
     Network,
     NotebookPen,
     PartyPopper,
+    RefreshCw,
     MousePointerClick,
     Radio,
     Rocket,
@@ -979,17 +980,38 @@ const ADMIN_AREAS: AppSubapp[] = [
         id: "admin-platform",
         label: "Platform", // i18n-ignore
         icon: Settings,
-        base: "/admin/settings",
-        match: ["/admin/apps", "/admin/setup", "/admin/display", "/admin/domains"],
+        base: "/admin/updates",
+        match: [
+            "/admin/settings",
+            "/admin/seasonal-themes",
+            "/admin/apps",
+            "/admin/setup",
+            "/admin/display",
+            "/admin/domains"
+        ],
         parent: { label: "Management", href: "/admin" }, // i18n-ignore
         parentAppId: "admin",
         sections: [
             {
-                label: "Updates & settings", // i18n-ignore
+                label: "Updates", // i18n-ignore
+                href: "/admin/updates",
+                adminOnly: true,
+                icon: RefreshCw,
+                keywords: ["version", "upgrade", "update schedule", "app updates"]
+            },
+            {
+                label: "General settings", // i18n-ignore
                 href: "/admin/settings",
                 adminOnly: true,
                 icon: Settings,
-                keywords: ["version", "upgrade"]
+                keywords: ["public pages", "contact", "terminal", "export", "import", "addresses"]
+            },
+            {
+                label: "Seasonal themes", // i18n-ignore
+                href: "/admin/seasonal-themes",
+                adminOnly: true,
+                icon: PartyPopper,
+                keywords: ["halloween", "christmas", "holidays", "decorations"]
             },
             {
                 label: "Polaris apps", // i18n-ignore

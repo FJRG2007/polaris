@@ -20,7 +20,7 @@
         "offline": "Its names answer again once it is running.",
         "taken": "{service} already answers to this name, so this service is deployed without it. Give one of them another name.",
         "kept": "It keeps previous deployments running, so each is reached by its own address and these names are not given out. Turn off Keep previous deployments to use them.",
-        "unsupported": "This server's Polaris predates private names. Update it from <link>Settings</link> to turn them on."
+        "unsupported": "This server's Polaris predates private names. Update it from <link>Updates</link> to turn them on."
     },
     "shortName": "Also reachable as <code>{name}</code>",
     "portless": "<code>{url}</code> reaches port {port}. Adding <code>:{port}</code> works too.",

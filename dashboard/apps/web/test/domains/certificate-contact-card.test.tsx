@@ -81,7 +81,7 @@ describe("the certificate contact card", () => {
         ] as const) {
             const markup = render({ ...BASE, email: "ops@corp.io", source: "install", edge: "outdated" }, locale);
             expect(markup).toContain(words);
-            expect(markup).toContain('href="/admin/settings"');
+            expect(markup).toContain('href="/admin/updates"');
             expectNoTerminal(markup);
         }
     });

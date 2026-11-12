@@ -211,7 +211,7 @@ async function markAllMailRead(userId: string): Promise<void> {
 const ADMIN_HREF: Record<AdminItemId, string> = {
     reports: "/admin/safety",
     cases: "/admin/safety",
-    update: "/admin/settings",
+    update: "/admin/updates",
     apis: "/admin/integrations"
 };
 

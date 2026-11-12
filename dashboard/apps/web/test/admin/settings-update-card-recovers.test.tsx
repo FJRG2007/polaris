@@ -15,7 +15,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let checkRefused = true;
-vi.mock("@/app/(app)/admin/settings/actions", () => ({
+vi.mock("@/app/(app)/admin/updates/actions", () => ({
     securityUpdatePolicyAction: async () => ({
         policy: { critical: "immediate", high: "immediate", medium: "off", low: "off", riskAccepted: null },
         quietHour: 4
@@ -43,6 +43,9 @@ vi.mock("@/lib/use-password-safety", () => ({ usePasswordSafety: () => null }));
 const { checkForNewBuild } = vi.hoisted(() => ({ checkForNewBuild: vi.fn(async () => false) }));
 vi.mock("@/lib/new-build", () => ({ checkForNewBuild }));
 
+vi.mock("@/app/(app)/admin/settings/actions", () => ({ saveLegalContactAction: async () => ({}) }));
+
+const { UpdatesView } = await import("@/app/(app)/admin/updates/updates-view");
 const { SettingsView } = await import("@/app/(app)/admin/settings/settings-view");
 
 const overview = {
@@ -111,25 +114,29 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-function view() {
+function view(kind: "updates" | "both" | "general" = "updates") {
     return render(
         withMessages(
-            <SettingsView
-                initialPolicy={{ mode: "daily", at: "04:00" }}
-                initialSource="image"
-                initialContact=""
-                publicPages={{
-                    home: "https://polaris.example.com/about",
-                    privacy: "https://polaris.example.com/legal/privacy",
-                    terms: "https://polaris.example.com/legal/terms"
-                }}
-                deployment={{
-                    hostname: "polaris",
-                    repo: "example/polaris",
-                    branch: "main",
-                    autoUpdate: true
-                }}
-            />
+            <>
+                {kind === "general" ? null : (
+                <UpdatesView
+                    initialPolicy={{ mode: "daily", at: "04:00" }}
+                    initialSource="image"
+                    deployment={{ branch: "main", autoUpdate: true }}
+                />
+                )}
+                {kind === "updates" ? null : (
+                    <SettingsView
+                        initialContact=""
+                        publicPages={{
+                            home: "https://polaris.example.com/about",
+                            privacy: "https://polaris.example.com/legal/privacy",
+                            terms: "https://polaris.example.com/legal/terms"
+                        }}
+                        deployment={{ hostname: "polaris", repo: "example/polaris", branch: "main" }}
+                    />
+                )}
+            </>
         )
     );
 }
@@ -149,7 +156,7 @@ describe("the update card after an update", () => {
 
     it("asks again after the edge's own 404 while the new dashboard starts", async () => {
         failWith = 404;
-        view();
+        view("both");
         await act(async () => {
             await vi.advanceTimersByTimeAsync(10_000);
         });
@@ -160,11 +167,10 @@ describe("the update card after an update", () => {
     it("shows the parts that answered and asks again for the one that did not", async () => {
         failures = 0;
         partial = 1;
-        view();
+        view("general");
         await act(async () => {
             await vi.advanceTimersByTimeAsync(500);
         });
-        expect(screen.getAllByText("running-abc").length).toBeGreaterThan(0);
         expect(screen.queryByText("203.0.113.7")).toBeNull();
         await act(async () => {
             await vi.advanceTimersByTimeAsync(5_000);

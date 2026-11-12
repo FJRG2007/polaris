@@ -321,7 +321,7 @@ function PanelBody({
                         {t.rich("statusHint.unsupported", {
                             link: (chunks) => (
                                 <Link
-                                    href="/admin/settings"
+                                    href="/admin/updates"
                                     className="text-primary hover:underline"
                                 >
                                     {chunks}

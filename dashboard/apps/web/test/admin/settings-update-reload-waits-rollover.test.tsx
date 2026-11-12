@@ -15,7 +15,7 @@ import { withMessages } from "../setup/i18n";
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/app/(app)/admin/settings/actions", () => ({
+vi.mock("@/app/(app)/admin/updates/actions", () => ({
     securityUpdatePolicyAction: async () => ({
         policy: { critical: "immediate", high: "immediate", medium: "off", low: "off", riskAccepted: null },
         quietHour: 4
@@ -45,6 +45,9 @@ vi.mock("@/app/(app)/chat/call-hold", async (importOriginal) => ({
     useHeldCall: () => heldCall
 }));
 
+vi.mock("@/app/(app)/admin/settings/actions", () => ({ saveLegalContactAction: async () => ({}) }));
+
+const { UpdatesView } = await import("@/app/(app)/admin/updates/updates-view");
 const { SettingsView } = await import("@/app/(app)/admin/settings/settings-view");
 
 /** The build each successive log poll is answered by, in order; the last repeats. */
@@ -90,25 +93,27 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-function view() {
+function view(kind: "updates" | "both" = "updates") {
     return render(
         withMessages(
-            <SettingsView
-                initialPolicy={{ mode: "daily", at: "04:00" }}
-                initialSource="image"
-                initialContact=""
-                publicPages={{
-                    home: "https://polaris.example.com/about",
-                    privacy: "https://polaris.example.com/legal/privacy",
-                    terms: "https://polaris.example.com/legal/terms"
-                }}
-                deployment={{
-                    hostname: "polaris",
-                    repo: "example/polaris",
-                    branch: "main",
-                    autoUpdate: true
-                }}
-            />
+            <>
+                <UpdatesView
+                    initialPolicy={{ mode: "daily", at: "04:00" }}
+                    initialSource="image"
+                    deployment={{ branch: "main", autoUpdate: true }}
+                />
+                {kind === "updates" ? null : (
+                    <SettingsView
+                        initialContact=""
+                        publicPages={{
+                            home: "https://polaris.example.com/about",
+                            privacy: "https://polaris.example.com/legal/privacy",
+                            terms: "https://polaris.example.com/legal/terms"
+                        }}
+                        deployment={{ hostname: "polaris", repo: "example/polaris", branch: "main" }}
+                    />
+                )}
+            </>
         )
     );
 }

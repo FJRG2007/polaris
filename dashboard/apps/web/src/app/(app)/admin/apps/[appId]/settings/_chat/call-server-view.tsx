@@ -194,7 +194,7 @@ export function CallServerView() {
                                         link: (chunks) => (
                                             <Link
                                                 key="link"
-                                                href="/admin/settings"
+                                                href="/admin/updates"
                                                 className="text-primary hover:underline"
                                             >
                                                 {chunks}

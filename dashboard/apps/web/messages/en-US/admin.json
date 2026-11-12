@@ -333,7 +333,7 @@
             },
             "detail": {
                 "unprepared": "Calls have nowhere to run on this deployment yet. Nothing to do here: it repairs itself the next time Polaris starts, and this says so as soon as it has.",
-                "missing": "Its container was never created here, which is why this said it was starting and never finished. Updating again brings it up - <link>Settings</link>, Update.",
+                "missing": "Its container was never created here, which is why this said it was starting and never finished. Updating again brings it up - <link>Updates</link>, Update.",
                 "stopped": "Its container exists and is not running. Start it from <link>Containers</link>, on the row named {container}.",
                 "running": "Calls between devices on this network work now. For calls from outside, two ports have to reach this machine - <link>Domains</link> lists them and reports when they answer.",
                 "waited": "It has had a couple of minutes and has not come up. It keeps trying, and calls come back on their own the moment it answers.",
@@ -2689,8 +2689,8 @@
                 "description": "The model providers agents run on, and the keys this deployment holds."
             },
             "settings": {
-                "title": "Updates & settings",
-                "description": "Version, in-band self-update, and deployment settings."
+                "title": "General settings",
+                "description": "Addresses, public pages, terminal sessions and transfer."
             },
             "sso": {
                 "title": "Single sign-on",
@@ -2699,6 +2699,14 @@
             "images": {
                 "title": "Security scans",
                 "description": "Vulnerabilities in Polaris's own images."
+            },
+            "updates": {
+                "title": "Updates",
+                "description": "Polaris version, update schedule and app builds."
+            },
+            "seasonalThemes": {
+                "title": "Seasonal themes",
+                "description": "Halloween, Christmas and other dates the interface dresses up for."
             }
         }
     },
@@ -3746,8 +3754,8 @@
     },
     "settings": {
         "page": {
-            "title": "Settings",
-            "description": "General configuration for this Polaris deployment."
+            "title": "General settings",
+            "description": "Where this deployment answers, its public pages, terminal and transfer."
         },
         "source": {
             "label": "Update with",
@@ -4213,5 +4221,17 @@
         "description": "Known vulnerabilities in the images Polaris runs on this machine.",
         "emptyTitle": "Not scanned yet",
         "emptyBody": "Polaris scans its own images on its own within a few hours of starting or updating."
+    },
+    "updates": {
+        "page": {
+            "title": "Updates",
+            "description": "The Polaris version, when it updates, and app builds."
+        }
+    },
+    "seasonalThemes": {
+        "page": {
+            "title": "Seasonal themes",
+            "description": "What the interface wears on Halloween, Christmas and other dates."
+        }
     }
 }

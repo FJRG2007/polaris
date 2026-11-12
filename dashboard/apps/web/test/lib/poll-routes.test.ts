@@ -262,7 +262,7 @@ vi.mock("@/app/(app)/automations/actions", () => ({
     chatWebhooksAction: actions.chatWebhooksAction,
     thresholdChoicesAction: actions.thresholdChoicesAction
 }));
-vi.mock("@/app/(app)/admin/settings/actions", () => ({
+vi.mock("@/app/(app)/admin/updates/actions", () => ({
     securityUpdatePolicyAction: async () => ({
         policy: { critical: "immediate", high: "immediate", medium: "off", low: "off", riskAccepted: null },
         quietHour: 4
@@ -904,8 +904,8 @@ const CASES: Case[] = [
         path: "/api/admin/settings/update-status",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/admin/settings/settings-polls")>(
-                    "@/app/(app)/admin/settings/settings-polls"
+                await actual<typeof import("@/app/(app)/admin/updates/update-polls")>(
+                    "@/app/(app)/admin/updates/update-polls"
                 )
             ).updateStatus(true),
         action: "checkUpdatesAction",
@@ -916,8 +916,8 @@ const CASES: Case[] = [
         path: "/api/admin/settings/update-status",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/admin/settings/settings-polls")>(
-                    "@/app/(app)/admin/settings/settings-polls"
+                await actual<typeof import("@/app/(app)/admin/updates/update-polls")>(
+                    "@/app/(app)/admin/updates/update-polls"
                 )
             ).updateStatus(false),
         action: "checkUpdatesAction",

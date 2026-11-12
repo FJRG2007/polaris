@@ -210,7 +210,7 @@ describe("each check against its source", () => {
             status: "warn",
             code: "behind",
             facts: { behind: 3 },
-            fix: { kind: "link", href: "/admin/settings" }
+            fix: { kind: "link", href: "/admin/updates" }
         });
         getUpdateStatus.mockResolvedValueOnce({ error: "rate limited" });
         expect(await runCheck("updates")).toMatchObject({ status: "unknown", code: "unreachable" });

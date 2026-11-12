@@ -18,7 +18,7 @@ import { prisma } from "@polaris/db";
 
 /** The screens whose badge a visit clears, and the mark each one keeps. */
 export const BADGE_SCREENS = {
-    "/admin/settings": "admin.update",
+    "/admin/updates": "admin.update",
     "/admin/safety": "admin.safety"
 } as const;
 

@@ -18,7 +18,7 @@ import { changeAppBuildAction, retryAppAction } from "@/lib/app-bundles/actions"
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Where an administrator updates Polaris and each app. */
-export const APP_UPDATES_HREF = "/admin/settings#app-updates";
+export const APP_UPDATES_HREF = "/admin/updates#app-updates";
 
 export function AppUnavailable({
     app,

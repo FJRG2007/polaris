@@ -11,7 +11,7 @@ import { withMessages } from "../../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-vi.mock("@/app/(app)/admin/settings/actions", () => ({
+vi.mock("@/app/(app)/admin/updates/actions", () => ({
     securityUpdatePolicyAction: async () => ({
         policy: { critical: "immediate", high: "immediate", medium: "off", low: "off", riskAccepted: null },
         quietHour: 4
@@ -34,23 +34,33 @@ vi.mock("@/app/(app)/admin/settings/transfer-actions", () => ({
 vi.mock("@/app/(app)/admin/domains/actions", () => ({ removeAddressAction: async () => ({}) }));
 vi.mock("@/lib/use-password-safety", () => ({ usePasswordSafety: () => null }));
 
+vi.mock("@/app/(app)/admin/settings/actions", () => ({ saveLegalContactAction: async () => ({}) }));
+
+const { UpdatesView } = await import("@/app/(app)/admin/updates/updates-view");
 const { SettingsView } = await import("@/app/(app)/admin/settings/settings-view");
 const { TransferCard } = await import("@/app/(app)/admin/settings/transfer-card");
 
-function settings(locale: "en-US" | "es-ES") {
+function settings(locale: "en-US" | "es-ES", kind: "updates" | "both" = "both") {
     return renderToStaticMarkup(
         withMessages(
-            <SettingsView
-                initialPolicy={{ mode: "daily", at: "04:00" }}
-                initialSource="image"
-                initialContact=""
-                publicPages={{
-                    home: "https://polaris.example.com/about",
-                    privacy: "https://polaris.example.com/legal/privacy",
-                    terms: "https://polaris.example.com/legal/terms"
-                }}
-                deployment={{ hostname: "polaris", repo: "example/polaris", branch: "main", autoUpdate: true }}
-            />,
+            <>
+                <UpdatesView
+                    initialPolicy={{ mode: "daily", at: "04:00" }}
+                    initialSource="image"
+                    deployment={{ branch: "main", autoUpdate: true }}
+                />
+                {kind === "updates" ? null : (
+                    <SettingsView
+                        initialContact=""
+                        publicPages={{
+                            home: "https://polaris.example.com/about",
+                            privacy: "https://polaris.example.com/legal/privacy",
+                            terms: "https://polaris.example.com/legal/terms"
+                        }}
+                        deployment={{ hostname: "polaris", repo: "example/polaris", branch: "main" }}
+                    />
+                )}
+            </>,
             locale
         )
     );

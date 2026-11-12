@@ -24,7 +24,8 @@ import { apiAdmin } from "@/lib/api-session";
 import { getUpdateStatus } from "@/lib/update-service";
 import { checkedAddresses } from "@/lib/address-health";
 import { getNetworkStatus } from "@/lib/network-service";
-import type { SettingsOverview } from "@/app/(app)/admin/settings/overview";
+import { z } from "zod";
+import { OVERVIEW_PARTS, type SettingsOverview } from "@/app/(app)/admin/settings/overview";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,13 +47,28 @@ async function within<T>(work: Promise<T>): Promise<T | null> {
     }
 }
 
-export async function GET(): Promise<Response> {
+/** `?parts=status,network` names the parts a screen draws; none named is all
+ *  of them, which is what a tab from an earlier build asks for. */
+const partsSchema = z
+    .string()
+    .trim()
+    .max(64)
+    .transform((raw) => raw.split(",").map((part) => part.trim()))
+    .pipe(z.array(z.enum(OVERVIEW_PARTS)).min(1));
+
+export async function GET(request: Request): Promise<Response> {
     const refused = await apiAdmin();
     if (refused instanceof Response) return refused;
+    const raw = new URL(request.url).searchParams.get("parts");
+    const parsed = raw === null ? null : partsSchema.safeParse(raw);
+    if (parsed && !parsed.success) {
+        return NextResponse.json({ error: "Unknown overview part." }, { status: 400 });
+    }
+    const wanted = new Set<string>(parsed?.data ?? OVERVIEW_PARTS);
     const [status, addresses, network] = await Promise.all([
-        within(getUpdateStatus()),
-        within(checkedAddresses()),
-        within(getNetworkStatus())
+        wanted.has("status") ? within(getUpdateStatus()) : null,
+        wanted.has("addresses") ? within(checkedAddresses()) : null,
+        wanted.has("network") ? within(getNetworkStatus()) : null
     ]);
     const overview: SettingsOverview = {
         status,

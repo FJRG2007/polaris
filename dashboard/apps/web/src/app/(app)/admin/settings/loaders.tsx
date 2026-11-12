@@ -4,13 +4,12 @@ import { paintRead } from "../paint-read";
 import type { ComponentProps } from "react";
 import { SettingsView } from "./settings-view";
 import { CardSkeleton } from "../region-skeletons";
-import { SeasonalAdminCard } from "./seasonal-card";
 import { AfterPaint } from "@/components/after-paint";
 import { TerminalSessionsCard } from "./terminal-card";
 
 /**
  * The settings screen's two regions, each its own read so neither waits for
- * the other. The update and contact settings are not kept in the tab.
+ * the other. The contact is not kept in the tab.
  */
 export function SettingsViewLoader({
     deployment,
@@ -34,8 +33,6 @@ export function SettingsViewLoader({
         >
             {(data) => (
                 <SettingsView
-                    initialPolicy={data.policy}
-                    initialSource={data.source}
                     initialContact={data.contact}
                     publicPages={data.publicPages}
                     deployment={deployment}
@@ -54,20 +51,10 @@ export function SettingsCardsLoader({ max, revision }: { max: number; revision: 
             skeleton={
                 <div className="mt-4 flex flex-col gap-4">
                     <CardSkeleton lines={1} />
-                    <CardSkeleton lines={1} />
                 </div>
             }
         >
-            {(data) => (
-                <>
-                    <SeasonalAdminCard
-                        initial={data.seasons}
-                        calendar={data.calendar}
-                        preview={data.preview}
-                    />
-                    <TerminalSessionsCard cap={data.terminalCap} max={max} />
-                </>
-            )}
+            {(data) => <TerminalSessionsCard cap={data.terminalCap} max={max} />}
         </AfterPaint>
     );
 }

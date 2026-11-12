@@ -161,7 +161,7 @@ async function tellOperators(input: {
     say?: OperatorAlert["say"];
     recipients?: OperatorAlert["recipients"];
 }): Promise<void> {
-    await notifyOperators({ ...input, permission: UPDATE_PERMISSION, href: "/admin/settings" });
+    await notifyOperators({ ...input, permission: UPDATE_PERMISSION, href: "/admin/updates" });
 }
 
 /**

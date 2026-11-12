@@ -230,7 +230,7 @@ export async function dismissAdminWaiting(
  * that on later does not raise a badge for something already looked at.
  */
 export async function markScreenSeen(userId: string, screen: BadgeScreen): Promise<void> {
-    if (screen === "/admin/settings") {
+    if (screen === "/admin/updates") {
         const build = await announcedBuild();
         if (build) await markSeen(userId, "admin.update", build);
         return;

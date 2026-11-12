@@ -357,7 +357,6 @@
         "Tools": "Tools",
         "Trash": "Trash",
         "Tunnels": "Tunnels",
-        "Updates & settings": "Updates & settings",
         "Uploads": "Uploads",
         "Usage": "Usage",
         "Usage & health": "Usage & health",
@@ -433,7 +432,10 @@
         "Details": "Details",
         "Files from Drive": "Files from Drive",
         "Links": "Links",
-        "Calls": "Calls"
+        "Calls": "Calls",
+        "Updates": "Updates",
+        "General settings": "General settings",
+        "Seasonal themes": "Seasonal themes"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

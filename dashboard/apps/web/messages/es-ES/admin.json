@@ -333,7 +333,7 @@
             },
             "detail": {
                 "unprepared": "Las llamadas aún no tienen dónde ejecutarse en este despliegue. No hay nada que hacer: se repara solo la próxima vez que arranque Polaris, y aquí se indicará en cuanto ocurra.",
-                "missing": "Su contenedor nunca se creó aquí, por eso decía que arrancaba y nunca terminaba. Actualizar de nuevo lo levanta: <link>Ajustes</link>, Actualizar.",
+                "missing": "Su contenedor nunca se creó aquí, por eso decía que arrancaba y nunca terminaba. Actualizar de nuevo lo levanta: <link>Versiones</link>, Actualizar.",
                 "stopped": "Su contenedor existe pero no está en marcha. Arráncalo desde <link>Contenedores</link>, en la fila {container}.",
                 "running": "Las llamadas entre dispositivos de esta red ya funcionan. Para llamadas desde fuera, dos puertos tienen que llegar a esta máquina: <link>Dominios</link> los muestra e indica cuándo responden.",
                 "waited": "Lleva un par de minutos y no ha arrancado. Sigue intentándolo, y las llamadas vuelven solas en cuanto responda.",
@@ -2689,8 +2689,8 @@
                 "description": "Los proveedores de modelos que usan los agentes y las claves que guarda este despliegue."
             },
             "settings": {
-                "title": "Versiones y ajustes",
-                "description": "Versión, actualización automática y ajustes del despliegue."
+                "title": "Ajustes generales",
+                "description": "Direcciones, páginas públicas, terminal y traspaso."
             },
             "sso": {
                 "title": "Acceso único",
@@ -2699,6 +2699,14 @@
             "images": {
                 "title": "Vulnerabilidades",
                 "description": "Vulnerabilidades en las imágenes de Polaris."
+            },
+            "updates": {
+                "title": "Versiones",
+                "description": "Versión de Polaris, calendario y versiones de apps."
+            },
+            "seasonalThemes": {
+                "title": "Temas de temporada",
+                "description": "Halloween, Navidad y otras fechas en que se viste la interfaz."
             }
         }
     },
@@ -3746,8 +3754,8 @@
     },
     "settings": {
         "page": {
-            "title": "Ajustes",
-            "description": "Configuración general de este despliegue de Polaris."
+            "title": "Ajustes generales",
+            "description": "Dónde responde este despliegue, páginas públicas, terminal y traspaso."
         },
         "source": {
             "label": "Actualizar con",
@@ -4213,5 +4221,17 @@
         "description": "Vulnerabilidades conocidas en las imágenes que Polaris ejecuta en esta máquina.",
         "emptyTitle": "Aún sin analizar",
         "emptyBody": "Polaris analiza sus propias imágenes por su cuenta en unas horas tras arrancar o actualizarse."
+    },
+    "updates": {
+        "page": {
+            "title": "Versiones",
+            "description": "La versión de Polaris, cuándo se actualiza y las apps."
+        }
+    },
+    "seasonalThemes": {
+        "page": {
+            "title": "Temas de temporada",
+            "description": "Lo que luce la interfaz en Halloween, Navidad y otras fechas."
+        }
     }
 }

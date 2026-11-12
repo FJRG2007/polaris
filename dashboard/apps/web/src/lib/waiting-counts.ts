@@ -33,7 +33,7 @@ export const SAFETY_EVENT = "admin.safety.case";
 
 /** Management's own screens that carry a part of its count. */
 const ADMIN_SCREEN_COUNT: Readonly<Record<string, (queue: AdminQueue) => number>> = {
-    "/admin/settings": (queue) => (queue.update ? 1 : 0),
+    "/admin/updates": (queue) => (queue.update ? 1 : 0),
     "/admin/safety": (queue) => queue.reports + queue.cases,
     "/admin/integrations": (queue) => queue.apis
 };

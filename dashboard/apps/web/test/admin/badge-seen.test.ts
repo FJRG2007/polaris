@@ -102,7 +102,7 @@ describe("an account that keeps its badges", () => {
 
 describe("opening a screen", () => {
     it("remembers the build the Update screen showed", async () => {
-        await markScreenSeen("ada", "/admin/settings");
+        await markScreenSeen("ada", "/admin/updates");
         expect(written).toEqual([{ key: "admin.update", mark: "new4567" }]);
     });
 

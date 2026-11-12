@@ -20,7 +20,7 @@
         "offline": "Sus nombres vuelven a responder en cuanto esté en marcha.",
         "taken": "{service} ya responde a este nombre, así que este servicio se despliega sin él. Pon otro nombre a uno de los dos.",
         "kept": "Mantiene en marcha los despliegues anteriores, así que cada uno se alcanza por su propia dirección y estos nombres no se asignan. Desactiva Conservar despliegues anteriores para usarlos.",
-        "unsupported": "El Polaris de este servidor es anterior a los nombres privados. Actualízalo desde <link>Ajustes</link> para activarlos."
+        "unsupported": "El Polaris de este servidor es anterior a los nombres privados. Actualízalo desde <link>Versiones</link> para activarlos."
     },
     "shortName": "También accesible como <code>{name}</code>",
     "portless": "<code>{url}</code> llega al puerto {port}. Con <code>:{port}</code> también funciona.",

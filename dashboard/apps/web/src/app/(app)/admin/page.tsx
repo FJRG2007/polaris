@@ -21,6 +21,8 @@ import {
     Scale,
     ScanSearch,
     Settings,
+    RefreshCw,
+    PartyPopper,
     ShieldCheck,
     KeyRound,
     SlidersHorizontal,
@@ -60,6 +62,8 @@ const SECTIONS = [
     { key: "uploads", href: "/admin/uploads", icon: HardDrive },
     { key: "integrations", href: "/admin/integrations", icon: Blocks },
     { key: "integrationsModels", href: "/admin/integrations/models", icon: Sparkles },
+    { key: "updates", href: "/admin/updates", icon: RefreshCw },
+    { key: "seasonalThemes", href: "/admin/seasonal-themes", icon: PartyPopper },
     { key: "settings", href: "/admin/settings", icon: Settings }
 ] as const;
 

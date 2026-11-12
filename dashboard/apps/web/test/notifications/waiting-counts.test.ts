@@ -63,9 +63,9 @@ describe("where a count sits in the rail", () => {
         expect(railCount({ href: "/admin", appId: "admin", inApp: false, waiting, admin })).toBe(3);
     });
 
-    it("puts the update on Update & settings and the reports on Safety, not on Overview", () => {
+    it("puts the update on Updates and the reports on Safety, not on Overview", () => {
         expect(railCount({ href: "/admin", appId: "admin", inApp: true, waiting, admin })).toBe(0);
-        expect(railCount({ href: "/admin/settings", appId: "", inApp: true, waiting, admin })).toBe(
+        expect(railCount({ href: "/admin/updates", appId: "", inApp: true, waiting, admin })).toBe(
             1
         );
         expect(railCount({ href: "/admin/safety", appId: "", inApp: true, waiting, admin })).toBe(

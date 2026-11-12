@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * The call server card points at Settings when its container was never
+ * The call server card points at Updates when its container was never
  * created, and at Containers - naming the container - when it exists but is
  * stopped. Both used to point somewhere that does not exist or leave the
  * container to be found by guesswork; this locks the two destinations down.
@@ -32,12 +32,12 @@ const BASE = {
 };
 
 describe("where calls run - container problem links", () => {
-    it("points a never-created container at Settings, Update", async () => {
+    it("points a never-created container at Updates, Update", async () => {
         settings = { ...BASE, container: "missing" };
         render(<CallServerView />, { wrapper: MessagesWrapper });
 
-        const link = await screen.findByRole("link", { name: "Settings" });
-        expect(link.getAttribute("href")).toBe("/admin/settings");
+        const link = await screen.findByRole("link", { name: "Updates" });
+        expect(link.getAttribute("href")).toBe("/admin/updates");
         expect(screen.getByText(/, Update\.$/)).toBeTruthy();
     });
 

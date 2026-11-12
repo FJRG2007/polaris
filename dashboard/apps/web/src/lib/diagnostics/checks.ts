@@ -227,7 +227,7 @@ const RUNNERS: Record<CheckId, () => Promise<Verdict>> = {
     },
     async updates() {
         const status = await within(getUpdateStatus());
-        const link: CheckFix = { kind: "link", href: "/admin/settings" };
+        const link: CheckFix = { kind: "link", href: "/admin/updates" };
         if (!status || status.error) return verdict("unknown", "unreachable", {}, link);
         if (status.upToDate) return verdict("pass", "ok", { version: status.current ?? "-" });
         return verdict(

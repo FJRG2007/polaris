@@ -83,7 +83,8 @@
         "openDomains": "Abrir dominios",
         "openCertificates": "Abrir certificados",
         "done": "Hecho. Se volvió a comprobar.",
-        "failed": "No funcionó. La comprobación muestra cómo está."
+        "failed": "No funcionó. La comprobación muestra cómo está.",
+        "openUpdates": "Abrir versiones"
     },
     "speed": {
         "heading": "Velocidad",

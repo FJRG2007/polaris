@@ -53,7 +53,7 @@ export function UpdateIndicator() {
 
     return (
         <Link
-            href="/admin/settings"
+            href="/admin/updates"
             title={
                 available.behindBy
                     ? t("update.behind", { count: available.behindBy })

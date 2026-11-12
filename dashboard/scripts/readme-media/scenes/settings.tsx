@@ -7,9 +7,7 @@ import { defineScene } from "../runtime/scene";
 import { toWire } from "@/lib/app-bundles/wire";
 import { TEAM, VIEWER } from "../fixtures/people";
 import { SecurityView } from "@/app/(app)/account/security/security-view";
-import { SettingsView } from "@/app/(app)/admin/settings/settings-view";
-import { TransferCard } from "@/app/(app)/admin/settings/transfer-card";
-import { SeasonalAdminCard } from "@/app/(app)/admin/settings/seasonal-card";
+import { UpdatesView } from "@/app/(app)/admin/updates/updates-view";
 import { RolesAdmin } from "@/app/(app)/admin/roles/roles-admin";
 import { DEFAULT_ROLES, PERMISSIONS, expandPermissions, type Permission } from "@polaris/core";
 import type { RoleView } from "@/lib/role-service";
@@ -26,7 +24,7 @@ import {
 
 export const settings = defineScene({
     id: "settings",
-    path: "/admin/settings",
+    path: "/admin/updates",
     // Nothing found in Polaris's own images: the card stays out of the way.
     actions: () => ({ ownVulnerabilitiesAction: () => null }),
     api: (ctx) => ({
@@ -34,33 +32,24 @@ export const settings = defineScene({
         "GET /api/admin/settings/overview": () => settingsOverview(ctx),
         "GET /api/updates/logs": () => quietUpdateLog(ctx)
     }),
-    // The page `/admin/settings` draws, with what it would have read.
+    // The page `/admin/updates` draws, with what it would have read.
     render: (ctx) => (
         <Chrome>
             <div className="mx-auto flex w-full max-w-2xl flex-col">
                 <PageHeader
-                    title={label(ctx.locale, "admin.settings.page.title")}
-                    description={label(ctx.locale, "admin.settings.page.description")}
+                    title={label(ctx.locale, "admin.updates.page.title")}
+                    description={label(ctx.locale, "admin.updates.page.description")}
                 />
-                <SettingsView
+                <UpdatesView
                     initialPolicy={{ mode: "daily", at: "05:00" }}
                     initialSource="image"
-                    initialContact="privacy@example.com"
-                    publicPages={{
-                        home: "https://polaris.example.com/about",
-                        privacy: "https://polaris.example.com/legal/privacy",
-                        terms: "https://polaris.example.com/legal/terms"
-                    }}
                     deployment={DEPLOYMENT}
                 />
-                <SeasonalAdminCard initial />
-                <TransferCard identity={[VIEWER.email, VIEWER.name]} />
             </div>
         </Chrome>
     )
 });
 
-/** Their own account's security: how it is proven and how long a session lasts. */
 export const accountSecurity = defineScene({
     id: "account-security",
     path: "/account/security",

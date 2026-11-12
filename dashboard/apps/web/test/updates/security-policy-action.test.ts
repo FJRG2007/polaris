@@ -34,7 +34,7 @@ vi.mock("@/lib/security/own-images", () => ({ ownVulnerabilities: vi.fn() }));
 vi.mock("@/lib/legal/service", () => ({ setLegalContact: vi.fn() }));
 
 const { saveSecurityUpdateAction, securityUpdatePolicyAction } = await import(
-    "@/app/(app)/admin/settings/actions"
+    "@/app/(app)/admin/updates/actions"
 );
 
 const SAFE = { critical: "immediate", high: "immediate", medium: "off", low: "off" } as const;

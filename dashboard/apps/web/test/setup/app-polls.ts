@@ -340,9 +340,9 @@ vi.mock("@/app/(app)/automations/automations-polls", () => ({
     )
 }));
 
-vi.mock("@/app/(app)/admin/settings/settings-polls", () => ({
+vi.mock("@/app/(app)/admin/updates/update-polls", () => ({
     updateStatus: forward(
-        () => import("@/app/(app)/admin/settings/actions"),
+        () => import("@/app/(app)/admin/updates/actions"),
         "checkUpdatesAction",
         1
     )
@@ -520,7 +520,7 @@ vi.mock("@/app/(app)/admin/admin-polls", () => ({
         0
     ),
     ownVulnerabilities: forward(
-        () => import("@/app/(app)/admin/settings/actions"),
+        () => import("@/app/(app)/admin/updates/actions"),
         "ownVulnerabilitiesAction",
         0
     )

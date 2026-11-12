@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { apiAdmin } from "@/lib/api-session";
 import { pollRoute } from "@/lib/poll-route";
-import { ownVulnerabilitiesAction } from "@/app/(app)/admin/settings/actions";
+import { ownVulnerabilitiesAction } from "@/app/(app)/admin/updates/actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -48,6 +48,7 @@ describe("navigationEntries", () => {
         // Management owns these two despite living at the top level.
         expect(hrefs).not.toContain("/admin/integrations");
         expect(hrefs).not.toContain("/admin/settings");
+        expect(hrefs).not.toContain("/admin/updates");
         expect(navigationEntries(true, ALL_APPS).map((entry) => entry.href)).toContain(
             "/admin/users"
         );
