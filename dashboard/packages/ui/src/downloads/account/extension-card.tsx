@@ -28,7 +28,7 @@ import { ExtensionCommand } from "./extension-command";
 import { ExtensionPreview } from "./download-previews";
 import { DownloadCard } from "../download-card";
 import { SegmentedControl, Select } from "../../index";
-import { ExtensionSteps, useBrowserChoice } from "./extension-steps";
+import { ExtensionFinishSteps, ExtensionSteps, useBrowserChoice } from "./extension-steps";
 
 /** The ways to install it. */
 type Way = "store" | "download" | "command";
@@ -132,8 +132,13 @@ export function ExtensionCard({
                 {/* Whichever way is showing, the same button. */}
                 <ExtensionInstallButton method={method} browser={browser} safari={safari} />
 
-                {way === "store" ? null : way === "command" ? (
-                    <ExtensionCommand repo={repo} browser={browser} />
+                {way === "store" ? (
+                    <ExtensionFinishSteps browser={browser} />
+                ) : way === "command" ? (
+                    <>
+                        <ExtensionCommand repo={repo} browser={browser} />
+                        <ExtensionFinishSteps browser={browser} />
+                    </>
                 ) : (
                     <>
                         <BrowserChoice.Provider value={browser}>{files}</BrowserChoice.Provider>

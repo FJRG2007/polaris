@@ -47,6 +47,8 @@ vi.mock("@polaris/db", () => {
             organizationBanner: table("orgBanner"),
             chatSpaceAvatar: table("space"),
             chatChannelAvatar: table("channel"),
+            // A channel's webhooks have pictures of their own; none here.
+            chatWebhookAvatar: { findMany: async () => [], deleteMany: async () => ({ count: 0 }) },
             user: { findUnique: async () => ({ email: "ada@example.com" }) }
         }
     };

@@ -43,6 +43,11 @@ export interface BrowserGuide {
     readonly action: string;
     /** What this way of loading it costs, which is different in each. */
     readonly caveat: string;
+    /** The switch that lets it run in private windows, as the browser names it. */
+    readonly privateSwitch: string;
+    /** Whether that switch is behind the extension's Details button (Chrome,
+     *  Edge, Brave) or on its card on the extensions page itself (Opera). */
+    readonly privateInDetails: boolean;
 }
 
 /** Everything the Chromium family shares: one build, one set of steps. */
@@ -53,18 +58,28 @@ const CHROMIUM = {
     // at a .zip is the commonest way this goes wrong.
     unpack: true,
     action: "Load unpacked",
-    caveat: "It stays until you remove it, and it does not update itself. Replacing the files in the same folder and pressing the refresh arrow is how it takes a new version."
+    caveat: "It stays until you remove it, and it does not update itself. Replacing the files in the same folder and pressing the refresh arrow is how it takes a new version.",
+    privateInDetails: true
 } as const;
 
 export const BROWSER_GUIDES: readonly BrowserGuide[] = [
     // i18n-ignore a browser's name
-    { id: "chrome", label: "Chrome", page: "chrome://extensions", ...CHROMIUM },
+    { id: "chrome", label: "Chrome", page: "chrome://extensions", privateSwitch: "Allow in Incognito", ...CHROMIUM },
     // i18n-ignore a browser's name
-    { id: "edge", label: "Edge", page: "edge://extensions", ...CHROMIUM },
+    { id: "edge", label: "Edge", page: "edge://extensions", privateSwitch: "Allow in InPrivate", ...CHROMIUM },
+    // Brave's own help: Details, then "Allow in Private".
     // i18n-ignore a browser's name
-    { id: "brave", label: "Brave", page: "brave://extensions", ...CHROMIUM },
+    { id: "brave", label: "Brave", page: "brave://extensions", privateSwitch: "Allow in Private", ...CHROMIUM },
     // i18n-ignore a browser's name
-    { id: "opera", label: "Opera", page: "opera://extensions", ...CHROMIUM },
+    // Opera draws the box on the extension's card rather than behind Details.
+    {
+        id: "opera",
+        label: "Opera", // i18n-ignore a browser's name
+        page: "opera://extensions",
+        ...CHROMIUM,
+        privateSwitch: "Allow in Incognito",
+        privateInDetails: false
+    },
     {
         id: "firefox",
         label: "Firefox", // i18n-ignore a browser's name
@@ -75,7 +90,10 @@ export const BROWSER_GUIDES: readonly BrowserGuide[] = [
         file: "firefox",
         unpack: false,
         action: "Load Temporary Add-on",
-        caveat: "Temporary is literal: Firefox lets it go when it closes, so it has to be loaded again next time."
+        caveat: "Temporary is literal: Firefox lets it go when it closes, so it has to be loaded again next time.",
+        // about:addons > the extension > "Run in Private Windows" > Allow.
+        privateSwitch: "Run in Private Windows",
+        privateInDetails: true
     }
 ];
 

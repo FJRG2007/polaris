@@ -1317,7 +1317,20 @@
             "pressFile": "Press <press>{action}</press> and choose the file you downloaded.",
             "pointIt": "Open the extension and point it at this Polaris. It asks for permission to talk to this address and no other.",
             "caveatChromium": "It stays until you remove it, and it does not update itself. Replacing the files in the same folder and pressing the refresh arrow is how it takes a new version.",
-            "caveatFirefox": "Temporary is literal: Firefox lets it go when it closes, so it has to be loaded again next time."
+            "caveatFirefox": "Temporary is literal: Firefox lets it go when it closes, so it has to be loaded again next time.",
+            "allowPrivate": "Open <press>Details</press> on Polaris and turn on <press>{switch}</press>, so it also works in private windows.",
+            "allowPrivateCard": "On Polaris's card, check <press>{switch}</press>, so it also works in private windows.",
+            "allowPrivateFirefox": "Open <press>about:addons</press>, choose Polaris and set <press>{switch}</press> to Allow.",
+            "pin": "Press the Extensions button in the toolbar and the pin next to Polaris, so it is one click away.",
+            "pinFirefox": "Press the Extensions button in the toolbar, then the gear next to Polaris and <press>Pin to Toolbar</press>.",
+            "back": "Back",
+            "next": "Continue",
+            "finish": "Done",
+            "stepOf": "Step {step} of {total}",
+            "finished": "All set. Open the extension from the toolbar whenever you need it.",
+            "afterTitle": "After installing",
+            "afterHint": "Two things only you can switch on in the browser:",
+            "devModeLabel": "Developer mode"
         },
         "cli": {
             "title": "Command line",

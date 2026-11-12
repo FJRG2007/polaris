@@ -104,3 +104,30 @@ describe("what each browser is told to do", () => {
         expect(english("downloads.steps.caveatChromium")).toBe(browserGuide("chrome").caveat);
     });
 });
+
+describe("the guided steps", () => {
+    it("walk from the download to pointing it here, with private windows and the pin on the way", async () => {
+        const { stepsFor } = await import("@polaris/ui/account-downloads/extension-steps");
+        expect(stepsFor(browserGuide("chrome"))).toEqual([
+            "download",
+            "open",
+            "devMode",
+            "load",
+            "private",
+            "pin",
+            "point"
+        ]);
+        expect(stepsFor(browserGuide("firefox"))[2]).toBe("land");
+        // Whatever installed it, these two are the browser's to switch on.
+        expect(stepsFor(browserGuide("edge"), true)).toEqual(["private", "pin"]);
+    });
+
+    it("name the private-window switch the way each browser does", () => {
+        expect(browserGuide("chrome").privateSwitch).toBe("Allow in Incognito");
+        expect(browserGuide("edge").privateSwitch).toBe("Allow in InPrivate");
+        expect(browserGuide("brave").privateSwitch).toBe("Allow in Private");
+        expect(browserGuide("firefox").privateSwitch).toBe("Run in Private Windows");
+        // Opera draws it on the extension's card, not behind Details.
+        expect(browserGuide("opera").privateInDetails).toBe(false);
+    });
+});

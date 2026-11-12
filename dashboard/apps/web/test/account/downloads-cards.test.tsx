@@ -66,7 +66,7 @@ describe("the extension card", () => {
         expect(screen.queryByRole("link", { name: "release files" })).toBeNull();
         await userEvent.click(screen.getByRole("radio", { name: "Download" }));
         expect(screen.getByRole("link", { name: "release files" })).toBeTruthy();
-        expect(screen.getByText("chrome://extensions")).toBeTruthy();
+        expect(screen.getByText("chrome://extensions", { selector: "code" })).toBeTruthy();
         expect(screen.getByText("Developer mode")).toBeTruthy();
     });
 
@@ -76,7 +76,9 @@ describe("the extension card", () => {
             screen.getByRole("combobox", { name: "Which browser you are loading it into" })
         );
         await userEvent.click(await screen.findByRole("option", { name: "Firefox" }));
-        expect(await screen.findByText("about:debugging#/runtime/this-firefox")).toBeTruthy();
+        expect(
+            await screen.findByText("about:debugging#/runtime/this-firefox", { selector: "code" })
+        ).toBeTruthy();
         expect(screen.queryByText("One line, and it keeps itself up to date")).toBeNull();
         expect(screen.getByRole("radio", { name: "Command" }).hasAttribute("disabled")).toBe(true);
         expect(screen.getByRole("link", { name: "release files" })).toBeTruthy();
@@ -92,7 +94,7 @@ describe("the extension card", () => {
                 screen.getByRole("combobox", { name: "Which browser you are loading it into" })
             );
             await userEvent.click(await screen.findByRole("option", { name: "Firefox" }));
-            await screen.findByText("about:debugging#/runtime/this-firefox");
+            await screen.findByText("about:debugging#/runtime/this-firefox", { selector: "code" });
             expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
         } finally {
             delete desktop.polarisDesktop;

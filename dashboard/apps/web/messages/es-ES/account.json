@@ -1317,7 +1317,20 @@
             "pressFile": "Pulsa <press>{action}</press> y elige el archivo que descargaste.",
             "pointIt": "Abre la extensión y apúntala a este Polaris. Pide permiso para hablar con esta dirección y con ninguna otra.",
             "caveatChromium": "Se queda hasta que la quites, y no se actualiza sola. Para que coja una versión nueva, sustituye los archivos en la misma carpeta y pulsa la flecha de recargar.",
-            "caveatFirefox": "Temporal quiere decir temporal: Firefox la descarta al cerrarse, así que hay que volver a cargarla la próxima vez."
+            "caveatFirefox": "Temporal quiere decir temporal: Firefox la descarta al cerrarse, así que hay que volver a cargarla la próxima vez.",
+            "allowPrivate": "Abre <press>Detalles</press> en Polaris y activa <press>{switch}</press>, para que funcione también en ventanas privadas.",
+            "allowPrivateCard": "En la tarjeta de Polaris, marca <press>{switch}</press>, para que funcione también en ventanas privadas.",
+            "allowPrivateFirefox": "Abre <press>about:addons</press>, elige Polaris y pon <press>{switch}</press> en Permitir.",
+            "pin": "Pulsa el botón de extensiones de la barra y la chincheta junto a Polaris, para tenerla a un clic.",
+            "pinFirefox": "Pulsa el botón de extensiones de la barra, luego el engranaje junto a Polaris y <press>Fijar a la barra</press>.",
+            "back": "Atrás",
+            "next": "Continuar",
+            "finish": "Listo",
+            "stepOf": "Paso {step} de {total}",
+            "finished": "Todo listo. Abre la extensión desde la barra cuando la necesites.",
+            "afterTitle": "Tras instalarla",
+            "afterHint": "Dos cosas que solo tú puedes activar en el navegador:",
+            "devModeLabel": "Modo desarrollador"
         },
         "cli": {
             "title": "Terminal",
