@@ -182,6 +182,14 @@ jobs:
           key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
       - if: steps.packages.outputs.cache-hit != 'true'
         run: npm run build:packages
+      # Next's route types (.next/types), which tsconfig.typecheck.json includes.
+      # Without them this job never saw the route checks only `next build` made,
+      # so the image build had to keep its own type check; generated here, the
+      # publish skips that copy (POLARIS_BUILD_SKIP_TYPECHECK) and nothing goes
+      # unchecked. Seconds, against the three minutes it takes inside the build.
+      - name: Generate Next's route types
+        working-directory: dashboard/apps/web
+        run: npx next typegen
       # The web app's tsc holds about as much as the build does and sits right at
       # Node's ~4 GB default heap, so it gets the same room the build step has.
       # It also covers the app bundles under apps/game-servers and apps/places

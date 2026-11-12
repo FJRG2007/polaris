@@ -124,6 +124,10 @@ ARG NODE_BUILD_OPTIONS=""
 # dashboard-publish.yml, whose tag waits on dashboard-ci's checks job linting the
 # same sources; empty everywhere else, an operator's update included, which lints.
 ARG POLARIS_BUILD_SKIP_LINT=""
+# "1" skips the type check inside `next build`, for the same reason: passed only
+# by dashboard-publish.yml, whose tag waits on dashboard-ci's checks job, which
+# generates Next's route types (`next typegen`) and type-checks them with the rest.
+ARG POLARIS_BUILD_SKIP_TYPECHECK=""
 # Most of the app build is recompiling modules that did not change; with the last
 # build's cache in place Next skips them. Only the compiler reads it - the runner
 # below copies the standalone output, so none of it reaches the image.

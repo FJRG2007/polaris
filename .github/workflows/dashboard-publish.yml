@@ -354,6 +354,7 @@ jobs:
             NODE_BUILD_OPTIONS=--max-old-space-size=8192
             POLARIS_APP_BUNDLES=publish
             POLARIS_BUILD_SKIP_LINT=1
+            POLARIS_BUILD_SKIP_TYPECHECK=1
           build-contexts: next-cache=${{ runner.temp }}/next-cache
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
@@ -390,6 +391,7 @@ jobs:
             NODE_BUILD_OPTIONS=--max-old-space-size=8192
             POLARIS_APP_BUNDLES=publish
             POLARIS_BUILD_SKIP_LINT=1
+            POLARIS_BUILD_SKIP_TYPECHECK=1
           build-contexts: next-cache=${{ runner.temp }}/next-cache
           cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web,mode=max
           outputs: type=cacheonly
@@ -409,6 +411,7 @@ jobs:
             NODE_BUILD_OPTIONS=--max-old-space-size=8192
             POLARIS_APP_BUNDLES=publish
             POLARIS_BUILD_SKIP_LINT=1
+            POLARIS_BUILD_SKIP_TYPECHECK=1
           # The same context as the build above, or the stages after it would not
           # match the layers already in this builder and the app would compile again.
           build-contexts: next-cache=${{ runner.temp }}/next-cache
@@ -454,6 +457,7 @@ jobs:
             NODE_BUILD_OPTIONS=--max-old-space-size=8192
             POLARIS_APP_BUNDLES=publish
             POLARIS_BUILD_SKIP_LINT=1
+            POLARIS_BUILD_SKIP_TYPECHECK=1
           build-contexts: next-cache=${{ runner.temp }}/next-cache
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
           outputs: type=local,dest=${{ runner.temp }}/next-cache-out

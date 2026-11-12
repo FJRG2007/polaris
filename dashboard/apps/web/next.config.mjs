@@ -91,7 +91,7 @@ const BUILD_STAMP = BUILD_SHA
     : Date.now().toString(36);
 
 /** How long webpack keeps a compile cache entry no build has read (see `webpack`). */
-const WEBPACK_CACHE_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000;
+const WEBPACK_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 /** @type {import("next").NextConfig} */
 const nextConfig = {
@@ -460,7 +460,9 @@ const nextConfig = {
         // content hash, so every commit added entries no later build asks for: the
         // image's copy passed 5 GB, and restoring, copying and exporting it cost a
         // publish more time than the compile it saved. Each build marks what it
-        // reads as used, so two days still keeps everything the current tree needs.
+        // reads as used, so a short age still keeps everything the current tree
+        // needs. Two days was too long once main took hundreds of commits a day:
+        // the copy reached 16 GB and moving it cost a publish about nine minutes.
         if (!dev && config.cache && typeof config.cache === "object") {
             config.cache.maxAge = WEBPACK_CACHE_MAX_AGE_MS;
         }
