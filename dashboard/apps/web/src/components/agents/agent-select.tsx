@@ -229,11 +229,13 @@ export function AgentSelect({
                                                           })
                                             }
                                         >
-                                            {option.apiKey
-                                                ? t("agentSelect.apiKeyAccount", {
-                                                      account: option.account
-                                                  })
-                                                : option.account}
+                                            {option.machine
+                                                ? t("agentSelect.machineAccount")
+                                                : option.apiKey
+                                                  ? t("agentSelect.apiKeyAccount", {
+                                                        account: option.account
+                                                    })
+                                                  : option.account}
                                         </span>
                                     ) : option.vendor ? (
                                         <span className="text-muted-foreground shrink-0 text-xs">

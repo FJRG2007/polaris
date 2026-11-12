@@ -576,6 +576,7 @@ type PolarT = NamespaceTranslator<"polar">;
 /** The account an option names, said as an API key where it is one. */
 function accountName(option: AgentOption, t: PolarT): string | null {
     if (!option.account) return null;
+    if (option.machine) return t("code.machineAccount");
     return option.apiKey ? t("code.apiKeyAccount", { account: option.account }) : option.account;
 }
 
@@ -630,8 +631,8 @@ export function AgentPicker({
                         {polar ? t("code.polarEngine") : (picked?.label ?? t("code.agent"))}
                     </span>
                     {picked?.account ? (
-                        <span className="min-w-0 truncate" title={picked.account}>
-                            {picked.account}
+                        <span className="min-w-0 truncate" title={accountName(picked, t) ?? undefined}>
+                            {accountName(picked, t)}
                         </span>
                     ) : null}
                 </button>

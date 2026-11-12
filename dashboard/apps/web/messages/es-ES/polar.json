@@ -1231,6 +1231,7 @@
         "refresh": "Recargar lista",
         "notSignedIn": "Sin conectar",
         "apiKeyAccount": "Clave API: {account}",
+        "machineAccount": "Login de este equipo",
         "apiKeys": "Claves y accesos",
         "searchAgents": "Buscar agente",
         "noAgentMatch": "Ningún agente",

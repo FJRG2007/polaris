@@ -1231,6 +1231,7 @@
         "refresh": "Refresh the list",
         "notSignedIn": "Not signed in",
         "apiKeyAccount": "API key: {account}",
+        "machineAccount": "This machine's login",
         "apiKeys": "Keys and sign-ins",
         "searchAgents": "Find an agent",
         "noAgentMatch": "No agents match",

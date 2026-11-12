@@ -1448,6 +1448,7 @@
         "machineHint": "Polaris no le inicia sesión con nada. Responde lo que ya tenga iniciado esta máquina, que es lo que obtienes tras iniciar sesión una vez en el propio terminal de una sesión.",
         "yourAccount": "Tu cuenta: {account}",
         "apiKeyAccount": "Clave API: {account}",
+        "machineAccount": "Login de este equipo",
         "apiKeyHint": "Usa esta clave API, de pago por uso, en vez de una suscripción.",
         "providedAccount": "La aporta este Polaris: {account}",
         "nothingSigns": "Nada de aquí inicia sesión en {agent}.",

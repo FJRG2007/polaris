@@ -1448,6 +1448,7 @@
         "machineHint": "Polaris signs it in with nothing. Whatever this machine is already signed in to answers for it - which is what you get after signing in once in a session's own terminal.",
         "yourAccount": "Your account: {account}",
         "apiKeyAccount": "API key: {account}",
+        "machineAccount": "This machine's login",
         "apiKeyHint": "Runs on this API key, billed per use, instead of a subscription.",
         "providedAccount": "Provided by this Polaris: {account}",
         "nothingSigns": "Nothing here signs {agent} in.",

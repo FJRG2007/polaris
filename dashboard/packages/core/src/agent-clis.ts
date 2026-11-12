@@ -616,7 +616,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
     },
     {
         id: "gemini",
-        label: "Gemini CLI",
+        label: "Gemini",
         vendor: "Google",
         binaries: ["gemini"],
         install: "npm install -g @google/gemini-cli",
@@ -659,7 +659,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
     },
     {
         id: "copilot",
-        label: "GitHub Copilot CLI",
+        label: "GitHub Copilot",
         vendor: "GitHub",
         binaries: ["copilot"],
         install: "npm install -g @github/copilot",
@@ -694,7 +694,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
     },
     {
         id: "cursor",
-        label: "Cursor CLI",
+        label: "Cursor",
         vendor: "Cursor",
         binaries: ["cursor-agent"],
         install: null,
