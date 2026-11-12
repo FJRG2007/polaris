@@ -15,7 +15,7 @@ confidence: 90
 discovered: 2026-11-12
 last_seen: 2026-11-12
 fixed: 2026-11-12
-fix_commit: null
+fix_commit: 99d78ef0e, b7298dfd8
 ---
 
 ## Summary
