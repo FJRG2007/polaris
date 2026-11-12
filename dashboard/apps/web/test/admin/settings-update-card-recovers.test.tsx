@@ -16,6 +16,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let checkRefused = true;
 vi.mock("@/app/(app)/admin/settings/actions", () => ({
+    securityUpdatePolicyAction: async () => ({
+        policy: { critical: "immediate", high: "immediate", medium: "off", low: "off", riskAccepted: null },
+        quietHour: 4
+    }),
+    saveSecurityUpdateAction: async () => ({}),
+    updateChangelogAction: async () => null,
     ownVulnerabilitiesAction: async () => null,
     checkUpdatesAction: async () => {
         if (checkRefused) throw new Error('Server Action "x" was not found on the server');

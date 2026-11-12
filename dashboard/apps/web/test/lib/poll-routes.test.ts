@@ -263,6 +263,12 @@ vi.mock("@/app/(app)/automations/actions", () => ({
     thresholdChoicesAction: actions.thresholdChoicesAction
 }));
 vi.mock("@/app/(app)/admin/settings/actions", () => ({
+    securityUpdatePolicyAction: async () => ({
+        policy: { critical: "immediate", high: "immediate", medium: "off", low: "off", riskAccepted: null },
+        quietHour: 4
+    }),
+    saveSecurityUpdateAction: async () => ({}),
+    updateChangelogAction: async () => null,
     checkUpdatesAction: actions.checkUpdatesAction,
     ownVulnerabilitiesAction: actions.ownVulnerabilitiesAction
 }));
