@@ -29,14 +29,28 @@ import {
     panelDirectDeviceIds,
     panelRoomIds,
     storedCards,
+    storedStyle,
     type PanelCard,
+    type PanelStyle,
     type PanelView
 } from "./panel-layout";
 
-const FIELDS = { id: true, placeId: true, name: true, cards: true } as const;
+const FIELDS = { id: true, placeId: true, name: true, cards: true, style: true } as const;
 
-function toView(row: { id: string; placeId: string; name: string; cards: unknown }): PanelView {
-    return { id: row.id, placeId: row.placeId, name: row.name, cards: storedCards(row.cards) };
+function toView(row: {
+    id: string;
+    placeId: string;
+    name: string;
+    cards: unknown;
+    style?: unknown;
+}): PanelView {
+    return {
+        id: row.id,
+        placeId: row.placeId,
+        name: row.name,
+        cards: storedCards(row.cards),
+        style: storedStyle(row.style)
+    };
 }
 
 /** Every panel of a place, by name. */
@@ -150,6 +164,21 @@ export async function savePanelCards(
     return toView(row);
 }
 
+/** How a panel is drawn, saved whole. */
+export async function savePanelStyle(
+    installedAppId: string,
+    id: string,
+    style: PanelStyle
+): Promise<PanelView> {
+    await requirePanel(installedAppId, id);
+    const row = await prisma.placePanel.update({
+        where: { id },
+        data: { style: { ...style } },
+        select: FIELDS
+    });
+    return toView(row);
+}
+
 export async function deletePanel(installedAppId: string, id: string): Promise<void> {
     const { count } = await prisma.placePanel.deleteMany({ where: { id, installedAppId } });
     if (count === 0) throw new HomeError("That panel is not here");
@@ -188,6 +217,15 @@ export interface PanelContents {
     readonly cameras: readonly CameraView[];
     /** Each button's automation, still at the panel's place. */
     readonly automations: readonly PanelAutomation[];
+    /** The room, and its floor, of every device on the panel: what the list
+     *  view groups by. */
+    readonly roomLabels: readonly PanelRoomLabel[];
+}
+
+export interface PanelRoomLabel {
+    readonly id: string;
+    readonly name: string;
+    readonly floor: string | null;
 }
 
 /** What a button shows of the automation it runs. */
@@ -235,9 +273,20 @@ export async function panelContents(installedAppId: string, id: string): Promise
     ]);
     const ids = panelDeviceIds(panel.cards, byRoom);
     const all = ids.size ? await devices.listDevices(installedAppId, panel.placeId) : [];
+    const shown = all.filter((device) => ids.has(device.id));
+    const labelIds = [
+        ...new Set(shown.flatMap((device) => (device.roomId ? [device.roomId] : [])))
+    ];
+    const roomLabels: PanelRoomLabel[] = labelIds.length
+        ? await prisma.placeRoom.findMany({
+              where: { installedAppId, placeId: panel.placeId, id: { in: labelIds } },
+              select: { id: true, name: true, floor: true }
+          })
+        : [];
     return {
         panel,
-        devices: all.filter((device) => ids.has(device.id)),
+        devices: shown,
+        roomLabels,
         rooms: roomRows.map((room: { id: string; name: string }) => ({
             id: room.id,
             name: room.name,

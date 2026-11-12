@@ -11588,6 +11588,10 @@ model PlacePanel {
     placeId        String @db.Uuid
     name           String
     cards          Json   @default("[]")
+    /// How the wall draws it: theme, accent, density, background and when the
+    /// screensaver starts. Read through `storedStyle` in Places, so a field it
+    /// does not know reads as its default.
+    style          Json   @default("{}")
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt

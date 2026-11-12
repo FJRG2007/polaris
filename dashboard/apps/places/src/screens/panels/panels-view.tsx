@@ -15,9 +15,11 @@ import { useRouter } from "next/navigation";
 import {
     Camera,
     Clock,
+    CloudSun,
     ExternalLink,
     Gauge,
     LayoutGrid,
+    Palette,
     Pencil,
     Play,
     Plus,
@@ -45,6 +47,8 @@ import { usePlacesT } from "../use-places-t";
 import { hostUi } from "@polaris/app-host/client";
 import { DeviceIcon } from "../devices/device-panel";
 import { PanelBoard, type BoardRoom } from "./panel-board";
+import { usePanelWeather } from "./panel-weather";
+import { PanelStyleDialog } from "./panel-style-dialog";
 import {
     PANEL_NAME_MAX,
     addCard,
@@ -52,6 +56,7 @@ import {
     panelNameSchema,
     type NewCard,
     type PanelCard,
+    type PanelStyle,
     type PanelView
 } from "../../lib/panel-layout";
 import type { DeviceView } from "../../lib/device-kinds";
@@ -186,6 +191,14 @@ function AddCardDialog({
                     <button type="button" className={row} onClick={() => onPick({ type: "clock" })}>
                         <Clock className="size-4 shrink-0 text-muted-foreground" />
                         {t("panels.addClock")}
+                    </button>
+                    <button
+                        type="button"
+                        className={row}
+                        onClick={() => onPick({ type: "weather" })}
+                    >
+                        <CloudSun className="size-4 shrink-0 text-muted-foreground" />
+                        {t("panels.addWeather")}
                     </button>
                     <section className="flex flex-col gap-1">
                         <h3 className="px-3 text-xs font-medium text-muted-foreground">
@@ -355,8 +368,13 @@ export function PanelsView({
     const [adding, setAdding] = useState(false);
     const [sharing, setSharing] = useState(false);
     const [removing, setRemoving] = useState(false);
+    const [styling, setStyling] = useState(false);
     const [error, setError] = useState("");
     const selected = panels.find((panel) => panel.id === selectedId) ?? null;
+    const weather = usePanelWeather(
+        selected ? `/api/home/panels/${encodeURIComponent(selected.id)}/weather` : null,
+        Boolean(selected?.cards.some((card) => card.type === "weather"))
+    );
 
     const replace = (next: PanelView) =>
         setPanels((list) => list.map((panel) => (panel.id === next.id ? next : panel)));
@@ -378,6 +396,24 @@ export function PanelsView({
             return;
         }
         router.refresh();
+    };
+
+    /** Save how the panel looks at once, and put the old look back if refused. */
+    const saveStyle = async (style: PanelStyle) => {
+        if (!selected) return;
+        const before = selected;
+        const pressed = { ...selected, style };
+        replace(pressed);
+        setStyling(false);
+        setError("");
+        const result = await runAction(
+            () => actions.savePanelStyleAction(before.id, style),
+            setError
+        );
+        if (!result || result.error || !result.panel) {
+            setPanels((list) => list.map((panel) => (panel === pressed ? before : panel)));
+            if (result?.error) setError(result.error);
+        }
     };
 
     const create = async (name: string): Promise<string | null> => {
@@ -509,6 +545,16 @@ export function PanelsView({
                                     size="sm"
                                     variant="ghost"
                                     className="size-9 p-0"
+                                    aria-label={t("panels.style", { name: selected.name })}
+                                    title={t("panels.style", { name: selected.name })}
+                                    onClick={() => setStyling(true)}
+                                >
+                                    <Palette className="size-4" />
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="size-9 p-0"
                                     aria-label={t("panels.share", { name: selected.name })}
                                     title={t("panels.share", { name: selected.name })}
                                     onClick={() => setSharing(true)}
@@ -577,6 +623,8 @@ export function PanelsView({
                                 editing={editing}
                                 onCardsChange={(cards) => void saveCards(cards)}
                                 onError={setError}
+                                density={selected.style.density}
+                                weather={weather}
                             />
                         </div>
                     )}
@@ -608,6 +656,14 @@ export function PanelsView({
                     else void saveCards(next);
                 }}
             />
+            {selected ? (
+                <PanelStyleDialog
+                    open={styling}
+                    style={selected.style}
+                    onClose={() => setStyling(false)}
+                    onSave={(style) => void saveStyle(style)}
+                />
+            ) : null}
             {selected && sharing ? (
                 <ShareDialog
                     open

@@ -3052,7 +3052,10 @@
         "runConfirm": "Lanzar",
         "runFailed": "Esa automatización no pudo empezar. Vuelve a intentarlo.",
         "sensorSince": "Desde las {time}",
-        "sensorOffline": "No responde"
+        "sensorOffline": "No responde",
+        "weather": "Tiempo",
+        "addWeather": "Tiempo",
+        "style": "Estilo: {name}"
     },
     "panelWall": {
         "nightDark": "Oscuro de noche",
@@ -3061,7 +3064,11 @@
         "fullscreen": "Ampliar",
         "exitFullscreen": "Ventana normal",
         "reconnecting": "Reconectando",
-        "empty": "Aún no hay nada en este panel."
+        "empty": "Aún no hay nada en este panel.",
+        "view": "Vista",
+        "viewGrid": "Tarjetas",
+        "viewList": "Lista",
+        "wake": "Activar pantalla"
     },
     "battery": {
         "level": "Batería {percent}%",
@@ -3108,5 +3115,61 @@
         "failed": "No se pudo empezar a hablar. Vuelve a probar.",
         "ended": "Se ha dejado de hablar.",
         "rtsp": "Para hablar a través de esta cámara, edítala y elige TP-Link Tapo (contraseña de Tapo)."
+    },
+    "panelWeather": {
+        "clear": "Despejado",
+        "partly": "Algo nublado",
+        "cloudy": "Nublado",
+        "fog": "Niebla",
+        "drizzle": "Llovizna",
+        "rain": "Lluvia",
+        "snow": "Nieve",
+        "storm": "Tormenta",
+        "unknown": "Tiempo",
+        "range": "Máx. {high}, mín. {low}",
+        "failed": "El tiempo no está disponible ahora.",
+        "noLocation": "Indica dónde está este lugar para ver su tiempo."
+    },
+    "panelList": {
+        "search": "Buscar en el panel",
+        "count": "{count, plural, one {# dispositivo} other {# dispositivos}}",
+        "label": "Dispositivos del panel",
+        "noMatch": "Sin resultados.",
+        "empty": "Sin dispositivos en el panel.",
+        "noRoom": "Sin sala",
+        "roomOnFloor": "{room}, {floor}"
+    },
+    "panelStyle": {
+        "title": "Apariencia",
+        "description": "Cómo se ve este panel en la pared.",
+        "theme": "Tema",
+        "accent": "Acento",
+        "density": "Densidad",
+        "background": "Fondo",
+        "screensaver": "Salvapantallas",
+        "screensaverOff": "Nunca",
+        "screensaverAfter": "{count, plural, one {Tras # minuto} other {Tras # minutos}}",
+        "themes": {
+            "auto": "Igual que la app",
+            "light": "Claro",
+            "dark": "Oscuro"
+        },
+        "accents": {
+            "default": "Del tema",
+            "blue": "Azul",
+            "teal": "Turquesa",
+            "green": "Verde",
+            "amber": "Ámbar",
+            "rose": "Rosa"
+        },
+        "densities": {
+            "comfortable": "Holgada",
+            "compact": "Compacta"
+        },
+        "backgrounds": {
+            "plain": "Liso",
+            "tinted": "Teñido",
+            "gradient": "Degradado"
+        }
     }
 }

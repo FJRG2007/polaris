@@ -24,7 +24,11 @@ export default async function WallPanelPage({
     if (!contents) notFound();
     return (
         <PanelWall
+            id={contents.panel.id}
             name={contents.panel.name}
+            style={contents.panel.style}
+            weatherUrl={`/api/home/panels/${encodeURIComponent(contents.panel.id)}/weather`}
+            roomLabels={contents.roomLabels}
             placeId={contents.panel.placeId}
             cards={contents.panel.cards}
             devices={contents.devices}

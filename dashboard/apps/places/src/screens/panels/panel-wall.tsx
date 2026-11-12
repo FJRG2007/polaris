@@ -10,21 +10,29 @@
  * page is shown (the browser drops it when hidden); where the API is missing,
  * a muted, silent video of a blank canvas plays instead, which is what keeps
  * older tablets from sleeping.
+ *
+ * Each panel carries its own look (`PanelStyle`): a theme, an accent, how
+ * tightly the cards sit, a background, and how long the wall waits without a
+ * touch before the screensaver (`panel-screensaver`) takes over.
  */
 
-import { isNight } from "./panel-state";
+import { wallSurface, wallTheme } from "./panel-state";
 import { Button, cn } from "@polaris/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { usePlacesT } from "../use-places-t";
-import type { PanelCard } from "../../lib/panel-layout";
+import type { ListRoom } from "../../lib/panel-list";
 import type { DeviceView } from "../../lib/device-kinds";
-import { Maximize, Minimize, Moon, Sun, WifiOff } from "lucide-react";
+import { PanelScreensaver, useIdle } from "./panel-screensaver";
+import { usePanelWeather } from "./panel-weather";
+import type { PanelCard, PanelStyle, PanelTheme } from "../../lib/panel-layout";
+import { LayoutGrid, List, Maximize, Minimize, Moon, Sun, WifiOff } from "lucide-react";
 import type { CameraView } from "../../lib/cameras";
 import type { PanelAutomation } from "../../lib/panels";
 import type { GuestPanelCamera } from "../../lib/guest-key";
 import { PanelBoard, type BoardAccess, type BoardRoom } from "./panel-board";
 
 const NIGHT_KEY = "polaris.wall.nightDark";
+const VIEW_KEY = "polaris.wall.view:";
 
 /** Keep the screen on while this is mounted. Says whether it could. */
 function useScreenAwake(): boolean {
@@ -94,25 +102,40 @@ function useScreenAwake(): boolean {
     return awake;
 }
 
-/** Dark from nine at night to seven in the morning, while asked for. The
- *  theme's tokens are on the root element, so that is where it is switched;
- *  the reader's own theme comes back by day and when the wall closes. */
-function useNightDark(enabled: boolean): void {
+/** The panel's theme, and dark from nine at night to seven in the morning
+ *  while asked for (`wallTheme`). The theme's tokens are on the root element,
+ *  so that is where it is switched; the reader's own theme comes back when
+ *  the wall closes. */
+function useWallTheme(theme: PanelTheme, nightDark: boolean): void {
     useEffect(() => {
-        if (!enabled) return;
+        if (theme === "auto" && !nightDark) return;
         const root = document.documentElement;
         const saved = ["light", "system"].filter((name) => root.classList.contains(name));
+        const restore = () => {
+            root.classList.remove("light", "system");
+            for (const name of saved) root.classList.add(name);
+        };
         const apply = () => {
-            if (isNight(new Date())) root.classList.remove("light", "system");
-            else for (const name of saved) root.classList.add(name);
+            const now = wallTheme(theme, nightDark, new Date());
+            if (now === "auto") return restore();
+            root.classList.remove("light", "system");
+            if (now === "light") root.classList.add("light");
         };
         apply();
         const timer = setInterval(apply, 60_000);
         return () => {
             clearInterval(timer);
-            for (const name of saved) root.classList.add(name);
+            restore();
         };
-    }, [enabled]);
+    }, [theme, nightDark]);
+}
+
+function readView(id: string): "grid" | "list" {
+    try {
+        return localStorage.getItem(VIEW_KEY + id) === "list" ? "list" : "grid";
+    } catch {
+        return "grid";
+    }
 }
 
 function readNight(): boolean {
@@ -124,7 +147,11 @@ function readNight(): boolean {
 }
 
 export function PanelWall({
+    id,
     name,
+    style,
+    weatherUrl,
+    roomLabels,
     placeId,
     cards,
     devices,
@@ -134,7 +161,12 @@ export function PanelWall({
     automations,
     access
 }: {
+    id: string;
     name: string;
+    style: PanelStyle;
+    /** Where the wall asks for the weather at its place. */
+    weatherUrl: string;
+    roomLabels?: readonly ListRoom[];
     placeId: string;
     cards: readonly PanelCard[];
     devices: readonly DeviceView[];
@@ -150,8 +182,17 @@ export function PanelWall({
     const [online, setOnline] = useState(true);
     const [full, setFull] = useState(false);
     const [error, setError] = useState("");
-    useEffect(() => setNight(readNight()), []);
-    useNightDark(night);
+    const [view, setView] = useState<"grid" | "list">("grid");
+    useEffect(() => {
+        setNight(readNight());
+        setView(readView(id));
+    }, [id]);
+    useWallTheme(style.theme, night);
+    const weather = usePanelWeather(
+        weatherUrl,
+        style.screensaver > 0 || cards.some((card) => card.type === "weather")
+    );
+    const { idle, wake } = useIdle(style.screensaver);
     useEffect(() => {
         const sync = () => setOnline(navigator.onLine);
         const screen = () => setFull(Boolean(document.fullscreenElement));
@@ -182,13 +223,24 @@ export function PanelWall({
             // Private window: kept for this visit only.
         }
     };
+    const chooseView = (next: "grid" | "list") => {
+        setView(next);
+        try {
+            localStorage.setItem(VIEW_KEY + id, next);
+        } catch {
+            // Private window: kept for this visit only.
+        }
+    };
     const toggleFull = () => {
         if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
         else void document.documentElement.requestFullscreen?.().catch(() => undefined);
     };
 
     return (
-        <div className="flex min-h-dvh flex-col gap-4 bg-background p-3 text-foreground sm:p-5">
+        <div
+            className="flex min-h-dvh flex-col gap-4 bg-background p-3 text-foreground sm:p-5"
+            style={wallSurface(style) as CSSProperties}
+        >
             <header className="flex min-w-0 items-center gap-2">
                 <h1 className="min-w-0 flex-1 truncate text-xl font-semibold" title={name}>
                     {name}
@@ -210,6 +262,36 @@ export function PanelWall({
                 >
                     {awake ? t("panelWall.awake") : t("panelWall.awakeOff")}
                 </span>
+                {devices.length > 0 ? (
+                    <div
+                        className="flex shrink-0 items-center gap-1"
+                        role="group"
+                        aria-label={t("panelWall.view")}
+                    >
+                        <Button
+                            type="button"
+                            variant={view === "grid" ? "primary" : "outline"}
+                            aria-pressed={view === "grid"}
+                            aria-label={t("panelWall.viewGrid")}
+                            title={t("panelWall.viewGrid")}
+                            onClick={() => chooseView("grid")}
+                            className="size-11 shrink-0 p-0"
+                        >
+                            <LayoutGrid className="size-5" />
+                        </Button>
+                        <Button
+                            type="button"
+                            variant={view === "list" ? "primary" : "outline"}
+                            aria-pressed={view === "list"}
+                            aria-label={t("panelWall.viewList")}
+                            title={t("panelWall.viewList")}
+                            onClick={() => chooseView("list")}
+                            className="size-11 shrink-0 p-0"
+                        >
+                            <List className="size-5" />
+                        </Button>
+                    </div>
+                ) : null}
                 <Button
                     type="button"
                     variant={night ? "primary" : "outline"}
@@ -253,8 +335,13 @@ export function PanelWall({
                     automations={automations}
                     access={access}
                     onError={setError}
+                    view={view}
+                    density={style.density}
+                    weather={weather}
+                    roomLabels={roomLabels}
                 />
             )}
+            {idle ? <PanelScreensaver weather={weather} onWake={wake} /> : null}
         </div>
     );
 }

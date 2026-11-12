@@ -23,7 +23,10 @@ import { whereNow } from "@polaris/core";
 import { PanelGrid } from "./panel-grid";
 import { useRouter } from "next/navigation";
 import { usePlacesT } from "../use-places-t";
-import type { PanelCard } from "../../lib/panel-layout";
+import type { PanelCard, PanelDensity } from "../../lib/panel-layout";
+import type { ListRoom } from "../../lib/panel-list";
+import { PanelDeviceList } from "./panel-list";
+import type { WeatherState } from "./panel-weather";
 import { useDeviceAct } from "../devices/use-device-act";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LentActionsProvider } from "../devices/lent-actions";
@@ -46,6 +49,7 @@ import {
     GuestCameraCard,
     RoomCard,
     SensorCard,
+    WeatherCard,
     type CardActs
 } from "./panel-cards";
 
@@ -182,7 +186,11 @@ export function PanelBoard({
     access,
     editing = false,
     onCardsChange,
-    onError
+    onError,
+    view = "grid",
+    density = "comfortable",
+    weather = { state: "loading" },
+    roomLabels
 }: {
     placeId: string;
     cards: readonly PanelCard[];
@@ -197,6 +205,12 @@ export function PanelBoard({
     editing?: boolean;
     onCardsChange?: (cards: PanelCard[]) => void;
     onError: (message: string) => void;
+    /** The cards, or every device on them as one list. */
+    view?: "grid" | "list";
+    density?: PanelDensity;
+    weather?: WeatherState;
+    /** The room and floor of each device, for the list's headings. */
+    roomLabels?: readonly ListRoom[];
 }) {
     const t = usePlacesT();
     const router = useRouter();
@@ -297,10 +311,16 @@ export function PanelBoard({
             );
         if (card.type === "action")
             return automationById.get(card.automationId)?.name ?? t("panels.addAction");
+        if (card.type === "weather") return t("panels.weather");
         return t("panels.clock");
     };
+    const listRooms = useMemo<readonly ListRoom[]>(
+        () => roomLabels ?? rooms.map((room) => ({ id: room.id, name: room.name, floor: null })),
+        [roomLabels, rooms]
+    );
     const render = (card: PanelCard) => {
         if (card.type === "clock") return <ClockCard />;
+        if (card.type === "weather") return <WeatherCard weather={weather} />;
         if (card.type === "device") {
             const device = byId.get(card.deviceId);
             return device ? <DeviceTile device={device} acts={acts} /> : <GoneCard />;
@@ -354,11 +374,19 @@ export function PanelBoard({
         return <RoomCard name={room.name} devices={inRoom} acts={acts} />;
     };
 
+    if (view === "list" && !editing)
+        return (
+            <LentActionsProvider lent={lent}>
+                <PanelDeviceList devices={devices} rooms={listRooms} acts={acts} />
+            </LentActionsProvider>
+        );
+
     return (
         <LentActionsProvider lent={lent}>
             <PanelGrid
                 cards={cards}
                 editing={editing}
+                density={density}
                 onChange={(next) => onCardsChange?.(next)}
                 render={render}
                 labelOf={labelOf}

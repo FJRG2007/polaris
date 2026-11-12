@@ -11,18 +11,19 @@
 import { Button, cn } from "@polaris/ui";
 import { usePlacesT } from "../use-places-t";
 import { GripVertical, MoveDiagonal2, X } from "lucide-react";
+import { DENSITY } from "./panel-state";
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
     PANEL_COLUMNS,
     moveCard,
     resizeCard,
     stackOrder,
-    type PanelCard
+    type PanelCard,
+    type PanelDensity
 } from "../../lib/panel-layout";
 
-/** Rows are this tall, in rem: a device tile of two rows has room for a switch
- *  and a slider at a size a finger finds. */
-const ROW_REM = 5.5;
+/* Rows are 5.5rem tall at the comfortable density: a device tile of two rows
+ * has room for a switch and a slider at a size a finger finds (`DENSITY`). */
 
 interface Drag {
     readonly id: string;
@@ -40,7 +41,8 @@ export function PanelGrid({
     onChange,
     render,
     labelOf,
-    extra
+    extra,
+    density = "comfortable"
 }: {
     cards: readonly PanelCard[];
     editing: boolean;
@@ -50,7 +52,9 @@ export function PanelGrid({
     /** A card's own setting while arranging (an automation button's "ask
      *  first"), drawn bottom left over the card. */
     extra?: (card: PanelCard) => ReactNode;
+    density?: PanelDensity;
 }) {
+    const size = DENSITY[density];
     const t = usePlacesT();
     const grid = useRef<HTMLDivElement>(null);
     const [drag, setDrag] = useState<Drag | null>(null);
@@ -62,7 +66,7 @@ export function PanelGrid({
         if (!box) return;
         event.preventDefault();
         (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-        const rowPx = parseFloat(getComputedStyle(document.documentElement).fontSize) * ROW_REM;
+        const rowPx = parseFloat(getComputedStyle(document.documentElement).fontSize) * size.row;
         setDrag({
             id: card.id,
             mode,
@@ -113,13 +117,19 @@ export function PanelGrid({
                 onPointerUp={end}
                 onPointerCancel={end}
                 className={cn(
-                    "grid gap-3",
+                    "grid",
                     // Arranging is done on the wide grid even on a narrow screen,
                     // scrolled sideways inside its box, so what is arranged is
                     // what the wall shows.
                     editing ? "min-w-[48rem] grid-cols-12" : "grid-cols-1 md:grid-cols-12"
                 )}
-                style={{ gridAutoRows: `${ROW_REM}rem` } as CSSProperties}
+                style={
+                    {
+                        gridAutoRows: `${size.row}rem`,
+                        gap: `${size.gap}rem`,
+                        "--panel-pad": `${size.pad}rem`
+                    } as CSSProperties
+                }
             >
                 {(editing ? shown : stackOrder(shown)).map((card) => {
                     const label = labelOf(card);

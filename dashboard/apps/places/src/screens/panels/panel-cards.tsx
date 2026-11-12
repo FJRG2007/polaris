@@ -34,6 +34,7 @@ import * as kinds from "../../lib/device-kinds";
 import { hostUi } from "@polaris/app-host/client";
 import { BatteryMeter } from "../devices/battery-meter";
 import { DeviceControls, DeviceIcon, stateClass } from "../devices/device-panel";
+import { WeatherFace, type WeatherState } from "./panel-weather";
 import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
 
 export interface CardActs {
@@ -47,7 +48,7 @@ function CardFrame({ children, className }: { children: React.ReactNode; classNa
     return (
         <div
             className={cn(
-                "flex h-full min-h-0 min-w-0 flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-4",
+                "flex h-full min-h-0 min-w-0 flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-[var(--panel-pad,1rem)]",
                 className
             )}
         >
@@ -157,6 +158,15 @@ export function ClockCard() {
                       }).format(now)
                     : ""}
             </span>
+        </CardFrame>
+    );
+}
+
+/** The weather at the panel's place now. */
+export function WeatherCard({ weather }: { weather: WeatherState }) {
+    return (
+        <CardFrame className="justify-center">
+            <WeatherFace weather={weather} />
         </CardFrame>
     );
 }

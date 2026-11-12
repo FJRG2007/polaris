@@ -18,6 +18,7 @@ import {
     normalizePanelName,
     panelCardsSchema,
     panelNameSchema,
+    panelStyleSchema,
     type PanelView
 } from "../../lib/panel-layout";
 
@@ -80,6 +81,27 @@ export async function savePanelCardsAction(
         targetType: "placePanel",
         targetId: String(id),
         metadata: { cards: parsed.data.length }
+    });
+    return { panel: result.value };
+}
+
+/** How a panel is drawn on the wall: theme, accent, density, background and
+ *  when its screensaver starts. */
+export async function savePanelStyleAction(
+    id: string,
+    style: unknown
+): Promise<{ panel?: PanelView; error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const parsed = panelStyleSchema.safeParse(style);
+    if (!parsed.success) return { error: await schemaSay(undefined) };
+    const result = await guard(() => panels.savePanelStyle(install.id, String(id), parsed.data));
+    if (result.error) return { error: result.error };
+    await host.auditService.recordAudit({
+        actorId: user.id,
+        action: "places.panel.style",
+        targetType: "placePanel",
+        targetId: String(id),
+        metadata: { ...parsed.data }
     });
     return { panel: result.value };
 }

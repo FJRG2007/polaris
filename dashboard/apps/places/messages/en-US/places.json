@@ -3052,7 +3052,10 @@
         "runConfirm": "Run",
         "runFailed": "That automation could not start. Try again.",
         "sensorSince": "Since {time}",
-        "sensorOffline": "Not answering"
+        "sensorOffline": "Not answering",
+        "weather": "Weather",
+        "addWeather": "Weather",
+        "style": "Style {name}"
     },
     "panelWall": {
         "nightDark": "Dark at night",
@@ -3061,7 +3064,11 @@
         "fullscreen": "Full screen",
         "exitFullscreen": "Leave full screen",
         "reconnecting": "Reconnecting",
-        "empty": "Nothing on this panel yet."
+        "empty": "Nothing on this panel yet.",
+        "view": "View",
+        "viewGrid": "Cards",
+        "viewList": "List",
+        "wake": "Wake the screen"
     },
     "battery": {
         "level": "Battery {percent}%",
@@ -3108,5 +3115,61 @@
         "failed": "Could not start talking. Try again.",
         "ended": "Talking stopped.",
         "rtsp": "To talk through this camera, edit it and choose TP-Link Tapo (Tapo password)."
+    },
+    "panelWeather": {
+        "clear": "Clear sky",
+        "partly": "Partly cloudy",
+        "cloudy": "Cloudy",
+        "fog": "Fog",
+        "drizzle": "Drizzle",
+        "rain": "Rain",
+        "snow": "Snow",
+        "storm": "Thunderstorm",
+        "unknown": "Weather",
+        "range": "High {high}, low {low}",
+        "failed": "Weather is not available right now.",
+        "noLocation": "Set where this place is to see its weather."
+    },
+    "panelList": {
+        "search": "Search this panel",
+        "count": "{count, plural, one {# device} other {# devices}}",
+        "label": "Devices on this panel",
+        "noMatch": "No devices match.",
+        "empty": "No devices on this panel.",
+        "noRoom": "No room",
+        "roomOnFloor": "{room}, {floor}"
+    },
+    "panelStyle": {
+        "title": "Panel look",
+        "description": "How this panel looks on the wall.",
+        "theme": "Theme",
+        "accent": "Accent",
+        "density": "Density",
+        "background": "Background",
+        "screensaver": "Screensaver",
+        "screensaverOff": "Never",
+        "screensaverAfter": "{count, plural, one {After # minute} other {After # minutes}}",
+        "themes": {
+            "auto": "Same as the app",
+            "light": "Light",
+            "dark": "Dark"
+        },
+        "accents": {
+            "default": "Theme's own",
+            "blue": "Blue",
+            "teal": "Turquoise",
+            "green": "Green",
+            "amber": "Amber",
+            "rose": "Rose"
+        },
+        "densities": {
+            "comfortable": "Comfortable",
+            "compact": "Compact"
+        },
+        "backgrounds": {
+            "plain": "Plain",
+            "tinted": "Tinted",
+            "gradient": "Gradient"
+        }
     }
 }

@@ -27,7 +27,11 @@ export default async function GuestKeyPage({
         if (panel.standing !== "live") notFound();
         return (
             <PanelWall
+                id={panel.panel.id}
                 name={panel.panel.name}
+                style={panel.panel.style}
+                weatherUrl={`/api/home/keys/${encodeURIComponent(token)}/weather`}
+                roomLabels={panel.roomLabels}
                 placeId={panel.panel.placeId}
                 cards={panel.panel.cards}
                 devices={panel.devices}

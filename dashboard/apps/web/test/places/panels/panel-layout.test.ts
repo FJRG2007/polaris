@@ -39,7 +39,7 @@ describe("panel cards schema", () => {
     });
 
     it("refuses an unknown card type and a device id that is not one", () => {
-        expect(panelCardsSchema.safeParse([{ ...clock, type: "weather" }]).success).toBe(false);
+        expect(panelCardsSchema.safeParse([{ ...clock, type: "chart" }]).success).toBe(false);
         expect(panelCardsSchema.safeParse([{ ...lamp, deviceId: "x" }]).success).toBe(false);
     });
 

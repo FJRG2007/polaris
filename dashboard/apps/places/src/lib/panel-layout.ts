@@ -23,7 +23,15 @@ export const PANEL_CARDS = 48;
 export const PANELS_PER_PLACE = 20;
 export const PANEL_NAME_MAX = 60;
 
-export const PANEL_CARD_TYPES = ["device", "room", "clock", "camera", "action", "sensor"] as const;
+export const PANEL_CARD_TYPES = [
+    "device",
+    "room",
+    "clock",
+    "camera",
+    "action",
+    "sensor",
+    "weather"
+] as const;
 export type PanelCardType = (typeof PANEL_CARD_TYPES)[number];
 
 /** Smallest and default size of each kind of card, in cells. */
@@ -35,7 +43,8 @@ export const CARD_SIZES: Readonly<
     clock: { minW: 2, minH: 1, w: 3, h: 2 },
     camera: { minW: 3, minH: 2, w: 4, h: 3 },
     action: { minW: 2, minH: 1, w: 3, h: 1 },
-    sensor: { minW: 2, minH: 2, w: 3, h: 2 }
+    sensor: { minW: 2, minH: 2, w: 3, h: 2 },
+    weather: { minW: 2, minH: 2, w: 3, h: 2 }
 };
 
 const cell = z.number().int();
@@ -63,7 +72,9 @@ export const panelCardSchema = z
         }),
         // One device's reading, large. A device card shows it too, smaller and
         // among its controls.
-        z.object({ ...box, type: z.literal("sensor"), deviceId: z.string().uuid() })
+        z.object({ ...box, type: z.literal("sensor"), deviceId: z.string().uuid() }),
+        // The weather at the panel's place, from the place's location.
+        z.object({ ...box, type: z.literal("weather") })
     ])
     .refine((card) => card.x + card.w <= PANEL_COLUMNS, "A card runs past the panel's edge")
     .refine((card) => card.y + card.h <= PANEL_ROWS, "A card runs past the panel's edge")
@@ -109,12 +120,69 @@ export function storedCards(value: unknown): PanelCard[] {
     return parsed.success ? parsed.data : [];
 }
 
+export const PANEL_THEMES = ["auto", "light", "dark"] as const;
+export const PANEL_ACCENTS = ["default", "blue", "teal", "green", "amber", "rose"] as const;
+export const PANEL_DENSITIES = ["comfortable", "compact"] as const;
+export const PANEL_BACKGROUNDS = ["plain", "tinted", "gradient"] as const;
+/** Minutes without a touch before the screensaver starts; 0 is never. */
+export const SCREENSAVER_MINUTES = [0, 1, 5, 10, 30] as const;
+
+export type PanelTheme = (typeof PANEL_THEMES)[number];
+export type PanelAccent = (typeof PANEL_ACCENTS)[number];
+export type PanelDensity = (typeof PANEL_DENSITIES)[number];
+export type PanelBackground = (typeof PANEL_BACKGROUNDS)[number];
+export type ScreensaverMinutes = (typeof SCREENSAVER_MINUTES)[number];
+
+const screensaverField = z.union([
+    z.literal(0),
+    z.literal(1),
+    z.literal(5),
+    z.literal(10),
+    z.literal(30)
+]);
+
+/** How a panel is drawn, as it is saved. Every field is required on a save. */
+export const panelStyleSchema = z.object({
+    theme: z.enum(PANEL_THEMES),
+    accent: z.enum(PANEL_ACCENTS),
+    density: z.enum(PANEL_DENSITIES),
+    background: z.enum(PANEL_BACKGROUNDS),
+    screensaver: screensaverField
+});
+export type PanelStyle = z.infer<typeof panelStyleSchema>;
+
+/** A panel nobody styled: the reader's own theme, as panels always looked,
+ *  and the screensaver after ten minutes without a touch. */
+export const DEFAULT_PANEL_STYLE: PanelStyle = {
+    theme: "auto",
+    accent: "default",
+    density: "comfortable",
+    background: "plain",
+    screensaver: 10
+};
+
+const storedStyleSchema = z.object({
+    theme: z.enum(PANEL_THEMES).catch(DEFAULT_PANEL_STYLE.theme),
+    accent: z.enum(PANEL_ACCENTS).catch(DEFAULT_PANEL_STYLE.accent),
+    density: z.enum(PANEL_DENSITIES).catch(DEFAULT_PANEL_STYLE.density),
+    background: z.enum(PANEL_BACKGROUNDS).catch(DEFAULT_PANEL_STYLE.background),
+    screensaver: screensaverField.catch(DEFAULT_PANEL_STYLE.screensaver)
+});
+
+/** A stored style, read back field by field: one missing or unknown (an older
+ *  row, a newer build) reads as its default and keeps the rest. */
+export function storedStyle(value: unknown): PanelStyle {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return storedStyleSchema.parse(source);
+}
+
 /** A panel as a screen sees it. */
 export interface PanelView {
     readonly id: string;
     readonly placeId: string;
     readonly name: string;
     readonly cards: readonly PanelCard[];
+    readonly style: PanelStyle;
 }
 
 /** The devices a panel shows: its device cards, and every device in its rooms.
@@ -234,7 +302,8 @@ export type NewCard =
     | { readonly type: "clock" }
     | { readonly type: "camera"; readonly cameraId: string }
     | { readonly type: "action"; readonly automationId: string; readonly confirm: boolean }
-    | { readonly type: "sensor"; readonly deviceId: string };
+    | { readonly type: "sensor"; readonly deviceId: string }
+    | { readonly type: "weather" };
 
 /** A card added at its default size in the first free box, or the cards
  *  unchanged when the panel has no room left. */
