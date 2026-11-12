@@ -455,14 +455,13 @@ const nextConfig = {
         // postbuild check fails the build if any path still gets through.
         if (!isServer) config.plugins.push(new PortableImportMetaUrl(workspaceRoot, webpack));
         // The production compile cache is carried from one CI build to the next
-        // (dashboard-publish.yml, dashboard-ci.yml), and webpack keeps an entry it
-        // has not used for 60 days by default. Minified chunks are stored by their
-        // content hash, so every commit added entries no later build asks for: the
-        // image's copy passed 5 GB, and restoring, copying and exporting it cost a
-        // publish more time than the compile it saved. Each build marks what it
-        // reads as used, so a short age still keeps everything the current tree
-        // needs. Two days was too long once main took hundreds of commits a day:
-        // the copy reached 16 GB and moving it cost a publish about nine minutes.
+        // (dashboard-ci.yml), and webpack keeps an entry it has not used for 60
+        // days by default. Minified chunks are stored by their content hash, so
+        // every commit added entries no later build asks for. Each build marks what
+        // it reads as used, so a short age still keeps everything the current tree
+        // needs. Webpack drops at most one stale pack per build, though, so this
+        // only slows the growth: the image build stopped carrying its copy once it
+        // sat at 16 GB (dashboard-publish.yml).
         if (!dev && config.cache && typeof config.cache === "object") {
             config.cache.maxAge = WEBPACK_CACHE_MAX_AGE_MS;
         }
