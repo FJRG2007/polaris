@@ -456,10 +456,14 @@ label.setting {
     text-align: left;
     justify-content: space-between;
     gap: 12px;
-    border: 1px solid var(--line);
     border-radius: 8px;
-    background: var(--surface);
     padding: 10px 12px;
+}
+
+/* Rows of switches read as one list: no box around each, only a tint under
+   the one the pointer is on. */
+label.setting:hover {
+    background: color-mix(in srgb, var(--text) 5%, transparent);
 }
 
 .setting-text {
@@ -521,6 +525,49 @@ dialog {
     background: var(--surface);
     color: var(--text);
     padding: 16px;
+}
+
+dialog.wide {
+    width: min(420px, calc(100vw - 32px));
+}
+
+.transfer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 20px;
+}
+
+.transfer .hint {
+    margin: 0 0 4px;
+}
+
+svg.qr {
+    display: block;
+    width: min(320px, 100%);
+    height: auto;
+    margin: 0 auto 14px;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+video.scan {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    margin-bottom: 14px;
+    border-radius: 8px;
+    background: #000000;
+    object-fit: cover;
+}
+
+dialog textarea {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+    word-break: break-all;
 }
 
 dialog::backdrop {
