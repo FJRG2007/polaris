@@ -81,5 +81,8 @@
         "intl-messageformat": "12.1.3",
         "ipaddr.js": "2.2.0",
         "zod": "3.25.76"
+    },
+    "devDependencies": {
+        "jsqr": "1.4.0"
     }
 }

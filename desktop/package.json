@@ -1,7 +1,7 @@
 {
     "name": "polaris-desktop",
     "productName": "Polaris",
-    "version": "0.1.25",
+    "version": "0.1.26",
     "private": true,
     "description": "Polaris for Windows, macOS and Linux: an instance in its own window, local pushes and native notifications.",
     "author": "FJRG2007 <fjrg2007@tpeoficial.com>",
@@ -39,6 +39,7 @@
     "dependencies": {
         "@noble/curves": "2.4.0",
         "fflate": "0.8.3",
+        "jsqr": "1.4.0",
         "zod": "4.6.7"
     }
 }

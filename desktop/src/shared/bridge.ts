@@ -25,6 +25,11 @@ import type { VoiceAction, VoiceState, WidgetView } from "./voice-widget";
 
 export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly error: string; };
 
+/** What taking in a list of hosts did. An error of null means it was cancelled. */
+export type HostImport =
+    | { readonly ok: true; readonly added: number; readonly named: number; readonly skipped: number; }
+    | { readonly ok: false; readonly error: string | null; };
+
 /** What the live check found about a typed address: whether it is a Polaris
  *  that can be opened, and the line to show. Null when it was cancelled by a
  *  newer address. */
@@ -298,6 +303,14 @@ export interface PolarisLocal {
         relaunch(): Promise<Outcome>;
         /** Put the settings away. */
         close(): Promise<void>;
+        /** Put the list of hosts on the clipboard as a code. */
+        copyHosts(): Promise<{ readonly ok: boolean; readonly count: number; }>;
+        /** Write the list of hosts to a file somebody picks. */
+        exportHostsFile(): Promise<HostImport>;
+        /** Take in a list of hosts from a file somebody picks. */
+        importHostsFile(): Promise<HostImport>;
+        /** Take in a list of hosts from a pasted or scanned code. */
+        importHosts(text: string): Promise<HostImport>;
         /** Ask for a newer version of this app now and say what was found. */
         checkForUpdates(): Promise<UpdateCheck>;
         /** Restart into the version that is installed and waiting. */
@@ -544,6 +557,10 @@ export const CHANNELS = {
     connectSwitch: "local:connect-switch",
     connectRename: "local:connect-rename",
     connectRemove: "local:connect-remove",
+    connectHostsCopy: "local:connect-hosts-copy",
+    connectHostsExport: "local:connect-hosts-export",
+    connectHostsOpen: "local:connect-hosts-open",
+    connectHostsImport: "local:connect-hosts-import",
     connectCheck: "local:connect-check",
     connectClose: "local:connect-close",
     connectCheckUpdates: "local:connect-check-updates",

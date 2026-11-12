@@ -36,6 +36,7 @@ import {
     type GameActivity,
     type Outcome,
     type PickedFolder,
+    type HostImport,
     type Preferences,
     type PreferenceToggle,
     type SystemIdle
@@ -79,6 +80,13 @@ export interface IpcHost extends PushHost {
     readonly switchServer: (origin: string) => Promise<Outcome>;
     readonly nameServer: (origin: string, name: string) => Outcome;
     readonly removeServer: (origin: string) => Outcome;
+    /** Moving the list of hosts to and from another device. */
+    readonly hosts: {
+        readonly copy: () => { ok: boolean; count: number };
+        readonly exportFile: (parent: BrowserWindow | null) => Promise<HostImport>;
+        readonly importFile: (parent: BrowserWindow | null) => Promise<HostImport>;
+        readonly take: (text: string) => HostImport;
+    };
     /** Put the settings away, from the page itself. */
     readonly closeConnect: () => void;
     /** The window that adds, names, removes and switches servers. */
@@ -574,6 +582,21 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.connectRemove, (event, raw: unknown) => {
         const origin = listedSchema.safeParse(raw);
         return from(event, "connect") && origin.success ? host.removeServer(origin.data) : REFUSED;
+    });
+    // Moving the list: only the settings window asks, and only text crosses in.
+    const HOSTS_REFUSED: HostImport = { ok: false, error: "Polaris could not do that. Try again." };
+    ipcMain.handle(CHANNELS.connectHostsCopy, (event) =>
+        from(event, "connect") ? host.hosts.copy() : { ok: false, count: 0 }
+    );
+    ipcMain.handle(CHANNELS.connectHostsExport, (event) =>
+        from(event, "connect") ? host.hosts.exportFile(BrowserWindow.fromWebContents(event.sender)) : HOSTS_REFUSED
+    );
+    ipcMain.handle(CHANNELS.connectHostsOpen, (event) =>
+        from(event, "connect") ? host.hosts.importFile(BrowserWindow.fromWebContents(event.sender)) : HOSTS_REFUSED
+    );
+    ipcMain.handle(CHANNELS.connectHostsImport, (event, raw: unknown) => {
+        const text = z.string().max(65536).safeParse(raw);
+        return from(event, "connect") && text.success ? host.hosts.take(text.data) : HOSTS_REFUSED;
     });
 
     ipcMain.handle(CHANNELS.keyState, (event) => (from(event, "api-key") ? keyFormState() : null));

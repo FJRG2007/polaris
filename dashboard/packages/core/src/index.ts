@@ -26,6 +26,8 @@ export * from "./minecraft-software.js";
 export * from "./size-units.js";
 export * from "./probe-timeout.js";
 export * from "./hostnames.js";
+export * from "./host-list.js";
+export * from "./qr.js";
 export * from "./local-network.js";
 export * from "./mac-address.js";
 export * from "./names.js";

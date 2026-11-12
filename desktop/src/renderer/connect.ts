@@ -18,6 +18,10 @@ import { available, byId, say } from "./dom";
 import { serverAddressSchema } from "@/shared/server-address";
 import { describeUpdateCheck } from "@/shared/update-check";
 import { describeServer, normalizeServerName, SERVER_NAME_MAX, type ServerRow } from "@/shared/servers";
+import { encodeHostList, HOST_LIST_PREFIX } from "../../../dashboard/packages/core/src/host-list";
+import { encodeQr, qrSvgPath } from "../../../dashboard/packages/core/src/qr";
+import type { HostImport } from "@/shared/bridge";
+import jsQR from "jsqr";
 
 const form = byId<HTMLFormElement>("form");
 const input = byId<HTMLInputElement>("address");
@@ -213,7 +217,10 @@ function viewRow(server: ServerRow, row: HTMLLIElement): void {
     const acts = document.createElement("div");
     acts.className = "acts";
     acts.append(
-        iconButton(`Rename ${label}`, PENCIL, () => editRow(server, row)),
+        // A host with no name says so in words: a pencil alone was easy to miss.
+        server.name
+            ? iconButton(`Rename ${label}`, PENCIL, () => editRow(server, row))
+            : textButton("Add a name", () => editRow(server, row)),
         iconButton(`Remove ${label}`, BIN, () => askRemove(server))
     );
     row.replaceChildren(open, acts);
@@ -275,6 +282,10 @@ function draw(servers: readonly ServerRow[]): void {
     known = servers.length;
     rows = servers;
     list.hidden = servers.length === 0;
+    // Exporting needs something to export; taking a list in never does.
+    for (const button of document.querySelectorAll<HTMLButtonElement>("[data-needs-hosts]")) {
+        button.hidden = servers.length === 0;
+    }
     tabs.hidden = servers.length === 0;
     title.textContent = servers.length === 0 ? "Open your Polaris" : "Polaris";
     if (first || servers.length === 0) showForm(servers.length === 0);
@@ -306,12 +317,168 @@ if (new URLSearchParams(location.search).has("sheet")) {
     cross.hidden = false;
     cross.addEventListener("click", closeSheet);
     document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && !event.defaultPrevented && !removeDialog.open && !restartDialog.open) closeSheet();
+        if (event.key === "Escape" && !event.defaultPrevented && !document.querySelector("dialog[open]")) closeSheet();
     });
     document.body.addEventListener("mousedown", (event) => {
         if (event.target === document.body) closeSheet();
     });
 }
+
+// ---- Moving the list to and from another device ----
+
+const transferNote = byId<HTMLParagraphElement>("transfer-note");
+const qrDialog = byId<HTMLDialogElement>("qr-dialog");
+const scanDialog = byId<HTMLDialogElement>("scan-dialog");
+const scanVideo = byId<HTMLVideoElement>("scan-video");
+const scanNote = byId<HTMLParagraphElement>("scan-note");
+const pasteDialog = byId<HTMLDialogElement>("paste-dialog");
+const pasteText = byId<HTMLTextAreaElement>("paste-text");
+const pasteError = byId<HTMLParagraphElement>("paste-error");
+const pasteConfirm = byId<HTMLButtonElement>("paste-confirm");
+
+function plural(count: number, one: string, many: string): string {
+    return `${count} ${count === 1 ? one : many}`;
+}
+
+/** What a list taken in did, in one line; null when it was cancelled. */
+function describeImport(outcome: HostImport): string | null {
+    if (!outcome.ok) return outcome.error;
+    const parts: string[] = [];
+    if (outcome.added) parts.push(`${plural(outcome.added, "host", "hosts")} added`);
+    if (outcome.named) parts.push(`${plural(outcome.named, "host", "hosts")} named`);
+    if (outcome.skipped) parts.push(`${outcome.skipped} left out: the list is full`);
+    return parts.length ? `${parts.join(", ")}.` : "Every host in it was already on your list.";
+}
+
+async function afterImport(outcome: HostImport): Promise<void> {
+    say(transferNote, describeImport(outcome));
+    if (outcome.ok) await refresh();
+}
+
+function showQr(): void {
+    const modules = encodeQr(encodeHostList(rows));
+    const svg = byId<HTMLElement>("qr-code") as unknown as SVGSVGElement;
+    byId("qr-too-long").hidden = modules !== null;
+    svg.style.display = modules ? "" : "none";
+    if (modules) {
+        const { path, size } = qrSvgPath(modules);
+        svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+        const drawn = document.createElementNS(SVG, "path");
+        drawn.setAttribute("d", path);
+        drawn.setAttribute("fill", "#000000");
+        svg.replaceChildren(drawn);
+    }
+    qrDialog.showModal();
+}
+
+let scanStream: MediaStream | null = null;
+let scanFrame = 0;
+
+function stopScan(): void {
+    cancelAnimationFrame(scanFrame);
+    for (const track of scanStream?.getTracks() ?? []) track.stop();
+    scanStream = null;
+    scanVideo.srcObject = null;
+    if (scanDialog.open) scanDialog.close();
+}
+
+/** Read frames until one holds a list of hosts; anything else is ignored. */
+function readFrames(canvas: HTMLCanvasElement): void {
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    const frame = () => {
+        if (!scanStream || !context) return;
+        if (scanVideo.readyState >= scanVideo.HAVE_CURRENT_DATA && scanVideo.videoWidth > 0) {
+            canvas.width = scanVideo.videoWidth;
+            canvas.height = scanVideo.videoHeight;
+            context.drawImage(scanVideo, 0, 0);
+            const image = context.getImageData(0, 0, canvas.width, canvas.height);
+            const found = jsQR(image.data, image.width, image.height, { inversionAttempts: "dontInvert" });
+            if (found?.data.startsWith(HOST_LIST_PREFIX)) {
+                stopScan();
+                void window.polarisLocal.connect.importHosts(found.data).then(afterImport, () => undefined);
+                return;
+            }
+            if (found) say(scanNote, "That QR is not a list of Polaris hosts.");
+        }
+        scanFrame = requestAnimationFrame(frame);
+    };
+    scanFrame = requestAnimationFrame(frame);
+}
+
+async function startScan(): Promise<void> {
+    say(transferNote, null);
+    say(scanNote, "Hold the other device's QR up to the camera.");
+    scanDialog.showModal();
+    try {
+        scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+    } catch {
+        say(scanNote, "Polaris could not use a camera. Check that one is connected and allowed, or use Paste code.");
+        return;
+    }
+    if (!scanDialog.open) {
+        stopScan();
+        return;
+    }
+    scanVideo.srcObject = scanStream;
+    await scanVideo.play().catch(() => undefined);
+    readFrames(document.createElement("canvas"));
+}
+
+function checkPaste(): boolean {
+    const text = pasteText.value.trim();
+    available(pasteConfirm, text !== "");
+    return text !== "";
+}
+
+async function confirmPaste(): Promise<void> {
+    if (!checkPaste()) return;
+    const outcome = await window.polarisLocal.connect.importHosts(pasteText.value).catch(() => null);
+    if (!outcome || !outcome.ok) {
+        say(pasteError, outcome?.error ?? "Something went wrong. Try again.");
+        return;
+    }
+    pasteDialog.close();
+    await afterImport(outcome);
+}
+
+byId("hosts-qr").addEventListener("click", showQr);
+byId("qr-close").addEventListener("click", () => qrDialog.close());
+byId("hosts-scan").addEventListener("click", () => void startScan());
+byId("scan-cancel").addEventListener("click", stopScan);
+scanDialog.addEventListener("close", stopScan);
+byId("hosts-copy").addEventListener("click", () => {
+    void window.polarisLocal.connect.copyHosts().then(
+        (copied) => say(transferNote, copied.ok ? `Code for ${plural(copied.count, "host", "hosts")} copied. Paste it on the other device.` : "Polaris could not copy the code."),
+        () => say(transferNote, "Polaris could not copy the code.")
+    );
+});
+byId("hosts-paste").addEventListener("click", () => {
+    say(transferNote, null);
+    pasteText.value = "";
+    say(pasteError, null);
+    checkPaste();
+    pasteDialog.showModal();
+    pasteText.focus();
+});
+pasteText.addEventListener("input", () => {
+    say(pasteError, null);
+    checkPaste();
+});
+byId("paste-cancel").addEventListener("click", () => pasteDialog.close());
+pasteConfirm.addEventListener("click", () => void confirmPaste());
+byId("hosts-export").addEventListener("click", () => {
+    say(transferNote, null);
+    void window.polarisLocal.connect.exportHostsFile().then(
+        (outcome) => say(transferNote, outcome.ok ? "Hosts exported." : outcome.error),
+        () => say(transferNote, "Something went wrong. Try again.")
+    );
+});
+byId("hosts-import").addEventListener("click", () => {
+    say(transferNote, null);
+    void window.polarisLocal.connect.importHostsFile().then(afterImport, () =>
+        say(transferNote, "Something went wrong. Try again.")
+    );
+});
 
 showAdd.addEventListener("click", () => showForm(true));
 hideAdd.addEventListener("click", () => showForm(false));

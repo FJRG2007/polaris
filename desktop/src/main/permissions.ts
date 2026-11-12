@@ -22,6 +22,20 @@ const GRANTED = new Set([
     "display-capture"
 ]);
 
+/**
+ * What the app's own pages are given, which is only ever one thing: the camera
+ * to the settings window, to read a QR of hosts off another device. Video and
+ * nothing else - never the microphone - and no other page of ours.
+ */
+export function allowLocalPermission(
+    permission: string,
+    kind: string | null,
+    mediaTypes: readonly string[] | undefined
+): boolean {
+    if (permission !== "media" || kind !== "connect") return false;
+    return mediaTypes === undefined || (mediaTypes.length > 0 && mediaTypes.every((type) => type === "video"));
+}
+
 export function allowPermission(permission: string, requestingUrl: string, serverOrigin: string | null): boolean {
     if (!serverOrigin || !GRANTED.has(permission)) return false;
     try {

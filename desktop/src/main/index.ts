@@ -34,7 +34,8 @@ import { watchForUpdates, type FirstCheck, type Update } from "./updates";
 import { updateBeforeOpening, type Opening } from "./update-first";
 import { UpdateReadyState } from "./update-ready";
 import { CHANNELS, type AddressCheck, type Outcome } from "@/shared/bridge";
-import { allowPermission } from "./permissions";
+import { allowLocalPermission, allowPermission } from "./permissions";
+import * as hostTransfer from "./host-transfer";
 import { handledSquirrelEvent } from "./squirrel";
 import { installScreenShare } from "./screen-share";
 import { installTray } from "./tray";
@@ -570,6 +571,15 @@ async function switchOrSayWhy(origin: string): Promise<boolean> {
     return false;
 }
 
+/** The kept list as the transfer reads and writes it. */
+const hostStore: hostTransfer.HostStore = {
+    saved: () => savedServers(),
+    keep: (servers) => {
+        setSavedServers(servers);
+        refreshMenu();
+    }
+};
+
 function nameServer(origin: string, typed: string): Outcome {
     const name = normalizeServerName(typed);
     if (name && name.length > SERVER_NAME_MAX) return { ok: false, error: `Use at most ${SERVER_NAME_MAX} characters.` };
@@ -656,11 +666,15 @@ function start(): void {
             }
             callback(verdict);
         });
-        session.defaultSession.setPermissionRequestHandler((_contents, permission, callback, details) => {
+        session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+            const mediaTypes = "mediaTypes" in details ? details.mediaTypes : undefined;
+            if (allowLocalPermission(permission, kindOf(contents), mediaTypes)) return callback(true);
             callback(allowPermission(permission, details.requestingUrl, server()));
         });
-        session.defaultSession.setPermissionCheckHandler((_contents, permission, requestingOrigin) =>
-            allowPermission(permission, requestingOrigin, server())
+        session.defaultSession.setPermissionCheckHandler(
+            (contents, permission, requestingOrigin) =>
+                (contents !== null && allowLocalPermission(permission, kindOf(contents), undefined)) ||
+                allowPermission(permission, requestingOrigin, server())
         );
 
         registerIpc({
@@ -709,6 +723,12 @@ function start(): void {
             switchServer,
             nameServer,
             removeServer,
+            hosts: {
+                copy: () => hostTransfer.copyHosts(hostStore),
+                exportFile: (parent) => hostTransfer.saveHostsFile(hostStore, parent),
+                importFile: (parent) => hostTransfer.importHostsFile(hostStore, parent),
+                take: (text) => hostTransfer.importHosts(hostStore, text)
+            },
             closeConnect,
             openServers: openConnect,
             updates,
