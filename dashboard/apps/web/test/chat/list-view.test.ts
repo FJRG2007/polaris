@@ -2,7 +2,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    autoDetailed,
     COMPACT_PANE,
+    DETAILED_HYSTERESIS,
     DETAILED_FROM,
     DETAILED_PANE,
     drawsDetailed,
@@ -30,6 +32,28 @@ describe("the list view setting", () => {
         expect(["auto", "compact", "detailed"].every(isChatListView)).toBe(true);
         expect(isChatListView("wide")).toBe(false);
         expect(isChatListView(null)).toBe(false);
+    });
+});
+
+describe("auto at the edge", () => {
+    it("goes detailed at the threshold and stays so through a scrollbar's width", () => {
+        expect(autoDetailed(false, DETAILED_FROM - 1)).toBe(false);
+        expect(autoDetailed(false, DETAILED_FROM)).toBe(true);
+        // The detailed rows bring a scrollbar in, 17 px at most on a desktop.
+        expect(autoDetailed(true, DETAILED_FROM - 17)).toBe(true);
+        expect(autoDetailed(true, DETAILED_FROM - DETAILED_HYSTERESIS - 1)).toBe(false);
+    });
+
+    it("settles instead of flipping when its own scrollbar narrows it", () => {
+        // Detailed rows overflow and take 10 px; compact ones fit and give it back.
+        const pane = DETAILED_FROM + 4;
+        let detailed = false;
+        const seen: boolean[] = [];
+        for (let frame = 0; frame < 10; frame += 1) {
+            detailed = autoDetailed(detailed, detailed ? pane - 10 : pane);
+            seen.push(detailed);
+        }
+        expect(new Set(seen.slice(1)).size).toBe(1);
     });
 });
 

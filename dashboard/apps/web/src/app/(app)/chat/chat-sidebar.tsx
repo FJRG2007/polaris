@@ -55,7 +55,7 @@ import { useRemoveFriend } from "./remove-friend";
 import { DuplicateChannelDialog } from "./duplicate-channel-dialog";
 import { InviteDialog } from "./invite-dialog";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { drawsDetailed, listTime, useChatListView, type ChatListView } from "./list-view";
+import { autoDetailed, drawsDetailed, listTime, useChatListView, type ChatListView } from "./list-view";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import { reordered, useRailDrag, type Dragging, type DropTarget } from "./use-rail-drag";
@@ -269,17 +269,27 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
     const [shelf, setShelf] = useState<LockShelf>("all");
     const { hideLocked } = useChatLock().state;
     const [listView, chooseListView] = useChatListView();
-    const directList = useRef<HTMLDivElement>(null);
-    const [listWidth, setListWidth] = useState(0);
-    // The width the rows actually have, which is what "auto" decides by.
-    useEffect(() => {
-        const node = directList.current;
+    // Whether "auto" draws the detailed rows, decided by the width the rows
+    // actually have. Kept as the decision rather than the width, so it moves
+    // with a margin (see `autoDetailed`) and a resize that changes nothing
+    // renders nothing.
+    const [wide, setWide] = useState(false);
+    const watcher = useRef<ResizeObserver | null>(null);
+    // A callback ref, so the list is watched from the moment it is drawn -
+    // it comes and goes with its folded section - and once, rather than
+    // subscribed afresh on every render.
+    const directList = useCallback((node: HTMLDivElement | null) => {
+        watcher.current?.disconnect();
+        watcher.current = null;
         if (!node || typeof ResizeObserver === "undefined") return;
-        const watch = new ResizeObserver(([entry]) => setListWidth(entry?.contentRect.width ?? 0));
+        const watch = new ResizeObserver(([entry]) => {
+            const width = entry?.contentRect.width ?? 0;
+            setWide((was) => autoDetailed(was, width));
+        });
         watch.observe(node);
-        return () => watch.disconnect();
-    });
-    const detailed = drawsDetailed(listView, listWidth);
+        watcher.current = watch;
+    }, []);
+    const detailed = listView === "auto" ? wide : drawsDetailed(listView, 0);
     const [newDirect, setNewDirect] = useState(false);
     const [newChannelIn, setNewChannelIn] = useState<{
         space: ChatSpaceView;

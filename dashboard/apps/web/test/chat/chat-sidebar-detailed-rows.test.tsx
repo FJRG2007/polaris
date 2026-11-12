@@ -171,6 +171,14 @@ describe("the conversation list dragged wide", () => {
         expect(document.querySelectorAll("time")).toHaveLength(2);
     });
 
+    it("keeps the detailed rows when its scrollbar takes a few pixels", () => {
+        render(<ChatSidebar />, { wrapper: MessagesWrapper });
+        dragTo(DETAILED_FROM + 2);
+        expect(screen.getByText("See you at nine")).toBeTruthy();
+        dragTo(DETAILED_FROM - 8);
+        expect(screen.getByText("See you at nine")).toBeTruthy();
+    });
+
     it("goes back to compact when it is narrowed again", () => {
         render(<ChatSidebar />, { wrapper: MessagesWrapper });
         dragTo(DETAILED_FROM + 40);

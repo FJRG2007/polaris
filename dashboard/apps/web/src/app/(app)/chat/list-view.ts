@@ -23,6 +23,25 @@ export function isChatListView(value: unknown): value is ChatListView {
     return value === "auto" || value === "compact" || value === "detailed";
 }
 
+/**
+ * How far below DETAILED_FROM "auto" goes before it gives the detailed rows up.
+ *
+ * Without it the list can flip for ever: detailed rows are taller, so they bring
+ * the pane's scrollbar in, the scrollbar takes its width off the rows, the rows
+ * are now under the line and go compact, the scrollbar leaves, the width is
+ * back over the line - every frame, which is a window that stops answering.
+ * Wider than any scrollbar a desktop draws.
+ */
+export const DETAILED_HYSTERESIS = 24;
+
+/**
+ * Whether "auto" draws the detailed rows at this width, given what it drew
+ * before: in at DETAILED_FROM, out only once well below it.
+ */
+export function autoDetailed(wasDetailed: boolean, width: number): boolean {
+    return width >= (wasDetailed ? DETAILED_FROM - DETAILED_HYSTERESIS : DETAILED_FROM);
+}
+
 /** Whether a list this wide, under this setting, draws the detailed rows. */
 export function drawsDetailed(view: ChatListView, width: number): boolean {
     return view === "detailed" || (view === "auto" && width >= DETAILED_FROM);
