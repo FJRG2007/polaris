@@ -12,8 +12,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { open, stat } from "node:fs/promises";
 import { backgroundUser } from "@/lib/session";
 import type { UpdateLogTail } from "@/lib/update-log";
-import { UPDATE_LOG_PATH as LOG_PATH } from "@/lib/update-runner";
+import { lastUpdateOutcome, UPDATE_LOG_PATH as LOG_PATH } from "@/lib/update-runner";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { currentUpdateRun } from "@/lib/update-timing-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +34,11 @@ export async function GET(request: NextRequest): Promise<Response> {
     // no-downtime rollover both the old and the new one serve for a few seconds, so
     // the caller learns the update landed as soon as a request reaches the new one.
     const build = (process.env.POLARIS_BUILD_SHA ?? "").trim() || null;
+    // Settled here as well as on the watcher's tick: the poll from the screen
+    // is what reaches the new build first, so this is where a run is measured.
+    const run = await lastUpdateOutcome()
+        .then((outcome) => currentUpdateRun(outcome))
+        .catch(() => null);
 
     const notReadable = NextResponse.json({
         exists: false,
@@ -44,7 +50,8 @@ export async function GET(request: NextRequest): Promise<Response> {
         finished: false,
         updatedAt: 0,
         now: Date.now(),
-        build
+        build,
+        run
     } satisfies UpdateLogTail);
     const info = await stat(LOG_PATH).catch(() => null);
     if (!info || !info.isFile()) return notReadable;
@@ -97,7 +104,8 @@ export async function GET(request: NextRequest): Promise<Response> {
             finished: match !== null,
             updatedAt: info.mtimeMs,
             now: Date.now(),
-            build
+            build,
+            run
         } satisfies UpdateLogTail);
     } finally {
         await handle.close();

@@ -3853,6 +3853,12 @@
             "ownVulnsUpdate": "Updating installs freshly built images on patched base images.",
             "ownVulnsLink": "See findings"
         },
+        "progress": {
+            "label": "Update progress",
+            "left": "About {minutes, plural, one {# minute} other {# minutes}} left",
+            "almost": "Less than a minute left",
+            "longer": "Taking longer than usual"
+        },
         "run": {
             "starting": "The update is starting; waiting for it to report.",
             "reattached": "Reattached to an update already running.",

@@ -52,6 +52,8 @@ const { SettingsView } = await import("@/app/(app)/admin/settings/settings-view"
 
 /** The build each successive log poll is answered by, in order; the last repeats. */
 let answeredBy: string[] = [];
+/** The run timing the logs answer carries, or none. */
+let runTiming: { startedAt: number; estimateMs: number } | null = null;
 const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/api/updates/logs")) {
@@ -68,7 +70,8 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
             finished: false,
             updatedAt: now,
             now,
-            build
+            build,
+            run: runTiming
         });
     }
     return new Response("starting", { status: 502 });
@@ -78,6 +81,7 @@ const reload = vi.fn();
 
 beforeEach(() => {
     heldCall = null;
+    runTiming = null;
     reload.mockClear();
     fetchMock.mockClear();
     vi.stubGlobal("fetch", fetchMock);
@@ -127,6 +131,18 @@ describe("reloading onto the new build", () => {
             await vi.advanceTimersByTimeAsync(15_000);
         });
         expect(reload).not.toHaveBeenCalled();
+    });
+
+    it("shows how far a re-attached update is, timed from when the server started it", async () => {
+        answeredBy = ["old"];
+        runTiming = { startedAt: Date.now() - 60_000, estimateMs: 4 * 60_000 };
+        const { container } = view();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(3_000);
+        });
+        const bar = container.querySelector("[role=progressbar]");
+        expect(Number(bar?.getAttribute("aria-valuenow"))).toBeGreaterThanOrEqual(23);
+        expect(container.textContent).toContain("About 3 minutes left");
     });
 
     it("reloads once the new dashboard is the only one answering", async () => {

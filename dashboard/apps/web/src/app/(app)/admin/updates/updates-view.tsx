@@ -68,6 +68,7 @@ import {
     triggerHostUpdateAction,
     updateReportAction
 } from "./actions";
+import { UpdateProgress, type WatchedRun } from "./update-progress";
 
 /** The facts that come from the environment, which the server already has when
  *  it renders the page. Everything that has to be gone and asked for arrives
@@ -216,6 +217,10 @@ export function UpdatesView({
     const [logText, setLogText] = useState("");
     const [logResult, setLogResult] = useState<UpdateResult | null>(null);
     const [reporting, setReporting] = useState(false);
+    // The run's timing as the server last reported it, and a clock that moves the
+    // bar between polls.
+    const [run, setRun] = useState<WatchedRun | null>(null);
+    const [clock, setClock] = useState(() => Date.now());
     // The build that was serving when this run started. A different one answering
     // later means the new dashboard has taken over - the completion signal that
     // survives the updater being cut off by the restart it is performing.
@@ -367,7 +372,11 @@ export function UpdatesView({
     async function fetchTail(offset: number): Promise<UpdateLogTail | null> {
         const res = await fetch(`/api/updates/logs?offset=${offset}`, { cache: "no-store" });
         if (!res.ok) return null;
-        return (await res.json()) as UpdateLogTail;
+        const tail = (await res.json()) as UpdateLogTail;
+        // Kept when an answer has none: the run is closed by the build that
+        // landed it, and the page is about to reload onto that build anyway.
+        if (tail.run) setRun({ ...tail.run, skew: Date.now() - tail.now });
+        return tail;
     }
 
     /** Where the moment an update was accepted is parked, for this tab. */
@@ -488,6 +497,7 @@ export function UpdatesView({
         setUpdateMsg(null);
         setLogText("");
         setLogResult(null);
+        setRun(null);
         // The host's clock before anything is asked for, so what the previous run
         // left on disk can be told from what this one writes. Read from the host
         // rather than taken from here: the two clocks disagree, and this decides
@@ -662,6 +672,13 @@ export function UpdatesView({
     // Stop the interval if the page unmounts mid-update.
     useEffect(() => stopPolling, []);
 
+    const timed = updating && run !== null;
+    useEffect(() => {
+        if (!timed) return;
+        const tick = setInterval(() => setClock(Date.now()), 1000);
+        return () => clearInterval(tick);
+    }, [timed]);
+
     const step = updating ? currentStep(logText) : null;
     const available = status?.phase === "available";
 
@@ -762,6 +779,7 @@ export function UpdatesView({
                             </>
                         )}
                     </div>
+                    {timed && run ? <UpdateProgress run={run} now={clock} /> : null}
                     {checkFailed ? (
                         <p className="text-xs text-danger">{t("settings.updates.checkFailed")}</p>
                     ) : null}

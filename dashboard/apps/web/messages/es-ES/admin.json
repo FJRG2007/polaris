@@ -3853,6 +3853,12 @@
             "ownVulnsUpdate": "Actualizar instala imágenes recién creadas sobre bases parcheadas.",
             "ownVulnsLink": "Ver hallazgos"
         },
+        "progress": {
+            "label": "Progreso",
+            "left": "Quedan unos {minutes, plural, one {# minuto} other {# minutos}}",
+            "almost": "Falta menos de un minuto",
+            "longer": "Tarda más de lo normal"
+        },
         "run": {
             "starting": "La actualización está empezando; esperando a que informe.",
             "reattached": "Conectado de nuevo a una actualización que ya estaba en curso.",

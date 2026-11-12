@@ -5,6 +5,8 @@
  * settings page that an update is still in flight.
  */
 
+import type { UpdateRunTiming } from "@/lib/update-timing";
+
 export interface UpdateLogTail {
     readonly exists: boolean;
     readonly content: string;
@@ -29,6 +31,8 @@ export interface UpdateLogTail {
      * updater can be cut off mid-run by the very restart it is performing.
      */
     readonly build: string | null;
+    /** The update running now, timed on the server, when one is. */
+    readonly run?: UpdateRunTiming | null;
 }
 
 /** A log nobody has written to for this long is a crashed run, not a live one. */

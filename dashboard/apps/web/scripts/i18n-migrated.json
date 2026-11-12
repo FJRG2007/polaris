@@ -1910,6 +1910,7 @@
         "web/src/app/(app)/account/tv/page.tsx",
         "web/src/app/(app)/account/tv/tv-catalog-picker.tsx",
         "web/src/app/(app)/account/tv/tv-updates-view.tsx",
+        "web/src/app/(app)/admin/updates/update-progress.tsx",
         "web/src/app/api/tv/authorize/claim/route.ts",
         "web/src/app/api/tv/authorize/route.ts",
         "web/src/app/api/tv/session/route.ts",

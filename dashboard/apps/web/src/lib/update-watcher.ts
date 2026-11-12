@@ -26,6 +26,7 @@ import { usersWithPermission } from "@polaris/auth";
 import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus, type UpdateStatus } from "@/lib/update-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { currentUpdateRun, markUpdateStarted } from "@/lib/update-timing-store";
 import { notifyOperators, type OperatorAlert } from "@/lib/notifications/operators";
 import { translatorFor } from "@/lib/i18n/translate";
 import { DEFAULT_LOCALE } from "@polaris/core";
@@ -259,7 +260,10 @@ async function firstSeen(
  */
 export async function startUpdate(): Promise<UpdateTrigger> {
     await publishUpdateSource(await getUpdateSource());
-    return startHostUpdate();
+    const trigger = await startHostUpdate();
+    // Timed from here, for the progress bar on the Updates screen.
+    if (trigger === "started") await markUpdateStarted().catch(() => undefined);
+    return trigger;
 }
 
 /** Start the install, and say whether it got going. */
@@ -460,6 +464,10 @@ export function startUpdateWatcher(): void {
         // The key sweep below is a database read and runs regardless; everything
         // else asks the internet, and offline would only log the same miss again.
         void sweepExpiringModelKeys().catch(() => undefined);
+        // Measures an update that landed with nobody watching the screen.
+        void lastUpdateOutcome()
+            .then((outcome) => currentUpdateRun(outcome))
+            .catch(() => undefined);
         if (internetOffline()) return;
         // On backup access the data saver holds the check (it may pull an image).
         void dataSaverActive()
