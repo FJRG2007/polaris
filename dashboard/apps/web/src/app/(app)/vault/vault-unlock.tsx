@@ -14,8 +14,9 @@
 
 import * as core from "@polaris/core";
 import * as passkeyClient from "@/lib/vault/passkey-client";
+import * as localPasskeys from "@/lib/local-passkeys";
 import { KeyRound, Loader2, Lock } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { VaultPasskeyEntry } from "@/lib/vault/passkey-schema";
 import { vaultPasskeyUsedAction } from "./passkey-actions";
 import type { KdfSettings } from "@polaris/core";
@@ -28,6 +29,7 @@ export function VaultUnlock({
     kdf,
     protectedKey,
     passkeys,
+    autoPasskey = true,
     notice,
     onUnlocked
 }: {
@@ -36,6 +38,9 @@ export function VaultUnlock({
     protectedKey: string;
     /** Passkeys enrolled to unlock this vault, wrapped key and all. */
     passkeys?: VaultPasskeyEntry[];
+    /** Ask for a passkey this browser has used before as soon as the screen
+     *  opens, rather than waiting for the button. */
+    autoPasskey?: boolean;
     /** Why it locked, when something other than the deadline did it. */
     notice?: string | null;
     onUnlocked: (key: SymmetricKey) => void;
@@ -55,12 +60,42 @@ export function VaultUnlock({
     }, [passkeys]);
     const passkeyBlocked = support === "no-webauthn" || support === "no-prf";
 
-    async function onPasskey() {
+    // Ask on its own once per lock screen, and only for the enrolled passkeys
+    // this browser has itself used (`lib/local-passkeys`) - never one that lives
+    // on another device. Waits until somebody is at the screen, so a vault that
+    // locked while its owner was away does not time a prompt out on its own. A
+    // dismissed prompt leaves the screen as it was and this tab asks no more.
+    const asked = useRef(false);
+    useEffect(() => {
+        if (!autoPasskey || asked.current || support === null || passkeyBlocked) return;
+        if (localPasskeys.automaticPasskeyPaused()) return;
+        const here = new Set(localPasskeys.localPasskeyIds());
+        const candidates = usable.filter((entry) => here.has(entry.credentialId));
+        if (candidates.length === 0) return;
+        const controller = new AbortController();
+        void localPasskeys.whenAttended(controller.signal).then((attended) => {
+            if (!attended || asked.current) return;
+            asked.current = true;
+            void onPasskey(candidates, true);
+        });
+        return () => controller.abort();
+    }, [autoPasskey, support, passkeyBlocked, usable]);
+
+    async function onPasskey(entries: VaultPasskeyEntry[] = usable, automatic = false) {
         setPending(true);
         setError(null);
         try {
-            const result = await passkeyClient.unlockWithPasskey(usable);
+            const result = await passkeyClient.unlockWithPasskey(entries);
             if ("failure" in result) {
+                if (automatic) {
+                    // Not an error the person made: they were never asked.
+                    if (result.failure === "cancelled") {
+                        localPasskeys.missedLocalPasskeys(entries.map((entry) => entry.credentialId));
+                    } else {
+                        localPasskeys.pauseAutomaticPasskey();
+                    }
+                    return;
+                }
                 setError(
                     result.failure === "cancelled"
                         ? t("passkeys.cancelled")
@@ -74,11 +109,13 @@ export function VaultUnlock({
                 );
                 return;
             }
+            localPasskeys.resumeAutomaticPasskey();
             onUnlocked(result.key);
             // Only a record for the settings list; the vault is already open.
             void vaultPasskeyUsedAction(result.id).catch(() => undefined);
         } catch {
-            setError(t("passkeys.failed"));
+            if (automatic) localPasskeys.pauseAutomaticPasskey();
+            else setError(t("passkeys.failed"));
         } finally {
             setPending(false);
         }

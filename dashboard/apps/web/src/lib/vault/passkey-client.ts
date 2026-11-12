@@ -10,6 +10,7 @@
  */
 
 import * as crypto from "@/lib/vault/crypto";
+import { rememberLocalPasskey } from "@/lib/local-passkeys";
 import type { VaultPasskeyEnrollInput, VaultPasskeyEntry } from "@/lib/vault/passkey-schema";
 
 /** Whether this browser can unlock with a passkey, and why not when it cannot. */
@@ -102,6 +103,8 @@ async function evaluatePrf(
     if (!first) return { failure: "no-prf" };
     const output = toBytes(first);
     if (output.length < crypto.PASSKEY_PRF_BYTES) return { failure: "no-prf" };
+    // It answered here, so the next lock screen can ask for it on its own.
+    rememberLocalPasskey(key);
     return { credentialId: toBase64Url(new Uint8Array(key.rawId)), output };
 }
 

@@ -489,6 +489,11 @@
         },
         "perSession": "One device can answer differently from this: open Sessions and set it on the session itself."
     },
+    "autoPasskey": {
+        "title": "Ask for the passkey right away",
+        "description": "When this device already has one of your passkeys, signing in to Polaris and unlocking the vault ask for it as soon as the screen opens. Passkeys on another computer or your phone are never asked for on their own.",
+        "label": "Ask for the passkey right away"
+    },
     "usernameSignIn": {
         "title": "Sign in with your username",
         "descriptionNamed": "Either {username} or your email address opens the account. Your username is public - it is how people mention you and find you - so leaving this on means half the credential is already known. Off, your address is needed as well, and Polaris does not hand that out.",

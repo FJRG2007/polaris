@@ -1252,6 +1252,11 @@ model UserSecurity {
     // on means the first half of the credential is published. Off, an attacker
     // needs the address as well, which this deployment does not hand out.
     usernameSignIn       Boolean   @default(true)
+    // Ask for a passkey as soon as a sign-in or vault unlock screen opens, when
+    // this browser has already used one of the account's passkeys itself. On by
+    // default: it only saves a press, and the passkey still asks for the face,
+    // finger or PIN that guards it.
+    autoPasskey          Boolean   @default(true)
     // Second-factor delivery methods the account accepts, beyond the
     // authenticator, which is always accepted while the factor is on. JSON
     // string array for SQLite portability; empty means authenticator only.

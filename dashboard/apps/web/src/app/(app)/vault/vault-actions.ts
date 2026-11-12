@@ -22,7 +22,7 @@ import * as ciphers from "@/lib/vault/ciphers";
 import * as folders from "@/lib/vault/folders";
 import { auth } from "@/lib/auth";
 import { requirePermission } from "@/lib/session";
-import { verifyAccountPassword } from "@polaris/auth";
+import { getUserSecurity, verifyAccountPassword } from "@polaris/auth";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import * as accessLog from "@/lib/vault/access-log";
 import type { ItemUseEntry } from "@/lib/vault/item-uses";
@@ -47,6 +47,9 @@ export interface VaultState {
     /** Passkeys that can unlock it, each with its wrapped key. Optional so a
      *  state built before passkeys existed still reads as "none". */
     passkeys?: VaultPasskeyEntry[];
+    /** Ask for one of those passkeys as soon as the lock screen opens, when this
+     *  browser has used it before. The account's own choice; on by default. */
+    autoPasskey?: boolean;
 }
 
 /** Whether there is a vault, and what the browser needs to open it. */
@@ -64,6 +67,10 @@ export async function vaultStateAction(): Promise<VaultState> {
             unlockTimeout: core.DEFAULT_VAULT_UNLOCK_TIMEOUT
         };
     }
+    const [passkeys, security] = await Promise.all([
+        listVaultPasskeys(user.id),
+        getUserSecurity(user.id)
+    ]);
     return {
         exists: true,
         kdf: {
@@ -77,7 +84,8 @@ export async function vaultStateAction(): Promise<VaultState> {
         publicKey: row.publicKey,
         email: user.email,
         unlockTimeout: row.unlockTimeout,
-        passkeys: await listVaultPasskeys(user.id)
+        passkeys,
+        autoPasskey: security.autoPasskey
     };
 }
 

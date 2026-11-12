@@ -15,6 +15,7 @@
  * by its own `verify-authentication`, exactly as `signIn.passkey()` does.
  */
 
+import * as localPasskeys from "@/lib/local-passkeys";
 import { authClient } from "@/lib/auth-client";
 import { fromBase64Url, toBase64Url } from "@/lib/vault/passkey-client";
 
@@ -98,12 +99,19 @@ export async function signInWithPasskeys(
         return { error: { code: "AUTH_CANCELLED" } };
     }
     if (!credential || !("rawId" in credential)) return { error: { code: "AUTH_CANCELLED" } };
+    const key = credential as PublicKeyCredential;
     const verified = (await authClient.$fetch("/passkey/verify-authentication", {
         method: "POST",
-        body: { response: assertionJson(credential as PublicKeyCredential) },
+        body: { response: assertionJson(key) },
         throw: false
     })) as { error?: { code?: string } | null };
-    if (verified.error) return { error: { code: verified.error.code } };
+    if (verified.error) {
+        // Removed from the account: this browser must stop offering it on its own.
+        if (verified.error.code === "PASSKEY_NOT_FOUND") localPasskeys.forgetLocalPasskeys([key.id]);
+        return { error: { code: verified.error.code } };
+    }
+    localPasskeys.rememberLocalPasskey(key);
+    localPasskeys.resumeAutomaticPasskey();
     authClient.$store.notify("$sessionSignal");
     return { error: null };
 }

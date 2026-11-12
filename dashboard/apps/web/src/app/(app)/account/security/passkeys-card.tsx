@@ -27,6 +27,7 @@ import { knownMessage } from "./known-sentences";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { authClient } from "@/lib/auth-client";
+import { rememberLocalPasskey } from "@/lib/local-passkeys";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import type { PasskeyView } from "@/lib/passkey-directory";
@@ -96,12 +97,20 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
     async function register() {
         setBusy(true);
         setError(null);
-        const result = await authClient.passkey.addPasskey({ name: name.trim() });
+        const result = await authClient.passkey.addPasskey({
+            name: name.trim(),
+            returnWebAuthnResponse: true
+        });
         setBusy(false);
         if (result?.error) {
             setError(result.error.message ? knownMessage(t, tv, result.error.message) : t("passkeys.notCompleted"));
             return;
         }
+        // Made on this device (Windows Hello, Touch ID...): the next sign-in here
+        // can ask for it on its own. A phone or a USB key is not noted.
+        const created = (result as { webauthn?: { response?: { id: string; authenticatorAttachment?: string } } })
+            .webauthn?.response;
+        if (created) rememberLocalPasskey(created);
         setName("");
         setAsking(false);
         // The credential was written by the passkey client, so the server is told

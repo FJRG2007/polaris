@@ -16,6 +16,7 @@ import { loadEnv } from "@polaris/config";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { ssoOfferedFor } from "@/lib/saml-providers";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { clientIp } from "@/lib/request-context";
 import { passkeyRelyingPartyId } from "@polaris/core";
 import { emailForUsername, emailLinkSignInAllowed } from "@polaris/auth";
 import {
@@ -130,6 +131,63 @@ export async function passkeysFor(
         where: { user: { email }, OR: boundHere(rpId) },
         select: { credentialID: true, transports: true },
         take: 20
+    });
+    return passkeys.map((passkey) => ({
+        id: passkey.credentialID,
+        transports: (passkey.transports ?? "").split(",").map((transport) => transport.trim()).filter(Boolean)
+    }));
+}
+
+/** How many passkeys one browser can ask about, and how often. A browser holds
+ *  a handful at most; the cap only bounds the query. */
+const AUTO_PASSKEY_CANDIDATES = 20;
+const AUTO_PASSKEY_LIMIT = 30;
+const AUTO_PASSKEY_WINDOW_MS = 10 * 60 * 1000;
+/** A WebAuthn credential id, base64url, as it is stored. */
+const CREDENTIAL_ID = /^[A-Za-z0-9_-]{16,1366}$/;
+
+/**
+ * Of the passkeys this browser has used itself (`lib/local-passkeys`), the ones
+ * the sign-in screen may ask for the moment it opens: still registered, bound to
+ * this address, and on an account that has not turned the automatic prompt off.
+ *
+ * Answered from credential ids rather than an identifier, so it says nothing
+ * about which addresses have accounts: an id is random and only the browser that
+ * used it has it, and an unknown one answers the same as one whose account said
+ * no. What comes back is what WebAuthn hands to the browser anyway - signing in
+ * still takes the authenticator.
+ */
+export async function automaticPasskeys(
+    candidates: unknown
+): Promise<{ id: string; transports: string[] }[]> {
+    if (!Array.isArray(candidates)) return [];
+    const ids = [
+        ...new Set(
+            candidates.filter(
+                (value): value is string => typeof value === "string" && CREDENTIAL_ID.test(value)
+            )
+        )
+    ].slice(0, AUTO_PASSKEY_CANDIDATES);
+    if (ids.length === 0) return [];
+    const rpId = await currentRelyingPartyId();
+    if (!rpId) return [];
+    const throttle = await rateLimit(
+        `passkey-auto:${(await clientIp()) ?? "unknown"}`,
+        AUTO_PASSKEY_LIMIT,
+        AUTO_PASSKEY_WINDOW_MS
+    );
+    if (!throttle.ok) return [];
+    const passkeys = await prisma.passkey.findMany({
+        where: {
+            credentialID: { in: ids },
+            OR: boundHere(rpId),
+            user: {
+                bannedAt: null,
+                OR: [{ security: { is: null } }, { security: { is: { autoPasskey: true } } }]
+            }
+        },
+        select: { credentialID: true, transports: true },
+        take: AUTO_PASSKEY_CANDIDATES
     });
     return passkeys.map((passkey) => ({
         id: passkey.credentialID,

@@ -9,16 +9,19 @@
 
 import * as core from "@polaris/core";
 import { MessagesWrapper } from "../../setup/i18n";
+import { freshWebStorage } from "../../helpers/memory-storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VaultPasskeyChoice, VaultPasskeyEntry } from "@/lib/vault/passkey-schema";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const support = vi.hoisted(() => vi.fn());
 const enrollWithPasskey = vi.hoisted(() => vi.fn());
+const unlockWithPasskey = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/vault/passkey-client", async (original) => ({
     ...(await original<typeof import("@/lib/vault/passkey-client")>()),
     passkeySupport: () => support(),
-    enrollWithPasskey
+    enrollWithPasskey,
+    unlockWithPasskey
 }));
 const actions = vi.hoisted(() => ({
     vaultPasskeyUsedAction: vi.fn(async () => undefined),
@@ -63,14 +66,18 @@ const CHOICE: VaultPasskeyChoice = {
     vault: null
 };
 
-function lockScreen(passkeys?: VaultPasskeyEntry[]) {
+function lockScreen(
+    passkeys?: VaultPasskeyEntry[],
+    options: { autoPasskey?: boolean; onUnlocked?: () => void } = {}
+) {
     return render(
         <VaultUnlock
             email="ana@example.com"
             kdf={core.DEFAULT_KDF_SETTINGS}
             protectedKey="2.a|b|c"
             passkeys={passkeys}
-            onUnlocked={() => undefined}
+            autoPasskey={options.autoPasskey}
+            onUnlocked={options.onUnlocked ?? (() => undefined)}
         />,
         { wrapper: MessagesWrapper }
     );
@@ -102,6 +109,62 @@ describe("unlock with a passkey", () => {
         await waitFor(() => expect(support).toHaveBeenCalled());
         expect(screen.queryByRole("button", { name: /passkey/i })).toBeNull();
         expect(screen.queryByTestId("passkey-unavailable")).toBeNull();
+    });
+});
+
+describe("asking for the passkey as the lock screen opens", () => {
+    const HERE = { id: ENTRY.credentialId, authenticatorAttachment: "platform" };
+    let focus: typeof document.hasFocus;
+
+    beforeEach(() => {
+        support.mockResolvedValue("supported");
+        freshWebStorage();
+        focus = document.hasFocus;
+        document.hasFocus = () => true;
+    });
+
+    afterEach(() => {
+        document.hasFocus = focus;
+    });
+
+    it("asks at once for an enrolled passkey this browser has used, and opens the vault", async () => {
+        const { rememberLocalPasskey } = await import("@/lib/local-passkeys");
+        rememberLocalPasskey(HERE);
+        const key = { encKey: new Uint8Array(32), macKey: new Uint8Array(32) };
+        unlockWithPasskey.mockResolvedValue({ key, id: ENTRY.id });
+        const onUnlocked = vi.fn();
+        lockScreen([ENTRY], { onUnlocked });
+        await waitFor(() => expect(onUnlocked).toHaveBeenCalledWith(key));
+        expect(unlockWithPasskey).toHaveBeenCalledTimes(1);
+        expect(unlockWithPasskey.mock.calls[0]![0]).toEqual([ENTRY]);
+    });
+
+    it("waits for the button when the passkey was only ever used on another device", async () => {
+        lockScreen([ENTRY]);
+        expect(await screen.findByRole("button", { name: /passkey/i })).toBeTruthy();
+        expect(unlockWithPasskey).not.toHaveBeenCalled();
+    });
+
+    it("waits for the button when the account turned it off", async () => {
+        const { rememberLocalPasskey } = await import("@/lib/local-passkeys");
+        rememberLocalPasskey(HERE);
+        lockScreen([ENTRY], { autoPasskey: false });
+        expect(await screen.findByRole("button", { name: /passkey/i })).toBeTruthy();
+        expect(unlockWithPasskey).not.toHaveBeenCalled();
+    });
+
+    it("says nothing when the prompt is dismissed, and this tab asks no more", async () => {
+        const local = await import("@/lib/local-passkeys");
+        local.rememberLocalPasskey(HERE);
+        unlockWithPasskey.mockResolvedValue({ failure: "cancelled" });
+        lockScreen([ENTRY]);
+        await waitFor(() => expect(unlockWithPasskey).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(local.automaticPasskeyPaused()).toBe(true));
+        expect(screen.queryByText(/cancel/i)).toBeNull();
+        cleanup();
+        lockScreen([ENTRY]);
+        expect(await screen.findByRole("button", { name: /passkey/i })).toBeTruthy();
+        expect(unlockWithPasskey).toHaveBeenCalledTimes(1);
     });
 });
 

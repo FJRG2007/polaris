@@ -46,6 +46,7 @@ import {
     setConnectionSignInChallenge,
     setEmailLinkSignIn,
     setUsernameSignIn,
+    setAutoPasskey,
     clearQuickPin,
     clearSecurityQuestions,
     getUserSecurity,
@@ -159,6 +160,25 @@ export async function setUsernameSignInAction(enabled: boolean): Promise<ActionR
     await recordAudit({
         actorId: user.id,
         action: "account.username-sign-in",
+        metadata: { enabled: enabled === true }
+    });
+    revalidatePath("/account/security");
+    return {};
+}
+
+/**
+ * Ask for the passkey on its own when a sign-in or vault unlock screen opens.
+ *
+ * Not held back on a new device, unlike the switches around it: it changes how
+ * many presses a sign-in takes, not what it takes, so there is nothing here for
+ * somebody on a browser the owner has never seen to gain.
+ */
+export async function setAutoPasskeyAction(enabled: boolean): Promise<ActionResult> {
+    const user = await requireUser();
+    await setAutoPasskey(user.id, enabled === true);
+    await recordAudit({
+        actorId: user.id,
+        action: "account.auto-passkey",
         metadata: { enabled: enabled === true }
     });
     revalidatePath("/account/security");

@@ -16,7 +16,15 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { validationMessage } from "@/components/i18n/validation-message";
 import { signInWithPasskeys } from "@/lib/passkey-sign-in";
-import { accountHasPasskey, emailLinkOffered, passkeysFor, resolveIdentifier, ssoOffered } from "./actions";
+import * as localPasskeys from "@/lib/local-passkeys";
+import {
+    accountHasPasskey,
+    automaticPasskeys,
+    emailLinkOffered,
+    passkeysFor,
+    resolveIdentifier,
+    ssoOffered
+} from "./actions";
 import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
 import { AccountChooser } from "./account-chooser";
 import { prepareAddAccountAction, type DeviceAccountView } from "@/app/device-account-actions";
@@ -223,11 +231,13 @@ export function LoginForm({
         setError(null);
         const identifier = values.identifier.trim();
         const allow = identifier ? await passkeysFor(identifier).catch(() => []) : [];
-        const result =
-            allow.length > 0 ? await signInWithPasskeys(allow) : await authClient.signIn.passkey();
+        // With no account typed, an empty list is the browser's own chooser -
+        // what `signIn.passkey()` asks for - through the one path that notes a
+        // passkey this device holds, so the next visit can ask for it on its own.
+        const result = await signInWithPasskeys(allow);
         setPending(false);
-        if (result?.error) {
-            if ((result.error as { code?: string }).code === "SSO_REQUIRED") {
+        if (result.error) {
+            if (result.error.code === "SSO_REQUIRED") {
                 setCanSso(true);
                 setError(t("login.ssoRequired"));
                 return;
@@ -235,10 +245,47 @@ export function LoginForm({
             setError(t("login.passkeyFailed"));
             return;
         }
-        window.localStorage.setItem(LAST_IDENTIFIER_KEY, values.identifier.trim());
+        if (identifier) window.localStorage.setItem(LAST_IDENTIFIER_KEY, identifier);
         router.push(postLoginTarget());
         router.refresh();
     }
+
+    // Ask for the passkey the moment the screen opens, when this browser has
+    // used one of the account's passkeys itself and the account has not turned
+    // this off (`lib/local-passkeys`, `automaticPasskeys`). Never while adding
+    // an account - the one this device knows is the one already signed in -
+    // nor right after a deliberate sign-out, nor again in a tab that dismissed
+    // it once. A dismissed prompt leaves the screen exactly as it was.
+    useEffect(() => {
+        if (add || localPasskeys.automaticPasskeyPaused()) return;
+        const ids = localPasskeys.localPasskeyIds();
+        if (ids.length === 0) return;
+        const controller = new AbortController();
+        void (async () => {
+            const allow = await automaticPasskeys(ids).catch(() => []);
+            if (allow.length === 0 || controller.signal.aborted) return;
+            const attended = await localPasskeys.whenAttended(controller.signal);
+            if (!attended || controller.signal.aborted) return;
+            const result = await signInWithPasskeys(allow);
+            if (result.error) {
+                if (result.error.code === "SSO_REQUIRED") {
+                    setCanSso(true);
+                    setError(t("login.ssoRequired"));
+                    localPasskeys.pauseAutomaticPasskey();
+                    return;
+                }
+                if (result.error.code === "AUTH_CANCELLED") {
+                    localPasskeys.missedLocalPasskeys(allow.map((passkey) => passkey.id));
+                } else {
+                    localPasskeys.pauseAutomaticPasskey();
+                }
+                return;
+            }
+            router.push(postLoginTarget());
+            router.refresh();
+        })();
+        return () => controller.abort();
+    }, []);
 
     /**
      * Email a one-time sign-in link. The answer is the same whether or not the

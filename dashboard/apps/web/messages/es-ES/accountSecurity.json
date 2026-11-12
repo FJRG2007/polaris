@@ -489,6 +489,11 @@
         },
         "perSession": "Un dispositivo puede responder distinto a esto: abre Sesiones y configúralo en la propia sesión."
     },
+    "autoPasskey": {
+        "title": "Pedir la passkey al momento",
+        "description": "Si este dispositivo ya tiene una de tus passkeys, entrar en Polaris y desbloquear la bóveda la piden en cuanto se abre la pantalla. Las passkeys de otro ordenador o de tu móvil nunca se piden solas.",
+        "label": "Pedir la passkey al momento"
+    },
     "usernameSignIn": {
         "title": "Entrar con tu nombre de usuario",
         "descriptionNamed": "Tanto {username} como tu correo abren la cuenta. Tu nombre de usuario es público (es como la gente te menciona y te encuentra), así que dejar esto activado significa que media credencial ya se conoce. Desactivado, también hace falta tu correo, y Polaris no lo comparte.",

@@ -28,6 +28,7 @@
 import { dropAllSnapshots } from "@/lib/snapshot-cache";
 import { dropMailCache } from "@/lib/mailbox/mail-cache";
 import { MENU_KEY as APP_MENU_KEY, STORE_KEY as APP_USAGE_KEY } from "@/lib/app-usage";
+import { pauseAutomaticPasskey } from "@/lib/local-passkeys";
 import { adoptLegacyPlaces, forgetPlaces, PREFIX as LAST_PLACE_PREFIX } from "@/lib/last-place";
 import { ACCOUNT_MARKER_KEY, currentAccount } from "@/lib/account-marker";
 import { STORE_KEY as RECENT_SEARCH_KEY } from "@/lib/search/recent";
@@ -109,6 +110,9 @@ export async function leaveAccount(target: string, signedOut?: "this" | "all"): 
         if (account) forgetPlaces(account);
     }
     await forgetAccountTraces();
+    // Signed out on purpose: the sign-in screen this lands on must not ask for
+    // a passkey on its own and sign the account straight back in.
+    if (signedOut) pauseAutomaticPasskey();
     // Cleared rather than set to the next account, which this tab does not know
     // yet: every other tab reloads and the first page to mount writes it.
     writeMarker("");

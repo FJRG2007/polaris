@@ -73,6 +73,7 @@ export {
     setEmailLinkSignIn,
     emailLinkSignInAllowed,
     setUsernameSignIn,
+    setAutoPasskey,
     emailForUsername,
     setTwoFactorPreferences,
     setTotpUnclaimed,

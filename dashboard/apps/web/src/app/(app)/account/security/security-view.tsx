@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PasskeysCard } from "./passkeys-card";
+import { AutoPasskeyCard } from "./auto-passkey-card";
 import { EmailLinkCard } from "./email-link-card";
 import { UsernameSignInCard } from "./username-sign-in-card";
 import { ShieldAlert, Trash2 } from "lucide-react";
@@ -78,6 +79,7 @@ export function SecurityView({
     requireLoginApproval,
     emailLinkSignIn,
     usernameSignIn,
+    autoPasskey,
     username,
     canSendMail,
     twoFactorEnabled,
@@ -114,6 +116,8 @@ export function SecurityView({
     emailLinkSignIn: boolean;
     /** Whether the username may stand in for the address at sign-in. */
     usernameSignIn: boolean;
+    /** Ask for a passkey this device holds as soon as a sign-in screen opens. */
+    autoPasskey: boolean;
     /** The handle itself, so the card can name it. */
     username: string;
     /** Whether this Polaris has a way to send mail at all, which is what decides
@@ -391,6 +395,7 @@ export function SecurityView({
             </div>
 
             <PasskeysCard passkeys={passkeys} lock={lock} />
+            <AutoPasskeyCard enabled={autoPasskey} lock={lock} />
             <SuccessorCard successor={successor} lock={lock} />
             {/* Last, because it is the end of the page: the emergency switch and
                 the two ways out, with nothing under them. */}

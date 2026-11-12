@@ -38,6 +38,9 @@ export interface UserSecuritySettings {
     emailLinkSignIn: boolean;
     /** Whether the username may stand in for the address at sign-in. */
     usernameSignIn: boolean;
+    /** Ask for a passkey as soon as a sign-in or vault unlock screen opens, on a
+     *  browser that has already used one of this account's passkeys itself. */
+    autoPasskey: boolean;
     /** Second-factor methods that send a code, beyond the authenticator. */
     twoFactorMethods: TwoFactorDeliveryMethod[];
     /** The method the challenge offers first. */
@@ -71,6 +74,9 @@ const DEFAULTS: UserSecuritySettings = {
     // On, because it is how every account has always worked: an account with no
     // row of its own must behave exactly as it did before this setting existed.
     usernameSignIn: true,
+    // On: it saves a press and nothing else - the passkey still asks for the
+    // face, finger or PIN that guards it.
+    autoPasskey: true,
     twoFactorMethods: [],
     twoFactorPreferred: "totp",
     // An account with no row of its own armed its factor through better-auth
@@ -143,6 +149,7 @@ export async function getUserSecurity(userId: string): Promise<UserSecuritySetti
         challengeConnectionSignIn: row.challengeConnectionSignIn,
         emailLinkSignIn: row.emailLinkSignIn,
         usernameSignIn: row.usernameSignIn,
+        autoPasskey: row.autoPasskey,
         twoFactorMethods: parseDeliveryMethods(row.twoFactorMethods),
         twoFactorPreferred: parsePreferredMethod(row.twoFactorPreferred),
         totpUnclaimed: row.totpUnclaimed,
@@ -213,6 +220,17 @@ export async function setEmailLinkSignIn(userId: string, enabled: boolean): Prom
 
 export async function setUsernameSignIn(userId: string, enabled: boolean): Promise<void> {
     await upsertSecurity(userId, { usernameSignIn: enabled });
+}
+
+/**
+ * Ask for the passkey on its own when a sign-in or unlock screen opens, or wait
+ * for the button.
+ *
+ * Convenience only, in both directions: the passkey still proves who is there,
+ * so neither value lets anybody in who could not get in by pressing the button.
+ */
+export async function setAutoPasskey(userId: string, enabled: boolean): Promise<void> {
+    await upsertSecurity(userId, { autoPasskey: enabled });
 }
 
 /**

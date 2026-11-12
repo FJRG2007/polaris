@@ -158,6 +158,7 @@ export default async function SecurityPage() {
                     requireLoginApproval={settings.requireLoginApproval}
                     emailLinkSignIn={settings.emailLinkSignIn}
                     usernameSignIn={settings.usernameSignIn}
+                    autoPasskey={settings.autoPasskey}
                     username={account?.username ?? ""}
                     canSendMail={mail.channelId !== null}
                     twoFactorEnabled={hasTwoFactor}
