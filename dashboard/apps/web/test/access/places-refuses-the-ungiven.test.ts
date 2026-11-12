@@ -29,7 +29,7 @@ vi.mock("next/navigation", () => ({
     }
 }));
 vi.mock("next/link", () => ({ default: () => null }));
-vi.mock("@polaris/ui", () => ({ PageHeader: () => null, Skeleton: () => null }));
+vi.mock("@polaris/ui", () => ({ PageHeader: () => null, Skeleton: () => null, ProductMark: () => null }));
 vi.mock("@polaris/db", () => ({
     prisma: { storageConnection: { findMany: async () => state.nas } }
 }));

@@ -14,7 +14,6 @@ import { GameLogo } from "@/components/game-logo";
 import { MessageTime } from "@/components/message-time";
 import { Button, CopyButton, Skeleton } from "@polaris/ui";
 import type { ChatMessageView } from "@/lib/chat/messages";
-import { readGameServerCard } from "./game-server-card-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { splitAddress, type GameServerCardView } from "@/lib/chat/game-server-card";
 
@@ -30,7 +29,10 @@ export function GameServerCard({
 
     useEffect(() => {
         let live = true;
-        void readGameServerCard(serverId)
+        // Loaded with the card rather than with every conversation: the list
+        // renders without pulling the server's session code in.
+        void import("./game-server-card-actions")
+            .then(({ readGameServerCard }) => readGameServerCard(serverId))
             .then((found) => {
                 if (live) setView(found);
             })

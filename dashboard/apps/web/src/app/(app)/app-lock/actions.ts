@@ -20,7 +20,7 @@ import { recordAppUnlock } from "@/lib/app-lock-service";
 import { unlockAppSchema } from "@/lib/app-locks";
 
 /** Attempts allowed per session before the window closes. */
-export const APP_UNLOCK_LIMIT = 5;
+const APP_UNLOCK_LIMIT = 5;
 const APP_UNLOCK_WINDOW_MS = 10 * 60 * 1000;
 
 export async function unlockAppAction(input: unknown): Promise<{ error?: string }> {
