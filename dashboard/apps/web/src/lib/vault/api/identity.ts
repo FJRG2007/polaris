@@ -286,6 +286,7 @@ export async function connectAuthorizeClaim(context: VaultContext): Promise<Resp
         claim.claimed.device,
         claim.claimed.extensionSessionId
     );
+    if (!token) return Response.json({ status: "denied" });
     // The account credential, so one approval is the whole of it: a client that
     // has just been let in should not then ask for a second sign-in to find out
     // whose account it is on. Absent only when the account holds nothing this

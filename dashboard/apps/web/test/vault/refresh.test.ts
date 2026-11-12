@@ -26,13 +26,20 @@ const findAccount = vi.fn(async () => ({
     user: { name: "Someone", email: "someone@polaris.test", emailVerified: true }
 }));
 const hasPermission = vi.fn(async () => true);
+const lockConnection = vi.fn(async () => ({ count: 1 }));
+const findDevice = vi.fn(async () => ({ extensionSessionId: null as string | null }));
 const updateDevice = vi.fn(async () => ({ count: 1 }));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        $transaction: async (run: (tx: unknown) => unknown) => {
+            const { prisma } = await import("@polaris/db");
+            return run(prisma);
+        },
         vaultAccount: { findFirst: vi.fn(), findUniqueOrThrow: findAccount },
         vaultOrgUser: { findMany: vi.fn(async () => []) },
-        vaultDevice: { upsert: vi.fn(), updateMany: updateDevice },
+        extensionSession: { updateMany: lockConnection },
+        vaultDevice: { findFirst: findDevice, upsert: vi.fn(), updateMany: updateDevice },
         vaultRefreshToken: { findUnique: findToken, update: updateToken, create: createToken }
     }
 }));
@@ -61,7 +68,7 @@ function tokenRow(overrides: Record<string, unknown> = {}) {
         stamp: "stamp-1",
         expiresAt: new Date(Date.now() + 60_000),
         revokedAt: null,
-        device: { identifier: "device-a" },
+        device: { identifier: "device-a", userId: USER, extension: null },
         vault: { securityStamp: "stamp-1", user: { bannedAt: null } },
         ...overrides
     };
@@ -70,10 +77,64 @@ function tokenRow(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
     vi.clearAllMocks();
     hasPermission.mockResolvedValue(true);
+    findDevice.mockResolvedValue({ extensionSessionId: null });
+    lockConnection.mockResolvedValue({ count: 1 });
     findToken.mockResolvedValue(tokenRow());
 });
 
 describe("vaultRefresh", () => {
+    it("refuses a device whose extension was disconnected without relying on the sweep", async () => {
+        findToken.mockResolvedValue(
+            tokenRow({
+                device: {
+                    identifier: "device-a",
+                    userId: USER,
+                    extension: { userId: USER, revokedAt: new Date() }
+                }
+            })
+        );
+        expect(await identity.vaultRefresh("token")).toEqual({ ok: false, kind: "invalid" });
+        expect(createToken).not.toHaveBeenCalled();
+    });
+
+    it("refuses issuance when disconnect wins after the refresh read", async () => {
+        findDevice.mockResolvedValue({ extensionSessionId: "connection-1" });
+        lockConnection.mockResolvedValue({ count: 0 });
+        expect(await identity.vaultRefresh("token")).toEqual({ ok: false, kind: "invalid" });
+        expect(createToken).not.toHaveBeenCalled();
+    });
+
+    it("checks the connection again when an approved claim mints credentials", async () => {
+        findDevice.mockResolvedValue({ extensionSessionId: "connection-1" });
+        lockConnection.mockResolvedValue({ count: 0 });
+        const { prisma } = await import("@polaris/db");
+        vi.mocked(prisma.vaultDevice.upsert).mockResolvedValueOnce({ id: "device-1" } as never);
+        expect(
+            await identity.issueVaultToken(
+                USER,
+                { identifier: "device-a", name: "test", type: 2 },
+                "connection-1"
+            )
+        ).toBeNull();
+        expect(createToken).not.toHaveBeenCalled();
+        expect(lockConnection).toHaveBeenCalledWith({
+            where: { id: "connection-1", userId: USER, revokedAt: null },
+            data: { revokedAt: null }
+        });
+    });
+
+    it("issues credentials while the owning extension connection is live", async () => {
+        findDevice.mockResolvedValue({ extensionSessionId: "connection-1" });
+        expect((await identity.vaultRefresh("token")).ok).toBe(true);
+        expect(createToken).toHaveBeenCalledOnce();
+        expect(lockConnection).toHaveBeenCalledOnce();
+    });
+
+    it("preserves refresh for a client without a device", async () => {
+        findToken.mockResolvedValue(tokenRow({ deviceId: null, device: null }));
+        expect((await identity.vaultRefresh("token")).ok).toBe(true);
+    });
+
     it("rotates a live token", async () => {
         const result = await identity.vaultRefresh("token");
         expect(result.ok).toBe(true);

@@ -22,7 +22,10 @@ const claimVaultAuthorization = vi.fn(async () => ({
     claimed: { userId: "user-1", device: DEVICE, wrappedKey: "sealed" }
 }));
 const issueClientKey = vi.fn(async () => "pol.secret" as string | null);
-const issueVaultToken = vi.fn(async () => ({ access_token: "access", refresh_token: "refresh" }));
+const issueVaultToken = vi.fn(async (): Promise<Record<string, unknown> | null> => ({
+    access_token: "access",
+    refresh_token: "refresh"
+}));
 
 const access = vi.hoisted(() => ({ vault: true }));
 
@@ -72,6 +75,13 @@ beforeEach(() => {
 });
 
 describe("collecting an approval", () => {
+    it("denies a claim revoked during token issuance and hands over no account key", async () => {
+        issueVaultToken.mockResolvedValueOnce(null);
+        const response = await connectAuthorizeClaim(claim());
+        await expect(response.json()).resolves.toEqual({ status: "denied" });
+        expect(issueClientKey).not.toHaveBeenCalled();
+    });
+
     it("hands back the sealed key, the account credential and the token", async () => {
         const response = await connectAuthorizeClaim(claim());
         await expect(response.json()).resolves.toEqual({

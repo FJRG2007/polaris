@@ -542,6 +542,14 @@ async function endConnections(
     now = new Date()
 ): Promise<void> {
     if (ids.length === 0) return;
+    // One write per row: the token goes with it, and a hash nothing can present
+    // again is one less way for a revoked connection to come back.
+    for (const id of ids) {
+        await prisma.extensionSession.updateMany({
+            where: { id, userId, revokedAt: null },
+            data: { revokedAt: now, tokenHash: `revoked:${id}` }
+        });
+    }
     const devices = await prisma.vaultDevice.findMany({
         where: { extensionSessionId: { in: [...ids] } },
         select: { id: true }
@@ -550,14 +558,6 @@ async function endConnections(
         await prisma.vaultRefreshToken.updateMany({
             where: { deviceId: { in: devices.map((device) => device.id) }, revokedAt: null },
             data: { revokedAt: now }
-        });
-    }
-    // One write per row: the token goes with it, and a hash nothing can present
-    // again is one less way for a revoked connection to come back.
-    for (const id of ids) {
-        await prisma.extensionSession.updateMany({
-            where: { id, userId, revokedAt: null },
-            data: { revokedAt: now, tokenHash: `revoked:${id}` }
         });
     }
 }
