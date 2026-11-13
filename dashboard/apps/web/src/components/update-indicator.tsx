@@ -13,38 +13,48 @@ import { Badge, pollWhileVisible } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { DownloadCloud } from "lucide-react";
+import type { UpdateStatus } from "@/lib/update-service";
+import * as shared from "@/lib/update-status-shared";
 
 /** Re-poll every six hours; the server response is cached, so this is cheap. */
 const POLL_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
+/** What the badge shows for a status: an installable update, or nothing. */
+function badgeOf(status: UpdateStatus | null): { behindBy: number | null } | null {
+    if (status?.phase !== "available") return null;
+    return { behindBy: typeof status.behindBy === "number" ? status.behindBy : null };
+}
+
 export function UpdateIndicator() {
     const t = useTranslations("components");
-    const [available, setAvailable] = useState<{ behindBy: number | null } | null>(null);
+    const [available, setAvailable] = useState(() => badgeOf(shared.latestUpdateStatus()));
 
     useEffect(() => {
         let active = true;
-        async function poll() {
+        let retry: ReturnType<typeof setTimeout> | null = null;
+        // The Updates screen asks far more often than this; whatever it hears
+        // shows here too, so the two never disagree.
+        const stopHearing = shared.onUpdateStatus((status) => setAvailable(badgeOf(status)));
+        async function poll(again = true) {
             try {
                 const response = await fetch("/api/updates");
                 if (!response.ok) return;
-                const data = (await response.json()) as {
-                    phase?: string;
-                    behindBy?: number | null;
-                };
-                if (!active) return;
-                setAvailable(
-                    data.phase === "available"
-                        ? { behindBy: typeof data.behindBy === "number" ? data.behindBy : null }
-                        : null
-                );
+                const data = (await response.json()) as UpdateStatus;
+                if (!active || typeof data.checkedAt !== "string") return;
+                shared.noteUpdateStatus(data);
+                // An answer the server is refreshing right now: take the fresh one.
+                if (again && shared.isStale(data))
+                    retry = setTimeout(() => void poll(false), shared.STALE_RETRY_MS);
             } catch {
-                // Network hiccup: leave the indicator hidden.
+                // Network hiccup: leave the indicator as it was.
             }
         }
-        poll();
-        const stopPolling = pollWhileVisible(poll, POLL_INTERVAL_MS);
+        void poll();
+        const stopPolling = pollWhileVisible(() => void poll(), POLL_INTERVAL_MS);
         return () => {
             active = false;
+            if (retry) clearTimeout(retry);
+            stopHearing();
             stopPolling();
         };
     }, []);

@@ -23,6 +23,7 @@ import { SecurityUpdates } from "./security-updates";
 import { UpdateChangelog } from "./update-changelog";
 import { FactRow as Row } from "../settings/fact-row";
 import { useSettingsOverview } from "../settings/use-overview";
+import * as shared from "@/lib/update-status-shared";
 import { checkForNewBuild } from "@/lib/new-build";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { clearUpdateInProgress, markUpdateInProgress } from "@/lib/update-in-progress";
@@ -231,6 +232,31 @@ export function UpdatesView({
     // than a sentence about a check that has not happened - "Up to date" before
     // anybody has looked is the one thing this line must never say.
     const { status, setStatus } = useSettingsOverview(UPDATE_PARTS);
+    // The badge in the top bar asks on its own; a newer answer it heard shows
+    // here too, so it never offers an update this card does not know about.
+    useEffect(
+        () =>
+            shared.onUpdateStatus((next) =>
+                setStatus((current) =>
+                    current && Date.parse(current.checkedAt) > Date.parse(next.checkedAt)
+                        ? current
+                        : next
+                )
+            ),
+        [setStatus]
+    );
+    // Whatever drew the card - the overview or a check - an answer the server
+    // gave from a cache it is refreshing right now is asked again shortly for
+    // the fresh one, rather than standing for five minutes.
+    const staleAnswer = status !== null && shared.isStale(status) ? status.checkedAt : null;
+    useEffect(() => {
+        if (!staleAnswer) return;
+        const timer = setTimeout(() => {
+            if (!busy.current) onCheck(false);
+        }, shared.STALE_RETRY_MS);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [staleAnswer]);
     const [checkFailed, setCheckFailed] = useState(false);
     // The quiet hour is the default, and a host that cannot install on its own
     // acts on it as "only tell me" - so that is what the control says there.
@@ -276,7 +302,9 @@ export function UpdatesView({
                 if (!(await checkForNewBuild()) && force) setCheckFailed(true);
                 return null;
             });
-            if (answer) setStatus(answer);
+            if (!answer) return;
+            shared.noteUpdateStatus(answer);
+            setStatus(answer);
         });
     }
 

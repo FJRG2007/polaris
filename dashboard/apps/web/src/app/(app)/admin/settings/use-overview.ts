@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from "react";
 import type { UpdateStatus } from "@/lib/update-service";
+import { noteUpdateStatus } from "@/lib/update-status-shared";
 import type { CheckedAddress } from "@/lib/address-health";
 import type { OverviewPart, SettingsOverview } from "./overview";
 
@@ -61,7 +62,10 @@ export function useSettingsOverview(parts: readonly OverviewPart[]) {
                 if (answer.ok) {
                     const overview = withNetwork((await answer.json()) as SettingsOverview);
                     // A check that answered first is newer than this one.
-                    if (overview.status) setStatus((current) => current ?? overview.status);
+                    if (overview.status) {
+                        noteUpdateStatus(overview.status);
+                        setStatus((current) => current ?? overview.status);
+                    }
                     if (overview.addresses) setAddresses(overview.addresses);
                     if (overview.network) setNetwork(overview.network);
                     // A part that did not answer in time keeps its placeholder
