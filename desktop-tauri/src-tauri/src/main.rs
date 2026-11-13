@@ -20,6 +20,7 @@ mod notices;
 mod os_prefs;
 mod tray;
 mod tv;
+mod updater;
 mod vpn;
 #[cfg(windows)]
 mod webview2;
@@ -871,6 +872,7 @@ fn main() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(login_item::plugin())
+        .plugin(updater::plugin())
         .manage(notices::Notices::default())
         .manage(call_keys::CallKeys::default())
         .manage(key_flow::Keys::default())

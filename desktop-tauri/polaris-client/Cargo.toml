@@ -45,5 +45,5 @@ url = "=2.5.8"
 zip = { version = "=9.5.1", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
-tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "test-util"] }
 wiremock = "=0.6.5"

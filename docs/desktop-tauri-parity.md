@@ -81,7 +81,7 @@ Pinned with `=` in the manifests; `desktop-tauri/Cargo.lock` is committed.
 | tokio (shell, `sync`, `time`, `fs`) | 1.54.1 | yes |
 | url | 2.5.8 | yes (shell: window addresses) |
 | webview2-com / windows-core (Windows) | 0.39.1 / 0.62.2 | yes (the versions wry 0.57 uses) |
-| tauri-plugin-updater | 2.14.1 | no (planned) |
+| tauri-plugin-updater | 2.14.1 | registered with no endpoint and no key: never checks (see `updates`) |
 | tauri-plugin-autostart | 2.7.0 | yes |
 | keyring (default `v1` stores) | 4.2.0 | yes, in `polaris-client` |
 | qrcodegen | 1.8.0 | yes, in `polaris-client` |
@@ -146,6 +146,94 @@ workflow changes for the beta:
   carrying `settings.json`, `instances.json` and the server list over, and the API key
   (Electron `safeStorage`) or ask for it once.
 
+### Cutover plan
+
+Nothing below is built yet, and no workflow changes for it now: it is the plan the
+release rows (`releases`, `updates`, `update-first`, `update-ready`, `appimage`,
+`squirrel`, `mac-signature`) are ported for. Read against `.github/workflows/desktop.yml`
+and `desktop/README.md` as they are on 2026-11-13.
+
+**Tags.** The Tauri app is released under `desktop-tauri-v<version>`
+(`polaris_client::releases::BETA_TAG_PREFIX`), which the Electron app's
+`newerRelease` never matches (it reads `startsWith("desktop-v")`), so no Tauri
+release can be offered to an Electron install as one of its own. A test holds that
+neither prefix starts with the other. While it is a beta, every such release is a
+prerelease and has no updater endpoint pointing at it.
+
+**Handing over, exactly once, with nothing typed.** Two ordinary Electron
+updates, published by `desktop.yml` as today (criterion 5):
+
+1. *Bridge* (`desktop-vN`, Electron). On its first start it writes what only
+   Electron can read into places the Tauri app reads: each saved API key, decrypted
+   with `safeStorage`, into the OS credential store under the Tauri app's service
+   name (`polaris_client::keys`), and a `handover.json` marker in its `userData`
+   saying the keys were copied. `settings.json`, `instances.json` and the server list
+   need no copy: the Tauri app already imports them once from Electron's `userData`
+   (`import_from_electron` in `main.rs`) and never writes there, so Electron's folder
+   stays as it was, a backup of the old state.
+2. *Switch* (`desktop-vN+1`, still an Electron update from the installed app's point
+   of view). It carries the Tauri installers next to the Electron ones, listed in
+   `SHA256SUMS`, and installs the Tauri app the way each platform already updates:
+   - **Windows (Squirrel).** The Electron app downloads the Tauri NSIS setup from
+     the release, checks its size and digest against `SHA256SUMS` (as `appimage.ts`
+     does today), runs it per-user and passive with an argument array, and quits only
+     when it exited 0 and the Tauri executable answers. The Tauri app's first start
+     imports settings and servers, finds the keys already in the credential store,
+     then runs Squirrel's `Update.exe --uninstall` for the old install. That runs
+     Electron's `--squirrel-uninstall` hook, which removes `polaris://`, the login
+     item and the mail handler, so the Tauri app re-registers all three after it, and
+     only then writes its own "handed over" marker.
+   - **macOS (Squirrel.Mac).** The switch release's `RELEASES-darwin-<arch>.json`
+     feed names a zip of the Tauri `Polaris.app`, with the same bundle identifier
+     (`io.github.fjrg2007.polaris`, the open identity decision in Beta identity, must
+     be settled this way for macOS) and the same Developer ID team, so Squirrel.Mac's
+     designated-requirement check accepts it and swaps the bundle like any update.
+     Unsigned Mac apps never updated themselves (`mac-signature`) and keep getting the
+     release page, as now.
+   - **Linux (AppImage).** The Electron app's own `replaceAppImage` puts the Tauri
+     AppImage in place of the running one (same path, same checksum check, atomic
+     rename). The .deb keeps getting the release page.
+
+   "Exactly once": every step is idempotent and gated on a marker - the switch does
+   nothing until the bridge's key marker exists, the Tauri import runs once (its own
+   marker), the Squirrel removal only when Squirrel's `Update.exe` is still there,
+   and the Tauri installer is attempted once per version through the same
+   one-start rule as `update-first` (`attempted`). A key that could not be copied
+   (no credential store) is asked for once by the Tauri app, as the `api-key-store`
+   row already says.
+
+**Signing keeps working, with no workflow changed now.** SignPath stays optional for
+good (`windows-signpath` is `continue-on-error: true` and only runs when its secret
+and three variables exist). For the Tauri build it signs the same two files it signs
+today, so the SignPath project's artifact configuration and policy stay unchanged:
+the Tauri executable is built as `polaris.exe` (`mainBinaryName`) and the NSIS setup
+renamed to `Polaris-Setup.exe` in the zip sent, both still `min-matches="0"`. The
+Tauri updater's minisign signature is a second, separate step that must run after
+Authenticode (it covers the final bytes), on the signed files when SignPath ran and
+on the unsigned ones when it did not, so an unsigned release still updates. Its
+private key is generated once, kept as a repository secret with a password and backed
+up offline like the TV signing key; only its public key goes into `tauri.conf.json`
+at release, together with the endpoint. macOS keeps `APPLE_*` and notarization as
+now. When the Tauri build is added it goes into `desktop.yml`'s existing tag-only
+jobs, so CI on every push stays exactly as fast.
+
+**A broken update always ends in an app that opens.**
+- Nothing is installed until it is verified: the plugin checks the minisign
+  signature before it runs or unpacks anything, and the switch checks `SHA256SUMS`.
+- The installed app is never left half-replaced where that can be avoided: the plugin
+  moves the macOS bundle and the AppImage with renames and restores the previous one
+  on failure (2.14.1 source, `replace_bundle` and `install_appimage`); on Windows the
+  NSIS setup overwrites a single executable (resources are embedded and WebView2's
+  loader is linked in), which is the one window left, kept short.
+- The start never loops: `update_first` remembers the version before it restarts and
+  never holds a start for the same version again, and every outcome but a working
+  restart (slow answer, failed install, closed window, failed or returning restart,
+  an attempt that could not be remembered) opens the app. Ported with its tests.
+- During the cutover there is always one working app: Electron is removed only by the
+  Tauri app after the Tauri app has opened, and Electron's `userData` is not deleted,
+  so a failed Tauri install leaves Electron opening as before and offering the switch
+  again in the background, never before opening twice.
+
 ## Electron main process (`desktop/src/main`)
 
 | Module | What it does | Tauri 2 / Rust equivalent | Status | Risks |
@@ -156,7 +244,7 @@ workflow changes for the beta:
 | annotate-overlay | See-through window over the shared display showing call strokes | shell: transparent, always-on-top window, `set_ignore_cursor_events` | todo | macOS transparency needs `macos-private-api`; full-screen games |
 | api-key-store | API key encrypted by the OS (`safeStorage`), never in plain text | `polaris-client::keys` (`KeyRing` over `keyring` 4.2.0: Credential Manager, Keychain, Secret Service), one entry per server under the beta's own service name | scaffolded | no store (Linux without a secret service): held in memory for the run, as Electron; Electron's Chromium-encrypted file cannot be migrated, so the beta asks once; only the Windows store was compiled |
 | app-badge | Waiting count on the taskbar/Dock/launcher icon | `polaris-client::app_badge` (same schema and per-system plan, tests ported) + `set_app_badge` command, Polaris windows only (remote capability + `from_polaris`): `set_overlay_icon` (Windows), `set_badge_label` (macOS), `set_badge_count` (Linux) | scaffolded | `window.polarisDesktop` (preload app) is not defined yet, so no page calls it |
-| appimage | Replaces a running AppImage with a verified newer one | `tauri-plugin-updater` (handles AppImage) | todo | SHA256SUMS check moves to the updater's signature |
+| appimage | Replaces a running AppImage with a verified newer one | `polaris_client::releases::{app_image_asset, parse_checksums}` (which file, which digest) + `tauri-plugin-updater` (the replace: backup rename, new file, restore on failure) | scaffolded | asset choice and `SHA256SUMS` reading ported with their tests; the replace is the plugin's, verified by its minisign signature instead of `SHA256SUMS`; the updater has no endpoint in the beta, so it never runs |
 | call-hotkeys | Holds mute/deafen keys system-wide during a call, one window at a time | `set_call_hotkeys` over `tauri-plugin-global-shortcut`, granted to the Polaris window by the remote capability and checked with `ipc::from_polaris`; presses go to the holding window as `polaris://call-hotkey`; let go on `null` and when the window is destroyed | scaffolded | not released on a navigation; `window.polarisDesktop` (preload app) is not defined yet, so no page calls it; Wayland has no global shortcuts without a portal |
 | context-menu | Right-click menu (copy, paste, links) in every window | `polaris-client::context_menu` (same items, link allow-list and tests) | blocked: Tauri 2 raises no right-click event from the webview to Rust, and getting one means a script with IPC in the remote page, which its capability forbids; WebView2/WebKit draw their own menu (copy, paste, links) meanwhile | menus differ per engine |
 | deep-links | What a `polaris://` link does once it arrives (queued until ready) | `polaris-client::deep_link` (`read_deep_link`, `deep_link_in`, `deep_link_route`, `DeepLinks` queue) + `tauri-plugin-deep-link` `on_open_url`/`get_current` + single-instance `deep-link` feature | scaffolded | ported with tests (same 2048 limit, path rules, newest-wins queue, one question at a time); the switch question is a native dialog (`tauri-plugin-dialog`). Not exercised on a running app; the `mailto:` link mail-handler is handed is not opened yet |
@@ -173,7 +261,7 @@ workflow changes for the beta:
 | known-games | The table of recognized game executables | `polaris_client::known_games` | scaffolded | `desktop/src/main/known-games.ts` stays the one place it is edited (hand-written, not generated from core); a test fails when the Rust table differs |
 | local-ca-pin | Trusts the same Polaris's local CA on its proven local address | `polaris-client::local_ca_pin`: `PinVerifier` (rustls `ServerCertVerifier` over rustls-platform-verifier, pin only on `UnknownIssuer` for in-scope hosts; webpki checks the chain with the pinned CA as sole anchor, its dates and CA flag read from DER); webview: WebView2 `ServerCertificateErrorDetected` (`ICoreWebView2_14`) | scaffolded | ported with the Electron fixtures as tests. Windows webview only; macOS (WKWebView) and Linux (WebKitGTK) blocked: wry exposes no certificate-error hook, so a local alternate with Polaris's own CA is refused there (the window then says why) |
 | login-item | Open with the computer (Squirrel launcher on Windows, autostart file on Linux) | `tauri-plugin-autostart` with `--hidden`; tray switch "Open with the computer", kept as `Settings::open_at_login` (off by default in the beta, unlike Electron, so the two never both start with the computer), re-applied every start; a debug build never writes it | scaffolded | entry is named after the beta, never Electron's; the Squirrel entry has to be removed at cutover |
-| mac-signature | Whether the macOS app has a Developer ID (Squirrel.Mac needs it) | not needed with `tauri-plugin-updater` | todo | Gatekeeper still wants notarization for a clean first open |
+| mac-signature | Whether the macOS app has a Developer ID (Squirrel.Mac needs it) | `polaris_client::mac_signature` (`team_identifier`, `developer_signed` through `/usr/bin/codesign`, argument array, 30 s limit) | scaffolded | tests ported; the beta's own updates do not need it (minisign), it is kept for the cutover, which reaches Mac users only through Squirrel.Mac and so only signed ones; never run on macOS; Gatekeeper still wants notarization for a clean first open |
 | mail-handler | Registers on Windows as a `mailto:` handler (Capabilities registry keys) | `mail_handler.rs` with `winreg` 0.56.0, under the beta's own names (`Polaris Beta`, `Polaris.Beta.Url.mailto`); only after the tray switch "Offer this beta for email links", kept as `Settings::mail_handler` (`mailHandler`, off by default); switching it off, or any start with it off, deletes every key it wrote | scaffolded | the beta has no installer, so "uninstall" is that switch; opening the `mailto:` link it is handed is the deep-link module's |
 | menu | Application menu (File, Edit, View, Window, Help + update offer) | Tauri `menu` API in `tray.rs`, set on macOS only; the update line is there and disabled (the beta never updates) | scaffolded | Windows/Linux draw a Tauri menu as a strip on every window, so there the engine's own keys and the tray stand in, as Electron hides its bar; devtools item left out of release builds |
 | navigation | Where a window may go; keeps the bridge on the configured origin | `polaris-client::navigation` (pure, tested) + `on_navigation`/`on_new_window` on every Polaris window; external links through `tauri-plugin-opener` (http, https, mailto only) | scaffolded | provider round trip kept (ends on the next Polaris page load); Back (`backIndex`) ported but no menu calls it yet |
@@ -184,19 +272,19 @@ workflow changes for the beta:
 | polaris-api | API-key calls, Bearer header, refusals, local-address failover | `polaris_client::ApiClient` + `polaris_client::instance` (port of core `instance-fallback`: signed challenge over `aws-lc-rs` Ed25519, hold, gateway statuses) | scaffolded | failover and streamed `send_file` ported and tested; keeping learned records on disk is the `instance-store` row; Chromium `net` used the window's proxy, reqwest uses the system proxy |
 | push-local | Build with local Docker, upload the image, follow the deployment log | `polaris_client::push_local` + shell `push_choose_folder`, `push_start` (events on a `Channel`), `push_cancel`, Polaris windows only | scaffolded | bounded memory: chunked gzip and upload, capped lines, batched events; the Polaris in use and its key from the key store, as Electron (the page sends only the service, its name and the platform); the push page and its notice are not built; the server a push names is not yet checked against the one in use |
 | reachability | Network error codes into sentences; offline-page detection | `polaris-client::net` (`NetFailure`) | scaffolded | reqwest has no typed DNS/TLS error, so those two are read from the error text |
-| releases | Highest published `desktop-v` release newer than this one (pure) | `tauri-plugin-updater` endpoint | todo | see the release section |
+| releases | Highest published `desktop-v` release newer than this one (pure) | `polaris_client::releases` (`newer_release` with a prefix, `parse_version`, `release_source`, `mac_feed_name`, `CHECKSUMS`); `BETA_TAG_PREFIX` = `desktop-tauri-v` | scaffolded | tests ported, plus: neither prefix starts with the other, and no workflow names the beta's prefix (read, not changed); see the release section |
 | same-instance | Whether a typed address is a server already listed (by signature) | `polaris-client::same_instance` over `polaris-client::instance` (the core instance-fallback port: Ed25519 via aws-lc-rs) | scaffolded | ported with tests (30 s cache, 50 entries); an untrusted certificate is accepted for that one host by a client built for the question (`AcceptHost`), with no cookie or key |
 | screen-share | Screen/window list with thumbnails for the dashboard's own picker | platform capture (`windows-capture`/ScreenCaptureKit/PipeWire) or the engine's own picker | todo | biggest gap: no `setDisplayMediaRequestHandler` equivalent; WebKitGTK screen share is limited |
 | settings | JSON settings: server, server list, per-service push folder | `polaris-client::settings` + `servers` (every field of the Electron schema, read field by field) | scaffolded | ported with tests; Electron's `settings.json` (`<config dir>/Polaris`, its `productName`) imported once when the beta has none, never written |
-| squirrel | Squirrel install/update/uninstall hooks (shortcuts) | NSIS/MSI bundler | todo | cutover must uninstall Squirrel cleanly |
+| squirrel | Squirrel install/update/uninstall hooks (shortcuts) | none in the beta: the Tauri installer's own hooks, and the cutover steps in the release section | blocked: no installer is built (`bundle.active: false` by rule), so there is nothing to hook | the Electron hooks stay in `desktop/`; the cutover removes the Squirrel install from the Tauri app after its first good start and re-registers `polaris://`, the login item and the mail handler, which the Squirrel uninstall hook removes |
 | tray | Tray icon menu (servers, API key, update) on Windows/Linux | Tauri `tray-icon` in `tray.rs`: Open, update line (disabled), Settings... opens the servers page, Switch to (two or more kept hosts, through the servers page's switch), API keys, Install on a TV (disabled until tv-install is ported), Forget the saved API key, Open in the browser (`tauri-plugin-opener`), the two OS switches, Quit | scaffolded | none |
 | tv-install | Installs Polaris TV on a set, step by step, with a backup first | `polaris-client::tv_install` over adb-*, tv-* and usb-link (same steps, checks, backup reads, grants, Home and control levels, link screen, debugging off, outcomes); commands `tv_state`, `tv_find`, `tv_find_usb`, `tv_cancel`, `tv_start` and the `tv-event` event in `src-tauri/src/tv.rs`, answered only for the main window on its saved Polaris; `tv_start` input read by `read_start` (`deny_unknown_fields`, private address, listed USB id, six-digit code) | scaffolded | TS tests ported; the steps after the connection run against a scripted TV and the release lookup against recorded GitHub answers (wiremock); never run against a real TV. The ADB key is in the system credential store (memory for the run where there is none) instead of a 0600 file. Blocked for the dashboard: a remote page reaches no app command until the beta declares an app ACL manifest (`tauri_build` `AppManifest`), which then gates every command, so it belongs with the `app` bridge row, not here; the tray entry stays disabled |
 | tv-mdns | Finds TVs over multicast DNS / DNS-SD | `polaris-client::tv_mdns` over the `mdns-sd` crate; collecting, merging and naming ported as pure functions | scaffolded | collecting tested on resolved records; the browse itself never ran on a real network or TV; Windows firewall prompt not checked; the TS packet-parser tests do not apply (the crate parses) |
 | tv-path | Which install path a TV takes, from core's tv-compat data | `polaris-client::tv_path` (pure), core's `models.json` / `debugging.json` compiled in with `include_str!` | scaffolded | every listed model's path tested from the same data as the TS test |
 | tv-wait | Waits for the TV's debugging port instead of asking to retry | `polaris-client::tv_wait` (async, hooks trait) | scaffolded | TS cases ported against a scripted clock and port |
-| update-first | Whether a start updates before it opens (pure) | shell + updater plugin | todo | must always end in an app that opens |
-| update-ready | The downloaded update waiting for a restart (pure) | shell state + updater plugin | todo | none |
-| updates | Self-update from GitHub releases every few hours | `tauri-plugin-updater` | todo | see the release section; never enabled in the beta |
+| update-first | Whether a start updates before it opens (pure) | `polaris_client::update_first` (`update_before_opening` over an `OpeningSteps` trait, tokio timers, the same four limits) | scaffolded | all TS tests ported on a paused clock, plus a late answer that must open; not called by the shell, since the beta has no endpoint and so never finds an update |
+| update-ready | The downloaded update waiting for a restart (pure) | `polaris_client::update_ready::UpdateReadyState` (pages by window label, one restart per 30 s window, the same two sentences) | scaffolded | TS tests ported; not wired to a command or event until the beta can find an update |
+| updates | Self-update from GitHub releases every few hours | `tauri-plugin-updater` 2.14.1 registered in `src-tauri/src/updater.rs` with `endpoints: []` and an empty `pubkey` | scaffolded | disabled for good in the beta, held by tests: the plugin config has no endpoint or key, `bundle` builds no update artifacts, no capability or page grants `updater:` commands, and no shell code calls `updater_builder`, `.endpoints(` or `.check()`; the check loop (every 6 h, after Squirrel's first run) is not written, there being nothing to check |
 | usb-link | TV USB connection through a hidden WebUSB page | `polaris-client::usb_link` over `nusb` 0.2.9, no hidden page: lists devices offering the ADB triple, opens one by its listed id, maps not-found/disconnected to gone and the rest to busy | scaffolded | never opened a real device; WinUSB driver binding on Windows (a TV without it answers busy, as with WebUSB); the hidden-window lifetime tests do not apply (no window) |
 | voice-widget | Always-on-top voice widget over games | transparent always-on-top window | todo | exclusive full-screen games cover it, as now |
 | vpn-helper-client | Talks to the VPN service over loopback with mutual challenge | `polaris_client::vpn_helper` (tokio TCP, `hmac` + `sha2`): `ask_helper` with the same line order, service-first HMAC proof checked in constant time before any order is sent, 20 s idle timeout, 4096-byte reply cap, `replySchema` read; `elevated_install`, `read_join` (`joinSchema`), `tailscale_path`, `device_name_from`, and `VpnConnection::read` (`connectionSchema` in `ipc.ts`, plus `deny_unknown_fields`) | scaffolded | TS tests ported to `polaris-client/tests/vpn`, plus a stand-in service that is `desktop/vpn-helper`'s `server.rs`/`auth.rs` with the tunnel left out (the helper is a binary crate of its own workspace, so its types are copied, not shared; it is unchanged) and the helper's own proof vector; never run against the real service. Order keys go out sorted, not in spread order (the service reads JSON, not bytes) |
@@ -232,7 +320,7 @@ workflow changes for the beta:
 | title-bar | Window button colours over the page header | `decorations(false)` + own buttons, or macOS `titleBarStyle` | todo | Windows has no title-bar overlay in Tauri |
 | tv-address | TV address parsing | `polaris-client::tv_address` | scaffolded | none |
 | update-check | "Check for updates" sentences (pure) | `polaris-client` | todo | none |
-| update-ready | Update-ready state as the dashboard sees it | serde type | todo | none |
+| update-ready | Update-ready state as the dashboard sees it | `polaris_client::update_ready::{UpdateReady, read_update_ready}` (`deny_unknown_fields`, the same version pattern, 64 characters at most) | scaffolded | tests ported with the main-process ones |
 | usb-adb | ADB over WebUSB bulk endpoints | `polaris-client::usb_adb`: interface choice, device naming, header/payload framing, the zero-length packet, as an `AdbLink`; a read dropped part way resumes | scaffolded | tested against an in-process fake TV speaking adbd's USB framing (`tests/tv/usb.rs`); no real device |
 | voice-widget | Voice widget state schema | serde types | todo | none |
 | window-place | Restores the window where it was, unless that display is gone | `tauri-plugin-window-state` | todo | the plugin must fall back when a monitor is gone |
