@@ -212,6 +212,11 @@ export interface ExtensionAccount {
     readonly id?: string | null;
     readonly name: string | null;
     readonly email: string | null;
+    /** The two halves of the name as the account keeps them, when the server
+     *  says them: "Javier" and "Romero González", which a split of the display
+     *  name cannot recover. */
+    readonly firstName?: string | null;
+    readonly lastName?: string | null;
 }
 
 /**

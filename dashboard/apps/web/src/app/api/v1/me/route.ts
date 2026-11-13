@@ -21,7 +21,14 @@ export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
 
     const user = await prisma.user.findUnique({
         where: { id: principal.userId },
-        select: { id: true, name: true, email: true, username: true }
+        select: {
+            id: true,
+            name: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            username: true
+        }
     });
     if (!user)
         return Response.json(

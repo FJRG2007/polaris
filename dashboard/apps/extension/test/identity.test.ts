@@ -84,6 +84,16 @@ describe("the account as an identity", () => {
         });
     });
 
+    it("keeps the account's own halves over a split of its display name", () => {
+        const values = accountIdentity({
+            name: "Javier",
+            email: "javier@x.test",
+            firstName: "Javier",
+            lastName: "Romero González"
+        });
+        expect(values).toMatchObject({ firstName: "Javier", lastName: "Romero González" });
+    });
+
     it("offers nothing for an account that said nothing", () => {
         expect(accountIdentity(null)).toBeNull();
         expect(accountIdentity({ name: " ", email: null })).toBeNull();

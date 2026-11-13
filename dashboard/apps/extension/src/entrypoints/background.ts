@@ -1486,7 +1486,12 @@ async function shelfIdentities(): Promise<identity.OpenIdentity[]> {
 async function ownIdentity(): Promise<messages.IdentityValues | null> {
     const account = await readAccount();
     const email = account?.email ?? (await EMAIL.getValue());
-    return identity.accountIdentity({ name: account?.name ?? null, email: email ?? null });
+    return identity.accountIdentity({
+        name: account?.name ?? null,
+        email: email ?? null,
+        firstName: account?.firstName ?? null,
+        lastName: account?.lastName ?? null
+    });
 }
 
 /** Every login this account can open, decrypted. */
@@ -1765,13 +1770,18 @@ async function readAccount(): Promise<messages.ExtensionAccount | null> {
             credentials: "omit"
         });
         if (!reply.ok) return null;
-        const body = (await reply.json()) as { user?: { name?: unknown; email?: unknown } };
-        const name = typeof body.user?.name === "string" ? body.user.name : null;
-        const email = typeof body.user?.email === "string" ? body.user.email : null;
+        const body = (await reply.json()) as {
+            user?: { name?: unknown; email?: unknown; firstName?: unknown; lastName?: unknown };
+        };
+        const text = (value: unknown): string | null => (typeof value === "string" ? value : null);
+        const name = text(body.user?.name);
+        const email = text(body.user?.email);
+        const firstName = text(body.user?.firstName);
+        const lastName = text(body.user?.lastName);
         // Neither half is worth keeping on its own account of nothing: a record
         // with two nulls in it says the same as no record and costs a read.
         if (name === null && email === null) return null;
-        const account: messages.ExtensionAccount = { name, email };
+        const account: messages.ExtensionAccount = { name, email, firstName, lastName };
         await ACCOUNT.setValue(account);
         return account;
     } catch {

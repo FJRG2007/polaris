@@ -100,7 +100,13 @@ export function cardOf(one: OpenIdentity, vaults: ReadonlyMap<string, string>): 
 export function accountIdentity(account: ExtensionAccount | null): IdentityValues | null {
     const name = account?.name?.trim() ?? "";
     const email = account?.email?.trim() ?? "";
-    if (name === "" && email === "") return null;
+    const first = account?.firstName?.trim() ?? "";
+    const last = account?.lastName?.trim() ?? "";
+    if (name === "" && email === "" && first === "" && last === "") return null;
+    // The account's own halves when it has them; the display name split at its
+    // first space only from a server too old to send them.
+    if (first !== "" || last !== "")
+        return { ...blankIdentity(), firstName: first, lastName: last, email };
     const [given = "", ...rest] = name.split(/\s+/);
     return { ...blankIdentity(), firstName: given, lastName: rest.join(" "), email };
 }
