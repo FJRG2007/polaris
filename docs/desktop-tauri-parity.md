@@ -33,7 +33,7 @@ All of these hold, measured, before the Electron app stops being the shipped one
 | `polaris-client`: address, API key, identity probe, API-key calls, unit tests | scaffolded |
 | `polaris-client`: failover, streamed upload, docker, push, folder zip, install tools, games | scaffolded |
 | Tauri shell: single instance, servers page, Polaris window with navigation, permissions, failover and local CA pin, tray, `polaris://` links, OS switches, notices, push and developer commands | scaffolded |
-| Everything else in the tables below | todo |
+| Everything else in the tables below | scaffolded, except the rows marked `blocked:` (context-menu, screen-share, annotate-overlay, title-bar, squirrel); every Electron IPC channel maps to a beta command or a blocked row |
 | Startup / memory measurement against Electron | scaffolded: beta measured hidden by `tools/measure-startup`; Electron by hand only (see [Startup and memory](#startup-and-memory)) |
 
 Statuses: `todo` (nothing yet), `scaffolded` (exists in the beta, not at parity),
