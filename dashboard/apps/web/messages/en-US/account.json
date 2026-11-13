@@ -440,10 +440,10 @@
                     "summary": "Add a domain"
                 },
                 "getDeployServicesByIdEnv": {
-                    "summary": "List variable names"
+                    "summary": "List a service's variable names"
                 },
                 "putDeployServicesByIdEnvByName": {
-                    "summary": "Create or replace a variable"
+                    "summary": "Create or replace a variable by name"
                 },
                 "deleteDeployServicesByIdEnvByName": {
                     "summary": "Remove a variable by name"
@@ -468,27 +468,27 @@
                     "summary": "Stop a service"
                 },
                 "getDeployServicesByIdVariables": {
-                    "summary": "List variables",
+                    "summary": "List a service's variables",
                     "description": "Secret values are withheld."
                 },
                 "postDeployServicesByIdVariables": {
-                    "summary": "Set a variable"
+                    "summary": "Set a variable on a service"
                 },
                 "postDeployServicesByIdVariablesImport": {
-                    "summary": "Import a .env file"
+                    "summary": "Import a .env file into a service"
                 },
                 "getDeployEnvironmentsByIdVariables": {
-                    "summary": "List variables",
+                    "summary": "List an environment's variables",
                     "description": "Secret values are withheld."
                 },
                 "postDeployEnvironmentsByIdVariables": {
-                    "summary": "Set a variable"
+                    "summary": "Set a variable on an environment"
                 },
                 "postDeployEnvironmentsByIdVariablesImport": {
-                    "summary": "Import a .env file"
+                    "summary": "Import a .env file into an environment"
                 },
                 "deleteDeployVariablesById": {
-                    "summary": "Remove a variable"
+                    "summary": "Remove a variable by id"
                 },
                 "getDeployVariablesByIdValue": {
                     "summary": "Reveal a variable's value"

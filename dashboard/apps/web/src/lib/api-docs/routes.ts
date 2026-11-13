@@ -79,14 +79,16 @@ const redeployed = z.boolean().describe("Whether the change is being redeployed"
 const variableRoutes = (
     prefix: string,
     file: string,
-    param: Record<string, ZodTypeAny>
+    param: Record<string, ZodTypeAny>,
+    /** Whose variables these are, "a service" or "an environment": keeps each summary unique. */
+    owner: string
 ): DocumentedRoute[] => [
     {
         method: "GET",
         path: `${prefix}/variables`,
         file: `${file}/variables/route.ts`,
         tag: "Deploy",
-        summary: "List variables",
+        summary: `List ${owner}'s variables`,
         description: "Secret values are withheld.",
         changes: false,
         params: param,
@@ -113,7 +115,7 @@ const variableRoutes = (
         path: `${prefix}/variables`,
         file: `${file}/variables/route.ts`,
         tag: "Deploy",
-        summary: "Set a variable",
+        summary: `Set a variable on ${owner}`,
         changes: true,
         params: param,
         query: formatQuery,
@@ -125,7 +127,7 @@ const variableRoutes = (
         path: `${prefix}/variables/import`,
         file: `${file}/variables/import/route.ts`,
         tag: "Deploy",
-        summary: "Import a .env file",
+        summary: `Import a .env file into ${owner}`,
         changes: true,
         params: param,
         query: formatQuery,
@@ -289,7 +291,7 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
         path: "/api/v1/deploy/services/{id}/env",
         file: "api/v1/deploy/services/[id]/env/route.ts",
         tag: "Deploy",
-        summary: "List variable names",
+        summary: "List a service's variable names",
         changes: false,
         params: serviceId,
         query: formatQuery,
@@ -314,7 +316,7 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
         path: "/api/v1/deploy/services/{id}/env/{name}",
         file: "api/v1/deploy/services/[id]/env/[name]/route.ts",
         tag: "Deploy",
-        summary: "Create or replace a variable",
+        summary: "Create or replace a variable by name",
         changes: true,
         params: { ...serviceId, name: schemas.variableKeySchema },
         query: formatQuery,
@@ -393,18 +395,24 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
         query: formatQuery,
         responses: { 200: ok(z.object({ [done]: z.literal(true) })) }
     })),
-    ...variableRoutes("/api/v1/deploy/services/{id}", "api/v1/deploy/services/[id]", serviceId),
+    ...variableRoutes(
+        "/api/v1/deploy/services/{id}",
+        "api/v1/deploy/services/[id]",
+        serviceId,
+        "a service"
+    ),
     ...variableRoutes(
         "/api/v1/deploy/environments/{id}",
         "api/v1/deploy/environments/[id]",
-        uuidParam
+        uuidParam,
+        "an environment"
     ),
     {
         method: "DELETE",
         path: "/api/v1/deploy/variables/{id}",
         file: "api/v1/deploy/variables/[id]/route.ts",
         tag: "Deploy",
-        summary: "Remove a variable",
+        summary: "Remove a variable by id",
         changes: true,
         params: uuidParam,
         query: redeployQuery,
