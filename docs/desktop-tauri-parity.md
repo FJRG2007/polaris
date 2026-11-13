@@ -170,9 +170,9 @@ workflow changes for the beta:
 | squirrel | Squirrel install/update/uninstall hooks (shortcuts) | NSIS/MSI bundler | todo | cutover must uninstall Squirrel cleanly |
 | tray | Tray icon menu (servers, API key, update) on Windows/Linux | Tauri `tray-icon` | scaffolded | only Open and Quit |
 | tv-install | Installs Polaris TV on a set, step by step, with a backup first | `polaris-client` module over adb-* | todo | long; needs real sets to verify |
-| tv-mdns | Finds TVs over multicast DNS / DNS-SD | `mdns-sd` crate | todo | firewall prompts on Windows |
-| tv-path | Which install path a TV takes, from core's tv-compat data | `polaris-client` (pure) | todo | data must stay generated from core |
-| tv-wait | Waits for the TV's debugging port instead of asking to retry | `polaris-client` (tokio) | todo | none |
+| tv-mdns | Finds TVs over multicast DNS / DNS-SD | `polaris-client::tv_mdns` over the `mdns-sd` crate; collecting, merging and naming ported as pure functions | scaffolded | collecting tested on resolved records; the browse itself never ran on a real network or TV; Windows firewall prompt not checked; the TS packet-parser tests do not apply (the crate parses) |
+| tv-path | Which install path a TV takes, from core's tv-compat data | `polaris-client::tv_path` (pure), core's `models.json` / `debugging.json` compiled in with `include_str!` | scaffolded | every listed model's path tested from the same data as the TS test |
+| tv-wait | Waits for the TV's debugging port instead of asking to retry | `polaris-client::tv_wait` (async, hooks trait) | scaffolded | TS cases ported against a scripted clock and port |
 | update-first | Whether a start updates before it opens (pure) | shell + updater plugin | todo | must always end in an app that opens |
 | update-ready | The downloaded update waiting for a restart (pure) | shell state + updater plugin | todo | none |
 | updates | Self-update from GitHub releases every few hours | `tauri-plugin-updater` | todo | see the release section; never enabled in the beta |
@@ -209,7 +209,7 @@ workflow changes for the beta:
 | servers | The list of known servers | `polaris-client` | todo | none |
 | text-size | Text size schema | serde type | todo | none |
 | title-bar | Window button colours over the page header | `decorations(false)` + own buttons, or macOS `titleBarStyle` | todo | Windows has no title-bar overlay in Tauri |
-| tv-address | TV address parsing | `polaris-client` | todo | none |
+| tv-address | TV address parsing | `polaris-client::tv_address` | scaffolded | none |
 | update-check | "Check for updates" sentences (pure) | `polaris-client` | todo | none |
 | update-ready | Update-ready state as the dashboard sees it | serde type | todo | none |
 | usb-adb | ADB over WebUSB bulk endpoints | `nusb` | todo | none |

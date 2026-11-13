@@ -12,6 +12,10 @@ pub mod address;
 pub mod api;
 pub mod identity;
 pub mod net;
+pub mod tv_address;
+pub mod tv_mdns;
+pub mod tv_path;
+pub mod tv_wait;
 
 pub use address::{AddressError, ApiKey, InstanceUrl};
 pub use api::{ApiClient, ApiError, DeploymentState, ImageTarget, Me, MeUser, Started};
