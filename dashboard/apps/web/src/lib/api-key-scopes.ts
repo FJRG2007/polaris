@@ -32,6 +32,7 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "translate.use": "Translate text",
     "automations.use": "Read and change automations",
     "automations.secrets": "Store automation secrets",
+    "alerts.topics": "Manage alert topics",
     "status.manage": "Run status pages and their checks",
     "mailserver.manage": "Run mail servers",
     "chat.use": "Use chat",
@@ -93,6 +94,7 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     "translate.use": "Translate text and detect its language with the engines this Polaris offers.",
     "automations.use": "List, create, change, publish and run the owner's automations.",
     "automations.secrets": "Store secrets for automations. A stored secret is never read back.",
+    "alerts.topics": "Create the topics other systems post alerts to.",
     "status.manage": "Create status pages, run their checks, and post incidents and maintenance.",
     "mailserver.manage":
         "Set up the mail servers the owner runs, and manage their domains, mailboxes and records.",

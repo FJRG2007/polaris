@@ -15,6 +15,7 @@
 import { z, type ZodTypeAny } from "zod";
 import { clientConnectSchema } from "@/lib/vpn/wireguard";
 import * as schemas from "@/lib/deploy/api/schemas";
+import { nativeAlertSchema } from "@/lib/alerts/parse";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
 
@@ -32,7 +33,9 @@ export interface DocumentedRoute {
     path: string;
     /** The route file, relative to src/app. */
     file: string;
-    tag: "Account" | "Deploy" | "MCP" | "Polar";
+    tag: "Account" | "Deploy" | "MCP" | "Polar" | "Alerts";
+    /** Authenticated by an alert topic's secret rather than an API key. */
+    topicSecret?: true;
     summary: string;
     description?: string;
     /** Changes something, and counts against the stricter rate limit. */
@@ -54,6 +57,16 @@ const accepted = (schema: ZodTypeAny): DocumentedResponse => ({
     description: "Accepted",
     schema,
     text: true
+});
+
+const alertAnswer = z.object({
+    id: z.string(),
+    time: z.number().int(),
+    event: z.literal("message"),
+    topic: z.string(),
+    message: z.string(),
+    priority: z.number().int(),
+    recipients: z.number().int()
 });
 
 /** A compatible request: the wire format's own, read by the route itself. */
@@ -574,6 +587,48 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
         responses: {
             200: ok(z.object({ data: z.array(z.object({ id: z.string() }).passthrough()) }).passthrough(), false)
         }
+    },
+    {
+        method: "POST",
+        path: "/api/alerts/{id}",
+        file: "api/alerts/[id]/route.ts",
+        tag: "Alerts",
+        topicSecret: true,
+        summary: "Post an alert to a topic",
+        description:
+            "Polaris' JSON, with the topic's secret as a bearer token. ntfy's JSON publish is also taken here, with the secret as its topic field. Unknown fields are refused.",
+        changes: true,
+        params: { id: z.string().uuid().describe("The topic's id.") },
+        body: nativeAlertSchema,
+        responses: { 200: ok(alertAnswer, false) }
+    },
+    {
+        method: "POST",
+        path: "/api/alerts/{id}/{token}",
+        file: "api/alerts/[id]/[token]/route.ts",
+        tag: "Alerts",
+        topicSecret: true,
+        summary: "Post an alert the ntfy way",
+        description:
+            "The body is the message; the rest goes in headers or the query. With the token message, it is Gotify's create-message, the secret as ?token= or X-Gotify-Key.",
+        changes: true,
+        params: {
+            id: z.string().uuid().describe("The topic's id."),
+            token: z.string().describe("The topic's secret.")
+        },
+        binaryBody: {
+            contentType: "text/plain",
+            headers: {
+                Title: "The alert's title.",
+                Priority: "1-5, or min, low, default, high, urgent.",
+                Tags: "Comma-separated tags.",
+                Click: "An http or https link the alert opens.",
+                Actions: "View actions: view, Label, https://link; separated by semicolons.",
+                Markdown: "yes to render the message as Markdown.",
+                "X-Dedup-Key": "Repeats with the same key fold into one alert for an hour."
+            }
+        },
+        responses: { 200: ok(alertAnswer, false) }
     }
 ];
 

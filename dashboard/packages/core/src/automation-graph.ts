@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { ALERT_LIMITS } from "./schemas/alert-topics.js";
 import { nextCronRun, parseCron } from "./cron.js";
 import { wallClock, zonedInstant } from "./schemas/display.js";
 import { durationSchema, durationSeconds } from "./automation-schema.js";
@@ -891,6 +892,16 @@ export const CORE_NODE_CONFIGS = {
     "core.connectivity": connectivityTriggerConfigSchema,
     /** Deploy a service again, as Redeploy on its page does. */
     "core.redeploy": z.object({ applicationId: z.string().uuid("serviceRequired") }),
+    /** An alert raised on one of the run-as account's topics, as a post to it would be. */
+    "core.alert": z.object({
+        topicId: z.string().uuid("topicRequired"),
+        title: text(ALERT_LIMITS.title).default(""),
+        body: text(AUTOMATION_LIMITS.textLength).min(1),
+        priority: z.number().int().min(1).max(5).default(3),
+        tags: text(ALERT_LIMITS.tag * ALERT_LIMITS.tags).default(""),
+        click: text(ALERT_LIMITS.url).default(""),
+        dedupKey: text(ALERT_LIMITS.dedupKey).default("")
+    }),
     /**
      * Put an agent to work on a connected repository: the one the event that
      * started the run names, or the one picked here. The instructions are the
@@ -970,6 +981,7 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     // The event's dedupe key is the step's idempotency key.
     "core.announce": { role: "action", ports: [], idempotent: true },
     "core.redeploy": { role: "action", ports: [], idempotent: false },
+    "core.alert": { role: "action", ports: [], idempotent: false },
     "core.agentWork": { role: "action", ports: [], idempotent: false },
     // A model's answer differs every time, and every ask is spent.
     "core.askAgent": { role: "action", ports: [], idempotent: false },

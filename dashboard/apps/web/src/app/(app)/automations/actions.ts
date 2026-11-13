@@ -983,3 +983,11 @@ export async function noticeChannelsAction(): Promise<
         return failure(caught);
     }
 }
+
+/** The alert topics a "Send an alert to a topic" step may pick: the ones its author manages. */
+export async function alertTopicChoicesAction(
+    input: unknown
+): Promise<OptionsPage<{ id: string; name: string }> | { error: string }> {
+    const { alertTopicChoicesAction: choices } = await import("@/app/(app)/account/alerts/actions");
+    return choices(input);
+}

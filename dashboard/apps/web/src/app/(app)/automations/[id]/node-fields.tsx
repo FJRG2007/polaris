@@ -26,7 +26,8 @@ import { useEffect, useState } from "react";
 import {
     agentRepoOptionsAction,
     polarAgentOptionsAction,
-    thresholdSubjectsAction
+    thresholdSubjectsAction,
+    alertTopicChoicesAction
 } from "../actions";
 import { PagedPicker } from "@/components/paged-picker";
 import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
@@ -79,6 +80,7 @@ export const STEP_TYPES = [
     "core.waitEvent",
     "core.waitCondition",
     "core.notify",
+    "core.alert",
     "core.message",
     "core.http",
     "core.chat",
@@ -153,6 +155,7 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     "core.set": () => ({ values: [] }),
     "core.announce": () => ({ name: "", payload: [] }),
     "core.redeploy": () => ({ applicationId: "" }),
+    "core.alert": () => ({ topicId: "", title: "", body: "", priority: 3, tags: "", click: "", dedupKey: "" }),
     "core.agentWork": () => ({ repoId: "", mode: null, instructions: "", target: "run" }),
     "core.askAgent": () => ({ agentId: "", prompt: "" }),
     "core.code": () => ({ code: CODE_TEMPLATES.filter, items: "" }),
@@ -428,6 +431,8 @@ export function NodeFields({
             return <ChatMessageFields config={config} set={set} />;
         case "core.redeploy":
             return <RedeployFields config={config} set={set} />;
+        case "core.alert":
+            return <AlertTopicFields config={config} set={set} />;
         case "core.agentWork":
             return <AgentWorkFields config={config} set={set} />;
         case "core.askAgent":
@@ -958,6 +963,61 @@ function RedeployFields({ config, set }: { config: Config; set: (change: Config)
                 </p>
             )}
             {missing && <p className="text-xs text-danger-ink">{t("fields.serviceGone")}</p>}
+        </div>
+    );
+}
+
+function AlertTopicFields({ config, set }: { config: Config; set: (change: Config) => void }) {
+    const t = useTranslations("automations");
+    const chosenId = typeof config.topicId === "string" ? config.topicId : "";
+    const priority = typeof config.priority === "number" ? config.priority : 3;
+    const text = (key: string) => (typeof config[key] === "string" ? (config[key] as string) : "");
+    return (
+        <div className="space-y-3">
+            <Field label={`${t("fields.alertTopic")} *`}>
+                <PagedPicker
+                    read={alertTopicChoicesAction}
+                    scope={{}}
+                    cache="automations:alert-topics"
+                    value={chosenId || null}
+                    onValueChange={(topicId) => set({ topicId })}
+                    placeholder={t("fields.alertTopicPick")}
+                    searchPlaceholder={t("fields.alertTopicSearch")}
+                    emptyText={t("fields.alertTopicNone")}
+                    aria-label={t("fields.alertTopic")}
+                />
+            </Field>
+            <p className="text-xs text-muted-foreground">
+                <Link className="underline" href="/account/alerts">
+                    {t("fields.alertTopicOpen")}
+                </Link>
+            </p>
+            <Field label={t("fields.alertSeverity")}>
+                <Select
+                    value={String(priority)}
+                    onValueChange={(value) => set({ priority: Number(value) })}
+                    options={core.ALERT_PRIORITIES.map((value) => ({
+                        value: String(value),
+                        label: t(`fields.alertSeverities.${value}`)
+                    }))}
+                    aria-label={t("fields.alertSeverity")}
+                />
+            </Field>
+            <Field label={t("fields.alertTitle")}>
+                <RefInput value={text("title")} onChange={(event) => set({ title: event.target.value })} />
+            </Field>
+            <Field label={`${t("fields.alertBody")} *`}>
+                <RefTextarea value={text("body")} onChange={(event) => set({ body: event.target.value })} />
+            </Field>
+            <Field label={t("fields.alertTags")}>
+                <RefInput value={text("tags")} onChange={(event) => set({ tags: event.target.value })} />
+            </Field>
+            <Field label={t("fields.alertClick")}>
+                <RefInput value={text("click")} onChange={(event) => set({ click: event.target.value })} />
+            </Field>
+            <Field label={t("fields.alertDedup")}>
+                <RefInput value={text("dedupKey")} onChange={(event) => set({ dedupKey: event.target.value })} />
+            </Field>
         </div>
     );
 }

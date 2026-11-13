@@ -2972,7 +2972,8 @@
             "statusPages": "Estado público",
             "games": "Juegos",
             "translate": "Traductor",
-            "polar": "Polar"
+            "polar": "Polar",
+            "alerts": "Alertas"
         },
         "permissions": {
             "drive": {
@@ -3084,6 +3085,9 @@
             "polar": {
                 "use": "Hablar con Polar",
                 "spend": "Usar Polar con las claves del despliegue"
+            },
+            "alerts": {
+                "topics": "Recibir alertas de otros sistemas"
             }
         }
     },

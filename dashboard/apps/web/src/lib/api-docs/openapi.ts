@@ -100,7 +100,7 @@ function operation(route: DocumentedRoute): JsonSchema {
         tags: [route.tag],
         summary: route.summary,
         ...(route.description ? { description: route.description } : {}),
-        security: [{ apiKey: [] }],
+        security: [route.topicSecret ? { topicSecret: [] } : { apiKey: [] }],
         parameters: parameters(route),
         responses: responses(route)
     };
@@ -140,7 +140,7 @@ export function buildOpenApi(
                 "Calls an API key can make. A key acts as the person who made it, and never with more than they can do themselves."
         },
         servers: [{ url: baseUrl }],
-        tags: [{ name: "Account" }, { name: "Deploy" }, { name: "MCP" }, { name: "Polar" }],
+        tags: [{ name: "Account" }, { name: "Deploy" }, { name: "MCP" }, { name: "Polar" }, { name: "Alerts" }],
         components: {
             securitySchemes: {
                 apiKey: {
@@ -148,6 +148,11 @@ export function buildOpenApi(
                     scheme: "bearer",
                     description:
                         "An API key from Account > API keys, sent as `Authorization: Bearer plk_...`."
+                },
+                topicSecret: {
+                    type: "http",
+                    scheme: "bearer",
+                    description: "An alert topic's secret, from Account > Alert topics."
                 }
             }
         },

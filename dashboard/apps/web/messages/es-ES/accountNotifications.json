@@ -620,6 +620,26 @@
         "agentWork": {
             "label": "No se subió el trabajo",
             "description": "Una sesión terminó con commits o cambios que Polaris no pudo subir, y los guardó."
+        },
+        "alertsMin": {
+            "label": "Alertas: mínima",
+            "description": "Una alerta de la gravedad más baja. En la campana, sin sonido."
+        },
+        "alertsLow": {
+            "label": "Alertas: baja",
+            "description": "Una alerta de gravedad baja."
+        },
+        "alertsDefault": {
+            "label": "Alertas: normal",
+            "description": "Una alerta de gravedad normal."
+        },
+        "alertsHigh": {
+            "label": "Alertas: alta",
+            "description": "Una alerta de gravedad alta."
+        },
+        "alertsUrgent": {
+            "label": "Alertas: urgente",
+            "description": "Una alerta urgente. Llega en horas de silencio."
         }
     },
     "groups": {
@@ -636,7 +656,8 @@
         "agents": "Agentes",
         "polar": "Polar",
         "system": "Polaris",
-        "apps": "De tus apps"
+        "apps": "De tus apps",
+        "alerts": "Alertas"
     },
     "badges": {
         "title": "Quitar avisos al abrir la pantalla",

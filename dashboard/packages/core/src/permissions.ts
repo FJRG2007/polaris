@@ -28,6 +28,7 @@ export const PERMISSIONS = [
     "crm.use",
     "translate.use",
     "automations.use",
+    "alerts.topics",
     "automations.secrets",
     "status.manage",
     "chat.use",
@@ -126,6 +127,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "crm.use",
         "translate.use",
         "automations.use",
+        "alerts.topics",
         "automations.secrets",
         "chat.use",
         "chat.spaces",
@@ -188,6 +190,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "crm.use",
         "translate.use",
         "automations.use",
+        "alerts.topics",
         "chat.use",
         "chat.spaces",
         "chat.groups",
@@ -271,6 +274,9 @@ export const PERMISSION_META: Readonly<Record<Permission, PermissionMeta>> = {
     // so this grants nothing the account could not already do by hand.
     "automations.use": { area: "Automations", label: "Make automations that act for you" },
     "automations.secrets": { area: "Automations", label: "Store secrets automations send" },
+    // A topic is an address other systems post alerts to. An organization's
+    // topics also need an admin of that organization.
+    "alerts.topics": { area: "Alerts", label: "Receive alerts from other systems" },
     // Status pages make Polaris dial addresses somebody typed, from inside the
     // network, and publish what it finds. Admin only, like adding a camera.
     "status.manage": {

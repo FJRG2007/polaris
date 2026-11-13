@@ -33,6 +33,7 @@ datasource db {
 
 model User {
     pushSubscriptions PushSubscription[]
+    alertTopics       AlertTopic[]
     polarThreads      PolarThread[]
     polarProjects     PolarProject[]
     polarCommands     PolarCommand[]
@@ -6680,6 +6681,7 @@ model PublicIpChange {
 // ORGANIZATION_POLICY in @polaris/core).
 model Organization {
     cloudAccounts     CloudAccount[]
+    alertTopics       AlertTopic[]
     automations       Automation[]
     automationSecrets AutomationSecret[]
     automationFolders AutomationFolder[]
@@ -17220,4 +17222,61 @@ model DisposableFile {
     transfer DisposableTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
 
     @@index([transferId])
+}
+
+// An address other systems post alerts to (ntfy, Gotify or Polaris' own JSON),
+// delivered to its recipients as notifications graded by severity. Only the
+// secret's hash is kept; the address is shown in full when it is made or reset.
+model AlertTopic {
+    id              String    @id @default(uuid(7)) @db.Uuid
+    ownerId         String    @db.Uuid
+    // The organization that owns it, or null for the owner's own.
+    orgId           String?   @db.Uuid
+    name            String
+    tokenHash       String
+    // The last 4 characters of the secret, to tell one address from the next.
+    tokenTail       String
+    // 1 min .. 5 urgent, ntfy's scale.
+    defaultPriority Int       @default(3)
+    // The lowest severity also pushed to devices.
+    pushFrom        Int       @default(3)
+    // An organization's topic: people and teams who get it besides the owner.
+    recipientUserIds String[] @default([]) @db.Uuid
+    recipientTeamIds String[] @default([]) @db.Uuid
+    lastUsedAt      DateTime?
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    owner      User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    org        Organization?   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    deliveries AlertDelivery[]
+
+    @@index([ownerId])
+    @@index([orgId])
+}
+
+// One alert a topic received, kept for its recent-deliveries list and for the
+// page the notification opens. Trimmed to 30 days.
+model AlertDelivery {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    topicId    String   @db.Uuid
+    priority   Int
+    title      String
+    message    String
+    markdown   Boolean  @default(false)
+    tags       String[] @default([])
+    click      String?
+    // [{ label, url }], ntfy's view actions.
+    actions    Json     @default("[]")
+    dedupKey   String?
+    // ntfy | gotify | json | test | automation
+    source     String
+    recipients Int      @default(0)
+    // delivered | folded
+    status     String
+    createdAt  DateTime @default(now())
+
+    topic AlertTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+    @@index([topicId, createdAt])
 }

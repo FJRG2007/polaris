@@ -102,6 +102,7 @@ export const NOTIFICATION_GROUPS = [
     "people",
     "agents",
     "polar",
+    "alerts",
     "system"
 ] as const;
 
@@ -120,6 +121,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroup, string> = {
     people: "People",
     agents: "Agents",
     polar: "Polar",
+    alerts: "Alerts",
     system: "Polaris"
 };
 
@@ -1103,6 +1105,50 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // Only the bell: the person was in Polaris a moment ago, and an answer
         // they walked away from is not worth a mail.
         level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    // Alerts other systems post to a topic (lib/alerts). One event per
+    // severity, so each can be muted or scheduled on its own; only urgent
+    // breaks through quiet hours and do not disturb.
+    {
+        id: "alerts.min",
+        group: "alerts",
+        label: "Alerts: minimum",
+        description: "An alert posted at the lowest severity. Kept on the bell, silently.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "alerts.low",
+        group: "alerts",
+        label: "Alerts: low",
+        description: "An alert posted at low severity.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "alerts.default",
+        group: "alerts",
+        label: "Alerts: normal",
+        description: "An alert posted at the normal severity.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "alerts.high",
+        group: "alerts",
+        label: "Alerts: high",
+        description: "An alert posted at high severity.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "alerts.urgent",
+        group: "alerts",
+        label: "Alerts: urgent",
+        description: "An urgent alert. Reaches you through quiet hours.",
+        level: "danger",
+        critical: true,
         defaults: { inapp: true, email: false }
     }
 ] as const;

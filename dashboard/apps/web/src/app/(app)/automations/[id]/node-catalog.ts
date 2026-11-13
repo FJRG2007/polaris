@@ -212,7 +212,7 @@ export function catalogGroups(options: {
         { id: "data", items: ["core.set", "core.code", "core.askAgent", "core.answer"].map(plain) },
         {
             id: "send",
-            items: ["core.notify", "core.message", "core.chat", "core.http"].map(plain)
+            items: ["core.notify", "core.alert", "core.message", "core.chat", "core.http"].map(plain)
         },
         // Steps that reach other automations; merged into the triggers' group of that name.
         { id: "automations", items: ["core.run", "core.announce"].map(plain) }

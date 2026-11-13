@@ -380,7 +380,8 @@
                 "Account": "Cuenta",
                 "Deploy": "Deploy",
                 "MCP": "MCP",
-                "Polar": "Polar"
+                "Polar": "Polar",
+                "Alerts": "Alertas"
             },
             "statuses": {
                 "200": "OK",
@@ -523,6 +524,28 @@
                 },
                 "getModels": {
                     "summary": "Los modelos a los que llega esta clave"
+                },
+                "postAlertsById": {
+                    "summary": "Enviar una alerta a un tema",
+                    "description": "El JSON de Polaris, con el secreto del tema como token bearer. También acepta el JSON de ntfy, con el secreto en su campo topic. Se rechazan campos desconocidos.",
+                    "params": {
+                        "id": "El id del tema."
+                    }
+                },
+                "postAlertsByIdByToken": {
+                    "summary": "Enviar una alerta al estilo ntfy",
+                    "description": "El cuerpo es el mensaje; el resto va en cabeceras o query. Con el token message, es el crear-mensaje de Gotify, secreto en ?token= o X-Gotify-Key.",
+                    "params": {
+                        "id": "El id del tema.",
+                        "token": "El secreto del tema.",
+                        "Title": "Título de la alerta.",
+                        "Priority": "1-5, o min, low, default, high, urgent.",
+                        "Tags": "Etiquetas separadas por comas.",
+                        "Click": "Enlace http o https que abre la alerta.",
+                        "Actions": "Acciones view: view, Texto, https://enlace; separadas por punto y coma.",
+                        "Markdown": "yes para mostrar el mensaje como Markdown.",
+                        "X-Dedup-Key": "Repeticiones con la misma clave se agrupan una hora."
+                    }
                 }
             }
         },
@@ -1899,5 +1922,82 @@
             "on": "Sí",
             "floor": "Nunca"
         }
+    },
+    "alerts": {
+        "title": "Temas de aviso",
+        "intro": "Direcciones a las que tus otros sistemas envían alertas. Llegan aquí como avisos, por gravedad.",
+        "new": "Nuevo tema",
+        "forbidden": "Tu cuenta no puede crear temas de alertas. Un admin puede permitirlo.",
+        "emptyTitle": "Aún no hay temas",
+        "emptyBody": "Crea uno y apunta un monitor, script o cliente ntfy a su dirección.",
+        "loadFailed": "No se pudieron cargar los temas. Reinténtalo.",
+        "lastUsed": "Última alerta {when}",
+        "neverUsed": "Sin alertas aún",
+        "test": "Probar",
+        "edit": "Editar",
+        "reset": "Otra dirección",
+        "delete": "Eliminar",
+        "summary": "Gravedad por defecto: {severity}. Push a dispositivos desde: {push}.",
+        "recent": "Alertas recientes",
+        "noDeliveries": "Aún no ha llegado nada.",
+        "folded": "Repetida, agrupada",
+        "reached": "Llegó a {count}",
+        "testSent": "Prueba enviada a {count}",
+        "resetTitle": "¿Crear una nueva dirección?",
+        "resetBody": "La dirección actual deja de funcionar ya. Lo que envíe a ella necesita la nueva.",
+        "cancel": "Cancelar",
+        "resetConfirm": "Crear dirección",
+        "errors": {
+            "forbidden": "No puedes cambiar este tema.",
+            "missing": "Este tema ya no existe.",
+            "invalid": "Revisa los campos y reinténtalo.",
+            "failed": "No ha funcionado. Reinténtalo."
+        },
+        "kind": "tema de aviso",
+        "testMessage": "Esta es una alerta de prueba.",
+        "testTitle": "Enviar una prueba",
+        "testBody": "La recibe todo el que reciba este tema, como una alerta real.",
+        "severityLabel": "Gravedad",
+        "message": "Mensaje",
+        "testHeading": "Prueba",
+        "send": "Enviar",
+        "personal": "Solo yo",
+        "editTitle": "Editar tema",
+        "newTitle": "Nuevo tema",
+        "formBody": "Las urgentes llegan en horas de silencio. Las mínimas quedan en la campana, sin sonido.",
+        "name": "Nombre",
+        "namePlaceholder": "Panel de la empresa",
+        "owner": "Pertenece a",
+        "defaultSeverity": "Gravedad si no se indica",
+        "pushFrom": "Push a dispositivos desde",
+        "pushHint": "Las de menor gravedad solo van a la campana.",
+        "people": "Personas",
+        "teams": "Equipos",
+        "noTeams": "Esta organización no tiene equipos.",
+        "save": "Guardar",
+        "create": "Crear",
+        "addressTitle": "Su dirección",
+        "addressBody": "Cópiala ya. Solo se muestra una vez; crea otra si la pierdes.",
+        "address": "Dirección",
+        "copy": "Copiar",
+        "done": "Hecho",
+        "setup": "Configurar",
+        "secretHidden": "Cambia YOUR_SECRET por la última parte de la dirección. ¿Perdida? Crea otra.",
+        "snippets": {
+            "curl": "Texto plano (curl)",
+            "ntfy": "Cabeceras ntfy",
+            "json": "JSON",
+            "gotify": "Gotify",
+            "kuma": "Uptime Kuma, ntfy",
+            "grafana": "Grafana, webhook"
+        },
+        "severity": {
+            "1": "Mínima",
+            "2": "Baja",
+            "3": "Normal",
+            "4": "Alta",
+            "5": "Urgente"
+        },
+        "openLink": "Abrir enlace"
     }
 }

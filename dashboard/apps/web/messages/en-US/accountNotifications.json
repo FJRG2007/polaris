@@ -620,6 +620,26 @@
         "agentWork": {
             "label": "A session's work could not be pushed",
             "description": "A session ended with commits or changes Polaris could not push, so it kept them for you."
+        },
+        "alertsMin": {
+            "label": "Alerts: minimum",
+            "description": "An alert posted at the lowest severity. Kept on the bell, silently."
+        },
+        "alertsLow": {
+            "label": "Alerts: low",
+            "description": "An alert posted at low severity."
+        },
+        "alertsDefault": {
+            "label": "Alerts: normal",
+            "description": "An alert posted at the normal severity."
+        },
+        "alertsHigh": {
+            "label": "Alerts: high",
+            "description": "An alert posted at high severity."
+        },
+        "alertsUrgent": {
+            "label": "Alerts: urgent",
+            "description": "An urgent alert. Reaches you through quiet hours."
         }
     },
     "groups": {
@@ -636,7 +656,8 @@
         "agents": "Agents",
         "polar": "Polar",
         "system": "Polaris",
-        "apps": "From your apps"
+        "apps": "From your apps",
+        "alerts": "Alerts"
     },
     "badges": {
         "title": "Clear badges when I open the screen",

@@ -299,6 +299,7 @@ export const STAGE_PRESETS: Readonly<Record<PresetCapability, StageLevels>> = {
     "crm.use": BUILDER,
     "translate.use": EVERYDAY,
     "automations.use": BUILDER,
+    "alerts.topics": BUILDER,
     "chat.use": [O, C, C, Y, Y],
     "chat.spaces": [O, O, O, Y, Y],
     "chat.groups": [O, O, C, Y, Y],

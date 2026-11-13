@@ -147,7 +147,8 @@
         "redeploy": "Redesplegar servicio",
         "code": "Código JS",
         "agentWork": "El agente trabaja en el repo",
-        "askAgent": "Usar un agente"
+        "askAgent": "Usar un agente",
+        "alert": "Enviar alerta a un tema"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -251,7 +252,26 @@
         "askAgentSearch": "Buscar agentes",
         "askAgentNone": "Aún no hay agentes. Crea uno en los ajustes de Polar.",
         "askAgentPrompt": "Pregunta",
-        "askAgentHint": "Inserta valores de pasos previos. Los siguientes leen la respuesta como text."
+        "askAgentHint": "Inserta valores de pasos previos. Los siguientes leen la respuesta como text.",
+        "alertTopic": "Tema",
+        "alertTopicPick": "Elige un tema",
+        "alertTopicSearch": "Buscar temas",
+        "alertTopicNone": "Aún no hay temas.",
+        "alertTopicOpen": "Crear uno",
+        "alertTopicGone": "Ese tema ya no existe.",
+        "alertTitle": "Título",
+        "alertBody": "Mensaje",
+        "alertSeverity": "Gravedad",
+        "alertTags": "Etiquetas, con comas",
+        "alertClick": "Enlace a abrir",
+        "alertDedup": "Agrupar por",
+        "alertSeverities": {
+            "1": "Mínima",
+            "2": "Baja",
+            "3": "Normal",
+            "4": "Alta",
+            "5": "Urgente"
+        }
     },
     "operators": {
         "eq": "igual a",
@@ -378,7 +398,10 @@
         "agentGone": "Ese agente ya no existe",
         "polarNoKey": "Ninguna clave de IA responde por la cuenta que lo ejecuta",
         "polarLimit": "La cuenta que lo ejecuta llegó al límite de la clave compartida",
-        "polarFailed": "El proveedor de IA no respondió"
+        "polarFailed": "El proveedor de IA no respondió",
+        "alertForbidden": "La cuenta con la que corre no puede usar temas",
+        "alertTopicGone": "Ese tema ya no existe o no está a tu alcance",
+        "alertInvalid": "La alerta quedó vacía o es demasiado larga"
     },
     "secrets": {
         "title": "Secretos",
@@ -709,7 +732,8 @@
         "redeploy": "Despliega un servicio de nuevo, como Redesplegar en su página.",
         "code": "Cambia elementos con JavaScript y pásalos al siguiente paso.",
         "agentWork": "Inicia una ejecución o sesión del agente en un repositorio conectado.",
-        "askAgent": "Pregunta a uno de tus agentes de Polar y usa su respuesta después."
+        "askAgent": "Pregunta a uno de tus agentes de Polar y usa su respuesta después.",
+        "alert": "Lanza una alerta en uno de tus temas de alertas."
     },
     "flow": {
         "conditionGroup": "Condiciones",

@@ -42,6 +42,7 @@ export const AREA_APPS: Readonly<Record<string, string | null>> = {
     CRM: "crm",
     Translate: "translate",
     Automations: "automations",
+    Alerts: "alerts",
     "Status pages": "status-pages",
     Chat: "chat",
     Games: "arcade",

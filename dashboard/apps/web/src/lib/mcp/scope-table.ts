@@ -72,6 +72,7 @@ export const PERMISSION_CATEGORIES: Readonly<Record<Permission, McpCategory>> = 
     "crm.use": "productivity",
     "translate.use": "productivity",
     "automations.use": "productivity",
+    "alerts.topics": "productivity",
     "automations.secrets": "productivity",
     "status.manage": "development",
     "chat.use": "chat",

@@ -107,7 +107,8 @@
         "users_manage": "Editar usuarios",
         "settings_manage": "Cambiar ajustes",
         "system_manage": "Actualizar y operar el sistema",
-        "translate_use": "Traducir texto"
+        "translate_use": "Traducir texto",
+        "alerts_topics": "Administrar alertas"
     },
     "page": {
         "title": "Asistentes de IA",

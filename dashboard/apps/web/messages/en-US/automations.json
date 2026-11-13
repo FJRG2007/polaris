@@ -147,7 +147,8 @@
         "redeploy": "Redeploy a service",
         "code": "Run code",
         "agentWork": "Agent works on the repository",
-        "askAgent": "Ask an agent"
+        "askAgent": "Ask an agent",
+        "alert": "Send an alert to a topic"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -251,7 +252,26 @@
         "askAgentSearch": "Search agents",
         "askAgentNone": "No agents yet. Create one in Polar's settings.",
         "askAgentPrompt": "Question",
-        "askAgentHint": "Insert values from earlier steps. Later steps read the answer as text."
+        "askAgentHint": "Insert values from earlier steps. Later steps read the answer as text.",
+        "alertTopic": "Topic",
+        "alertTopicPick": "Pick a topic",
+        "alertTopicSearch": "Search topics",
+        "alertTopicNone": "No alert topics yet.",
+        "alertTopicOpen": "Create one",
+        "alertTopicGone": "That topic is gone.",
+        "alertTitle": "Title",
+        "alertBody": "Message",
+        "alertSeverity": "Severity",
+        "alertTags": "Tags, comma separated",
+        "alertClick": "Link to open",
+        "alertDedup": "Dedup key",
+        "alertSeverities": {
+            "1": "Minimum",
+            "2": "Low",
+            "3": "Normal",
+            "4": "High",
+            "5": "Urgent"
+        }
     },
     "operators": {
         "eq": "equals",
@@ -378,7 +398,10 @@
         "agentGone": "That agent no longer exists",
         "polarNoKey": "No AI provider key can answer for the account this runs as",
         "polarLimit": "The shared key's limit is reached for the account this runs as",
-        "polarFailed": "The AI provider didn't answer"
+        "polarFailed": "The AI provider didn't answer",
+        "alertForbidden": "The account it runs as cannot use alert topics",
+        "alertTopicGone": "That topic is gone or out of reach",
+        "alertInvalid": "The alert came out empty or too long"
     },
     "secrets": {
         "title": "Secrets",
@@ -709,7 +732,8 @@
         "redeploy": "Deploy a service again, as Redeploy on its page does.",
         "code": "Change items with JavaScript and pass them on.",
         "agentWork": "Start an agent run or session on a connected repository.",
-        "askAgent": "Ask one of your Polar agents and use its answer in later steps."
+        "askAgent": "Ask one of your Polar agents and use its answer in later steps.",
+        "alert": "Raise an alert on one of your alert topics."
     },
     "flow": {
         "conditionGroup": "Conditions",

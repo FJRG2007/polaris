@@ -2972,7 +2972,8 @@
             "statusPages": "Status pages",
             "games": "Games",
             "translate": "Translate",
-            "polar": "Polar"
+            "polar": "Polar",
+            "alerts": "Alerts"
         },
         "permissions": {
             "drive": {
@@ -3084,6 +3085,9 @@
             "polar": {
                 "use": "Talk to Polar",
                 "spend": "Run Polar on this deployment's keys"
+            },
+            "alerts": {
+                "topics": "Receive alerts from other systems"
             }
         }
     },

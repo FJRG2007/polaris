@@ -452,7 +452,8 @@
         "Calls": "Calls",
         "Updates": "Updates",
         "General settings": "General settings",
-        "Seasonal themes": "Seasonal themes"
+        "Seasonal themes": "Seasonal themes",
+        "Alert topics": "Alert topics"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

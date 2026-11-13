@@ -380,7 +380,8 @@
                 "Account": "Account",
                 "Deploy": "Deploy",
                 "MCP": "MCP",
-                "Polar": "Polar"
+                "Polar": "Polar",
+                "Alerts": "Alerts"
             },
             "statuses": {
                 "200": "OK",
@@ -523,6 +524,28 @@
                 },
                 "getModels": {
                     "summary": "The models this key can address"
+                },
+                "postAlertsById": {
+                    "summary": "Post an alert to a topic",
+                    "description": "Polaris' JSON, with the topic's secret as a bearer token. ntfy's JSON publish is also taken here, with the secret as its topic field. Unknown fields are refused.",
+                    "params": {
+                        "id": "The topic's id."
+                    }
+                },
+                "postAlertsByIdByToken": {
+                    "summary": "Post an alert the ntfy way",
+                    "description": "The body is the message; the rest goes in headers or the query. With the token message, it is Gotify's create-message, the secret as ?token= or X-Gotify-Key.",
+                    "params": {
+                        "id": "The topic's id.",
+                        "token": "The topic's secret.",
+                        "Title": "The alert's title.",
+                        "Priority": "1-5, or min, low, default, high, urgent.",
+                        "Tags": "Comma-separated tags.",
+                        "Click": "An http or https link the alert opens.",
+                        "Actions": "View actions: view, Label, https://link; separated by semicolons.",
+                        "Markdown": "yes to render the message as Markdown.",
+                        "X-Dedup-Key": "Repeats with the same key fold into one alert for an hour."
+                    }
                 }
             }
         },
@@ -1899,5 +1922,82 @@
             "on": "On",
             "floor": "Never"
         }
+    },
+    "alerts": {
+        "title": "Alert topics",
+        "intro": "Addresses your other systems post alerts to. They arrive here as notifications, by severity.",
+        "new": "New topic",
+        "forbidden": "Your account cannot create alert topics. An admin can allow it.",
+        "emptyTitle": "No topics yet",
+        "emptyBody": "Create one and point a monitor, script or ntfy client at its address.",
+        "loadFailed": "The topics could not be loaded. Try again.",
+        "lastUsed": "Last alert {when}",
+        "neverUsed": "No alerts yet",
+        "test": "Test",
+        "edit": "Edit",
+        "reset": "New address",
+        "delete": "Delete",
+        "summary": "Default severity: {severity}. Pushed to devices from: {push}.",
+        "recent": "Recent alerts",
+        "noDeliveries": "Nothing received yet.",
+        "folded": "Repeat, folded",
+        "reached": "Reached {count}",
+        "testSent": "Test sent to {count}",
+        "resetTitle": "Make a new address?",
+        "resetBody": "The current address stops working at once. Anything posting to it needs the new one.",
+        "cancel": "Cancel",
+        "resetConfirm": "Make new address",
+        "errors": {
+            "forbidden": "You cannot change this topic.",
+            "missing": "This topic no longer exists.",
+            "invalid": "Check the fields and try again.",
+            "failed": "That did not work. Try again."
+        },
+        "kind": "alert topic",
+        "testMessage": "This is a test alert.",
+        "testTitle": "Send a test alert",
+        "testBody": "Everyone this topic reaches gets it, as a real alert would.",
+        "severityLabel": "Severity",
+        "message": "Message",
+        "testHeading": "Test alert",
+        "send": "Send",
+        "personal": "Just me",
+        "editTitle": "Edit topic",
+        "newTitle": "New topic",
+        "formBody": "Urgent alerts come through quiet hours. Minimum ones stay on the bell, silently.",
+        "name": "Name",
+        "namePlaceholder": "Company dashboard",
+        "owner": "Belongs to",
+        "defaultSeverity": "Severity when none is given",
+        "pushFrom": "Push to devices from",
+        "pushHint": "Lower severities only reach the bell.",
+        "people": "People",
+        "teams": "Teams",
+        "noTeams": "This organization has no teams.",
+        "save": "Save",
+        "create": "Create",
+        "addressTitle": "Topic address",
+        "addressBody": "Copy it now. It is shown only once; make a new one if it is lost.",
+        "address": "Address",
+        "copy": "Copy",
+        "done": "Done",
+        "setup": "Set it up",
+        "secretHidden": "Replace YOUR_SECRET with the last part of the address. Lost it? Make a new address.",
+        "snippets": {
+            "curl": "Plain text (curl)",
+            "ntfy": "ntfy headers",
+            "json": "JSON",
+            "gotify": "Gotify",
+            "kuma": "Uptime Kuma, ntfy provider",
+            "grafana": "Grafana, webhook"
+        },
+        "severity": {
+            "1": "Minimum",
+            "2": "Low",
+            "3": "Normal",
+            "4": "High",
+            "5": "Urgent"
+        },
+        "openLink": "Open link"
     }
 }

@@ -31,6 +31,7 @@ import {
     PhoneIncoming,
     Power,
     Rocket,
+    Siren,
     SquareTerminal,
     Puzzle,
     Radio,
@@ -303,6 +304,7 @@ const NODE_KEYS = {
     "core.try": "try",
     "core.waitCondition": "waitCondition",
     "core.redeploy": "redeploy",
+    "core.alert": "alert",
     "core.agentWork": "agentWork",
     "core.askAgent": "askAgent",
     "core.code": "code"
@@ -347,6 +349,7 @@ const NODE_ICONS: Record<string, LucideIcon> = {
     "game-servers.action.power": Power,
     "game-servers.action.command": SquareTerminal,
     "core.redeploy": Rocket,
+    "core.alert": Siren,
     "core.agentWork": Bot,
     "core.askAgent": Bot,
     "core.code": Code,
