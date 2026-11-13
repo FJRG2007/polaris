@@ -14,7 +14,7 @@ export function FactRow({
     return (
         <>
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className="truncate font-medium">
+            <dd className="truncate font-medium" title={value ?? undefined}>
                 {value === null ? (
                     <Skeleton className="h-4 w-24" />
                 ) : href ? (

@@ -3713,7 +3713,8 @@
                 "feature": "Nuevo",
                 "fix": "Resuelto",
                 "performance": "Más ágil",
-                "other": "Otros cambios"
+                "other": "Otros cambios",
+                "maintenance": "Mantenimiento"
             },
             "showAll": "Ver los {count}",
             "showLess": "Ver menos",

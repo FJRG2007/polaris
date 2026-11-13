@@ -686,7 +686,7 @@ export function UpdatesView({
         <div className="flex w-full flex-col gap-4">
             <Card>
                 <CardHeader>
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                         <CardTitle>{t("settings.updates.title")}</CardTitle>
                         <Button
                             size="sm"
@@ -784,7 +784,7 @@ export function UpdatesView({
                         <p className="text-xs text-danger">{t("settings.updates.checkFailed")}</p>
                     ) : null}
 
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <dl className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm sm:grid-cols-[max-content_minmax(0,1fr)] sm:gap-x-8">
                         <Row
                             label={t("settings.updates.runningBuild")}
                             value={status?.current ?? null}
@@ -819,7 +819,7 @@ export function UpdatesView({
                                 value={source}
                                 onValueChange={(next) => void onSource(next as UpdateSource)}
                                 options={sourceChoices(t)}
-                                className="w-60"
+                                className="w-60 max-w-full"
                                 disabled={updating}
                             />
                         </div>
@@ -836,7 +836,7 @@ export function UpdatesView({
                                     void onSchedule({ ...policy, mode: mode as AutoUpdateMode })
                                 }
                                 options={updateModes(t)}
-                                className="w-60"
+                                className="w-60 max-w-full"
                                 disabled={updating}
                             />
                             {policy.mode === "daily" ? (
@@ -870,7 +870,7 @@ export function UpdatesView({
                     {available || updating || logText ? (
                         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
                             {available ? (
-                                <div className="flex items-center justify-between gap-2">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
                                     <span>
                                         {t.rich("settings.updates.viewChanges", {
                                             link: (chunks) => (

@@ -3713,7 +3713,8 @@
                 "feature": "New",
                 "fix": "Fixed",
                 "performance": "Faster",
-                "other": "Other changes"
+                "other": "Other changes",
+                "maintenance": "Maintenance"
             },
             "showAll": "Show all {count}",
             "showLess": "Show less",
