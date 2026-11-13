@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseCommit, type ChangelogEntry } from "@polaris/core";
-import { groupChangelog, isMaintenance } from "@/lib/changelog-groups";
+import { groupChangelog, isMaintenance, shipsElsewhere } from "@/lib/changelog-groups";
 
 function entry(subject: string, body = ""): ChangelogEntry {
     const parsed = parseCommit(subject.length.toString(16).padStart(7, "0"), `${subject}\n\n${body}`);
@@ -43,5 +43,20 @@ describe("groupChangelog", () => {
         ]);
         expect(groups.map((group) => group.group)).toEqual(["security", "feature", "fix", "maintenance"]);
         expect(groups[3]!.entries.map((item) => item.scope)).toEqual(["ci"]);
+    });
+});
+
+describe("shipsElsewhere", () => {
+    it("leaves out what the website, desktop and extension release on their own", () => {
+        expect(shipsElsewhere(entry("✨ feat(site): Copy page beside the docs"))).toBe(true);
+        expect(shipsElsewhere(entry("🐛 fix(desktop): a right-click menu"))).toBe(true);
+        expect(shipsElsewhere(entry("✨ feat(extension, streamdeck): new key"))).toBe(true);
+        expect(groupChangelog([entry("✨ feat(site): a new page")])).toEqual([]);
+    });
+
+    it("keeps a change that also touches this server, and any security fix", () => {
+        expect(shipsElsewhere(entry("✨ feat(site, mail): shared cards"))).toBe(false);
+        expect(shipsElsewhere(entry("🐛 fix(mail): replies keep the thread"))).toBe(false);
+        expect(shipsElsewhere(entry("🐛 fix(desktop): token in logs", "Security: high"))).toBe(false);
     });
 });

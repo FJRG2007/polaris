@@ -25,14 +25,14 @@ const WORKFLOW = join(
     "dashboard-publish.yml"
 );
 
-/** The filter as one pattern: every app under `dashboard/apps` but the one it
+/** The filter as one pattern: every app under `dashboard/apps` but the ones it
  *  excludes, then the rest of what it names. */
 function workflowWebFilter(): string {
     const text = readFileSync(WORKFLOW, "utf8");
     const rest = text.match(/has '([^']+)' && web=true/);
-    const excluded = text.match(/grep -qvE '\^dashboard\/apps\/([\w-]+)\/' && web=true/);
+    const excluded = text.match(/grep -qvE '\^dashboard\/apps\/\(([\w|-]+)\)\/' && web=true/);
     if (!rest || !excluded) throw new Error("the web filter was not found in dashboard-publish.yml");
-    return `^dashboard/apps/(?!${excluded[1]}/)|${rest[1]}`;
+    return `^dashboard/apps/(?!(?:${excluded[1]})/)|${rest[1]}`;
 }
 
 describe("WEB_IMAGE_PATHS", () => {
@@ -50,9 +50,15 @@ describe("WEB_IMAGE_PATHS", () => {
             expect(WEB_IMAGE_PATHS.test(file)).toBe(true);
     });
 
-    it("counts every app package but the browser extension", () => {
+    it("counts every app package but those that ship on their own", () => {
         expect(WEB_IMAGE_PATHS.test("dashboard/apps/places/src/lib/places-extension.ts")).toBe(true);
         expect(WEB_IMAGE_PATHS.test("dashboard/apps/game-servers/package.json")).toBe(true);
         expect(WEB_IMAGE_PATHS.test("dashboard/apps/extension/src/popup.tsx")).toBe(false);
+        // The public website, the companion and the Stream Deck plugin: none is
+        // in the image, so a change to one offers no deployment an update.
+        expect(WEB_IMAGE_PATHS.test("dashboard/apps/site/src/views/docs.tsx")).toBe(false);
+        expect(WEB_IMAGE_PATHS.test("dashboard/apps/companion/package.json")).toBe(false);
+        expect(WEB_IMAGE_PATHS.test("dashboard/apps/streamdeck/src/plugin.ts")).toBe(false);
+        expect(WEB_IMAGE_PATHS.test("dashboard/apps/sites-of-mine/x.ts")).toBe(true);
     });
 });

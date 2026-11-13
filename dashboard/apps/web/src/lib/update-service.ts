@@ -105,7 +105,7 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
  *  a deployment runs. Counting it would leave the card promising a build that is
  *  never published, which is the state this filter exists to keep off the screen. */
 export const WEB_IMAGE_PATHS =
-    /^dashboard\/apps\/(?!extension\/)|^dashboard\/(packages|cli|patches|scripts)\/|^dashboard\/resources\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
+    /^dashboard\/apps\/(?!(?:extension|site|companion|streamdeck)\/)|^dashboard\/(packages|cli|patches|scripts)\/|^dashboard\/resources\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
 
 /** Check runs that decide whether the dashboard image is safe to install (mirrors
  *  dashboard-publish.yml: `changes` picks the images, `web` builds this one, and

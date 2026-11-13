@@ -36,13 +36,40 @@ const MAINTENANCE_SCOPES = new Set([
 const MAINTENANCE_SUBJECT =
     /\b(?:broke|breaks|unbreak|unbreaks) main\b|\bmain (?:is )?(?:green|red)\b|\bflaky (?:tests?|specs?)\b|\bguard tests?\b|\bguards? (?:that|which) broke\b/i;
 
-/** Whether an entry is internal upkeep. A security fix never is. */
-export function isMaintenance(entry: Pick<ChangelogEntry, "scope" | "title" | "security">): boolean {
-    if (entry.security) return false;
-    const scopes = (entry.scope ?? "")
+/**
+ * Scopes that ship somewhere other than this server: the public website, the
+ * desktop app, the browser extension, the Stream Deck plugin and the companion.
+ * Each has its own release, so a change to one changes nothing an update of
+ * Polaris installs and is not listed as if it did.
+ */
+const ELSEWHERE_SCOPES = new Set([
+    "site",
+    "website",
+    "desktop",
+    "extension",
+    "streamdeck",
+    "companion"
+]);
+
+function scopesOf(entry: Pick<ChangelogEntry, "scope">): string[] {
+    return (entry.scope ?? "")
         .toLowerCase()
         .split(/[\s,/]+/)
         .filter(Boolean);
+}
+
+/** Whether a change ships with something other than this server. A security
+ *  fix is always listed: it is the one entry nobody should have to look for. */
+export function shipsElsewhere(entry: Pick<ChangelogEntry, "scope" | "security">): boolean {
+    if (entry.security) return false;
+    const scopes = scopesOf(entry);
+    return scopes.length > 0 && scopes.every((scope) => ELSEWHERE_SCOPES.has(scope));
+}
+
+/** Whether an entry is internal upkeep. A security fix never is. */
+export function isMaintenance(entry: Pick<ChangelogEntry, "scope" | "title" | "security">): boolean {
+    if (entry.security) return false;
+    const scopes = scopesOf(entry);
     if (scopes.length > 0 && scopes.every((scope) => MAINTENANCE_SCOPES.has(scope))) return true;
     return MAINTENANCE_SUBJECT.test(entry.title);
 }
@@ -53,6 +80,7 @@ export function groupChangelog(
 ): { group: ChangelogGroup; entries: ChangelogEntry[] }[] {
     const byGroup = new Map<ChangelogGroup, ChangelogEntry[]>();
     for (const entry of entries) {
+        if (shipsElsewhere(entry)) continue;
         const group: ChangelogGroup = isMaintenance(entry) ? "maintenance" : (entry.kind as ChangeKind);
         const list = byGroup.get(group);
         if (list) list.push(entry);

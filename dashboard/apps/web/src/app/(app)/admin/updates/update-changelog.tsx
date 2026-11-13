@@ -14,19 +14,55 @@
  */
 
 import { updateChangelogAction } from "./actions";
-import { Badge, Skeleton, cn } from "@polaris/ui";
+import { AppLogo, Badge, Skeleton, cn, hasAppLogo } from "@polaris/ui";
 import type { ChangelogEntry } from "@polaris/core";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, ShieldAlert } from "lucide-react";
+import {
+    Bug,
+    ChevronRight,
+    Gauge,
+    Package,
+    ShieldAlert,
+    Sparkles,
+    Wrench,
+    type LucideIcon
+} from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { UpdateChangelog as Changelog } from "@/lib/update-changelog";
-import { groupChangelog, type ChangelogGroup } from "@/lib/changelog-groups";
+import { groupChangelog, shipsElsewhere, type ChangelogGroup } from "@/lib/changelog-groups";
 
 /** Rows shown per group before "Show all". */
 const FOLDED = 4;
 
 /** Groups open on arrival; the rest wait for a click. */
 const OPEN_BY_DEFAULT: ReadonlySet<ChangelogGroup> = new Set(["security", "feature"]);
+
+/** Each group's mark, beside its name in the summary and on its header. */
+const GROUP_ICONS: Record<ChangelogGroup, LucideIcon> = {
+    security: ShieldAlert,
+    feature: Sparkles,
+    fix: Bug,
+    performance: Gauge,
+    other: Package,
+    maintenance: Wrench
+};
+
+/** Scopes named differently from the app whose logo they stand for. */
+const SCOPE_APPS: Readonly<Record<string, string>> = {
+    agents: "polar",
+    places: "home",
+    "game-servers": "games",
+    servers: "cloud-servers",
+    "network-filter": "dns-blocker",
+    updates: "admin",
+    users: "admin"
+};
+
+/** The app logo a commit scope stands for, or null to show the scope as text. */
+export function scopeApp(scope: string): string | null {
+    const app = SCOPE_APPS[scope] ?? scope;
+    return hasAppLogo(app) ? app : null;
+}
 
 const SEVERITY_BADGE = {
     critical: "danger",
@@ -53,6 +89,12 @@ export function UpdateChangelog({ head }: { head: string }) {
     }, [head]);
 
     const groups = useMemo(() => groupChangelog(changelog?.entries ?? []), [changelog]);
+    // The website, desktop and extension ship on their own: counted with the
+    // rest that is not listed, never shown as something this update installs.
+    const elsewhere = useMemo(
+        () => (changelog?.entries ?? []).filter(shipsElsewhere).length,
+        [changelog]
+    );
 
     const title = <h3 className="text-sm font-medium text-foreground">{t("settings.changelog.title")}</h3>;
 
@@ -86,14 +128,18 @@ export function UpdateChangelog({ head }: { head: string }) {
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
                 {title}
                 <ul className="flex min-w-0 flex-wrap items-center gap-1.5">
-                    {groups.map(({ group, entries }) => (
-                        <li key={group}>
-                            <Badge variant={group === "security" ? "danger" : "neutral"}>
-                                {t(`settings.changelog.kinds.${group}`)}
-                                <span className="tabular">{entries.length}</span>
-                            </Badge>
-                        </li>
-                    ))}
+                    {groups.map(({ group, entries }) => {
+                        const Icon = GROUP_ICONS[group];
+                        return (
+                            <li key={group}>
+                                <Badge variant={group === "security" ? "danger" : "neutral"}>
+                                    <Icon className="size-3 shrink-0" aria-hidden />
+                                    {t(`settings.changelog.kinds.${group}`)}
+                                    <span className="tabular">{entries.length}</span>
+                                </Badge>
+                            </li>
+                        );
+                    })}
                 </ul>
             </div>
 
@@ -104,6 +150,7 @@ export function UpdateChangelog({ head }: { head: string }) {
                     const shown = all ? entries : entries.slice(0, FOLDED);
                     const security = group === "security";
                     const listId = `changelog-${group}`;
+                    const Icon = GROUP_ICONS[group];
                     return (
                         <div key={group} className={cn("min-w-0", security && "bg-danger-soft")}>
                             <button
@@ -120,9 +167,10 @@ export function UpdateChangelog({ head }: { head: string }) {
                                     )}
                                     aria-hidden
                                 />
-                                {security ? (
-                                    <ShieldAlert className="size-3.5 shrink-0 text-danger-ink" aria-hidden />
-                                ) : null}
+                                <Icon
+                                    className={cn("size-3.5 shrink-0", security && "text-danger-ink")}
+                                    aria-hidden
+                                />
                                 <span className={cn("min-w-0 truncate", security && "text-danger-ink")}>
                                     {t(`settings.changelog.kinds.${group}`)}
                                 </span>
@@ -153,11 +201,11 @@ export function UpdateChangelog({ head }: { head: string }) {
                 })}
             </div>
 
-            {changelog.more > 0 || changelog.hidden > 0 ? (
+            {changelog.more > 0 || changelog.hidden + elsewhere > 0 ? (
                 <p className="text-xs text-muted-foreground">
                     {t.rich("settings.changelog.rest", {
                         more: changelog.more,
-                        hidden: changelog.hidden,
+                        hidden: changelog.hidden + elsewhere,
                         link: (chunks) => (
                             <a
                                 key="link"
@@ -186,7 +234,12 @@ function ChangeRow({ entry, repo }: { entry: ChangelogEntry; repo: string }) {
                     {t(`settings.security.severity.${entry.security.severity}`)}
                 </Badge>
             ) : null}
-            {entry.scope ? (
+            {entry.scope && scopeApp(entry.scope) ? (
+                <span className="flex shrink-0" title={entry.scope}>
+                    <AppLogo appId={scopeApp(entry.scope)!} size={16} />
+                    <span className="sr-only">{entry.scope}</span>
+                </span>
+            ) : entry.scope ? (
                 <span
                     className="max-w-[6rem] shrink-0 truncate sm:max-w-[9rem] rounded bg-muted px-1.5 text-[0.6875rem] leading-[18px] text-muted-foreground"
                     title={entry.scope}
