@@ -13,6 +13,9 @@ type Answer<T> = { error: string } | ({ error?: undefined } & T);
 
 const last = new Map<string, unknown>();
 
+/** How long to wait before asking again after a request got no answer at all. */
+const RETRY_MS = [1_000, 2_000, 4_000];
+
 export interface VpnRead<T> {
     /** The newest answer, or null before the first one arrives. */
     readonly data: T | null;
@@ -47,8 +50,19 @@ export function useVpnRead<T>(
     const reload = useCallback(() => {
         let live = true;
         asking.current += 1;
-        loader
-            .current()
+        // A request cut on its way (a tunnel this page just brought up moves
+        // every route) is asked again before it is called a failure.
+        const attempt = (round: number): Promise<Answer<T>> =>
+            loader.current().catch((error: unknown) => {
+                if (!live || round >= RETRY_MS.length) throw error;
+                return new Promise<Answer<T>>((resolve, reject) => {
+                    setTimeout(
+                        () => (live ? resolve(attempt(round + 1)) : reject(error)),
+                        RETRY_MS[round]
+                    );
+                });
+            });
+        attempt(0)
             .then((answer) => {
                 if (!live) return;
                 if (answer.error !== undefined) {
@@ -62,8 +76,9 @@ export function useVpnRead<T>(
             .catch((error: unknown) => {
                 // The action never answered (the page outlived an update, or the
                 // connection dropped): the cause is only ever seen here.
+                if (!live) return;
                 console.error(`polaris: the VPN's ${key} read failed:`, error);
-                if (live) setError(failure);
+                setError(failure);
             })
             .finally(() => {
                 asking.current -= 1;
