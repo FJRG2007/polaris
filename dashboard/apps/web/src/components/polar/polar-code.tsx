@@ -75,6 +75,7 @@ import {
 } from "@/components/polar/elements/model-selector";
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
 import { useCodeSlash } from "@/components/polar/polar-code-slash";
+import * as codeCommands from "@/lib/polar/code-commands";
 import { usePolarCommands } from "@/components/polar/polar-commands";
 import { ContextBar } from "@/components/polar/polar-context";
 import { estimateTokens } from "@/lib/polar/compaction";
@@ -575,7 +576,8 @@ export function PolarCodeView({
     avatar,
     voiceKit,
     providers,
-    onPolarTask
+    onPolarTask,
+    onHistory
 }: {
     code: PolarCodeState;
     fullPage: boolean;
@@ -587,6 +589,8 @@ export function PolarCodeView({
     providers: ModelSelectorProvider[] | null;
     /** A task Polar answers itself, handed to Chat with its repository. */
     onPolarTask: (task: PolarTask) => void;
+    /** Shows the history, for "/resume". */
+    onHistory: () => void;
 }) {
     const t = useTranslations("polar");
     const canStart = code.access === "manage";
@@ -612,6 +616,9 @@ export function PolarCodeView({
                 fullPage={fullPage}
                 voiceKit={voiceKit}
                 onOpen={code.open}
+                onNew={() => code.open(null)}
+                onHistory={onHistory}
+                onRename={code.history.rename}
             />
         );
 
@@ -639,6 +646,7 @@ export function PolarCodeView({
             providers={providers}
             onStarted={started}
             onPolarTask={onPolarTask}
+            onHistory={onHistory}
         />
     );
     if (fullPage)
@@ -653,6 +661,9 @@ export function PolarCodeView({
         </PolarThreadFrame>
     );
 }
+
+/** Code's commands in the composer that starts a task. */
+const START_COMMANDS = codeCommands.codeCommandsFor("start", null);
 
 const DOT: Record<PolarCodeRow["state"], string> = {
     queued: "bg-muted-foreground/50",
@@ -764,7 +775,8 @@ function CodeStart({
     voiceKit,
     providers,
     onStarted,
-    onPolarTask
+    onPolarTask,
+    onHistory
 }: {
     canStart: boolean;
     pending: boolean;
@@ -785,10 +797,12 @@ function CodeStart({
     providers: ModelSelectorProvider[] | null;
     onStarted: (id: string, text: string) => void;
     onPolarTask: (task: PolarTask) => void;
+    onHistory: () => void;
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
     const [prompt, setPrompt] = useState("");
+    const [modelOpen, setModelOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [gap, setGap] = useState<GithubAppGap | null>(null);
     const [busy, startTransition] = useTransition();
@@ -811,7 +825,20 @@ function CodeStart({
         onValueChange: setPrompt,
         skills: choices?.skills ?? [],
         own,
-        onSkill: setSkill
+        onSkill: setSkill,
+        place: "start",
+        commands: START_COMMANDS,
+        onCommand: (command) => {
+            setPrompt("");
+            if (command === "help") return setPrompt("/");
+            if (command === "resume") return onHistory();
+            if (command === "model") return setModelOpen(true);
+            if (command === "clear") {
+                setIssue(null);
+                setSkill(null);
+                parts.uploads.clear();
+            }
+        }
     });
     // What was just sent, shown at once as the first message of the session
     // while the machine for it comes up, rather than a composer that only
@@ -887,6 +914,7 @@ function CodeStart({
         (prompt.trim().length > 0 || (!polar && issue !== null));
 
     const submit = () => {
+        if (slash.run(prompt)) return;
         if (!ready || busy) return;
         if (polar && model) {
             const text = slash.expand(prompt.trim());
@@ -1006,6 +1034,8 @@ function CodeStart({
                                 onChange={onPick}
                                 automatic={polarSources.length > 0}
                                 disabled={busy || pending}
+                                open={modelOpen}
+                                onOpenChange={setModelOpen}
                             />
                             {asksMode ? (
                                 <PermissionModePicker
@@ -1102,7 +1132,10 @@ function CodeThread({
     canPrompt,
     fullPage,
     voiceKit,
-    onOpen
+    onOpen,
+    onNew,
+    onHistory,
+    onRename
 }: {
     sessionId: string;
     /** What the task was started with here, shown until the session has it. */
@@ -1113,6 +1146,12 @@ function CodeThread({
     /** Open another session in this thread's place: the one a stopped session
      *  is continued in. */
     onOpen: (sessionId: string) => void;
+    /** Leaves for a new task, for "/new"; the session carries on. */
+    onNew: () => void;
+    /** Shows the history, for "/resume". */
+    onHistory: () => void;
+    /** Renames the session, for "/rename"; false when it was not renamed. */
+    onRename: (sessionId: string, title: string) => Promise<boolean>;
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
@@ -1123,12 +1162,25 @@ function CodeThread({
     const [failed, setFailed] = useState(false);
     const [reply, setReply] = useState("");
     const own = usePolarCommands().commands;
-    // A running session has its skill already; only the person's commands apply.
-    const slash = useCodeSlash({ value: reply, onValueChange: setReply, skills: [], own, onSkill: null });
     const [error, setError] = useState<string | null>(null);
     const [busy, startTransition] = useTransition();
     const parts = useCodeComposerParts(busy);
     const signal = useUnmountSignal();
+    // The handed-over commands follow the CLI the session runs.
+    const cli = thread?.view?.cli ?? null;
+    const commands = useMemo(() => codeCommands.codeCommandsFor("thread", cli), [cli]);
+    // A running session has its skill already; Code's commands and the
+    // person's own apply.
+    const slash = useCodeSlash({
+        value: reply,
+        onValueChange: setReply,
+        skills: [],
+        own,
+        onSkill: null,
+        place: "thread",
+        commands,
+        onCommand: (command, rest) => runCommand(command, rest)
+    });
 
     const read = useCallback(() => {
         readPoll<PolarCodeThread | null>("/api/polar/code/thread", { sessionId }, signal())
@@ -1164,7 +1216,11 @@ function CodeThread({
     }, [sent, pending]);
 
     const send = () => {
-        const text = slash.expand(reply.trim());
+        if (slash.run(reply)) return;
+        sendText(slash.expand(reply.trim()));
+    };
+
+    const sendText = (text: string) => {
         if (!text || busy || parts.uploads.uploading || parts.uploads.failed) return;
         const attachments = parts.uploads.ids;
         setError(null);
@@ -1190,6 +1246,39 @@ function CodeThread({
                 read();
             });
         });
+    };
+
+    /** What a "/" command does here: Polaris's own run on this screen, the
+     *  rest go to the agent in its CLI's own spelling. */
+    const runCommand = (command: codeCommands.CodeCommand, rest: string) => {
+        setReply("");
+        if (command === "help") return setReply("/");
+        if (command === "new") return onNew();
+        if (command === "resume") return onHistory();
+        if (command === "diff") return setWorkspace(true);
+        if (command === "rename") {
+            if (!rest) return setReply("/rename ");
+            setError(null);
+            // The history keeps a title to 80 characters.
+            return void onRename(sessionId, rest.slice(0, 80)).then((renamed) => {
+                if (renamed) read();
+                else setError(t("slash.code.renameFailed"));
+            });
+        }
+        if (command === "stop") {
+            setError(null);
+            return startTransition(() => {
+                void runAction(
+                    () => postCode<{ error?: string }>("/api/polar/code/interrupt", { sessionId }),
+                    setError
+                ).then((result) => {
+                    if (result?.error) setError(result.error);
+                    read();
+                });
+            });
+        }
+        const text = cli ? codeCommands.forwardedText(command, rest, cli) : null;
+        if (text) sendText(text);
     };
 
     const session = thread?.session;

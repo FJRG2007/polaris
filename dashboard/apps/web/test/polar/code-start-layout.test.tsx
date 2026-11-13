@@ -240,6 +240,9 @@ describe("Code's slash commands", () => {
         const list = await screen.findByRole("listbox", { name: "Commands" });
         expect(within(list).getByText("/review")).toBeTruthy();
         await waitFor(() => expect(within(list).getByText("/tidy")).toBeTruthy());
+        // Code's own four come first: /help, /resume, /model and /clear.
+        expect(within(list).getByText("/model")).toBeTruthy();
+        for (let step = 0; step < 4; step++) fireEvent.keyDown(box, { key: "ArrowDown" });
         fireEvent.keyDown(box, { key: "Enter" });
         await waitFor(() =>
             expect(screen.getByRole("button", { name: "Skill: review" })).toBeTruthy()

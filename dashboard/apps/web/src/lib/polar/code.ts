@@ -37,7 +37,13 @@ import { userHasManage, type SessionUser } from "@/lib/session";
 import { sessionCursor } from "@/lib/agents/session-cursor";
 import { priceSlugs } from "@/lib/agents/session-usage";
 import { getCatalogModel } from "@/lib/agents/model-catalog";
-import { dedupeCodeRows, POLAR_CODE_PAGE, polarCodeEditSchema, threadEvents } from "@/lib/polar/code-history";
+import {
+    dedupeCodeRows,
+    POLAR_CODE_PAGE,
+    polarCodeEditSchema,
+    polarCodeInterruptSchema,
+    threadEvents
+} from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
 import { shownSessionBranch } from "@/lib/agents/session-branch";
 import * as repoOptions from "@/lib/agents/repo-options";
@@ -52,6 +58,7 @@ import { pendingPermission, type PendingPermission } from "@/lib/agents/session-
 import { lastTurnRefused, refusedAccountName } from "@/lib/agents/signin-refusal";
 import {
     forkSessionAction,
+    interruptSessionAction,
     listSessionsAction,
     promptSessionAction,
     sessionChoicesAction,
@@ -506,6 +513,19 @@ export async function polarCodePrompt(
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
     return promptSessionAction(input);
+}
+
+/** Stop the turn a running session is on ("/stop"), as Escape does in its
+ *  terminal; the session stays up for the next message. */
+export async function polarCodeInterrupt(
+    user: SessionUser,
+    input: unknown
+): Promise<{ error?: string }> {
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    const parsed = polarCodeInterruptSchema.safeParse(input);
+    // An id that is not one reads as a session that is not there.
+    return interruptSessionAction(parsed.success ? parsed.data.sessionId : "");
 }
 
 /**

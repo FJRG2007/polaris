@@ -92,7 +92,9 @@ export function CodeModelPicker({
     value,
     onChange,
     automatic,
-    disabled
+    disabled,
+    open,
+    onOpenChange
 }: {
     /** Null while they are on their way. */
     sources: readonly CodeSource[] | null;
@@ -101,6 +103,9 @@ export function CodeModelPicker({
     /** Whether Polar's Automatic is offered. */
     automatic: boolean;
     disabled: boolean;
+    /** Held by the caller when given, so a "/model" can open it. */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }) {
     const t = useTranslations("polar");
     const { prefs, setOrder, failed } = usePickerPrefs();
@@ -162,7 +167,9 @@ export function CodeModelPicker({
 
     return (
         <DropdownMenu
+            open={open}
             onOpenChange={(next) => {
+                onOpenChange?.(next);
                 if (next) return;
                 setQuery("");
                 setOrdering(false);

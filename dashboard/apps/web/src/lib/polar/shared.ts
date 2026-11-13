@@ -556,9 +556,10 @@ export type BuiltinCommand = (typeof POLAR_BUILTIN_COMMANDS)[number];
  * and /compact do (https://code.claude.com/docs/en/commands): they run here,
  * /goal included (it sends its condition as the turn that starts it),
  * never reach the model as text, and no command of a person's can take their
- * name. Left out of Claude Code's list: /init, /rewind and /resume (a chat has
- * no project files to set up or restore; the history list already reopens
- * any chat), and /cost, which is /usage there too.
+ * name. /resume opens the history, /stop stops the answer on its way and
+ * /copy copies the last answer, as Claude Code's do. Left out of its list:
+ * /init and /rewind (a chat has no project files to set up or restore), and
+ * /cost, which is /usage there too.
  */
 export const POLAR_CONTROL_COMMANDS = [
     "clear",
@@ -571,6 +572,9 @@ export const POLAR_CONTROL_COMMANDS = [
     "temp",
     "memory",
     "goal",
+    "resume",
+    "stop",
+    "copy",
     "help"
 ] as const;
 export type ControlCommand = (typeof POLAR_CONTROL_COMMANDS)[number];

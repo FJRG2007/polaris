@@ -205,7 +205,8 @@
             "polar": "Polar",
             "control": "Este chat",
             "own": "Tuyos",
-            "skills": "Skills"
+            "skills": "Skills",
+            "code": "Code"
         },
         "control": {
             "clear": "Empezar de cero; el chat sigue en tu historial",
@@ -218,7 +219,26 @@
             "temp": "Abrir un chat temporal, o salir de él",
             "memory": "Abrir lo que Polar recuerda",
             "goal": "Seguir trabajando hasta cumplir una condición",
-            "help": "Ver todos los comandos"
+            "help": "Ver todos los comandos",
+            "resume": "Abrir tus chats y retomar uno",
+            "stop": "Parar la respuesta actual",
+            "copy": "Copiar última respuesta"
+        },
+        "code": {
+            "help": "Ver los comandos",
+            "new": "Tarea nueva; esta sigue en marcha",
+            "resume": "Abrir el historial y retomar una",
+            "model": "Elegir modelo para la tarea",
+            "clear": "Vaciar la conversación del agente",
+            "clearDraft": "Vaciar el texto, la issue y la skill",
+            "compact": "Resumir la conversación para liberar sitio",
+            "review": "Pedir al agente que revise un PR",
+            "securityReview": "Revisión de seguridad de los cambios",
+            "init": "Escribir una guía del repositorio",
+            "stop": "Parar el turno del agente",
+            "rename": "Renombrar la sesión",
+            "diff": "Ver archivos y cambios",
+            "renameFailed": "No se pudo renombrar. Reinténtalo."
         }
     },
     "context": {
@@ -979,7 +999,11 @@
         "temporary": "Los chats temporales no pueden.",
         "renameHow": "Escribe el nombre tras /rename.",
         "renamed": "Chat renombrado.",
-        "renameFailed": "No se pudo renombrar. Reinténtalo."
+        "renameFailed": "No se pudo renombrar. Reinténtalo.",
+        "notBusy": "Polar no responde ahora mismo.",
+        "nothingToCopy": "No hay respuesta que copiar.",
+        "copied": "Respuesta copiada.",
+        "copyFailed": "No se pudo copiar. Reinténtalo."
     },
     "compact": {
         "divider": "Conversación compactada",

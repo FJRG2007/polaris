@@ -51,6 +51,7 @@ import {
     useShortcutText
 } from "@polaris/ui";
 import {
+    Copy,
     Cpu,
     Gauge,
     FileText,
@@ -107,11 +108,11 @@ import { useWide } from "@/components/polar/use-wide";
 import * as droppedItems from "@/lib/polar/dropped-items";
 import * as polarCommands from "@/components/polar/polar-commands";
 import { usePolarSidebar } from "@/components/polar/use-polar-sidebar";
+import { PolarSlashMenu } from "@/components/polar/polar-slash-menu";
 import {
     firstPickable,
     stepPickable,
     suggestionOptionId,
-    SuggestionList,
     type SuggestionListItem
 } from "@/components/rich-text/suggestion-list";
 import { Shimmer } from "@/components/polar/elements/shimmer";
@@ -617,6 +618,9 @@ const CONTROL_ICONS: Record<Control, SuggestionListItem["icon"]> = {
     temp: Ghost,
     memory: Brain,
     goal: Target,
+    resume: History,
+    stop: Square,
+    copy: Copy,
     help: CircleHelp
 };
 /** Control commands that take words after them, so picking one from the list
@@ -1863,6 +1867,20 @@ export function PolarChat({
             setInput("/");
             return textarea.current?.focus();
         }
+        if (command === "resume") return setShowHistory(true);
+        if (command === "stop") {
+            if (!busy) return void toast.show({ title: t("control.notBusy") });
+            return void stopAnswer();
+        }
+        if (command === "copy") {
+            const last = [...chat.messages].reverse().find((message) => message.role === "assistant");
+            const text = last ? textOf(last) : "";
+            if (!text) return void toast.show({ title: t("control.nothingToCopy") });
+            return void navigator.clipboard
+                .writeText(text)
+                .then(() => toast.show({ title: t("control.copied") }))
+                .catch(() => toast.show({ title: t("control.copyFailed") }));
+        }
         if (busy || compacting) return void toast.show({ title: t("control.busy") });
         if (chat.messages.length === 0) return void toast.show({ title: t("control.empty") });
         if (command === "compact") return void compact(rest || null, false);
@@ -2280,17 +2298,16 @@ export function PolarChat({
 
     const composer = (
         <div className="relative">
-            {slashOpen ? (
-                <SuggestionList
-                    id={ids.slash}
-                    label={t("slash.title")}
-                    items={slashItems}
-                    active={slashHighlight}
-                    onHover={setSlashActive}
-                    onPick={pickSlash}
-                    className="absolute bottom-full left-0 z-20 mb-2 w-full max-w-sm"
-                />
-            ) : null}
+            <PolarSlashMenu
+                open={slashOpen}
+                id={ids.slash}
+                label={t("slash.title")}
+                items={slashItems}
+                active={slashHighlight}
+                onHover={setSlashActive}
+                onPick={pickSlash}
+                onDismiss={() => setSlashDismissed(true)}
+            />
             {/* Voice mode takes the composer's place, as in ChatGPT; the
                 composer stays mounted, so a draft is still there after. */}
             {goalState.goal && !inCall ? (
@@ -2721,6 +2738,7 @@ export function PolarChat({
                             voiceKit={voiceKit}
                             providers={providers}
                             onPolarTask={startCodeChat}
+                            onHistory={() => setShowHistory(true)}
                         />
                     </div>
                 )}

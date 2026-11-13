@@ -205,7 +205,8 @@
             "polar": "Polar",
             "control": "This chat",
             "own": "Yours",
-            "skills": "Skills"
+            "skills": "Skills",
+            "code": "Code"
         },
         "control": {
             "clear": "Start over; this chat stays in your history",
@@ -218,7 +219,26 @@
             "temp": "Start a temporary chat, or leave one",
             "memory": "Open what Polar remembers",
             "goal": "Keep working until a condition is met",
-            "help": "Show every command"
+            "help": "Show every command",
+            "resume": "Open your chats to pick one up",
+            "stop": "Stop the answer on its way",
+            "copy": "Copy Polar's last answer"
+        },
+        "code": {
+            "help": "Show every command",
+            "new": "Start a new task; this one keeps running",
+            "resume": "Open your history to pick a session up",
+            "model": "Pick the model for the task",
+            "clear": "Clear the agent's conversation and start fresh",
+            "clearDraft": "Empty the box, the issue and the skill",
+            "compact": "Summarize the agent's conversation to free room",
+            "review": "Ask the agent to review a pull request",
+            "securityReview": "Security review of the pending changes",
+            "init": "Write a guide to this repository for the agent",
+            "stop": "Stop the agent's current turn",
+            "rename": "Rename this session",
+            "diff": "See the files and changes",
+            "renameFailed": "Couldn't rename the session. Try again."
         }
     },
     "context": {
@@ -979,7 +999,11 @@
         "temporary": "Temporary chats can't do that.",
         "renameHow": "Type the new name after /rename.",
         "renamed": "Chat renamed.",
-        "renameFailed": "Couldn't rename the chat. Try again."
+        "renameFailed": "Couldn't rename the chat. Try again.",
+        "notBusy": "Polar isn't answering right now.",
+        "nothingToCopy": "There's no answer to copy yet.",
+        "copied": "Last answer copied.",
+        "copyFailed": "Couldn't copy the answer. Try again."
     },
     "compact": {
         "divider": "Conversation compacted",

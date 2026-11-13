@@ -68,6 +68,9 @@ export function filterCodeRows<T extends Pick<PolarCodeRow, "title" | "repo">>(
     });
 }
 
+/** The session "/stop" stops the turn of. */
+export const polarCodeInterruptSchema = z.object({ sessionId: z.string().trim().uuid() }).strict();
+
 /** A change to one row of the Code history, as the sidebar sends it. */
 export const polarCodeEditSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("delete"), sessionId: z.string().trim().uuid() }).strict(),

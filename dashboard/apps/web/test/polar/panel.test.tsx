@@ -296,11 +296,11 @@ describe("the / commands", () => {
         mount();
         await ready();
         slash("/");
-        // Polar's six, the eleven that act on the chat, then the entry that
+        // Polar's six, the fourteen that act on the chat, then the entry that
         // writes a new one.
-        expect(options()).toHaveLength(18);
+        expect(options()).toHaveLength(21);
         expect(screen.getByText("Keep working until a condition is met")).toBeTruthy();
-        expect(options()[17]).toMatch(/^New command/);
+        expect(options()[20]).toMatch(/^New command/);
         expect(highlighted()).toMatch(/^\/new/);
         const box = screen.getByLabelText("Message Polar");
         expect(box.getAttribute("aria-activedescendant")).toBe(
@@ -898,6 +898,7 @@ describe("matching the / list", () => {
             "compact",
             "context",
             "export",
+            "stop",
             "tldr",
             "translate",
             "fix-tests"
