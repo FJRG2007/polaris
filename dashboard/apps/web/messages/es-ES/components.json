@@ -1910,5 +1910,43 @@
         "rewriting": "Reescribiendo...",
         "fillIn": "{count, plural, one {1 dato por rellenar:} other {# datos por rellenar:}}",
         "fillInField": "Seleccionar {field} en el texto"
+    },
+    "payloadShape": {
+        "any": "Libre",
+        "structured": "Con forma",
+        "name": "Campo",
+        "type": "Tipo",
+        "required": "Obligatorio",
+        "nullable": "Puede ser nulo",
+        "remove": "Quitar campo",
+        "minLength": "Long. mín.",
+        "maxLength": "Long. máx.",
+        "pattern": "Patrón",
+        "min": "Mín",
+        "max": "Máx",
+        "values": "Valores, separados por coma",
+        "minItems": "Mín. elem.",
+        "maxItems": "Máx. elem.",
+        "items": "Cada ítem",
+        "strict": "Rechazar claves extra",
+        "addField": "Añadir campo",
+        "checkField": "Revisa este campo.",
+        "invalid": "Esta forma tiene un error.",
+        "sample": "JSON ejemplo",
+        "samplePlaceholder": "Pega un JSON para comprobarlo",
+        "notJson": "No es JSON válido.",
+        "matches": "Encaja en la forma.",
+        "fails": "Falla en {path}",
+        "useSample": "Usar como forma",
+        "types": {
+            "string": "Texto",
+            "number": "Número",
+            "integer": "Entero",
+            "boolean": "Sí/no",
+            "enum": "Uno de",
+            "array": "Lista",
+            "object": "Objeto",
+            "null": "Nulo"
+        }
     }
 }

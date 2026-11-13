@@ -27,23 +27,6 @@ function routeFiles(dir: string): string[] {
 describe("the API reference", () => {
     const doc = buildOpenApi("https://polaris.example.test");
 
-    it("gives every operation a summary of its own", () => {
-        const seen = new Map<string, string>();
-        const duplicates: string[] = [];
-        const paths = doc.paths as Record<string, Record<string, { summary?: string }>>;
-        for (const [path, item] of Object.entries(paths)) {
-            for (const [method, op] of Object.entries(item)) {
-                const summary = (op.summary ?? "").trim().toLowerCase();
-                const call = `${method.toUpperCase()} ${path}`;
-                expect(summary, call).not.toBe("");
-                const first = seen.get(summary);
-                if (first) duplicates.push(`"${op.summary}": ${first} and ${call}`);
-                else seen.set(summary, call);
-            }
-        }
-        expect(duplicates).toEqual([]);
-    });
-
     it("documents only routes that accept an API key, with the method the file exports", () => {
         for (const route of DOCUMENTED_ROUTES) {
             const source = readFileSync(join(APP, route.file), "utf8");

@@ -80,6 +80,8 @@ export * from "./automation-list-filter.js";
 export * from "./automation-schema.js";
 export * from "./solar.js";
 export * from "./automation-graph.js";
+export * from "./automation-webhook.js";
+export * from "./payload-shape.js";
 export * from "./automation-canvas.js";
 export * from "./automation-app-events.js";
 export * from "./sign-in-methods.js";

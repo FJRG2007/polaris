@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
+vi.mock("@/app/(app)/account/step-up-actions", () => ({ proveStepUpAction: vi.fn() }));
 vi.mock("@/app/(app)/automations/actions", () => ({}));
 
 import { MessagesWrapper } from "../setup/i18n";

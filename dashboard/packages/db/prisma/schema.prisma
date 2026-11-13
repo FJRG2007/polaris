@@ -15825,6 +15825,7 @@ model Automation {
     user     User?               @relation("AutomationShelf", fields: [userId], references: [id], onDelete: Cascade)
     versions AutomationVersion[]
     triggers AutomationTrigger[]
+    hookDeliveries AutomationHookDelivery[]
     runs     AutomationRun[]
     alarmEpisodes AutomationAlarmEpisode[]
 
@@ -15846,6 +15847,29 @@ model AutomationVersion {
     automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
 
     @@unique([automationId, number])
+}
+
+// One request a webhook trigger answered, refused ones included, so its owner
+// can see what arrived. The newest 50 per trigger are kept.
+model AutomationHookDelivery {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    automationId String   @db.Uuid
+    nodeId       String
+    at           DateTime @default(now())
+    method       String
+    ip           String?
+    country      String?
+    userAgent    String?
+    status       Int
+    // Why it was turned away (core WEBHOOK_REFUSALS), null when accepted.
+    reason       String?
+    // The field a refused payload failed on, for the owner only.
+    detail       String?
+    test         Boolean  @default(false)
+
+    automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+    @@index([automationId, nodeId, at])
 }
 
 // One armed trigger of the published version, derived on publish so an event

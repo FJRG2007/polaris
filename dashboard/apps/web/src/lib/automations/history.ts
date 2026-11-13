@@ -336,7 +336,9 @@ export function pinnedCause(pinned: unknown): Record<string, unknown> {
 export async function startTestRun(
     actor: RunActor,
     id: string,
-    triggerNodeId?: string
+    triggerNodeId?: string,
+    /** What the trigger gave, such as the request "Send test" made; its pin otherwise. */
+    given?: Record<string, unknown>
 ): Promise<{ runId: string } | { problems: core.GraphProblem[] }> {
     const row = await load(actor, id, true);
     const parsed = core.automationGraphSchema.safeParse(row.draft);
@@ -349,8 +351,11 @@ export async function startTestRun(
         ? triggers.find((node) => node.id === triggerNodeId)
         : triggers[0];
     if (!trigger) throw new AutomationAccessError("noTrigger");
-    const cause =
-        trigger.pinned !== undefined ? pinnedCause(trigger.pinned) : { kind: "test", by: actor.id };
+    const cause = given
+        ? given
+        : trigger.pinned !== undefined
+          ? pinnedCause(trigger.pinned)
+          : { kind: "test", by: actor.id };
     return { runId: await startSnapshot(actor, id, parsed.data, trigger.id, cause) };
 }
 

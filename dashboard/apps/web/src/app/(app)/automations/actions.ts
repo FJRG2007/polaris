@@ -15,6 +15,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { translate } from "@/lib/i18n/translate";
 import * as service from "@/lib/automations/service";
 import * as history from "@/lib/automations/history";
+import * as hooks from "@/lib/automations/webhook-service";
+import { stepUpGranted } from "@/lib/step-up-grant";
 import * as secrets from "@/lib/automations/secrets";
 import * as organize from "@/lib/automations/organize";
 import * as appEvents from "@/lib/automations/app-events";
@@ -311,6 +313,71 @@ export async function rotateHookAction(automationId: unknown, nodeId: unknown): 
         await service.saveDraft(who, parsed.data[0], graph);
         refresh(parsed.data[0]);
         return { ok: true };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+const hookNode = z.tuple([id, z.string().min(1).max(64)]);
+
+/** "Send test": a signed sample request through the trigger's real checks, then a test run. */
+export async function sendHookTestAction(
+    automationId: unknown,
+    nodeId: unknown
+): Promise<Result<{ runId: string }> | { ok: false; error: string; refused: core.WebhookRefusal }> {
+    const parsed = hookNode.safeParse([automationId, nodeId]);
+    if (!parsed.success) return invalid();
+    try {
+        const answer = await hooks.sendHookTest(await actor(), ...parsed.data);
+        const t = await getTranslations("automations");
+        if ("problems" in answer)
+            return { ok: false, error: t("errors.notReady"), problems: answer.problems };
+        if ("refused" in answer)
+            return {
+                ok: false,
+                error: t(`webhook.refusals.${answer.refused}`),
+                refused: answer.refused
+            };
+        refresh(parsed.data[0]);
+        return { ok: true, runId: answer.runId };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+/** A trigger's secret, once the session has just proved itself. */
+export async function revealHookSecretAction(
+    automationId: unknown,
+    nodeId: unknown,
+    rotation: unknown
+): Promise<Result<{ secret: string }> | { ok: false; error: string; stepUp: true }> {
+    const parsed = z
+        .tuple([id, z.string().min(1).max(64), core.webhookConfigSchema.shape.secretRotation])
+        .safeParse([automationId, nodeId, rotation]);
+    if (!parsed.success) return invalid();
+    try {
+        const user = await requirePermission("automations.use");
+        if (!(await stepUpGranted(user.id, user.sessionId, "automation-hook-secret")))
+            return {
+                ok: false,
+                error: (await getTranslations("automations"))("webhook.confirmFirst"),
+                stepUp: true
+            };
+        const who = { id: user.id, isAdmin: user.isAdmin };
+        return { ok: true, secret: await hooks.revealHookSecret(who, ...parsed.data) };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+export async function listHookDeliveriesAction(
+    automationId: unknown,
+    nodeId: unknown
+): Promise<Result<{ deliveries: hooks.HookDeliveryView[] }>> {
+    const parsed = hookNode.safeParse([automationId, nodeId]);
+    if (!parsed.success) return invalid();
+    try {
+        return { ok: true, deliveries: await hooks.listHookDeliveries(await actor(), ...parsed.data) };
     } catch (caught) {
         return failure(caught);
     }

@@ -7,6 +7,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
+vi.mock("@/app/(app)/account/step-up-actions", () => ({ proveStepUpAction: vi.fn() }));
 vi.mock("@/app/(app)/automations/actions", () => ({}));
 import * as core from "@polaris/core";
 import * as nodes from "@polaris-app/places/src/lib/automation-nodes";

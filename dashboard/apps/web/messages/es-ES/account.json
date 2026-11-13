@@ -440,10 +440,10 @@
                     "summary": "Añadir dominio"
                 },
                 "getDeployServicesByIdEnv": {
-                    "summary": "Nombres de variables de un servicio"
+                    "summary": "Nombres de variables"
                 },
                 "putDeployServicesByIdEnvByName": {
-                    "summary": "Crear o sustituir una variable por nombre"
+                    "summary": "Crear o sustituir una variable"
                 },
                 "deleteDeployServicesByIdEnvByName": {
                     "summary": "Quitar una variable por nombre"
@@ -468,27 +468,27 @@
                     "summary": "Detener servicio"
                 },
                 "getDeployServicesByIdVariables": {
-                    "summary": "Listar variables de un servicio",
+                    "summary": "Listar variables",
                     "description": "Los valores secretos no se muestran."
                 },
                 "postDeployServicesByIdVariables": {
-                    "summary": "Fijar una variable en un servicio"
+                    "summary": "Fijar una variable"
                 },
                 "postDeployServicesByIdVariablesImport": {
-                    "summary": "Importar .env en un servicio"
+                    "summary": "Importar archivo .env"
                 },
                 "getDeployEnvironmentsByIdVariables": {
-                    "summary": "Listar variables de un entorno",
+                    "summary": "Listar variables",
                     "description": "Los valores secretos no se muestran."
                 },
                 "postDeployEnvironmentsByIdVariables": {
-                    "summary": "Fijar una variable en un entorno"
+                    "summary": "Fijar una variable"
                 },
                 "postDeployEnvironmentsByIdVariablesImport": {
-                    "summary": "Importar .env en un entorno"
+                    "summary": "Importar archivo .env"
                 },
                 "deleteDeployVariablesById": {
-                    "summary": "Quitar una variable por id"
+                    "summary": "Quitar una variable"
                 },
                 "getDeployVariablesByIdValue": {
                     "summary": "Ver el valor de una variable"

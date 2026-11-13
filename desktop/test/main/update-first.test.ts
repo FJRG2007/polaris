@@ -16,7 +16,7 @@ import {
 
 const never = <T>() => new Promise<T>(() => undefined);
 
-function check(overrides: Partial<FirstCheck> = {}): Omit<FirstCheck, "checkNow" | "downloaded"> {
+function check(overrides: Partial<FirstCheck> = {}): Omit<FirstCheck, "checkNow"> {
     return { asked: Promise.resolve(), installing: Promise.resolve("0.1.3"), installed: Promise.resolve(true), ...overrides };
 }
 
@@ -32,7 +32,7 @@ function steps(overrides: Partial<OpeningSteps> = {}) {
 }
 
 /** Let the start run up to the restart, which a working restart never returns from. */
-async function untilRestart(first: Omit<FirstCheck, "checkNow" | "downloaded">, step: OpeningSteps): Promise<void> {
+async function untilRestart(first: Omit<FirstCheck, "checkNow">, step: OpeningSteps): Promise<void> {
     void updateBeforeOpening(first, step);
     await vi.advanceTimersByTimeAsync(0);
     expect(step.restart).toHaveBeenCalledTimes(1);

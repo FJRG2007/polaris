@@ -16,7 +16,7 @@
 
 import { available, byId, say } from "./dom";
 import { serverAddressSchema } from "@/shared/server-address";
-import { describeUpdateCheck, type UpdateCheck } from "@/shared/update-check";
+import { describeUpdateCheck } from "@/shared/update-check";
 import { describeServer, normalizeServerName, SERVER_NAME_MAX, type ServerRow } from "@/shared/servers";
 import { encodeHostList, HOST_LIST_PREFIX } from "../../../dashboard/packages/core/src/host-list";
 import { encodeQr, qrSvgPath } from "../../../dashboard/packages/core/src/qr";
@@ -586,24 +586,14 @@ checkUpdates.addEventListener("click", () => {
     void window.polarisLocal.connect
         .checkForUpdates()
         .catch(() => ({ kind: "failed", reason: "Polaris did not answer." }) as const)
-        .then(showUpdateCheck);
+        .then((found) => {
+            updateStatus.textContent = describeUpdateCheck(found);
+            updateStatus.className = found.kind === "failed" ? "error" : "hint";
+            restartUpdate.hidden = found.kind !== "ready";
+            updatePage.hidden = found.kind !== "available";
+            available(checkUpdates, true);
+        });
 });
-/** Say what a check found; a download keeps the button until it ends, then
- *  says what it came to, so one press reaches "Restart now". */
-function showUpdateCheck(found: UpdateCheck): void {
-    updateStatus.textContent = describeUpdateCheck(found);
-    updateStatus.className = found.kind === "failed" ? "error" : "hint";
-    restartUpdate.hidden = found.kind !== "ready";
-    updatePage.hidden = found.kind !== "available";
-    if (found.kind !== "downloading") {
-        available(checkUpdates, true);
-        return;
-    }
-    void window.polarisLocal.connect
-        .updateDownloaded()
-        .catch(() => ({ kind: "failed", reason: "Polaris did not answer." }) as const)
-        .then((ended) => showUpdateCheck(ended.kind === "downloading" ? { kind: "failed", reason: "Try again." } : ended));
-}
 updatePage.addEventListener("click", () => {
     void window.polarisLocal.connect
         .openUpdatePage()

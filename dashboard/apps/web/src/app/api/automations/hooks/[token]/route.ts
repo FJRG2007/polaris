@@ -1,51 +1,50 @@
 /**
  * An automation's webhook address: a capability URL. Only the hash of the token
- * is stored; the call becomes an outbox event, matched like any other, and is
- * answered 202 before the run does anything. Rate limited per address, body
- * capped at the event payload limit, never echoed back.
+ * is stored; a call that passes the trigger's checks (webhook-guard) becomes an
+ * outbox event, matched like any other. Every call that reached a trigger is
+ * written to its recent deliveries, refused ones with the reason. Refusals
+ * answer with their status and a short word, never with an internal.
  */
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { randomUUID } from "node:crypto";
-import { rateLimit } from "@/lib/rate-limit-service";
-import { readCappedBody } from "@/lib/request-body";
 import { hookHash } from "@/lib/automations/triggers";
 import { emitAutomationEvent, kickIntake } from "@/lib/automations/outbox";
+import { hookSecret, inspectHook, recordDelivery, refusalResponse } from "@/lib/automations/webhook-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const PER_MINUTE = 60;
-const KEPT_HEADERS = [
-    "content-type",
-    "user-agent",
-    "x-request-id",
-    "x-github-event",
-    "x-event-type"
-];
+/** How long "answer after the run" waits before answering that it is still running. */
+const WAIT_MS = 25_000;
+
+// i18n-ignore: a reply to a machine caller, not read on screen
+const notFound = () => Response.json({ error: "not found" }, { status: 404 });
+
+async function waitForRun(automationId: string, firingKey: string): Promise<{ id: string; status: string } | null> {
+    const until = Date.now() + WAIT_MS;
+    let run: { id: string; status: string } | null = null;
+    while (Date.now() < until) {
+        run = await prisma.automationRun.findFirst({
+            where: { automationId, firingKey },
+            select: { id: true, status: true }
+        });
+        if (run && core.runFinished(run.status as core.RunStatus)) return run;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    return run;
+}
 
 async function handle(request: Request, token: string): Promise<Response> {
-    if (!/^[\w-]{20,100}$/.test(token))
-        // i18n-ignore: a reply to a machine caller, not read on screen
-        return Response.json({ error: "not found" }, { status: 404 });
+    if (!/^[\w-]{20,100}$/.test(token)) return notFound();
     const hash = hookHash(token);
-    const limited = await rateLimit(`automation-hook:${hash}`, PER_MINUTE, 60_000);
-    if (!limited.ok)
-        return Response.json(
-            // i18n-ignore: a reply to a machine caller, not read on screen
-            { error: "rate limited" },
-            {
-                status: 429,
-                headers: { "retry-after": String(Math.ceil(limited.retryAfterMs / 1000)) }
-            }
-        );
-
     const trigger = await prisma.automationTrigger.findUnique({
         where: { hookHash: hash },
         select: {
             nodeId: true,
             versionId: true,
+            automationId: true,
             automation: {
                 select: { enabled: true, publishedVersionId: true, orgId: true, userId: true }
             }
@@ -56,8 +55,7 @@ async function handle(request: Request, token: string): Promise<Response> {
         !trigger.automation.enabled ||
         trigger.automation.publishedVersionId !== trigger.versionId
     )
-        // i18n-ignore: a reply to a machine caller, not read on screen
-        return Response.json({ error: "not found" }, { status: 404 });
+        return notFound();
 
     const version = await prisma.automationVersion.findUnique({
         where: { id: trigger.versionId },
@@ -67,69 +65,66 @@ async function handle(request: Request, token: string): Promise<Response> {
     const node = graph.success
         ? graph.data.nodes.find((entry) => entry.id === trigger.nodeId)
         : undefined;
-    const config = core.CORE_NODE_CONFIGS["core.webhook"].safeParse(node?.config);
-    const method = config.success ? config.data.method : "POST";
-    if (method !== "any" && request.method !== method)
-        // i18n-ignore: a reply to a machine caller, not read on screen
-        return Response.json({ error: "method not allowed" }, { status: 405 });
+    const parsed = core.CORE_NODE_CONFIGS["core.webhook"].safeParse(node?.config ?? {});
+    const config = parsed.success ? parsed.data : core.webhookConfigSchema.parse({});
+    const inspection = await inspectHook({
+        request,
+        config,
+        secret: hookSecret(trigger.automationId, trigger.nodeId, config.secretRotation),
+        hash
+    });
+    const delivery = {
+        automationId: trigger.automationId,
+        nodeId: trigger.nodeId,
+        method: request.method,
+        ip: inspection.ip,
+        userAgent: inspection.userAgent
+    };
+    if (!inspection.ok) {
+        void recordDelivery({ ...delivery, status: inspection.status, reason: inspection.reason, detail: inspection.detail });
+        return refusalResponse(inspection, config);
+    }
 
-    const declared = Number(request.headers.get("content-length") ?? "0");
-    if (declared > core.AUTOMATION_LIMITS.eventPayloadBytes)
-        // i18n-ignore: a reply to a machine caller, not read on screen
-        return Response.json({ error: "too large" }, { status: 413 });
-    const bytes =
-        request.method === "GET"
-            ? new Uint8Array(0)
-            : await readCappedBody(request, core.AUTOMATION_LIMITS.eventPayloadBytes).catch(
-                  () => null
-              );
-    // i18n-ignore: a reply to a machine caller, not read on screen
-    if (!bytes) return Response.json({ error: "too large" }, { status: 413 });
-    const raw = new TextDecoder().decode(bytes);
-    let body: unknown = raw;
-    if ((request.headers.get("content-type") ?? "").includes("json") && raw) {
-        try {
-            body = JSON.parse(raw);
-        } catch {
-            // i18n-ignore: a reply to a machine caller, not read on screen
-            return Response.json({ error: "invalid json" }, { status: 400 });
-        }
-    }
-    const url = new URL(request.url);
-    const headers: Record<string, string> = {};
-    for (const name of KEPT_HEADERS) {
-        const value = request.headers.get(name);
-        if (value) headers[name] = value.slice(0, 500);
-    }
     const eventId = await emitAutomationEvent("core.webhook", {
         orgId: trigger.automation.orgId,
         userId: trigger.automation.userId,
         subjectKey: hash,
-        payload: {
-            kind: "webhook",
-            method: request.method,
-            query: Object.fromEntries(url.searchParams),
-            headers,
-            body
-        },
+        payload: inspection.payload,
         dedupeKey: `${hash}:${request.headers.get("idempotency-key")?.slice(0, 200) ?? randomUUID()}`
     });
     void kickIntake().catch((caught) =>
         console.error("polaris: automations intake failed:", caught)
     );
-    return Response.json({ accepted: true, event: eventId }, { status: 202 });
+    const { response } = config;
+    void recordDelivery({ ...delivery, status: response.status, reason: null });
+    if (request.method === "HEAD") return new Response(null, { status: response.status });
+    let run: { id: string; status: string } | null = null;
+    if (response.mode === "afterRun" && eventId)
+        run = await waitForRun(trigger.automationId, `${eventId}:${trigger.nodeId}`);
+    if (response.body)
+        return new Response(response.body, {
+            status: response.status,
+            headers: {
+                "content-type": response.body.trimStart().startsWith("{")
+                    ? "application/json"
+                    : "text/plain; charset=utf-8"
+            }
+        });
+    return Response.json(
+        run ? { accepted: true, event: eventId, run: run.id, status: run.status } : { accepted: true, event: eventId },
+        { status: response.status }
+    );
 }
 
-export async function POST(
-    request: Request,
-    context: { params: Promise<{ token: string }> }
-): Promise<Response> {
-    return handle(request, (await context.params).token);
-}
+type Context = { params: Promise<{ token: string }> };
 
-export async function GET(
-    request: Request,
-    context: { params: Promise<{ token: string }> }
-): Promise<Response> {
-    return handle(request, (await context.params).token);
-}
+const answer = async (request: Request, context: Context) =>
+    handle(request, (await context.params).token);
+
+export const GET = answer;
+export const POST = answer;
+export const PUT = answer;
+export const PATCH = answer;
+export const DELETE = answer;
+export const HEAD = answer;
+export const OPTIONS = answer;

@@ -89,6 +89,7 @@ import {
     when
 } from "../shared";
 import { NodeFields, configValid, newNode } from "./node-fields";
+import { TestRunStarted } from "./webhook-fields";
 import { FailureFields, WhenFields } from "./flow-fields";
 import { isTriggerType, pickedNode } from "./node-catalog";
 import { AssistPrepare, PolarAssist } from "../polar-assist";
@@ -350,6 +351,7 @@ function Loaded({
     return (
         <AssistPrepare value={prepare}>
             <EditorGraphProvider value={editorGraph}>
+              <TestRunStarted.Provider value={setTestRunId}>
                 {naming !== null ? (
                     <form
                         className="mb-5 flex min-w-0 flex-wrap items-center gap-2"
@@ -743,6 +745,7 @@ function Loaded({
                         })
                     }
                 />
+              </TestRunStarted.Provider>
             </EditorGraphProvider>
         </AssistPrepare>
     );

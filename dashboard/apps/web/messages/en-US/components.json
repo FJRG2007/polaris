@@ -1910,5 +1910,43 @@
         "rewriting": "Rewriting...",
         "fillIn": "{count, plural, one {1 field to fill:} other {# fields to fill:}}",
         "fillInField": "Select {field} in the text"
+    },
+    "payloadShape": {
+        "any": "Any",
+        "structured": "Structured",
+        "name": "Field name",
+        "type": "Type",
+        "required": "Required",
+        "nullable": "Can be null",
+        "remove": "Remove field",
+        "minLength": "Min length",
+        "maxLength": "Max length",
+        "pattern": "Pattern",
+        "min": "Min",
+        "max": "Max",
+        "values": "Values, comma separated",
+        "minItems": "Min items",
+        "maxItems": "Max items",
+        "items": "Each item",
+        "strict": "Refuse unknown keys",
+        "addField": "Add field",
+        "checkField": "Check this field.",
+        "invalid": "This shape has a mistake.",
+        "sample": "Sample JSON",
+        "samplePlaceholder": "Paste a JSON sample to check it",
+        "notJson": "Not valid JSON.",
+        "matches": "Matches the shape.",
+        "fails": "Fails at {path}",
+        "useSample": "Use as shape",
+        "types": {
+            "string": "Text",
+            "number": "Number",
+            "integer": "Integer",
+            "boolean": "Yes/no",
+            "enum": "One of",
+            "array": "List",
+            "object": "Object",
+            "null": "Null"
+        }
     }
 }

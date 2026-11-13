@@ -20,6 +20,7 @@ import { durationSchema, durationSeconds } from "./automation-schema.js";
 import { automationNodeId } from "./automation-nodes.js";
 import { isAppEventName, type AppEventApp } from "./automation-app-events.js";
 import { AGENT_RUN_MODES, AGENT_WORK_TARGETS } from "./agents.js";
+import { webhookConfigSchema } from "./automation-webhook.js";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -819,11 +820,7 @@ export const connectivityTriggerConfigSchema = z.object({
 export const CORE_NODE_CONFIGS = {
     "core.manual": z.object({}).strict(),
     "core.schedule": scheduleConfigSchema,
-    "core.webhook": z.object({
-        method: z.enum(["POST", "GET", "any"]).default("POST"),
-        /** Bumped by "New address": the old address stops working. */
-        rotation: z.number().int().min(0).max(1_000_000).default(0)
-    }),
+    "core.webhook": webhookConfigSchema,
     "core.if": z.object({ condition: conditionTreeSchema }),
     "core.wait": waitConfigSchema,
     "core.notify": z.object({

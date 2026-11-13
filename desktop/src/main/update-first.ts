@@ -43,7 +43,7 @@ function after<T>(ms: number, value: T): Promise<T> {
     return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
 
-export async function updateBeforeOpening(first: Omit<FirstCheck, "checkNow" | "downloaded">, steps: OpeningSteps): Promise<Opening> {
+export async function updateBeforeOpening(first: Omit<FirstCheck, "checkNow">, steps: OpeningSteps): Promise<Opening> {
     await Promise.race([first.asked, after(SETTLE_BEFORE_ASKING_MS, undefined)]);
     const version = await Promise.race([first.installing, after(CHECK_BEFORE_OPENING_MS, null)]);
     if (!version || version === steps.attempted() || steps.opened()) return "open";

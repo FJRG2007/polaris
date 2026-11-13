@@ -735,9 +735,6 @@ function start(): void {
             checkUpdates: () =>
                 updateWatch?.checkNow() ??
                 Promise.resolve({ kind: "failed", reason: "Polaris is still starting. Try again in a moment." } as const),
-            updateDownloaded: () =>
-                updateWatch?.downloaded() ??
-                Promise.resolve({ kind: "failed", reason: "Polaris is still starting. Try again in a moment." } as const),
             openUpdatePage: () => {
                 if (!menuUpdate) return false;
                 menuUpdate.open();

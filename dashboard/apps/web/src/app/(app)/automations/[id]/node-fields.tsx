@@ -14,10 +14,8 @@ import { listingHref } from "@/lib/apps/marketplace-store";
 import {
     Button,
     Checkbox,
-    CopyButton,
     Input,
     Select,
-    useToast,
     type SelectOption,
     DateInput
 } from "@polaris/ui";
@@ -28,7 +26,6 @@ import { useEffect, useState } from "react";
 import {
     agentRepoOptionsAction,
     polarAgentOptionsAction,
-    rotateHookAction,
     thresholdSubjectsAction
 } from "../actions";
 import { PagedPicker } from "@/components/paged-picker";
@@ -37,6 +34,9 @@ import { RefInput, RefTextarea } from "./references";
 import { CodeEditor } from "@/components/json-view";
 import { ThresholdFields, useSubjectProbe } from "./threshold-fields";
 import { ScheduleFields } from "./schedule-fields";
+import { WebhookFields } from "./webhook-fields";
+
+export { WebhookAddress } from "./webhook-fields";
 import { NoticeDeliveryFields } from "@/components/automations/notice-delivery-fields";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import {
@@ -93,7 +93,7 @@ export const STEP_TYPES = [
 export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     "core.manual": () => ({}),
     "core.schedule": () => ({ kind: "every", amount: 15, unit: "minutes" }),
-    "core.webhook": () => ({ method: "POST", rotation: 0 }),
+    "core.webhook": () => core.newWebhookConfig(),
     "core.if": () => ({
         condition: {
             kind: "group",
@@ -310,32 +310,16 @@ export function NodeFields({
     switch (node.type) {
         case "core.manual":
             return null;
-        case "core.webhook": {
+        case "core.webhook":
             return (
-                <div className="space-y-3">
-                    <Field label={t("fields.method")}>
-                        {/* i18n-ignore: HTTP methods, typed as is */}
-                        <Select
-                            value={config.method ?? "POST"}
-                            onValueChange={(method) => set({ method })}
-                            options={[
-                                { value: "POST", label: "POST" }, // i18n-ignore
-                                { value: "GET", label: "GET" }, // i18n-ignore
-                                { value: "any", label: t("fields.anyMethod") }
-                            ]}
-                            aria-label={t("fields.method")}
-                        />
-                    </Field>
-                    <WebhookAddress
-                        detail={detail}
-                        nodeId={node.id}
-                        rotation={typeof config.rotation === "number" ? config.rotation : 0}
-                        onRotate={(rotation) => set({ rotation })}
-                        onChanged={onChanged}
-                    />
-                </div>
+                <WebhookFields
+                    node={node}
+                    config={config}
+                    set={set}
+                    detail={detail}
+                    onChanged={onChanged}
+                />
             );
-        }
         case "core.schedule":
             return (
                 <ScheduleFields
@@ -692,81 +676,6 @@ export function NodeFields({
                 return <AppNodeFields node={node} setConfig={setConfig} detail={detail} />;
             return <p className="text-sm text-muted-foreground">{t("nodes.unknown")}</p>;
     }
-}
-
-/**
- * A webhook trigger's address, from the moment the trigger is added: the saved
- * one when the editor holds the saved rotation, asked for otherwise. "New
- * address" on a trigger that is not saved yet only moves the rotation here;
- * the next save keeps it.
- */
-export function WebhookAddress({
-    detail,
-    nodeId,
-    rotation,
-    onRotate,
-    onChanged
-}: {
-    detail: AutomationDetail;
-    nodeId: string;
-    rotation: number;
-    onRotate: (rotation: number) => void;
-    onChanged: () => void;
-}) {
-    const t = useTranslations("automations");
-    const toast = useToast();
-    const savedNode = detail.draft.nodes.find((entry) => entry.id === nodeId);
-    const savedRotation = (savedNode?.config as { rotation?: unknown } | undefined)?.rotation;
-    const known =
-        detail.hooks[nodeId] && (savedRotation ?? 0) === rotation ? detail.hooks[nodeId] : null;
-    const [asked, setAsked] = useState<{ key: string; path: string } | null>(null);
-    const key = `${nodeId}:${rotation}`;
-    useEffect(() => {
-        if (known || asked?.key === key) return;
-        let cancelled = false;
-        void polls.hookAddress(detail.id, nodeId, rotation).then((answer) => {
-            if (!cancelled && answer.ok) setAsked({ key, path: answer.path });
-        });
-        return () => {
-            cancelled = true;
-        };
-    }, [known, asked?.key, key, detail.id, nodeId, rotation]);
-    const path = known ?? (asked?.key === key ? asked.path : null);
-    const url = path && typeof window !== "undefined" ? `${window.location.origin}${path}` : null;
-    return (
-        <div className="space-y-1 text-sm">
-            <span>{t("editor.webhookUrl")}</span>
-            {url ? (
-                <div className="flex min-w-0 items-center gap-2">
-                    <code
-                        className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs"
-                        title={url}
-                    >
-                        {url}
-                    </code>
-                    <CopyButton value={url} />
-                </div>
-            ) : null}
-            <p className="text-xs text-muted-foreground">{t("editor.webhookUnpublished")}</p>
-            <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                    if (!savedNode) {
-                        onRotate(rotation + 1);
-                        return;
-                    }
-                    const answer = await rotateHookAction(detail.id, nodeId);
-                    toast.show({ title: answer.ok ? t("editor.newAddressDone") : answer.error });
-                    if (!answer.ok) return;
-                    onRotate(rotation + 1);
-                    onChanged();
-                }}
-            >
-                {t("editor.newAddress")}
-            </Button>
-        </div>
-    );
 }
 
 /**

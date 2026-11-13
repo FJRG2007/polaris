@@ -46,7 +46,8 @@ export const STEP_UP_PURPOSES = [
     "close-account",
     "vault-passkeys",
     "chat-lock-reset",
-    "admin-credentials"
+    "admin-credentials",
+    "automation-hook-secret"
 ] as const;
 
 export type StepUpPurpose = (typeof STEP_UP_PURPOSES)[number];

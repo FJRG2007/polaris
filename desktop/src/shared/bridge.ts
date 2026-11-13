@@ -313,9 +313,6 @@ export interface PolarisLocal {
         importHosts(text: string): Promise<HostImport>;
         /** Ask for a newer version of this app now and say what was found. */
         checkForUpdates(): Promise<UpdateCheck>;
-        /** After an answer of "downloading": what that download came to, once
-         *  it is installed or has failed. */
-        updateDownloaded(): Promise<UpdateCheck>;
         /** Restart into the version that is installed and waiting. */
         restartToUpdate(): Promise<Outcome>;
         /** Open the download page of the version found; false when there is none. */
@@ -567,7 +564,6 @@ export const CHANNELS = {
     connectCheck: "local:connect-check",
     connectClose: "local:connect-close",
     connectCheckUpdates: "local:connect-check-updates",
-    connectUpdateDownloaded: "local:connect-update-downloaded",
     connectRestart: "local:connect-restart",
     connectUpdatePage: "local:connect-update-page",
     keyState: "local:key-state",
