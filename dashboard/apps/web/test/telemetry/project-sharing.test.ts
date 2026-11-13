@@ -92,6 +92,9 @@ vi.mock("@/lib/domain-service", () => ({
     appBaseUrl: vi.fn(async () => "https://polaris.example.test")
 }));
 vi.mock("@/lib/workspace-scope", () => ({ scopeOrgIdFor: vi.fn(async () => null) }));
+vi.mock("@/lib/deploy/managed-projects", () => ({
+    polarisProjectIds: vi.fn(async () => new Set(["internal-project"]))
+}));
 vi.mock("@polaris/deploy", () => ({ slugify: (value: string) => value }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
@@ -115,6 +118,14 @@ const { requireTelemetryReader } = await import("@/lib/telemetry/reader");
 const { requireMayShare } = await import("@/lib/access/sharing-service");
 
 type Sharer = Parameters<typeof requireMayShare>[0];
+
+describe("the projects Polaris runs for itself", () => {
+    it("are left out of the list, like Deploy leaves them out", async () => {
+        const { listProjects } = await import("@/lib/telemetry/project-service");
+        await listProjects({ id: "owner", isAdmin: true }, null);
+        expect(JSON.stringify(state.where)).toContain('"notIn":["internal-project"]');
+    });
+});
 
 describe("a shared telemetry project", () => {
     beforeEach(() => {
@@ -146,7 +157,11 @@ describe("a shared telemetry project", () => {
         state.granted = new Map([[PROJECT, "view"]]);
         const { data } = await actions.telemetryOverviewAction({ projectId: PROJECT });
         expect(state.where).toMatchObject({
-            AND: [{ OR: [{ ownerId: "reader" }, { id: { in: [PROJECT] } }] }, { id: { in: [PROJECT] } }]
+            AND: [
+                { OR: [{ ownerId: "reader" }, { id: { in: [PROJECT] } }] },
+                { OR: [{ deployProjectId: null }, { deployProjectId: { notIn: ["internal-project"] } }] },
+                { id: { in: [PROJECT] } }
+            ]
         });
         expect(data?.projects[0]).toMatchObject({
             shared: true,

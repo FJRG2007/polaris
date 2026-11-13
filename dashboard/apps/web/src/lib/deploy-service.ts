@@ -3624,10 +3624,15 @@ async function telemetryEnv(environmentId: string): Promise<Record<string, strin
         });
         if (!environment) return {};
 
-        const [{ projectForDeploy, dsnFor }, { appBaseUrl }] = await Promise.all([
-            import("@/lib/telemetry/project-service"),
-            import("@/lib/domain-service")
-        ]);
+        const [{ projectForDeploy, dsnFor }, { appBaseUrl }, { polarisProjectIds }] =
+            await Promise.all([
+                import("@/lib/telemetry/project-service"),
+                import("@/lib/domain-service"),
+                import("@/lib/deploy/managed-projects")
+            ]);
+        // An app Polaris installed is not the operator's code to debug, and a
+        // telemetry project for it was only ever an empty "Marketplace" card.
+        if ((await polarisProjectIds()).has(environment.project.id)) return {};
         const project = await projectForDeploy(environment.project);
         return {
             SENTRY_DSN: dsnFor(project, await appBaseUrl()),

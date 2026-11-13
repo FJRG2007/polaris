@@ -15,6 +15,7 @@
 
 import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
+import { polarisProjectIds } from "@/lib/deploy/managed-projects";
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 
 /** The slug and name Polaris' own project always has. */
@@ -193,7 +194,14 @@ export async function listProjects(
 ): Promise<ProjectSummary[]> {
     const own = actor.isAdmin ? { orgId } : { ownerId: actor.id, orgId };
     const readable = lent.size > 0 ? { OR: [own, { id: { in: [...lent] } }] } : own;
+    // The projects Polaris runs for itself (the one installed apps live in, the
+    // mail server's) are not anybody's deployment, so they are not listed here
+    // either - the same rule that keeps them out of Deploy.
+    const internal = [...(await polarisProjectIds())];
     const narrowed = [
+        ...(internal.length > 0
+            ? [{ OR: [{ deployProjectId: null }, { deployProjectId: { notIn: internal } }] }]
+            : []),
         ...(page.ids ? [{ id: { in: [...page.ids] } }] : []),
         ...(page.query ? [{ name: { contains: page.query, mode: "insensitive" as const } }] : [])
     ];
