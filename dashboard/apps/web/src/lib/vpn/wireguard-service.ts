@@ -615,8 +615,21 @@ export async function nodesFor(user: { id: string; isAdmin: boolean }) {
 }
 
 export async function devicesOf(userId: string) {
+    return peersWhere({ userId });
+}
+
+/**
+ * The devices on the VPN's own servers a viewer sees: their own, or every one for
+ * an administrator, each with who it belongs to. Newest first, at most a
+ * thousand, like `devicesOf`.
+ */
+export async function devicesFor(viewer: { id: string; isAdmin: boolean }) {
+    return peersWhere(viewer.isAdmin ? {} : { userId: viewer.id });
+}
+
+async function peersWhere(where: { userId?: string }) {
     const peers = await prisma.vpnPeer.findMany({
-        where: { userId },
+        where,
         orderBy: { createdAt: "desc" },
         take: 1000,
         select: {
@@ -625,7 +638,8 @@ export async function devicesOf(userId: string) {
             lastHandshake: true,
             received: true,
             sent: true,
-            node: { select: { name: true, exit: true } }
+            node: { select: { name: true, exit: true } },
+            user: { select: { id: true, name: true, email: true } }
         }
     });
     return peers.map(({ received, sent, ...peer }) => ({

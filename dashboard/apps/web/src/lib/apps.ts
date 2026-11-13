@@ -2945,19 +2945,21 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/vpn/devices",
             requiresApp: "vpn",
             icon: MonitorSmartphone,
-            keywords: ["machines", "nodes", "exit node", "subnet routes", "rename"]
+            keywords: ["machines", "computer", "extension", "connected", "remove"]
         },
         {
             label: "Private networks", // i18n-ignore
             href: "/vpn/networks",
-            requiresApp: "vpn",
+            // Rides on the device mesh, an integration switched on in the
+            // VPN's settings (`VPN_MESH` in `lib/vpn/settings.ts`).
+            requiresApp: "vpn-mesh",
             icon: Network,
             keywords: ["subnet", "home automation", "iot", "router", "wifi", "openwrt"]
         },
         {
             label: "Join a network", // i18n-ignore
             href: "/vpn/add",
-            requiresApp: "vpn",
+            requiresApp: "vpn-mesh",
             icon: Plus,
             keywords: ["install", "login server", "key", "phone", "tv", "router"]
         }

@@ -14,6 +14,7 @@ import * as service from "@/lib/vpn/wireguard-service";
 import { profilesOf } from "@/lib/vpn/profile-service";
 import { requireAdmin, requireUser } from "@/lib/session";
 import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
+import { vpnMeshOn } from "@/lib/vpn/mesh";
 
 type Result<T = object> = { error: string } | ({ error?: undefined } & T);
 
@@ -124,6 +125,19 @@ export async function removeVpnDeviceAction(input: unknown): Promise<Result> {
     }
 }
 
+/** The devices on the VPN's own servers: the reader's, or everybody's for an
+ *  administrator. */
+export async function vpnAppDevicesAction(): Promise<
+    Result<{ devices: Awaited<ReturnType<typeof service.devicesFor>> }>
+> {
+    const user = await requireUser();
+    try {
+        return { devices: await service.devicesFor(user) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
 export interface NodesAnswer {
     readonly nodes: Awaited<ReturnType<typeof service.listNodes>>;
     /** The nodes on this admin's own servers - the ones they may edit or remove. */
@@ -132,12 +146,14 @@ export interface NodesAnswer {
     readonly canAdd: boolean;
     readonly access: Awaited<ReturnType<typeof service.listAccess>>;
     readonly open: boolean;
+    /** Whether the device mesh integration is switched on. */
+    readonly mesh: boolean;
 }
 
 export async function vpnAdminAction(): Promise<Result<NodesAnswer>> {
     const user = await requireAdmin();
     try {
-        const [nodes, free, access, open] = await Promise.all([
+        const [nodes, free, access, open, mesh] = await Promise.all([
             service.listNodes(),
             // Only whether one exists: the dialog reads the servers themselves a
             // page at a time, under the same filters.
@@ -146,13 +162,14 @@ export async function vpnAdminAction(): Promise<Result<NodesAnswer>> {
                 select: { id: true }
             }),
             service.listAccess(),
-            service.openAccess()
+            service.openAccess(),
+            vpnMeshOn()
         ]);
         const owned = await prisma.host.findMany({
             where: { ownerId: user.id, id: { in: nodes.map(({ hostId }) => hostId) } },
             select: { id: true }
         });
-        return { nodes, access, open, mine: owned.map(({ id }) => id), canAdd: free !== null };
+        return { nodes, access, open, mine: owned.map(({ id }) => id), canAdd: free !== null, mesh };
     } catch (error) {
         return failed(error);
     }

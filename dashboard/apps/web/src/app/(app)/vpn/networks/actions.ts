@@ -41,6 +41,7 @@ export interface NetworksAnswer {
 export async function listNetworksAction(): Promise<Result<NetworksAnswer>> {
     const user = await requireUser();
     try {
+        await vpn.requireMesh();
         const [networks, firstServer] = await Promise.all([
             service.listNetworks({ id: user.id, isAdmin: user.isAdmin }),
             user.isAdmin ? service.firstNetworkServer(user.id) : Promise.resolve(null)
@@ -55,6 +56,7 @@ export async function listNetworksAction(): Promise<Result<NetworksAnswer>> {
 export async function createNetworkAction(input: unknown): Promise<Result<{ notice?: string }>> {
     const user = await requireAdmin();
     try {
+        await vpn.requireMesh();
         const { network, problem } = await service.createNetwork(
             user,
             networkInputSchema.parse(input)
@@ -75,6 +77,7 @@ export async function createNetworkAction(input: unknown): Promise<Result<{ noti
 export async function updateNetworkAction(input: unknown): Promise<Result> {
     const user = await requireAdmin();
     try {
+        await vpn.requireMesh();
         const change = networkChangeSchema.parse(input);
         await service.updateNetwork(change);
         await recordAudit({
@@ -92,6 +95,7 @@ export async function updateNetworkAction(input: unknown): Promise<Result> {
 export async function retryGatewayAction(input: unknown): Promise<Result> {
     const user = await requireAdmin();
     try {
+        await vpn.requireMesh();
         await service.retryGateway(user, idSchema.parse(input).id);
         return {};
     } catch (error) {
@@ -102,6 +106,7 @@ export async function retryGatewayAction(input: unknown): Promise<Result> {
 export async function removeNetworkAction(input: unknown): Promise<Result> {
     const user = await requireAdmin();
     try {
+        await vpn.requireMesh();
         const { id } = idSchema.parse(input);
         await service.removeNetwork(user, id);
         await recordAudit({

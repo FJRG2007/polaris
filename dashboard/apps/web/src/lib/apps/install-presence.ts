@@ -17,6 +17,8 @@
 import { prisma } from "@polaris/db";
 import { isNativeApp } from "@/lib/apps/native-apps";
 import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
+import { vpnMeshOn } from "@/lib/vpn/mesh";
+import { VPN_MESH } from "@/lib/vpn/settings";
 
 const CACHE_TTL_MS = 15_000;
 
@@ -50,7 +52,10 @@ const IMPLIED_BY: Readonly<Record<string, () => Promise<boolean>>> = {
                 }
             },
             select: { id: true }
-        })) !== null
+        })) !== null,
+    // The VPN's device mesh is a switch on the VPN's own install, never a row of
+    // its own: its screens are here exactly while that switch is on.
+    [VPN_MESH]: vpnMeshOn
 };
 
 /** Whether any non-removed install of this catalog app exists, or anything that

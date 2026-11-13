@@ -40,6 +40,8 @@ import { installApp, uninstallApp } from "@/lib/apps/install-service";
 import * as deploy from "@/lib/deploy-service";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { headscaleClient, type HeadscaleClient, type HeadscaleNode } from "./headscale-client";
+import { vpnMeshOn } from "./mesh";
+import { invalidateInstallPresence } from "@/lib/apps/install-presence";
 
 /** The environment value the engine's entrypoint writes its configuration from. */
 export const VPN_CONFIG_ENV = "HEADSCALE_CONFIG_BASE64";
@@ -64,7 +66,9 @@ export type VpnRefusalCode =
     | "subnetTaken"
     | "noServer"
     | "gatewayFailed"
-    | "noAccess";
+    | "noAccess"
+    | "meshOff"
+    | "meshRunning";
 
 export class VpnRefusal extends Error {
     constructor(readonly code: VpnRefusalCode) {
@@ -114,6 +118,26 @@ async function requireApp(): Promise<{ id: string; settings: rules.VpnSettings }
         id: row.id,
         settings: rules.readVpnSettings(readInstallConfig(row.config)[CONFIG_KEY])
     };
+}
+
+/**
+ * Refuse anything of the device mesh while it is switched off: its screens are
+ * not offered then, and a hand-made request is answered the same way.
+ */
+export async function requireMesh(): Promise<void> {
+    if (!(await vpnMeshOn())) throw new VpnRefusal("meshOff");
+}
+
+/**
+ * Switch the device mesh on or off. Off is refused while the control server is
+ * running, so nobody's device loses its way in from a switch: it is turned off
+ * first, which keeps every device for when the mesh comes back.
+ */
+export async function setMesh(on: boolean): Promise<void> {
+    const app = await requireApp();
+    if (!on && app.settings.enabled) throw new VpnRefusal("meshRunning");
+    await saveSettings(app.id, { ...app.settings, mesh: on });
+    invalidateInstallPresence(rules.VPN_MESH);
 }
 
 async function saveSettings(id: string, settings: rules.VpnSettings): Promise<void> {

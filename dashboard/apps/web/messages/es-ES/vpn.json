@@ -28,7 +28,9 @@
         "tooMany": "Esta VPN ya tiene todas las redes que puede guardar.",
         "subnetTaken": "Otra red ya usa parte de esa subred.",
         "noServer": "Ese servidor ya no está disponible.",
-        "gatewayFailed": "La red se guardó, pero su servidor no pudo iniciar la pasarela. Pulsa Repetir cuando vuelva."
+        "gatewayFailed": "La red se guardó, pero su servidor no pudo iniciar la pasarela. Pulsa Repetir cuando vuelva.",
+        "meshOff": "La red de equipos está apagada. Un administrador puede activarla en los ajustes de la VPN.",
+        "meshRunning": "Apaga primero el servidor de control, para que ningún dispositivo pierda el acceso."
     },
     "zoneErrors": {
         "no-domain": "Aún no hay ningún dominio donde poner la VPN. Añade uno en Dominios.",
@@ -302,7 +304,7 @@
             "portOpen": "{address} responde, pero esta red puede bloquear el puerto UDP {port} saliente. Inténtalo de nuevo o usa otra red.",
             "unreachable": "No se encontró la dirección de ese servidor. Prueba otra ubicación."
         },
-        "remoteAccess": "Tailscale y otras formas de entrar en este servidor",
+        "remoteAccess": "Otros accesos a este servidor",
         "own": {
             "title": "Tus propias VPN",
             "hint": "Importa un archivo WireGuard de un proveedor como Proton o Mullvad. Se conecta desde la app de Polaris en tu ordenador.",
@@ -423,8 +425,9 @@
         "empty": "Aún no has dado acceso a nadie. Los administradores siempre pueden conectarse."
     },
     "mesh": {
-        "title": "Redes privadas",
-        "hint": "Opcional: permite que los dispositivos se vean entre sí y lleguen a una red de casa. Para el uso normal no hace falta."
+        "title": "Red de equipos",
+        "hint": "Integración opcional: los dispositivos se unen con la app de Tailscale y se ven entre sí y con redes de casa. Las apps de Polaris no la necesitan.",
+        "devicesTitle": "Red de equipos"
     },
     "place": {
         "set": "Indicar dónde está",
@@ -469,5 +472,13 @@
         "commandHint": "Ejecútalo en el router o servidor para unirlo a tu VPN.",
         "copyCommand": "Copiar comando",
         "manage": "Ver y revocar claves"
+    },
+    "appDevices": {
+        "intro": "Tus dispositivos en la VPN. Uno aparece aquí la primera vez que se conecta desde una app de Polaris.",
+        "adminIntro": "Todos los dispositivos en los servidores de la VPN. Cada persona ve los suyos; los administradores, todos.",
+        "add": "Descargar apps",
+        "emptyTitle": "Sin dispositivos",
+        "emptyBody": "Conéctate desde la app de Polaris en tu ordenador o desde la extensión de Polaris.",
+        "removeBody": "Se desconecta y la próxima vez se conecta como un dispositivo nuevo."
     }
 }

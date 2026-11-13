@@ -10,6 +10,14 @@ import { z } from "zod";
 export const VPN_APP = "vpn";
 /** The control server, which exists only between Turn on and Turn off. */
 export const VPN_ENGINE_APP = "vpn-engine";
+/**
+ * The device mesh: devices that join with a third-party client and reach each
+ * other, and the private networks that ride on it. An optional integration an
+ * administrator switches on; the VPN itself is Polaris's own apps connecting to
+ * its own servers and needs none of it. Not a catalog app: the id the rails and
+ * the install probe ask about (`AppSection.requiresApp`, `install-presence`).
+ */
+export const VPN_MESH = "vpn-mesh";
 /** The port Headscale listens on inside its container. */
 export const VPN_PORT = 8080;
 /** The subdomain the control server is offered under in a zone. */
@@ -54,7 +62,10 @@ export const vpnSettingsSchema = z.object({
      *  so the devices on it sign back in when it is turned on again. */
     enabled: z.boolean().catch(false),
     /** The private networks, read entry by entry (`readNetworks`). */
-    networks: z.array(z.unknown()).catch([])
+    networks: z.array(z.unknown()).catch([]),
+    /** Whether the device mesh is switched on; null until an administrator
+     *  chooses, which `meshOn` answers from what the install already has. */
+    mesh: z.boolean().nullable().catch(null)
 });
 export type VpnSettings = z.infer<typeof vpnSettingsSchema>;
 
@@ -67,8 +78,26 @@ export function readVpnSettings(stored: unknown): VpnSettings {
               baseDomain: DEFAULT_BASE_DOMAIN,
               apiKey: null,
               enabled: false,
-              networks: []
+              networks: [],
+              mesh: null
           };
+}
+
+/**
+ * Whether the device mesh is on. An administrator's choice once made; before
+ * that, on exactly when this install already used it - a control server set up
+ * (it has a key or a hostname, or is running) or a private network saved - so an
+ * update never takes it away from the devices already on it, and a VPN that
+ * never used it does not show it.
+ */
+export function meshOn(settings: VpnSettings): boolean {
+    if (settings.mesh !== null) return settings.mesh;
+    return (
+        settings.enabled ||
+        settings.apiKey !== null ||
+        settings.hostname !== null ||
+        settings.networks.length > 0
+    );
 }
 
 /**

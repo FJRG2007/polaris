@@ -7,6 +7,8 @@
  */
 
 import * as vpn from "@/lib/vpn/service";
+import { notFound } from "next/navigation";
+import { vpnMeshOn } from "@/lib/vpn/mesh";
 import { requireUser } from "@/lib/session";
 import { VpnNoAccess } from "../../no-access";
 import { authIdSchema } from "@/lib/vpn/settings";
@@ -16,6 +18,7 @@ export const dynamic = "force-dynamic";
 
 export default async function VpnRegisterPage({ params }: { params: Promise<{ authId: string }> }) {
     const user = await requireUser();
+    if (!(await vpnMeshOn())) notFound();
     const parsed = authIdSchema.safeParse((await params).authId);
     if (!(await vpn.mayJoin(user))) return <VpnNoAccess />;
     return (

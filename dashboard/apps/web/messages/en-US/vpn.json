@@ -28,7 +28,9 @@
         "tooMany": "This VPN already has as many networks as it can keep.",
         "subnetTaken": "Another network already uses part of that subnet.",
         "noServer": "That server is no longer available.",
-        "gatewayFailed": "The network was saved, but its server could not start the gateway. Press Retry when it is back."
+        "gatewayFailed": "The network was saved, but its server could not start the gateway. Press Retry when it is back.",
+        "meshOff": "The device network is off. An administrator can switch it on in the VPN's settings.",
+        "meshRunning": "Turn the control server off first, so no device loses its way in."
     },
     "zoneErrors": {
         "no-domain": "There is no domain to put the VPN on yet. Add one in Domains.",
@@ -302,7 +304,7 @@
             "portOpen": "{address} is reachable, but this network may block outgoing UDP port {port}. Try again or use another network.",
             "unreachable": "That server's address could not be found. Try another location."
         },
-        "remoteAccess": "Tailscale and other ways into this server",
+        "remoteAccess": "Other ways into this server",
         "own": {
             "title": "Your own VPNs",
             "hint": "Import a WireGuard file from a provider such as Proton or Mullvad. It connects from the Polaris app on your computer.",
@@ -423,8 +425,9 @@
         "empty": "Nobody has been given access yet. Administrators can always connect."
     },
     "mesh": {
-        "title": "Private networks",
-        "hint": "Optional: lets devices reach each other and a home network. Normal VPN use does not need it."
+        "title": "Device network",
+        "hint": "Optional integration: devices join with the Tailscale app and reach each other and home networks. The Polaris apps do not need it.",
+        "devicesTitle": "Device network"
     },
     "place": {
         "set": "Set where this server is",
@@ -469,5 +472,13 @@
         "commandHint": "Run this on the router or server to connect it to your VPN.",
         "copyCommand": "Copy command",
         "manage": "See and revoke keys"
+    },
+    "appDevices": {
+        "intro": "Your devices on the VPN. One appears here the first time it connects from a Polaris app.",
+        "adminIntro": "Every device on the VPN's servers. People see only their own; administrators see all of them.",
+        "add": "Get the apps",
+        "emptyTitle": "No devices yet",
+        "emptyBody": "Connect from the Polaris app on your computer or the Polaris extension.",
+        "removeBody": "It is disconnected and connects again as a new device next time."
     }
 }

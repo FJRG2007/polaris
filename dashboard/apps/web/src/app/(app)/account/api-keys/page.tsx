@@ -12,6 +12,7 @@ import { ApiKeysView } from "./api-keys-view";
 import { Messages } from "@/components/i18n/messages";
 import { VpnDeviceKeys } from "@/components/vpn/device-keys";
 import { isClientKey } from "@/lib/vault/client-key";
+import { vpnMeshOn } from "@/lib/vpn/mesh";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,12 @@ export default async function ApiKeysPage() {
     // that appeared on its own is a credential nobody can explain later - which is
     // the kind people leave alone rather than manage. Assistants connected over
     // MCP have their own screen, Account > AI assistants.
-    const all = await listApiKeys(user.id);
+    // VPN device keys belong to the VPN's device network, an integration that is
+    // off unless an administrator switched it on.
+    const [all, mesh] = await Promise.all([
+        listApiKeys(user.id),
+        vpnMeshOn().catch(() => false)
+    ]);
     const keys = all.filter((key) => !isClientKey(key.description));
 
     return (
@@ -40,9 +46,11 @@ export default async function ApiKeysPage() {
                 <p className="text-sm text-muted-foreground">{t("apiKeys.page.intro")}</p>
             </div>
             <ApiKeysView keys={keys} />
-            <Messages namespaces={["vpn"]}>
-                <VpnDeviceKeys />
-            </Messages>
+            {mesh ? (
+                <Messages namespaces={["vpn"]}>
+                    <VpnDeviceKeys />
+                </Messages>
+            ) : null}
         </div>
     );
 }

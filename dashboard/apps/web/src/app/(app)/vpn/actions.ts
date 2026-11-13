@@ -81,6 +81,26 @@ export async function installVpnAppAction(): Promise<Result> {
     }
 }
 
+/** Switch the device mesh integration on or off. Off is refused while its
+ *  control server runs, so nobody's device is cut off by a switch. */
+export async function setVpnMeshAction(input: unknown): Promise<Result> {
+    const user = await requireAdmin();
+    try {
+        const on = z.boolean().parse(input);
+        await vpn.setMesh(on);
+        await recordAudit({
+            actorId: user.id,
+            action: on ? "vpn.mesh.on" : "vpn.mesh.off",
+            targetType: "installedApp",
+            targetId: rules.VPN_MESH
+        });
+        revalidatePath("/", "layout");
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
 export interface VpnOverview {
     readonly status: vpn.VpnStatus;
     /** The zones a hostname may be taken in; empty for anybody but an
@@ -94,6 +114,7 @@ export interface VpnOverview {
 export async function vpnOverviewAction(): Promise<Result<VpnOverview>> {
     const user = await requireUser();
     try {
+        await vpn.requireMesh();
         const [status, zones, mayJoin] = await Promise.all([
             vpn.vpnStatus(),
             rules.mayOperate(viewerOf(user)) ? vpn.hostnameZones() : Promise.resolve([]),
@@ -113,6 +134,7 @@ export async function checkVpnHostnameAction(
     const parsed = hostnameChoiceSchema.safeParse(input);
     if (!parsed.success) return { hostname: "", available: false, invalid: true };
     try {
+        await vpn.requireMesh();
         const result = await vpn.checkHostname(user.id, parsed.data);
         if (typeof result === "string") {
             const t = await getTranslations("vpn");
@@ -131,6 +153,7 @@ export async function checkVpnHostnameAction(
 export async function turnOnVpnAction(input: unknown): Promise<Result> {
     const user = await requireAdmin();
     try {
+        await vpn.requireMesh();
         const choice = hostnameChoiceSchema.parse(input);
         await vpn.turnOn(user.id, choice);
         await recordAudit({
@@ -149,6 +172,7 @@ export async function turnOnVpnAction(input: unknown): Promise<Result> {
 export async function turnOffVpnAction(): Promise<Result> {
     const user = await requireAdmin();
     try {
+        await vpn.requireMesh();
         await vpn.turnOff();
         await recordAudit({
             actorId: user.id,
@@ -167,6 +191,7 @@ export async function turnOffVpnAction(): Promise<Result> {
 export async function removeVpnAction(): Promise<Result> {
     const user = await requireAdmin();
     try {
+        await vpn.requireMesh();
         await vpn.removeVpn();
         await recordAudit({
             actorId: user.id,
@@ -187,6 +212,7 @@ export async function listVpnDevicesAction(): Promise<
 > {
     const user = await requireUser();
     try {
+        await vpn.requireMesh();
         const [devices, mayJoin] = await Promise.all([
             vpn.listDevices(viewerOf(user)),
             vpn.mayJoin(user)
@@ -202,6 +228,7 @@ export async function renameVpnDeviceAction(
 ): Promise<Result<{ device: vpn.VpnDevice }>> {
     const user = await requireUser();
     try {
+        await vpn.requireMesh();
         const { nodeId, name } = z.object({ nodeId: nodeIdSchema, name: z.string() }).parse(input);
         return { device: await vpn.renameDevice(viewerOf(user), nodeId, name) };
     } catch (error) {
@@ -212,6 +239,7 @@ export async function renameVpnDeviceAction(
 export async function removeVpnDeviceAction(input: unknown): Promise<Result> {
     const user = await requireUser();
     try {
+        await vpn.requireMesh();
         const { nodeId } = z.object({ nodeId: nodeIdSchema }).parse(input);
         await vpn.removeDevice(viewerOf(user), nodeId);
         await recordAudit({
@@ -237,6 +265,7 @@ export async function setVpnDeviceRoutesAction(
 ): Promise<Result<{ device: vpn.VpnDevice }>> {
     const user = await requireUser();
     try {
+        await vpn.requireMesh();
         const { nodeId, exitNode, routes } = z
             .object({
                 nodeId: nodeIdSchema,
@@ -263,6 +292,7 @@ export async function createVpnKeyAction(): Promise<
 > {
     const user = await requireUser();
     try {
+        await vpn.requireMesh();
         return await vpn.createDeviceKey({
             id: user.id,
             name: user.name,
@@ -279,6 +309,7 @@ export async function createVpnKeyAction(): Promise<
 export async function listVpnKeysAction(): Promise<Result<{ keys: vpn.DeviceKey[] | null }>> {
     const user = await requireUser();
     try {
+        await vpn.requireMesh();
         return {
             keys: await vpn.listDeviceKeys({
                 id: user.id,
@@ -296,6 +327,7 @@ export async function listVpnKeysAction(): Promise<Result<{ keys: vpn.DeviceKey[
 export async function revokeVpnKeyAction(input: unknown): Promise<Result> {
     const user = await requireUser();
     try {
+        await vpn.requireMesh();
         const { keyId } = z.object({ keyId: nodeIdSchema }).parse(input);
         await vpn.revokeDeviceKey(
             { id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin },
@@ -319,6 +351,7 @@ export async function registerVpnDeviceAction(
 ): Promise<Result<{ device: vpn.VpnDevice }>> {
     const user = await requireUser();
     try {
+        await vpn.requireMesh();
         const { authId } = z.object({ authId: rules.authIdSchema }).parse(input);
         const device = await vpn.registerDevice(
             { id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin },

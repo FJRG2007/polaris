@@ -10,6 +10,7 @@ import { countryName } from "@/components/map/country-name";
 import { dropServerOptions, ServerPicker } from "@/components/server-picker";
 import { useVpnRead } from "./use-vpn-read";
 import * as actions from "./connect-actions";
+import { setVpnMeshAction } from "./actions";
 import { VpnOverviewSection } from "./overview";
 import { useState, useTransition } from "react";
 import { MapPin, Pencil, Plus, Trash2 } from "lucide-react";
@@ -281,11 +282,19 @@ export function VpnAdminSettings() {
                 </ul>
             </section>
             <section className="flex min-w-0 flex-col gap-2">
-                <div className="min-w-0">
-                    <h2 className="text-sm font-medium">{t("mesh.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("mesh.hint")}</p>
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                    <div className="min-w-0">
+                        <h2 className="text-sm font-medium">{t("mesh.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{t("mesh.hint")}</p>
+                    </div>
+                    <ui.Switch
+                        aria-label={t("mesh.title")}
+                        checked={data?.mesh ?? false}
+                        disabled={data === null || pending}
+                        onChange={(on) => run(() => setVpnMeshAction(on))}
+                    />
                 </div>
-                <VpnOverviewSection isAdmin />
+                {data?.mesh ? <VpnOverviewSection isAdmin /> : null}
             </section>
             {nodeDialog ? (
                 <NodeDialog

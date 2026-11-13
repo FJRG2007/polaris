@@ -531,10 +531,11 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         }
     },
     {
-        // Your own Tailscale network. Installing it runs nothing: it puts the VPN
-        // screens here, and the control server starts only when an administrator
-        // presses Turn on - it needs a hostname in one of the deploy zones, which
-        // is chosen on that same screen.
+        // Polaris's own VPN: people connect from the Polaris app or extension to
+        // servers run here. Installing it runs nothing. The device network (a
+        // Tailscale-compatible control server, `vpn-engine`) is an optional
+        // integration switched on in its settings, and starts only when an
+        // administrator presses Turn on there.
         id: "vpn",
         name: "VPN",
         category: "Tools",
