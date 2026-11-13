@@ -14,7 +14,8 @@ import { Power, Trash2 } from "lucide-react";
 import * as actions from "./connect-actions";
 import { openProfileAction } from "./profile-actions";
 import { desktopBridge } from "@/lib/desktop-bridge";
-import { countryName, WorldMap, type MapPlace } from "./world-map";
+import { countryName } from "@/components/map/country-name";
+import { WorldMap, type MapPlace } from "@/components/map/world-map";
 import type { DesktopVpnStatus } from "@/lib/desktop-bridge";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -66,9 +67,13 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
             .join(", ");
     const places = useMemo<MapPlace[]>(
         () =>
-            [...nodes.filter((node) => node.exit !== "tor"), ...profiles].flatMap((place) =>
-                place.country ? [{ id: place.id, country: place.country, label: place.name }] : []
-            ),
+            [...nodes.filter((node) => node.exit !== "tor"), ...profiles].map((place) => ({
+                id: place.id,
+                country: place.country,
+                latitude: place.latitude,
+                longitude: place.longitude,
+                label: [place.name, place.city].filter(Boolean).join(", ")
+            })),
         [nodes, profiles]
     );
     // A place whose server nothing reaches is said so up front, not after a try.
@@ -188,6 +193,7 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
             <div className="grid grid-cols-1 min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
                 <ui.Card className="min-w-0 p-3">
                     <WorldMap
+                        label={t("connect.map")}
                         places={places}
                         selected={selected}
                         active={active}

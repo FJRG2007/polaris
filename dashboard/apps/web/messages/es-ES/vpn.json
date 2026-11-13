@@ -323,7 +323,8 @@
         },
         "unreachable": "No accesible",
         "unreachableHint": "Su servidor no acepta conexiones ahora mismo.",
-        "unreachableFix": "Ver qué abrir"
+        "unreachableFix": "Ver qué abrir",
+        "map": "Desde dónde puedes conectarte"
     },
     "nodes": {
         "title": "Servidores",
@@ -441,9 +442,11 @@
         "finding": "Buscando...",
         "noMatch": "Nada con ese nombre.",
         "noPlace": "Nada en esas coordenadas.",
-        "mapHint": "O pulsa un país en el mapa.",
+        "mapHint": "O pulsa un punto del mapa. Acerca para elegir un pueblo.",
         "automatic": "Usar su dirección",
-        "close": "Cerrar"
+        "close": "Cerrar",
+        "anywhere": "En cualquier sitio de {country}",
+        "map": "Dónde está este servidor"
     },
     "keys": {
         "title": "Claves VPN",

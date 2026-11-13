@@ -13,7 +13,7 @@
  */
 
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, Filter, FilterX, Globe, Radio } from "lucide-react";
 import {
     Card,
@@ -31,6 +31,7 @@ import {
 } from "@polaris/ui";
 import * as core from "@polaris/core";
 import * as polls from "./analytics-polls";
+import * as map from "@/components/map/world-map";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import type { AnalyticsReportAnswer } from "./actions";
 import { useDisplayFormat } from "@/components/display-format";
@@ -395,112 +396,44 @@ export function GeographySection(props: PanelProps) {
 
 // --- the map -----------------------------------------------------------------------
 
-interface WorldShape {
-    w: number;
-    h: number;
-    countries: { c: string; n: string; d: string }[];
-}
-
-let world: Promise<WorldShape> | null = null;
-
-/**
- * The outlines, pre-projected (Mercator, Antarctica left out) from Natural Earth's
- * 1:110m countries as published in world-atlas, keyed by ISO 3166-1 alpha-2.
- * Shipped with the app and loaded only when a map is drawn, never from a CDN.
- * `scripts/gen-world-map.mjs` rebuilds it.
- */
-function loadWorld(): Promise<WorldShape> {
-    world ??= import("./world-map.json").then((module) => (module.default ?? module) as WorldShape);
-    return world;
-}
-
-/** Where the pointer is over the map, in the map box's own pixels. */
-interface Pointer {
-    readonly code: string;
-    readonly x: number;
-    readonly y: number;
-}
-
 /**
  * Visitors by country, darker where there are more. Colour runs on the square root
  * of the share of the top country, so one dominant country does not leave every
- * other one looking empty. Hovering a country lights it and names it beside the
- * pointer; picking one narrows the screen to it.
+ * other one looking empty. Hovering a country names it beside the pointer;
+ * picking one narrows the screen to it.
  */
 export function WorldMap({ rows, unavailable = false }: { rows: readonly core.VisitRow[] | null; unavailable?: boolean }) {
     const t = useTranslations("analytics");
     const pick = useFilterPick();
-    const box = useRef<HTMLDivElement>(null);
-    const [shape, setShape] = useState<WorldShape | null>(null);
-    const [pointer, setPointer] = useState<Pointer | null>(null);
-    useEffect(() => {
-        let live = true;
-        void loadWorld().then((loaded) => {
-            if (live) setShape(loaded);
-        });
-        return () => {
-            live = false;
-        };
-    }, []);
     const byCode = useMemo(() => new Map((rows ?? []).map((row) => [row.key.toUpperCase(), row])), [rows]);
     const top = useMemo(() => (rows ?? []).reduce((best, row) => Math.max(best, row.visitors), 0), [rows]);
 
     if (unavailable) return <Empty>{t("breakdowns.notKept")}</Empty>;
-    if (!shape || rows === null) return <Skeleton className="aspect-[960/621] w-full" />;
-
-    const point = (code: string, event: MouseEvent) => {
-        const rect = box.current?.getBoundingClientRect();
-        if (!rect) return;
-        setPointer({ code, x: event.clientX - rect.left, y: event.clientY - rect.top });
-    };
-    const hovered = pointer ? byCode.get(pointer.code) : undefined;
-    const width = box.current?.clientWidth ?? 0;
+    if (rows === null) return <Skeleton className="aspect-[960/621] w-full" />;
 
     return (
         <div className="flex flex-col gap-2">
-            <div ref={box} className="relative min-w-0" onMouseLeave={() => setPointer(null)}>
-                <svg viewBox={`0 0 ${shape.w} ${shape.h}`} className="h-auto w-full" role="img" aria-label={t("map.title")}>
-                    {shape.countries.map((country, index) => {
-                        const row = country.c ? byCode.get(country.c) : undefined;
-                        const share = row && top > 0 ? Math.sqrt(row.visitors / top) : 0;
-                        const lit = pointer?.code === country.c && country.c !== "";
-                        return (
-                            <path
-                                key={`${country.c}-${index}`}
-                                d={country.d}
-                                className={cn(
-                                    "stroke-background transition-[fill,fill-opacity] duration-150",
-                                    lit ? "fill-primary" : row ? "fill-primary" : "fill-muted-foreground/15",
-                                    row && pick ? "cursor-pointer" : ""
-                                )}
-                                strokeWidth={0.6}
-                                fillOpacity={lit ? 1 : row ? 0.25 + 0.75 * share : 1}
-                                onMouseMove={(event) => point(country.c, event)}
-                                onClick={() => {
-                                    if (row && pick) pick("country", row.key);
-                                }}
-                            >
-                                <title>{country.c ? core.countryName(country.c) : country.n}</title>
-                            </path>
-                        );
-                    })}
-                </svg>
-                {pointer && pointer.code ? (
-                    <div
-                        role="tooltip"
-                        className="pointer-events-none absolute z-10 max-w-[16rem] truncate rounded-md bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md ring-1 ring-border"
-                        style={{
-                            top: Math.max(0, pointer.y - 40),
-                            // Flip to the left of the pointer in the right third, so it never runs off the card.
-                            ...(pointer.x > width * 0.66 ? { right: width - pointer.x + 12 } : { left: pointer.x + 12 })
-                        }}
-                    >
-                        {`${core.countryFlag(pointer.code)} ${core.countryName(pointer.code)}: ${t("map.visitors", {
-                            count: grouped(hovered?.visitors ?? 0)
-                        })}`}
-                    </div>
-                ) : null}
-            </div>
+            <map.WorldMap
+                label={t("map.title")}
+                shade={(code) => {
+                    const row = byCode.get(code);
+                    return row && top > 0 ? Math.sqrt(row.visitors / top) : null;
+                }}
+                describe={(code) =>
+                    `${core.countryFlag(code)} ${core.countryName(code)}: ${t("map.visitors", {
+                        count: grouped(byCode.get(code)?.visitors ?? 0)
+                    })}`
+                }
+                pickable={(code) => byCode.has(code)}
+                onPick={
+                    pick
+                        ? ({ country }) => {
+                              const row = byCode.get(country);
+                              if (row) pick("country", row.key);
+                          }
+                        : undefined
+                }
+            />
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span className="min-w-0 truncate">{rows.length === 0 ? t("breakdowns.noCountries") : t("map.hint")}</span>
                 <span className="flex shrink-0 items-center gap-3">

@@ -26,10 +26,21 @@ async function failed(error: unknown): Promise<{ error: string }> {
     return { error: t("errors.generic") };
 }
 
+/** A place with where to draw it on the map, when that is known. */
+type Spotted<T> = Omit<T, "latitude" | "longitude"> & {
+    readonly latitude: number | null;
+    readonly longitude: number | null;
+};
+
+function spotted<T extends Parameters<typeof places.spotOf>[0]>(place: T): Spotted<T> {
+    const spot = places.spotOf(place);
+    return { ...place, latitude: spot?.latitude ?? null, longitude: spot?.longitude ?? null };
+}
+
 export interface ConnectAnswer {
-    readonly nodes: Awaited<ReturnType<typeof service.nodesFor>>;
+    readonly nodes: Spotted<Awaited<ReturnType<typeof service.nodesFor>>[number]>[];
     readonly devices: Awaited<ReturnType<typeof service.devicesOf>>;
-    readonly profiles: Awaited<ReturnType<typeof profilesOf>>;
+    readonly profiles: Spotted<Awaited<ReturnType<typeof profilesOf>>[number]>[];
     readonly standing: wg.AccessStanding | "none";
     readonly deviceLimit: number;
     readonly usedBytes: string;
@@ -46,9 +57,9 @@ export async function connectAction(): Promise<Result<ConnectAnswer>> {
             service.accessOf(user)
         ]);
         return {
-            nodes,
+            nodes: nodes.map(spotted),
             devices,
-            profiles,
+            profiles: profiles.map(spotted),
             standing: access ? wg.accessStanding(access, new Date()) : "none",
             deviceLimit: access?.deviceLimit ?? 0,
             usedBytes: (access?.usedBytes ?? 0n).toString(),

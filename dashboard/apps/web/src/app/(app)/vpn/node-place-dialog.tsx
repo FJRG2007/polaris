@@ -2,14 +2,16 @@
 
 /**
  * Where a VPN server is, set by hand: a town found by name, a pair of coordinates,
- * or a country pressed on the map. "Use its address" goes back to reading it from
- * the server's own address, which is what happens until somebody sets one.
+ * or a spot pressed on the map, which offers the town there and the whole country.
+ * "Use its address" goes back to reading it from the server's own address, which
+ * is what happens until somebody sets one.
  */
 
 import * as ui from "@polaris/ui";
 import * as actions from "./connect-actions";
 import { useState, useTransition } from "react";
-import { countryName, WorldMap } from "./world-map";
+import { countryName } from "@/components/map/country-name";
+import { WorldMap, type MapPick } from "@/components/map/world-map";
 import { parseCoordinates } from "@/lib/vpn/wireguard";
 import type { PlaceMatch } from "@/lib/vpn/place-search";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -19,8 +21,13 @@ interface PlacedNode {
     readonly name: string;
     readonly country: string | null;
     readonly city: string | null;
+    readonly latitude: number | null;
+    readonly longitude: number | null;
     readonly placedBy: string | null;
 }
+
+/** The marker of the spot pressed on the map, beside the server's own. */
+const SPOT = "spot";
 
 export function NodePlaceDialog({
     node,
@@ -36,6 +43,8 @@ export function NodePlaceDialog({
     const [query, setQuery] = useState("");
     const [matches, setMatches] = useState<PlaceMatch[] | null>(null);
     const [searchedPoint, setSearchedPoint] = useState(false);
+    /** A spot pressed on the map, offered as its town and as its whole country. */
+    const [spot, setSpot] = useState<MapPick | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [searching, startSearch] = useTransition();
     const [saving, startSave] = useTransition();
@@ -45,15 +54,26 @@ export function NodePlaceDialog({
 
     function find(): void {
         if (typed.length < 2 || busy) return;
+        setSpot(null);
+        search(point ?? { query: typed });
+    }
+
+    function pickOnMap(pick: MapPick): void {
+        if (busy) return;
+        setSpot(pick);
+        search({ latitude: pick.latitude, longitude: pick.longitude });
+    }
+
+    function search(input: { query: string } | { latitude: number; longitude: number }): void {
         setError(null);
         startSearch(async () => {
-            const result = await actions.findVpnPlaceAction(point ?? { query: typed });
+            const result = await actions.findVpnPlaceAction(input);
             if (result.error !== undefined) {
                 setError(result.error);
                 setMatches(null);
                 return;
             }
-            setSearchedPoint(point !== null);
+            setSearchedPoint(!("query" in input));
             setMatches(result.matches);
         });
     }
@@ -126,6 +146,31 @@ export function NodePlaceDialog({
                             {t(searchedPoint ? "place.noPlace" : "place.noMatch")}
                         </p>
                     ) : null}
+                    {spot ? (
+                        <ui.Button
+                            variant="outline"
+                            size="sm"
+                            className="min-w-0 justify-start"
+                            disabled={busy}
+                            onClick={() =>
+                                save({
+                                    id: node.id,
+                                    place: {
+                                        country: spot.country,
+                                        city: null,
+                                        latitude: null,
+                                        longitude: null
+                                    }
+                                })
+                            }
+                        >
+                            <span className="min-w-0 truncate">
+                                {t("place.anywhere", {
+                                    country: countryName(spot.country, locale)
+                                })}
+                            </span>
+                        </ui.Button>
+                    ) : null}
                     {matches && matches.length > 0 ? (
                         <ul className="flex max-h-48 min-w-0 flex-col overflow-y-auto overscroll-contain">
                             {matches.map((match) => {
@@ -154,27 +199,25 @@ export function NodePlaceDialog({
                     ) : null}
                     <p className="text-xs text-muted-foreground">{t("place.mapHint")}</p>
                     <WorldMap
-                        places={
-                            node.country
-                                ? [{ id: node.id, country: node.country, label: node.name }]
-                                : []
-                        }
-                        selected={node.id}
-                        active={null}
-                        onSelect={() => undefined}
-                        onPickCountry={(country) =>
-                            busy
-                                ? undefined
-                                : save({
-                                      id: node.id,
-                                      place: {
-                                          country,
-                                          city: null,
-                                          latitude: null,
-                                          longitude: null
+                        label={t("place.map")}
+                        places={[
+                            ...(node.country
+                                ? [
+                                      {
+                                          id: node.id,
+                                          country: node.country,
+                                          latitude: node.latitude,
+                                          longitude: node.longitude,
+                                          label: [node.name, where].filter(Boolean).join(", ")
                                       }
-                                  })
-                        }
+                                  ]
+                                : []),
+                            ...(spot
+                                ? [{ id: SPOT, ...spot, label: countryName(spot.country, locale) }]
+                                : [])
+                        ]}
+                        selected={spot ? SPOT : node.id}
+                        onPick={pickOnMap}
                     />
                     {error ? (
                         <p role="alert" className="text-sm text-danger">

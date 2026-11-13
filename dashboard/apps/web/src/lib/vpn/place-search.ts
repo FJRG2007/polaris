@@ -171,3 +171,57 @@ export async function placeOfPoint(
     );
     return answer ? placeAt(answer, latitude, longitude) : undefined;
 }
+
+export interface Spot {
+    readonly latitude: number;
+    readonly longitude: number;
+}
+
+/** Towns already looked up for the map, and the ones nobody could find, kept a while
+ *  so an offline install does not ask again on every read. */
+const towns = new Map<string, { at: number; spot: Spot | null }>();
+const asking = new Set<string>();
+const TOWNS = 500;
+const MISS_MS = 10 * 60 * 1000;
+
+/**
+ * Where a town is, for a place that kept only its name and country (a server
+ * placed by its address, a tunnel file). Answers from memory and never waits:
+ * a town not looked up yet is looked up behind the read and drawn from the next
+ * one, and until then the map shows the country. Derived on every read rather
+ * than stored, so a place moved by hand or by a new address is never drawn at
+ * the old one.
+ */
+export function spotOfTown(country: string, city: string): Spot | null {
+    const key = `${country}:${city.toLowerCase()}`;
+    const hit = towns.get(key);
+    const fresh = hit && Date.now() - hit.at < (hit.spot ? KEPT_MS : MISS_MS);
+    if (!fresh && !asking.has(key)) {
+        asking.add(key);
+        void searchPlaces(city, "en")
+            .then((matches) => {
+                const match = matches?.find((candidate) => candidate.country === country);
+                if (towns.size >= TOWNS) towns.delete(towns.keys().next().value as string);
+                towns.set(key, {
+                    at: Date.now(),
+                    spot: match ? { latitude: match.latitude, longitude: match.longitude } : null
+                });
+            })
+            .catch(() => undefined)
+            .finally(() => asking.delete(key));
+    }
+    return hit?.spot ?? null;
+}
+
+/** A place's spot: its own when it has one, else its town's when that is known. */
+export function spotOf(place: {
+    readonly country: string | null;
+    readonly city: string | null;
+    readonly latitude?: number | null;
+    readonly longitude?: number | null;
+}): Spot | null {
+    if (typeof place.latitude === "number" && typeof place.longitude === "number") {
+        return { latitude: place.latitude, longitude: place.longitude };
+    }
+    return place.country && place.city ? spotOfTown(place.country, place.city) : null;
+}

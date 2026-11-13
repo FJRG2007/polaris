@@ -1,7 +1,9 @@
 /**
- * Rebuild `src/app/(app)/analytics/world-map.json`: Natural Earth's 1:110m
- * countries (as published in world-atlas), projected once with Mercator so the
- * browser draws plain paths and ships no projection code.
+ * Rebuild `src/components/map/world-map.json`: Natural Earth's 1:110m countries
+ * (as published in world-atlas), projected once with Mercator so the browser
+ * draws plain paths and ships no geo library. The projection's own numbers go
+ * with them (`k`, `tx`, `ty`), so `src/components/map/projection.ts` can place a
+ * latitude and longitude on the same paths with two lines of arithmetic.
  *
  * Mercator, like the analytics tools people compare this one with, because it is
  * the shape everybody recognises; Antarctica is left out, since nobody visits
@@ -29,12 +31,12 @@ if (!tools) {
 }
 
 const require = createRequire(join(resolve(tools), "node_modules", "noop.js"));
-const { geoMercator, geoPath } = require("d3-geo");
+const { geoArea, geoCentroid, geoMercator, geoPath } = require("d3-geo");
 const { feature } = require("topojson-client");
 const atlas = require("world-atlas/countries-110m.json");
 
 const here = dirname(fileURLToPath(import.meta.url));
-const target = join(here, "..", "src", "app", "(app)", "analytics", "world-map.json");
+const target = join(here, "..", "src", "components", "map", "world-map.json");
 const previous = JSON.parse(readFileSync(target, "utf8"));
 const codeByName = new Map(previous.countries.map((country) => [country.n, country.c]));
 
@@ -53,12 +55,40 @@ const path = geoPath(projection);
 /** One decimal is a tenth of a pixel at full width: invisible, and half the bytes. */
 const round = (d) => d.replace(/-?\d+\.\d+/g, (number) => String(Math.round(Number(number) * 10) / 10));
 
+const tenth = (value) => Math.round(value * 10) / 10;
+
+/**
+ * The country's biggest piece, so France's marker and zoom are France and not a
+ * point between Paris and French Guiana.
+ */
+function mainland(country) {
+    if (country.geometry.type !== "MultiPolygon") return country;
+    const pieces = country.geometry.coordinates.map((coordinates) => ({
+        type: "Feature",
+        properties: {},
+        geometry: { type: "Polygon", coordinates }
+    }));
+    return pieces.reduce((best, piece) => (geoArea(piece) > geoArea(best) ? piece : best));
+}
+
 const countries = shown.map((country) => {
     const name = country.properties.name;
     const code = codeByName.get(name);
     if (code === undefined) throw new Error(`no code for ${name}`);
-    return { c: code, n: name, d: round(path(country) ?? "") };
+    const main = mainland(country);
+    const [x, y] = projection(geoCentroid(main));
+    const [[x0, y0], [x1, y1]] = path.bounds(main);
+    return {
+        c: code,
+        n: name,
+        d: round(path(country) ?? ""),
+        x: tenth(x),
+        y: tenth(y),
+        b: [tenth(x0), tenth(y0), tenth(x1), tenth(y1)]
+    };
 });
 
-writeFileSync(target, `${JSON.stringify({ w: WIDTH, h: height, countries })}\n`);
+const [tx, ty] = projection.translate();
+const meta = { w: WIDTH, h: height, k: projection.scale(), tx, ty };
+writeFileSync(target, `${JSON.stringify({ ...meta, countries })}\n`);
 console.log(`${countries.length} countries, ${WIDTH}x${height}`);

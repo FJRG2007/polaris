@@ -6,7 +6,7 @@ import Link from "next/link";
 import * as ui from "@polaris/ui";
 import { NodePlaceDialog } from "./node-place-dialog";
 import { NodeReachStatus } from "./node-reach-status";
-import { countryName } from "./world-map";
+import { countryName } from "@/components/map/country-name";
 import { dropServerOptions, ServerPicker } from "@/components/server-picker";
 import { useVpnRead } from "./use-vpn-read";
 import * as actions from "./connect-actions";

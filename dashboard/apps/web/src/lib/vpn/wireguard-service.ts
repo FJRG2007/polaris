@@ -448,6 +448,8 @@ export async function listNodes() {
             proxyIssue: true,
             country: true,
             city: true,
+            latitude: true,
+            longitude: true,
             placedBy: true,
             reachVerdict: true,
             reachCheckedAt: true,
@@ -590,6 +592,8 @@ export async function nodesFor(user: { id: string; isAdmin: boolean }) {
             proxyIssue: true,
             country: true,
             city: true,
+            latitude: true,
+            longitude: true,
             reachVerdict: true,
             reachCheckedAt: true,
             host: { select: { address: true } }

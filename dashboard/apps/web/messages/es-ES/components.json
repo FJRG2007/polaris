@@ -1953,5 +1953,12 @@
             "object": "Objeto",
             "null": "Nulo"
         }
+    },
+    "map": {
+        "role": "mapa",
+        "group": "{count} lugares: {names}",
+        "zoomIn": "Acercar",
+        "zoomOut": "Alejar",
+        "whole": "Mapa entero"
     }
 }

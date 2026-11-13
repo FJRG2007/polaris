@@ -323,7 +323,8 @@
         },
         "unreachable": "Not reachable",
         "unreachableHint": "Its server is not taking connections right now.",
-        "unreachableFix": "See what to open"
+        "unreachableFix": "See what to open",
+        "map": "Where you can connect from"
     },
     "nodes": {
         "title": "Servers",
@@ -441,9 +442,11 @@
         "finding": "Finding...",
         "noMatch": "Nothing found with that name.",
         "noPlace": "Nothing at those coordinates.",
-        "mapHint": "Or press a country on the map.",
+        "mapHint": "Or press a spot on the map. Zoom in to pick a town.",
         "automatic": "Use its address",
-        "close": "Close"
+        "close": "Close",
+        "anywhere": "Anywhere in {country}",
+        "map": "Where this server is"
     },
     "keys": {
         "title": "VPN device keys",
