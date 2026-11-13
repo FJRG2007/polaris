@@ -247,7 +247,7 @@ function StepScene({ kind, guide }: { kind: StepKind; guide: BrowserGuide }) {
         );
     }
     return (
-        <div aria-hidden className="flex w-full max-w-60 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-surface">
+        <div aria-hidden className="flex w-60 max-w-full shrink-0 flex-col overflow-hidden rounded-md border border-border bg-surface">
             <div className="flex items-center gap-1.5 border-b border-border px-2 py-1.5">
                 <span className="flex gap-1">
                     <span className="size-1.5 rounded-full bg-muted-foreground/40" />
@@ -333,10 +333,13 @@ function GuidedSteps({
                                     <AddressToPaste text={guide.page} />
                                 </div>
                             ) : null}
+                            {/* Wraps by the room the card has, not the window's: in a
+                                narrow card the picture and the buttons, both fixed,
+                                stood side by side past its padding. */}
                             {open ? (
-                                <div className="flex flex-col gap-3 px-3 pb-3 pl-11 sm:flex-row sm:items-end sm:justify-between">
+                                <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 px-3 pb-3 pl-11">
                                     <StepScene kind={kind} guide={guide} />
-                                    <div className="flex shrink-0 items-center gap-2">
+                                    <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
                                         <span className="text-xs text-muted-foreground">
                                             {t("downloads.steps.stepOf", { step: index + 1, total: kinds.length })}
                                         </span>
