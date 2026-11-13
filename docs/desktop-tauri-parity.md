@@ -70,14 +70,21 @@ Pinned with `=` in the manifests; `desktop-tauri/Cargo.lock` is committed.
 
 | Crate | Version | Used now |
 | --- | --- | --- |
-| tauri (feature `tray-icon`) | 2.12.5 | yes |
+| tauri (features `image-png`, `tray-icon`) | 2.12.5 | yes |
 | tauri-build | 2.7.4 | yes |
 | tauri-plugin-single-instance (feature `deep-link`) | 2.5.5 | yes |
 | tauri-plugin-deep-link | 2.6.3 | yes |
-| tauri-plugin-notification | 2.8.1 | no (planned) |
-| tauri-plugin-global-shortcut | 2.4.1 | no (planned) |
+| tauri-plugin-notification | 2.8.1 | yes |
+| tauri-plugin-global-shortcut | 2.4.1 | yes |
 | tauri-plugin-updater | 2.14.1 | no (planned) |
-| tauri-plugin-autostart | 2.7.0 | no (planned) |
+| tauri-plugin-autostart | 2.7.0 | yes |
+| tauri-plugin-dialog | 2.8.4 | yes |
+| tauri-plugin-clipboard-manager | 2.5.0 | yes |
+| tauri-plugin-opener | 2.7.3 | yes |
+| keyring (default `v1` stores) | 4.2.0 | yes, in `polaris-client` |
+| qrcodegen | 1.8.0 | yes, in `polaris-client` |
+| base64 | 0.23.1 | yes, in `polaris-client` |
+| winreg (Windows only) | 0.56.0 | yes |
 | tauri-plugin-window-state | 2.5.0 | no (planned) |
 | reqwest (features `rustls`, `json`) | 0.13.5 | yes; `rustls` uses rustls-platform-verifier, so the system trust store |
 | wiremock (tests only) | 0.6.5 | yes |
@@ -133,32 +140,32 @@ workflow changes for the beta:
 | adb-pairing | Android 11+ Wireless debugging pairing (TLS + SPAKE2 + six-digit code) | `polaris-client::adb_pairing` (`rustls` TLS 1.3, `export_keying_material`, `aes-gcm`, `hkdf`) | scaffolded | exchange tested over a real in-memory TLS 1.3 session (both ends export the same material) and a scripted TV; certificate bytes identical to the TS module (fixture); never paired with a real TV |
 | adb-spake2 | SPAKE2 over Ed25519 exactly as BoringSSL's spake25519 | `polaris-client::adb_spake2`, own implementation over `curve25519-dalek` | scaffolded | meets the cross-implementation vectors the TS tests pin (`spake2-vectors.py`); BoringSSL publishes none, so no real adbd has checked it |
 | annotate-overlay | See-through window over the shared display showing call strokes | shell: transparent, always-on-top window, `set_ignore_cursor_events` | todo | macOS transparency needs `macos-private-api`; full-screen games |
-| api-key-store | API key encrypted by the OS (`safeStorage`), never in plain text | `keyring` crate (Credential Manager, Keychain, Secret Service) | todo | Linux without a secret service: keep it in memory only, as now; migrating Electron's encrypted key |
-| app-badge | Waiting count on the taskbar/Dock/launcher icon | `Window::set_badge_count` (macOS/Linux), `set_overlay_icon` (Windows) | todo | Windows overlay icon has to be drawn per count |
+| api-key-store | API key encrypted by the OS (`safeStorage`), never in plain text | `polaris-client::keys` (`KeyRing` over `keyring` 4.2.0: Credential Manager, Keychain, Secret Service), one entry per server under the beta's own service name | scaffolded | no store (Linux without a secret service): held in memory for the run, as Electron; Electron's Chromium-encrypted file cannot be migrated, so the beta asks once; only the Windows store was compiled |
+| app-badge | Waiting count on the taskbar/Dock/launcher icon | `polaris-client::app_badge` (same schema and per-system plan, tests ported) + `set_app_badge` command: `set_overlay_icon` (Windows), `set_badge_label` (macOS), `set_badge_count` (Linux) | scaffolded | the remote Polaris page has no IPC capability yet, so only the app's own pages can call it |
 | appimage | Replaces a running AppImage with a verified newer one | `tauri-plugin-updater` (handles AppImage) | todo | SHA256SUMS check moves to the updater's signature |
-| call-hotkeys | Holds mute/deafen keys system-wide during a call, one window at a time | `tauri-plugin-global-shortcut` | todo | Wayland has no global shortcuts without a portal |
-| context-menu | Right-click menu (copy, paste, links) in every window | WebView2/WebKit draw their own; custom items via the Tauri menu API | todo | menus differ per engine |
+| call-hotkeys | Holds mute/deafen keys system-wide during a call, one window at a time | `set_call_hotkeys` over `tauri-plugin-global-shortcut`; presses go to the holding window as `polaris://call-hotkey`; let go on `null` and when the window is destroyed | scaffolded | not released on a navigation (navigation is another module); remote page has no IPC capability yet; Wayland has no global shortcuts without a portal |
+| context-menu | Right-click menu (copy, paste, links) in every window | `polaris-client::context_menu` (same items, link allow-list and tests) | blocked: Tauri 2 raises no right-click event from the webview to Rust, and getting one means a script with IPC in the remote page, which its capability forbids; WebView2/WebKit draw their own menu (copy, paste, links) meanwhile | menus differ per engine |
 | deep-links | What a `polaris://` link does once it arrives (queued until ready) | `tauri-plugin-deep-link` `on_open_url` + single-instance `deep-link` feature | scaffolded | beta only registers the scheme and brings the window forward; the page a link names is not opened yet |
 | deploy-outcome | Words for a finished deployment notice (pure) | `polaris-client` (pure function) | todo | none |
 | docker | Local Docker run with argument lists, never a shell | `std::process::Command` with args | todo | none |
 | folder-zip | Zips a folder for "Upload a folder" (skips `node_modules`, `.git`) | `zip` crate + `walkdir`, in `polaris-client` | todo | streaming large folders |
 | game-detect | Which known game is running, from the process list | `sysinfo` crate | todo | per-platform process names |
-| host-transfer | Host list to/from a file, clipboard or QR code | `tauri-plugin-dialog`, `tauri-plugin-clipboard-manager` | todo | none |
+| host-transfer | Host list to/from a file, clipboard or QR code | `polaris-client::host_list` (port of core `host-list.ts`: code, link, file, merge; QR via `qrcodegen` 1.8.0, the Nayuki encoder `qr.ts` follows, byte mode, level M) + commands `copy_hosts`, `import_hosts`, `save_hosts_file`, `import_hosts_file`, `hosts_qr` over `tauri-plugin-dialog` and `tauri-plugin-clipboard-manager` | scaffolded | list kept in the beta's `hosts.json` with the saved server first until a server list lands; reading a QR with the camera is the settings page's (renderer, not ported); the QR is checked for size, not decoded by a reader in a test |
 | index | App entry: windows, server list, first-run, failover, updates, notices, wiring | `src-tauri/src/main.rs` | scaffolded | first run and saved server only; no offline page or server list yet |
 | install-tool | Installs an allow-listed tool after the app's own confirmation dialog | `std::process::Command` + `tauri-plugin-dialog` | todo | keep the allow-list in Rust, never page-supplied |
 | instance-store | Persists what each server said about itself (id, local addresses, CA pin) | `polaris-client` + a JSON file in the config dir | todo | none |
 | ipc | Every page request checked by window kind, origin and schema | Tauri commands + capabilities (remote capability scoped to the configured origin, added at run time with `add_capability`) | todo | the page bridge must stay the same `window.polarisDesktop` so the dashboard does not change |
-| key-flow | Gets the push API key, checks it with `GET /api/v1/me`, keeps it | `polaris-client::ApiClient::me` + api-key-store | scaffolded | `me()` and the key shape exist; no window yet |
+| key-flow | Gets the push API key, checks it with `GET /api/v1/me`, keeps it | `polaris-client::keys::check_key` (`ApiClient::me`, 401 -> the same sentence) + `key_flow.rs`: one shared form window (`ui/api-key.html`), every push waiting on it, kept in the keyring | scaffolded | no push is ported yet, so `api_key_for` has no caller |
 | known-games | The table of recognized game executables | data module in `polaris-client` | todo | none |
 | local-ca-pin | Trusts the same Polaris's local CA on its proven local address | custom `rustls` `ServerCertVerifier`; webview side via WebView2/WebKit certificate events | todo | wry exposes no certificate-error hook; may need platform code per engine |
-| login-item | Open with the computer (Squirrel launcher on Windows, autostart file on Linux) | `tauri-plugin-autostart` | todo | the Squirrel entry has to be removed at cutover |
+| login-item | Open with the computer (Squirrel launcher on Windows, autostart file on Linux) | `tauri-plugin-autostart` with `--hidden`; tray switch "Open with the computer", saved in `settings.json`, re-applied every start; off by default; a debug build never writes it | scaffolded | entry is named after the beta, never Electron's; the Squirrel entry has to be removed at cutover |
 | mac-signature | Whether the macOS app has a Developer ID (Squirrel.Mac needs it) | not needed with `tauri-plugin-updater` | todo | Gatekeeper still wants notarization for a clean first open |
-| mail-handler | Registers on Windows as a `mailto:` handler (Capabilities registry keys) | `winreg` crate in the shell; deep-link plugin for the scheme | todo | registry keys must be removed on uninstall |
-| menu | Application menu (File, Edit, View, Window, Help + update offer) | Tauri `menu` API | todo | macOS only draws it, as now |
+| mail-handler | Registers on Windows as a `mailto:` handler (Capabilities registry keys) | `mail_handler.rs` with `winreg` 0.56.0, under the beta's own names (`Polaris Beta`, `Polaris.Beta.Url.mailto`); only after the tray switch "Offer this beta for email links"; switching it off, or any start with it off, deletes every key it wrote | scaffolded | the beta has no installer, so "uninstall" is that switch; opening the `mailto:` link it is handed is the deep-link module's |
+| menu | Application menu (File, Edit, View, Window, Help + update offer) | Tauri `menu` API in `tray.rs`, set on macOS only; the update line is there and disabled (the beta never updates) | scaffolded | Windows/Linux draw a Tauri menu as a strip on every window, so there the engine's own keys and the tray stand in, as Electron hides its bar; devtools item left out of release builds |
 | navigation | Where a window may go; keeps the bridge on the configured origin | `on_navigation` / `on_new_window` handlers on the webview | todo | the beta does not restrict navigation yet; the remote page gets no IPC (no `remote` capability) |
-| notice-layout | Notice title/body per system (pure) | `polaris-client` (pure) | todo | none |
-| notice-once | Which `once` notices repeat one already shown (pure) | `polaris-client` (pure) | todo | none |
-| notices | OS notices, replaced by tag | `tauri-plugin-notification` | todo | replacing by tag is not supported on every platform |
+| notice-layout | Notice title/body per system (pure) | `polaris-client::notice::notice_layout`, `icon_acceptable` (tests ported) | scaffolded | none |
+| notice-once | Which `once` notices repeat one already shown (pure) | `polaris-client::notice::OnceNotices` (tests ported) | scaffolded | none |
+| notices | OS notices, replaced by tag | `show_notice` over `tauri-plugin-notification`, laid out and de-duplicated by `polaris-client::notice` | scaffolded | the plugin on desktop has no click, reply, buttons, insistent or replace-by-tag, and takes no per-notice picture |
 | permissions | Deny-by-default browser permissions, only for the configured Polaris | WebView2 `PermissionRequested`, WebKit permission signals via `with_webview` | todo | no cross-platform Tauri API; platform code per engine |
 | polaris-api | API-key calls, Bearer header, refusals, local-address failover | `polaris-client::ApiClient` | scaffolded | failover and the upload (`sendFile`) are not ported; Chromium `net` used the window's proxy, reqwest uses the system proxy |
 | push-local | Build with local Docker, upload the image, follow the deployment log | `polaris-client` + `docker` module | todo | streaming upload with chunked encoding; types (`ImageTarget`, `Started`, `DeploymentState`) exist |
@@ -168,7 +175,7 @@ workflow changes for the beta:
 | screen-share | Screen/window list with thumbnails for the dashboard's own picker | platform capture (`windows-capture`/ScreenCaptureKit/PipeWire) or the engine's own picker | todo | biggest gap: no `setDisplayMediaRequestHandler` equivalent; WebKitGTK screen share is limited |
 | settings | JSON settings: server, server list, per-service push folder | JSON in the config dir | scaffolded | only `server` exists; no migration of Electron's file yet |
 | squirrel | Squirrel install/update/uninstall hooks (shortcuts) | NSIS/MSI bundler | todo | cutover must uninstall Squirrel cleanly |
-| tray | Tray icon menu (servers, API key, update) on Windows/Linux | Tauri `tray-icon` | scaffolded | only Open and Quit |
+| tray | Tray icon menu (servers, API key, update) on Windows/Linux | Tauri `tray-icon` in `tray.rs`: Open, update line (disabled), Settings..., Switch to (two or more kept hosts, checked through `connect`), API keys, Install on a TV (disabled until tv-install is ported), Forget the saved API key, Open in the browser (`tauri-plugin-opener`), the two OS switches, Quit | scaffolded | none |
 | tv-install | Installs Polaris TV on a set, step by step, with a backup first | `polaris-client` module over adb-* | todo | long; needs real sets to verify |
 | tv-mdns | Finds TVs over multicast DNS / DNS-SD | `polaris-client::tv_mdns` over the `mdns-sd` crate; collecting, merging and naming ported as pure functions | scaffolded | collecting tested on resolved records; the browse itself never ran on a real network or TV; Windows firewall prompt not checked; the TS packet-parser tests do not apply (the crate parses) |
 | tv-path | Which install path a TV takes, from core's tv-compat data | `polaris-client::tv_path` (pure), core's `models.json` / `debugging.json` compiled in with `include_str!` | scaffolded | every listed model's path tested from the same data as the TS test |
@@ -200,7 +207,7 @@ workflow changes for the beta:
 | annotate | Stroke schema for the overlay | serde types | todo | none |
 | api-key | API key shape `plk_<8>.<secret>` | `polaris-client::ApiKey` | scaffolded | same regex and sentences; `Debug` redacts |
 | bridge | Bridge channel names and types | command names | todo | none |
-| call-hotkeys | Dashboard key spelling to OS accelerators | parser for global-shortcut | todo | none |
+| call-hotkeys | Dashboard key spelling to OS accelerators | `polaris-client::hotkeys` (`to_accelerator`, `call_accelerators`, schema; tests ported); `Plus` spelled `Equal` for the shortcut parser | scaffolded | none |
 | deep-link | `polaris://open?server=&path=` parsing and limits | `polaris-client` module | todo | any website can start such a link: same limits |
 | install-tools | Allow-listed tools and how to start them | Rust table | todo | none |
 | mailto | `mailto:` to the Mail composer path | `polaris-client` (pure) | todo | none |
@@ -221,7 +228,7 @@ workflow changes for the beta:
 | Page | What it does | Status |
 | --- | --- | --- |
 | connect | Settings and first run: the server list, add, rename, remove, open | scaffolded (`desktop-tauri/ui`: one address field) |
-| api-key | Paste and check the push key | todo |
+| api-key | Paste and check the push key | scaffolded (`ui/api-key.html`) |
 | push | Pick folder and platform, follow build, upload and deployment | todo |
 | tv | Find a TV and install Polaris TV | todo |
 | usb | Hidden WebUSB holder | replaced by `nusb` (todo) |

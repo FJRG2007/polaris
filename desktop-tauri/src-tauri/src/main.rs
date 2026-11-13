@@ -6,11 +6,18 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod call_keys;
+mod host_transfer;
+mod key_flow;
+mod login_item;
+mod mail_handler;
+mod notices;
+mod os_prefs;
+mod tray;
+
 use polaris_client::{probe, probe_client, InstanceUrl, Verdict};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
 use tauri::{
     AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
@@ -23,6 +30,12 @@ const SETTINGS_FILE: &str = "settings.json";
 #[derive(Default, Serialize, Deserialize)]
 struct Settings {
     server: Option<String>,
+    /// Start with the computer (`login_item`); off until switched on.
+    #[serde(default)]
+    open_at_login: bool,
+    /// Offered for `mailto:` links on Windows (`mail_handler`); off until switched on.
+    #[serde(default)]
+    mail_handler: bool,
 }
 
 /// The client every probe goes through, built once.
@@ -49,6 +62,7 @@ fn save_server(app: &AppHandle, server: &InstanceUrl) -> Result<(), String> {
     }
     let text = serde_json::to_string_pretty(&Settings {
         server: Some(server.to_string()),
+        ..os_prefs::read_settings(app)
     })
     .map_err(|_| "The address could not be saved.".to_owned())?;
     let temporary = path.with_extension("json.tmp");
@@ -108,26 +122,6 @@ fn open_main_window(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open Polaris", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &quit])?;
-    let mut tray = TrayIconBuilder::with_id("main")
-        .tooltip("Polaris Beta")
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| match event.id().as_ref() {
-            "open" => show_main(app),
-            "quit" => app.exit(0),
-            _ => {}
-        });
-    if let Some(icon) = app.default_window_icon() {
-        tray = tray.icon(icon.clone());
-    }
-    tray.build(app)?;
-    Ok(())
-}
-
 fn main() {
     let http = probe_client().expect("the HTTP client builds with its defaults");
     tauri::Builder::default()
@@ -137,8 +131,32 @@ fn main() {
             show_main(app)
         }))
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(login_item::plugin())
+        .manage(notices::Notices::default())
+        .manage(call_keys::CallKeys::default())
+        .manage(key_flow::Keys::default())
+        .manage(tray::Zoom::default())
         .manage(Http(http))
-        .invoke_handler(tauri::generate_handler![connect])
+        .invoke_handler(tauri::generate_handler![
+            connect,
+            notices::show_notice,
+            notices::set_app_badge,
+            call_keys::set_call_hotkeys,
+            key_flow::api_key_form,
+            key_flow::submit_api_key,
+            key_flow::cancel_api_key,
+            key_flow::open_api_keys,
+            host_transfer::copy_hosts,
+            host_transfer::import_hosts,
+            host_transfer::save_hosts_file,
+            host_transfer::import_hosts_file,
+            host_transfer::hosts_qr
+        ])
         .setup(|app| {
             let handle = app.handle().clone();
             // Installers register the scheme; a development run has none, so it
@@ -151,7 +169,15 @@ fn main() {
             app.deep_link()
                 .on_open_url(move |_event| show_main(&opened));
             open_main_window(&handle)?;
-            build_tray(&handle)?;
+            tray::install(&handle)?;
+            // A start the computer made opens in the tray, as the Electron app does.
+            if login_item::started_at_login(&std::env::args().collect::<Vec<_>>()) {
+                if let Some(window) = handle.get_webview_window(MAIN) {
+                    let _ = window.hide();
+                }
+            }
+            login_item::restore(&handle);
+            mail_handler::restore(&handle);
             Ok(())
         })
         .run(tauri::generate_context!())
