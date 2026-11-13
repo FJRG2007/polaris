@@ -9,6 +9,11 @@ repository.workspace = true
 authors.workspace = true
 publish.workspace = true
 
+[features]
+# A hidden, timed start for desktop-tauri/tools/measure-startup. Never in a build
+# anybody runs.
+measure = []
+
 [build-dependencies]
 tauri-build = { version = "=2.7.4", features = [] }
 

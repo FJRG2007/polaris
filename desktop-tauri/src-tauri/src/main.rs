@@ -16,6 +16,8 @@ mod ipc;
 mod key_flow;
 mod login_item;
 mod mail_handler;
+#[cfg(feature = "measure")]
+mod measure;
 mod notices;
 mod os_prefs;
 mod share;
@@ -859,6 +861,10 @@ fn import_from_electron(app: &AppHandle, folder: &std::path::Path) {
 }
 
 fn main() {
+    #[cfg(feature = "measure")]
+    if let Some(page) = measure::page() {
+        return measure::run(page, std::time::Instant::now());
+    }
     let probe_http = probe_client().expect("the HTTP client builds with its defaults");
     let pins = PinVerifier::new().expect("the system certificate verifier loads");
     let http = pins
