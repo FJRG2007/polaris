@@ -8,14 +8,14 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { SiteLocale } from "@/data/builders";
 import { SITE_ORIGIN, asset, href, siteData, words } from "@/lib/site";
-import { ArrowLeft, ArrowRight, Bug, ChevronRight, Lightbulb, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bug, ChevronRight, GitPullRequest, Lightbulb, Pencil } from "lucide-react";
 import { docNeighbors, type DocPage, type DocSection } from "@/data/docs";
 import { DocsSearch, type DocsSearchWords } from "@/components/docs-search";
 import { HostField, HostedHtml } from "@/components/example-host";
 import { EXAMPLE_HOST } from "@/lib/example-origin";
 import { SiteTvChecker, SiteTvGallery } from "@/components/site-tv-checker";
 import { TV_COMPAT_SLUG, TV_PRIVACY_SLUG } from "@/data/builders";
-import { PageToc, PageTocFolded } from "@/components/page-toc";
+import { PageToc, PageTocFolded, RAIL_HEADING, type TocItem } from "@/components/page-toc";
 import { apiPath, markdownPath } from "@/data/api-pages";
 import { PageActions, type PageActionsWords } from "@/components/page-actions";
 
@@ -46,8 +46,10 @@ export function searchWords(locale: SiteLocale): DocsSearchWords {
 
 /**
  * A docs page: the search and a sidebar list on the left, the page in the
- * middle and, on a wide screen, `aside` on the right. The guides and the API
- * reference share it, each with its own list.
+ * middle and, on a wide screen, a column on the right with "Copy page", the
+ * page's sections and "Contribute". Below that width "Copy page" heads the page
+ * (`PageHead`) and "Contribute" closes it. The guides and the API reference
+ * share it, each with its own list.
  */
 export function DocsLayout({
     locale,
@@ -55,7 +57,8 @@ export function DocsLayout({
     sidebar,
     page,
     source,
-    aside,
+    toc,
+    copy = true,
     children
 }: {
     locale: SiteLocale;
@@ -66,9 +69,13 @@ export function DocsLayout({
     page: string;
     /** The page's file in the repository, when it has one, for "Edit this page". */
     source?: string;
-    aside?: ReactNode;
+    /** The page's sections, for "On this page". */
+    toc?: readonly TocItem[];
+    /** Whether the page has a Markdown copy, for "Copy page". */
+    copy?: boolean;
     children: ReactNode;
 }) {
+    const t = words(locale).docs;
     return (
         <div className="flex flex-col gap-8 lg:flex-row">
             <nav
@@ -76,13 +83,22 @@ export function DocsLayout({
                 className="flex shrink-0 flex-col gap-3 text-sm lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-56 lg:self-start lg:overflow-y-auto"
             >
                 <DocsSearch locale={locale} words={searchWords(locale)} className="w-full" />
-                <SideList label={label}>
-                    {sidebar}
-                    <Contribute locale={locale} page={page} source={source} />
-                </SideList>
+                <SideList label={label}>{sidebar}</SideList>
             </nav>
-            <div className="flex min-w-0 flex-1 flex-col gap-6">{children}</div>
-            {aside}
+            <div className="flex min-w-0 flex-1 flex-col gap-6">
+                {children}
+                <Contribute
+                    locale={locale}
+                    page={page}
+                    source={source}
+                    className="border-t border-border pt-4 xl:hidden"
+                />
+            </div>
+            <aside className="hidden shrink-0 flex-col gap-6 xl:sticky xl:top-20 xl:flex xl:max-h-[calc(100vh-6rem)] xl:w-56 xl:self-start xl:overflow-y-auto">
+                {copy ? <CopyPage locale={locale} page={page} className="w-full" /> : null}
+                {toc?.length ? <PageToc label={t.onThisPage} items={toc} /> : null}
+                <Contribute locale={locale} page={page} source={source} />
+            </aside>
         </div>
     );
 }
@@ -93,11 +109,21 @@ export function pageUrl(locale: SiteLocale, page: string): string {
 }
 
 /**
- * The foot of the sidebar: an issue or a feature request filed against the
- * repository's own templates with this page already named, and the page's
- * file to edit when it has one.
+ * "Contribute": an issue or a feature request filed against the repository's
+ * own templates with this page already named, and the page's file to edit
+ * when it has one.
  */
-function Contribute({ locale, page, source }: { locale: SiteLocale; page: string; source?: string }) {
+function Contribute({
+    locale,
+    page,
+    source,
+    className
+}: {
+    locale: SiteLocale;
+    page: string;
+    source?: string;
+    className?: string;
+}) {
     const t = words(locale).docs;
     const { repo } = siteData();
     const body = t.issueBody.replace("{url}", pageUrl(locale, page));
@@ -111,9 +137,10 @@ function Contribute({ locale, page, source }: { locale: SiteLocale; page: string
             : [])
     ];
     return (
-        <div className="flex flex-col gap-0.5 border-t border-border pt-3">
-            <p className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-foreground-subtle">
-                {t.contribute}
+        <div className={`flex min-w-0 flex-col gap-2 text-sm ${className ?? ""}`}>
+            <p className={RAIL_HEADING}>
+                <GitPullRequest className="size-4 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 truncate">{t.contribute}</span>
             </p>
             {links.map(({ to, label, Icon }) => (
                 <a
@@ -121,9 +148,10 @@ function Contribute({ locale, page, source }: { locale: SiteLocale; page: string
                     href={to}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={SIDE_LINK}
+                    title={label}
+                    className="flex min-w-0 items-center gap-2 text-muted-foreground hover:text-foreground"
                 >
-                    <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+                    <Icon className="size-4 shrink-0" aria-hidden="true" />
                     <span className="min-w-0 truncate">{label}</span>
                 </a>
             ))}
@@ -148,7 +176,22 @@ export function pageActionWords(locale: SiteLocale): PageActionsWords {
     };
 }
 
-/** A page's first row: where it sits on the left, "Copy page" on the right. */
+/** "Copy page" for a page, from the Markdown the build wrote beside it. */
+function CopyPage({ locale, page, className }: { locale: SiteLocale; page: string; className?: string }) {
+    return (
+        <PageActions
+            markdown={asset(`${locale}/${markdownPath(page)}`)}
+            url={pageUrl(locale, page)}
+            words={pageActionWords(locale)}
+            className={className}
+        />
+    );
+}
+
+/**
+ * A page's first row: where it sits on the left and, on a screen too narrow
+ * for the column beside the page, "Copy page" on the right.
+ */
 export function PageHead({
     locale,
     page,
@@ -161,11 +204,7 @@ export function PageHead({
     return (
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-4 gap-y-2">
             <div className="min-w-0 flex-1">{children}</div>
-            <PageActions
-                markdown={asset(`${locale}/${markdownPath(page)}`)}
-                url={pageUrl(locale, page)}
-                words={pageActionWords(locale)}
-            />
+            <CopyPage locale={locale} page={page} className="shrink-0 xl:hidden" />
         </div>
     );
 }
@@ -204,13 +243,13 @@ function DocsFrame({
     locale,
     current,
     source,
-    aside,
+    toc,
     children
 }: {
     locale: SiteLocale;
     current: string | null;
     source?: string;
-    aside?: ReactNode;
+    toc?: readonly TocItem[];
     children: ReactNode;
 }) {
     const t = words(locale).docs;
@@ -221,7 +260,8 @@ function DocsFrame({
             label={t.guides}
             page={current ? `docs/${current}/` : "docs/"}
             source={source}
-            aside={aside}
+            toc={toc}
+            copy={current !== null}
             sidebar={
                 <>
                     {docSections(locale).map((section) => (
@@ -411,9 +451,7 @@ export function DocView({ locale, page }: { locale: SiteLocale; page: DocPage })
             locale={locale}
             current={page.slug}
             source={page.source}
-            aside={
-                page.headings.length ? <PageToc label={t.onThisPage} items={page.headings} /> : null
-            }
+            toc={page.headings}
         >
             <article className="flex min-w-0 flex-col gap-4">
                 <PageHead locale={locale} page={`docs/${page.slug}/`}>

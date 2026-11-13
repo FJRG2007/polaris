@@ -13,7 +13,7 @@ import type { ApiConstraint, ApiField, ApiOperation, SiteLocale } from "@/data/b
 import { requestSamples } from "@/data/docs";
 import { CodeTabs } from "@/components/code-tabs";
 import { HostField, HostedHtml } from "@/components/example-host";
-import { PageToc, PageTocFolded, type TocItem } from "@/components/page-toc";
+import { PageTocFolded, type TocItem } from "@/components/page-toc";
 import { Badge, CopyButton, buttonVariants, cn } from "@polaris/ui";
 import { highlight, highlightAll } from "@/lib/highlight";
 import { EXAMPLE_ORIGIN } from "@/lib/example-origin";
@@ -92,12 +92,12 @@ function MethodTag({ method, small }: { method: string; small?: boolean }) {
 function ApiFrame({
     locale,
     current,
-    aside,
+    toc,
     children
 }: {
     locale: SiteLocale;
     current: string;
-    aside?: ReactNode;
+    toc?: readonly TocItem[];
     children: ReactNode;
 }) {
     const t = words(locale).api;
@@ -117,7 +117,7 @@ function ApiFrame({
             locale={locale}
             label={t.title}
             page={current}
-            aside={aside}
+            toc={toc}
             sidebar={
                 <>
                     {link(pages.apiPath.overview(), t.overview)}
@@ -312,7 +312,7 @@ export async function ApiOverviewView({ locale }: { locale: SiteLocale }) {
         <ApiFrame
             locale={locale}
             current={pages.apiPath.overview()}
-            aside={<PageToc label={words(locale).docs.onThisPage} items={toc} />}
+            toc={toc}
         >
             <div className="flex flex-col gap-2">
                 <PageHead locale={locale} page={pages.apiPath.overview()}>
@@ -459,7 +459,7 @@ export async function ApiOperationView({
         <ApiFrame
             locale={locale}
             current={path}
-            aside={<PageToc label={words(locale).docs.onThisPage} items={toc} />}
+            toc={toc}
         >
             <article className="flex min-w-0 flex-col gap-6">
                 <PageHead locale={locale} page={path}>
