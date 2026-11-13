@@ -20,6 +20,10 @@
             "label": "Eventos",
             "hint": "Cada informe según llegó, el más nuevo primero"
         },
+        "performance": {
+            "label": "Rendimiento",
+            "hint": "Qué páginas y peticiones van más lentas de lo debido"
+        },
         "releases": {
             "label": "Versiones",
             "hint": "Las compilaciones que informaron, y sus fallos"
@@ -138,7 +142,10 @@
         "makeTask": "No se pudo crear la tarea. Reinténtalo.",
         "readActivity": "No se pudo leer la actividad. Reinténtalo.",
         "comment": "No se pudo guardar el comentario. Reinténtalo.",
-        "readEnvironments": "No se pudieron leer los entornos"
+        "readEnvironments": "No se pudieron leer los entornos",
+        "readPerformance": "No se pudo leer el rendimiento de este proyecto.",
+        "routeGone": "Esa ruta ya no se mide.",
+        "target": "No se pudo guardar el objetivo."
     },
     "grid": {
         "count": "{count, plural, one {Un proyecto} other {# proyectos}}",
@@ -422,5 +429,61 @@
         "count": "Por {count, plural, one {# evento más} other {# eventos más}}",
         "until": "Ignorado hasta {at}",
         "left": "Ignorado por {count, plural, one {# evento más} other {# eventos más}}"
+    },
+    "performance": {
+        "search": "Buscar rutas",
+        "kind": "Tipo",
+        "allKinds": "Todos",
+        "projectTarget": "Objetivo {target}",
+        "projectTargetDefault": "Objetivos estándar",
+        "none": "Aún no hay mediciones",
+        "noneHint": "Activa el tracing en el cliente de Sentry (tracesSampleRate) y sus cargas y peticiones aparecerán aquí.",
+        "noMatch": "Sin coincidencias",
+        "noMatchHint": "Prueba otra búsqueda u otro tipo.",
+        "route": "Ruta",
+        "target": "Objetivo",
+        "trend": "vs habitual",
+        "more": "Cargar más",
+        "columns": {
+            "count": "Últimas 24 h",
+            "p50": "p50",
+            "p75": "p75",
+            "p95": "p95"
+        },
+        "ops": {
+            "pageload": "Carga",
+            "navigation": "Navegación",
+            "http_server": "Petición",
+            "http_client": "Saliente"
+        },
+        "back": "Volver a rendimiento",
+        "assign": "Asignar",
+        "fix": "Arreglar con Polar",
+        "usual": "p75 habitual",
+        "change": "Cambiar",
+        "openIssue": "Abrir incidencia",
+        "vitals": "Web Vitals, últimas 24 h",
+        "samples": "Muestras más lentas",
+        "noSamples": "Aún no hay muestras lentas.",
+        "noSpans": "Esta muestra no envió spans.",
+        "spans": "Spans",
+        "goodUnder": "Bueno bajo {target}",
+        "metrics": {
+            "duration": "Duración",
+            "lcp": "LCP",
+            "fcp": "FCP",
+            "ttfb": "TTFB",
+            "inp": "INP",
+            "cls": "CLS"
+        },
+        "routeTargetTitle": "Objetivo de esta ruta",
+        "projectTargetTitle": "Objetivo de todas las rutas",
+        "targetLabel": "Debe cargar en (ms)",
+        "targetPlaceholder": "Vacío usa el valor de Web Vitals",
+        "targetHint": "Vacío vuelve al valor por defecto: LCP 2500 ms en páginas, 800 ms en peticiones.",
+        "targetInvalid": "Usa un número entero de milisegundos, hasta 600000.",
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "fixPrompt": "El {op} \"{name}\" va más lento de lo debido: p50 {p50}, p75 {p75}, p95 {p95}, objetivo {target}.\nSpans más lentos de una muestra de {sample}:\n{spans}\nAverigua por qué va lento y arréglalo."
     }
 }

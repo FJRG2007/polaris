@@ -14,6 +14,7 @@ import { AppChrome } from "@/components/app-chrome";
 import { ProvideAppHostUi } from "@/components/app-host/client";
 import { SessionKeeper } from "@/components/session-keeper";
 import { AccountWatcher } from "@/components/account-watcher";
+import { PageTiming } from "@/components/telemetry/page-timing";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
     const user = await requireUser();
@@ -23,6 +24,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                 dashboard's pieces when they render. */}
             <ProvideAppHostUi />
             <SessionKeeper />
+            {/* How long this screen took to load, into Polaris' own Telemetry. */}
+            <PageTiming />
             {/* The real account behind the session: an administrator looking at
                 Polaris as somebody else is still signed in as themselves. */}
             <AccountWatcher userId={user.viewingAs?.actorId ?? user.id} />

@@ -30,6 +30,7 @@ import { RelativeTime } from "@/components/relative-time";
 import type { PickedPerson } from "@/components/people-picker";
 import { AssignDialog, CreateTaskDialog } from "./issue-dialogs";
 import { EventStream, EventView, ReleaseList } from "./event-stream";
+import { PerformanceList, RouteView } from "./performance";
 import { useDebounced } from "./use-debounced";
 import {
     IGNORE_COUNTS,
@@ -379,6 +380,22 @@ export function TelemetryView({
                                 hrefFor={(event) => paths.projectHref(projectId, "events", event.id)}
                             />
                         ))}
+                    {open === "performance" &&
+                        (itemId ? (
+                            <RouteView
+                                projectId={projectId}
+                                routeId={itemId}
+                                readOnly={readOnly || !project}
+                                viewerId={viewer.id}
+                                backHref={paths.projectHref(projectId, "performance")}
+                            />
+                        ) : (
+                            <PerformanceList
+                                projectId={projectId}
+                                readOnly={readOnly || !project}
+                                hrefFor={(routeId) => paths.projectHref(projectId, "performance", routeId)}
+                            />
+                        ))}
                     {open === "releases" && (
                         <ReleaseList
                             projectId={projectId}
@@ -407,6 +424,7 @@ export function TelemetryView({
                     {!project &&
                         open !== "issues" &&
                         open !== "events" &&
+                        open !== "performance" &&
                         open !== "releases" &&
                         open !== "environments" && (
                         <div className="flex flex-col gap-3" aria-busy="true">

@@ -13,7 +13,7 @@
  * is a thing you go into, so it has an inside.
  */
 
-import { Activity, BellRing, Bug, KeyRound, Layers, Settings, ShieldCheck, Tag, type LucideIcon } from "lucide-react";
+import { Activity, BellRing, Bug, Gauge, KeyRound, Layers, Settings, ShieldCheck, Tag, type LucideIcon } from "lucide-react";
 
 export interface Section {
     /** What it is called in the URL. Short and stable: it ends up in links
@@ -36,6 +36,13 @@ export const SECTIONS: readonly Section[] = [
         label: "Events", // i18n-ignore
         icon: Activity,
         hint: "Every report as it arrived, newest first", // i18n-ignore
+        readOnly: true
+    },
+    {
+        key: "performance",
+        label: "Performance", // i18n-ignore
+        icon: Gauge,
+        hint: "Which pages and requests are slower than they should be", // i18n-ignore
         readOnly: true
     },
     {

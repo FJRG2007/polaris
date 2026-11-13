@@ -312,6 +312,8 @@ export function pageContextFrom(
     };
 }
 
+/** The longest prompt another screen may hand Polar through the address. */
+const MAX_HANDED_PROMPT = 6000;
 const OPEN_KEY = "polar.open";
 const WIDTH_KEY = "polar.width";
 /** The scoped chats remembered, newest last, so the oldest can be let go. */
@@ -1392,6 +1394,9 @@ export function PolarChat({
         const session = params?.get("session") ?? null;
         const trying = trialFromAddress(params?.get("skill") ?? null);
         const withAgent = params?.get("agent") ?? null;
+        // A screen handing work over ("Fix with Polar") writes what to ask; it
+        // lands in the composer, never sent, so the person reads it first.
+        const prompt = params?.get("prompt")?.slice(0, MAX_HANDED_PROMPT) ?? null;
         if (session) {
             window.history.replaceState(null, "", window.location.pathname);
             setInCode(false);
@@ -1402,6 +1407,7 @@ export function PolarChat({
         }
         if (fresh) {
             startNew(fresh === "1" ? null : fresh);
+            if (prompt) setInput(prompt);
             if (trying) {
                 setTemporary(true);
                 setTrialSkill(trying);

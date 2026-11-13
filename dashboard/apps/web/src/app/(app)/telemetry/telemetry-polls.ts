@@ -60,3 +60,9 @@ export const telemetryReleases = inputPoll<typeof telemetryActionsModule.release
 export const telemetryEnvironments = inputPoll<typeof telemetryActionsModule.environmentsAction>(
     "/api/telemetry/environments"
 );
+export const telemetryPerformance = inputPoll<typeof telemetryActionsModule.performancePageAction>(
+    "/api/telemetry/performance"
+);
+export const telemetryRoute = inputPoll<typeof telemetryActionsModule.routeDetailAction>(
+    "/api/telemetry/performance-route"
+);

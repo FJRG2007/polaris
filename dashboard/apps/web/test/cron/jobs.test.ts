@@ -246,6 +246,8 @@ describe("the work Polaris runs on a schedule", () => {
             "service-sleep",
             "task-reminders",
             "task-trackers",
+            // Two passes would fold the same hours into their day twice.
+            "telemetry-performance",
             // Two passes would count the same traffic twice, and each would rewrite
             // a node's peer list under the other.
             "vpn-nodes"

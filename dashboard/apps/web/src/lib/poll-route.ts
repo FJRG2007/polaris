@@ -40,8 +40,16 @@ export function pollRoute<Q extends z.ZodTypeAny>(
         // i18n-ignore: status bodies no screen shows; the caller keeps what it had
         if (options.signedIn !== false && !(await backgroundUser()))
             return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });
-        const params = Object.fromEntries(new URL(request.url).searchParams);
-        return answer(request, query.safeParse(params), read);
+        const url = new URL(request.url);
+        const startedAt = Date.now();
+        const response = await answer(request, query.safeParse(Object.fromEntries(url.searchParams)), read);
+        // Polaris' own reads, timed into its own Telemetry project. Loaded on
+        // use, so a poll route does not carry the telemetry store in its graph.
+        void import("@/lib/telemetry/capture").then((capture) =>
+            capture.measureInternal(url.pathname, startedAt),
+            () => undefined
+        );
+        return response;
     };
 }
 

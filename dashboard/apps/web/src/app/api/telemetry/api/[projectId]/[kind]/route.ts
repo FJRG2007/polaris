@@ -29,6 +29,8 @@ import * as core from "@polaris/core";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { captureEvent } from "@/lib/telemetry/store";
+import * as perf from "@/lib/telemetry/performance";
+import { recordInteraction, recordTransaction } from "@/lib/telemetry/performance-store";
 import { readIngestBody } from "@/lib/telemetry/ingest-body";
 import { projectForIngest, recordRefusal, secretAccepted } from "@/lib/telemetry/project-service";
 
@@ -159,18 +161,28 @@ export async function POST(
     if (!limit.ok) return accepted();
 
     const now = new Date();
-    const payloads =
-        envelope === null
-            ? [safeJson(body)]
-            : envelope.items
-                  // A session, a transaction, a profile and a client report are
-                  // all legitimate items on an envelope, and none of them is a
-                  // failure. Reading them all and storing what turns out to be
-                  // an event is cheaper than a list of types to keep in step.
-                  .map((item) => item.payload);
+    const items =
+        envelope === null ? [{ type: "event", payload: safeJson(body) }] : envelope.items;
 
     let stored: string | null = null;
-    for (const payload of payloads) {
+    for (const { type, payload } of items) {
+        // A transaction is how long a page or a request took, and a span item
+        // is the browser SDK's INP. Neither is a failure: they become the
+        // project's performance, never an issue of their own.
+        if (type === "transaction") {
+            const reading = perf.readTransaction(payload);
+            if (reading) await recordTransaction(project, reading, now);
+            continue;
+        }
+        if (type === "span") {
+            const reading = perf.readInpSpan(payload);
+            if (reading) await recordInteraction(project, reading, now);
+            continue;
+        }
+        // A session, a profile and a client report are legitimate items on an
+        // envelope, and none of them is a failure. Reading the rest and
+        // storing what turns out to be an event is cheaper than a list of
+        // types to keep in step.
         const event = core.readEvent(payload, now);
         if (!event) continue;
         await captureEvent(project, event);

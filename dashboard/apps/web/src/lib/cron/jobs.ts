@@ -27,6 +27,7 @@ import { sweepRateLimits } from "@/lib/rate-limit-service";
 import { sweepDueSends } from "@/lib/mailbox/compose";
 import { pruneOrphanDelegateDrafts } from "@/lib/mailbox/delegate-act";
 import { pruneTelemetry } from "@/lib/telemetry/store";
+import { runPerformanceJob } from "@/lib/telemetry/performance-store";
 import { runAutoscale } from "@/lib/deploy/autoscaler";
 import { appJobs } from "@/lib/app-extensions/registry";
 import { sweepDueBackups } from "@/lib/backups/service";
@@ -333,6 +334,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // zero; nothing is written and nothing is lost.
         leaseMs: null,
         run: pruneTelemetry
+    },
+    {
+        key: "telemetry-performance",
+        // Every ten minutes: a page that turned slow is an issue within the
+        // quarter hour, and each pass reads only the routes that reported in
+        // the last day, a bounded batch at a time.
+        everyMs: 10 * MINUTE,
+        // Longer than the gap, as every lease here is: two passes at once would
+        // fold the same hours into their day twice.
+        leaseMs: 15 * MINUTE,
+        run: () => runPerformanceJob()
     },
     {
         key: "drive-jobs",

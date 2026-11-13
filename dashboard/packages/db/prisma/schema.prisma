@@ -12706,6 +12706,11 @@ model TelemetryProject {
     // address | client | secret - which check turned it away.
     refusedReason     String?
 
+    // How long a route of this project should take, in milliseconds, when the
+    // route names no target of its own. Null is the Web Vitals "good" threshold
+    // for the kind of route (see lib/telemetry/performance.ts).
+    perfTargetMs      Int?
+
     createdAt     DateTime @default(now())
     updatedAt     DateTime @updatedAt
 
@@ -12717,6 +12722,7 @@ model TelemetryProject {
     days          TelemetryDay[]
     alertRules    TelemetryAlertRule[]
     alertFires    TelemetryAlertFire[]
+    perfRoutes    TelemetryPerfRoute[]
 
     @@unique([ownerId, slug])
     @@index([orgId])
@@ -12770,6 +12776,7 @@ model TelemetryIssue {
     activity   TelemetryActivity[]
     users      TelemetryIssueUser[]
     alertFires TelemetryAlertFire[]
+    perfRoutes TelemetryPerfRoute[]
 
     @@unique([projectId, fingerprint])
     @@index([projectId, status, lastSeen])
@@ -12931,6 +12938,105 @@ model TelemetryDay {
 
     @@unique([issueId, day])
     @@index([projectId, day])
+}
+
+// One page or request of a project, as its Sentry transactions name it, with
+// how long it takes.
+//
+// A transaction is never kept as a row of its own: millions of them would be a
+// table nobody can read. Each one adds to the histograms of its route
+// (TelemetryPerfBucket), and the percentiles here are worked out from those by
+// the telemetry-performance job, so the list sorts on columns rather than on
+// arithmetic.
+model TelemetryPerfRoute {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    projectId   String    @db.Uuid
+    // The transaction name, parameterized ("/users/:id"), and the kind of thing
+    // it measures: pageload | navigation | http.server | http.client | ...
+    name        String
+    op          String
+    // Which measurement the numbers below are of: lcp for a page load that
+    // reports one, otherwise duration.
+    metric      String    @default("duration")
+    // The last day, as of `evaluatedAt`.
+    count       Int       @default(0)
+    p50         Float?
+    p75         Float?
+    p95         Float?
+    // The p75 of the seven days before that, which "slower than usual" is
+    // measured against.
+    baselineP75 Float?
+    // This route's own target, in milliseconds. Null is the project's.
+    targetMs    Int?
+    // The performance issue it opened, if it is slow.
+    issueId     String?   @db.Uuid
+    // When it was last reported as slow, so an issue is told at most hourly.
+    flaggedAt   DateTime?
+    lastSeen    DateTime  @default(now())
+    evaluatedAt DateTime?
+
+    project TelemetryProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    issue   TelemetryIssue?       @relation(fields: [issueId], references: [id], onDelete: SetNull)
+    buckets TelemetryPerfBucket[]
+    samples TelemetryPerfSample[]
+
+    @@unique([projectId, op, name])
+    // The orders the Performance list offers, and the job's walk.
+    @@index([projectId, lastSeen])
+    @@index([projectId, count])
+    @@index([projectId, p50])
+    @@index([projectId, p75])
+    @@index([projectId, p95])
+    @@index([projectId, name])
+    @@index([lastSeen, evaluatedAt])
+    @@index([issueId])
+}
+
+// A histogram of one measurement of one route over one hour or one day.
+//
+// `hist` counts values into fixed logarithmic buckets (see HISTOGRAM in
+// lib/telemetry/performance.ts), so two of them add element by element and any
+// percentile is read back within a few percent - which is what lets an hour be
+// folded into its day and a day's p95 be computed without the transactions.
+model TelemetryPerfBucket {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    routeId   String   @db.Uuid
+    // duration | lcp | fcp | ttfb | inp | cls (cls in thousandths).
+    metric    String
+    // 60 for an hour, 1440 for a day.
+    grain     Int
+    at        DateTime
+    count     Int      @default(0)
+    sum       Float    @default(0)
+    hist      Int[]
+
+    route TelemetryPerfRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+    @@unique([routeId, metric, grain, at])
+    @@index([grain, at])
+}
+
+// One slow transaction kept whole, so the route can show where the time went.
+//
+// Only the slow ones are written, and the job keeps the slowest few per route
+// within the project's retention: this is drill-down, not a log.
+model TelemetryPerfSample {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    projectId   String   @db.Uuid
+    routeId     String   @db.Uuid
+    eventId     String?
+    durationMs  Float
+    release     String?
+    environment String?
+    url         String?
+    // The spans and measurements, as JSON text.
+    detail      String   @default("{}")
+    at          DateTime @default(now())
+
+    route TelemetryPerfRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+    @@index([routeId, durationMs])
+    @@index([projectId, at])
 }
 // ---------------------------------------------------------------------------
 // Mail

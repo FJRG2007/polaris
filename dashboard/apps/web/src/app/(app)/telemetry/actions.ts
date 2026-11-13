@@ -18,6 +18,7 @@
  * stay with its owner, and making a project still needs `deploy.manage`.
  */
 
+import { z } from "zod";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { slugify } from "@polaris/deploy";
@@ -35,6 +36,7 @@ import { requireTelemetryReader } from "@/lib/telemetry/reader";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as report from "@/lib/telemetry/report-service";
 import * as projects from "@/lib/telemetry/project-service";
+import * as performance from "@/lib/telemetry/performance-store";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
@@ -794,5 +796,69 @@ export async function deleteAlertRuleAction(input: unknown): Promise<{ error?: s
         return {};
     } catch (caught) {
         return await failure(caught, "alerts.errors.delete");
+    }
+}
+
+const performancePageSchema = z.object({
+    projectId: z.string().uuid(),
+    sort: z.enum(performance.ROUTE_SORTS).default("p75"),
+    op: z.string().trim().max(64).nullish(),
+    query: z.string().trim().max(200).nullish(),
+    cursor: z.string().regex(/^\d{1,7}$/).nullish()
+});
+
+/** A page of a project's routes and requests, with how long they take. */
+export async function performancePageAction(
+    input: unknown
+): Promise<{ data?: Awaited<ReturnType<typeof performance.listRoutesPage>>; error?: string }> {
+    const parsed = performancePageSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.readPerformance") };
+    const { actor: caller, lent } = await requireTelemetryReader();
+    try {
+        await projects.requireProject(caller, parsed.data.projectId, lent);
+        return { data: await performance.listRoutesPage(parsed.data) };
+    } catch (caught) {
+        return await failure(caught, "errors.readPerformance");
+    }
+}
+
+const routeRefSchema = z.object({ projectId: z.string().uuid(), routeId: z.string().uuid() });
+
+/** One route: its measurements over the last day and its slowest samples. */
+export async function routeDetailAction(
+    input: unknown
+): Promise<{ data?: NonNullable<Awaited<ReturnType<typeof performance.routeDetail>>>; error?: string }> {
+    const parsed = routeRefSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.readPerformance") };
+    const { actor: caller, lent } = await requireTelemetryReader();
+    try {
+        await projects.requireProject(caller, parsed.data.projectId, lent);
+        const detail = await performance.routeDetail(parsed.data.projectId, parsed.data.routeId);
+        if (!detail) return { error: await say("errors.routeGone") };
+        return { data: detail };
+    } catch (caught) {
+        return await failure(caught, "errors.readPerformance");
+    }
+}
+
+const targetSchema = z.object({
+    projectId: z.string().uuid(),
+    routeId: z.string().uuid().nullable(),
+    // Up to ten minutes, in milliseconds; null goes back to the default.
+    targetMs: z.number().int().min(1).max(600_000).nullable()
+});
+
+/** Set how long a route - or, with no route, every route of the project - should take. */
+export async function setPerformanceTargetAction(input: unknown): Promise<{ error?: string }> {
+    const parsed = targetSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.target") };
+    const { caller, editable, manages } = await editor();
+    try {
+        await requireEditable(caller, parsed.data.projectId, editable, manages);
+        const done = await performance.setTarget(parsed.data.projectId, parsed.data.routeId, parsed.data.targetMs);
+        if (!done) return { error: await say("errors.routeGone") };
+        return {};
+    } catch (caught) {
+        return await failure(caught, "errors.target");
     }
 }

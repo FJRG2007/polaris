@@ -181,6 +181,68 @@ function hereContexts(): core.ContextGroup[] {
     ];
 }
 
+/** One in this many of Polaris' own requests is timed; a slow one always is. */
+const TIMING_SAMPLE = 10;
+const TIMING_ALWAYS_MS = 800;
+
+/**
+ * Time one of Polaris' own requests into its own project, so the Performance
+ * section shows which of its screens' reads are slow. Sampled, and the slow
+ * ones always, so a busy dashboard costs a write per ten reads at most. Never
+ * throws and is never waited on.
+ */
+export function measureInternal(name: string, startedAt: number, now: number = Date.now()): void {
+    const durationMs = now - startedAt;
+    if (durationMs < TIMING_ALWAYS_MS && Math.floor(Math.random() * TIMING_SAMPLE) !== 0) return;
+    recordOwnTiming({ name, op: "http.server", method: "GET", durationMs, values: { duration: durationMs }, now });
+}
+
+/**
+ * One of Polaris' own page loads, as the browser measured it, into its own
+ * project. The browser already sampled it (see `components/page-timing`), so
+ * every one that arrives is kept. Judged by its LCP, the way a page an SDK
+ * reports is. Never throws and is never waited on.
+ */
+export function measurePageLoad(
+    path: string,
+    values: Readonly<Partial<Record<"lcp" | "fcp" | "ttfb" | "inp" | "cls", number>>>,
+    now: number = Date.now()
+): void {
+    const durationMs = values.lcp ?? values.fcp ?? values.ttfb ?? 0;
+    recordOwnTiming({ name: path, op: "pageload", method: null, durationMs, values: { duration: durationMs, ...values }, now });
+}
+
+function recordOwnTiming(input: {
+    name: string;
+    op: string;
+    method: string | null;
+    durationMs: number;
+    values: Readonly<Record<string, number>>;
+    now: number;
+}): void {
+    void (async () => {
+        const project = await systemProject();
+        if (!project) return;
+        const [perf, store] = await Promise.all([
+            import("@/lib/telemetry/performance"),
+            import("@/lib/telemetry/performance-store")
+        ]);
+        await store.recordTransaction(project, {
+            name: perf.routeName(input.name, "url"),
+            op: input.op,
+            eventId: null,
+            durationMs: input.durationMs,
+            values: input.values,
+            release: buildStamp(),
+            environment: process.env.NODE_ENV === "production" ? "production" : "development",
+            url: null,
+            method: input.method,
+            spans: [],
+            at: new Date(input.now)
+        });
+    })().catch((error: unknown) => console.error("polaris: could not time a request:", error));
+}
+
 /**
  * Record something that went wrong inside Polaris.
  *

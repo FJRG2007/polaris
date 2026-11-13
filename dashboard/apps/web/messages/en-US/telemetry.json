@@ -20,6 +20,10 @@
             "label": "Events",
             "hint": "Every report as it arrived, newest first"
         },
+        "performance": {
+            "label": "Performance",
+            "hint": "Which pages and requests are slower than they should be"
+        },
         "releases": {
             "label": "Releases",
             "hint": "The builds that reported, and their issues"
@@ -138,7 +142,10 @@
         "makeTask": "The task could not be created. Try again.",
         "readActivity": "The activity could not be read. Try again.",
         "comment": "That comment could not be saved. Try again.",
-        "readEnvironments": "Could not read the environments"
+        "readEnvironments": "Could not read the environments",
+        "readPerformance": "Could not read the performance of this project.",
+        "routeGone": "That route is no longer measured.",
+        "target": "Could not save the target."
     },
     "grid": {
         "count": "{count, plural, one {One project} other {# projects}}",
@@ -422,5 +429,61 @@
         "count": "For {count, plural, one {# more event} other {# more events}}",
         "until": "Ignored until {at}",
         "left": "Ignored for {count, plural, one {# more event} other {# more events}}"
+    },
+    "performance": {
+        "search": "Search routes",
+        "kind": "Kind",
+        "allKinds": "All kinds",
+        "projectTarget": "Target {target}",
+        "projectTargetDefault": "Default targets",
+        "none": "Nothing measured yet",
+        "noneHint": "Turn on tracing in the Sentry client (tracesSampleRate) and its page loads and requests appear here.",
+        "noMatch": "No routes match",
+        "noMatchHint": "Try another search or kind.",
+        "route": "Route",
+        "target": "Target",
+        "trend": "vs usual",
+        "more": "Load more",
+        "columns": {
+            "count": "Last 24 h",
+            "p50": "p50",
+            "p75": "p75",
+            "p95": "p95"
+        },
+        "ops": {
+            "pageload": "Page load",
+            "navigation": "Navigation",
+            "http_server": "Request",
+            "http_client": "Outgoing"
+        },
+        "back": "Back to performance",
+        "assign": "Assign",
+        "fix": "Fix with Polar",
+        "usual": "Usual p75",
+        "change": "Change",
+        "openIssue": "Open its issue",
+        "vitals": "Web Vitals, last 24 h",
+        "samples": "Slowest samples",
+        "noSamples": "No slow samples kept yet.",
+        "noSpans": "This sample reported no spans.",
+        "spans": "Spans",
+        "goodUnder": "Good under {target}",
+        "metrics": {
+            "duration": "Duration",
+            "lcp": "LCP",
+            "fcp": "FCP",
+            "ttfb": "TTFB",
+            "inp": "INP",
+            "cls": "CLS"
+        },
+        "routeTargetTitle": "Target for this route",
+        "projectTargetTitle": "Target for every route",
+        "targetLabel": "Should load within (ms)",
+        "targetPlaceholder": "Empty uses the Web Vitals default",
+        "targetHint": "Empty goes back to the default: LCP 2500 ms for pages, 800 ms for requests.",
+        "targetInvalid": "Use a whole number of milliseconds, up to 600000.",
+        "cancel": "Cancel",
+        "save": "Save",
+        "fixPrompt": "The {op} \"{name}\" is slower than it should be: p50 {p50}, p75 {p75}, p95 {p95}, target {target}.\nSlowest spans of a {sample} sample:\n{spans}\nFind out why it is slow and fix it."
     }
 }

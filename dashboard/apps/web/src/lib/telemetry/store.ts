@@ -275,6 +275,8 @@ export async function pruneTelemetry(now: Date = new Date()): Promise<number> {
             where: { projectId: project.id, at: { lt: before } }
         });
         removed += count;
+        // The slow transactions kept for drill-down go with the events.
+        await prisma.telemetryPerfSample.deleteMany({ where: { projectId: project.id, at: { lt: before } } });
     }
     // A year of counts, which is longer than any project's events and short
     // enough that the table cannot grow without bound.
