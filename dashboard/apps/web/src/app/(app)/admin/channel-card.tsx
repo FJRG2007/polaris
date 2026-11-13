@@ -9,7 +9,7 @@ import type { ComponentType } from "react";
 import { CheckCircle2, Settings2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { CHANNEL_STATUS_TONE } from "./inbox/platform-meta";
+import { CHANNEL_STATUS_TONE } from "./email/channels/platform-meta";
 
 /** One connected channel, whatever it carries. A messaging channel and an email
  *  sender differ only in what their subtitle says, so they share a card. */

@@ -1,7 +1,7 @@
 /**
  * Discord adapter via discord.js over the gateway. Receives messages and button
  * clicks live, and sends text or native buttons (chunked into action rows). No
- * browser, free. Inbound flows through the bridge to the web ingest like Telegram.
+ * browser, free.
  */
 
 import {

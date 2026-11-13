@@ -173,8 +173,7 @@
         },
         "admin": {
             "description": "Users, access, domains & updates",
-            "guestDescription": "Customer conversations across every channel",
-            "otherwiseDescription": "The senders your mail and texts go out through"
+            "guestDescription": "The senders your mail and texts go out through"
         },
         "account": {
             "description": "Profile, security & API keys"
@@ -253,7 +252,6 @@
         "Connected accounts": "Connected accounts",
         "Console": "Console",
         "Consumption": "Consumption",
-        "Contacts": "Contacts",
         "Containers": "Containers",
         "Conversations": "Conversations",
         "Databases": "Databases",
@@ -301,7 +299,6 @@
         "Labels": "Labels",
         "Linked chat": "Linked chat",
         "Limits": "Limits",
-        "Logs": "Logs",
         "Machines": "Machines",
         "Mail": "Mail",
         "Mail server": "Mail server",

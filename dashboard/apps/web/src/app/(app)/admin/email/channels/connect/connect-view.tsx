@@ -12,8 +12,8 @@ import { useState, type ReactElement } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
-import { ConnectChannelDialog } from "@/app/(app)/admin/inbox/connect-channel-dialog";
-import { channelCatalog, type ChannelKind } from "@/app/(app)/admin/inbox/channel-catalog";
+import { ConnectChannelDialog } from "@/app/(app)/admin/email/channels/connect-channel-dialog";
+import { channelCatalog, type ChannelKind } from "@/app/(app)/admin/email/channels/channel-catalog";
 
 export function ConnectChannelView({
     bridgeReady,
@@ -31,14 +31,14 @@ export function ConnectChannelView({
     /** Everything is set up to be used, so a finished connect goes to the list. */
     function done() {
         setKind(null);
-        router.push("/admin/inbox/channels");
+        router.push("/admin/email/channels");
     }
 
     return (
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
             <div className="flex flex-col gap-1">
                 <Link
-                    href="/admin/inbox/channels"
+                    href="/admin/email/channels"
                     className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                 >
                     <ArrowLeft className="size-3" /> {t("inboxChannels.title")}

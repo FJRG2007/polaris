@@ -17,12 +17,12 @@
     "uninstallDescription": "Esto elimina su contenedor y la quita de tus aplicaciones. Los datos en volúmenes locales del servidor se pierden; los que están en un montaje NAS se conservan.",
     "channels": {
         "title": "Canales",
-        "hint": "Conecta WhatsApp, Telegram, Discord o Slack. El token, el número de teléfono o el QR de cada canal se introduce en Entrada al conectarlo.",
+        "hint": "Conecta WhatsApp, Telegram, Discord o Slack. El token, el número o el QR de cada canal se introduce en Canales al conectarlo.",
         "connect": "Conectar un canal",
         "loading": "Cargando canales...",
-        "empty": "Aún no hay canales conectados. Conecta uno para empezar a recibir y enviar mensajes desde Entrada.",
-        "goToInbox": "Ir a Entrada",
-        "openInbox": "Abrir Entrada",
+        "empty": "Aún no hay canales conectados. Conecta uno para enviar alertas y códigos por él.",
+        "goToInbox": "Ir a Canales",
+        "openInbox": "Abrir Canales",
         "status": {
             "connected": "conectado",
             "connecting": "conectando",

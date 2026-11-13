@@ -13,7 +13,6 @@ import { loadEnv } from "@polaris/config";
 import { slugify } from "@polaris/deploy";
 import { listHosts } from "@/lib/host-service";
 import { encryptSecret } from "@polaris/storage";
-import { appBaseUrl } from "@/lib/domain-service";
 import { publishAccessChange } from "@/lib/access-live";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { availableHostPort } from "@/lib/apps/port-registry";
@@ -231,12 +230,11 @@ export async function installApp(
     const template = app.template!;
     const image = template.image!;
 
-    // The messaging hub needs the web and the bridge to share two secrets: the API
-    // bearer and the inbound ingest key. Minted here, injected as the bridge's env,
-    // and stored (encrypted) on the install so the web can resolve them later.
+    // The messaging hub needs the web and the bridge to share the API bearer.
+    // Minted here, injected as the bridge's env, and stored (encrypted) on the
+    // install so the web can resolve it later.
     const isHub = appHasCapability(app, "messaging-hub");
     const bridgeToken = isHub ? randomBytes(32).toString("hex") : null;
-    const ingestKey = isHub ? randomBytes(32).toString("hex") : null;
 
     // Resolve the server the operator chose: the local host, or an SSH host
     // adopted as a deploy target on first use (same path as Deploy).
@@ -332,17 +330,9 @@ export async function installApp(
         }
     }
     // Hub wiring: the bridge reads these at startup (see services/messaging-bridge).
-    // WEB_INGEST_URL defaults to the public app URL; a locally-installed hub has it
-    // overridden to the web's internal ingest (service DNS) at deploy time, since the
-    // public URL does not resolve from inside a deployed container.
-    if (isHub && bridgeToken && ingestKey) {
+    if (isHub && bridgeToken) {
         const bridgePort = template.ports?.[0]?.container ?? 8787;
         envByKey.set("BRIDGE_TOKEN", { value: bridgeToken, isSecret: true });
-        envByKey.set("WEB_INGEST_KEY", { value: ingestKey, isSecret: true });
-        envByKey.set("WEB_INGEST_URL", {
-            value: `${await appBaseUrl()}/api/inbox/ingest`,
-            isSecret: false
-        });
         envByKey.set("BRIDGE_PORT", { value: String(bridgePort), isSecret: false });
     }
     for (const entry of seed?.env ?? []) {
@@ -369,14 +359,11 @@ export async function installApp(
         });
     }
 
-    // Persist the hub's shared secrets (encrypted) on the install, so the web can
-    // resolve the bridge's bearer + ingest key when it dials it later.
+    // Persist the hub's shared secret (encrypted) on the install, so the web can
+    // resolve the bridge's bearer when it dials it later.
     const secretBlob =
-        isHub && bridgeToken && ingestKey
-            ? encryptSecret(
-                  JSON.stringify({ token: bridgeToken, ingestKey }),
-                  loadEnv().POLARIS_MASTER_KEY
-              )
+        isHub && bridgeToken
+            ? encryptSecret(JSON.stringify({ token: bridgeToken }), loadEnv().POLARIS_MASTER_KEY)
             : null;
 
     const installed = await prisma.installedApp.create({

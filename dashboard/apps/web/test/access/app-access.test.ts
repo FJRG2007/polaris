@@ -83,23 +83,23 @@ describe("reachableAppIds", () => {
 });
 
 /**
- * Inbox stopped being an app of its own and became a subject of Management, which
- * only administrators can open - and `member` and `viewer` both hold `inbox.read`.
- * Without a door of their own they would keep the permission and lose every way to
- * use it, which is the regression these cover.
+ * `member` and `viewer` both hold `inbox.read`, and Management is otherwise only
+ * an administrator's. Without a door of their own they would keep the permission
+ * and lose every way to use it - their own email and SMS senders - which is the
+ * regression these cover.
  */
-describe("the Inbox door inside Management", () => {
-    it("offers Management to a member, under Inbox's name and landing on it", async () => {
+describe("the Email & SMS door inside Management", () => {
+    it("offers Management to a member, under Email & SMS's name and landing on it", async () => {
         const apps = await reachableApps(holding("inbox.read"));
         expect(apps.map((app) => app.id)).toEqual(["overview", "vpn", "polar", "admin"]);
         const app = apps.find((entry) => entry.id === "admin");
-        expect(app?.label).toBe("Inbox");
-        expect(app?.href).toBe("/admin/inbox");
+        expect(app?.label).toBe("Email & SMS");
+        expect(app?.href).toBe("/admin/email");
     });
 
     it("keeps the member's one door out of the Overview they land on", async () => {
         // Their landing screen is the grid like everybody else's; what this
-        // protects is that Inbox is still on the switcher behind it, since the
+        // protects is that Email & SMS is still on the switcher behind it, since the
         // permission is the only thing they hold.
         expect(await homePathFor(holding("inbox.read"))).toBe("/home");
         expect(await reachableAppIds(holding("inbox.read"))).toContain("admin");
@@ -124,14 +124,14 @@ describe("the Inbox door inside Management", () => {
         expect(await reachableAppIds(holding("drive.read"))).not.toContain("admin");
     });
 
-    it("opens the member's senders instead while the messaging bridge is not installed", async () => {
+    it("opens the same senders whether or not the messaging bridge is installed", async () => {
         const input = { ...holding("inbox.read"), isInstalled: async () => false };
         const app = (await reachableApps(input)).find((entry) => entry.id === "admin");
         expect(app?.label).toBe("Email & SMS");
         expect(app?.href).toBe("/admin/email");
         const navIds = await reachableAppNav(input);
-        expect(navIds.guestIds).toEqual([]);
-        expect(navIds.otherwiseIds).toEqual(["admin"]);
+        expect(navIds.guestIds).toEqual(["admin"]);
+        expect(navIds.otherwiseIds).toEqual([]);
     });
 });
 

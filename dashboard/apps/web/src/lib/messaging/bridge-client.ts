@@ -6,13 +6,7 @@
  * operators running their own. Never called from the client.
  */
 
-import type {
-    ChannelCapabilities,
-    ChannelState,
-    InteractivePrompt,
-    Platform,
-    TargetGroup
-} from "@polaris/messaging";
+import type { ChannelCapabilities, ChannelState, InteractivePrompt, Platform } from "@polaris/messaging";
 import { isBridgeConfigured, resolveBridge } from "./bridge-endpoint";
 
 /** Whether a bridge is configured; the UI hides channel actions when it is not. */
@@ -63,19 +57,4 @@ export async function bridgeSend(
         method: "POST",
         body: JSON.stringify(message)
     });
-}
-
-/** Addressable send targets grouped (server -> channels) for a channel whose
- *  adapter enumerates them (Discord). Soft-fails to an empty list so the UI falls
- *  back to manual entry when the bridge is older or the adapter lists nothing. */
-export async function bridgeListTargets(channelId: string): Promise<TargetGroup[]> {
-    try {
-        const { groups } = await call<{ groups: TargetGroup[] }>(
-            `/channels/${encodeURIComponent(channelId)}/targets`,
-            { method: "GET" }
-        );
-        return Array.isArray(groups) ? groups : [];
-    } catch {
-        return [];
-    }
 }

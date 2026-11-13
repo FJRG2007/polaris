@@ -1485,7 +1485,7 @@
         "errors": {
             "unknownChannel": "Unknown channel."
         },
-        "readOnly": "Only members who manage the Inbox can add or change senders.",
+        "readOnly": "Only members who manage channels can add or change senders.",
         "senders": {
             "title": "Email senders",
             "hint": "The accounts Polaris sends its mail through. Send a test message after adding one.",
@@ -1580,52 +1580,6 @@
         }
     },
     "inbox": {
-        "view": {
-            "title": "Inbox",
-            "newChat": "New chat",
-            "connectChannel": "Connect channel",
-            "empty": "No conversations yet. Start one, or wait for an incoming message.",
-            "selectConversation": "Select a conversation"
-        },
-        "thread": {
-            "back": "Back to conversations",
-            "unassigned": "Unassigned",
-            "assign": "Assign agent",
-            "reopen": "Reopen",
-            "close": "Close",
-            "delete": "Delete conversation",
-            "deleteDescription": "This removes the conversation and its messages from Polaris. The chat on {platform} itself is not affected.",
-            "deleteConfirm": "Delete",
-            "chooseOption": "Choose an option",
-            "optionsPlaceholder": "One option per line",
-            "promptPlaceholder": "Prompt shown above the options",
-            "messagePlaceholder": "Type a message",
-            "optionsTitle": "Send selectable options",
-            "options": "Options",
-            "chose": "chose: {selection}",
-            "sending": "sending...",
-            "failed": "failed to send"
-        },
-        "newChat": {
-            "description": "Message someone on a connected channel to start a conversation.",
-            "contact": "Contact",
-            "contactPlaceholder": "Pick a saved contact (optional)",
-            "handle": "Handle",
-            "channel": "Channel",
-            "to": "To",
-            "enterManually": "Enter manually",
-            "recipientPlaceholder": "Recipient id",
-            "noChannel": "No {platform} channel is connected. Connect one to message this handle.",
-            "mismatch": "This handle is on {platform}. Pick a {platform} channel to send it.",
-            "telegramNote": "Telegram bots can't start a chat. Ask the person to open your bot and send <code>/start</code> - the conversation appears in your inbox and you reply there.",
-            "telegramInvalid": "Enter a numeric chat id, not a @username.",
-            "name": "Name (optional)",
-            "namePlaceholder": "Display name",
-            "message": "Message",
-            "messagePlaceholder": "First message",
-            "saveContact": "Save as contact",
-            "send": "Send"
-        },
         "connect": {
             "connected": "{name} is connected",
             "connectedDescription": "The token works. Finish the setup so the bot can reach people.",
@@ -1636,7 +1590,7 @@
             "qrFailed": "Connection failed - try again.",
             "qrWaiting": "Waiting for the scan...",
             "addTitle": "Add a channel",
-            "addDescription": "Pick a platform, then how to connect it. Add as many as you like and handle them all from one inbox.",
+            "addDescription": "Pick a platform, then how to connect it.",
             "connectTitle": "Connect {name}",
             "variantDescription": "Pick how to connect {name}.",
             "back": "Back",
@@ -1705,29 +1659,13 @@
         "platforms": {
             "email": "Email"
         },
-        "peerHints": {
-            "whatsapp": "Phone number with country code, e.g. 34600111222",
-            "telegram": "Numeric chat id, not a @username. The person must have messaged the bot first (Telegram bots can't start a chat).",
-            "discord": "A server channel id the bot can post to, or a user id to DM (prefix a DM with user:)",
-            "slack": "A channel or user id"
-        },
-        "discordPeer": {
-            "serverChannel": "Server channel",
-            "directMessage": "Direct message",
-            "userPlaceholder": "User id or username to DM",
-            "pickChannel": "Pick a channel",
-            "channelPlaceholder": "Channel id the bot can post to",
-            "userHint": "DM by numeric User ID (most reliable: developer mode on, right-click a user > Copy User ID), or a username if the bot shares a server and the Server Members intent is on.",
-            "pickHint": "Pick a server and a channel the bot can post to.",
-            "channelHint": "A text channel id the bot can post to (right-click the channel > Copy Channel ID)."
-        },
         "discordSetup": {
             "checking": "Checking what the bot can reach...",
             "notRunning": "The bridge is not running this bot right now, so there is nothing to check.",
             "noServer": "The bot is in no server yet",
             "inServers": "{count, plural, one {In # server} other {In # servers}}",
             "noServerHint": "It can only send once somebody adds it to one.",
-            "serversHint": "Server channels are pickable when you write a message.",
+            "serversHint": "It can send to any channel in those servers.",
             "checkAgain": "Check again",
             "addBot": "Add the bot to a server",
             "addBotHint": "Discord asks which of your servers, then to confirm: {permissions}.",
@@ -1750,25 +1688,12 @@
             "removeChannelFailed": "Could not remove the channel",
             "nothingToUpdate": "Nothing to update",
             "updateChannelFailed": "Could not update the channel",
-            "reconnectFailed": "Could not reconnect the channel",
-            "invalidRequest": "Invalid request",
-            "deleteConversationFailed": "Could not delete the conversation",
-            "updateConversationFailed": "Could not update the conversation",
-            "nothingToSend": "Nothing to send",
-            "typeMessage": "Type a message first",
-            "sendFailed": "Could not send the message",
-            "startFailed": "Could not start the chat",
-            "saveContactFailed": "Could not save the contact",
-            "updateContactFailed": "Could not update the contact",
-            "addHandleFailed": "Could not add the handle",
-            "updateHandleFailed": "Could not update the handle",
-            "removeHandleFailed": "Could not remove the handle",
-            "removeContactFailed": "Could not remove the contact"
+            "reconnectFailed": "Could not reconnect the channel"
         }
     },
     "inboxChannels": {
         "title": "Channels",
-        "intro": "The messaging channels the Inbox and Watch alerts send over.",
+        "intro": "The messaging channels alerts, notices and sign-in codes go out over.",
         "connect": "Connect a channel",
         "empty": "Nothing connected yet. Connect a messaging channel to start chatting.",
         "status": "{status, select, connected {connected} connecting {connecting} qr {qr} error {error} disconnected {disconnected} ready {ready} other {{status}}}",
@@ -1795,9 +1720,9 @@
             "removeDescription": "This disconnects the channel and deletes its conversations and messages. It cannot be undone."
         },
         "connectPage": {
-            "intro": "Pick what to connect. Add as many as you like and handle them all from one inbox.",
+            "intro": "Pick what to connect. Add as many as you like.",
             "messaging": "Messaging",
-            "messagingHint": "Two-way chat in the Inbox, and where Watch sends its alerts.",
+            "messagingHint": "Where alerts, notices and sign-in codes are sent.",
             "setUp": "Set up",
             "bridgeStopped": "The messaging bridge is not running. <link>Open it</link> to start it.",
             "bridgeStoppedNoAccess": "The messaging bridge is not running. Your administrators can start it."
@@ -1843,35 +1768,6 @@
             "testAddress": "Enter the address to send the test to.",
             "tooManyTests": "{minutes, plural, one {Too many test messages. Try again in # minute.} other {Too many test messages. Try again in # minutes.}}"
         }
-    },
-    "inboxContacts": {
-        "title": "Contacts",
-        "intro": "One entry per person, unified across every platform they use. Pick them when starting a chat.",
-        "newContact": "New contact",
-        "fullName": "Full name",
-        "add": "Add",
-        "createFailed": "Could not create the contact",
-        "search": "Search people",
-        "noContacts": "No contacts yet.",
-        "noMatches": "No matches.",
-        "noHandles": "No handles",
-        "selectPrompt": "Select a contact, or add one.",
-        "handleCount": "{count, plural, one {# handle} other {# handles}}",
-        "delete": "Delete",
-        "note": "Note",
-        "optional": "Optional",
-        "saveDetails": "Save details",
-        "handles": "Handles",
-        "noHandlesYet": "No handles yet. Add one below to start chats.",
-        "peerPlaceholder": "Number or id",
-        "removeHandle": "Remove handle"
-    },
-    "inboxLogs": {
-        "title": "Logs",
-        "intro": "Recent messages across every channel - inbound, outbound, and delivery state. Updates live.",
-        "empty": "No messaging activity yet.",
-        "noText": "(no text)",
-        "ack": "{ack, select, pending {pending} sending {sending} sent {sent} delivered {delivered} read {read} failed {failed} other {{ack}}}"
     },
     "integrations": {
         "page": {
@@ -2376,7 +2272,7 @@
                 "links": {
                     "0": {
                         "label": "Create an application",
-                        "help": "New Application, then a name. Nothing else on the first screen matters here - Polaris does not use a bot, and a bot connected for the inbox is a different application from this one."
+                        "help": "New Application, then a name. Nothing else on the first screen matters here - Polaris does not use a bot, and a bot connected as a channel is a different application from this one."
                     },
                     "1": {
                         "label": "Register the redirect URI on it",
@@ -2648,10 +2544,6 @@
             "evidence": {
                 "title": "Evidence",
                 "description": "The controls in force, for an audit, as a dated report you can export."
-            },
-            "inbox": {
-                "title": "Inbox",
-                "description": "Conversations, the channels they arrive on, and who they are with."
             },
             "chat": {
                 "title": "Chat",
@@ -2977,7 +2869,7 @@
             "home": "Home",
             "tools": "Tools",
             "tasks": "Tasks",
-            "inbox": "Inbox",
+            "inbox": "Email & SMS",
             "family": "Family",
             "management": "Management",
             "crm": "CRM",
@@ -3063,8 +2955,8 @@
                 "manage": "Create and change tasks"
             },
             "inbox": {
-                "read": "Read conversations",
-                "manage": "Reply and manage channels"
+                "read": "See senders and channels",
+                "manage": "Manage channels"
             },
             "family": {
                 "manage": "Create and look after children's accounts"
@@ -3169,7 +3061,7 @@
             "title": "What counts as a second step",
             "hint": "People pick from whichever of these works on this deployment.",
             "fixed": "Always accepted. It needs nothing from this deployment, so it is what people can still use when everything else is unreachable.",
-            "noMail": "No email channel carries account mail yet, so nobody can pick this. Connect a sender under Inbox > Channels, then nominate it under Management > Email.",
+            "noMail": "No email channel carries account mail yet, so nobody can pick this. Connect a sender under Management > Email, then nominate it there.",
             "totp": {
                 "label": "Authenticator app",
                 "description": "A code the phone generates on its own, with no network involved."

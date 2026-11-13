@@ -251,8 +251,6 @@ const nextConfig = {
         { source: "/admin/images", destination: "/admin/security/scans", permanent: false },
         { source: "/settings", destination: "/admin/settings", permanent: false },
         { source: "/settings/:path*", destination: "/admin/settings/:path*", permanent: false },
-        { source: "/inbox", destination: "/admin/inbox", permanent: false },
-        { source: "/inbox/:path*", destination: "/admin/inbox/:path*", permanent: false },
         { source: "/favorites", destination: "/drive/favorites", permanent: false },
         // Security scans and Cloud servers were marketplace apps at the top
         // level; they are sections of Servers now, on every Polaris.

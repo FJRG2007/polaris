@@ -173,8 +173,7 @@
         },
         "admin": {
             "description": "Usuarios, acceso, dominios y versiones",
-            "guestDescription": "Conversaciones con clientes de todos los canales",
-            "otherwiseDescription": "Los remitentes por los que sale tu correo y SMS"
+            "guestDescription": "Los remitentes por los que sale tu correo y SMS"
         },
         "account": {
             "description": "Perfil, seguridad y claves de API"
@@ -253,7 +252,6 @@
         "Connected accounts": "Cuentas conectadas",
         "Console": "Consola",
         "Consumption": "Consumo",
-        "Contacts": "Contactos",
         "Containers": "Contenedores",
         "Conversations": "Conversaciones",
         "Databases": "Bases de datos",
@@ -301,7 +299,6 @@
         "Labels": "Etiquetas",
         "Linked chat": "Chat vinculado",
         "Limits": "Límites",
-        "Logs": "Registros",
         "Machines": "Máquinas",
         "Mail": "Correo",
         "Mail server": "Servidor de correo",

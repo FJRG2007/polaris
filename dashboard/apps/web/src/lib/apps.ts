@@ -171,16 +171,14 @@ export interface AppEntry {
      * A subject an admin-only app carries that is not administration, for the
      * people whose work it is.
      *
-     * Management owns Inbox: the channels conversations arrive on are instance
-     * configuration, but the conversations themselves are a member's daily work,
-     * and `member` and `viewer` both hold `inbox.read`. Without this they would
-     * lose the door to it the moment Inbox stopped being an app of its own. So an
-     * account holding the permission sees the app under this name and lands here;
-     * every administration screen behind it stays shut by its own guard.
+     * Management owns Email & SMS: a member's own senders and channels are
+     * their work, not administration, and `member` and `viewer` both hold
+     * `inbox.read`. So an account holding the permission sees the app under this
+     * name and lands here; every administration screen behind it stays shut by
+     * its own guard.
      *
-     * Inbox only exists once the messaging bridge is installed, so the door names
-     * that app in `requiresApp` and the subject to open instead without it in
-     * `otherwise` - for Management, the member's own email and SMS senders.
+     * A subject that only exists once a marketplace app is installed names it in
+     * `requiresApp`, and the subject to open instead without it in `otherwise`.
      */
     guest?: {
         permission: Permission;
@@ -606,15 +604,9 @@ export const POLARIS_APPS: AppEntry[] = [
         adminOnly: true,
         guest: {
             permission: "inbox.read",
-            href: "/admin/inbox",
-            label: "Inbox", // i18n-ignore
-            description: "Customer conversations across every channel", // i18n-ignore
-            requiresApp: "messaging-bridge",
-            otherwise: {
-                href: "/admin/email",
-                label: "Email & SMS", // i18n-ignore
-                description: "The senders your mail and texts go out through" // i18n-ignore
-            }
+            href: "/admin/email",
+            label: "Email & SMS", // i18n-ignore
+            description: "The senders your mail and texts go out through" // i18n-ignore
         }
     },
     {
@@ -949,8 +941,8 @@ const ADMIN_AREAS: AppSubapp[] = [
         parentAppId: "admin",
         sections: [
             {
-                // Senders belong to whoever added them, so anybody who can open the
-                // Inbox can add their own; only the account-mail choice is an admin's.
+                // Senders belong to whoever added them, so anybody holding
+                // `inbox.read` can add their own; only the account-mail choice is an admin's.
                 label: "Email & SMS", // i18n-ignore
                 href: "/admin/email",
                 needs: "inbox.read",
@@ -968,6 +960,17 @@ const ADMIN_AREAS: AppSubapp[] = [
                     "outgoing",
                     "account mail"
                 ]
+            },
+            {
+                // The channels alerts, notices and sign-in codes go out through.
+                // Only here once the messaging bridge is installed: without it
+                // nothing on this screen can connect.
+                label: "Channels", // i18n-ignore
+                href: "/admin/email/channels",
+                needs: "inbox.read",
+                requiresApp: "messaging-bridge",
+                icon: Radio,
+                keywords: ["whatsapp", "telegram", "slack", "discord", "bot", "messaging"]
             },
             {
                 label: "Safety", // i18n-ignore
@@ -2703,31 +2706,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "certification"
             ]
         },
-        ...ADMIN_AREAS.flatMap((area) =>
-            area.id === "admin-communication"
-                ? [
-                      areaEntry(area),
-                      {
-                          // The messaging bridge's two-way chat. Only here once the bridge is
-                          // installed: without it nothing on these screens can connect or send.
-                          label: "Inbox", // i18n-ignore
-                          href: "/admin/inbox",
-                          requiresApp: "messaging-bridge",
-                          group: ADMIN_AREAS_GROUP,
-                          icon: MessagesSquare,
-                          keywords: [
-                              "conversations",
-                              "chats",
-                              "messages",
-                              "whatsapp",
-                              "telegram",
-                              "slack",
-                              "contacts"
-                          ]
-                      }
-                  ]
-                : [areaEntry(area)]
-        )
+        ...ADMIN_AREAS.map(areaEntry)
     ],
     "dns-blocker": [
         {
@@ -3015,44 +2994,15 @@ export interface AppSubapp {
     match?: string[];
     parent: { label: string; href: string };
     /** The app "back" returns to, when not everybody who reaches this subject can
-     *  open it. Inbox is Management's, and a member holds `inbox.read` without
-     *  holding anything else in Management - so for them the way back is a door
-     *  that refuses them, and the rail leaves it out rather than drawing it. */
+     *  open it. Email & SMS is Management's, and a member holds `inbox.read`
+     *  without holding anything else in Management - so for them the way back is
+     *  a door that refuses them, and the rail leaves it out rather than drawing it. */
     parentAppId?: string;
     sections: AppSection[];
 }
 
 export const APP_SUBAPPS: AppSubapp[] = [
     ...ADMIN_AREAS,
-    {
-        id: "inbox",
-        label: "Inbox", // i18n-ignore
-        icon: MessagesSquare,
-        base: "/admin/inbox",
-        parent: { label: "Management", href: "/admin" }, // i18n-ignore
-        parentAppId: "admin",
-        sections: [
-            {
-                label: "Conversations", // i18n-ignore
-                href: "/admin/inbox",
-                icon: MessagesSquare,
-                keywords: ["chats", "messages"]
-            },
-            {
-                label: "Contacts", // i18n-ignore
-                href: "/admin/inbox/contacts",
-                icon: Contact,
-                keywords: ["people"]
-            },
-            {
-                label: "Channels", // i18n-ignore
-                href: "/admin/inbox/channels",
-                icon: Radio,
-                keywords: ["whatsapp", "telegram", "slack", "discord"]
-            },
-            { label: "Logs", href: "/admin/inbox/logs", icon: ScrollText } // i18n-ignore
-        ]
-    },
     {
         id: "runners",
         label: "Runners", // i18n-ignore

@@ -6,10 +6,9 @@ bearer-authenticated HTTP API. Polaris deploys it as a managed
 container so the heavier WhatsApp Web backend (Puppeteer/Chromium) stays isolated
 from the web process.
 
-The web is the source of truth: it stores channels, conversations and messages in
-Postgres. The bridge holds only the live adapter connections. Inbound messages are
-POSTed to the web's ingest route; outbound sends come in over the API. WhatsApp
-Cloud inbound arrives on the web's Meta webhook, not here.
+The web is the source of truth: it stores channels in Postgres. The bridge holds
+only the live adapter connections. Outbound sends come in over the API; inbound
+messages are not forwarded anywhere.
 
 ## Environment
 
@@ -17,12 +16,6 @@ Cloud inbound arrives on the web's Meta webhook, not here.
 - `BRIDGE_TOKEN` - bearer token the web presents on every API call. Required: the
   process exits at startup if it is unset, since an empty token would leave the
   API unauthenticated. Polaris installs always set a random one.
-- `WEB_INGEST_URL` - the web's inbound ingest endpoint. Polaris sets this per
-  install: a local install uses the web's internal service DNS
-  (`http://web:3000/api/inbox/ingest`) over the shared `polaris-hub` network,
-  since the public URL does not resolve from inside a container; a remote install
-  keeps the public app URL.
-- `WEB_INGEST_KEY` - shared key sent as `x-internal-key` when forwarding inbound.
 - `WA_SESSION_DIR` - where whatsapp-web sessions persist (default `/app/.sessions`,
   a mounted volume so a linked number survives restarts).
 - `PUPPETEER_EXECUTABLE_PATH` - system Chromium for whatsapp-web (set in the image).

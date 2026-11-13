@@ -93,9 +93,8 @@ export interface AppDeployPlan {
      *  every service joined before an environment could keep its own. */
     readonly networks?: readonly string[];
     /** External networks this service joins beyond the proxy network. The messaging
-     *  hub uses it to join the control-plane's default network so it can reach the
-     *  web's inbound ingest directly; empty for a normal app. Each must already
-     *  exist on the target (compose declares them external). */
+     *  hub uses it to join the dedicated web<->hub network; empty for a normal app.
+     *  Each must already exist on the target (compose declares them external). */
     readonly extraNetworks?: readonly string[];
     /** Names the service answers to on one network only, keyed by network: on a
      *  network of the operator's own it was asked to join, the names their other

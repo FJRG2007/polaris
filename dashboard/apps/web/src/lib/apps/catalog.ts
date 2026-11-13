@@ -269,9 +269,9 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         name: "Messaging bridge",
         category: "Messaging",
         icon: MessagesSquare,
-        summary: "Unified inbox for WhatsApp, Telegram, Discord and Slack.",
+        summary: "Send alerts and codes over WhatsApp, Telegram, Discord and Slack.",
         description:
-            "Runs the Polaris messaging bridge so you can read and reply to WhatsApp, Telegram, Discord and Slack conversations from one inbox, and lets AI assistants answer through the same channels. Self-hosted: the only external dependency is each platform and a phone number for WhatsApp.", // i18n-ignore
+            "Runs the Polaris messaging bridge so alerts, notices and sign-in codes can go out over WhatsApp, Telegram, Discord and Slack. Self-hosted: the only external dependency is each platform and a phone number for WhatsApp.", // i18n-ignore
         installMethod: "compose-template",
         capabilities: ["messaging-hub"],
         dashboard: "builtin",

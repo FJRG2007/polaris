@@ -8,7 +8,6 @@
 import { readPoll } from "@/lib/poll-fetch";
 import type * as settingsActionsModule from "@/app/(app)/admin/updates/actions";
 import type * as retentionActionsModule from "@/app/(app)/admin/retention/actions";
-import type * as inboxActionsModule from "@/app/(app)/admin/inbox/actions";
 import type * as domainsActionsModule from "@/app/(app)/admin/domains/actions";
 import type * as chatActionsModule from "@/app/(app)/admin/apps/[appId]/settings/_chat/actions";
 import type * as dnsActionsModule from "@/app/(app)/account/domains/dns-actions";
@@ -28,34 +27,6 @@ export const dnsZones = (signal?: AbortSignal) =>
 export const networkStatus = (signal?: AbortSignal) =>
     readPoll<Answer<typeof domainsActionsModule.networkStatusAction>>(
         "/api/admin/network-status",
-        {},
-        signal
-    );
-
-export const firstDiscordChannel = (signal?: AbortSignal) =>
-    readPoll<Answer<typeof inboxActionsModule.firstDiscordChannelAction>>(
-        "/api/admin/inbox/discord-channel",
-        {},
-        signal
-    );
-
-export const channelTargets = (channelId: string, signal?: AbortSignal) =>
-    readPoll<Answer<typeof inboxActionsModule.listChannelTargetsAction>>(
-        "/api/admin/inbox/channel-targets",
-        { channelId },
-        signal
-    );
-
-export const inboxAgents = (signal?: AbortSignal) =>
-    readPoll<Answer<typeof inboxActionsModule.listAgentsAction>>(
-        "/api/admin/inbox/agents",
-        {},
-        signal
-    );
-
-export const inboxContacts = (signal?: AbortSignal) =>
-    readPoll<Answer<typeof inboxActionsModule.listContactsAction>>(
-        "/api/admin/inbox/contacts",
         {},
         signal
     );

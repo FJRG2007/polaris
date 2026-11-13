@@ -2,10 +2,10 @@
 
 /**
  * Adapted dashboard for an installed Messaging bridge. The bridge itself needs no
- * per-app config; credentials are set per channel when connecting it in the Inbox
- * (a Telegram/Discord/Slack bot token, a WhatsApp Cloud token + phone-number id,
- * or a WhatsApp QR scan). This panel surfaces the connected channels and their
- * live status, and sends the operator to the Inbox to add or manage them.
+ * per-app config; credentials are set per channel when connecting it under
+ * Email & SMS > Channels (a Telegram/Discord/Slack bot token, a WhatsApp Cloud
+ * token + phone-number id, or a WhatsApp QR scan). This panel surfaces the
+ * connected channels and their live status, and links to that screen.
  */
 
 import { useCallback } from "react";
@@ -23,7 +23,7 @@ import {
     type LucideIcon
 } from "lucide-react";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
-import { inboxStateAction } from "@/app/(app)/admin/inbox/actions";
+import { channelsStateAction } from "@/app/(app)/admin/email/channels/actions";
 import type { ChannelView } from "@/lib/messaging-service";
 
 /** A neutral glyph + label per platform (no third-party brand logos). The
@@ -56,7 +56,7 @@ export function MessagingBridgePanel() {
     // only what moved. Names and statuses only - no channel's token is in it.
     const load = useCallback(
         () =>
-            inboxStateAction()
+            channelsStateAction()
                 .then((state) => state.channels)
                 .catch((): ChannelView[] => []),
         []
@@ -77,7 +77,7 @@ export function MessagingBridgePanel() {
                         </p>
                     </div>
                     <Button asChild size="sm">
-                        <Link href="/admin/inbox">
+                        <Link href="/admin/email/channels/connect">
                             <Plus className="size-4" /> {t("channels.connect")}
                         </Link>
                     </Button>
@@ -94,7 +94,7 @@ export function MessagingBridgePanel() {
                             {t("channels.empty")}
                         </p>
                         <Button asChild size="sm" variant="secondary">
-                            <Link href="/admin/inbox">{t("channels.goToInbox")}</Link>
+                            <Link href="/admin/email/channels">{t("channels.goToInbox")}</Link>
                         </Button>
                     </div>
                 ) : (
@@ -128,7 +128,7 @@ export function MessagingBridgePanel() {
                 )}
 
                 {channels && channels.length > 0 && (
-                    <Link href="/admin/inbox" className="text-sm text-primary hover:underline">
+                    <Link href="/admin/email/channels" className="text-sm text-primary hover:underline">
                         {t("channels.openInbox")}
                     </Link>
                 )}

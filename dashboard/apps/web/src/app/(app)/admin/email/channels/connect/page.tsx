@@ -12,7 +12,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
-import { ConnectChannelLoader, cardsSkeleton } from "@/app/(app)/admin/inbox/loaders";
+import { ConnectChannelLoader, cardsSkeleton } from "@/app/(app)/admin/email/channels/loaders";
 import { ViewHeadingSkeleton } from "@/app/(app)/admin/region-skeletons";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +36,7 @@ export default async function ConnectChannelPage() {
                     className="mx-auto flex w-full max-w-4xl flex-col gap-6"
                     lead={
                         <Link
-                            href="/admin/inbox/channels"
+                            href="/admin/email/channels"
                             className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                         >
                             <ArrowLeft className="size-3" /> {t("inboxChannels.title")}

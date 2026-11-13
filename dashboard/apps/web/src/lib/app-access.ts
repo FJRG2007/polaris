@@ -14,7 +14,7 @@
  */
 
 import type { GrantSubject, Permission } from "@polaris/core";
-import { APP_SECTIONS, POLARIS_APPS, type AppEntry } from "@/lib/apps";
+import { APP_SECTIONS, APP_SUBAPPS, POLARIS_APPS, type AppEntry } from "@/lib/apps";
 
 /** Where somebody with no app at all belongs. */
 export const ACCOUNT_HOME = "/account";
@@ -192,9 +192,10 @@ export async function heldSectionPermissions({
 export async function installedSectionApps({ isInstalled }: AppAccessInput): Promise<string[]> {
     const named = [
         ...new Set(
-            Object.values(APP_SECTIONS)
-                .flat()
-                .flatMap((section) => (section.requiresApp ? [section.requiresApp] : []))
+            [
+                ...Object.values(APP_SECTIONS).flat(),
+                ...APP_SUBAPPS.flatMap((subapp) => subapp.sections)
+            ].flatMap((section) => (section.requiresApp ? [section.requiresApp] : []))
         )
     ];
     if (!isInstalled) return named;

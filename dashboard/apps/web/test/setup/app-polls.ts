@@ -314,15 +314,13 @@ vi.mock("@/app/(app)/home/home-polls", () => ({
     )
 }));
 
-vi.mock("@/app/(app)/admin/inbox/inbox-polls", () => {
-    const actions = () => import("@/app/(app)/admin/inbox/actions");
-    return {
-        conversations: forward(actions, "listConversationsAction", 0),
-        messages: forward(actions, "getMessagesAction", 1),
-        activity: forward(actions, "listActivityAction", 0),
-        channelState: forward(actions, "channelStateAction", 1)
-    };
-});
+vi.mock("@/app/(app)/admin/email/channels/channel-polls", () => ({
+    channelState: forward(
+        () => import("@/app/(app)/admin/email/channels/actions"),
+        "channelStateAction",
+        1
+    )
+}));
 
 vi.mock("@/app/(app)/mail-server/mail-server-polls", () => ({
     serverDetail: forward(() => import("@/app/(app)/mail-server/actions"), "serverDetailAction", 1),
@@ -496,22 +494,6 @@ vi.mock("@/app/(app)/admin/admin-polls", () => ({
     networkStatus: forward(
         () => import("@/app/(app)/admin/domains/actions"),
         "networkStatusAction",
-        0
-    ),
-    firstDiscordChannel: forward(
-        () => import("@/app/(app)/admin/inbox/actions"),
-        "firstDiscordChannelAction",
-        0
-    ),
-    channelTargets: forward(
-        () => import("@/app/(app)/admin/inbox/actions"),
-        "listChannelTargetsAction",
-        1
-    ),
-    inboxAgents: forward(() => import("@/app/(app)/admin/inbox/actions"), "listAgentsAction", 0),
-    inboxContacts: forward(
-        () => import("@/app/(app)/admin/inbox/actions"),
-        "listContactsAction",
         0
     ),
     mailBodyHeld: forward(

@@ -1485,7 +1485,7 @@
         "errors": {
             "unknownChannel": "Canal desconocido."
         },
-        "readOnly": "Solo quien gestiona la bandeja puede añadir o cambiar remitentes.",
+        "readOnly": "Solo quien gestiona canales puede añadir o cambiar remitentes.",
         "senders": {
             "title": "Remitentes",
             "hint": "Las cuentas por las que Polaris envía su correo. Manda una prueba tras añadir una.",
@@ -1580,52 +1580,6 @@
         }
     },
     "inbox": {
-        "view": {
-            "title": "Bandeja",
-            "newChat": "Nuevo chat",
-            "connectChannel": "Conectar canal",
-            "empty": "Aún no hay conversaciones. Empieza una o espera a que llegue un mensaje.",
-            "selectConversation": "Selecciona una conversación"
-        },
-        "thread": {
-            "back": "Volver a las conversaciones",
-            "unassigned": "Sin asignar",
-            "assign": "Asignar agente",
-            "reopen": "Reabrir",
-            "close": "Cerrar",
-            "delete": "Eliminar conversación",
-            "deleteDescription": "Se eliminan de Polaris la conversación y sus mensajes. El chat en {platform} no se ve afectado.",
-            "deleteConfirm": "Eliminar",
-            "chooseOption": "Elige una opción",
-            "optionsPlaceholder": "Una opción por línea",
-            "promptPlaceholder": "Texto que aparece sobre las opciones",
-            "messagePlaceholder": "Escribe un mensaje",
-            "optionsTitle": "Enviar opciones para elegir",
-            "options": "Opciones",
-            "chose": "eligió: {selection}",
-            "sending": "enviando...",
-            "failed": "no se pudo enviar"
-        },
-        "newChat": {
-            "description": "Escribe a alguien en un canal conectado para empezar una conversación.",
-            "contact": "Contacto",
-            "contactPlaceholder": "Elige un contacto guardado (opcional)",
-            "handle": "Alias",
-            "channel": "Canal",
-            "to": "Para",
-            "enterManually": "Introducir a mano",
-            "recipientPlaceholder": "Id destinatario",
-            "noChannel": "No hay ningún canal de {platform} conectado. Conecta uno para escribir a este identificador.",
-            "mismatch": "Este identificador es de {platform}. Elige un canal de {platform} para enviarlo.",
-            "telegramNote": "Los bots de Telegram no pueden iniciar un chat. Pide a la persona que abra tu bot y envíe <code>/start</code>: la conversación aparece en tu bandeja y respondes desde ahí.",
-            "telegramInvalid": "Introduce un id de chat numérico, no un @usuario.",
-            "name": "Nombre (opcional)",
-            "namePlaceholder": "Nombre visible",
-            "message": "Mensaje",
-            "messagePlaceholder": "Primer mensaje",
-            "saveContact": "Guardar contacto",
-            "send": "Enviar"
-        },
         "connect": {
             "connected": "{name} está conectado",
             "connectedDescription": "El token funciona. Termina la configuración para que el bot pueda llegar a la gente.",
@@ -1636,7 +1590,7 @@
             "qrFailed": "La conexión ha fallado. Inténtalo de nuevo.",
             "qrWaiting": "Esperando el escaneo...",
             "addTitle": "Añadir un canal",
-            "addDescription": "Elige una plataforma y cómo conectarla. Añade todas las que quieras y gestiónalas desde una sola bandeja.",
+            "addDescription": "Elige una plataforma y cómo conectarla.",
             "connectTitle": "Conectar {name}",
             "variantDescription": "Elige cómo conectar {name}.",
             "back": "Atrás",
@@ -1705,29 +1659,13 @@
         "platforms": {
             "email": "Correo"
         },
-        "peerHints": {
-            "whatsapp": "Número de teléfono con prefijo del país, p. ej. 34600111222",
-            "telegram": "Id de chat numérico, no un @usuario. La persona tiene que haber escrito antes al bot (los bots de Telegram no pueden iniciar un chat).",
-            "discord": "Un id de canal del servidor en el que el bot pueda publicar, o un id de usuario para un MD (antepón user: a un MD)",
-            "slack": "Id de canal o usuario"
-        },
-        "discordPeer": {
-            "serverChannel": "Canal del servidor",
-            "directMessage": "Mensaje directo",
-            "userPlaceholder": "Id o usuario al que escribir",
-            "pickChannel": "Elige un canal",
-            "channelPlaceholder": "Id de canal donde publica el bot",
-            "userHint": "MD por User ID numérico (lo más fiable: activa el modo desarrollador, clic derecho en un usuario > Copiar ID de usuario), o un nombre de usuario si el bot comparte servidor y el intent Server Members está activado.",
-            "pickHint": "Elige un servidor y un canal en el que el bot pueda publicar.",
-            "channelHint": "Un id de canal de texto en el que el bot pueda publicar (clic derecho en el canal > Copiar ID del canal)."
-        },
         "discordSetup": {
             "checking": "Comprobando a qué puede llegar el bot...",
             "notRunning": "El puente no está ejecutando este bot ahora mismo, así que no hay nada que comprobar.",
             "noServer": "El bot aún no está en un servidor",
             "inServers": "{count, plural, one {En # servidor} other {En # servidores}}",
             "noServerHint": "Solo podrá enviar cuando alguien lo añada a uno.",
-            "serversHint": "Puedes elegir los canales del servidor al escribir un mensaje.",
+            "serversHint": "Puede enviar a cualquier canal de esos servidores.",
             "checkAgain": "Comprobar",
             "addBot": "Añadir el bot a un servidor",
             "addBotHint": "Discord te pregunta en cuál de tus servidores y luego pide confirmar: {permissions}.",
@@ -1750,25 +1688,12 @@
             "removeChannelFailed": "No se pudo quitar el canal",
             "nothingToUpdate": "Nada que cambiar",
             "updateChannelFailed": "No se pudo actualizar el canal",
-            "reconnectFailed": "No se pudo volver a conectar el canal",
-            "invalidRequest": "Solicitud no válida",
-            "deleteConversationFailed": "No se pudo eliminar la conversación",
-            "updateConversationFailed": "No se pudo actualizar la conversación",
-            "nothingToSend": "Nada que enviar",
-            "typeMessage": "Escribe antes un mensaje",
-            "sendFailed": "No se pudo enviar el mensaje",
-            "startFailed": "No se pudo iniciar el chat",
-            "saveContactFailed": "No se pudo guardar el contacto",
-            "updateContactFailed": "No se pudo actualizar el contacto",
-            "addHandleFailed": "No se añadió el alias",
-            "updateHandleFailed": "No se cambió el alias",
-            "removeHandleFailed": "No se pudo quitar el identificador",
-            "removeContactFailed": "No se pudo quitar el contacto"
+            "reconnectFailed": "No se pudo volver a conectar el canal"
         }
     },
     "inboxChannels": {
         "title": "Canales",
-        "intro": "Los canales de mensajería por los que envían la Bandeja y las alertas de Watch.",
+        "intro": "Los canales por los que salen alertas, avisos y códigos de acceso.",
         "connect": "Conectar un canal",
         "empty": "Aún no hay nada conectado. Conecta un canal de mensajería para empezar a chatear.",
         "status": "{status, select, connected {conectado} connecting {conectando} qr {QR} error {error} disconnected {desconectado} ready {listo} other {{status}}}",
@@ -1795,9 +1720,9 @@
             "removeDescription": "Se desconecta el canal y se eliminan sus conversaciones y mensajes. No se puede deshacer."
         },
         "connectPage": {
-            "intro": "Elige qué conectar. Añade todos los que quieras y gestiónalos desde una sola bandeja.",
+            "intro": "Elige qué conectar. Añade todos los que quieras.",
             "messaging": "Mensajería",
-            "messagingHint": "Chat en ambos sentidos en la Bandeja de entrada, y donde Watch envía sus alertas.",
+            "messagingHint": "Donde se envían alertas, avisos y códigos de acceso.",
             "setUp": "Preparar",
             "bridgeStopped": "El puente de mensajería no está activo. <link>Ábrelo</link> para iniciarlo.",
             "bridgeStoppedNoAccess": "El puente de mensajería no está activo. Tus administradores pueden iniciarlo."
@@ -1843,35 +1768,6 @@
             "testAddress": "Introduce la dirección a la que enviar la prueba.",
             "tooManyTests": "{minutes, plural, one {Demasiados mensajes de prueba. Vuelve a intentarlo en # minuto.} other {Demasiados mensajes de prueba. Vuelve a intentarlo en # minutos.}}"
         }
-    },
-    "inboxContacts": {
-        "title": "Contactos",
-        "intro": "Una ficha por persona, con todas las plataformas que usa. Elígela al empezar un chat.",
-        "newContact": "Nuevo contacto",
-        "fullName": "Nombre",
-        "add": "Añadir",
-        "createFailed": "No se pudo crear el contacto",
-        "search": "Buscar personas",
-        "noContacts": "Aún no hay contactos.",
-        "noMatches": "Sin resultados.",
-        "noHandles": "Sin alias",
-        "selectPrompt": "Selecciona un contacto o añade uno.",
-        "handleCount": "{count, plural, one {# identificador} other {# identificadores}}",
-        "delete": "Eliminar",
-        "note": "Nota",
-        "optional": "Opcional",
-        "saveDetails": "Guardar datos",
-        "handles": "Alias",
-        "noHandlesYet": "Aún no hay identificadores. Añade uno abajo para empezar chats.",
-        "peerPlaceholder": "Número o id",
-        "removeHandle": "Quitar alias"
-    },
-    "inboxLogs": {
-        "title": "Logs",
-        "intro": "Mensajes recientes de todos los canales: entrantes, salientes y estado de entrega. Se actualiza en directo.",
-        "empty": "Aún no hay actividad de mensajería.",
-        "noText": "(sin texto)",
-        "ack": "{ack, select, pending {pendiente} sending {enviando} sent {enviado} delivered {entregado} read {leído} failed {fallido} other {{ack}}}"
     },
     "integrations": {
         "page": {
@@ -2376,7 +2272,7 @@
                 "links": {
                     "0": {
                         "label": "Crear una aplicación",
-                        "help": "New Application, y luego un nombre. Nada más de la primera pantalla importa aquí: Polaris no usa un bot, y un bot conectado para la bandeja de entrada es una aplicación distinta de esta."
+                        "help": "New Application, y luego un nombre. Nada más de la primera pantalla importa aquí: Polaris no usa un bot, y un bot conectado como canal es una aplicación distinta de esta."
                     },
                     "1": {
                         "label": "Registrar en ella el URI de redirección",
@@ -2648,10 +2544,6 @@
             "evidence": {
                 "title": "Pruebas",
                 "description": "Los controles vigentes, para una auditoría, en un informe fechado que puedes exportar."
-            },
-            "inbox": {
-                "title": "Bandeja",
-                "description": "Conversaciones, los canales por los que llegan y con quién son."
             },
             "chat": {
                 "title": "Chat",
@@ -2977,7 +2869,7 @@
             "home": "Casa",
             "tools": "Útiles",
             "tasks": "Tareas",
-            "inbox": "Bandeja",
+            "inbox": "Correo y SMS",
             "family": "Familia",
             "management": "Gestión",
             "crm": "CRM",
@@ -3063,8 +2955,8 @@
                 "manage": "Crear y cambiar tareas"
             },
             "inbox": {
-                "read": "Leer conversaciones",
-                "manage": "Responder y gestionar canales"
+                "read": "Ver remitentes y canales",
+                "manage": "Gestionar canales"
             },
             "family": {
                 "manage": "Crear y cuidar cuentas de menores"
@@ -3169,7 +3061,7 @@
             "title": "Qué cuenta como segundo paso",
             "hint": "Cada persona elige entre los que funcionan en este despliegue.",
             "fixed": "Siempre aceptada. No necesita nada de este despliegue, así que es lo que se puede seguir usando cuando todo lo demás falla.",
-            "noMail": "Todavía ningún canal de correo envía el correo de cuenta, así que nadie puede elegir esta opción. Conecta un remitente en Bandeja > Canales y luego elígelo en Administración > Correo.",
+            "noMail": "Todavía ningún canal de correo envía el correo de cuenta, así que nadie puede elegir esta opción. Conecta un remitente en Administración > Correo y luego elígelo allí.",
             "totp": {
                 "label": "App de autenticación",
                 "description": "Un código que el móvil genera por sí solo, sin conexión."

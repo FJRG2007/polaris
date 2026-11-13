@@ -2,7 +2,6 @@ import Link from "next/link";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
-import { InboxCardWhenInstalled } from "./overview-inbox";
 import {
     Activity,
     Award,
@@ -17,7 +16,6 @@ import {
     IdCard,
     Mail,
     MessageSquare,
-    MessagesSquare,
     Scale,
     ScanSearch,
     Settings,
@@ -36,8 +34,7 @@ import {
  * The Management app's home: one card per administration area. The areas
  * themselves are the existing admin pages; this page (and the app's sidebar)
  * gather them into a single place instead of the account menu. Each card's
- * words are `overview.sections.<key>` in the `admin` catalog. The Inbox card,
- * like its rail entry, waits for the messaging bridge to be installed.
+ * words are `overview.sections.<key>` in the `admin` catalog.
  */
 const SECTIONS = [
     { key: "users", href: "/admin/users", icon: Users },
@@ -49,7 +46,6 @@ const SECTIONS = [
     { key: "sso", href: "/admin/sso", icon: KeyRound },
     { key: "activity", href: "/admin/activity", icon: Activity },
     { key: "evidence", href: "/admin/evidence", icon: ClipboardCheck },
-    { key: "inbox", href: "/admin/inbox", icon: MessagesSquare },
     { key: "chat", href: "/admin/apps/chat/settings", icon: MessageSquare },
     { key: "email", href: "/admin/email", icon: Mail },
     { key: "domains", href: "/admin/domains", icon: Globe },
@@ -97,13 +93,7 @@ export default async function ManagementPage() {
                             </span>
                         </Link>
                     );
-                    // The inbox exists only once the messaging bridge is installed;
-                    // whether it is, is read after the paint.
-                    return section.key === "inbox" ? (
-                        <InboxCardWhenInstalled key={section.href}>{card}</InboxCardWhenInstalled>
-                    ) : (
-                        card
-                    );
+                    return card;
                 })}
             </div>
         </>

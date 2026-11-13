@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Channels page: the messaging channels the Inbox and Watch alerts send over,
+ * Channels page: the messaging channels alerts and sign-in codes send over,
  * each as a card opening a Manage dialog to
  * rename it, replace its credentials or config, reconnect (or re-link WhatsApp
  * Web by scanning a fresh QR in place), or remove it. Connecting is a page of its
@@ -12,13 +12,13 @@
 import Link from "next/link";
 import { ChannelCard } from "../../channel-card";
 import type { ChannelView } from "@/lib/messaging-service";
-import { DiscordSetupPanel } from "../discord-setup-panel";
+import { DiscordSetupPanel } from "./discord-setup-panel";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, useTransition } from "react";
-import * as polls from "../inbox-polls";
-import { CHANNEL_STATUS_TONE, PLATFORM_LOGO, platformLabel } from "../platform-meta";
-import { deleteChannelAction, reconnectChannelAction, updateChannelAction } from "../actions";
+import * as polls from "./channel-polls";
+import { CHANNEL_STATUS_TONE, PLATFORM_LOGO, platformLabel } from "./platform-meta";
+import { deleteChannelAction, reconnectChannelAction, updateChannelAction } from "./actions";
 import { Loader2, MessagesSquare, Plus, QrCode, RefreshCw } from "lucide-react";
 import {
     Button,
@@ -104,7 +104,7 @@ export function ChannelsView({ initialChannels }: { initialChannels: ChannelView
                     <p className="text-sm text-muted-foreground">{t("inboxChannels.intro")}</p>
                 </div>
                 <Button asChild>
-                    <Link href="/admin/inbox/channels/connect">
+                    <Link href="/admin/email/channels/connect">
                         <Plus className="size-4" /> {t("inboxChannels.connect")}
                     </Link>
                 </Button>

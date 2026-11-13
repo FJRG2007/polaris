@@ -378,7 +378,7 @@ export function NoticeDeliveryFields({
                             channels && messagingChannels.length === 0 ? (
                                 <>
                                     {t("delivery.messagingNone")}{" "}
-                                    <Link className="underline" href="/admin/inbox/channels">
+                                    <Link className="underline" href="/admin/email/channels">
                                         {t("delivery.messagingAdd")}
                                     </Link>
                                 </>

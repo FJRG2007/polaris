@@ -158,14 +158,10 @@ import {
 } from "@polaris/deploy";
 
 /** A locally-installed messaging hub (this catalog app) joins a dedicated web<->hub
- *  network and POSTs inbound events to the web by service DNS - the public app URL
- *  does not resolve from inside a deployed container. Both are computed at deploy
- *  time from the install and the current target, never persisted, so an existing hub
- *  adopts them on its next redeploy and a retarget to a remote server drops them
- *  automatically; a remote hub keeps the public URL and no extra network. */
+ *  network. Computed at deploy time from the install and the current target, never
+ *  persisted, so a retarget to a remote server drops it automatically. */
 const HUB_CATALOG_ID = "messaging-bridge";
 const HUB_NETWORK = "polaris-hub";
-const WEB_INTERNAL_INGEST_URL = "http://web:3000/api/inbox/ingest";
 
 /** Re-exported: a deploy is a row plus this file, and callers of this module ask
  *  it where the file is rather than knowing about the directory themselves. */
@@ -3122,9 +3118,8 @@ async function buildAppPlan(
     // And may decide variables it always runs with, over whatever was stored, so
     // an install made before one existed gets it on its next deploy.
     Object.assign(env, releaseEnvFor(imageRef));
-    // A locally-targeted messaging hub reaches the web's ingest over the dedicated
-    // hub network by service DNS; detected from the install + target here (not
-    // persisted), so a remote hub keeps the public URL from its stored env.
+    // A locally-targeted messaging hub joins the dedicated hub network; detected
+    // from the install + target here, not persisted.
     const isLocalHub =
         app.target.kind === "local" &&
         Boolean(
@@ -3133,7 +3128,6 @@ async function buildAppPlan(
                 select: { id: true }
             })
         );
-    if (isLocalHub) env.WEB_INGEST_URL = WEB_INTERNAL_INGEST_URL;
     const healthcheck = app.healthcheck
         ? (JSON.parse(app.healthcheck) as AppDeployPlan["healthcheck"])
         : undefined;
@@ -3332,7 +3326,7 @@ async function buildAppPlan(
         replicas: app.replicas,
         limits: limitsOf(app),
         // Extra external networks the service joins: a locally-installed messaging
-        // hub joins the dedicated web<->hub network to reach the web's ingest by DNS,
+        // hub joins the dedicated web<->hub network,
         // and any service the networks of the operator's own it was asked to join,
         // under the names their services call it by (its own name when none given).
         ...(() => {

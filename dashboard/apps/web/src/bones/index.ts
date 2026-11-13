@@ -8,7 +8,6 @@
 
 import routeAdmin from "./route-admin.bones.json";
 import routeDrive from "./route-drive.bones.json";
-import routeInbox from "./route-inbox.bones.json";
 import routeTasks from "./route-tasks.bones.json";
 import routeTrash from "./route-trash.bones.json";
 import routeWatch from "./route-watch.bones.json";
@@ -18,7 +17,6 @@ import routeSettings from "./route-settings.bones.json";
 import routeFavorites from "./route-favorites.bones.json";
 import routeTelemetry from "./route-telemetry.bones.json";
 import routeAnalytics from "./route-analytics.bones.json";
-import routeInboxLogs from "./route-inbox-logs.bones.json";
 import routeTasksDocs from "./route-tasks-docs.bones.json";
 import routeTasksTime from "./route-tasks-time.bones.json";
 import routeAdminEmail from "./route-admin-email.bones.json";
@@ -42,8 +40,6 @@ import routeAccountAccess from "./route-account-access.bones.json";
 import routeAdminActivity from "./route-admin-activity.bones.json";
 import routeAdminPolicies from "./route-admin-policies.bones.json";
 import routeDriveOverview from "./route-drive-overview.bones.json";
-import routeInboxChannels from "./route-inbox-channels.bones.json";
-import routeInboxContacts from "./route-inbox-contacts.bones.json";
 import routeWatchServices from "./route-watch-services.bones.json";
 import routeWatchWebhooks from "./route-watch-webhooks.bones.json";
 import routeAppsContainers from "./route-apps-containers.bones.json";
@@ -68,7 +64,6 @@ import routeAnalyticsSitesNew from "./route-analytics-sites-new.bones.json";
 import routeAccountPreferences from "./route-account-preferences.bones.json";
 import routeAnalyticsGeography from "./route-analytics-geography.bones.json";
 import routeAccountNotifications from "./route-account-notifications.bones.json";
-import routeInboxChannelsConnect from "./route-inbox-channels-connect.bones.json";
 
 export const ROUTE_BONES: Record<string, ResponsiveLayout | undefined> = {
     "route-account": routeAccount,
@@ -110,11 +105,6 @@ export const ROUTE_BONES: Record<string, ResponsiveLayout | undefined> = {
     "route-drive-recent": routeDriveRecent,
     "route-drive-shared-links": routeDriveSharedLinks,
     "route-favorites": routeFavorites,
-    "route-inbox": routeInbox,
-    "route-inbox-channels": routeInboxChannels,
-    "route-inbox-channels-connect": routeInboxChannelsConnect,
-    "route-inbox-contacts": routeInboxContacts,
-    "route-inbox-logs": routeInboxLogs,
     "route-integrations": routeIntegrations,
     "route-settings": routeSettings,
     "route-tasks": routeTasks,

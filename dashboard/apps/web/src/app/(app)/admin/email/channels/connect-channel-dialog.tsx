@@ -26,7 +26,7 @@ import {
 } from "@polaris/ui";
 import type { ChannelView } from "@/lib/messaging-service";
 import { connectChannelAction } from "./actions";
-import * as polls from "./inbox-polls";
+import * as polls from "./channel-polls";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     CHANNEL_PLATFORM,

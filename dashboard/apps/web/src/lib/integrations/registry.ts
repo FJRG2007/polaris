@@ -542,7 +542,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create an application",
                 url: "https://discord.com/developers/applications",
-                help: "New Application, then a name. Nothing else on the first screen matters here - Polaris does not use a bot, and a bot connected for the inbox is a different application from this one.",
+                help: "New Application, then a name. Nothing else on the first screen matters here - Polaris does not use a bot, and a bot connected as a channel is a different application from this one.",
                 values: ["appName"]
             },
             {

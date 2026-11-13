@@ -25,9 +25,6 @@ const actions = vi.hoisted(() => {
         "dnsTailAction",
         "tunnelStatusesAction",
         "readAppWidgetsAction",
-        "listConversationsAction",
-        "getMessagesAction",
-        "listActivityAction",
         "channelStateAction",
         "serverDetailAction",
         "getRunAction",
@@ -102,10 +99,6 @@ const actions = vi.hoisted(() => {
         "callServerSettingsAction",
         "listDnsZonesAction",
         "networkStatusAction",
-        "firstDiscordChannelAction",
-        "listChannelTargetsAction",
-        "listAgentsAction",
-        "listContactsAction",
         "mailBodyHeldAction",
         "ownVulnerabilitiesAction",
         "linkedAccountsAction",
@@ -241,15 +234,8 @@ vi.mock("@/app/(app)/home/app-widget-actions", () => ({
     readAppWidgetsAction: actions.readAppWidgetsAction,
     appWidgetTargetsAction: actions.appWidgetTargetsAction
 }));
-vi.mock("@/app/(app)/admin/inbox/actions", () => ({
-    listConversationsAction: actions.listConversationsAction,
-    getMessagesAction: actions.getMessagesAction,
-    listActivityAction: actions.listActivityAction,
-    channelStateAction: actions.channelStateAction,
-    firstDiscordChannelAction: actions.firstDiscordChannelAction,
-    listChannelTargetsAction: actions.listChannelTargetsAction,
-    listAgentsAction: actions.listAgentsAction,
-    listContactsAction: actions.listContactsAction
+vi.mock("@/app/(app)/admin/email/channels/actions", () => ({
+    channelStateAction: actions.channelStateAction
 }));
 vi.mock("@/app/(app)/mail-server/actions", () => ({
     serverDetailAction: actions.serverDetailAction,
@@ -508,10 +494,7 @@ const ROUTES: Record<string, () => Promise<{ GET?: Handler; POST?: Handler }>> =
     "/api/dns-blocker/tail": () => import("@/app/api/dns-blocker/tail/route"),
     "/api/tunnels/statuses": () => import("@/app/api/tunnels/statuses/route"),
     "/api/home/app-widgets": () => import("@/app/api/home/app-widgets/route"),
-    "/api/inbox/conversations": () => import("@/app/api/inbox/conversations/route"),
-    "/api/inbox/messages": () => import("@/app/api/inbox/messages/route"),
-    "/api/inbox/activity": () => import("@/app/api/inbox/activity/route"),
-    "/api/inbox/channel-state": () => import("@/app/api/inbox/channel-state/route"),
+    "/api/admin/channels/state": () => import("@/app/api/admin/channels/state/route"),
     "/api/mail-server/detail": () => import("@/app/api/mail-server/detail/route"),
     "/api/automations/run": () => import("@/app/api/automations/run/route"),
     "/api/admin/settings/update-status": () =>
@@ -598,10 +581,6 @@ const ROUTES: Record<string, () => Promise<{ GET?: Handler; POST?: Handler }>> =
     "/api/admin/call-server": () => import("@/app/api/admin/call-server/route"),
     "/api/domains/zones": () => import("@/app/api/domains/zones/route"),
     "/api/admin/network-status": () => import("@/app/api/admin/network-status/route"),
-    "/api/admin/inbox/discord-channel": () => import("@/app/api/admin/inbox/discord-channel/route"),
-    "/api/admin/inbox/channel-targets": () => import("@/app/api/admin/inbox/channel-targets/route"),
-    "/api/admin/inbox/agents": () => import("@/app/api/admin/inbox/agents/route"),
-    "/api/admin/inbox/contacts": () => import("@/app/api/admin/inbox/contacts/route"),
     "/api/admin/retention/mail-bodies": () => import("@/app/api/admin/retention/mail-bodies/route"),
     "/api/admin/own-vulnerabilities": () => import("@/app/api/admin/own-vulnerabilities/route"),
     "/api/drive/linked-accounts": () => import("@/app/api/drive/linked-accounts/route"),
@@ -684,9 +663,9 @@ const dns = () =>
     actual<typeof import("@/app/(app)/network-filter/dns-blocker-polls")>(
         "@/app/(app)/network-filter/dns-blocker-polls"
     );
-const inbox = () =>
-    actual<typeof import("@/app/(app)/admin/inbox/inbox-polls")>(
-        "@/app/(app)/admin/inbox/inbox-polls"
+const channels = () =>
+    actual<typeof import("@/app/(app)/admin/email/channels/channel-polls")>(
+        "@/app/(app)/admin/email/channels/channel-polls"
     );
 const domains = () =>
     actual<typeof import("@/app/(app)/account/domains/domains-polls")>(
@@ -848,30 +827,9 @@ const CASES: Case[] = [
         args: []
     },
     {
-        name: "the Inbox's conversations",
-        path: "/api/inbox/conversations",
-        ask: async () => (await inbox()).conversations(),
-        action: "listConversationsAction",
-        args: []
-    },
-    {
-        name: "a conversation's messages",
-        path: "/api/inbox/messages",
-        ask: async () => (await inbox()).messages("conversation-1"),
-        action: "getMessagesAction",
-        args: ["conversation-1"]
-    },
-    {
-        name: "the Inbox's log",
-        path: "/api/inbox/activity",
-        ask: async () => (await inbox()).activity(),
-        action: "listActivityAction",
-        args: []
-    },
-    {
         name: "a channel's state",
-        path: "/api/inbox/channel-state",
-        ask: async () => (await inbox()).channelState("channel-1"),
+        path: "/api/admin/channels/state",
+        ask: async () => (await channels()).channelState("channel-1"),
         action: "channelStateAction",
         args: ["channel-1"]
     },
@@ -1790,54 +1748,6 @@ const CASES: Case[] = [
                 )
             ).networkStatus(),
         action: "networkStatusAction",
-        args: []
-    },
-    {
-        name: "the Discord bot channel to ask about servers",
-        path: "/api/admin/inbox/discord-channel",
-        ask: async () =>
-            (
-                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
-                    "@/app/(app)/admin/admin-polls"
-                )
-            ).firstDiscordChannel(),
-        action: "firstDiscordChannelAction",
-        args: []
-    },
-    {
-        name: "a bot channel's servers and channels",
-        path: "/api/admin/inbox/channel-targets",
-        ask: async () =>
-            (
-                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
-                    "@/app/(app)/admin/admin-polls"
-                )
-            ).channelTargets("channelId-1"),
-        action: "listChannelTargetsAction",
-        args: ["channelId-1"]
-    },
-    {
-        name: "the agents a thread can be assigned to",
-        path: "/api/admin/inbox/agents",
-        ask: async () =>
-            (
-                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
-                    "@/app/(app)/admin/admin-polls"
-                )
-            ).inboxAgents(),
-        action: "listAgentsAction",
-        args: []
-    },
-    {
-        name: "the inbox contacts",
-        path: "/api/admin/inbox/contacts",
-        ask: async () =>
-            (
-                await actual<typeof import("@/app/(app)/admin/admin-polls")>(
-                    "@/app/(app)/admin/admin-polls"
-                )
-            ).inboxContacts(),
-        action: "listContactsAction",
         args: []
     },
     {

@@ -2,14 +2,15 @@
  * Resolves how the web reaches the messaging bridge and the shared secrets it
  * authenticates with. Two modes, env taking precedence:
  *
- *  1. Static env (MESSAGING_BRIDGE_URL / MESSAGING_BRIDGE_TOKEN / MESSAGING_INGEST_KEY)
+ *  1. Static env (MESSAGING_BRIDGE_URL / MESSAGING_BRIDGE_TOKEN)
  *     for operators who run their own bridge outside the marketplace.
  *  2. A marketplace-installed bridge: a managed Deploy app. Its URL is derived
  *     from the app's target and stable host port - the same addressing the edge
- *     uses to dial apps - and its bearer token plus the inbound ingest key are the
- *     encrypted pair stored on the InstalledApp at install time.
+ *     uses to dial apps - and its bearer token is stored encrypted on the
+ *     InstalledApp at install time (older installs also stored an ingest key,
+ *     which is ignored).
  *
- * Server-only. Cached briefly so the hot paths (send, state poll, ingest) do not
+ * Server-only. Cached briefly so the hot paths (send, state poll) do not
  * hit the database on every call.
  */
 
@@ -24,17 +25,14 @@ export interface BridgeEndpoint {
     baseUrl: string;
     /** Bearer token the bridge API requires. */
     token: string;
-    /** Shared key the bridge stamps on inbound events (x-internal-key). */
-    ingestKey: string;
 }
 
 const CACHE_TTL_MS = 10_000;
 let cache: { value: BridgeEndpoint | null; at: number } | null = null;
 
-/** The shared-secret pair stored (encrypted) on the installed bridge row. */
+/** The shared secret stored (encrypted) on the installed bridge row. */
 interface BridgeSecrets {
     token: string;
-    ingestKey: string;
 }
 
 /** Read the static-env bridge config, or null when no bridge URL is set there. */
@@ -43,8 +41,7 @@ function fromEnv(): BridgeEndpoint | null {
     if (!baseUrl) return null;
     return {
         baseUrl,
-        token: process.env.MESSAGING_BRIDGE_TOKEN ?? "",
-        ingestKey: process.env.MESSAGING_INGEST_KEY ?? ""
+        token: process.env.MESSAGING_BRIDGE_TOKEN ?? ""
     };
 }
 
@@ -96,12 +93,11 @@ async function fromInstall(): Promise<BridgeEndpoint | null> {
     } catch {
         return null;
     }
-    if (!secrets.token || !secrets.ingestKey) return null;
+    if (!secrets.token) return null;
 
     return {
         baseUrl: `http://${dialHost}:${hostPortForApp(installed.applicationId)}`,
-        token: secrets.token,
-        ingestKey: secrets.ingestKey
+        token: secrets.token
     };
 }
 
