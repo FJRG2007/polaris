@@ -65,7 +65,9 @@ describe("what a session's environment may carry", () => {
         const carried = credentialsForAgent(claude, available);
 
         expect(carried.CLAUDE_CODE_OAUTH_TOKEN).toBe("sub-token");
-        expect(carried.ANTHROPIC_API_KEY).toBe("sk-ant");
+        // The plan beside a key: the key stays behind, since the tool would
+        // read it first and the plan would never be used.
+        expect(carried.ANTHROPIC_API_KEY).toBeUndefined();
         // Everything else in the store stayed in the store.
         expect(carried.OPENAI_COMPATIBLE_BASE_URL).toBeUndefined();
         expect(carried.OPENAI_COMPATIBLE_API_KEY).toBeUndefined();

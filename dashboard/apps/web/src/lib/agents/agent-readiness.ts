@@ -135,9 +135,15 @@ export function credentialsForAgent(
     available: Record<string, string>
 ): Record<string, string> {
     const chosen: Record<string, string> = {};
-    for (const credential of cli.credentials) {
-        const value = available[credential.env];
-        if (value) chosen[credential.env] = value;
+    // A plan and a key for the same tool are alternatives, not a pair: the tool
+    // reads the key first (Claude Code takes ANTHROPIC_API_KEY over
+    // CLAUDE_CODE_OAUTH_TOKEN), so handing both silently bills the key - or
+    // fails on it - while the plan sits unused. The plan wins when there is one.
+    const held = cli.credentials.filter((credential) => available[credential.env]);
+    const plan = held.some((credential) => credential.subscription);
+    for (const credential of held) {
+        if (plan && !credential.subscription) continue;
+        chosen[credential.env] = available[credential.env]!;
     }
     // The workspace an Anthropic key acts in travels with that key and nothing
     // else: without it a key not tied to one workspace is refused every request.
@@ -155,8 +161,10 @@ export function credentialsForAgent(
  * - An API key: that key alone (and what travels with it). Handed the stored
  *   subscription as well, the tool would use whichever it reads first, and the
  *   bill would not be the one chosen.
- * - A sign-in account: that account, over whatever else the tool reads.
- * - Nothing picked: whatever resolves.
+ * - A sign-in account: that account alone. The tool reads an API key before
+ *   its sign-in, so a stored key carried beside the picked account is the key
+ *   doing the work - or being refused - instead of the account.
+ * - Nothing picked: whatever resolves, the plan over a key.
  */
 export function sessionCredentials(
     cli: core.AgentCli,
@@ -166,7 +174,7 @@ export function sessionCredentials(
 ): Record<string, string> {
     if (machineLogin) return {};
     if (chosen?.apiKey) return { [chosen.env]: chosen.secret, ...chosen.extra };
-    if (chosen) return { ...credentialsForAgent(cli, available), [chosen.env]: chosen.secret };
+    if (chosen) return { [chosen.env]: chosen.secret };
     return credentialsForAgent(cli, available);
 }
 

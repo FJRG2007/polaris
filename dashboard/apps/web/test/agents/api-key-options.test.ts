@@ -60,16 +60,23 @@ describe("what a session started on a choice is handed", () => {
         });
     });
 
-    it("is the picked account over the rest for a subscription", () => {
+    it("is the picked account alone for a subscription", () => {
+        // Claude Code reads ANTHROPIC_API_KEY before CLAUDE_CODE_OAUTH_TOKEN: a
+        // stored key carried beside the picked plan is what answered, and a key
+        // with no workspace was refused on every prompt.
         const chosen = { env: "CLAUDE_CODE_OAUTH_TOKEN", secret: "sub-picked", apiKey: false, extra: {} };
         expect(sessionCredentials(claude, available, chosen, false)).toEqual({
-            CLAUDE_CODE_OAUTH_TOKEN: "sub-picked",
-            ANTHROPIC_API_KEY: "sk-first"
+            CLAUDE_CODE_OAUTH_TOKEN: "sub-picked"
         });
     });
 
-    it("is nothing for the machine's own login, and what resolves otherwise", () => {
+    it("is nothing for the machine's own login, and the plan over a key otherwise", () => {
         expect(sessionCredentials(claude, available, null, true)).toEqual({});
-        expect(sessionCredentials(claude, available, null, false)).toEqual(available);
+        expect(sessionCredentials(claude, available, null, false)).toEqual({
+            CLAUDE_CODE_OAUTH_TOKEN: "sub-token"
+        });
+        expect(
+            sessionCredentials(claude, { ANTHROPIC_API_KEY: "sk-first" }, null, false)
+        ).toEqual({ ANTHROPIC_API_KEY: "sk-first" });
     });
 });
