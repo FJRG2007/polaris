@@ -36,6 +36,11 @@ fn main() {
             "running_game",
             "set_custom_games",
             "running_programs",
+            "tv_state",
+            "tv_find",
+            "tv_find_usb",
+            "tv_cancel",
+            "tv_start",
         ]),
     ))
     .expect("the Tauri build step runs");

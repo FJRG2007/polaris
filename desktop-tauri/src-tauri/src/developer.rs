@@ -12,7 +12,7 @@ use polaris_client::install_tools::{
     self as tools, InstallFailure, InstallRequest, InstallResult, InstallTool, InstallVia,
 };
 use polaris_client::push_local::{self, PushEvent, PushPlan, SystemTools};
-use polaris_client::{ApiClient, ApiKey, InstanceUrl};
+use polaris_client::ApiClient;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -118,11 +118,7 @@ pub async fn push_choose_folder(
 pub struct PushInput {
     service_id: String,
     name: String,
-    server: String,
     platform: String,
-    /// Checked for its shape, used for this push only and never kept: the key
-    /// store is its own row of the parity ledger.
-    api_key: String,
 }
 
 /// Start a push; its events arrive on `events`, and its end is the answer.
@@ -146,9 +142,12 @@ pub async fn push_start(
     if !push_local::is_platform(&input.platform) {
         return Err("Choose a platform from the list.".into());
     }
-    let server = InstanceUrl::parse(&input.server)
-        .map_err(|_| "Choose the Polaris to push to first.".to_owned())?;
-    let key = ApiKey::parse(&input.api_key).map_err(|error| error.to_string())?;
+    // The Polaris in use and its key from the key store, as the Electron app
+    // does: a page never names where its image and key go.
+    let server = crate::saved_server(&app).ok_or("Choose the Polaris to push to first.")?;
+    let key = crate::key_flow::api_key_for(&app, &server)
+        .await
+        .ok_or("Add an API key for this Polaris to push to it.")?;
     let cancel = CancellationToken::new();
     let folder = {
         let mut pushes = lock(&state.pushes);

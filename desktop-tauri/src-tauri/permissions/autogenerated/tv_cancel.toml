@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-tv-cancel"
+description = "Enables the tv_cancel command without any pre-configured scope."
+commands.allow = ["tv_cancel"]
+
+[[permission]]
+identifier = "deny-tv-cancel"
+description = "Denies the tv_cancel command without any pre-configured scope."
+commands.deny = ["tv_cancel"]

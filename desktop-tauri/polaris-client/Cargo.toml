@@ -20,7 +20,9 @@ flate2 = "=1.1.11"
 getrandom = { version = "=0.4.3", features = ["sys_rng"] }
 hkdf = "=0.13.0"
 keyring = "=4.2.0"
+if-addrs = "=0.15.0"
 mdns-sd = "=0.21.7"
+nusb = "=0.2.9"
 qrcodegen = "=1.8.0"
 rsa = { version = "=0.10.0", features = ["pkcs1v15"] }
 rustls = { version = "=0.23.46", default-features = false, features = ["aws_lc_rs", "std"] }

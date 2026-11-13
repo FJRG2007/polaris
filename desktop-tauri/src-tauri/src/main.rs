@@ -19,6 +19,7 @@ mod mail_handler;
 mod notices;
 mod os_prefs;
 mod tray;
+mod tv;
 #[cfg(windows)]
 mod webview2;
 
@@ -906,6 +907,11 @@ fn main() {
             developer::running_game,
             developer::set_custom_games,
             developer::running_programs,
+            tv::tv_state,
+            tv::tv_find,
+            tv::tv_find_usb,
+            tv::tv_cancel,
+            tv::tv_start
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -956,6 +962,9 @@ fn main() {
             }
             // The first window: what the app was started for, and always something on screen.
             let waiting = links.opened();
+            if let Some(tv) = tv::Tv::new(&handle) {
+                app.manage(tv);
+            }
             show_polaris(&handle, None);
             if let Some(link) = waiting {
                 tauri::async_runtime::spawn(async move { links.open(link).await });

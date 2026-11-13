@@ -3,7 +3,7 @@
 //! and an autostart desktop file on Linux, each named after the beta so the
 //! Electron app's own entry is never touched.
 //!
-//! The setting is the shared `Settings::open_at_login`, on by default as in the
+//! The setting is the shared `Settings::open_at_login`, off by default in the beta, unlike the
 //! Electron app. A development run has no business starting with the computer,
 //! so it never writes the entry.
 

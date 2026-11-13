@@ -91,7 +91,9 @@ impl Default for Settings {
             pushes: BTreeMap::new(),
             update_attempted: None,
             window_place: None,
-            open_at_login: true,
+            // Off in the beta: it must never start with the computer beside the
+            // Electron app unless somebody switches it on.
+            open_at_login: false,
             hardware_acceleration: true,
             minimize_to_tray: true,
             start_minimized: false,
@@ -205,7 +207,7 @@ impl Settings {
                 .filter(|text| crate::servers::utf16_len(text) <= 64)
                 .map(str::to_owned),
             window_place: read_place(field("windowPlace")),
-            open_at_login: boolean(field("openAtLogin"), true),
+            open_at_login: boolean(field("openAtLogin"), false),
             hardware_acceleration: boolean(field("hardwareAcceleration"), true),
             minimize_to_tray: boolean(field("minimizeToTray"), true),
             start_minimized: boolean(field("startMinimized"), false),

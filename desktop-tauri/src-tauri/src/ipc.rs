@@ -370,7 +370,7 @@ pub fn open_window(app: AppHandle, window: WebviewWindow, input: OpenWindow) -> 
 }
 
 /// The commands a Polaris window may call, each checked again with `from_polaris`.
-pub const POLARIS_COMMANDS: [&str; 13] = [
+pub const POLARIS_COMMANDS: [&str; 18] = [
     "open-servers",
     "open-window",
     "show-notice",
@@ -384,6 +384,11 @@ pub const POLARIS_COMMANDS: [&str; 13] = [
     "running-game",
     "set-custom-games",
     "running-programs",
+    "tv-state",
+    "tv-find",
+    "tv-find-usb",
+    "tv-cancel",
+    "tv-start",
 ];
 
 /// Grants the Polaris commands to the configured origin. Tauri cannot take a

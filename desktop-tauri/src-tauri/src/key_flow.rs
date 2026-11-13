@@ -54,8 +54,6 @@ impl Keys {
 
 /// The key for this Polaris, asking for it when there is none. `None` when the
 /// person closed the form.
-// enigma: no push is ported to the beta yet; push-local calls this when it is.
-#[allow(dead_code)]
 pub async fn api_key_for(app: &AppHandle, server: &InstanceUrl) -> Option<ApiKey> {
     let keys = app.state::<Keys>();
     if let Some(key) = keys.ring.key_for(server) {

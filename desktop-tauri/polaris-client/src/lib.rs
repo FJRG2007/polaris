@@ -36,9 +36,12 @@ pub mod same_instance;
 pub mod servers;
 pub mod settings;
 pub mod tv_address;
+pub mod tv_install;
 pub mod tv_mdns;
 pub mod tv_path;
 pub mod tv_wait;
+pub mod usb_adb;
+pub mod usb_link;
 pub mod window_failover;
 pub mod zip_rules;
 

@@ -145,12 +145,9 @@ fn folder(name: &str) -> PathBuf {
 fn every_field_falls_back_on_its_own() {
     let defaults = Settings::read(&json!({ "server": HOME }));
     assert_eq!(defaults.server.as_deref(), Some(HOME));
-    assert!(
-        defaults.hardware_acceleration
-            && defaults.minimize_to_tray
-            && defaults.open_at_login
-            && defaults.voice_widget
-    );
+    assert!(defaults.hardware_acceleration && defaults.minimize_to_tray && defaults.voice_widget);
+    // Off in the beta, so it never starts with the computer beside Electron.
+    assert!(!defaults.open_at_login);
     assert!(!defaults.start_minimized && !defaults.voice_widget_game_only);
     assert_eq!(defaults.update_attempted, None);
     assert_eq!(defaults.text_size(), 16);
