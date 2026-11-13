@@ -25,6 +25,13 @@ export interface DocPage {
     readonly text: Readonly<Record<string, string>>;
 }
 
+/** Polaris's one top-level roadmap: a docs page of its own, rendered from these files. */
+export const ROADMAP = {
+    slug: "roadmap",
+    en: "docs/roadmap.md",
+    es: "docs/roadmap.es.md"
+} as const;
+
 /** `game-servers.es.md` as `game-servers`. */
 export function docSlug(file: string): string {
     return file.replace(/(\.es)?\.md$/, "");

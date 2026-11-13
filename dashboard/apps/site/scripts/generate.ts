@@ -535,15 +535,26 @@ const ownGuide = (file: string, spanish: boolean) => {
     return spanish && existsSync(join(root, own)) ? own : file;
 };
 const extraPaths = new Map(extraGuides.map((file) => [file, docs.docSlug(file.split("/").pop()!)]));
+// The roadmap is a page of its own with a sidebar group of its own.
+const hasRoadmap = existsSync(join(root, docs.ROADMAP.en));
 // A link to either language's file opens the guide's page.
+const pagedFiles: [string, string][] = [
+    ...extraPaths,
+    ...(hasRoadmap ? [[docs.ROADMAP.en, docs.ROADMAP.slug] as [string, string]] : [])
+];
 const linkPaths = new Map<string, string>(
-    [...extraPaths].flatMap(([file, slug]): [string, string][] => [
+    pagedFiles.flatMap(([file, slug]): [string, string][] => [
         [file, slug],
         [file.replace(/\.md$/, ".es.md"), slug]
     ])
 );
 const INTEGRATIONS = "integrations";
-const docSlugs = new Set([...featureFiles.map(docs.docSlug), ...extraPaths.values(), INTEGRATIONS]);
+const docSlugs = new Set([
+    ...featureFiles.map(docs.docSlug),
+    ...extraPaths.values(),
+    INTEGRATIONS,
+    ...(hasRoadmap ? [docs.ROADMAP.slug] : [])
+]);
 const docMedia = new Set<string>();
 const escapeHtml = (text: string) =>
     text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -626,6 +637,14 @@ async function guides(spanish: boolean): Promise<docs.DocPage[]> {
                       spanish ? "README.es.md" : "README.md"
                   )
               ]
+            : []),
+        ...(hasRoadmap
+            ? [
+                  (() => {
+                      const own = ownGuide(docs.ROADMAP.en, spanish);
+                      return renderDoc(docs.ROADMAP.slug, read(join(root, own)), "docs", own);
+                  })()
+              ]
             : [])
     ]);
     const pages = await Promise.all(
@@ -655,7 +674,8 @@ function sections(spanish: boolean, pages: readonly docs.DocPage[]): docs.DocSec
     return docs.arrangeSections(
         [
             ...(own.length ? own : docs.readmeSections(readmeEn)),
-            { label: words.integrations, slugs: [INTEGRATIONS, ...extraPaths.values()] }
+            { label: words.integrations, slugs: [INTEGRATIONS, ...extraPaths.values()] },
+            { label: words.roadmap, slugs: [docs.ROADMAP.slug] }
         ],
         pages.map((page) => page.slug),
         words.more

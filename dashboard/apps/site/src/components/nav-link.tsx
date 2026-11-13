@@ -22,8 +22,8 @@ export function NavLink({
     className: string;
     /** Also current on every page under this one ("docs/" for each guide). */
     section?: boolean;
-    /** A page under it that has its own entry in the bar. */
-    except?: string;
+    /** Pages under it that have their own entry in the bar. */
+    except?: readonly string[];
     children: ReactNode;
 }) {
     const path = trim(usePathname() ?? "");
@@ -31,7 +31,7 @@ export function NavLink({
         path === trim(href) ||
         (section === true &&
             path.startsWith(`${trim(href)}/`) &&
-            (!except || !path.startsWith(trim(except))));
+            !(except ?? []).some((page) => path.startsWith(trim(page))));
     return (
         <Link href={href} className={className} aria-current={current ? "page" : undefined}>
             {children}

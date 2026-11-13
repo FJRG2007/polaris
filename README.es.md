@@ -7,6 +7,8 @@
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="#todo-se-conecta">Integraciones</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="docs/roadmap.es.md">Hoja de ruta</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="#licencia">Licencia</a>
   <hr />
 </div>

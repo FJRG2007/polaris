@@ -18,6 +18,8 @@
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="docs/developers/README.md">Developers</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="docs/roadmap.md">Roadmap</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="README.es.md">Español</a>
   <hr />
 </div>
@@ -664,6 +666,7 @@ How to report a bug, propose a change and open a pull request is in
 [code of conduct](CODE_OF_CONDUCT.md). The monorepo layout, the development
 loop, how to build and test the dashboard and the Rust components, and the
 release flow all live in the [developer guide](docs/developers/README.md).
+Where Polaris is going, area by area, is in the [roadmap](docs/roadmap.md).
 
 ## License
 

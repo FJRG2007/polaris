@@ -1,5 +1,5 @@
 /**
- * The frame of every page: the document, the bar with the four pages and the
+ * The frame of every page: the document, the bar with the site's pages and the
  * language picker, and the footer pointing at the repository.
  */
 
@@ -18,7 +18,8 @@ const PAGES = [
     { key: "marketplace", page: "marketplace/" },
     { key: "downloads", page: "downloads/" },
     { key: "docs", page: "docs/" },
-    { key: "api", page: "docs/api/" }
+    { key: "api", page: "docs/api/" },
+    { key: "roadmap", page: "docs/roadmap/" }
 ] as const;
 
 export function SiteShell({ locale, children }: { locale: SiteLocale; children: ReactNode }) {
@@ -49,7 +50,10 @@ export function SiteShell({ locale, children }: { locale: SiteLocale; children: 
                                     key={entry.key}
                                     href={href(locale, entry.page)}
                                     section={entry.key === "docs"}
-                                    except={href(locale, "docs/api/")}
+                                    except={[
+                                        href(locale, "docs/api/"),
+                                        href(locale, "docs/roadmap/")
+                                    ]}
                                     className="shrink-0 rounded-md px-2.5 py-1.5 text-muted-foreground hover:text-foreground aria-[current=page]:bg-surface aria-[current=page]:text-foreground"
                                 >
                                     {t.nav[entry.key]}
