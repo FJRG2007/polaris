@@ -89,6 +89,4 @@ export function modelProviderRows(): ProviderRow[] {
 }
 
 /** What a provider is called, for a sentence about a key that belongs to it. */
-export function modelProviderName(slug: string): string {
-    return MODEL_INTEGRATIONS.find((entry) => entry.slug === slug)?.name ?? slug;
-}
+export { modelProviderName } from "@/lib/integrations/registry";

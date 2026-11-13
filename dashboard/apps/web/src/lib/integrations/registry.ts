@@ -1004,5 +1004,11 @@ export function findIntegration(slug: string): IntegrationCatalogEntry | undefin
  *  everything else put together. */
 export const MODEL_INTEGRATIONS = INTEGRATIONS.filter((entry) => entry.category === "Models");
 
+/** What a model provider is called. Kept here, beside the list, because client
+ *  components need it and this module is safe to ship to the browser. */
+export function modelProviderName(slug: string): string {
+    return MODEL_INTEGRATIONS.find((entry) => entry.slug === slug)?.name ?? slug;
+}
+
 /** The rest of the marketplace. */
 export const SERVICE_INTEGRATIONS = INTEGRATIONS.filter((entry) => entry.category !== "Models");

@@ -11,7 +11,9 @@ import Link from "next/link";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import { Button, Select, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { modelProviderName } from "@/lib/agents/model-key-providers";
+// Not lib/agents/model-key-providers: that one reaches the server-only key
+// checks, and this is drawn in the browser.
+import { modelProviderName } from "@/lib/integrations/registry";
 import { ModelSelector, type ModelSelectorProvider } from "@/components/polar/elements/model-selector";
 import type { AgentEngine, ComposerAccount } from "@/lib/polar/agents/composer-agents";
 import {
