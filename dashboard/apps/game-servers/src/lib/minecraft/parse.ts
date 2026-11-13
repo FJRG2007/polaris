@@ -148,6 +148,15 @@ export function parseWhitelistAnswer(output: string): string[] {
 }
 
 /**
+ * Whether the game answered that it found no player by that name. On a server
+ * that asks Mojang, this is also what it says when Mojang did not answer in
+ * time, so a caller checks the name itself before believing it.
+ */
+export function saysNoSuchPlayer(output: string): boolean {
+    return /(does not exist|that player does not exist|no player was found)/i.test(stripFormatting(output));
+}
+
+/**
  * Why the server would not put a name on its whitelist, or null when it did.
  *
  * RCON reports a refused command the same way it reports a successful one - the
@@ -163,9 +172,7 @@ export function parseWhitelistRefusal(output: string): string | null {
     const text = stripFormatting(output).trim();
     // Already on the list is the command declining to do something already done.
     if (/already whitelisted/i.test(text)) return null;
-    if (/(does not exist|that player does not exist|no player was found)/i.test(text)) {
-        return gameMessage("games", "lib.unknownName");
-    }
+    if (saysNoSuchPlayer(text)) return gameMessage("games", "lib.unknownName");
     // The third is the parser's own wording and is kept to what it actually
     // prints: a bare "expected" is a word an answer that worked can carry too.
     if (/(unknown or incomplete command|incorrect argument|expected (?:whitespace|end of|quote|value|integer|float|bool|literal|string))/i.test(text)) {

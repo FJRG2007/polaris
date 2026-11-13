@@ -907,6 +907,7 @@
         "reasonRule": "Una línea, y sin comillas dobles - la consola del juego no puede llevarlas.",
         "resourceUrlRule": "Un enlace https que acabe en .zip, .tar.gz o .tgz - el archivo de la versión, no la página.",
         "unknownName": "El juego no conoce ese nombre. Revisa cómo se escribe, o desactiva la autenticación de Mojang si este servidor es para clientes no oficiales.",
+        "mojangSlow": "Mojang no respondió cuando el juego comprobó el nombre. Prueba en un minuto.",
         "whitelistNotUnderstood": "Este servidor no entendió el comando de la lista blanca.",
         "playerListUnread": "Polaris no pudo leer ahora la lista de jugadores de este servidor, y no escribirá encima de una lista que no ve. Inténtalo de nuevo en un momento.",
         "listNotReloaded": "El servidor no recargó su lista, así que lo tomará la próxima vez que arranque.",

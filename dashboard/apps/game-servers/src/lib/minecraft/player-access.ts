@@ -36,8 +36,10 @@ import {
     playerOfEntry,
     parseJoinAddresses,
     parseProperties,
-    parseWhitelistRefusal
+    parseWhitelistRefusal,
+    saysNoSuchPlayer
 } from "./parse";
+import { mojangKnowsName } from "./skin-service";
 import { readContainerFile, readContainerFileState, writeContainerFile } from "../container-files";
 import {
     isReadableRoster,
@@ -506,6 +508,38 @@ async function spellingsSeen(installedAppId: string): Promise<string[]> {
     return rows.map((row) => row.name);
 }
 
+/** Waits before asking the game again when its own Mojang lookup came back empty. */
+const LOOKUP_RETRY_MS = [1_500, 4_000];
+
+/**
+ * `whitelist add` on a server that asks Mojang. The game answers "That player
+ * does not exist" both for a name Mojang does not know and for a lookup that
+ * timed out, so that answer is checked with Mojang here: a real name is asked
+ * for again, and only a name Mojang denies is called unknown. Without this, a
+ * slow moment at Mojang told the operator to check the spelling of a name that
+ * was right, and to turn authentication off.
+ */
+export async function addThroughGame(server: ServerContainer, name: string): Promise<void> {
+    let answer = await server.say(["whitelist", "add", name]);
+    if (!saysNoSuchPlayer(answer)) {
+        const refusal = parseWhitelistRefusal(answer);
+        if (refusal !== null) throw new WhitelistRefused(refusal);
+        return;
+    }
+    const known = await mojangKnowsName(name);
+    if (known === "no") throw new WhitelistRefused(gameMessage("games", "lib.unknownName"));
+    for (const wait of known === "yes" ? LOOKUP_RETRY_MS : []) {
+        await new Promise((resolve) => setTimeout(resolve, wait));
+        answer = await server.say(["whitelist", "add", name]);
+        if (!saysNoSuchPlayer(answer)) {
+            const refusal = parseWhitelistRefusal(answer);
+            if (refusal !== null) throw new WhitelistRefused(refusal);
+            return;
+        }
+    }
+    throw new WhitelistRefused(gameMessage("games", "lib.mojangSlow"));
+}
+
 /**
  * Put names on the game's own whitelist, in a way it will still honour after a
  * restart.
@@ -522,10 +556,7 @@ async function putOnWhitelist(server: ServerContainer, names: readonly string[])
     if (names.length === 0) return "";
     const added = gameMessage("games", "lib.whitelistAdded", { names: names.join(", ") });
     if (!(await inventsIdentities(server))) {
-        for (const name of names) {
-            const refusal = parseWhitelistRefusal(await server.say(["whitelist", "add", name]));
-            if (refusal !== null) throw new WhitelistRefused(refusal);
-        }
+        for (const name of names) await addThroughGame(server, name);
         return added;
     }
     const current = await readRoster(server, WHITELIST_FILE);

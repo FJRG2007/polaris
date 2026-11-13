@@ -90,6 +90,20 @@ async function texturePng(hash: string): Promise<Uint8Array> {
     return checked(await boundedBytes(response, skin.SKIN_MAX_BYTES));
 }
 
+/**
+ * Whether Mojang knows this name: "unknown" when it could not be asked. Only the
+ * existence is read, so it is one small request with the usual timeout.
+ */
+export async function mojangKnowsName(name: string): Promise<"yes" | "no" | "unknown"> {
+    try {
+        const found = await fixedFetch(`${MOJANG_NAME}${encodeURIComponent(name)}`);
+        if (found.status === 204 || found.status === 404) return "no";
+        return found.ok ? "yes" : "unknown";
+    } catch {
+        return "unknown";
+    }
+}
+
 /** A player's skin as Mojang holds it, signature and all. */
 export async function mojangSkin(name: string): Promise<SkinPreview> {
     const found = await fixedFetch(`${MOJANG_NAME}${encodeURIComponent(name)}`);

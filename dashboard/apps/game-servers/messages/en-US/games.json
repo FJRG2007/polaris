@@ -907,6 +907,7 @@
         "reasonRule": "One line, and no double quotes - the game console cannot carry them.",
         "resourceUrlRule": "A https link ending in .zip, .tar.gz or .tgz - the release file, not the page.",
         "unknownName": "The game does not know that name. Check the spelling, or turn Mojang authentication off if this server is for cracked clients.",
+        "mojangSlow": "Mojang did not answer when the game checked this name. Try again in a minute.",
         "whitelistNotUnderstood": "This server did not understand the whitelist command.",
         "playerListUnread": "Polaris could not read this server's player list just now, and will not write over a list it cannot see. Try again in a moment.",
         "listNotReloaded": "The server did not reload its list, so it will pick this up the next time it starts.",
