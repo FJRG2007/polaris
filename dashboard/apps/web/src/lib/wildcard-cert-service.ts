@@ -24,6 +24,7 @@
 import { join } from "node:path";
 import { X509Certificate } from "node:crypto";
 import { deployBase } from "@/lib/domain-service";
+import { deployZoneBase } from "@/lib/domain-zones";
 import { isMagicBase } from "@polaris/deploy";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { mkdir, readFile } from "node:fs/promises";
@@ -91,9 +92,20 @@ function orderableBase(base: string): string | null {
     return clean;
 }
 
+/**
+ * The base the deploy addresses are minted under right now.
+ *
+ * The zone layout first: an instance set up with zones never writes the legacy deploy
+ * base, so reading only that one left it on the magic-DNS default - the card hidden,
+ * nothing ever ordered, and every unused address on the edge's own certificate.
+ */
+async function currentBase(): Promise<string | null> {
+    return orderableBase((await deployZoneBase()) ?? (await deployBase()));
+}
+
 /** The wildcard's state for the screen, without ordering anything. */
 export async function wildcardCertView(now: number = Date.now()): Promise<WildcardCertView> {
-    const base = orderableBase(await deployBase());
+    const base = await currentBase();
     if (!base) return { needed: false, base: null, expiresAt: null, problem: null };
     const [stored, issuedFor] = await Promise.all([readStoredCert(), getSetting(ISSUED_FOR_SETTING)]);
     if (stored && issuedFor === base && new Date(stored.validTo).getTime() > now) {
@@ -116,6 +128,13 @@ export async function wildcardCertState(): Promise<WildcardCertState> {
         expiresAt: cert ? new Date(cert.validTo) : null,
         reason: null
     };
+}
+
+/** The base a valid wildcard on disk covers, or null when none does: the zone whose
+ *  plain HTTP the edge may redirect onto https without landing on a warning. */
+export async function trustedWildcardBase(now: number = Date.now()): Promise<string | null> {
+    const state = await wildcardCertState();
+    return state.base && state.expiresAt && state.expiresAt.getTime() > now ? state.base : null;
 }
 
 /**
@@ -166,7 +185,7 @@ async function readStoredCert(): Promise<X509Certificate | null> {
  * are just instances that have not opted into this.
  */
 export async function ensureWildcardCertificate(): Promise<WildcardCertState> {
-    const base = orderableBase(await deployBase());
+    const base = await currentBase();
     if (!base) {
         return { base: null, expiresAt: null, reason: "no deploy domain is configured" };
     }
@@ -192,6 +211,11 @@ export async function ensureWildcardCertificate(): Promise<WildcardCertState> {
         await publish(certificate, key);
         await setSetting(ISSUED_FOR_SETTING, base);
         await setSetting(LAST_ERROR_SETTING, null);
+        // Re-render the routes so the covered zone's plain HTTP starts redirecting now
+        // rather than on the next deploy.
+        void import("@/lib/deploy-service")
+            .then((module) => module.syncAppRoutes())
+            .catch((error: unknown) => console.error("polaris: could not republish routes after the wildcard:", error));
         return {
             base,
             expiresAt: new Date(new X509Certificate(certificate).validTo),

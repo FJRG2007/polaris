@@ -10,11 +10,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
     base: "plr.example.test",
+    zone: null as string | null,
     token: null as string | null,
     settings: new Map<string, string | null>()
 }));
 
 vi.mock("@/lib/domain-service", () => ({ deployBase: async () => state.base }));
+vi.mock("@/lib/domain-zones", () => ({ deployZoneBase: async () => state.zone }));
 vi.mock("@/lib/setting-store", () => ({
     getSetting: async (key: string) => state.settings.get(key) ?? null,
     setSetting: async (key: string, value: string | null) => void state.settings.set(key, value)
@@ -33,6 +35,7 @@ const { wildcardCertView } = await import("@/lib/wildcard-cert-service");
 
 beforeEach(() => {
     state.base = "plr.example.test";
+    state.zone = null;
     state.token = null;
     state.settings.clear();
 });
@@ -41,6 +44,12 @@ describe("the wildcard card's view", () => {
     it("is not shown on a magic-DNS base, which nobody here can order for", async () => {
         state.base = "sslip.io";
         expect(await wildcardCertView()).toEqual({ needed: false, base: null, expiresAt: null, problem: null });
+    });
+
+    it("covers the zone layout's deploy base, which leaves the legacy one on its default", async () => {
+        state.base = "sslip.io";
+        state.zone = "plr.zones.example.test";
+        expect(await wildcardCertView()).toMatchObject({ needed: true, base: "plr.zones.example.test" });
     });
 
     it("names DNS access as what is missing when no token can write the zone", async () => {
