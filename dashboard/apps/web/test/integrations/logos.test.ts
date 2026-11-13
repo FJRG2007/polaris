@@ -73,7 +73,9 @@ const MONOGRAM_PROVIDERS = [
     "cortecs",
     "edenai"
 ];
-const MONOGRAM_AGENTS = ["amp", "aider", "droid", "crush"];
+// Amp and Droid are drawn from their vendors' own marks now; Aider and Crush
+// publish no square mark, so they stay letters.
+const MONOGRAM_AGENTS = ["aider", "crush"];
 
 /** A monogram is the one logo drawn as a tinted span of letters. */
 function isMonogram(markup: string): boolean {
