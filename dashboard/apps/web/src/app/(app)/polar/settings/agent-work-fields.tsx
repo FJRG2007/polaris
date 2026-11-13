@@ -11,6 +11,8 @@ import Link from "next/link";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import { Button, Select, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { modelProviderName } from "@/lib/agents/model-key-providers";
+import { ModelSelector, type ModelSelectorProvider } from "@/components/polar/elements/model-selector";
 import type { AgentEngine, ComposerAccount } from "@/lib/polar/agents/composer-agents";
 import {
     AGENT_MODELS_MAX,
@@ -58,6 +60,28 @@ export function modelOptionsFor(
         model: model.model,
         label: model.name
     }));
+}
+
+/** The models still free to add, grouped the way Polar's model picker draws
+ *  them: one group per provider, under that provider's name and logo. */
+export function selectorProviders(options: readonly AgentModelOption[]): ModelSelectorProvider[] {
+    const groups = new Map<string, ModelSelectorProvider>();
+    for (const option of options) {
+        const group = groups.get(option.provider) ?? {
+            provider: option.provider,
+            name: modelProviderName(option.provider),
+            payers: [],
+            models: []
+        };
+        group.models.push({
+            provider: option.provider,
+            model: option.model,
+            name: option.label,
+            reasoning: false
+        });
+        groups.set(option.provider, group);
+    }
+    return [...groups.values()];
 }
 
 export function AgentWorkFields({
@@ -207,25 +231,18 @@ export function AgentWorkFields({
                             </ol>
                         ) : null}
                         {free.length > 0 && value.models.length < AGENT_MODELS_MAX ? (
-                            <Select
-                                aria-label={t("settings.agents.work.add")}
-                                value=""
-                                placeholder={t("settings.agents.work.add")}
-                                options={free.map((option) => ({
-                                    value: keyOf(option.provider, option.model),
-                                    label: option.label
-                                }))}
-                                onValueChange={(picked) => {
-                                    const option = free.find(
-                                        (entry) => keyOf(entry.provider, entry.model) === picked
-                                    );
-                                    if (option) {
-                                        setModels([
-                                            ...value.models,
-                                            { provider: option.provider, model: option.model }
-                                        ]);
-                                    }
-                                }}
+                            <ModelSelector
+                                providers={selectorProviders(free)}
+                                choice={null}
+                                forCode
+                                triggerClassName="inline-flex h-8 w-full min-w-0 items-center gap-2 rounded-md border border-border bg-background px-2 text-left text-sm text-muted-foreground"
+                                triggerContent={t("settings.agents.work.add")}
+                                onChoice={(picked) =>
+                                    setModels([
+                                        ...value.models,
+                                        { provider: picked.provider, model: picked.model }
+                                    ])
+                                }
                             />
                         ) : options.length === 0 ? (
                             <span className="text-xs text-muted-foreground">

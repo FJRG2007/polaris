@@ -297,6 +297,13 @@ const AGENT_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     openclaw: models.OpenClawMark
 };
 
+/** Coding agents whose vendor ships only a full-colour app icon, drawn from
+ *  that file: Amp's and Factory's own favicons. */
+const AGENT_IMAGES: Record<string, string> = {
+    amp: "/logos/amp.svg",
+    droid: "/logos/factory-droid.svg"
+};
+
 /** The logo for a coding agent, by its catalogue id. `custom` is a tool Polaris
  *  knows nothing about, including what it looks like, so it draws the same
  *  neutral block an unknown integration does. */
@@ -311,6 +318,9 @@ export function AgentLogo({
 }) {
     const Mark = AGENT_MARKS[id];
     if (Mark) return <Mark className={className} />;
+    const image = AGENT_IMAGES[id];
+    if (image)
+        return <img src={image} alt="" className={cn("shrink-0 rounded-sm object-contain", className)} />;
     if (id === "custom") return <Blocks className={className} />;
     return <ProviderMonogram slug={id} name={label} className={className} />;
 }

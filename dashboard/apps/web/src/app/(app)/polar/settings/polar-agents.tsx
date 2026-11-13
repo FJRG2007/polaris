@@ -70,6 +70,10 @@ export interface AgentPicks {
 }
 
 /** Where a chat with the agent starts. */
+/** Included tools shown before "Show all": Polar and the first few, so the
+ *  list does not push the person's own agents off the screen. */
+const COLLAPSED_TOOLS = 5;
+
 export function agentChatHref(id: string): string {
     return `/polar?new=1&agent=${encodeURIComponent(id)}`;
 }
@@ -151,6 +155,7 @@ export function PolarAgents({
     const [error, setError] = useState<string | null>(null);
     const [editing, setEditing] = useState<AgentView | "new" | null>(null);
     const [tuning, setTuning] = useState<{ engine: string; name: string } | null>(null);
+    const [allTools, setAllTools] = useState(false);
     const [removing, setRemoving] = useState<AgentView | null>(null);
 
     const workOf = (engine: string): AgentWork =>
@@ -196,7 +201,7 @@ export function PolarAgents({
                 </div>
                 <Card>
                     <CardBody className="flex flex-col divide-y divide-border p-0">
-                        {builtIns.map((entry) => (
+                        {(allTools ? builtIns : builtIns.slice(0, COLLAPSED_TOOLS)).map((entry) => (
                             <div key={entry.engine} className="flex items-center gap-3 px-4 py-3">
                                 <EngineMark engine={entry.engine} name={entry.name} />
                                 <div className="min-w-0 flex-1">
@@ -221,6 +226,18 @@ export function PolarAgents({
                                 ) : null}
                             </div>
                         ))}
+                        {builtIns.length > COLLAPSED_TOOLS ? (
+                            <button
+                                type="button"
+                                className="px-4 py-2 text-left text-xs text-muted-foreground hover:text-foreground"
+                                aria-expanded={allTools}
+                                onClick={() => setAllTools((current) => !current)}
+                            >
+                                {allTools
+                                    ? t("settings.agents.showFewer")
+                                    : t("settings.agents.showAll", { count: builtIns.length })}
+                            </button>
+                        ) : null}
                     </CardBody>
                 </Card>
             </div>
@@ -279,11 +296,17 @@ export function PolarAgents({
                                             </p>
                                             <p className="truncate text-xs text-muted-foreground">
                                                 {[
-                                                    t("settings.agents.runsOn", {
-                                                        engine: engineName(row.engine)
-                                                    }),
+                                                    // Only worth saying when it is not the usual: an
+                                                    // agent on Polar is what anybody expects.
+                                                    onPolar
+                                                        ? null
+                                                        : t("settings.agents.runsOn", {
+                                                              engine: engineName(row.engine)
+                                                          }),
                                                     workSummary(row, picks.engines, picks.models, t)
-                                                ].join(" - ")}
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(" - ")}
                                             </p>
                                         </div>
                                         <Button asChild size="sm" variant="outline" className="shrink-0">
@@ -496,11 +519,16 @@ function AgentEditor({
     const [loadedFor, setLoadedFor] = useState<AgentView | "new" | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [advanced, setAdvanced] = useState(false);
 
     if (editing !== loadedFor) {
+        const loaded = valuesOf(editing);
         setLoadedFor(editing);
         setError(null);
-        setValues(valuesOf(editing));
+        setValues(loaded);
+        // An agent already set to a coding tool shows where it works; a new
+        // one starts on Polar and nobody has to decide.
+        setAdvanced(loaded.engine !== POLAR_ENGINE);
     }
 
     const checked = agentInputSchema.safeParse(values);
@@ -602,6 +630,15 @@ function AgentEditor({
                             </div>
                         );
                     })}
+                    {!advanced ? (
+                        <button
+                            type="button"
+                            className="self-start text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                            onClick={() => setAdvanced(true)}
+                        >
+                            {t("settings.agents.editor.engineMore")}
+                        </button>
+                    ) : (
                     <div className="flex flex-col gap-1 text-sm">
                         <label htmlFor="agent-engine">{t("settings.agents.editor.engine")}</label>
                         <Select
@@ -623,6 +660,7 @@ function AgentEditor({
                                 : t("settings.agents.editor.engineToolHint")}
                         </span>
                     </div>
+                    )}
                     <div className="flex flex-col gap-1 text-sm">
                         <label htmlFor="agent-instructions">
                             {t("settings.agents.editor.instructions")} *

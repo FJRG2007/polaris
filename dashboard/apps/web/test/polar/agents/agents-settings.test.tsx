@@ -86,8 +86,8 @@ describe("the Agents settings", () => {
         // Nothing changed yet.
         expect(save.getAttribute("aria-disabled")).toBe("true");
         await choose("Account", "work@example.com");
-        await choose("Add a model", "Claude Opus");
-        await choose("Add a model", "Claude Sonnet");
+        await pickModel("Claude Opus");
+        await pickModel("Claude Sonnet");
         expect(screen.getByText("Preferred")).toBeTruthy();
         // Sonnet first.
         fireEvent.click(screen.getAllByRole("button", { name: "Move up" })[1] as HTMLElement);
@@ -122,10 +122,13 @@ describe("the Agents settings", () => {
             target: { value: "Review the diff." }
         });
         expect(screen.getByLabelText("pdf")).toBeTruthy();
-        await choose("Runs on", "Claude Code");
+        // Where it works is optional: a new agent is on Polar until asked.
+        expect(screen.queryByRole("combobox", { name: "Works in" })).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Use it in Code with a coding tool" }));
+        await choose("Works in", "Claude Code");
         // Skills are Polar's; a tool works on its own.
         expect(screen.queryByLabelText("pdf")).toBeNull();
-        await choose("Add a model", "Claude Opus");
+        await pickModel("Claude Opus");
         fireEvent.click(screen.getByRole("switch", { name: "Only these models" }));
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
         await waitFor(() => expect(saved).toHaveLength(1));
@@ -141,6 +144,63 @@ describe("the Agents settings", () => {
         // It starts a Code task, not a chat.
         const start = await screen.findByRole("link", { name: "New task" });
         expect(start.getAttribute("href")).toBe("/polar?session=new");
+    });
+});
+
+describe("the included tools", () => {
+    it("draws every tool with its logo and folds the long list", () => {
+        const tools = ["amp", "droid", "aider", "crush", "goose", "cline"].map((engine) => ({
+            ...CLAUDE,
+            engine,
+            name: `Tool ${engine}`
+        }));
+        const { container } = render(
+            <PolarAgents
+                initial={[]}
+                defaults={[]}
+                readOnly={false}
+                picks={{ skills: [], connectors: [], models: [], engines: [CLAUDE, ...tools] }}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        // Polar and the first four; the rest wait behind "Show all".
+        expect(screen.getByText("Tool amp")).toBeTruthy();
+        expect(screen.queryByText("Tool cline")).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Show all 8" }));
+        expect(screen.getByText("Tool cline")).toBeTruthy();
+        const images = [...container.querySelectorAll("img")].map((img) => img.getAttribute("src"));
+        expect(images).toContain("/logos/amp.svg");
+        expect(images).toContain("/logos/factory-droid.svg");
+    });
+
+    it("leaves a stored coding tool where it is and shows it", () => {
+        render(
+            <PolarAgents
+                initial={[
+                    {
+                        id: "0190c6a0-0000-7000-8000-0000000000c1",
+                        name: "Reviewer",
+                        description: "",
+                        instructions: "Review.",
+                        engine: "claude",
+                        account: null,
+                        models: [],
+                        modelPolicy: "preferred",
+                        web: false,
+                        skills: [],
+                        connectorIds: [],
+                        choice: null
+                    } as never
+                ]}
+                defaults={[]}
+                readOnly={false}
+                picks={{ skills: [], connectors: [], models: [], engines: [CLAUDE] }}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        expect(screen.getByText(/In Code with Claude Code/)).toBeTruthy();
+        fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0] as HTMLElement);
+        expect(screen.getByRole("combobox", { name: "Works in" })).toBeTruthy();
     });
 });
 
@@ -175,6 +235,14 @@ const CLAUDE = {
         { provider: "anthropic", model: "claude-sonnet", name: "Claude Sonnet" }
     ]
 };
+
+/** Adds a model through Polar's shared model picker, which opens a menu
+ *  grouped by provider rather than a plain select. */
+async function pickModel(name: string) {
+    const trigger = screen.getByRole("button", { name: "Add a model" });
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: new RegExp(name) }));
+}
 
 /** Picks an option of the select a label names. */
 async function choose(label: string, option: string) {
