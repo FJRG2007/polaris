@@ -471,7 +471,7 @@ function TestBlock({
             </p>
             {shown ? (
                 <div className="relative min-w-0">
-                    <pre className="max-h-56 min-w-0 overflow-auto rounded-md border border-border bg-field p-2 pr-9 font-mono text-xs">
+                    <pre className="max-h-56 min-w-0 overflow-auto overscroll-contain rounded-md border border-border bg-field p-2 pr-9 font-mono text-xs">
                         {curl}
                     </pre>
                     <CopyButton value={curl} className="absolute right-1 top-1" />
@@ -772,7 +772,7 @@ function Deliveries({
             ) : rows.length === 0 ? (
                 <p className="text-xs text-muted-foreground">{t("webhook.noDeliveries")}</p>
             ) : (
-                <ul className="max-h-64 min-w-0 divide-y divide-border overflow-y-auto rounded-md border border-border">
+                <ul className="max-h-64 min-w-0 divide-y divide-border overflow-y-auto overscroll-contain rounded-md border border-border">
                     {rows.map((row) => {
                         const refused = row.reason !== null;
                         const reason = refused
