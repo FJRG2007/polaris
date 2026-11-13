@@ -24,6 +24,7 @@
 import { join } from "node:path";
 import { X509Certificate } from "node:crypto";
 import { deployBase } from "@/lib/domain-service";
+import { isMagicBase } from "@polaris/deploy";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { mkdir, readFile } from "node:fs/promises";
 import { dynamicDir, writeDynamicFile } from "@/lib/traefik-dynamic";
@@ -43,6 +44,10 @@ const DYNAMIC_TLS = "polaris-wildcard.yml";
  *  rather than serving a certificate for a name nobody uses any more. */
 const ISSUED_FOR_SETTING = "tls.wildcard.issuedFor";
 
+/** Why the last order failed, kept so the Certificates screen can say so; cleared by
+ *  the next one that succeeds. */
+const LAST_ERROR_SETTING = "tls.wildcard.lastError";
+
 /**
  * Renew this long before expiry. Let's Encrypt issues for 90 days and recommends
  * renewing at 30 left; the window is generous because a failed attempt should have
@@ -57,6 +62,49 @@ export interface WildcardCertState {
     readonly expiresAt: Date | null;
     /** Why there is no wildcard, when there is not one and could be. */
     readonly reason: string | null;
+}
+
+/**
+ * Why the deploy addresses have no trusted wildcard, in terms the screen can word:
+ * `no-dns-access` - nothing here can write the zone's DNS, which DNS-01 needs, so an
+ * address nothing is deployed on is served with the edge's own certificate and the
+ * browser says it is not secure; `order-failed` - the last order did not go through;
+ * `pending` - it has not been ordered yet. Null when one covers them.
+ */
+export type WildcardProblem = "no-dns-access" | "order-failed" | "pending" | null;
+
+/** What the Certificates screen shows about the deploy addresses' wildcard. */
+export interface WildcardCertView {
+    /** False when the addresses are on a shared magic-DNS name nobody here owns. */
+    readonly needed: boolean;
+    /** The base it covers (`plr.example.com`). */
+    readonly base: string | null;
+    /** ISO time the current certificate expires, or null when there is none. */
+    readonly expiresAt: string | null;
+    readonly problem: WildcardProblem;
+}
+
+/** The deploy base a wildcard would be ordered for, or null when it is none of ours. */
+function orderableBase(base: string): string | null {
+    const clean = base.trim().toLowerCase();
+    if (!clean || clean.split(".").length < 2 || isMagicBase(clean)) return null;
+    return clean;
+}
+
+/** The wildcard's state for the screen, without ordering anything. */
+export async function wildcardCertView(now: number = Date.now()): Promise<WildcardCertView> {
+    const base = orderableBase(await deployBase());
+    if (!base) return { needed: false, base: null, expiresAt: null, problem: null };
+    const [stored, issuedFor] = await Promise.all([readStoredCert(), getSetting(ISSUED_FOR_SETTING)]);
+    if (stored && issuedFor === base && new Date(stored.validTo).getTime() > now) {
+        return { needed: true, base, expiresAt: new Date(stored.validTo).toISOString(), problem: null };
+    }
+    const [token, lastError] = await Promise.all([
+        loadCloudflareToken(),
+        getSetting(LAST_ERROR_SETTING)
+    ]);
+    const problem: WildcardProblem = !token ? "no-dns-access" : lastError ? "order-failed" : "pending";
+    return { needed: true, base, expiresAt: null, problem };
 }
 
 /** What is on disk right now, without ordering anything. */
@@ -118,8 +166,8 @@ async function readStoredCert(): Promise<X509Certificate | null> {
  * are just instances that have not opted into this.
  */
 export async function ensureWildcardCertificate(): Promise<WildcardCertState> {
-    const base = (await deployBase()).trim().toLowerCase();
-    if (!base || base.split(".").length < 2) {
+    const base = orderableBase(await deployBase());
+    if (!base) {
         return { base: null, expiresAt: null, reason: "no deploy domain is configured" };
     }
     // A magic-DNS base (sslip.io and friends) is nobody's zone here, and its names
@@ -143,6 +191,7 @@ export async function ensureWildcardCertificate(): Promise<WildcardCertState> {
         const { certificate, key } = await orderWildcard(base, token);
         await publish(certificate, key);
         await setSetting(ISSUED_FOR_SETTING, base);
+        await setSetting(LAST_ERROR_SETTING, null);
         return {
             base,
             expiresAt: new Date(new X509Certificate(certificate).validTo),
@@ -151,6 +200,7 @@ export async function ensureWildcardCertificate(): Promise<WildcardCertState> {
     } catch (caught) {
         const reason = caught instanceof Error ? caught.message : "the order failed";
         console.error("polaris: could not obtain the wildcard certificate:", reason);
+        await setSetting(LAST_ERROR_SETTING, reason.slice(0, 500)).catch(() => undefined);
         // The old certificate, if there is one, keeps serving: a failed renewal is not a
         // reason to stop presenting one that is still valid.
         return { base, expiresAt: stored ? new Date(stored.validTo) : null, reason };

@@ -674,6 +674,19 @@
                 "unknown": "The edge reads this when it starts, and this machine does not let Polaris restart it, so a change applies the next time the machine restarts."
             }
         },
+        "wildcard": {
+            "title": "Deploy addresses certificate",
+            "description": "One certificate for every address under your deploy domain, so a new or unused one opens without a security warning.",
+            "covered": "Every address under {base} has a trusted certificate, valid until {when}.",
+            "problem": {
+                "noDnsAccess": "Addresses under {base} with nothing deployed show a security warning. Covering them takes DNS access to the domain: connect a Cloudflare token that can edit its DNS.",
+                "orderFailed": "The certificate for {base} could not be issued. Check that the Cloudflare token can edit this domain's DNS, then try again.",
+                "pending": "The certificate for {base} has not been issued yet."
+            },
+            "connect": "Connect Cloudflare",
+            "issue": "Issue now",
+            "issuing": "Issuing..."
+        },
         "backup": {
             "title": "Backup access",
             "description": "Keeps your domain reachable from outside when the home line stops taking visitors. The direct path is used while it works, so normal use adds no delay.",

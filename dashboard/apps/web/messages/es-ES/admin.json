@@ -674,6 +674,19 @@
                 "unknown": "El borde lee esto al arrancar y esta máquina no deja que Polaris lo reinicie, así que un cambio se aplica la próxima vez que se reinicie la máquina."
             }
         },
+        "wildcard": {
+            "title": "Certificado de despliegues",
+            "description": "Un certificado para todas las direcciones de tu dominio de despliegue, para que una nueva o sin uso abra sin aviso de seguridad.",
+            "covered": "Todas las direcciones de {base} tienen un certificado de confianza, válido hasta {when}.",
+            "problem": {
+                "noDnsAccess": "Las direcciones de {base} sin nada desplegado muestran un aviso de seguridad. Cubrirlas requiere acceso al DNS del dominio: conecta un token de Cloudflare que pueda editarlo.",
+                "orderFailed": "No se pudo emitir el certificado de {base}. Comprueba que el token de Cloudflare puede editar el DNS de este dominio y vuelve a intentarlo.",
+                "pending": "El certificado de {base} aún no se ha emitido."
+            },
+            "connect": "Conectar Cloudflare",
+            "issue": "Emitir ahora",
+            "issuing": "Emitiendo..."
+        },
         "backup": {
             "title": "Acceso de reserva",
             "description": "Mantiene tu dominio accesible desde fuera cuando la línea de casa deja de recibir visitas. Mientras la ruta directa funciona se usa esa, así que no añade retraso.",

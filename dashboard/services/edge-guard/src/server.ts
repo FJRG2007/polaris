@@ -6,6 +6,8 @@
  * forwardAuth check, so Traefik can point at `/authz` (or any path) uniformly.
  */
 
+import { VACANT_PATH } from "@polaris/core";
+import { sendVacant } from "./vacant.js";
 import { sendRedirect } from "./redirect.js";
 import { blockLog, sendBlocked } from "./block-page.js";
 import { sendSignInUnavailable } from "./signin-unavailable.js";
@@ -25,7 +27,7 @@ export const GUARD_FEATURES_HEADER = "x-polaris-guard-features";
 
 /** What this guard enforces beyond the rules every guard has always read. `frame` is
  *  the proxy merging framing protection into the app's own response headers. */
-export const GUARD_FEATURES = "challenge,frame,ed25519,blocks";
+export const GUARD_FEATURES = "challenge,frame,ed25519,blocks,vacant";
 
 /** First value of a request header (Node lower-cases header names). */
 function header(req: IncomingMessage, name: string): string | undefined {
@@ -47,6 +49,22 @@ export function createGuardServer(config: () => GuardConfig): Server {
                 [GUARD_FEATURES_HEADER]: GUARD_FEATURES
             });
             res.end("ok");
+            return;
+        }
+        // The page an app's error middleware shows when its upstream is down, and the
+        // one the catch-all router serves for an unclaimed name. Served here as well as
+        // on the proxy listener because this listener never carries a visitor's own
+        // path: Traefik only ever calls it at the forwardAuth address. On the proxy,
+        // the error page's sub-request arrives with the signed origin header the
+        // route's later middlewares stamped onto the shared request, so the proxy
+        // took it for app traffic and dialled the stopped app a second time - which
+        // is how a stopped service still answered `Bad gateway`.
+        if (url === VACANT_PATH || url.startsWith(`${VACANT_PATH}/`) || url.startsWith(`${VACANT_PATH}?`)) {
+            sendVacant(res, {
+                host: header(req, "x-forwarded-host") ?? header(req, "host"),
+                accept: header(req, "accept"),
+                path: url
+            });
             return;
         }
         if (url.startsWith(WAF_BLOCK_LOOKUP_PATH)) {

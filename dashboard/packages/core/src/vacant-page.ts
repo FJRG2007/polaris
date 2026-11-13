@@ -130,7 +130,7 @@ export function vacantPage(input: VacantPageInput): string {
         icon: down ? STOPPED : EMPTY,
         heading: down ? "This app is not running" : "There is nothing running here",
         lead: down
-            ? `Something is deployed on ${host}, and it is not answering.`
+            ? `The app on ${host} exists, but it is stopped or not answering.`
             : `No service answers on ${host}.`,
         sections: [
             {
@@ -142,7 +142,7 @@ export function vacantPage(input: VacantPageInput): string {
             {
                 heading: "What can I do about it?",
                 body: down
-                    ? "If this is yours, open the app in Polaris and check whether it is running and what its logs say. Otherwise it is worth telling whoever sent you here."
+                    ? "If this is yours, open it in Polaris and start it. Otherwise, let whoever sent you here know."
                     : "If this is yours, deploy something on this address or point it at an app in Polaris. Otherwise check the link you followed - it may be old."
             }
         ],

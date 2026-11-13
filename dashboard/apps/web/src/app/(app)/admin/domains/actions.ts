@@ -16,6 +16,11 @@ import { runScheduledJob } from "@/lib/cron/scheduler";
 import { repairCallAddress } from "@/lib/chat/call-address-watch";
 import { acmeEmailSchema } from "@/lib/tls/acme-contact";
 import {
+    ensureWildcardCertificate,
+    wildcardCertView,
+    type WildcardCertView
+} from "@/lib/wildcard-cert-service";
+import {
     acmeContactStatus,
     restartEdge,
     saveAcmeEmail,
@@ -433,6 +438,20 @@ export async function restartEdgeAction(): Promise<{ restarting: boolean }> {
     });
     restartEdgeAfterAnswer();
     return { restarting: true };
+}
+
+/** Order the deploy addresses' wildcard certificate now instead of on the daily pass,
+ *  and answer with what the card should show after it. */
+export async function issueWildcardCertificateAction(): Promise<WildcardCertView> {
+    const user = await requireAdmin();
+    await recordAudit({
+        actorId: user.id,
+        action: "domains.issueWildcardCertificate",
+        targetType: "setting",
+        targetId: "tls.wildcard"
+    });
+    await ensureWildcardCertificate();
+    return wildcardCertView();
 }
 
 /**

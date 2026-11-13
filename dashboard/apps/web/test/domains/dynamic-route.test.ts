@@ -283,6 +283,25 @@ describe("an app whose container is not answering", () => {
         expect(config).toContain('query: "/__polaris/vacant/down"');
     });
 
+    it("fetches the page from the listener the probe found, not the proxy an obfuscated route dials", () => {
+        // The error page's sub-request carries the signed origin the route stamped, and
+        // the proxy reads that as app traffic - dialling the stopped app a second time.
+        const config = renderDynamicConfig([route({ emailObfuscation: true })], {
+            vacantAvailable: true,
+            vacantUpstream: "http://polaris-edge-guard:8080"
+        });
+        const vacant = config.slice(config.indexOf("    polaris-vacant:\n      loadBalancer"));
+
+        expect(vacant.split("\n")[3]).toContain('url: "http://polaris-edge-guard:8080"');
+    });
+
+    it("falls back to the proxy listener for a guard that serves the page only there", () => {
+        const config = renderDynamicConfig([route()], { vacantAvailable: true });
+        const vacant = config.slice(config.indexOf("    polaris-vacant:\n      loadBalancer"));
+
+        expect(vacant.split("\n")[3]).toContain('url: "http://polaris-edge-guard:8081"');
+    });
+
     it("leaves the app's own errors alone", () => {
         // A 500 is the app answering, and a 503 is it saying it is in maintenance -
         // usually with a Retry-After a client is meant to read. The middleware matches

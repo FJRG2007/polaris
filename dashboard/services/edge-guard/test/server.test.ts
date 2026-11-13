@@ -9,6 +9,7 @@ import { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import type { GuardConfig } from "../src/authz.js";
 import { encodeGuardRule, wafBlockLookupToken } from "@polaris/core/waf";
+import { VACANT_DOWN_PATH, VACANT_HEADER, VACANT_HEADER_VALUE } from "@polaris/core";
 import { createGuardServer } from "../src/server.js";
 import { describe, expect, it, afterAll, beforeAll } from "vitest";
 
@@ -156,5 +157,26 @@ describe("looking a block up by its reference", () => {
         );
         expect(response.status).toBe(404);
         expect(response.headers.get("content-type")).toContain("application/json");
+    });
+});
+
+describe("the not-running page", () => {
+    it("is served here even when the request carries a route's signed origin and rule", async () => {
+        // What the error page's sub-request looks like: Traefik copies the request's
+        // headers after the route's own middlewares stamped them.
+        const response = await fetch(`${guardUrl}${VACANT_DOWN_PATH}`, {
+            headers: {
+                ...DENIED,
+                "x-polaris-origin": "signed-origin",
+                host: "app.plr.example.com",
+                accept: "text/html"
+            }
+        });
+        const body = await response.text();
+
+        expect(response.status).toBe(502);
+        expect(response.headers.get(VACANT_HEADER)).toBe(VACANT_HEADER_VALUE);
+        expect(body).toContain("This app is not running");
+        expect(body).not.toContain("Bad gateway");
     });
 });

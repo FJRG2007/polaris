@@ -565,6 +565,13 @@ export async function connectCloudflareAccountAction(input: {
                 metadata: { method: "api-token", scope, stored: result.stored.join(",") }
             });
             revalidatePath("/admin/integrations");
+            // A token that can write DNS is what the deploy addresses' wildcard was
+            // waiting for; ordered now rather than on the next daily pass.
+            void import("@/lib/wildcard-cert-service")
+                .then((module) => module.ensureWildcardCertificate())
+                .catch((error: unknown) =>
+                    console.error("polaris: the wildcard certificate order failed:", error)
+                );
         }
         return {
             connected: result.connected,

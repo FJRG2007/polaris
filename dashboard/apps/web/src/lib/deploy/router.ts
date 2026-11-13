@@ -159,7 +159,7 @@ const PROXY_PROBE_TTL_MS = 30_000;
 const PROXY_PROBE_TIMEOUT_MS = 2000;
 
 let proxyProbe: { at: number; reachable: boolean } | null = null;
-let vacantProbe: { at: number; reachable: boolean } | null = null;
+let vacantProbe: { at: number; upstream: string } | null = null;
 
 /**
  * Whether the guard's proxy listener is actually answering.
@@ -199,25 +199,50 @@ export async function guardProxyReachable(now: number = Date.now()): Promise<boo
  * response header is what a guard that really does serve the page replies with.
  */
 export async function guardVacantReachable(now: number = Date.now()): Promise<boolean> {
-    if (vacantProbe && now - vacantProbe.at < PROXY_PROBE_TTL_MS) return vacantProbe.reachable;
-    let reachable = false;
+    return (await guardVacantUpstream(now)) !== null;
+}
+
+/** Whether `base` answers the page with the header only a guard that serves it sends. */
+async function servesVacant(base: string): Promise<boolean> {
     try {
-        const response = await fetch(`${guardProxyUrl()}${VACANT_PATH}`, {
+        const response = await fetch(`${base}${VACANT_PATH}`, {
             signal: AbortSignal.timeout(PROXY_PROBE_TIMEOUT_MS)
         });
-        reachable = response.headers.get(VACANT_HEADER) === VACANT_HEADER_VALUE;
+        return response.headers.get(VACANT_HEADER) === VACANT_HEADER_VALUE;
     } catch {
-        reachable = false;
+        return false;
     }
+}
+
+/**
+ * Where the edge should fetch the page from, or null when no listener of the guard
+ * serves it.
+ *
+ * The forwardAuth listener first. An app's error page is a sub-request Traefik makes
+ * with the headers of the original request - including the signed origin a proxied
+ * route's later middlewares stamped onto it - and the proxy listener reads a request
+ * carrying one as app traffic: it dialled the stopped app again and answered with its
+ * own `Bad gateway`. The forwardAuth listener never carries a visitor's path, so it
+ * serves the page whatever headers came with it. A guard older than that serves the
+ * page on the proxy only, which still covers every name nothing claims and every route
+ * that is not proxied.
+ */
+export async function guardVacantUpstream(now: number = Date.now()): Promise<string | null> {
+    if (vacantProbe && now - vacantProbe.at < PROXY_PROBE_TTL_MS) return vacantProbe.upstream;
+    const upstream = (await servesVacant(guardUrl()))
+        ? guardUrl()
+        : (await servesVacant(guardProxyUrl()))
+          ? guardProxyUrl()
+          : null;
     // Only a yes is remembered. The sidecar and this process start together with nothing
     // sequencing them, so the first probe after a host reboot can be a no that means
     // "not up yet" rather than "too old to serve it" - and caching that would leave the
     // next sync a few seconds later believing it too. A no is cheap to ask again;
     // remembering it is what turns a startup race into a feature that is silently off
-    // until someone happens to edit a domain.
-    if (reachable) vacantProbe = { at: now, reachable };
-    else vacantProbe = null;
-    return reachable;
+    // until someone happens to edit a domain. A yes from the proxy alone is not kept
+    // either, so a guard updated to serve it on the other listener is picked up.
+    vacantProbe = upstream === guardUrl() ? { at: now, upstream } : null;
+    return upstream;
 }
 
 const featureProbes = new Map<string, { at: number; supported: boolean }>();
@@ -270,6 +295,9 @@ export interface RenderOptions {
     /** Whether the guard serves that page. False writes none of it, so a stale sidecar
      *  keeps today's behaviour rather than being pointed at a path it does not have. */
     readonly vacantAvailable?: boolean;
+    /** The guard listener that serves it (see `guardVacantUpstream`). The proxy
+     *  listener when not given, which every guard that serves the page has. */
+    readonly vacantUpstream?: string;
     /**
      * An explicit rank for every app router, or nothing to leave Traefik ranking
      * them by the length of their rule.
@@ -745,7 +773,7 @@ export function renderDynamicConfig(
             `    ${VACANT_ERRORS}:\n      errors:\n        status: ["502", "504"]\n        service: ${VACANT}\n        query: "${VACANT_DOWN_PATH}"`
         );
         services.push(
-            `    ${VACANT}:\n      loadBalancer:\n        servers:\n          - url: "${guardProxyUrl()}"`
+            `    ${VACANT}:\n      loadBalancer:\n        servers:\n          - url: "${options.vacantUpstream ?? guardProxyUrl()}"`
         );
         // An asleep app is routed as it always is, to a container that is stopped: the
         // refusal is what brings this page up, saying it is waking rather than down.
@@ -921,9 +949,9 @@ export class LocalRouter implements Router {
         // Only worth asking when something would actually be pointed at the proxy.
         const wantsFrame = routes.some((route) => route.frameAncestors !== undefined);
         const wantsProxy = wantsFrame || routes.some((route) => route.emailObfuscation === true);
-        const [proxyAvailable, vacantAvailable, frameAvailable] = await Promise.all([
+        const [proxyAvailable, vacantUpstream, frameAvailable] = await Promise.all([
             wantsProxy ? guardProxyReachable() : Promise.resolve(true),
-            guardVacantReachable(),
+            guardVacantUpstream(),
             wantsFrame ? guardSupportsFeature("frame") : Promise.resolve(false)
         ]);
         if (wantsProxy && !proxyAvailable) {
@@ -932,6 +960,7 @@ export class LocalRouter implements Router {
                 `polaris: the edge guard's proxy is not answering on ${guardProxyUrl()}; routing ${affected} domain(s) direct, without email obfuscation. Update the polaris-edge-guard container to restore it.`
             );
         }
+        const vacantAvailable = vacantUpstream !== null;
         if (!vacantAvailable) {
             console.warn(
                 `polaris: the edge guard does not serve ${VACANT_PATH} on ${guardProxyUrl()}; an unused hostname keeps answering with the edge's own 404 and a stopped app with Bad Gateway. Update the polaris-edge-guard container to restore it.`
@@ -952,6 +981,7 @@ export class LocalRouter implements Router {
             renderDynamicConfig(routes, {
                 proxyAvailable,
                 vacantAvailable,
+                ...(vacantUpstream ? { vacantUpstream } : {}),
                 frameAvailable: frameAvailable && proxyAvailable,
                 vacantZones: this.vacantZones
             }),
