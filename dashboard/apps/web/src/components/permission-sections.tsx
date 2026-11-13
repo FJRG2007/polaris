@@ -16,7 +16,7 @@
  * the entries (`renderItems`) and holds whatever they change.
  */
 
-import { AppLogo, Button, Checkbox, Input, cn } from "@polaris/ui";
+import { Button, Checkbox, Input, cn } from "@polaris/ui";
 import { ChevronRight, Search } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
@@ -30,6 +30,7 @@ import {
     type SectionItem
 } from "@/lib/permission-sections";
 import { areaApp } from "@/lib/permission-labels";
+import { PolarisAppIcon } from "@/components/polaris-app-icon";
 
 const STORAGE_PREFIX = "polaris.permissionSections.";
 
@@ -169,9 +170,7 @@ export function PermissionSections<T extends SectionItem>({
                                         }
                                         className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
                                     >
-                                        {app ? (
-                                            <AppLogo appId={app} size={18} className="shrink-0" />
-                                        ) : null}
+                                        <PolarisAppIcon appId={app} label={section.label} size={18} />
                                         <span
                                             className="min-w-0 flex-1 truncate font-medium"
                                             title={section.label}

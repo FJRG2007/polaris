@@ -38,6 +38,7 @@ import {
 } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { PolarisAppIcon } from "@/components/polaris-app-icon";
 import { saveShortcutsAction } from "@/app/(app)/shortcut-actions";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
@@ -57,6 +58,24 @@ function groupTitle(t: T, group: string): string {
 function appTitle(t: T, app: string): string {
     const key = `apps.${app}` as NamespaceKey<"shortcuts">;
     return t.has(key) ? t(key) : app;
+}
+
+/** The Polaris app a shortcut set belongs to, for its logo. General shortcuts
+ *  and Databases belong to no single app and draw none. */
+const SHORTCUT_APP_IDS: Partial<Record<core.ShortcutApp, string>> = {
+    mail: "mail",
+    tasks: "tasks",
+    calendar: "calendar",
+    drive: "drive",
+    viewer: "drive",
+    chat: "chat",
+    places: "home",
+    vault: "vault",
+    office: "office"
+};
+
+function appIcon(app: string) {
+    return <PolarisAppIcon appId={SHORTCUT_APP_IDS[app as core.ShortcutApp]} />;
 }
 
 const ICON = "size-7 shrink-0 p-0 text-muted-foreground hover:text-foreground";
@@ -254,6 +273,7 @@ export function ShortcutSettings({
             groups.push({
                 id: `${name}:${group}`,
                 app: name,
+                icon: appIcon(name),
                 title:
                     filter === "all" && !app
                         ? `${appTitle(t, name)} - ${groupTitle(t, group)}`
@@ -370,7 +390,11 @@ export function ShortcutSettings({
                             { value: "all", label: t("allApps") },
                             ...core.SHORTCUT_APPS.filter((name) =>
                                 core.SHORTCUTS.some((definition) => definition.app === name)
-                            ).map((name) => ({ value: name, label: appTitle(t, name) }))
+                            ).map((name) => ({
+                                value: name,
+                                label: appTitle(t, name),
+                                icon: appIcon(name)
+                            }))
                         ]}
                     />
                 ) : null}

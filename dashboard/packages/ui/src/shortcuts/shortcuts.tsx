@@ -316,6 +316,8 @@ export interface ShortcutSheetRow {
 export interface ShortcutSheetGroup {
     readonly id: string;
     readonly title: string;
+    /** Drawn before the caption: the app the group belongs to, when it has one. */
+    readonly icon?: ReactNode;
     readonly rows: readonly ShortcutSheetRow[];
 }
 
@@ -342,7 +344,10 @@ export function ShortcutSheet({
         <div className={cn("grid gap-x-6 gap-y-6 lg:grid-cols-2", className)}>
             {groups.map((group) => (
                 <section key={group.id} aria-label={group.title} className="min-w-0">
-                    <h4 className="mb-2.5 text-[13px] font-semibold">{group.title}</h4>
+                    <h4 className="mb-2.5 flex min-w-0 items-center gap-2 text-[13px] font-semibold">
+                        {group.icon}
+                        <span className="min-w-0">{group.title}</span>
+                    </h4>
                     <ul className="rounded-lg border border-border">
                         {group.rows.map((row) => (
                             <li

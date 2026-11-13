@@ -29,6 +29,7 @@ import { ChevronRight, Info } from "lucide-react";
 import { Badge, Checkbox, cn } from "@polaris/ui";
 import { scopeLabelKey } from "@/lib/mcp/oauth/scope-labels";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { PolarisAppIcon } from "@/components/polaris-app-icon";
 import type { ScopeAbilities, ScopeAbility } from "@/lib/mcp/abilities";
 import {
     groupByCategory,
@@ -42,6 +43,19 @@ import {
  *  than it saves. Past it, a section starts open only when it holds a scope the
  *  app never asked for, so that note is never folded away. */
 const OPEN_UP_TO = 2;
+
+/** The Polaris app each heading is about, for the logo beside it. A heading
+ *  that spans several apps (Productivity, Development) has none and wears its
+ *  initial instead. */
+const CATEGORY_APPS: Partial<Record<McpCategory, string>> = {
+    home: "home",
+    mail: "mail",
+    calendar: "calendar",
+    chat: "chat",
+    files: "drive",
+    games: "games",
+    account: "account"
+};
 
 export function McpScopeChecklist({
     offered,
@@ -138,6 +152,7 @@ export function McpScopeChecklist({
                                 }
                                 className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm"
                             >
+                                <PolarisAppIcon appId={CATEGORY_APPS[category]} label={label} />
                                 <span className="min-w-0 flex-1 truncate font-medium" title={label}>
                                     {label}
                                 </span>

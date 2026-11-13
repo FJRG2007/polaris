@@ -131,3 +131,25 @@ describe("a section of the consent list", () => {
         expect(screen.queryByLabelText("What it allows: Read and write your notes")).toBeNull();
     });
 });
+
+describe("a heading of the consent list", () => {
+    it("wears its app's logo, and a heading of several apps its initial", () => {
+        render(
+            withMessages(
+                <McpScopeChecklist
+                    offered={["mail.read", "tasks.read"]}
+                    selected={[]}
+                    effective={new Set()}
+                    onToggle={vi.fn()}
+                />
+            )
+        );
+        const mail = screen.getByLabelText("Show Mail");
+        expect(mail.querySelector("svg[data-app-logo='mail']")).not.toBeNull();
+        const initials = screen
+            .getAllByRole("button")
+            .filter((button) => button.querySelector("[data-app-icon='initial']"));
+        expect(initials).toHaveLength(1);
+        expect(initials[0]).not.toBe(mail);
+    });
+});

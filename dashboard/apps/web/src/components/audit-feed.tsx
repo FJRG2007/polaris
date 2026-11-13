@@ -28,6 +28,7 @@ import { useLiveResource } from "@/components/use-live-resource";
 import { Download, Loader2, RefreshCw, Search, X } from "lucide-react";
 import { ActivityTable, type ActivityRow } from "@/components/activity-table";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { PolarisAppIcon } from "@/components/polaris-app-icon";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
     Button,
@@ -287,7 +288,9 @@ export function AuditFeed({
                         { value: ALL, label: t("auditFeed.everyArea") },
                         ...(facets?.areas ?? []).map((area) => ({
                             value: area,
-                            label: areaLabel(area)
+                            label: areaLabel(area),
+                            // An area named after an app ("drive.file") wears its logo.
+                            icon: <PolarisAppIcon appId={area.split(".")[0]} />
                         }))
                     ]}
                 />

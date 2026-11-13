@@ -160,3 +160,14 @@ describe("the settings", () => {
         );
     });
 });
+
+describe("the shortcut sets of each app", () => {
+    it("put the app's logo beside the set's caption", () => {
+        render(withMessages(<ShortcutSettings app="drive" />));
+        const logos = [...document.querySelectorAll("h4 svg[data-app-logo]")].map((logo) =>
+            logo.getAttribute("data-app-logo")
+        );
+        expect(logos).toContain("drive");
+        expect(logos.every((id) => id === "drive")).toBe(true);
+    });
+});
