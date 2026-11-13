@@ -64,6 +64,46 @@ export function scopeApp(scope: string): string | null {
     return hasAppLogo(app) ? app : null;
 }
 
+/** Scopes that are initialisms, written in capitals when shown as text. */
+const SCOPE_INITIALISMS: ReadonlySet<string> = new Set([
+    "ai",
+    "api",
+    "ci",
+    "cli",
+    "css",
+    "dns",
+    "ip",
+    "mcp",
+    "pdf",
+    "ssh",
+    "sso",
+    "tv",
+    "ui",
+    "usb",
+    "vpn"
+]);
+
+/**
+ * A commit subject as a line of the changelog. Subjects are written in lower
+ * case by the commit convention; read as a list, they start with a capital.
+ */
+export function changeTitle(title: string): string {
+    return title.charAt(0).toLocaleUpperCase("en") + title.slice(1);
+}
+
+/** A commit scope as a label: `agents` reads "Agents", `ui` reads "UI",
+ *  `game-servers` reads "Game servers", and each of `a,b` the same way. */
+export function scopeLabel(scope: string): string {
+    return scope
+        .split(",")
+        .map((part) => {
+            const word = part.trim();
+            if (SCOPE_INITIALISMS.has(word)) return word.toUpperCase();
+            return changeTitle(word.replace(/-/g, " "));
+        })
+        .join(", ");
+}
+
 const SEVERITY_BADGE = {
     critical: "danger",
     high: "danger",
@@ -235,20 +275,20 @@ function ChangeRow({ entry, repo }: { entry: ChangelogEntry; repo: string }) {
                 </Badge>
             ) : null}
             {entry.scope && scopeApp(entry.scope) ? (
-                <span className="flex shrink-0" title={entry.scope}>
+                <span className="flex shrink-0" title={scopeLabel(entry.scope)}>
                     <AppLogo appId={scopeApp(entry.scope)!} size={16} />
-                    <span className="sr-only">{entry.scope}</span>
+                    <span className="sr-only">{scopeLabel(entry.scope)}</span>
                 </span>
             ) : entry.scope ? (
                 <span
                     className="max-w-[6rem] shrink-0 truncate sm:max-w-[9rem] rounded bg-muted px-1.5 text-[0.6875rem] leading-[18px] text-muted-foreground"
-                    title={entry.scope}
+                    title={scopeLabel(entry.scope)}
                 >
-                    {entry.scope}
+                    {scopeLabel(entry.scope)}
                 </span>
             ) : null}
-            <span className="min-w-0 flex-1 truncate text-foreground" title={entry.title}>
-                {entry.title}
+            <span className="min-w-0 flex-1 truncate text-foreground" title={changeTitle(entry.title)}>
+                {changeTitle(entry.title)}
             </span>
             <a
                 className="shrink-0 font-mono text-[0.6875rem] text-foreground-subtle hover:text-primary hover:underline"

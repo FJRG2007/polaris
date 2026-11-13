@@ -82,6 +82,23 @@ describe("the badge", () => {
         expect(screen.getByRole("link").getAttribute("href")).toBe("/admin/updates");
     });
 
+    it("hears of an update published while the tab stays open within minutes", async () => {
+        const now = Date.now();
+        const answers = [status("up-to-date", now), status("available", now + 5 * 60_000)];
+        const fetcher = vi.fn(async () => Response.json(answers.shift()));
+        vi.stubGlobal("fetch", fetcher);
+        render(withMessages(<UpdateIndicator />));
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(screen.queryByRole("link")).toBeNull();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(5 * 60_000);
+        });
+        expect(fetcher).toHaveBeenCalledTimes(2);
+        expect(screen.getByRole("link").getAttribute("href")).toBe("/admin/updates");
+    });
+
     it("follows what the Updates screen heard", async () => {
         const now = Date.now();
         vi.stubGlobal(

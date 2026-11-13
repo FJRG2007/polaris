@@ -2,7 +2,7 @@
 
 /**
  * Passive update indicator in the top bar. Polls the cached update endpoint on
- * mount and on a slow interval, and shows a small badge linking to settings only
+ * mount and every few minutes, and shows a small badge linking to settings only
  * when there is an update that can actually be installed - a published image, not
  * a commit still being built. Silent otherwise, and silent on any error: a failed
  * check must never nag.
@@ -16,8 +16,13 @@ import { DownloadCloud } from "lucide-react";
 import type { UpdateStatus } from "@/lib/update-service";
 import * as shared from "@/lib/update-status-shared";
 
-/** Re-poll every six hours; the server response is cached, so this is cheap. */
-const POLL_INTERVAL_MS = 6 * 60 * 60 * 1000;
+/**
+ * Re-poll every five minutes, the Updates screen's pace. The answer is the
+ * server's cached check, so a poll is one small read. At six hours a tab left
+ * open learned of an update hours after it was published, which read as Polaris
+ * never saying a thing until somebody went and pressed Check.
+ */
+const POLL_INTERVAL_MS = 5 * 60_000;
 
 /** What the badge shows for a status: an installable update, or nothing. */
 function badgeOf(status: UpdateStatus | null): { behindBy: number | null } | null {

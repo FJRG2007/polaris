@@ -36,31 +36,46 @@ vi.mock("@/app/(app)/admin/updates/actions", () => ({
     })
 }));
 
-import { UpdateChangelog } from "@/app/(app)/admin/updates/update-changelog";
+import {
+    UpdateChangelog,
+    changeTitle,
+    scopeLabel
+} from "@/app/(app)/admin/updates/update-changelog";
 
 afterEach(cleanup);
 
 describe("UpdateChangelog", () => {
     it("opens Security and New, folds the rest, and links each commit", async () => {
         render(<UpdateChangelog head="head" />);
-        await screen.findByText("share link expiry");
+        await screen.findByText("Share link expiry");
         const toggles = screen.getAllByRole("button", { expanded: true });
         expect(toggles.map((button) => button.textContent)).toEqual([
             "settings.changelog.kinds.security1",
             "settings.changelog.kinds.feature6"
         ]);
-        expect(screen.queryByText("unread badge")).toBeNull();
-        expect(screen.queryByText("the guards that broke main")).toBeNull();
-        expect(screen.getAllByText(/feature number/)).toHaveLength(4);
+        expect(screen.queryByText("Unread badge")).toBeNull();
+        expect(screen.queryByText("The guards that broke main")).toBeNull();
+        expect(screen.getAllByText(/Feature number/)).toHaveLength(4);
         const sha = screen.getByText("aaaaaaa");
         expect(sha.getAttribute("href")).toBe(`https://github.com/example/repo/commit/${"a".repeat(40)}`);
 
         fireEvent.click(screen.getByText("settings.changelog.showAll"));
-        expect(screen.getAllByText(/feature number/)).toHaveLength(6);
+        expect(screen.getAllByText(/Feature number/)).toHaveLength(6);
 
         fireEvent.click(screen.getByRole("button", { name: /kinds\.maintenance/ }));
-        expect(screen.getByText("the guards that broke main").getAttribute("title")).toBe(
-            "the guards that broke main"
+        expect(screen.getByText("The guards that broke main").getAttribute("title")).toBe(
+            "The guards that broke main"
         );
+    });
+
+    it("starts every change and every scope with a capital", () => {
+        expect(changeTitle("a session reads its credentials fresh")).toBe(
+            "A session reads its credentials fresh"
+        );
+        expect(changeTitle("")).toBe("");
+        expect(scopeLabel("agents")).toBe("Agents");
+        expect(scopeLabel("ui")).toBe("UI");
+        expect(scopeLabel("game-servers")).toBe("Game servers");
+        expect(scopeLabel("chat,vpn")).toBe("Chat, VPN");
     });
 });
