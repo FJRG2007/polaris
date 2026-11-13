@@ -10,6 +10,7 @@ import type { SiteLocale } from "@/data/builders";
 import { href, siteData, words } from "@/lib/site";
 import { NavLink } from "@/components/nav-link";
 import { LanguagePicker } from "@/components/language-picker";
+import { GitHubMark } from "@polaris/ui/account-downloads/brand-icons";
 
 const PAGES = [
     { key: "home", page: "" },
@@ -63,9 +64,11 @@ export function SiteShell({ locale, children }: { locale: SiteLocale; children: 
                         />
                         <a
                             href={`https://github.com/${repo}`}
-                            className="shrink-0 px-2.5 py-1.5 text-muted-foreground hover:text-foreground"
+                            aria-label={t.nav.github}
+                            title={t.nav.github}
+                            className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"
                         >
-                            {t.nav.github}
+                            <GitHubMark className="size-5" />
                         </a>
                     </nav>
                 </header>
