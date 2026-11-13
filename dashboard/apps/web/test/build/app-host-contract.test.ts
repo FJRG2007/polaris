@@ -197,6 +197,7 @@ const EAGER_UI = [
     // read of what the notification stream said, in a module the shell's own
     // message chime (`device-once`) already loads.
     "soundingClient.anotherClientSounds",
+    "soundingClient.thisClientRings",
     // Telling the rail an app's favorites changed: a function in the module
     // the rail itself (in the shell) already loads.
     "appFavorites.refreshAppFavorites",

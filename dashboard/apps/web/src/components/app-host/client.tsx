@@ -33,7 +33,7 @@ import {
 } from "@/app/(app)/apps/installed/[id]/tabs";
 import { runAction } from "@/lib/run-action";
 import { soundGain } from "@/lib/notification-sound";
-import { anotherClientSounds } from "@/lib/notifications/sounding-client";
+import { anotherClientSounds, thisClientRings } from "@/lib/notifications/sounding-client";
 import { GameLogo } from "@/components/game-logo";
 import { relativeTime } from "@/lib/relative-time";
 import { IntegrationLogo } from "@/components/logos";
@@ -276,7 +276,7 @@ export const clientHost = {
     logos: { IntegrationLogo },
     mediaPlayer: { MediaPlayer },
     notificationSound: { soundGain },
-    soundingClient: { anotherClientSounds },
+    soundingClient: { anotherClientSounds, thisClientRings },
     pagedPicker: { PagedPicker },
     qrCode: { QRCodeSVG },
     appUrl: { useAppUrl },

@@ -1,27 +1,27 @@
 // @vitest-environment jsdom
 /**
- * An alarm or timer rings where the account's sounds are made. With the
- * desktop app open and elected to sound, a browser tab leaves the ring to it,
- * as messages and calls already do; and a dashboard that cannot say leaves the
- * tab ringing, because an alarm rung nowhere is the worse mistake.
+ * An alarm or timer shows on every open Polaris and sounds on one. Which client
+ * sounds is the connection the server elected (`thisClientRings`); within it,
+ * one tab of the browser (`claim`). A dashboard that cannot say rings, because
+ * an alarm rung nowhere is the worse mistake.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const sounding = vi.hoisted(() => ({ another: false as boolean | "missing" }));
+const sounding = vi.hoisted(() => ({ here: true as boolean | "missing" }));
 
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
         soundingClient: {
-            anotherClientSounds: () => {
-                if (sounding.another === "missing") throw new Error("not provided");
-                return sounding.another;
+            thisClientRings: () => {
+                if (sounding.here === "missing") throw new Error("not provided");
+                return sounding.here;
             }
         }
     }
 }));
 
-import { claim } from "@polaris-app/calendar/src/screens/clock/ringer";
+import { claim, soundsHere } from "@polaris-app/calendar/src/screens/clock/ringer";
 
 describe("which client rings an alarm", () => {
     const kept = new Map<string, string>();
@@ -36,23 +36,23 @@ describe("which client rings an alarm", () => {
 
     afterEach(() => vi.unstubAllGlobals());
 
-    it("rings in the browser when nothing else sounds for the account", async () => {
-        sounding.another = false;
-        expect(await claim("timer:a:2026-11-10T20:00:00Z")).toBe(true);
+    it("sounds where the server elected this client", () => {
+        sounding.here = true;
+        expect(soundsHere()).toBe(true);
     });
 
-    it("leaves the ring to the desktop app while the app sounds", async () => {
-        sounding.another = true;
-        expect(await claim("timer:b:2026-11-10T20:00:00Z")).toBe(false);
+    it("stays quiet where another client was elected", () => {
+        sounding.here = false;
+        expect(soundsHere()).toBe(false);
     });
 
-    it("rings anyway on a dashboard that does not say who sounds", async () => {
-        sounding.another = "missing";
-        expect(await claim("timer:c:2026-11-10T20:00:00Z")).toBe(true);
+    it("sounds anyway on a dashboard that does not say who sounds", () => {
+        sounding.here = "missing";
+        expect(soundsHere()).toBe(true);
     });
 
-    it("still rings once per browser", async () => {
-        sounding.another = false;
+    it("claims the sound for one tab per browser, whoever is elected", async () => {
+        sounding.here = false;
         expect(await claim("timer:d:2026-11-10T20:00:00Z")).toBe(true);
         expect(await claim("timer:d:2026-11-10T20:00:00Z")).toBe(false);
     });

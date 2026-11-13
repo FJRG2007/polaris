@@ -21,7 +21,7 @@ import { arrivalsMayAlert } from "@polaris/core";
 import { useSessionScope } from "@/components/session-scope";
 import type { NotificationView } from "@/lib/notification-service";
 import { notificationStreamPath } from "@/lib/notifications/stream-path";
-import { noteStreamConnection, reportDesktopAttention } from "@/lib/notifications/attention-report";
+import { noteStreamConnection, reportAttention } from "@/lib/notifications/attention-report";
 import { noteSounder } from "@/lib/notifications/sounding-client";
 import { arrivedDeployResults, desktopBridge } from "@/lib/desktop-bridge";
 import { openPeerChannel, subscribeSharedStream, type PeerChannel } from "@/lib/shared-stream";
@@ -186,10 +186,10 @@ export function NotificationsProvider({
      * address for it; two spellings alive at once would be two connections with
      * only one of them elected. See `notifications/stream-path`.
      */
-    // Inside the desktop app, say whether anybody is at this computer, so the
-    // sounds go to a browser somebody is using while the desk sits empty. See
+    // Say whether anybody is at this client - the app from the system, a
+    // browser from the last touch - so the sounds go where somebody is. See
     // `notifications/attention-report`.
-    useEffect(() => reportDesktopAttention(), []);
+    useEffect(() => reportAttention(), []);
 
     const [soundChanged, setSoundChanged] = useState(0);
     useEffect(() => {

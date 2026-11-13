@@ -16,17 +16,20 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { backgroundUser } from "@/lib/session";
-import { markLiveClientAway } from "@/lib/notifications/live-clients";
+import { markLiveClientActive, markLiveClientAway } from "@/lib/notifications/live-clients";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const attentionSchema = z.object({
-    /** The connection, as the stream's frames name it. */
-    connection: z.string().uuid(),
-    /** True when nobody is at the computer. */
-    away: z.boolean()
-});
+/** The connection, as the stream's frames name it. */
+const connection = z.string().uuid();
+
+/** The desktop app: whether anybody is at the computer. A browser: how long ago
+ *  somebody last touched Polaris in it, capped at a day. */
+const attentionSchema = z.union([
+    z.object({ connection, away: z.boolean() }).strict(),
+    z.object({ connection, idleMs: z.number().int().min(0).max(86_400_000) }).strict()
+]);
 
 function accepted(): NextResponse {
     return new NextResponse(null, { status: 204 });
@@ -46,6 +49,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const parsed = attentionSchema.safeParse(body);
-    if (parsed.success) markLiveClientAway(session.id, parsed.data.connection, parsed.data.away);
+    if (!parsed.success) return accepted();
+    const report = parsed.data;
+    if ("away" in report) markLiveClientAway(session.id, report.connection, report.away);
+    else markLiveClientActive(session.id, report.connection, report.idleMs);
     return accepted();
 }

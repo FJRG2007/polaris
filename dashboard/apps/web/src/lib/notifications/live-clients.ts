@@ -20,11 +20,18 @@
  * comes from, so an app left open on a desk at home silenced the browser its
  * owner was using somewhere else - a call rang in an empty room. So a client may
  * say that nobody is at its computer (`away`), and one that is not is preferred
- * over one that is, before the desktop rule applies. Only the app can say it:
- * it asks the operating system how long the machine has gone untouched. A
- * browser cannot see past its own page - a tab behind an editor is not a person
- * gone - so it never claims to be away, and nor does a client that predates
- * this. Both count as somebody there, which is how everything behaved before.
+ * over one that is, before the desktop rule applies. The app asks the operating
+ * system how long the machine has gone untouched. A browser can only see its own
+ * page, so it says when somebody last touched Polaris in it (`activeAt`), and it
+ * counts as away once that is `BROWSER_IDLE_MS` old.
+ *
+ * Away on its own was not enough. A browser used to never be away, so somebody
+ * who set a timer and walked away from their computer had the app go away two
+ * minutes later and the browser tab on the same desk take the ring. When every
+ * client is away, the one touched most recently wins: on one computer the app
+ * always is (any input in the browser is input the system saw too), and across
+ * two computers it is the one somebody left last. A client that never reports -
+ * an older build - counts as somebody there, which is how it behaved before.
  *
  * Held in memory, like the presence registry beside it and for the same reason: it
  * is worth knowing for as long as a connection is open and never again. It follows
@@ -58,6 +65,10 @@ const STALE_MS = 30_000;
  *  loop grows nothing without bound. Past it the quietest goes. */
 const MAX_CLIENTS_PER_USER = 16;
 
+/** How long a browser goes untouched before it counts as away. The same as the
+ *  app's own threshold (`IDLE_AFTER_SECONDS` in the desktop app). */
+export const BROWSER_IDLE_MS = 120_000;
+
 export interface LiveClient {
     /** This connection, for as long as it lives. */
     readonly id: string;
@@ -80,6 +91,13 @@ export interface LiveClient {
      * keep the place it always had.
      */
     readonly away: boolean;
+    /**
+     * When somebody was last known to be at it, or null for never said. For the
+     * app, the moment it said it went away (an upper bound, which is what keeps
+     * the app ahead of a browser on the same computer); for a browser, the last
+     * touch of Polaris in it.
+     */
+    readonly activeAt: number | null;
     /** When it opened. The election orders by this, so it does not move while the
      *  set of connections does not. */
     readonly opened: number;
@@ -94,12 +112,14 @@ const clients = new Map<string, Map<string, LiveClient>>();
  * Which connection should raise the effects that belong to the device.
  *
  * Pure, and the whole rule: a client somebody is at first, then a desktop
- * client, then the one that has been open longest, then the lowest id. The last two are not arbitrary - the answer
+ * client, then the one that has been open longest, then the lowest id. With
+ * nobody at any of them, the one touched most recently, then the same order.
+ * The last two are not arbitrary - the answer
  * has to be the same for every connection asking, and it must not move while
  * nothing changes, or two clients would trade the chime between them and a burst
  * of messages would sound on both.
  */
-export function chimingClient(live: readonly LiveClient[]): string | null {
+export function chimingClient(live: readonly LiveClient[], now = Date.now()): string | null {
     // A client that has the sound switched off is not a candidate. It would win on
     // being the app and then play nothing, and everybody else would have been told
     // to stay quiet - so the one switch somebody flipped to silence one window
@@ -113,12 +133,30 @@ export function chimingClient(live: readonly LiveClient[]): string | null {
     const pool = willing.length > 0 ? willing : live;
     // The same shape for nobody being anywhere: then the app is as good a place
     // as any, and the ordinary rule still has to elect somebody.
-    const attended = pool.filter((client) => !client.away);
+    const attended = pool.filter((client) => present(client, now));
     let best: LiveClient | null = null;
     for (const client of attended.length > 0 ? attended : pool) {
-        if (!best || better(client, best)) best = client;
+        if (!best) best = client;
+        else if (attended.length > 0 ? better(client, best) : leftLater(client, best))
+            best = client;
     }
     return best?.id ?? null;
+}
+
+/** Whether somebody is at a client: the app until it says otherwise, a browser
+ *  touched within `BROWSER_IDLE_MS`, and anything that never said. */
+function present(client: LiveClient, now: number): boolean {
+    if (client.away) return false;
+    if (client.kind === "desktop" || client.activeAt === null) return true;
+    return now - client.activeAt <= BROWSER_IDLE_MS;
+}
+
+/** Between clients nobody is at: the one left most recently, then the usual order. */
+function leftLater(one: LiveClient, than: LiveClient): boolean {
+    const mine = one.activeAt ?? 0;
+    const theirs = than.activeAt ?? 0;
+    if (mine !== theirs) return mine > theirs;
+    return better(one, than);
 }
 
 function better(one: LiveClient, than: LiveClient): boolean {
@@ -153,7 +191,7 @@ export function openLiveClient(
         held = new Map();
         clients.set(userId, held);
     }
-    held.set(id, { id, kind, rings, away: false, opened: now, seen: now });
+    held.set(id, { id, kind, rings, away: false, activeAt: null, opened: now, seen: now });
 
     // Past the cap the one heard from longest ago goes, which is the likeliest to
     // be a connection nobody is behind any more.
@@ -210,7 +248,28 @@ export function markLiveClientAway(
     const held = clients.get(userId);
     const client = held?.get(id);
     if (!held || !client) return false;
-    held.set(id, { ...client, away, seen: now });
+    // Away keeps the moment it started: that is when somebody was last there,
+    // and a report repeated every half minute must not move it later.
+    const activeAt = away && client.away && client.activeAt !== null ? client.activeAt : now;
+    held.set(id, { ...client, away, activeAt, seen: now });
+    return true;
+}
+
+/**
+ * Record when somebody last touched Polaris in a browser, as how long ago that
+ * was - the browser's clock is not the server's, and an interval does not
+ * depend on either. Only for a connection of this account, like `markLiveClientAway`.
+ */
+export function markLiveClientActive(
+    userId: string,
+    id: string,
+    idleMs: number,
+    now = Date.now()
+): boolean {
+    const held = clients.get(userId);
+    const client = held?.get(id);
+    if (!held || !client) return false;
+    held.set(id, { ...client, activeAt: now - Math.max(0, idleMs), seen: now });
     return true;
 }
 
@@ -232,7 +291,7 @@ export function liveClientChimes(userId: string, id: string, now = Date.now()): 
     sweep(now);
     const held = clients.get(userId);
     if (!held || held.size === 0) return true;
-    const elected = chimingClient([...held.values()]);
+    const elected = chimingClient([...held.values()], now);
     return elected === null || elected === id;
 }
 
@@ -253,7 +312,7 @@ export function chimingKind(userId: string, now = Date.now()): LiveClientKind | 
     const held = clients.get(userId);
     if (!held || held.size === 0) return null;
     const live = [...held.values()];
-    const elected = chimingClient(live);
+    const elected = chimingClient(live, now);
     return live.find((client) => client.id === elected)?.kind ?? null;
 }
 

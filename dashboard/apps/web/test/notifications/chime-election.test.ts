@@ -20,6 +20,8 @@ import {
     closeLiveClient,
     chimingKind,
     liveClientChimes,
+    BROWSER_IDLE_MS,
+    markLiveClientActive,
     markLiveClientAway,
     openLiveClient,
     resetLiveClients,
@@ -34,9 +36,10 @@ function client(
     kind: "desktop" | "browser",
     opened: number,
     rings = true,
-    away = false
+    away = false,
+    activeAt: number | null = null
 ): LiveClient {
-    return { id, kind, rings, away, opened, seen: opened };
+    return { id, kind, rings, away, activeAt, opened, seen: opened };
 }
 
 beforeEach(() => resetLiveClients());
@@ -284,5 +287,87 @@ describe("the app only while somebody is at it", () => {
         const app = client("app", "desktop", AT, true, true);
         const tab = client("tab", "browser", AT, false);
         expect(chimingClient([app, tab])).toBe("app");
+    });
+});
+
+describe("a browser nobody has touched", () => {
+    /** The stream's ticks, which keep both connections from being swept. */
+    function tick(at: number, ids = ["app", "tab"]): void {
+        for (const id of ids)
+            touchLiveClient("u1", id, id === "app" ? "desktop" : "browser", true, at);
+    }
+
+    it("keeps the ring on the app when somebody walks away from one computer", () => {
+        // The case that rang a timer in the browser: a timer set, the desk left.
+        // The browser was last touched before the system went idle, and the app
+        // says it went away two minutes after that - so the app is the one
+        // somebody left last, and it keeps the ring.
+        openLiveClient("u1", "app", "desktop", true, AT);
+        openLiveClient("u1", "tab", "browser", true, AT);
+        markLiveClientActive("u1", "tab", 0, AT + 1_000);
+        markLiveClientAway("u1", "app", true, AT + 1_000 + BROWSER_IDLE_MS + 3_000);
+        const later = AT + 1_000 + BROWSER_IDLE_MS + 10 * 60_000;
+        tick(later);
+        expect(chimingKind("u1", later)).toBe("desktop");
+        expect(liveClientChimes("u1", "app", later)).toBe(true);
+        expect(liveClientChimes("u1", "tab", later)).toBe(false);
+    });
+
+    it("never hands it to the browser between the two going idle", () => {
+        openLiveClient("u1", "app", "desktop", true, AT);
+        openLiveClient("u1", "tab", "browser", true, AT);
+        markLiveClientActive("u1", "tab", 0, AT);
+        // The browser counts as away first; the app reports a few seconds later.
+        for (let at = AT; at <= AT + BROWSER_IDLE_MS + 5_000; at += 1_000) {
+            tick(at);
+            expect(chimingKind("u1", at)).toBe("desktop");
+        }
+        markLiveClientAway("u1", "app", true, AT + BROWSER_IDLE_MS + 5_000);
+        tick(AT + BROWSER_IDLE_MS + 6_000);
+        expect(chimingKind("u1", AT + BROWSER_IDLE_MS + 6_000)).toBe("desktop");
+    });
+
+    it("gives it to a browser in use while the app's computer is empty", () => {
+        openLiveClient("u1", "app", "desktop", true, AT);
+        openLiveClient("u1", "tab", "browser", true, AT);
+        markLiveClientAway("u1", "app", true, AT);
+        markLiveClientActive("u1", "tab", 5_000, AT + 60 * 60_000);
+        expect(chimingKind("u1", AT + 60 * 60_000 + 1_000)).toBe("browser");
+    });
+
+    it("gives it to the browser left last when the app was left long before", () => {
+        // The app at home since the morning, a browser at work in the background
+        // behind an editor: both away, and the browser is where somebody was last.
+        openLiveClient("u1", "app", "desktop", true, AT);
+        openLiveClient("u1", "tab", "browser", true, AT);
+        markLiveClientAway("u1", "app", true, AT);
+        markLiveClientActive("u1", "tab", 20 * 60_000, AT + 3 * 60 * 60_000);
+        expect(chimingKind("u1", AT + 3 * 60 * 60_000)).toBe("browser");
+    });
+
+    it("keeps when the app went away through repeated reports", () => {
+        openLiveClient("u1", "app", "desktop", true, AT);
+        openLiveClient("u1", "tab", "browser", true, AT);
+        markLiveClientAway("u1", "app", true, AT);
+        markLiveClientActive("u1", "tab", 0, AT + 10_000);
+        // The app repeats itself every half minute; that is not somebody there.
+        tick(AT + 10 * 60_000);
+        markLiveClientAway("u1", "app", true, AT + 10 * 60_000);
+        expect(chimingKind("u1", AT + 10 * 60_000 + 1)).toBe("browser");
+    });
+
+    it("picks one browser of two, not both", () => {
+        openLiveClient("u1", "pc", "browser", true, AT);
+        openLiveClient("u1", "phone", "browser", true, AT + 10);
+        markLiveClientActive("u1", "pc", 10 * 60_000, AT + 20 * 60_000);
+        markLiveClientActive("u1", "phone", 1_000, AT + 20 * 60_000);
+        expect(liveClientChimes("u1", "phone", AT + 20 * 60_000)).toBe(true);
+        expect(liveClientChimes("u1", "pc", AT + 20 * 60_000)).toBe(false);
+    });
+
+    it("lets a touch report reach only its own account's connections", () => {
+        openLiveClient("u1", "tab", "browser", true, AT);
+        expect(markLiveClientActive("u2", "tab", 0, AT)).toBe(false);
+        expect(markLiveClientActive("u1", "gone", 0, AT)).toBe(false);
     });
 });

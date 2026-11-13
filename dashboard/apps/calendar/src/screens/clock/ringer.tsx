@@ -11,13 +11,15 @@
  * minute late (the computer slept) is left to the server, which already told
  * the person.
  *
- * One tab per browser rings, and a browser leaves the ring to the desktop app
- * while the app is the client elected to sound (`anotherClientSounds`).
- * Stopping it on one device has to reach every other that rings: the stop is
- * written on the row (`stoppedDue`), and while something rings here the
- * snapshot is read again every few seconds so the ring falls quiet wherever it
- * was answered. Tabs of this browser hear sooner,
- * over the clock's broadcast channel.
+ * Every open Polaris shows the ring - each tab of each browser, the desktop
+ * app, a phone - so it can be stopped from wherever somebody is. Only one of
+ * them makes the sound: the client the server elected (`thisClientRings`), and
+ * within it one tab (`claim`). The election is read again while it rings, so
+ * the sound moves if that client closes or somebody sits down at another one.
+ * Stopping it anywhere has to reach every other: the stop is written on the row
+ * (`stoppedDue`), and while something shows here the snapshot is read again
+ * every few seconds so the ring goes wherever it was answered. Tabs of this
+ * browser hear sooner, over the clock's broadcast channel.
  */
 
 import { useCalendarT } from "../i18n";
@@ -120,25 +122,25 @@ function fresh(): Promise<Response> {
     return fetch("/api/calendar/time", { cache: "no-store" });
 }
 
+/** How often a ringing screen asks again whether it is the one to sound. */
+const ELECTION_POLL_MS = 2_000;
+
 /**
- * Whether the desktop app (or, while its computer sits untouched, a browser)
- * is the client the server elected to make the account's sounds, and this page
- * is not it. A browser tab then leaves the ring to the app, as messages and
- * calls already do. A dashboard that does not offer the answer leaves nobody
- * yielding: an alarm rung twice is better than one rung nowhere.
+ * Whether this client is the one the server elected to make the account's
+ * sounds. A dashboard that does not offer the answer rings: an alarm rung
+ * twice is better than one rung nowhere.
  */
-function anotherClientRings(): boolean {
+export function soundsHere(): boolean {
     try {
-        return hostUi.soundingClient.anotherClientSounds();
+        return hostUi.soundingClient.thisClientRings();
     } catch {
-        return false;
+        return true;
     }
 }
 
-/** Claim a ring for this tab: false when another tab of this browser has it,
- *  or when another kind of client rings for the account. */
+/** Claim the sound of a ring for this tab: false when another tab of this
+ *  browser has it. Which client sounds at all is `soundsHere`. */
 export async function claim(key: string): Promise<boolean> {
-    if (anotherClientRings()) return false;
     const take = (): boolean => {
         try {
             const raw = window.localStorage.getItem(RANG_KEY);
@@ -173,6 +175,8 @@ export function useRinger(clock: ClockRead): Ringer {
     const [rings, setRings] = useState<Ring[]>([]);
     const [turn, setTurn] = useState(0);
     const heard = useRef(new Set<string>());
+    const claimed = useRef(new Set<string>());
+    const [elected, setElected] = useState(soundsHere);
     const snapshot = clock.snapshot;
     const skew = clock.skew;
     const refreshClock = clock.refresh;
@@ -188,18 +192,22 @@ export function useRinger(clock: ClockRead): Ringer {
             if (local <= now) {
                 heard.current.add(ring.key);
                 if (now - local > LATE_MS || answered(ring, snapshot)) continue;
-                void claim(ring.key).then(async (mine) => {
-                    if (!mine) return;
+                void (async () => {
                     if (!(await stillOwed(ring))) {
                         // Changed somewhere else since this tab last read:
                         // read again, so what it shows catches up as well.
                         refreshClock();
                         return;
                     }
+                    // Shown in every tab; the sound is this tab's only if it
+                    // claims it first among the tabs of this browser.
+                    if (await claim(ring.key)) claimed.current.add(ring.key);
                     setRings((current) =>
-                        current.some((entry) => entry.key === ring.key) ? current : [...current, ring]
+                        current.some((entry) => entry.key === ring.key)
+                            ? current
+                            : [...current, ring]
                     );
-                });
+                })();
             } else soonest = Math.min(soonest, local);
         }
         if (soonest === Infinity) return;
@@ -235,12 +243,23 @@ export function useRinger(clock: ClockRead): Ringer {
         return () => window.clearInterval(timer);
     }, [ringing, refresh]);
 
-    // One sound at a time: the first ring's.
-    const first = rings[0];
+    // Whether this client is still the one to sound, asked again while it
+    // rings so the sound follows the election.
     useEffect(() => {
-        if (!first) return;
+        if (!ringing) return;
+        setElected(soundsHere());
+        const timer = window.setInterval(() => setElected(soundsHere()), ELECTION_POLL_MS);
+        return () => window.clearInterval(timer);
+    }, [ringing]);
+
+    // One sound at a time: the first ring's, in the one tab of the one client
+    // that sounds.
+    const first = rings[0];
+    const loud = !!first && elected && claimed.current.has(first.key);
+    useEffect(() => {
+        if (!first || !loud) return;
         return playRing(first.sound);
-    }, [first]);
+    }, [first, loud]);
 
     const done = useCallback(
         (ring: Ring) => setRings((current) => current.filter((entry) => entry.key !== ring.key)),

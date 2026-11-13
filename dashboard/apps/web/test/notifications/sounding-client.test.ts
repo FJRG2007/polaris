@@ -18,6 +18,7 @@ import {
     anotherClientSounds,
     noteSounder,
     resetSounder,
+    thisClientRings,
     yieldsTo
 } from "@/lib/notifications/sounding-client";
 import { claimForDevice } from "@/lib/device-once";
@@ -130,6 +131,25 @@ describe("yielding", () => {
         expect(anotherClientSounds()).toBe(false);
         noteSounder(JSON.stringify({ sounder: "phone" }));
         expect(anotherClientSounds()).toBe(false);
+    });
+});
+
+describe("the one client that rings an alarm", () => {
+    it("rings only on the connection the server elected", () => {
+        // Two browsers are the same kind; the kind alone would ring both.
+        noteSounder(JSON.stringify({ items: [], chime: false, sounder: "browser" }));
+        expect(thisClientRings()).toBe(false);
+        noteSounder(JSON.stringify({ items: [], chime: true, sounder: "browser" }));
+        expect(thisClientRings()).toBe(true);
+    });
+
+    it("rings before any frame, and on one that does not say", () => {
+        expect(thisClientRings()).toBe(true);
+        noteSounder(JSON.stringify({ items: [], chime: false }));
+        noteSounder(JSON.stringify({ items: [] }));
+        expect(thisClientRings()).toBe(true);
+        noteSounder("not json");
+        expect(thisClientRings()).toBe(true);
     });
 });
 

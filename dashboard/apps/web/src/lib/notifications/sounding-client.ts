@@ -23,10 +23,17 @@ import { z } from "zod";
 import { desktopBridge } from "@/lib/desktop-bridge";
 import type { LiveClientKind } from "@/lib/notifications/live-clients";
 
-const frameSchema = z.object({ sounder: z.enum(["desktop", "browser"]).nullable().catch(null) });
+const frameSchema = z.object({
+    sounder: z.enum(["desktop", "browser"]).nullable().catch(null),
+    chime: z.boolean().nullable().optional().catch(null)
+});
 
 /** The kind the server last said makes the sounds; null for nothing said. */
 let sounder: LiveClientKind | null = null;
+
+/** Whether the server last said this client's connection is the elected one;
+ *  null for nothing said. */
+let elected: boolean | null = null;
 
 /** Read the elected kind off a notification stream frame. A frame that does not
  *  say - an older server - leaves nobody yielding. */
@@ -34,8 +41,10 @@ export function noteSounder(data: string): void {
     try {
         const frame = frameSchema.safeParse(JSON.parse(data));
         sounder = frame.success ? frame.data.sounder : null;
+        elected = frame.success ? (frame.data.chime ?? null) : null;
     } catch {
         sounder = null;
+        elected = null;
     }
 }
 
@@ -49,7 +58,19 @@ export function anotherClientSounds(): boolean {
     return yieldsTo(desktopBridge() ? "desktop" : "browser", sounder);
 }
 
+/**
+ * Whether this client is the ONE that rings for the account - the connection
+ * the server elected, not merely a client of the elected kind. Two browsers
+ * (a computer and a phone) are the same kind, and an alarm rings once.
+ * Unknown - no frame yet, an older server - rings: an alarm rung twice is
+ * better than one rung nowhere.
+ */
+export function thisClientRings(): boolean {
+    return elected !== false;
+}
+
 /** Forget what the server said. Exists for tests. */
 export function resetSounder(): void {
     sounder = null;
+    elected = null;
 }
