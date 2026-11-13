@@ -25,6 +25,7 @@ import { closeVoiceWidget, refreshVoiceWidget, setVoiceWidgetGame } from "./voic
 import { DEEP_LINK_SCHEME, deepLinkIn, readDeepLink } from "@/shared/deep-link";
 import { DeepLinks } from "./deep-links";
 import { registerMailHandler } from "./mail-handler";
+import { installContextMenu } from "./context-menu";
 import { mailtoIn, mailtoPath } from "@/shared/mailto";
 import { GameWatcher } from "./game-detect";
 import { showNotice } from "./notices";
@@ -662,6 +663,7 @@ function start(): void {
 
     app.on("web-contents-created", (_event, contents) => {
         contents.on("will-attach-webview", (event) => event.preventDefault());
+        installContextMenu(contents);
     });
 
     app.whenReady().then(() => {
