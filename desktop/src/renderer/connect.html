@@ -4,13 +4,13 @@
         <meta charset="utf-8" />
         <meta
             http-equiv="Content-Security-Policy"
-            content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+            content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'"
         />
         <title>Polaris</title>
         <link rel="stylesheet" href="styles.css" />
     </head>
     <body>
-        <div id="panel" class="panel">
+        <div id="panel" class="panel" data-loading>
         <button id="close-sheet" class="icon sheet-close" type="button" aria-label="Close" title="Close" hidden>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
                 <path d="M18 6 6 18" />
@@ -28,29 +28,20 @@
         </nav>
         <p id="failure" class="banner bad" role="alert" hidden></p>
         <section id="servers-page" role="tabpanel">
-            <ul id="server-list" class="server-list" aria-label="Your hosts" hidden></ul>
-            <button id="show-add" class="ghost with-icon" type="button" hidden><span data-icon="plus"></span>Add a host</button>
-            <section class="transfer" aria-labelledby="transfer-title">
-                <p id="transfer-title" class="section-title">Move your hosts</p>
-                <p class="hint">Only addresses and names travel, never a sign-in.</p>
-                <div class="tiles">
-                    <button id="hosts-send" class="tile" type="button" data-needs-hosts>
-                        <span class="tile-icon" data-icon="send"></span>
-                        <span class="tile-text">
-                            <span class="name">Send to another device</span>
-                            <span class="hint">QR code, code or file</span>
-                        </span>
+            <div class="section-head">
+                <p class="section-title">Your hosts</p>
+                <div class="acts">
+                    <button id="hosts-receive" class="icon" type="button" aria-label="Import hosts from another device" title="Import hosts from another device">
+                        <span data-icon="import"></span>
                     </button>
-                    <button id="hosts-receive" class="tile" type="button">
-                        <span class="tile-icon" data-icon="receive"></span>
-                        <span class="tile-text">
-                            <span class="name">Receive from another device</span>
-                            <span class="hint">Scan, paste or open a file</span>
-                        </span>
+                    <button id="hosts-send" class="icon" type="button" aria-label="Export hosts to another device" title="Export hosts to another device" data-needs-hosts>
+                        <span data-icon="export"></span>
                     </button>
                 </div>
-                <p id="transfer-note" class="hint" role="status" aria-live="polite" hidden></p>
-            </section>
+            </div>
+            <p id="transfer-note" class="hint transfer-note" role="status" aria-live="polite" hidden></p>
+            <ul id="server-list" class="server-list" aria-label="Your hosts" hidden></ul>
+            <button id="show-add" class="ghost with-icon" type="button" hidden><span data-icon="plus"></span>Add a host</button>
             <form id="form" novalidate>
                 <label class="field-label">
                     <span id="address-label">The address you open Polaris at *</span>
@@ -137,8 +128,8 @@
         </section>
         </div>
         <dialog id="send-dialog" class="wide" aria-labelledby="send-title">
-            <p id="send-title" class="name">Send your hosts</p>
-            <p class="hint">On the other device, open Polaris and choose Receive from another device.</p>
+            <p id="send-title" class="name">Export your hosts</p>
+            <p class="hint">On the other device, open Polaris and choose Import hosts. Only addresses and names travel, never a sign-in.</p>
             <svg id="qr-code" class="qr" role="img" aria-label="QR code of your hosts"></svg>
             <p id="qr-too-long" class="banner" hidden>Too many hosts for one QR code. Copy the code or save a file instead.</p>
             <p class="divider"><span>or</span></p>
@@ -152,7 +143,7 @@
             </div>
         </dialog>
         <dialog id="receive-dialog" class="wide" aria-labelledby="receive-title">
-            <p id="receive-title" class="name">Receive hosts</p>
+            <p id="receive-title" class="name">Import hosts</p>
             <div id="receive-scan">
                 <p id="scan-note" class="hint" role="status" aria-live="polite">Hold the other device's QR code up to the camera.</p>
                 <video id="scan-video" class="scan" muted playsinline></video>

@@ -12,7 +12,7 @@ const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown
 const clipboard = vi.hoisted(() => ({ writeText: vi.fn() }));
 
 vi.mock("electron", () => ({
-    ipcMain: { handle: (channel: string, handler: (event: unknown, ...args: unknown[]) => unknown) => handlers.set(channel, handler) },
+    ipcMain: { handle: (channel: string, handler: (event: unknown, ...args: unknown[]) => unknown) => handlers.set(channel, handler), on: () => undefined },
     BrowserWindow: { fromWebContents: () => null, getAllWindows: () => [] },
     clipboard,
     dialog: {},

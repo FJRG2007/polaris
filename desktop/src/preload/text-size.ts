@@ -30,6 +30,17 @@ export function reportTextSize(report: (raw: string) => void): void {
 export function applyTextSize(size: number): void {
     if (typeof document === "undefined") return;
     const apply = () => document.documentElement.style.setProperty("font-size", `${size}px`);
-    if (document.documentElement) apply();
-    else window.addEventListener("DOMContentLoaded", apply, { once: true });
+    if (document.documentElement) {
+        apply();
+        return;
+    }
+    // A preload can run before the parser has made the root: take it the moment
+    // it exists, which is before anything is drawn, rather than on
+    // DOMContentLoaded, which can come after the first paint.
+    const watch = new MutationObserver(() => {
+        if (!document.documentElement) return;
+        watch.disconnect();
+        apply();
+    });
+    watch.observe(document, { childList: true });
 }

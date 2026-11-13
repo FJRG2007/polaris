@@ -159,7 +159,9 @@ const ICONS: Record<string, string[]> = {
     open: ["M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z", "M14 2v4a2 2 0 0 0 2 2h4", "M12 12v6", "m15 15-3-3-3 3"],
     paste: ["M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z", "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"],
     scan: ["M3 7V5a2 2 0 0 1 2-2h2", "M17 3h2a2 2 0 0 1 2 2v2", "M21 17v2a2 2 0 0 1-2 2h-2", "M7 21H5a2 2 0 0 1-2-2v-2", "M7 12h10"],
-    plus: ["M12 5v14", "M5 12h14"]
+    plus: ["M12 5v14", "M5 12h14"],
+    import: ["M12 3v12", "m7 10 5 5 5-5", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"],
+    export: ["M12 15V3", "m7 8 5-5 5 5", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"]
 };
 
 for (const slot of document.querySelectorAll<HTMLElement>("[data-icon]")) {
@@ -669,7 +671,7 @@ hardwareAcceleration.addEventListener("change", () => {
 byId("restart-later").addEventListener("click", () => restartDialog.close());
 byId("restart-now").addEventListener("click", relaunch);
 byId("restart-pending-now").addEventListener("click", relaunch);
-void window.polarisLocal.connect.preferences().catch(() => null).then((preferences) => {
+const preferencesLoaded = window.polarisLocal.connect.preferences().catch(() => null).then((preferences) => {
     if (!preferences) return;
     openAtLogin.checked = preferences.openAtLogin;
     hardwareAcceleration.checked = preferences.hardwareAcceleration;
@@ -786,7 +788,7 @@ form.addEventListener("submit", (event) => {
         });
 });
 
-void window.polarisLocal.connect.state().then((state) => {
+const stateLoaded = window.polarisLocal.connect.state().catch(() => null).then((state) => {
     const servers = state?.servers ?? [];
     // The first run has nothing to list, so the field starts with the address
     // in use; once there is a list, that address is a row and the field is for
@@ -796,4 +798,12 @@ void window.polarisLocal.connect.state().then((state) => {
     draw(servers);
     check();
     ask();
+});
+
+// The page as written is the first run's - the address form, no tabs - so it
+// stays out of sight until the list and the settings are in, rather than
+// showing that form for a moment and swapping it for the tabs.
+void Promise.allSettled([stateLoaded, preferencesLoaded]).then(() => {
+    delete byId("panel").dataset.loading;
+    if (!form.hidden) input.focus();
 });

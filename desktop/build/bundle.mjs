@@ -55,6 +55,11 @@ mkdirSync(join(DIST, "renderer"), { recursive: true });
 for (const file of ["connect.html", "api-key.html", "push.html", "tv.html", "usb.html", "overlay.html", "voice-widget.html", "updating.html", "styles.css", "mark.svg"]) {
     copyFileSync(join(ROOT, "src/renderer", file), join(DIST, "renderer", file));
 }
+// The dashboard's face, so these windows read the way it does.
+mkdirSync(join(DIST, "renderer", "fonts"), { recursive: true });
+for (const file of ["IBMPlexSans-Regular.woff2", "IBMPlexSans-Medium.woff2", "IBMPlexSans-SemiBold.woff2", "NOTICE.md"]) {
+    copyFileSync(join(ROOT, "src/renderer/fonts", file), join(DIST, "renderer", "fonts", file));
+}
 // The window icon on Linux - Windows and macOS take theirs from the executable -
 // and the tray icon on Windows and Linux.
 copyFileSync(join(ROOT, "assets/icon.png"), join(DIST, "icon.png"));

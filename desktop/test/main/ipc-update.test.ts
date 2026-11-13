@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>();
 
 vi.mock("electron", () => ({
-    ipcMain: { handle: (channel: string, handler: (event: unknown, ...args: unknown[]) => unknown) => handlers.set(channel, handler) },
+    ipcMain: { handle: (channel: string, handler: (event: unknown, ...args: unknown[]) => unknown) => handlers.set(channel, handler), on: () => undefined },
     BrowserWindow: { fromWebContents: () => null, getAllWindows: () => [] },
     dialog: {},
     app: { getPath: () => "", isPackaged: false, on: () => undefined },

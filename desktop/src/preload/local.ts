@@ -86,10 +86,11 @@ const bridge: PolarisLocal = {
 
 contextBridge.exposeInMainWorld("polarisLocal", bridge);
 
-// Every window of the app's own reads at the account's text size.
-void ipcRenderer.invoke(CHANNELS.textSize).then((size: unknown) => {
-    if (typeof size === "number") applyTextSize(size);
-}, () => undefined);
+// Every window of the app's own reads at the account's text size, asked for
+// before the page draws: an answer that came back after the first paint would
+// lay the window out at the default size and then redraw it at this one.
+const size: unknown = ipcRenderer.sendSync(CHANNELS.textSize);
+if (typeof size === "number") applyTextSize(size);
 ipcRenderer.on(CHANNELS.textSizeChanged, (_event: unknown, size: unknown) => {
     if (typeof size === "number") applyTextSize(size);
 });

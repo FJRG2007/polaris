@@ -17,9 +17,41 @@
     --success: #1f7a4d;
     --code: #0f1013;
     --code-text: #d6d8de;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    /* The account's text size replaces this once the preload has it. */
+    --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    /* The dashboard's type scale (dashboard/docs/design.md), in rem of the root
+       below, so every step follows the account's text size exactly as the
+       dashboard's do: 13px body at the default 16. */
+    --text-title: 1.0625rem;
+    --text-dialog: 0.9375rem;
+    --text-heading: 0.875rem;
+    --text-body: 0.8125rem;
+    --text-small: 0.75rem;
+    --text-label: 0.6875rem;
+    font-family: var(--font-sans);
+    /* The root is the account's text size, as the dashboard's html is; the
+       preload sets it before the first paint. */
     font-size: 16px;
+}
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-weight: 400;
+    font-display: block;
+    src: url("fonts/IBMPlexSans-Regular.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-weight: 500;
+    font-display: block;
+    src: url("fonts/IBMPlexSans-Medium.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-weight: 600;
+    font-display: block;
+    src: url("fonts/IBMPlexSans-SemiBold.woff2") format("woff2");
 }
 
 @media (prefers-color-scheme: dark) {
@@ -40,15 +72,40 @@
 
 body {
     margin: 0;
-    padding: 28px 28px 24px;
+    padding: 20px 20px 16px;
     background: var(--ground);
     color: var(--text);
+    font-size: var(--text-body);
     line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Everything that takes a press says so; what cannot be pressed now says that. */
+button,
+select,
+summary,
+a[href],
+[role="tab"],
+[role="switch"],
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"],
+label:has(> input[type="checkbox"]),
+label:has(> input[type="radio"]) {
+    cursor: pointer;
+}
+
+button:disabled,
+button[aria-disabled="true"],
+select:disabled,
+input:disabled,
+label:has(> input:disabled) {
+    cursor: not-allowed;
 }
 
 h1 {
     margin: 0 0 4px;
-    font-size: 1.1rem;
+    font-size: var(--text-title);
     font-weight: 600;
     letter-spacing: -0.01em;
 }
@@ -80,7 +137,7 @@ label {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    font-size: 0.8rem;
+    font-size: var(--text-small);
     font-weight: 500;
     color: var(--muted);
 }
@@ -95,7 +152,7 @@ fieldset {
 legend {
     padding: 0;
     margin-bottom: 6px;
-    font-size: 0.8rem;
+    font-size: var(--text-small);
     font-weight: 500;
     color: var(--muted);
 }
@@ -113,8 +170,8 @@ textarea {
     color: var(--text);
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 9px 11px;
+    border-radius: 6px;
+    padding: 0.3125rem 0.625rem;
 }
 
 .field input {
@@ -139,22 +196,22 @@ input[aria-invalid="true"] {
     top: 50%;
     transform: translateY(-50%);
     padding: 4px 8px;
-    font-size: 0.75rem;
+    font-size: var(--text-small);
 }
 
 .hint {
-    font-size: 0.8rem;
+    font-size: var(--text-small);
     color: var(--muted);
     font-weight: 400;
 }
 
 .error {
-    font-size: 0.85rem;
+    font-size: var(--text-body);
     color: var(--danger);
 }
 
 .found {
-    font-size: 0.8rem;
+    font-size: var(--text-small);
     color: var(--success);
 }
 
@@ -163,7 +220,7 @@ input[aria-invalid="true"] {
     background: var(--surface);
     border-radius: 8px;
     padding: 10px 12px;
-    font-size: 0.85rem;
+    font-size: var(--text-body);
 }
 
 .banner.bad {
@@ -208,12 +265,19 @@ label.row > input {
 
 button {
     font: inherit;
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid var(--line);
     background: var(--surface);
     color: var(--text);
-    padding: 8px 14px;
-    cursor: pointer;
+    min-height: 2rem;
+    padding: 0 0.75rem;
+    font-weight: 500;
+    transition: background-color 120ms, border-color 120ms, color 120ms;
+}
+
+button:not(.primary, .danger, .link, .icon, [role="tab"], .server-open):hover {
+    border-color: color-mix(in srgb, var(--text) 22%, var(--line));
+    background: color-mix(in srgb, var(--text) 5%, var(--surface));
 }
 
 button.primary {
@@ -226,6 +290,7 @@ button.primary {
 button.link {
     border: none;
     background: none;
+    min-height: 0;
     padding: 0;
     color: var(--accent);
     text-decoration: underline;
@@ -235,12 +300,11 @@ button.link {
 button[aria-disabled="true"],
 button:disabled {
     opacity: 0.55;
-    cursor: default;
 }
 
 .path {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.8rem;
+    font-size: var(--text-small);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -254,7 +318,7 @@ button:disabled {
     list-style: none;
     margin: 0;
     padding: 0;
-    font-size: 0.75rem;
+    font-size: var(--text-small);
     color: var(--muted);
 }
 
@@ -297,7 +361,7 @@ pre.log {
     border-radius: 8px;
     padding: 10px 12px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.75rem;
+    font-size: var(--text-small);
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-all;
@@ -309,7 +373,7 @@ pre.log {
 
 h2 {
     margin: 0 0 8px;
-    font-size: 0.85rem;
+    font-size: var(--text-body);
     font-weight: 600;
     color: var(--muted);
 }
@@ -318,10 +382,12 @@ h2 {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
 }
 
 .brand .mark {
+    width: 24px;
+    height: 24px;
     margin: 0;
 }
 
@@ -332,17 +398,22 @@ h2 {
 .tabs {
     display: flex;
     gap: 2px;
-    margin-bottom: 16px;
+    margin: 0 0 12px;
     border-bottom: 1px solid var(--line);
 }
 
 .tabs button {
+    margin-bottom: -1px;
     border: 0;
     border-bottom: 2px solid transparent;
     border-radius: 0;
     background: none;
     color: var(--muted);
-    padding: 6px 10px;
+    padding: 0 0.625rem;
+}
+
+.tabs button:hover {
+    color: var(--text);
 }
 
 #usb-found button[aria-pressed="true"] {
@@ -356,7 +427,7 @@ h2 {
 
 .server-list {
     list-style: none;
-    margin: 0 0 12px;
+    margin: 0 0 8px;
     padding: 0;
     display: flex;
     flex-direction: column;
@@ -384,7 +455,9 @@ h2 {
     border: 0;
     background: none;
     color: inherit;
-    padding: 5px 8px;
+    min-height: 0;
+    padding: 4px 8px;
+    font-weight: 400;
     text-align: left;
 }
 
@@ -413,12 +486,17 @@ h2 {
 
 .name {
     color: var(--text);
+    font-weight: 500;
+}
+
+dialog > .name:first-child {
+    font-size: var(--text-dialog);
     font-weight: 600;
 }
 
 .server .host {
     color: var(--muted);
-    font-size: 0.85rem;
+    font-size: var(--text-body);
 }
 
 .server .host:empty {
@@ -428,7 +506,7 @@ h2 {
 .server .badge {
     flex-shrink: 0;
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: var(--text-small);
 }
 
 .server input {
@@ -459,8 +537,12 @@ label.setting {
     text-align: left;
     justify-content: space-between;
     gap: 12px;
-    border-radius: 8px;
-    padding: 10px 12px;
+    margin: 0 -10px;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: var(--text-body);
+    color: var(--text);
+    cursor: pointer;
 }
 
 /* Rows of switches read as one list: no box around each, only a tint under
@@ -479,10 +561,12 @@ label.setting:hover {
     appearance: none;
     flex-shrink: 0;
     position: relative;
-    width: 34px;
-    height: 20px;
+    width: 2.25rem;
+    height: 1.25rem;
     margin: 0;
-    border-radius: 10px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
     background: var(--line);
     transition: background-color 120ms;
 }
@@ -490,10 +574,10 @@ label.setting:hover {
 .switch::after {
     content: "";
     position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 16px;
-    height: 16px;
+    top: 0.125rem;
+    left: 0.125rem;
+    width: 1rem;
+    height: 1rem;
     border-radius: 50%;
     background: #fff;
     transition: transform 120ms;
@@ -504,15 +588,18 @@ label.setting:hover {
 }
 
 .switch:checked::after {
-    transform: translateX(14px);
+    transform: translateX(1rem);
 }
 
 .version {
     margin-top: 12px;
 }
 
+/* The app's own line under the settings: set apart from them, not one more row. */
 .version-row {
     margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
 }
 
 .version-row .version {
@@ -524,10 +611,10 @@ label.setting:hover {
 dialog {
     width: min(340px, calc(100vw - 32px));
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: 12px;
     background: var(--surface);
     color: var(--text);
-    padding: 16px;
+    padding: 20px;
     max-height: calc(100vh - 32px);
     overflow: auto;
 }
@@ -536,15 +623,22 @@ dialog.wide {
     width: min(420px, calc(100vw - 32px));
 }
 
-.transfer {
+/* A list's heading, with the actions on the whole list beside it. */
+.section-head {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-top: 20px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
 }
 
-.transfer .hint {
-    margin: 0 0 4px;
+.section-head .acts {
+    display: flex;
+    gap: 2px;
+}
+
+.transfer-note {
+    margin-bottom: 8px;
 }
 
 svg.qr {
@@ -577,7 +671,7 @@ dialog textarea {
     box-sizing: border-box;
     margin-bottom: 10px;
     font-family: ui-monospace, monospace;
-    font-size: 0.8rem;
+    font-size: var(--text-small);
     word-break: break-all;
 }
 
@@ -595,8 +689,8 @@ button.icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 2rem;
+    height: 2rem;
     padding: 0;
     border-color: transparent;
     background: none;
@@ -609,9 +703,13 @@ button.icon:hover {
 }
 
 button.icon svg {
-    width: 16px;
-    height: 16px;
+    width: 1rem;
+    height: 1rem;
     flex-shrink: 0;
+}
+
+button.icon [data-icon] {
+    display: inline-flex;
 }
 
 /* The window shown while an update goes in. */
@@ -717,18 +815,22 @@ button.icon svg {
     width: min(540px, 100%);
     max-height: calc(100vh - 80px);
     overflow: auto;
-    padding: 28px 28px 24px;
+    padding: 20px 20px 16px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 14px;
     box-shadow: 0 24px 80px rgb(0 0 0 / 0.4);
+}
+
+/* The card rises in once it is shown, not while it waits for its state. */
+.sheet .panel:not([data-loading]) {
     animation: sheet-in 160ms ease-out;
 }
 
 .sheet-close {
     position: absolute;
-    top: 14px;
-    right: 14px;
+    top: 10px;
+    right: 10px;
 }
 
 @keyframes sheet-in {
@@ -746,54 +848,17 @@ button.icon svg {
 
 .switch:disabled {
     opacity: 0.5;
-    cursor: not-allowed;
 }
-/* Moving the hosts: two actions, each opening one focused step. */
+
+/* Kept out of sight until its first state is drawn (connect.ts). */
+.panel[data-loading] {
+    visibility: hidden;
+}
+
 .section-title {
     color: var(--text);
+    font-size: var(--text-heading);
     font-weight: 600;
-}
-.tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-    gap: 8px;
-}
-button.tile {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-    padding: 12px;
-    text-align: left;
-    border-radius: 10px;
-    transition: border-color 120ms, background-color 120ms;
-}
-button.tile:hover {
-    border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
-    background: color-mix(in srgb, var(--accent) 6%, var(--surface));
-}
-.tile-icon {
-    flex-shrink: 0;
-    display: grid;
-    place-items: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 8px;
-    color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-.tile-icon svg {
-    width: 1.1rem;
-    height: 1.1rem;
-}
-.tile-text {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-.tile-text .name,
-.tile-text .hint {
-    overflow-wrap: anywhere;
 }
 .divider {
     display: flex;
@@ -801,7 +866,7 @@ button.tile:hover {
     gap: 10px;
     margin: 0 0 10px;
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: var(--text-small);
 }
 .divider::before,
 .divider::after {
