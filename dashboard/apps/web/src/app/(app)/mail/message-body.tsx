@@ -355,8 +355,17 @@ function frameDocument(
     window.addEventListener("contextmenu", function (event) {
       var selection = window.getSelection();
       var text = selection ? String(selection) : "";
-      if (!text.trim() || text.length > ${selectionMenu.FRAMED_SELECTION_MAX}) return;
       var x = event.clientX, y = event.clientY;
+      if (!text.trim()) {
+        // A link with nothing selected: Polaris's link menu, as on any page.
+        // Only its address travels, and the page checks that too.
+        var anchor = event.target && event.target.closest ? event.target.closest("a[href]") : null;
+        if (!anchor || !/^(https?:|mailto:)/i.test(anchor.href)) return;
+        event.preventDefault();
+        parent.postMessage({ polarisMailMenu: { x: x, y: y, href: anchor.href } }, "*");
+        return;
+      }
+      if (text.length > ${selectionMenu.FRAMED_SELECTION_MAX}) return;
       if (event.button !== 2 || (x === 0 && y === 0)) {
         var rect = selection.rangeCount ? selection.getRangeAt(0).getBoundingClientRect() : null;
         if (rect) { x = rect.left; y = rect.bottom; }
@@ -508,6 +517,10 @@ export function SandboxedHtml({
                 const box = frame.current.getBoundingClientRect();
                 const found = selectionMenu.framedSelection(menu, box);
                 if (found) selectionMenu.openFramedSelection(found);
+                const link = found
+                    ? null
+                    : selectionMenu.framedLink(menu, box, window.location.origin);
+                if (link) selectionMenu.openFramedLink(link);
                 return;
             }
             const claimed = (event.data as { polarisMailHeight?: unknown } | null)

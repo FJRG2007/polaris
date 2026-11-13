@@ -232,13 +232,18 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
             const { x, y, text } = (event as CustomEvent<selectionMenu.FramedSelection>).detail;
             setMenu({ x, y, found: { text, field: null }, fieldRange: null, range: null });
         };
+        // A link inside such a frame, with nothing selected: checked the same way.
+        const onFramedLink = (event: Event) =>
+            setLink((event as CustomEvent<selectionMenu.FramedLink>).detail);
         window.addEventListener("contextmenu", record, true);
         window.addEventListener("contextmenu", onContextMenu);
         window.addEventListener(selectionMenu.FRAMED_SELECTION_EVENT, onFramed);
+        window.addEventListener(selectionMenu.FRAMED_LINK_EVENT, onFramedLink);
         return () => {
             window.removeEventListener("contextmenu", record, true);
             window.removeEventListener("contextmenu", onContextMenu);
             window.removeEventListener(selectionMenu.FRAMED_SELECTION_EVENT, onFramed);
+            window.removeEventListener(selectionMenu.FRAMED_LINK_EVENT, onFramedLink);
         };
     }, []);
 

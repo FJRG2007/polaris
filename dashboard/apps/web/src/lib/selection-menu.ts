@@ -194,6 +194,59 @@ export function framedSelection(
     return { x: offset.left + x, y: offset.top + y, text };
 }
 
+/** A right-click on a link inside a sandboxed frame, with nothing selected. */
+export const FRAMED_LINK_EVENT = "polaris:framed-link";
+
+export interface FramedLink extends LinkAt {
+    readonly x: number;
+    readonly y: number;
+}
+
+/**
+ * What a frame posted, read as a link at a point on this page, or null. The
+ * address is parsed here, not trusted: only the web and mail leave, and the
+ * frame's own origin is opaque, so `internal` is decided against this page.
+ */
+export function framedLink(
+    claimed: unknown,
+    offset: { readonly left: number; readonly top: number },
+    pageOrigin: string
+): FramedLink | null {
+    if (!claimed || typeof claimed !== "object") return null;
+    const { x, y, href } = claimed as { x?: unknown; y?: unknown; href?: unknown };
+    if (typeof x !== "number" || typeof y !== "number") return null;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (typeof href !== "string" || href.length > FRAMED_SELECTION_MAX) return null;
+    let url: URL;
+    try {
+        url = new URL(href);
+    } catch {
+        return null;
+    }
+    if (!LINK_PROTOCOLS.has(url.protocol)) return null;
+    const mail = url.protocol === "mailto:";
+    let copyText = url.href;
+    if (mail) {
+        try {
+            copyText = decodeURIComponent(url.pathname);
+        } catch {
+            copyText = url.pathname;
+        }
+    }
+    return {
+        x: offset.left + x,
+        y: offset.top + y,
+        href: url.href,
+        copyText,
+        internal: !mail && url.origin === pageOrigin
+    };
+}
+
+/** Open Polaris's link menu for a link inside a frame. */
+export function openFramedLink(found: FramedLink): void {
+    window.dispatchEvent(new CustomEvent<FramedLink>(FRAMED_LINK_EVENT, { detail: found }));
+}
+
 /** Open the selection menu for text selected inside a frame. */
 export function openFramedSelection(found: FramedSelection): void {
     window.dispatchEvent(

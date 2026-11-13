@@ -297,6 +297,46 @@ describe("text selected inside a received email", () => {
     });
 });
 
+describe("a link inside a received email", () => {
+    const offset = { left: 100, top: 200 };
+    const origin = "https://polaris.example";
+
+    it("opens Polaris's link menu for what the frame reports", () => {
+        page();
+        const found = selectionMenu.framedLink(
+            { x: 5, y: 6, href: "https://example.com/track?id=1" },
+            offset,
+            origin
+        );
+        expect(found).not.toBeNull();
+        act(() => selectionMenu.openFramedLink(found!));
+        expect(screen.getByRole("menuitem", { name: "Open in new tab" })).toBeTruthy();
+        expect(screen.getByRole("menuitem", { name: "Copy link address" })).toBeTruthy();
+    });
+
+    it("parses the address itself and refuses anything but the web and mail", () => {
+        expect(
+            selectionMenu.framedLink({ x: 5, y: 6, href: "mailto:ana@example.com" }, offset, origin)
+        ).toEqual({
+            x: 105,
+            y: 206,
+            href: "mailto:ana@example.com",
+            copyText: "ana@example.com",
+            internal: false
+        });
+        expect(
+            selectionMenu.framedLink({ x: 0, y: 0, href: `${origin}/tasks` }, offset, origin)
+                ?.internal
+        ).toBe(true);
+        for (const href of ["javascript:alert(1)", "data:text/html,x", "nope", 7])
+            expect(selectionMenu.framedLink({ x: 5, y: 6, href }, offset, origin)).toBeNull();
+        expect(
+            selectionMenu.framedLink({ x: Number.NaN, y: 6, href: origin }, offset, origin)
+        ).toBeNull();
+        expect(selectionMenu.framedLink(null, offset, origin)).toBeNull();
+    });
+});
+
 describe("selection quote", () => {
     it("is cleaned and capped, and empty is nothing", () => {
         expect(selectionQuote("  \n\t ")).toBeNull();
