@@ -332,7 +332,6 @@
             "noMatch": "No permission matches that.",
             "clear": "Clear",
             "groups": {
-                "files": "Files",
                 "storage": "Storage",
                 "sharing": "Sharing",
                 "snippets": "Snippets",
@@ -353,6 +352,12 @@
                 "family": "Family",
                 "administration": "Administration",
                 "polar": "Polar"
+            },
+            "levelOf": "Access to {group}",
+            "level": {
+                "none": "None",
+                "read": "Read",
+                "write": "Read and write"
             }
         },
         "reference": {

@@ -27,7 +27,17 @@
 import { useMemo, useState } from "react";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { ChevronRight, Search, X } from "lucide-react";
-import { Badge, Button, Checkbox, Input, cn } from "@polaris/ui";
+import { levelOf, withLevel, type ScopeLevel } from "@/lib/scope-levels";
+import {
+    AppLogo,
+    Badge,
+    Button,
+    Checkbox,
+    Input,
+    SegmentedControl,
+    cn,
+    hasAppLogo
+} from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { expandPermissions, impliedBy, type Permission } from "@polaris/core";
 import { SCOPE_GROUPS, SCOPE_HINTS, SCOPE_LABELS, scopeGroupKey } from "@/lib/api-key-scopes";
@@ -65,12 +75,27 @@ export function ScopePicker({
     const groups = useMemo(() => {
         const named = SCOPE_GROUPS.map((group) => ({
             title: scopeGroupTitle(t, group.title),
-            scopes: group.scopes.filter((scope) => offered.has(scope))
+            scopes: group.scopes.filter((scope) => offered.has(scope)),
+            app: group.app,
+            // Levels only where every scope they name can be put on this key:
+            // a level that cannot be granted in full is not a choice to offer.
+            levels:
+                group.levels && group.levels.write.every((scope) => offered.has(scope))
+                    ? group.levels
+                    : undefined
         })).filter((group) => group.scopes.length > 0);
         const listed = new Set(named.flatMap((group) => group.scopes));
         const rest = available.filter((scope) => !listed.has(scope));
         return rest.length > 0
-            ? [...named, { title: t("apiKeys.scopes.other"), scopes: rest }]
+            ? [
+                  ...named,
+                  {
+                      title: t("apiKeys.scopes.other"),
+                      scopes: rest,
+                      app: undefined,
+                      levels: undefined
+                  }
+              ]
             : named;
     }, [available, offered, t]);
 
@@ -202,6 +227,9 @@ export function ScopePicker({
                                             expanded && "rotate-90"
                                         )}
                                     />
+                                    {group.app && hasAppLogo(group.app) ? (
+                                        <AppLogo appId={group.app} size={18} />
+                                    ) : null}
                                     <span
                                         className="min-w-0 flex-1 truncate font-medium"
                                         title={group.title}
@@ -222,6 +250,34 @@ export function ScopePicker({
                                             : t("apiKeys.scopes.none")}
                                     </span>
                                 </button>
+                                {group.levels ? (
+                                    <SegmentedControl<ScopeLevel>
+                                        size="sm"
+                                        className="mr-3 shrink-0"
+                                        aria-label={t("apiKeys.scopes.levelOf", {
+                                            group: group.title
+                                        })}
+                                        value={levelOf(group.levels, selected)}
+                                        onValueChange={(level) =>
+                                            group.levels &&
+                                            onChange(withLevel(selected, group.levels, level))
+                                        }
+                                        options={[
+                                            {
+                                                value: "none",
+                                                label: t("apiKeys.scopes.level.none")
+                                            },
+                                            {
+                                                value: "read",
+                                                label: t("apiKeys.scopes.level.read")
+                                            },
+                                            {
+                                                value: "write",
+                                                label: t("apiKeys.scopes.level.write")
+                                            }
+                                        ]}
+                                    />
+                                ) : null}
                             </div>
 
                             {expanded && (

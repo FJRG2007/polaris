@@ -332,7 +332,6 @@
             "noMatch": "Ningún permiso coincide.",
             "clear": "Borrar",
             "groups": {
-                "files": "Archivos",
                 "storage": "Almacenamiento",
                 "sharing": "Compartir",
                 "snippets": "Fragmentos",
@@ -353,6 +352,12 @@
                 "family": "Familia",
                 "administration": "Administración",
                 "polar": "Polar"
+            },
+            "levelOf": "Acceso a {group}",
+            "level": {
+                "none": "Nada",
+                "read": "Leer",
+                "write": "Leer y editar"
             }
         },
         "reference": {

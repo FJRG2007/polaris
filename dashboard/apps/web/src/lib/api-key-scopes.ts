@@ -10,6 +10,7 @@
  */
 
 import type { Permission } from "@polaris/core";
+import type { ScopeLevels } from "@/lib/scope-levels";
 
 export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "drive.read": "Read files",
@@ -135,33 +136,45 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
 export interface ScopeGroup {
     readonly title: string;
     readonly scopes: readonly Permission[];
+    /** The app whose logo is drawn beside the area, when it has one. */
+    readonly app?: string;
+    /** None / read / read and write, for an area where those are the choice. */
+    readonly levels?: ScopeLevels;
 }
 
 /** Resource sections, in the order the dialog shows them. */
 export const SCOPE_GROUPS: readonly ScopeGroup[] = [
-    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Files", scopes: ["drive.read", "drive.write", "drive.delete"] },
-    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Storage", scopes: ["connections.manage"] },
+    {
+        // i18n-ignore said in the reader's words by account/api-keys/scope-picker
+        title: "Storage",
+        scopes: ["drive.read", "drive.write", "drive.delete", "connections.manage"],
+        app: "drive",
+        levels: { read: ["drive.read"], write: ["drive.read", "drive.write", "drive.delete"] }
+    },
     {
         // i18n-ignore said in the reader's words by account/api-keys/scope-picker
         title: "Sharing",
-        scopes: ["shares.create", "shares.manage", "requests.create", "requests.manage"]
+        scopes: ["shares.create", "shares.manage", "requests.create", "requests.manage"],
+        app: "drive"
+    },
+    {
+        // i18n-ignore said in the reader's words by account/api-keys/scope-picker
+        title: "Snippets",
+        scopes: ["snippets.read", "snippets.write"],
+        levels: { read: ["snippets.read"], write: ["snippets.read", "snippets.write"] }
     },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Snippets", scopes: ["snippets.read", "snippets.write"] },
+    { title: "Vault", scopes: ["vault.use"], app: "vault" },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Vault", scopes: ["vault.use"] },
+    { title: "Notes", scopes: ["notes.use"], app: "notes" },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Notes", scopes: ["notes.use"] },
+    { title: "Office", scopes: ["office.use"], app: "office" },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Office", scopes: ["office.use"] },
+    { title: "VPN", scopes: ["vpn.use"], app: "vpn" },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "VPN", scopes: ["vpn.use"] },
+    { title: "Mail", scopes: ["mail.use", "mailserver.manage"], app: "mail" },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Mail", scopes: ["mail.use", "mailserver.manage"] },
-    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Calendar", scopes: ["calendar.use"] },
+    { title: "Calendar", scopes: ["calendar.use"], app: "calendar" },
     {
         // i18n-ignore said in the reader's words by account/api-keys/scope-picker
         title: "Chat",
@@ -172,31 +185,63 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
             "chat.attach",
             "chat.call",
             "chat.meetings"
-        ]
+        ],
+        app: "chat"
     },
-    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Deployments", scopes: ["deploy.read", "deploy.manage"] },
+    {
+        // i18n-ignore said in the reader's words by account/api-keys/scope-picker
+        title: "Deployments",
+        scopes: ["deploy.read", "deploy.manage"],
+        levels: { read: ["deploy.read"], write: ["deploy.read", "deploy.manage"] }
+    },
     {
         // i18n-ignore said in the reader's words by account/api-keys/scope-picker
         title: "Game servers",
-        scopes: ["games.read", "games.moderate", "games.console", "games.manage"]
+        scopes: ["games.read", "games.moderate", "games.console", "games.manage"],
+        app: "games",
+        levels: {
+            read: ["games.read"],
+            write: ["games.read", "games.moderate", "games.console", "games.manage"]
+        }
+    },
+    {
+        // i18n-ignore said in the reader's words by account/api-keys/scope-picker
+        title: "Agents",
+        scopes: ["agents.read", "agents.manage"],
+        levels: { read: ["agents.read"], write: ["agents.read", "agents.manage"] }
     },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Agents", scopes: ["agents.read", "agents.manage"] },
+    { title: "Polar", scopes: ["polar.use", "polar.spend"], app: "polar" },
+    {
+        // i18n-ignore said in the reader's words by account/api-keys/scope-picker
+        title: "Home",
+        scopes: ["home.read", "home.control", "home.manage"],
+        app: "home",
+        levels: { read: ["home.read"], write: ["home.read", "home.control", "home.manage"] }
+    },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Polar", scopes: ["polar.use", "polar.spend"] },
-    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Home", scopes: ["home.read", "home.control", "home.manage"] },
-    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Tools", scopes: ["tools.use", "tools.manage"] },
-    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Tasks", scopes: ["tasks.read", "tasks.manage"] },
-    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Inbox", scopes: ["inbox.read", "inbox.manage"] },
+    { title: "Tools", scopes: ["tools.use", "tools.manage"], app: "tools" },
+    {
+        // i18n-ignore said in the reader's words by account/api-keys/scope-picker
+        title: "Tasks",
+        scopes: ["tasks.read", "tasks.manage"],
+        app: "tasks",
+        levels: { read: ["tasks.read"], write: ["tasks.read", "tasks.manage"] }
+    },
+    {
+        // i18n-ignore said in the reader's words by account/api-keys/scope-picker
+        title: "Inbox",
+        scopes: ["inbox.read", "inbox.manage"],
+        levels: { read: ["inbox.read"], write: ["inbox.read", "inbox.manage"] }
+    },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
     { title: "Family", scopes: ["family.manage"] },
-    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
-    { title: "Administration", scopes: ["users.manage", "settings.manage", "system.manage"] }
+    {
+        // i18n-ignore said in the reader's words by account/api-keys/scope-picker
+        title: "Administration",
+        scopes: ["users.manage", "settings.manage", "system.manage"],
+        app: "admin"
+    }
 ];
 
 /** Where an area's name is in the `account` catalog: `SCOPE_GROUPS` names each
