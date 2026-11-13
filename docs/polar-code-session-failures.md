@@ -124,6 +124,32 @@ show a recurrence is listed).
   Docker on the development machine). If it recurs: `ls
   ~/.polaris/sessions/*/tmp` on the server and `TMUX_TMPDIR=<that> tmux ls`.
 
+## PC-7 - a session keeps the credentials it booted with
+
+- Seen: 2026-11-13, session `ece844d2` on lirio-0, booted 11:27 before PC-3's fix
+  shipped. Reopened at 13:23 on the fixed build, it still failed with the
+  workspace 400.
+- Evidence: `/session/claim.env` in its container (written 11:27) held both
+  `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN`; the boot sources it once and
+  every later turn inherits that environment.
+- Fix: before every prompt, reopen and interface launch, Polaris resolves the
+  credentials again through the boot's own path and writes them to
+  `credentials.env` in the session's state directory; the launch script clears
+  every variable the tool reads and sources that file right before the agent
+  starts. A launch script written by an older build is taught the line on the
+  first refresh. A refresh that fails keeps the boot's credentials and logs why.
+
+## PC-8 - the stored sign-in itself is refused
+
+- Seen: 2026-11-13. Running `claude -p` in that container with only the stored
+  `CLAUDE_CODE_OAUTH_TOKEN` (linked 2026-08-31) answered
+  `Failed to authenticate. API Error: 401 Invalid bearer token`.
+- The session showed only a failed turn; nothing said to link the account again.
+- Fix: a failed turn whose text is a credential refusal marks that account
+  refused (as a refused key is) and the session shows which account and a
+  button to AI keys. Saving a new secret on the account clears the mark, and
+  thanks to PC-7 a session already open uses it on its next prompt.
+
 ## How to diagnose a failing session
 
 All read-only, on the server, never on the development machine (no Docker there).

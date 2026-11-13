@@ -29,6 +29,7 @@
 import { shellQuote } from "./session-hooks";
 import {
     FIRST_RUN_WORKDIR,
+    hasControlCharacter,
     isVendorSessionId,
     promptSubmitDelayMs,
     sanitizeAgentPrompt,
@@ -666,6 +667,95 @@ export const PREVIEW_PROMPT =
     "Hot reload does not reach the preview, which is reloaded from its tab.";
 
 /**
+ * The agent's credentials as Polaris resolved them for the coming turn, in the
+ * state directory beside the checkout.
+ *
+ * The boot environment is fixed the moment the machine starts, and every turn
+ * and every relaunch inherits it - so a session started before somebody linked
+ * their account again kept the old credential until it ended. Polaris rewrites
+ * this file before each prompt from the accounts as they are now, and the launch
+ * script reads it right before the agent starts. Shell, because the launch
+ * sources it: it clears every variable the tool reads first, so a credential
+ * that is gone is gone rather than inherited from the boot.
+ */
+export const CREDENTIALS_FILE = "credentials.env";
+
+/** The line the launch script reads that file with. Also what a launch script
+ *  written by an older build is taught, so its sessions refresh too. */
+const READ_CREDENTIALS = `if [ -f "$POLARIS_STATE_DIR/${CREDENTIALS_FILE}" ]; then . "$POLARIS_STATE_DIR/${CREDENTIALS_FILE}"; fi`;
+
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * The credentials file's contents: every name in `cleared` and `env` unset,
+ * then `env` set and exported. Throws on a name that is not a variable or a
+ * value with a control character, the same rule the boot environment is held
+ * to, naming the variable and never the value.
+ */
+export function credentialsFileBody(
+    cleared: readonly string[],
+    env: Readonly<Record<string, string>>
+): string {
+    const names = [...new Set([...cleared, ...Object.keys(env)])];
+    for (const name of names) {
+        if (!ENV_NAME.test(name)) throw new Error(`Polaris will not write a credential named ${name}.`);
+    }
+    for (const [name, value] of Object.entries(env)) {
+        if (hasControlCharacter(value))
+            throw new Error(`Polaris built an unusable value for ${name} and kept the session's own.`);
+    }
+    const set = Object.keys(env);
+    return [
+        "# Written by Polaris before each turn: this session's agent credentials as they are now.",
+        ...(names.length > 0 ? [`unset ${names.join(" ")}`] : []),
+        ...Object.entries(env).map(([name, value]) => `${name}=${shellQuote(value)}`),
+        ...(set.length > 0 ? [`export ${set.join(" ")}`] : []),
+        ""
+    ].join("\n");
+}
+
+const PART_NAME = /^credentials\.[a-f0-9]{8,64}\.part$/;
+
+/**
+ * Put a credentials file written beside its final name (`part`) in place:
+ * private, owned like the state directory, and renamed so the launch never
+ * reads half of one. A launch script from an older build is taught to read it
+ * first. Carries no value, so it can travel as an argument. Exits 0 without
+ * doing anything where there is no launch script - a session still booting,
+ * or a state directory that is not there.
+ */
+export function installCredentialsCommand(stateDir: string, part: string): string {
+    if (!PART_NAME.test(part)) throw new Error("That is not a credentials file Polaris wrote.");
+    const read = Buffer.from(READ_CREDENTIALS, "utf8").toString("base64");
+    return [
+        `d="${stateDir}"`,
+        `p="$d/${part}"`,
+        'if [ ! -f "$d/launch.sh" ]; then rm -f "$p"; exit 0; fi',
+        `if ! grep -q ${CREDENTIALS_FILE} "$d/launch.sh"; then`,
+        `  if { head -n 1 "$d/launch.sh"; printf %s ${read} | base64 -d; echo; tail -n +2 "$d/launch.sh"; } > "$d/launch.sh.part" && chmod 0755 "$d/launch.sh.part"; then mv "$d/launch.sh.part" "$d/launch.sh"; else rm -f "$d/launch.sh.part"; fi`,
+        "fi",
+        'chmod 0600 "$p" || { rm -f "$p"; exit 1; }',
+        'chown "$(stat -c %u:%g "$d" 2>/dev/null)" "$p" 2>/dev/null || true',
+        `mv "$p" "$d/${CREDENTIALS_FILE}"`
+    ].join("\n");
+}
+
+/**
+ * Write a credentials file and put it in place, as one script for a machine
+ * reached over SSH, where the script travels on standard input and never on a
+ * command line. Nothing is written where there is no state directory.
+ */
+export function writeCredentialsCommand(stateDir: string, part: string, body: string): string {
+    const encoded = Buffer.from(body, "utf8").toString("base64");
+    return [
+        `[ -d "${stateDir}" ] || exit 0`,
+        "umask 077",
+        `printf %s ${encoded} | base64 -d > "${stateDir}/${part}" || exit 1`,
+        installCredentialsCommand(stateDir, part)
+    ].join("\n");
+}
+
+/**
  * Starts the agent, or reopens one of its conversations.
  *
  * A file rather than lines in the setup, so anything that has to start the agent
@@ -688,6 +778,7 @@ export const LAUNCH_SCRIPT = [
     "#!/bin/sh",
     "# Written by Polaris. Starts this session's agent; an argument reopens that conversation.",
     "# --turn <file> runs the prompt in that file without the agent's interface, on the conversation its hooks last named.",
+    READ_CREDENTIALS,
     'turn=""',
     'if [ "${1:-}" = "--turn" ]; then',
     '  turn="${2:-}"',

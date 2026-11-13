@@ -400,6 +400,16 @@ export async function getSession(sessionId: string, ownerId: string): Promise<Se
     return record ? toView(record as unknown as SessionRecord) : null;
 }
 
+/** One session by id, unscoped: for the runtime acting on a session its caller
+ *  already reached through `getSession`. Never for answering a person. */
+export async function sessionViewById(sessionId: string): Promise<SessionView | null> {
+    const record = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: VIEW_SELECT
+    });
+    return record ? toView(record as unknown as SessionRecord) : null;
+}
+
 /**
  * One session shared with this account (`agents.session`), read the way its
  * owner sees it, or null without a grant. Only for reading: every control goes

@@ -676,6 +676,20 @@ function Notice({ error, children }: { error?: boolean; children: ReactNode }) {
     );
 }
 
+/** The provider refused the account the agent signs in with: which one, and
+ *  where to link it again. Every turn fails until it is. */
+export function SignInRefusedNotice({ account }: { account: string | null }) {
+    const t = useTranslations("polar");
+    return (
+        <Notice error>
+            {account ? t("code.signInRefused", { account }) : t("code.signInRefusedUnnamed")}{" "}
+            <Button asChild size="sm" variant="outline" className="ml-1 align-middle">
+                <Link href="/account/ai-keys">{t("code.linkAgain")}</Link>
+            </Button>
+        </Notice>
+    );
+}
+
 /** Chat's composer as Code takes it: the same files (copied into the session's
  *  working directory) and the same microphone; no voice conversation for an
  *  agent session (said on the button). */
@@ -1339,6 +1353,9 @@ function CodeThread({
                             </div>
                         ) : null}
                         {thread.error ? <Notice error>{thread.error}</Notice> : null}
+                        {thread.refusedSignIn ? (
+                            <SignInRefusedNotice account={thread.refusedSignIn.account} />
+                        ) : null}
                     </>
                 )}
             </PolarThreadFrame>

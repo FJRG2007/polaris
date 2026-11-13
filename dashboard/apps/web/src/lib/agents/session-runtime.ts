@@ -26,7 +26,10 @@ import { borrowSsh } from "@/lib/connection-pool";
 import { appBaseUrl } from "@/lib/domain-service";
 import { containerState, withContainerPorts } from "./session-ports";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
+import { randomBytes } from "node:crypto";
+import { Readable } from "node:stream";
 import { sessionCredentials } from "@/lib/agents/agent-readiness";
+import { ANTHROPIC_HEADERS_ENV } from "@/lib/agents/agent-providers";
 import { chatCredentialFor, secretForAccount, sessionSecretsFor } from "@/lib/agents/model-keys";
 import { opencodeModelEnv } from "@/lib/agents/opencode-model";
 import * as attachments from "@/lib/agents/session-attachments";
@@ -63,6 +66,7 @@ import {
     resolveSessionEnigma,
     SessionRefusal,
     sessionPlacement,
+    sessionViewById,
     type SessionView
 } from "./session-service";
 
@@ -279,26 +283,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     const credential = `${base}/api/agents/sessions/${session.id}/git-credential`;
     const enigma = await resolveSessionEnigma(session.id);
     const agent = agentCommandFor(session, enigma.enabled);
-    const chosen = session.accountId
-        ? await secretForAccount(session.ownerId, session.accountId)
-        : null;
-
-    // Null is the store failing to answer, and it is not the same as an account
-    // holding nothing. A session started on a blank environment because the
-    // store blinked would come up at a login prompt and look, from every screen,
-    // exactly like an agent thinking.
-    // Not asked at all when the machine answers for itself: that session wants
-    // nothing out of the store, so a store that blinked would be refusing it
-    // over credentials the person deliberately declined.
-    const available: Record<string, string> | null = session.useMachineLogin
-        ? {}
-        : await sessionSecretsFor(session.ownerId);
-    if (available === null) {
-        throw new SessionRefusal(
-            "Polaris could not read the stored credentials just now. Try again in a moment."
-        );
-    }
-    const modelEnv = await modelEnvFor(session);
+    const credentials = await credentialEnvFor(session, agent.cli);
     // Only the tools whose turn flags were checked against their own docs.
     const headless = agent.cli.headless?.join(" ") ?? "";
 
@@ -365,11 +350,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // token injected over that is how a credential somebody revoked months
         // ago comes to beat a login that works - the tool reads the variable
         // first and never looks at the home.
-        credentials: {
-            ...sessionCredentials(agent.cli, available, chosen, session.useMachineLogin),
-            // The provider and model picked on the form, last, so they win.
-            ...modelEnv
-        },
+        credentials,
         // The same decision, for the tools that take a variable rather than a
         // flag. Held to the same rule so the two halves cannot disagree.
         autonomyEnv: core.permissionModeArgs(agent.cli.id, session.permissionMode) === null &&
@@ -379,6 +360,108 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         runAs: session.place === "host" ? "" : commands.CONTAINER_USER,
         home: session.place === "host" ? "" : commands.AGENT_HOME
     };
+}
+
+/**
+ * What the agent signs in with, resolved from the accounts as they are now: the
+ * one the session picked, else whatever resolves, then the provider and model
+ * picked on the form. Shared by the boot and by the refresh before every turn,
+ * so the two cannot disagree on what a session is handed.
+ */
+async function credentialEnvFor(
+    session: SessionView,
+    cli: core.AgentCli
+): Promise<Record<string, string>> {
+    const chosen = session.accountId
+        ? await secretForAccount(session.ownerId, session.accountId)
+        : null;
+    // Null is the store failing to answer, and it is not the same as an account
+    // holding nothing. A session started on a blank environment because the
+    // store blinked would come up at a login prompt and look, from every screen,
+    // exactly like an agent thinking.
+    // Not asked at all when the machine answers for itself: that session wants
+    // nothing out of the store, so a store that blinked would be refusing it
+    // over credentials the person deliberately declined.
+    const available: Record<string, string> | null = session.useMachineLogin
+        ? {}
+        : await sessionSecretsFor(session.ownerId);
+    if (available === null) {
+        throw new SessionRefusal(
+            "Polaris could not read the stored credentials just now. Try again in a moment."
+        );
+    }
+    return {
+        ...sessionCredentials(cli, available, chosen, session.useMachineLogin),
+        // The provider and model picked on the form, last, so they win.
+        ...(await modelEnvFor(session))
+    };
+}
+
+/**
+ * Hand the session's next turn the credentials as they are now.
+ *
+ * The boot environment is fixed when the machine starts, so without this a
+ * session kept a credential somebody has since replaced or removed - and the
+ * tool reads a stale API key before the sign-in it was meant to use. Resolved
+ * through the same path as the boot, written into the state directory (see
+ * `commands.CREDENTIALS_FILE`), and read by the launch script right before the
+ * agent starts. Every variable the tool reads is cleared first, so one that is
+ * gone does not survive from the boot. File-shaped credentials stay as the boot
+ * wrote them: the tool reads those from its home, not from the environment.
+ *
+ * Never fails the prompt it runs before: a store that blinked, a machine that
+ * did not answer or a session that is still booting keeps the credentials it
+ * has, and the reason goes to the log.
+ */
+export async function refreshCredentials(sessionId: string): Promise<void> {
+    try {
+        const session = await sessionViewById(sessionId);
+        const placement = await sessionPlacement(sessionId);
+        if (!session || !placement || core.isSessionOver(placement.state)) return;
+        const cli = agentCommandFor(session, false).cli;
+        const fresh = await credentialEnvFor(session, cli);
+        const files = new Set(
+            cli.credentials.filter((entry) => entry.file).map((entry) => entry.env)
+        );
+        const env = Object.fromEntries(
+            Object.entries(fresh).filter(([name]) => !files.has(name))
+        );
+        const cleared = [...cli.credentials.map((entry) => entry.env), ANTHROPIC_HEADERS_ENV];
+        const body = commands.credentialsFileBody(cleared, guardEnv(env));
+        const stateDir = stateDirFor(placement);
+        const part = `credentials.${randomBytes(8).toString("hex")}.part`;
+        if (placement.place === "host") {
+            const result = await runInSession(
+                sessionId,
+                commands.writeCredentialsCommand(stateDir, part, body)
+            );
+            if (result.code !== 0) throw new Error(`the server answered ${result.code}`);
+            return;
+        }
+        const containerId = placement.containerId;
+        if (!containerId) return;
+        await withContainerPorts(placement.hostId, async (ports) => {
+            // A daemon too old to write a file keeps the boot's credentials.
+            if (!ports.writeFile) return;
+            const bytes = Buffer.from(body, "utf8");
+            await ports.writeFile(
+                containerId,
+                `${stateDir}/${part}`,
+                Readable.from([bytes]),
+                bytes.length
+            );
+            const placed = await ports.runIn(
+                containerId,
+                commands.shellArgv(commands.installCredentialsCommand(stateDir, part))
+            );
+            if (placed.code !== 0) throw new Error(`the container answered ${placed.code}`);
+        });
+    } catch (error) {
+        console.error(
+            `[agent-session] ${sessionId}: kept the credentials it booted with:`,
+            error instanceof Error ? error.message : "unknown"
+        );
+    }
 }
 
 /**
@@ -857,6 +940,9 @@ async function waitForAgent(
  * first, so what somebody asked for survives even if the machine has gone away.
  */
 export async function promptSession(sessionId: string, text: string): Promise<void> {
+    // Before the prompt is queued, so the turn it starts reads the credentials
+    // as they are now rather than as they were when the machine booted.
+    await refreshCredentials(sessionId);
     // A session whose runner takes its prompts gets this one as a file in the
     // queue: nothing typed, nothing that has to look ready first.
     const placement = await sessionPlacement(sessionId);
@@ -956,6 +1042,7 @@ export async function openAgentInterface(
 ): Promise<"opened" | "interactive" | "busy"> {
     const placement = await sessionPlacement(sessionId);
     if (!placement) throw new Error("That session no longer exists.");
+    await refreshCredentials(sessionId);
     const result = await runInSession(sessionId, commands.openInterfaceCommand(stateDirFor(placement)));
     if (result.code === 0) return "opened";
     if (result.code === commands.NOT_OPENED.interactive) return "interactive";
@@ -965,6 +1052,7 @@ export async function openAgentInterface(
 
 /** Bring the agent back on its conversation, typed into the shell it left. */
 export async function resumeAgent(sessionId: string, vendorSessionId: string): Promise<void> {
+    await refreshCredentials(sessionId);
     await steer(
         sessionId,
         commands.resumeCommand(vendorSessionId),

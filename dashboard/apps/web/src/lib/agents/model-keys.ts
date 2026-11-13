@@ -402,6 +402,9 @@ export async function updateModelKey(
         data: {
             ...(input.name === undefined ? {} : { name: input.name }),
             ...(input.secret === undefined ? {} : envelope(input.secret, held.provider, config)),
+            // A new secret is a new answer: a refusal of the old one says nothing
+            // about it, and leaving it marked would keep the screen saying Refused.
+            ...(input.secret === undefined ? {} : { coolingUntil: null, coolingReason: null }),
             ...(configChanged ? { config: JSON.stringify(config) } : {}),
             // A date pushed out has to start the warnings over, or the one already
             // sent would be the last thing said about a key that is fine now.

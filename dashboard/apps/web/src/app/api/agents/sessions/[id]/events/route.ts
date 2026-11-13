@@ -27,6 +27,7 @@ import { readerWords } from "@/lib/i18n/reader-words";
 import { isSessionOver, parseHookSequence } from "@polaris/core";
 import { after } from "next/server";
 import * as history from "@/lib/agents/session-history";
+import { isSignInRefusal, noteRefusedSignIn } from "@/lib/agents/signin-refusal";
 
 /** The events after which the transcript is read. */
 const HISTORY_KINDS = new Set(["turn.end", "turn.failed", "tool.end", "tool.failed"]);
@@ -99,6 +100,10 @@ export async function POST(
     // A finished turn or tool is when the transcript has something new. After
     // the answer, so the hook is never held on a read of the machine; the read
     // is claimed per session, so a burst of tools is one read.
+    // A turn the provider refused the credential for: the account is marked
+    // refused, so the keys screen and the picker say so, and the session asks
+    // for it to be linked again (`polarCodeThread`).
+    if (kind === "turn.failed" && isSignInRefusal(event.detail)) after(() => noteRefusedSignIn(id));
     if (state && isSessionOver(state)) after(() => history.syncFinalSessionHistory(id));
     else if (HISTORY_KINDS.has(kind)) after(() => history.syncSessionHistorySoon(id));
     return acknowledged();

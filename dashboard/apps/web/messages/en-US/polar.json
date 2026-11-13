@@ -1125,6 +1125,9 @@
         }
     },
     "code": {
+        "signInRefused": "{account} was refused by its provider. Every turn fails until you link it again.",
+        "signInRefusedUnnamed": "This session's sign-in was refused by its provider. Every turn fails until you link it again.",
+        "linkAgain": "Link again",
         "agentGone": "That agent no longer exists or runs on another tool now. Pick it again.",
         "yourAgents": "Your agents",
         "editAgents": "Edit agents",

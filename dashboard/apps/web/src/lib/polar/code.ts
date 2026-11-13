@@ -48,6 +48,7 @@ import {
 } from "@/lib/agents/session-service";
 import { keepSpare } from "@/lib/agents/session-spares";
 import { pendingPermission, type PendingPermission } from "@/lib/agents/session-permissions";
+import { lastTurnRefused, refusedAccountName } from "@/lib/agents/signin-refusal";
 import {
     forkSessionAction,
     listSessionsAction,
@@ -106,6 +107,10 @@ export interface PolarCodeThread {
     /** How full the agent's context is, as its last turn reported it; null
      *  when no turn was read or the model's window is not known. */
     readonly context: { readonly used: number; readonly window: number } | null;
+    /** The latest turn failed because the provider refused the account the
+     *  agent signs in with: what to call that account (null when the session
+     *  picked none). Only for somebody who may steer it; null otherwise. */
+    readonly refusedSignIn: { readonly account: string | null } | null;
 }
 
 /** The session's last reported size against its model's window, or null. */
@@ -249,7 +254,11 @@ export async function polarCodeThread(
         view: detail.session,
         canManage: access === "manage",
         permission,
-        context
+        context,
+        refusedSignIn:
+            access === "manage" && lastTurnRefused(detail.events)
+                ? { account: await refusedAccountName(detail.session.accountId) }
+                : null
     };
 }
 

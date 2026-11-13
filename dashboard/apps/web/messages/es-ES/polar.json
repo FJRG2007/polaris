@@ -1125,6 +1125,9 @@
         }
     },
     "code": {
+        "signInRefused": "El proveedor rechazó {account}. Cada turno fallará hasta que lo vuelvas a vincular.",
+        "signInRefusedUnnamed": "El proveedor rechazó el acceso de esta sesión. Cada turno fallará hasta que lo vuelvas a vincular.",
+        "linkAgain": "Vincular",
         "agentGone": "Ese agente ya no existe o ahora usa otra herramienta. Vuelve a elegirlo.",
         "yourAgents": "Tus agentes",
         "editAgents": "Editar agentes",
