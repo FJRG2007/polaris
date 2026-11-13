@@ -370,7 +370,7 @@ pub fn open_window(app: AppHandle, window: WebviewWindow, input: OpenWindow) -> 
 }
 
 /// The commands a Polaris window may call, each checked again with `from_polaris`.
-pub const POLARIS_COMMANDS: [&str; 30] = [
+pub const POLARIS_COMMANDS: [&str; 31] = [
     "open-servers",
     "open-window",
     "show-notice",
@@ -401,7 +401,12 @@ pub const POLARIS_COMMANDS: [&str; 30] = [
     "draw-on-share",
     "can-draw-on-share",
     "stop-drawing",
+    "text-size-seen",
 ];
+
+/// What `bridge.js` needs beyond the commands: hearing the events the app
+/// sends this window (a TV install's progress, a call key), never emitting one.
+pub const POLARIS_CORE: [&str; 2] = ["core:event:allow-listen", "core:event:allow-unlisten"];
 
 /// Grants the Polaris commands to the configured origin. Tauri cannot take a
 /// capability back, so one is added per origin the app has been on, and every
@@ -411,12 +416,16 @@ pub fn allow_origin(app: &AppHandle, origin: &str) {
     if !state.mark_capability(origin) {
         return;
     }
-    let capability = POLARIS_COMMANDS.iter().fold(
-        tauri::ipc::CapabilityBuilder::new(format!("remote-{}", state.capability_count()))
-            .remote(format!("{origin}/*"))
-            .windows([crate::MAIN, "polaris-*"]),
-        |capability, command| capability.permission(format!("allow-{command}")),
-    );
+    let capability = POLARIS_COMMANDS
+        .iter()
+        .map(|command| format!("allow-{command}"))
+        .chain(POLARIS_CORE.iter().map(|core| (*core).to_owned()))
+        .fold(
+            tauri::ipc::CapabilityBuilder::new(format!("remote-{}", state.capability_count()))
+                .remote(format!("{origin}/*"))
+                .windows([crate::MAIN, "polaris-*"]),
+            |capability, permission| capability.permission(permission),
+        );
     if let Err(error) = app.add_capability(capability) {
         eprintln!("polaris: the Polaris window's commands could not be granted: {error}");
     }

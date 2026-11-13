@@ -29,6 +29,7 @@ pub mod keys;
 pub mod known_games;
 pub mod local_ca_pin;
 pub mod mac_signature;
+pub mod mailto;
 pub mod navigation;
 pub mod net;
 pub mod notice;
@@ -52,6 +53,7 @@ pub mod voice_widget;
 pub mod vpn;
 pub mod vpn_helper;
 pub mod window_failover;
+pub mod window_place;
 pub mod zip_rules;
 
 pub use address::{AddressError, ApiKey, InstanceUrl};

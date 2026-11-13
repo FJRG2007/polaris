@@ -25,6 +25,7 @@ fn main() {
             "open_api_keys",
             "open_servers",
             "open_window",
+            "text_size_seen",
             "show_notice",
             "set_app_badge",
             "set_call_hotkeys",

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-text-size-seen"
+description = "Enables the text_size_seen command without any pre-configured scope."
+commands.allow = ["text_size_seen"]
+
+[[permission]]
+identifier = "deny-text-size-seen"
+description = "Denies the text_size_seen command without any pre-configured scope."
+commands.deny = ["text_size_seen"]

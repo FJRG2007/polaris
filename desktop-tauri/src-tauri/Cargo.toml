@@ -33,6 +33,7 @@ tauri-plugin-notification = "=2.8.1"
 tauri-plugin-opener = "=2.7.3"
 tauri-plugin-updater = "=2.14.1"
 tauri-plugin-single-instance = { version = "=2.5.5", features = ["deep-link"] }
+tauri-plugin-window-state = "=2.5.0"
 tokio = { version = "=1.54.1", features = ["sync", "time", "fs"] }
 tokio-util = "=0.7.20"
 url = "=2.5.8"

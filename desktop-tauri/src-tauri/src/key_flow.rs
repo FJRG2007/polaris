@@ -92,6 +92,7 @@ pub async fn api_key_for(app: &AppHandle, server: &InstanceUrl) -> Option<ApiKey
 
 fn open_key_window(app: &AppHandle) -> tauri::Result<()> {
     let window = WebviewWindowBuilder::new(app, KEY_WINDOW, WebviewUrl::App("api-key.html".into()))
+        .initialization_script(crate::bridge::local_script(app))
         .title("API key - Polaris")
         .inner_size(520.0, 470.0)
         .resizable(false)

@@ -9,6 +9,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod bridge;
 mod call_keys;
 mod developer;
 mod host_transfer;
@@ -35,6 +36,7 @@ use polaris_client::instance_store::{
     read_instances_value, read_stored_instance, write_stored_instance, INSTANCES_FILE, RELEARN_MS,
 };
 use polaris_client::local_ca_pin::{pin_scope, PinVerifier};
+use polaris_client::mailto::mailto_in;
 use polaris_client::navigation::{
     is_safe_external_url, is_server_url, main_frame_step, server_path, NavigationVerdict,
 };
@@ -193,6 +195,13 @@ impl Shared {
     fn capability_count(&self) -> usize {
         lock(&self.capabilities).len()
     }
+}
+
+/// Every address the stored record of `server` says it answers on.
+fn stored_addresses(app: &AppHandle, server: &str) -> Vec<String> {
+    read_stored_instance(&shared(app).instances_file(), server)
+        .map(|stored| stored.record.addresses)
+        .unwrap_or_default()
 }
 
 fn is_polaris_label(label: &str) -> bool {
@@ -386,6 +395,7 @@ fn open_servers_window(app: &AppHandle) {
         return;
     }
     let built = WebviewWindowBuilder::new(app, SERVERS, WebviewUrl::App("index.html".into()))
+        .initialization_script(bridge::local_script(app))
         .title("Polaris Beta - Servers")
         .inner_size(560.0, 640.0)
         .min_inner_size(400.0, 420.0)
@@ -415,7 +425,13 @@ fn polaris_builder<'a>(
 ) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
     let navigating = app.clone();
     let opening = app.clone();
-    WebviewWindowBuilder::new(app, label, WebviewUrl::External(url))
+    let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::External(url));
+    // `window.polarisDesktop`, on the Polaris in use and nowhere else.
+    let builder = match bridge::script_for(app) {
+        Some(script) => builder.initialization_script(script),
+        None => builder,
+    };
+    builder
         .on_navigation(move |url| {
             let state = shared(&navigating);
             let Some(origin) = state.active_origin() else {
@@ -489,6 +505,7 @@ fn open_main(app: &AppHandle, url: &str) -> tauri::Result<()> {
         })
         .on_document_title_changed(move |window, title| title_changed(&titled, &window, &title))
         .build()?;
+    bridge::keep_reachable(&window);
     // Closing keeps the app in the tray, as the Electron app does on Windows and
     // Linux; Quit in the tray menu ends it.
     let handle = window.clone();
@@ -873,8 +890,8 @@ fn main() {
     tauri::Builder::default()
         // First, so a second launch hands over its arguments (a polaris:// link
         // included, through the deep-link feature) before anything else starts.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            show_polaris(app, None)
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            show_polaris(app, mailto_in(&argv).as_deref())
         }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_notification::init())
@@ -884,6 +901,18 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(login_item::plugin())
         .plugin(updater::plugin())
+        // The main window's size and place; `bridge::keep_reachable` moves it
+        // back on screen when the display it was on is gone.
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::SIZE
+                        | tauri_plugin_window_state::StateFlags::POSITION
+                        | tauri_plugin_window_state::StateFlags::MAXIMIZED,
+                )
+                .with_filter(|label| label == MAIN)
+                .build(),
+        )
         .manage(notices::Notices::default())
         .manage(call_keys::CallKeys::default())
         .manage(key_flow::Keys::default())
@@ -903,6 +932,7 @@ fn main() {
             ipc::connect_close,
             ipc::open_servers,
             ipc::open_window,
+            bridge::text_size_seen,
             notices::show_notice,
             notices::set_app_badge,
             call_keys::set_call_hotkeys,
@@ -995,7 +1025,10 @@ fn main() {
             if let Some(tv) = tv::Tv::new(&handle) {
                 app.manage(tv);
             }
-            show_polaris(&handle, None);
+            show_polaris(
+                &handle,
+                mailto_in(&std::env::args().collect::<Vec<_>>()).as_deref(),
+            );
             if let Some(link) = waiting {
                 tauri::async_runtime::spawn(async move { links.open(link).await });
             }
