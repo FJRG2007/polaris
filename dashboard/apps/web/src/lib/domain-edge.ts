@@ -108,7 +108,8 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
     const definitions: string[] = [
         `    ${REDIRECT}:`,
         "      redirectScheme:",
-        "        scheme: https"
+        "        scheme: https",
+        "        permanent: true"
     ];
     if (allow.length > 0) {
         const mw = `${ROUTER}-allow`;

@@ -46,6 +46,7 @@ describe("renderStatusEdge", () => {
                 "    polaris-status-pages-redirect-https:",
                 "      redirectScheme:",
                 "        scheme: https",
+                "        permanent: true",
                 "    polaris-status-pages-acme-root:",
                 "      replacePathRegex:",
                 '        regex: "^/$"',

@@ -200,6 +200,7 @@ describe("traefik labels", () => {
         expect(labels["traefik.http.routers.web-web.middlewares"]).toBe(
             "polaris-redirect-https@docker"
         );
+        expect(labels["traefik.http.middlewares.polaris-redirect-https.redirectscheme.permanent"]).toBe("true");
     });
 
     it("adds a path prefix to the rule", () => {

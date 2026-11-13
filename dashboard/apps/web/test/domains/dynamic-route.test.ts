@@ -208,6 +208,34 @@ describe("names in a deploy zone with nothing on them", () => {
         expect(config).not.toContain("\\.");
     });
 
+    it("serves the page over plain HTTP where no trusted certificate covers the zone", () => {
+        const config = zoned();
+
+        expect(config).toContain("    polaris-vacant-http:");
+        expect(config).not.toContain("polaris-vacant-http-secure:");
+    });
+
+    it("redirects plain HTTP onto https, permanently, once a trusted wildcard covers the zone", () => {
+        const config = renderDynamicConfig([], {
+            vacantZones: ["plr.example.com", "old.example.com"],
+            vacantSecureZones: ["plr.example.com"],
+            vacantAvailable: true
+        });
+        const block = (name: string) =>
+            config.slice(config.indexOf(`    ${name}:`)).split("\n").slice(0, 7).join("\n");
+
+        const secure = block("polaris-vacant-http-secure");
+        expect(secure).toContain("[.]plr[.]example[.]com");
+        expect(secure).not.toContain("old[.]example");
+        expect(secure).toContain("entryPoints: [web]");
+        expect(secure).toContain("middlewares: [polaris-redirect-https]");
+        // The uncovered zone keeps the page over HTTP rather than a warning interstitial.
+        const plain = block("polaris-vacant-http");
+        expect(plain).toContain("old[.]example[.]com");
+        expect(plain).not.toContain("plr[.]example");
+        expect(config).toMatch(/polaris-redirect-https:\n\s+redirectScheme:\n\s+scheme: https\n\s+permanent: true/);
+    });
+
     it("ranks below every app router, which Traefik would otherwise order by length", () => {
         const config = zoned([route()]);
         const vacant = config.slice(config.indexOf("    polaris-vacant:"));

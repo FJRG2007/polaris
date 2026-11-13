@@ -413,6 +413,7 @@ export function traefikLabels(input: TraefikServiceInput): Record<string, string
     });
     // The redirect middleware itself (idempotent; Traefik dedupes by name).
     labels["traefik.http.middlewares.polaris-redirect-https.redirectscheme.scheme"] = "https";
+    labels["traefik.http.middlewares.polaris-redirect-https.redirectscheme.permanent"] = "true";
     return labels;
 }
 

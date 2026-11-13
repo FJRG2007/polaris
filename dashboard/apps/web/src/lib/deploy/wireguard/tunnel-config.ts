@@ -416,7 +416,8 @@ export function renderTunnelRoutes(routes: readonly TunnelRoute[]): string {
         "  middlewares:",
         "    polaris-wg-https:",
         "      redirectScheme:",
-        "        scheme: https"
+        "        scheme: https",
+        "        permanent: true"
     ];
     if (usable.length === 0) return `${lines.join("\n")}\n`;
     lines.push("  routers:");

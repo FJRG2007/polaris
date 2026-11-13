@@ -123,6 +123,7 @@ services:
       - "traefik.http.routers.polaris-web-http.priority=10"
       - "traefik.http.routers.polaris-web-http.middlewares=polaris-redirect-https"
       - "traefik.http.middlewares.polaris-redirect-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.polaris-redirect-https.redirectscheme.permanent=true"
       # Reaching the dashboard by a bare address, from a network where that still
       # means what it used to mean. Same service and same priority as the named
       # router it was split out of; the allow list is the only difference.

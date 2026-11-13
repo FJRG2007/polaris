@@ -298,6 +298,9 @@ export interface RenderOptions {
     /** The guard listener that serves it (see `guardVacantUpstream`). The proxy
      *  listener when not given, which every guard that serves the page has. */
     readonly vacantUpstream?: string;
+    /** Vacant zones a trusted certificate covers: their plain HTTP redirects onto https
+     *  rather than serving the page. */
+    readonly vacantSecureZones?: readonly string[];
     /**
      * An explicit rank for every app router, or nothing to leave Traefik ranking
      * them by the length of their rule.
@@ -685,19 +688,25 @@ function usableZone(zone: string): boolean {
  * here; where it does not - the shipped resolver answers an HTTP challenge and cannot
  * issue a wildcard, so that needs the DNS credential - a browser gets the edge's default
  * certificate and warns before showing the page. The plain HTTP router below is what
- * makes that recoverable, and it is why this one does not redirect onto https.
+ * makes that recoverable, and it is why such a zone is not redirected onto https. A zone
+ * in `secureZones` has a trusted wildcard, so its plain HTTP redirects instead.
  *
  * The guard sits in front of both. Not for a rule of its own - there is no app here to
  * have one - but because this is the surface the subdomain sweep jail watches, and a ban
  * it issues is applied inside the guard. Without this, the jail would ban an address and
  * that address would carry on being served every unclaimed name it asked for.
  */
-function vacantRouters(zones: readonly string[], defs: Map<string, string>): string[] {
-    const rule = zones
-        .map(
-            (zone) => `HostRegexp(\`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]${hostPattern(zone)}$\`)`
-        )
-        .join(" || ");
+function vacantRouters(
+    zones: readonly string[],
+    defs: Map<string, string>,
+    secureZones: ReadonlySet<string> = new Set()
+): string[] {
+    const ruleOf = (list: readonly string[]): string =>
+        list
+            .map(
+                (zone) => `HostRegexp(\`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]${hostPattern(zone)}$\`)`
+            )
+            .join(" || ");
     // An empty rule: no denylist, no login, no inspection. It exists so the guard runs
     // at all, and what it does when it runs is the ban check every request gets.
     const empty = encodeGuardRule({
@@ -721,14 +730,27 @@ function vacantRouters(zones: readonly string[], defs: Map<string, string>): str
         `    polaris-waf-guard:\n      forwardAuth:\n        address: "${guardUrl()}/authz"`
     );
     const mw = `${VACANT_CTX}, polaris-waf-guard, ${VACANT_REWRITE}`;
-    return [
-        `    ${VACANT}:\n      rule: "${rule}"\n      entryPoints: [websecure]\n      priority: 1\n      service: ${VACANT}\n      middlewares: [${mw}]\n      tls: {}`,
-        // Served over plain HTTP as well, rather than redirected onto https: a name
-        // nothing has deployed on may have no certificate a browser trusts, and a
-        // warning interstitial in front of "there is nothing here" tells the visitor
-        // less than the page does.
-        `    ${VACANT}-http:\n      rule: "${rule}"\n      entryPoints: [web]\n      priority: 1\n      service: ${VACANT}\n      middlewares: [${mw}]`
+    const routers = [
+        `    ${VACANT}:\n      rule: "${ruleOf(zones)}"\n      entryPoints: [websecure]\n      priority: 1\n      service: ${VACANT}\n      middlewares: [${mw}]\n      tls: {}`
     ];
+    // Served over plain HTTP as well, rather than redirected onto https: a name
+    // nothing has deployed on may have no certificate a browser trusts, and a
+    // warning interstitial in front of "there is nothing here" tells the visitor
+    // less than the page does.
+    const plain = zones.filter((zone) => !secureZones.has(zone));
+    if (plain.length > 0) {
+        routers.push(
+            `    ${VACANT}-http:\n      rule: "${ruleOf(plain)}"\n      entryPoints: [web]\n      priority: 1\n      service: ${VACANT}\n      middlewares: [${mw}]`
+        );
+    }
+    // A zone a trusted certificate covers redirects like every other address here.
+    const secured = zones.filter((zone) => secureZones.has(zone));
+    if (secured.length > 0) {
+        routers.push(
+            `    ${VACANT}-http-secure:\n      rule: "${ruleOf(secured)}"\n      entryPoints: [web]\n      priority: 1\n      service: ${VACANT}\n      middlewares: [polaris-redirect-https]`
+        );
+    }
+    return routers;
 }
 
 /** Render Traefik dynamic config for a set of app routes. Shared by every Router
@@ -742,7 +764,7 @@ export function renderDynamicConfig(
     const defs = new Map<string, string>([
         [
             "polaris-redirect-https",
-            "    polaris-redirect-https:\n      redirectScheme:\n        scheme: https"
+            "    polaris-redirect-https:\n      redirectScheme:\n        scheme: https\n        permanent: true"
         ]
     ]);
     const zones =
@@ -851,7 +873,7 @@ export function renderDynamicConfig(
         else services.push(serviceBlock(name, route, upstream));
     }
     // Last, so it loses the length-ranked tie to every app router above it.
-    if (zones.length > 0) routers.push(...vacantRouters(zones, defs));
+    if (zones.length > 0) routers.push(...vacantRouters(zones, defs, new Set(options.vacantSecureZones ?? [])));
     if (routers.length === 0) return NO_ROUTES_FILE;
     const middlewares = [...defs.values()].join("\n");
     return `http:\n  routers:\n${routers.join("\n")}\n  services:\n${services.join("\n")}\n  middlewares:\n${middlewares}\n`;
@@ -933,6 +955,16 @@ function canaryBlocks(
 const FILE = "polaris-apps.yml";
 
 /** The Polaris host's own edge: writes the Traefik file-provider config it watches. */
+/** The vacant zones the stored wildcard certificate covers. Imported late: the
+ *  certificate service reaches the deploy service, which reaches this module. */
+async function trustedVacantZones(zones: readonly string[]): Promise<string[]> {
+    if (zones.length === 0) return [];
+    const base = await import("@/lib/wildcard-cert-service")
+        .then((module) => module.trustedWildcardBase())
+        .catch(() => null);
+    return base ? zones.filter((zone) => zone.toLowerCase() === base) : [];
+}
+
 export class LocalRouter implements Router {
     private readonly file = FILE;
 
@@ -983,7 +1015,8 @@ export class LocalRouter implements Router {
                 vacantAvailable,
                 ...(vacantUpstream ? { vacantUpstream } : {}),
                 frameAvailable: frameAvailable && proxyAvailable,
-                vacantZones: this.vacantZones
+                vacantZones: this.vacantZones,
+                vacantSecureZones: await trustedVacantZones(this.vacantZones)
             }),
             { force: this.force }
         );

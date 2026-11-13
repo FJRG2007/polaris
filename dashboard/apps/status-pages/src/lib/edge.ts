@@ -46,7 +46,8 @@ export function renderStatusEdge(routes: readonly StatusEdgeRoute[], origin: str
     const middlewares: string[] = [
         `    ${REDIRECT}:`,
         "      redirectScheme:",
-        "        scheme: https"
+        "        scheme: https",
+        "        permanent: true"
     ];
     for (const route of unique) {
         const name = `${SERVICE}-${route.slug}`;
