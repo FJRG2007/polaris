@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-connect-submit"
+description = "Enables the connect_submit command without any pre-configured scope."
+commands.allow = ["connect_submit"]
+
+[[permission]]
+identifier = "deny-connect-submit"
+description = "Denies the connect_submit command without any pre-configured scope."
+commands.deny = ["connect_submit"]

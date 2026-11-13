@@ -11,7 +11,7 @@ use polaris_client::notice::{notice_layout, NoticeWords, OnceNotices, Platform};
 use serde::Deserialize;
 use std::sync::Mutex;
 use std::time::Instant;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager, State, WebviewWindow};
 use tauri_plugin_notification::NotificationExt;
 
 /// Caps on what a page may hand over: a notice is a line or two, and a tag is
@@ -123,15 +123,22 @@ pub fn show(app: &AppHandle, notices: &Notices, notice: NoticeInput) -> Result<b
 #[tauri::command]
 pub fn show_notice(
     app: AppHandle,
+    window: WebviewWindow,
     notices: State<'_, Notices>,
     notice: NoticeInput,
 ) -> Result<bool, String> {
+    if !crate::ipc::from_polaris(&app, &window) {
+        return Err(crate::ipc::REFUSAL.to_owned());
+    }
     show(&app, &notices, notice)
 }
 
 /// Put what is waiting on the main window's icon.
 #[tauri::command]
-pub fn set_app_badge(app: AppHandle, badge: AppBadge) -> Result<(), String> {
+pub fn set_app_badge(app: AppHandle, window: WebviewWindow, badge: AppBadge) -> Result<(), String> {
+    if !crate::ipc::from_polaris(&app, &window) {
+        return Err(crate::ipc::REFUSAL.to_owned());
+    }
     let badge = badge.checked().map_err(str::to_owned)?;
     let Some(window) = app.get_webview_window(crate::MAIN) else {
         return Ok(());

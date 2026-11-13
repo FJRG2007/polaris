@@ -71,7 +71,7 @@ input {
     font: inherit;
 }
 
-#problem {
+.problem {
     margin: 0;
     color: var(--danger);
     font-size: 0.875rem;
@@ -93,4 +93,52 @@ button[aria-disabled="true"],
 button:disabled {
     opacity: 0.6;
     cursor: default;
+}
+
+h2 {
+    margin: 1.5rem 0 0.25rem;
+    font-size: 1rem;
+}
+
+#servers {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+#servers li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+}
+
+#servers .label {
+    flex: 1 1 8rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#servers .problem {
+    flex-basis: 100%;
+}
+
+.badge {
+    font-size: 0.75rem;
+    opacity: 0.75;
+}
+
+.hint {
+    margin: 0;
+    font-size: 0.875rem;
+    opacity: 0.8;
+}
+
+button.quiet {
+    background: transparent;
+    color: inherit;
+    border: 1px solid currentColor;
 }

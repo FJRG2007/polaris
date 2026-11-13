@@ -20,7 +20,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::ipc::{Channel, Response};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, State, WebviewWindow};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tokio_util::sync::CancellationToken;
@@ -94,9 +94,13 @@ pub struct ServiceInput {
 #[tauri::command]
 pub async fn push_choose_folder(
     app: AppHandle,
+    window: WebviewWindow,
     state: State<'_, Developer>,
     input: ServiceInput,
 ) -> Result<Option<String>, String> {
+    if !crate::ipc::from_polaris(&app, &window) {
+        return Err(crate::ipc::REFUSAL.to_owned());
+    }
     uuid(&input.service_id)?;
     let name = input.name.trim();
     if name.is_empty() || name.chars().count() > 200 {
@@ -124,11 +128,16 @@ pub struct PushInput {
 /// Start a push; its events arrive on `events`, and its end is the answer.
 #[tauri::command]
 pub async fn push_start(
+    app: AppHandle,
+    window: WebviewWindow,
     state: State<'_, Developer>,
     http: State<'_, crate::Http>,
     input: PushInput,
     events: Channel<PushEvent>,
 ) -> Result<push_local::PushEnd, String> {
+    if !crate::ipc::from_polaris(&app, &window) {
+        return Err(crate::ipc::REFUSAL.to_owned());
+    }
     uuid(&input.service_id)?;
     let name = input.name.trim().to_owned();
     if name.is_empty() || name.chars().count() > 200 {
@@ -190,7 +199,15 @@ pub struct ServiceId {
 
 /// Stop a push; once it is deploying, this only stops following it.
 #[tauri::command]
-pub fn push_cancel(state: State<'_, Developer>, input: ServiceId) {
+pub fn push_cancel(
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, Developer>,
+    input: ServiceId,
+) {
+    if !crate::ipc::from_polaris(&app, &window) {
+        return;
+    }
     if let Some((_, Some(cancel))) = lock(&state.pushes).get(&input.service_id) {
         cancel.cancel();
     }
@@ -201,7 +218,7 @@ pub fn push_cancel(state: State<'_, Developer>, input: ServiceId) {
 /// (`{"ok":true,"name","files"}`, `{"ok":false,"error"}` or `null` when nothing
 /// was picked), then the zip.
 #[tauri::command]
-pub async fn upload_folder(app: AppHandle) -> Response {
+pub async fn upload_folder(app: AppHandle, window: WebviewWindow) -> Response {
     let frame = |head: serde_json::Value, zip: Vec<u8>| {
         let head = head.to_string().into_bytes();
         let mut bytes = u32::try_from(head.len())
@@ -212,6 +229,12 @@ pub async fn upload_folder(app: AppHandle) -> Response {
         bytes.extend(zip);
         Response::new(bytes)
     };
+    if !crate::ipc::from_polaris(&app, &window) {
+        return frame(
+            serde_json::json!({ "ok": false, "error": crate::ipc::REFUSAL }),
+            Vec::new(),
+        );
+    }
     let Some(folder) = pick_folder(&app, "Choose the folder to upload".into()).await else {
         return frame(serde_json::Value::Null, Vec::new());
     };
@@ -257,7 +280,14 @@ fn open_launch(launch: &tools::Launch) {
 
 /// Install an allow-listed tool after the app's own confirmation.
 #[tauri::command]
-pub async fn install_tool(app: AppHandle, request: InstallRequest) -> InstallResult {
+pub async fn install_tool(
+    app: AppHandle,
+    window: WebviewWindow,
+    request: InstallRequest,
+) -> InstallResult {
+    if !crate::ipc::from_polaris(&app, &window) {
+        return InstallResult::failed(InstallFailure::Refused);
+    }
     let platform = std::env::consts::OS;
     let Some(repo) = tools::repository_slug(env!("CARGO_PKG_REPOSITORY")) else {
         return InstallResult::failed(InstallFailure::Unsupported);
@@ -382,7 +412,14 @@ fn start_watching(state: &Developer) {
 
 /// The game running now, as last seen; starts watching on the first ask.
 #[tauri::command]
-pub fn running_game(state: State<'_, Developer>) -> Option<RunningGame> {
+pub fn running_game(
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, Developer>,
+) -> Option<RunningGame> {
+    if !crate::ipc::from_polaris(&app, &window) {
+        return None;
+    }
     start_watching(&state);
     lock(&state.games).running().cloned()
 }
@@ -396,9 +433,14 @@ pub struct CustomGames {
 /// The programs somebody added as games, looked for at once.
 #[tauri::command]
 pub async fn set_custom_games(
+    app: AppHandle,
+    window: WebviewWindow,
     state: State<'_, Developer>,
     input: CustomGames,
 ) -> Result<(), String> {
+    if !crate::ipc::from_polaris(&app, &window) {
+        return Err(crate::ipc::REFUSAL.to_owned());
+    }
     let valid = |text: &str| !text.trim().is_empty() && text.chars().count() <= 200;
     if input.games.len() > 100
         || !input
@@ -418,7 +460,10 @@ pub async fn set_custom_games(
 /// The names of what is running, for the settings page to pick a game from, on
 /// a press. Goes to the page on screen and nowhere else.
 #[tauri::command]
-pub async fn running_programs() -> Vec<String> {
+pub async fn running_programs(app: AppHandle, window: WebviewWindow) -> Vec<String> {
+    if !crate::ipc::from_polaris(&app, &window) {
+        return Vec::new();
+    }
     let names = tokio::task::spawn_blocking(|| programs(&mut None))
         .await
         .ok()

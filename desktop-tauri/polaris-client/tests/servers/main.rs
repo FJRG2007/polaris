@@ -173,6 +173,17 @@ fn every_field_falls_back_on_its_own() {
 }
 
 #[test]
+fn the_mail_link_switch_is_off_until_turned_on_and_kept_once_it_is() {
+    assert!(!Settings::read(&json!({ "server": HOME })).mail_handler);
+    assert!(!Settings::read(&json!({ "mailHandler": "yes" })).mail_handler);
+    let on = Settings::read(&json!({ "mailHandler": true }));
+    assert!(on.mail_handler);
+    let written = serde_json::to_value(&on).unwrap();
+    assert_eq!(written["mailHandler"], json!(true));
+    assert_eq!(Settings::read(&written), on);
+}
+
+#[test]
 fn pushes_keep_a_folder_per_service_and_a_bad_record_reads_as_none() {
     let id = "0f8fad5b-d9cb-469f-a165-70867728950e";
     let read = Settings::read(

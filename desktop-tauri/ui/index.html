@@ -9,13 +9,21 @@
     </head>
     <body>
         <main>
-            <h1>Open your Polaris</h1>
+            <h1>Your Polaris servers</h1>
+            <p id="load-error" class="problem" role="alert" hidden></p>
+            <ul id="servers" aria-label="Servers"></ul>
+            <p id="empty" hidden>Add the address of your Polaris to open it here.</p>
             <form id="connect" novalidate>
-                <label for="address">Address</label>
+                <h2>Add a server</h2>
+                <label for="address">Address *</label>
                 <input id="address" name="address" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://polaris.example.com" required autofocus />
-                <p id="problem" role="alert" hidden></p>
-                <button id="open" type="submit">Open</button>
+                <p id="check" class="hint" aria-live="polite" hidden></p>
+                <label for="name">Name</label>
+                <input id="name" name="name" type="text" maxlength="40" placeholder="Shown instead of the address" />
+                <p id="problem" class="problem" role="alert" hidden></p>
+                <button id="open" type="submit">Add and open</button>
             </form>
+            <button id="close" type="button" class="quiet" hidden>Back to Polaris</button>
         </main>
     </body>
 </html>

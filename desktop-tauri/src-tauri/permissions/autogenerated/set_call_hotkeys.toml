@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-call-hotkeys"
+description = "Enables the set_call_hotkeys command without any pre-configured scope."
+commands.allow = ["set_call_hotkeys"]
+
+[[permission]]
+identifier = "deny-set-call-hotkeys"
+description = "Denies the set_call_hotkeys command without any pre-configured scope."
+commands.deny = ["set_call_hotkeys"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-push-cancel"
+description = "Enables the push_cancel command without any pre-configured scope."
+commands.allow = ["push_cancel"]
+
+[[permission]]
+identifier = "deny-push-cancel"
+description = "Denies the push_cancel command without any pre-configured scope."
+commands.deny = ["push_cancel"]

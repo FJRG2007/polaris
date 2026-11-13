@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-open-api-keys"
+description = "Enables the open_api_keys command without any pre-configured scope."
+commands.allow = ["open_api_keys"]
+
+[[permission]]
+identifier = "deny-open-api-keys"
+description = "Denies the open_api_keys command without any pre-configured scope."
+commands.deny = ["open_api_keys"]

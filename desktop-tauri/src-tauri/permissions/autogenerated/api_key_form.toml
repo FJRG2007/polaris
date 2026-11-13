@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-api-key-form"
+description = "Enables the api_key_form command without any pre-configured scope."
+commands.allow = ["api_key_form"]
+
+[[permission]]
+identifier = "deny-api-key-form"
+description = "Denies the api_key_form command without any pre-configured scope."
+commands.deny = ["api_key_form"]

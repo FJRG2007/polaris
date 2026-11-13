@@ -1,0 +1,14 @@
+{
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "api-key",
+    "description": "The app's own API key form, asked for by a push. Its four commands and nothing else.",
+    "local": true,
+    "windows": ["api-key"],
+    "permissions": [
+        "core:default",
+        "allow-api-key-form",
+        "allow-submit-api-key",
+        "allow-cancel-api-key",
+        "allow-open-api-keys"
+    ]
+}

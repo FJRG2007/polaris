@@ -11,7 +11,9 @@ use polaris_client::{ApiKey, InstanceUrl};
 use serde::Serialize;
 use std::sync::Mutex;
 use tauri::async_runtime::{channel, Sender};
-use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{
+    AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+};
 
 pub const KEY_WINDOW: &str = "api-key";
 
@@ -120,25 +122,32 @@ pub struct KeyFormState {
 }
 
 #[tauri::command]
-pub fn api_key_form(keys: State<'_, Keys>) -> KeyFormState {
-    KeyFormState {
+pub fn api_key_form(window: WebviewWindow, keys: State<'_, Keys>) -> Result<KeyFormState, String> {
+    if !crate::ipc::from_local(&window, KEY_WINDOW) {
+        return Err(crate::ipc::REFUSAL.to_owned());
+    }
+    Ok(KeyFormState {
         server: keys
             .asking()
             .as_ref()
             .map(|a| a.server.to_string())
             .unwrap_or_default(),
         can_keep: keys.ring.can_keep(),
-    }
+    })
 }
 
 /// A key pasted into the form: checked, kept, and handed to the pushes waiting.
 #[tauri::command]
 pub async fn submit_api_key(
     app: AppHandle,
+    window: WebviewWindow,
     keys: State<'_, Keys>,
     http: State<'_, Http>,
     key: String,
 ) -> Result<(), String> {
+    if !crate::ipc::from_local(&window, KEY_WINDOW) {
+        return Err(crate::ipc::REFUSAL.to_owned());
+    }
     let server = keys
         .asking()
         .as_ref()
@@ -158,12 +167,18 @@ pub async fn submit_api_key(
 
 /// "Create one in Account > API keys": that page of the saved Polaris.
 #[tauri::command]
-pub fn open_api_keys(app: AppHandle) {
-    crate::tray::show_polaris(&app, "/account/api-keys");
+pub fn open_api_keys(app: AppHandle, window: WebviewWindow) {
+    if !crate::ipc::from_local(&window, KEY_WINDOW) {
+        return;
+    }
+    crate::show_polaris(&app, Some("/account/api-keys"));
 }
 
 #[tauri::command]
-pub fn cancel_api_key(app: AppHandle) {
+pub fn cancel_api_key(app: AppHandle, window: WebviewWindow) {
+    if !crate::ipc::from_local(&window, KEY_WINDOW) {
+        return;
+    }
     if let Some(window) = app.get_webview_window(KEY_WINDOW) {
         let _ = window.close();
     }

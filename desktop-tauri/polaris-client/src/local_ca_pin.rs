@@ -509,3 +509,12 @@ impl ServerCertVerifier for AcceptHost {
         self.system.supported_verify_schemes()
     }
 }
+
+/// The answer for one certificate error the webview reports: accept only a
+/// pinned chain (leaf first, DER) on an in-scope host (`verifyDecision`).
+/// The caller asks only for an untrusted authority.
+pub fn accepts_chain(scope: Option<&PinScope>, hostname: &str, chain: &[Vec<u8>]) -> bool {
+    let Some(scope) = scope else { return false };
+    let host = bare_host(hostname);
+    scope.hosts.contains(&host) && chain_ends_in_pin(chain, &host, &scope.pins, UnixTime::now())
+}

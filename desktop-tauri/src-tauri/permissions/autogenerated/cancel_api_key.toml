@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cancel-api-key"
+description = "Enables the cancel_api_key command without any pre-configured scope."
+commands.allow = ["cancel_api_key"]
+
+[[permission]]
+identifier = "deny-cancel-api-key"
+description = "Denies the cancel_api_key command without any pre-configured scope."
+commands.deny = ["cancel_api_key"]

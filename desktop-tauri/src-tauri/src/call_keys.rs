@@ -42,6 +42,9 @@ pub fn set_call_hotkeys(
     keys: State<'_, CallKeys>,
     input: Option<CallHotkeys>,
 ) -> Result<CallHotkeysResult, String> {
+    if !crate::ipc::from_polaris(&app, &window) {
+        return Err(crate::ipc::REFUSAL.to_owned());
+    }
     let label = window.label().to_owned();
     let holder = keys
         .0

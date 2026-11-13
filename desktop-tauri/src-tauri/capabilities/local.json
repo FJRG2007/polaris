@@ -1,7 +1,23 @@
 {
     "$schema": "../gen/schemas/desktop-schema.json",
     "identifier": "local",
-    "description": "The app's own pages: the first-run page and the API key form. No `remote` entry: a Polaris loaded in the window gets no access to the app.",
-    "windows": ["main", "api-key"],
-    "permissions": ["core:default"]
+    "description": "The app's own servers page. A Polaris window is never given this: its commands come from the remote capability added at run time for the configured origin only.",
+    "local": true,
+    "windows": ["servers"],
+    "permissions": [
+        "core:default",
+        "allow-connect-state",
+        "allow-connect-submit",
+        "allow-connect-check",
+        "allow-connect-switch",
+        "allow-connect-rename",
+        "allow-connect-edit",
+        "allow-connect-remove",
+        "allow-connect-close",
+        "allow-copy-hosts",
+        "allow-import-hosts",
+        "allow-save-hosts-file",
+        "allow-import-hosts-file",
+        "allow-hosts-qr"
+    ]
 }

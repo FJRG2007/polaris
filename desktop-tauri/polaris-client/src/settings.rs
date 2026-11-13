@@ -78,6 +78,9 @@ pub struct Settings {
     pub voice_widget_game_only: bool,
     pub voice_widget_place: Option<Point>,
     pub text_size: Option<u16>,
+    /// The beta's own: offered for `mailto:` links on Windows. Off until switched
+    /// on, and absent from the Electron app's file, which reads it as off.
+    pub mail_handler: bool,
 }
 
 impl Default for Settings {
@@ -96,6 +99,7 @@ impl Default for Settings {
             voice_widget_game_only: false,
             voice_widget_place: None,
             text_size: None,
+            mail_handler: false,
         }
     }
 }
@@ -214,6 +218,7 @@ impl Settings {
                 })
             }),
             text_size: field("textSize").and_then(read_text_size),
+            mail_handler: boolean(field("mailHandler"), false),
         }
     }
 

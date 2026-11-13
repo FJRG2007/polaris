@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-connect-edit"
+description = "Enables the connect_edit command without any pre-configured scope."
+commands.allow = ["connect_edit"]
+
+[[permission]]
+identifier = "deny-connect-edit"
+description = "Denies the connect_edit command without any pre-configured scope."
+commands.deny = ["connect_edit"]

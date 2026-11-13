@@ -9,7 +9,7 @@
 //! zoom, back) and the tray stand in for it.
 
 use crate::os_prefs::read_settings;
-use crate::{saved_server, show_main, Http, MAIN};
+use crate::{saved_server, show_polaris, Outcome, MAIN};
 use polaris_client::host_list::PortableHost;
 use std::sync::Mutex;
 use tauri::menu::{
@@ -25,16 +25,6 @@ const SWITCH: &str = "switch:";
 /// The page zoom the menu's zoom items step through.
 #[derive(Default)]
 pub struct Zoom(Mutex<Option<f64>>);
-
-/// The app's own pages, at the address Tauri serves them from.
-fn local_page(page: &str) -> Option<Url> {
-    let base = if cfg!(windows) {
-        "http://tauri.localhost/"
-    } else {
-        "tauri://localhost/"
-    };
-    Url::parse(base).ok()?.join(page).ok()
-}
 
 fn item(app: &AppHandle, id: &str, label: &str, enabled: bool) -> tauri::Result<MenuItem<Wry>> {
     MenuItem::with_id(app, id, label, enabled, None::<&str>)
@@ -262,17 +252,6 @@ fn zoom(app: &AppHandle, step: Option<f64>) {
     }
 }
 
-/// Bring the main window to `path` on the saved Polaris.
-pub fn show_polaris(app: &AppHandle, path: &str) {
-    let (Some(server), Some(window)) = (saved_server(app), app.get_webview_window(MAIN)) else {
-        return;
-    };
-    if let Ok(url) = server.to_url().join(path) {
-        let _ = window.navigate(url);
-    }
-    show_main(app);
-}
-
 fn say(app: &AppHandle, error: &str) {
     let notice = crate::notices::NoticeInput::problem(error);
     let _ = crate::notices::show(app, &app.state::<crate::notices::Notices>(), notice);
@@ -281,15 +260,10 @@ fn say(app: &AppHandle, error: &str) {
 fn handle(app: &AppHandle, id: &str) {
     let window = app.get_webview_window(MAIN);
     match id {
-        "open" => show_main(app),
+        "open" => show_polaris(app, None),
         "quit" => app.exit(0),
-        "settings" => {
-            if let (Some(window), Some(page)) = (window, local_page("index.html")) {
-                let _ = window.navigate(page);
-            }
-            show_main(app);
-        }
-        "api-keys" => show_polaris(app, "/account/api-keys"),
+        "settings" => crate::open_servers_window(app),
+        "api-keys" => show_polaris(app, Some("/account/api-keys")),
         "forget-key" => crate::key_flow::forget(app),
         "browser" => {
             if let Some(server) = saved_server(app) {
@@ -331,8 +305,8 @@ fn handle(app: &AppHandle, id: &str) {
     }
 }
 
-/// Go to another kept Polaris: checked like an address typed on the first-run
-/// page, and saved only when a Polaris answers there.
+/// Go to another kept Polaris: the servers page's own switch, checked like an
+/// address typed there and kept only when a Polaris answers.
 fn switch(app: &AppHandle, origin: String) {
     if saved_server(app).is_some_and(|server| server.to_string() == origin) {
         refresh(app);
@@ -340,11 +314,9 @@ fn switch(app: &AppHandle, origin: String) {
     }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        let outcome = crate::connect(app.clone(), app.state::<Http>(), origin).await;
-        if let Err(error) = outcome {
+        if let Outcome::Error { error, .. } = crate::ipc::switch_server(&app, &origin).await {
             say(&app, &error);
         }
-        show_main(&app);
         refresh(&app);
     });
 }
@@ -365,7 +337,7 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
                 ..
             } = event
             {
-                show_main(tray.app_handle());
+                show_polaris(tray.app_handle(), None);
             }
         });
     if let Some(icon) = app.default_window_icon() {
@@ -407,11 +379,5 @@ mod tests {
             describe(&PortableHost::new("http://192.168.1.20:3000", None)),
             "192.168.1.20:3000"
         );
-    }
-
-    #[test]
-    fn finds_the_apps_own_pages() {
-        let page = local_page("index.html").unwrap();
-        assert!(page.as_str().ends_with("localhost/index.html"));
     }
 }

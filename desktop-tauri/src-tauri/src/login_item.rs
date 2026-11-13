@@ -3,8 +3,9 @@
 //! and an autostart desktop file on Linux, each named after the beta so the
 //! Electron app's own entry is never touched.
 //!
-//! Off by default in the beta. A development run has no business starting with
-//! the computer, so it never writes the entry.
+//! The setting is the shared `Settings::open_at_login`, on by default as in the
+//! Electron app. A development run has no business starting with the computer,
+//! so it never writes the entry.
 
 use crate::os_prefs::{read_settings, update_settings};
 use tauri::{AppHandle, Runtime};

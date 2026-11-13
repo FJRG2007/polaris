@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-open-servers"
+description = "Enables the open_servers command without any pre-configured scope."
+commands.allow = ["open_servers"]
+
+[[permission]]
+identifier = "deny-open-servers"
+description = "Denies the open_servers command without any pre-configured scope."
+commands.deny = ["open_servers"]

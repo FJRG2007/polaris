@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-copy-hosts"
+description = "Enables the copy_hosts command without any pre-configured scope."
+commands.allow = ["copy_hosts"]
+
+[[permission]]
+identifier = "deny-copy-hosts"
+description = "Denies the copy_hosts command without any pre-configured scope."
+commands.deny = ["copy_hosts"]

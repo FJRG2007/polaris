@@ -3,17 +3,16 @@
 //! addresses and names only; every sign-in stays with the session it belongs
 //! to.
 //!
-//! The beta keeps the list in its own `hosts.json` beside `settings.json`, with
-//! the saved server always first.
+//! The list is the servers page's own (`Settings::servers`), the server in
+//! use always on it.
 
-use crate::saved_server;
 use polaris_client::host_list::{
     encode_host_list, encode_qr, host_list_file, host_list_link, merge_host_lists, qr_svg_path,
     read_host_list, PortableHost,
 };
+use polaris_client::servers::SavedServer;
 use serde::Serialize;
-use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, WebviewWindow};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_dialog::DialogExt;
 
@@ -21,7 +20,6 @@ use tauri_plugin_dialog::DialogExt;
 pub const SERVERS_MAX: usize = 20;
 /// A list file is a few kilobytes; anything far larger is not one.
 const FILE_MAX: u64 = 64 * 1024;
-const HOSTS_FILE: &str = "hosts.json";
 
 /// What taking a list in, or writing one out, came to. `error: null` when the
 /// person cancelled.
@@ -47,34 +45,33 @@ fn failed(error: Option<&str>) -> HostImport {
     }
 }
 
-fn hosts_path(app: &AppHandle) -> Option<PathBuf> {
-    Some(app.path().app_config_dir().ok()?.join(HOSTS_FILE))
-}
-
-/// The hosts kept, the saved server first. Read leniently: the file is on disk
-/// and anything may have written it, so it goes through the same reader as a
-/// list from another device.
+/// The hosts kept, the server in use first, as the servers page lists them.
 pub fn saved_hosts(app: &AppHandle) -> Vec<PortableHost> {
-    let kept = hosts_path(app)
-        .and_then(|path| std::fs::read_to_string(path).ok())
-        .and_then(|text| read_host_list(&text))
-        .unwrap_or_default();
-    let first: Vec<PortableHost> = saved_server(app)
-        .map(|server| vec![PortableHost::new(server.as_str(), None)])
-        .unwrap_or_default();
-    let mut hosts = merge_host_lists(&first, &kept, SERVERS_MAX).hosts;
+    let mut hosts: Vec<PortableHost> = crate::shared(app)
+        .saved()
+        .into_iter()
+        .map(|server| PortableHost {
+            origin: server.origin,
+            name: server.name,
+        })
+        .collect();
     hosts.truncate(SERVERS_MAX);
     hosts
 }
 
 fn keep(app: &AppHandle, hosts: &[PortableHost]) -> Result<(), ()> {
-    let path = hosts_path(app).ok_or(())?;
-    if let Some(folder) = path.parent() {
-        std::fs::create_dir_all(folder).map_err(drop)?;
-    }
-    let temporary = path.with_extension("json.tmp");
-    std::fs::write(&temporary, host_list_file(hosts)).map_err(drop)?;
-    std::fs::rename(&temporary, &path).map_err(drop)
+    let list: Vec<SavedServer> = hosts
+        .iter()
+        .map(|host| SavedServer {
+            origin: host.origin.clone(),
+            name: host.name.clone(),
+        })
+        .collect();
+    crate::shared(app)
+        .update_settings(|settings| settings.set_saved_servers(list))
+        .map_err(drop)?;
+    crate::tray::refresh(app);
+    Ok(())
 }
 
 /// Take in a list read from a code, a link or a file's text. Pure but for the
@@ -107,7 +104,10 @@ pub struct Copied {
 
 /// The list as a code, put on the clipboard.
 #[tauri::command]
-pub fn copy_hosts(app: AppHandle) -> Result<Copied, String> {
+pub fn copy_hosts(app: AppHandle, window: WebviewWindow) -> Result<Copied, String> {
+    if !crate::ipc::is_servers(&window) {
+        return Err(crate::ipc::REFUSAL.to_owned());
+    }
     let hosts = saved_hosts(&app);
     app.clipboard()
         .write_text(encode_host_list(&hosts))
@@ -120,13 +120,24 @@ pub fn copy_hosts(app: AppHandle) -> Result<Copied, String> {
 
 /// Take in a list pasted or read off a QR code.
 #[tauri::command]
-pub fn import_hosts(app: AppHandle, text: String) -> HostImport {
-    import_into(&saved_hosts(&app), &text, |hosts| keep(&app, hosts))
+pub fn import_hosts(app: AppHandle, window: WebviewWindow, text: String) -> HostImport {
+    // `z.string().max(65536)`, in UTF-16 units as zod counts them.
+    if !crate::ipc::is_servers(&window) || polaris_client::servers::utf16_len(&text) > 65_536 {
+        return failed(Some(crate::ipc::REFUSAL));
+    }
+    take(&app, &text)
+}
+
+fn take(app: &AppHandle, text: &str) -> HostImport {
+    import_into(&saved_hosts(app), text, |hosts| keep(app, hosts))
 }
 
 /// The list written to a file somebody picks.
 #[tauri::command]
-pub async fn save_hosts_file(app: AppHandle) -> HostImport {
+pub async fn save_hosts_file(app: AppHandle, window: WebviewWindow) -> HostImport {
+    if !crate::ipc::is_servers(&window) {
+        return failed(Some(crate::ipc::REFUSAL));
+    }
     let picked = app
         .dialog()
         .file()
@@ -152,7 +163,10 @@ pub async fn save_hosts_file(app: AppHandle) -> HostImport {
 
 /// Take in a list from a file somebody picks.
 #[tauri::command]
-pub async fn import_hosts_file(app: AppHandle) -> HostImport {
+pub async fn import_hosts_file(app: AppHandle, window: WebviewWindow) -> HostImport {
+    if !crate::ipc::is_servers(&window) {
+        return failed(Some(crate::ipc::REFUSAL));
+    }
     let picked = app
         .dialog()
         .file()
@@ -170,7 +184,7 @@ pub async fn import_hosts_file(app: AppHandle) -> HostImport {
         Ok(_) => {}
     }
     match std::fs::read_to_string(&path) {
-        Ok(text) => import_hosts(app, text),
+        Ok(text) => take(&app, &text),
         Err(_) => failed(Some("Polaris could not read that file.")),
     }
 }
@@ -184,7 +198,10 @@ pub struct HostsQr {
 }
 
 #[tauri::command]
-pub fn hosts_qr(app: AppHandle) -> Option<HostsQr> {
+pub fn hosts_qr(app: AppHandle, window: WebviewWindow) -> Option<HostsQr> {
+    if !crate::ipc::is_servers(&window) {
+        return None;
+    }
     let modules = encode_qr(&host_list_link(&saved_hosts(&app)))?;
     let (path, size) = qr_svg_path(&modules);
     Some(HostsQr { path, size })
