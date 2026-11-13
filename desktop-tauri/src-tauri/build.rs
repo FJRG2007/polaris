@@ -41,6 +41,12 @@ fn main() {
             "tv_find_usb",
             "tv_cancel",
             "tv_start",
+            "vpn_device_name",
+            "vpn_key",
+            "vpn_up",
+            "vpn_down",
+            "vpn_status",
+            "vpn_join",
         ]),
     ))
     .expect("the Tauri build step runs");

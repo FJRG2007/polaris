@@ -42,6 +42,8 @@ pub mod tv_path;
 pub mod tv_wait;
 pub mod usb_adb;
 pub mod usb_link;
+pub mod vpn;
+pub mod vpn_helper;
 pub mod window_failover;
 pub mod zip_rules;
 

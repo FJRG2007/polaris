@@ -20,6 +20,7 @@ mod notices;
 mod os_prefs;
 mod tray;
 mod tv;
+mod vpn;
 #[cfg(windows)]
 mod webview2;
 
@@ -911,12 +912,19 @@ fn main() {
             tv::tv_find,
             tv::tv_find_usb,
             tv::tv_cancel,
-            tv::tv_start
+            tv::tv_start,
+            vpn::vpn_device_name,
+            vpn::vpn_key,
+            vpn::vpn_up,
+            vpn::vpn_down,
+            vpn::vpn_status,
+            vpn::vpn_join
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
             let folder = app.path().app_config_dir()?;
             import_from_electron(&handle, &folder);
+            app.manage(vpn::VpnService::new(&handle, &folder));
             let settings = Settings::load(&folder.join(SETTINGS_FILE));
             app.manage(Shared {
                 folder,

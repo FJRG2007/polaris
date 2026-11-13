@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vpn-up"
+description = "Enables the vpn_up command without any pre-configured scope."
+commands.allow = ["vpn_up"]
+
+[[permission]]
+identifier = "deny-vpn-up"
+description = "Denies the vpn_up command without any pre-configured scope."
+commands.deny = ["vpn_up"]

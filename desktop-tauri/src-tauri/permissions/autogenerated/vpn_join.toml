@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vpn-join"
+description = "Enables the vpn_join command without any pre-configured scope."
+commands.allow = ["vpn_join"]
+
+[[permission]]
+identifier = "deny-vpn-join"
+description = "Denies the vpn_join command without any pre-configured scope."
+commands.deny = ["vpn_join"]
