@@ -3673,6 +3673,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sysinfo",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
@@ -3683,6 +3684,8 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
+ "tokio",
+ "tokio-util",
  "winreg",
 ]
 

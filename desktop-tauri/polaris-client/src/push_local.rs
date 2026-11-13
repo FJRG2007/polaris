@@ -85,7 +85,8 @@ pub struct PushPlan {
 }
 
 /// How a push ended.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PushEnd {
     pub ok: bool,
     pub message: String,

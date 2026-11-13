@@ -7,6 +7,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod call_keys;
+mod developer;
 mod host_transfer;
 mod key_flow;
 mod login_item;
@@ -142,6 +143,7 @@ fn main() {
         .manage(key_flow::Keys::default())
         .manage(tray::Zoom::default())
         .manage(Http(http))
+        .manage(developer::Developer::default())
         .invoke_handler(tauri::generate_handler![
             connect,
             notices::show_notice,
@@ -155,7 +157,15 @@ fn main() {
             host_transfer::import_hosts,
             host_transfer::save_hosts_file,
             host_transfer::import_hosts_file,
-            host_transfer::hosts_qr
+            host_transfer::hosts_qr,
+            developer::push_choose_folder,
+            developer::push_start,
+            developer::push_cancel,
+            developer::upload_folder,
+            developer::install_tool,
+            developer::running_game,
+            developer::set_custom_games,
+            developer::running_programs
         ])
         .setup(|app| {
             let handle = app.handle().clone();
