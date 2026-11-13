@@ -39,6 +39,20 @@ describe("a reply in the reading pane", () => {
         expect(screen.getByRole("button", { name: "Hide trimmed content" })).toBeTruthy();
     });
 
+    it("keeps its text selectable when the message turned selection off", async () => {
+        const locked = '<style>*{user-select:none}</style><div>Copy this</div>';
+        const { container } = render(
+            <MessageBody html={locked} text="" remoteAllowed={false} trackerVendors={[]} />,
+            { wrapper: MessagesWrapper }
+        );
+        await waitFor(() => expect(frameSource(container)).toContain("Copy this"));
+        const source = frameSource(container);
+        // Ours comes after the message, so it wins the cascade.
+        expect(source.lastIndexOf("user-select:text!important")).toBeGreaterThan(
+            source.indexOf("Copy this")
+        );
+    });
+
     it("draws a message that is only a quote whole, with no pill", async () => {
         const only =
             '<div class="gmail_quote"><div class="gmail_attr">On Mon, Ann wrote:</div><blockquote>Only this</blockquote></div>';

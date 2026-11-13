@@ -383,6 +383,9 @@ function frameDocument(
      frame stayed at its opening height and scrolled inside itself, next to the
      pane already scrolling outside it. */
   html,body{height:auto!important;min-height:0!important;overflow:visible!important;}
+  /* A message that turned selection off (user-select:none on everything is a
+     common newsletter template) left nothing in it to select or copy. */
+  #polaris-body,#polaris-body *{-webkit-user-select:text!important;user-select:text!important;}
 </style>
 </body></html>`;
 }
