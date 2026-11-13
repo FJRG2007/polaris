@@ -1,7 +1,7 @@
 [package]
 name = "polaris-client"
 version = "0.1.0"
-description = "Talking to a Polaris instance from a native client: addresses, identity probe and the API-key calls."
+description = "Talking to a Polaris instance from a native client: addresses, identity probe, the API-key calls and the deploy side."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -11,8 +11,12 @@ publish.workspace = true
 
 [dependencies]
 aes-gcm = "=0.11.1"
+# Ed25519 (an instance proving it is the same one) and the nonce it signs: the
+# crypto rustls already builds, so nothing new is compiled for it.
+aws-lc-rs = "=1.19.0"
 base64 = "=0.23.1"
 curve25519-dalek = "=5.0.0"
+flate2 = "=1.1.11"
 getrandom = { version = "=0.4.3", features = ["sys_rng"] }
 hkdf = "=0.13.0"
 keyring = "=4.2.0"
@@ -20,14 +24,18 @@ mdns-sd = "=0.21.7"
 qrcodegen = "=1.8.0"
 rsa = { version = "=0.10.0", features = ["pkcs1v15"] }
 rustls = { version = "=0.23.46", default-features = false, features = ["aws_lc_rs", "std"] }
-reqwest = { version = "=0.13.5", default-features = false, features = ["rustls", "json"] }
+reqwest = { version = "=0.13.5", default-features = false, features = ["rustls", "json", "stream"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.154"
 sha2 = "=0.11.1"
+sysinfo = { version = "=0.40.3", default-features = false, features = ["system"] }
+tempfile = "=3.27.0"
 thiserror = "=2.0.21"
-tokio = { version = "=1.54.1", features = ["io-util", "macros", "net", "time"] }
+tokio = { version = "=1.54.1", features = ["fs", "io-util", "macros", "net", "process", "rt", "sync", "time"] }
 tokio-rustls = { version = "=0.26.6", default-features = false, features = ["aws_lc_rs"] }
+tokio-util = { version = "=0.7.20", features = ["io"] }
 url = "=2.5.8"
+zip = { version = "=9.5.1", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread"] }
