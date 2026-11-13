@@ -13,9 +13,11 @@
  * what it asks for. A device-code login (Copilot, Codex) is two steps - open the
  * page, type the code - and the dialog shows exactly those, as lifted off the
  * screen, then notices on its own that the CLI said it was done and keeps the
- * login. A login that wants something typed back (Gemini's authorization code,
- * Claude's token) keeps the terminal open with a line under it. Either way the
- * raw terminal is one click away.
+ * login. A login that wants a code typed back (Gemini's authorization code,
+ * Claude's) is the same two steps with a field for the code, and a login that
+ * prints its token (Claude's) is kept the moment the token is on the screen.
+ * Either way the raw terminal is one click away, and it opens on its own with
+ * the copy field under it if the token could not be read.
  *
  * The screen is polled rather than streamed. A login is thirty seconds of
  * waiting on somebody else's OAuth, the output is a few lines, and a socket for
@@ -103,7 +105,14 @@ export function SigninDialog({
     // Null until somebody chooses: then the flow decides, open for a login that
     // wants typing and folded for one that only wants a code typed elsewhere.
     const [showTerminal, setShowTerminal] = useState<boolean | null>(null);
+    // Set when a login that prints its token finished and no token could be
+    // read: the person copies it in instead, which is what this was before.
+    const [manual, setManual] = useState(false);
     const autoLinks = useRef(0);
+    // Bumped by every automatic attempt that found nothing yet, so the next one
+    // is scheduled even when the answer came back too fast for `busy` to be seen
+    // changing: React folds the two into one render and the effect never reran.
+    const [retries, setRetries] = useState(0);
     const terminal = useRef<HTMLPreElement>(null);
 
     const ready = view?.ready ?? false;
@@ -111,8 +120,10 @@ export function SigninDialog({
     const code = view?.code ?? null;
     const finished = view?.finished ?? false;
     const stopped = view !== null && view.exitCode !== null && !finished;
-    const terminalOpen = showTerminal ?? !device;
-    const capture = signin.file ? actions.capture : undefined;
+    const capture = (signin.file || signin.onScreen) && !manual ? actions.capture : undefined;
+    // Folded while Polaris drives the login itself; open where the person has
+    // to read something off it.
+    const terminalOpen = showTerminal ?? (!device && !capture);
 
     // Started as the dialog opens: there is nothing to ask first, and a machine
     // that takes a minute to install the tool should be doing it while the
@@ -190,6 +201,8 @@ export function SigninDialog({
         setExpired(false);
         setError(null);
         setLine("");
+        setManual(false);
+        setShowTerminal(null);
         autoLinks.current = 0;
         setRound((value) => value + 1);
     };
@@ -222,9 +235,16 @@ export function SigninDialog({
                     const captured = id ? await runAction(() => capture({ id, env: signin.env }), report) : null;
                     if (!captured?.value) {
                         setBusy(false);
-                        if (captured?.error && (!quiet || autoLinks.current >= MAX_AUTO_LINKS)) {
+                        const givenUp = !quiet || autoLinks.current >= MAX_AUTO_LINKS;
+                        // Only once the login is over: pressed early, the token
+                        // is simply not printed yet.
+                        if (givenUp && signin.onScreen && finished) {
+                            setManual(true);
+                            setShowTerminal(true);
+                        } else if (captured?.error && givenUp) {
                             setError(captured.error);
                         }
+                        if (quiet) setRetries((value) => value + 1);
                         return;
                     }
                     value = captured.value;
@@ -243,7 +263,7 @@ export function SigninDialog({
             })();
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [id, secret, name, capture, view?.signedInAs, signin.env]
+        [id, secret, name, capture, view?.signedInAs, signin.env, signin.onScreen, finished]
     );
 
     // Kept the moment the CLI says it worked, with no button to find. Only for
@@ -261,7 +281,7 @@ export function SigninDialog({
             autoLinks.current === 0 ? 0 : POLL_MS
         );
         return () => clearTimeout(timer);
-    }, [finished, capture, linked, busy, link]);
+    }, [finished, capture, linked, busy, link, retries]);
 
     const openLabel = url ? hostOf(url) : null;
     const showLink = !linked && (!device || finished || stopped);
@@ -316,17 +336,17 @@ export function SigninDialog({
                             signedInAs={view?.signedInAs ?? null}
                         />
                     ) : ready && !device && !stopped && !expired ? (
-                        <div className="flex flex-col gap-2">
-                            <p className="text-sm">{t("signinDialog.pasteStep")}</p>
-                            {url ? (
-                                <Button asChild variant="outline" size="sm" className="self-start">
-                                    <a href={url} target="_blank" rel="noopener noreferrer">
-                                        <ExternalLink className="size-4 shrink-0" />
-                                        {t("signinDialog.openPage")}
-                                    </a>
-                                </Button>
-                            ) : null}
-                        </div>
+                        <PasteSteps
+                            url={url}
+                            line={line}
+                            onLine={setLine}
+                            onSend={send}
+                            // The terminal has its own line under it; one field
+                            // for the same thing is enough.
+                            field={!terminalOpen}
+                            busy={busy || settled}
+                            finished={finished && Boolean(capture)}
+                        />
                     ) : null}
 
                     {(stopped || expired) && !linked ? (
@@ -414,11 +434,13 @@ export function SigninDialog({
                     ) : null}
 
                     {linked || device ? null : capture ? (
-                        <p className="text-xs text-muted-foreground">{t("signinDialog.fileHint")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {signin.onScreen ? t("signinDialog.tokenHint") : t("signinDialog.fileHint")}
+                        </p>
                     ) : (
                         <label className="block space-y-1">
                             <span className="text-xs text-muted-foreground">
-                                {t("signinDialog.copyIn")}
+                                {manual ? t("signinDialog.tokenMissed") : t("signinDialog.copyIn")}
                             </span>
                             <Input
                                 type="password"
@@ -454,6 +476,93 @@ export function SigninDialog({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** The two steps of a login that wants a code typed back: open the page, then
+ *  paste what it shows into a field of its own rather than into a terminal. */
+function PasteSteps({
+    url,
+    line,
+    onLine,
+    onSend,
+    field,
+    busy,
+    finished
+}: {
+    url: string | null;
+    line: string;
+    onLine: (value: string) => void;
+    onSend: () => void;
+    field: boolean;
+    busy: boolean;
+    finished: boolean;
+}) {
+    const t = useTranslations("components");
+    return (
+        <ol className="bg-elevated flex flex-col gap-4 rounded-md border border-border p-4">
+            <li className="flex min-w-0 flex-col gap-2">
+                <span className="text-sm">
+                    <span className="text-muted-foreground mr-2 font-mono">1</span>
+                    {t("signinDialog.pasteStepOpen")}
+                </span>
+                {url ? (
+                    <Button asChild variant="primary" size="md" className="max-w-full self-start">
+                        <a href={url} target="_blank" rel="noopener noreferrer" title={url}>
+                            <ExternalLink className="size-4 shrink-0" />
+                            <span className="min-w-0 truncate">{t("signinDialog.openPage")}</span>
+                        </a>
+                    </Button>
+                ) : (
+                    <span className="text-muted-foreground flex items-center gap-2 text-xs">
+                        <Loader2 className="size-4 shrink-0 animate-spin" />
+                        {t("signinDialog.gettingPage")}
+                    </span>
+                )}
+            </li>
+            <li className="flex min-w-0 flex-col gap-2">
+                <span className="text-sm">
+                    <span className="text-muted-foreground mr-2 font-mono">2</span>
+                    {t("signinDialog.pasteStepCode")}
+                </span>
+                {field ? (
+                    <div className="flex items-center gap-2">
+                        <Input
+                            value={line}
+                            onChange={(event) => onLine(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    onSend();
+                                }
+                            }}
+                            placeholder={t("signinDialog.codePlaceholder")}
+                            aria-label={t("signinDialog.codePlaceholder")}
+                            autoComplete="off"
+                            spellCheck={false}
+                            className="min-w-0 flex-1 font-mono"
+                            disabled={busy}
+                        />
+                        <Button
+                            size="icon-sm"
+                            variant="outline"
+                            onClick={onSend}
+                            aria-label={t("signinDialog.pasteStepCode")}
+                            title={t("signinDialog.pasteStepCode")}
+                            disabled={busy || !line.trim()}
+                        >
+                            <CornerDownLeft className="size-4 shrink-0" />
+                        </Button>
+                    </div>
+                ) : null}
+            </li>
+            {finished ? (
+                <li className="text-muted-foreground flex items-center gap-2 text-xs" aria-live="polite">
+                    <Loader2 className="size-4 shrink-0 animate-spin" />
+                    {t("signinDialog.linking")}
+                </li>
+            ) : null}
+        </ol>
     );
 }
 

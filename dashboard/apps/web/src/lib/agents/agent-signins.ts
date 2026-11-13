@@ -24,6 +24,7 @@
 
 import * as core from "@polaris/core";
 import { MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
+import { hasScreenToken } from "@/lib/agents/signin-screen";
 
 /**
  * The prefix every sign-in row's `provider` column carries.
@@ -86,6 +87,9 @@ export interface AgentSignin {
     /** Where the tool keeps this login in its home, relative to it, when it is
      *  a file the tool writes rather than a value to copy off the screen. */
     readonly file: string | null;
+    /** The login prints this credential as its result, so Polaris reads it off
+     *  the screen and keeps it without anybody copying it. */
+    readonly onScreen: boolean;
     /** Which catalogued tools this one signs in. Carries the id as well as the
      *  label so a screen can draw the tool's mark without matching on words. */
     readonly serves: readonly { readonly id: string; readonly label: string }[];
@@ -122,6 +126,7 @@ export function agentSignins(): AgentSignin[] {
                 howto: credential.howto,
                 subscription: credential.subscription,
                 file: credential.file ?? null,
+                onScreen: hasScreenToken(credential.env),
                 serves: [{ id: cli.id, label: cli.label }]
             });
         }

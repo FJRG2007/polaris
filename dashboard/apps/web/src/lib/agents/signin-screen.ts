@@ -4,10 +4,11 @@
  * Pure, so every rule below is asserted against text a real login printed
  * rather than against a container this machine cannot start.
  *
- * Nothing here reads a credential off the screen. What it lifts out is what the
- * vendor's CLI prints for the person to act on - the address to open, the
- * one-time code to type there, the line that says who signed in - and only ever
- * what was actually printed: a field that did not parse is null, never a guess.
+ * What it lifts out is what the vendor's CLI prints for the person to act on -
+ * the address to open, the one-time code to type there, the line that says who
+ * signed in - and, for a login whose result is a token printed on the screen,
+ * that token. Only ever what was actually printed, in a shape a real login was
+ * seen to print: a field that did not parse is null, never a guess.
  */
 
 import { firstUrlIn } from "./session-commands";
@@ -197,4 +198,66 @@ export function readSigninScreen(raw: string): SigninProgress {
         exitCode,
         finished: signedInAs !== null || exitCode === 0
     };
+}
+
+/**
+ * A token a login prints as its result, by the credential it is.
+ *
+ * `claude setup-token` ends like this (seen 2026-11-13, Claude Code 2.1.323),
+ * the token broken across lines wherever the terminal's width fell:
+ *
+ *      Your OAuth token (valid for 1 year):
+ *
+ *      sk-ant-oat01-EW5S...
+ *      kOAe...QAA
+ *
+ *      Store this token securely. You won't be able to see it again.
+ *
+ * `start` is how the token begins and `alphabet` the characters it is made of,
+ * so the pieces after the first line are joined only while they are nothing but
+ * token, and the blank line under it ends it.
+ */
+export interface ScreenToken {
+    readonly start: string;
+    readonly alphabet: RegExp;
+    /** The whole token, once joined: anything else is not one. */
+    readonly shape: RegExp;
+}
+
+export const SCREEN_TOKENS: Readonly<Record<string, ScreenToken>> = {
+    CLAUDE_CODE_OAUTH_TOKEN: {
+        start: "sk-ant-oat",
+        alphabet: /^[A-Za-z0-9_-]+$/,
+        shape: /^sk-ant-oat\d{2}-[A-Za-z0-9_-]{40,}$/
+    }
+};
+
+/** Whether this credential's login prints its token on the screen. */
+export function hasScreenToken(env: string): boolean {
+    return env in SCREEN_TOKENS;
+}
+
+/**
+ * The token a login printed, or null while it has not printed a whole one.
+ *
+ * The last one on the screen wins, as with a device code: a login run twice in
+ * the same terminal leaves the old one above the new.
+ */
+export function screenTokenIn(env: string, screen: string): string | null {
+    const token = SCREEN_TOKENS[env];
+    if (!token) return null;
+    const lines = screen.split("\n").map((line) => line.trim());
+    let found: string | null = null;
+    for (let at = 0; at < lines.length; at += 1) {
+        const first = lines[at]!;
+        if (!first.startsWith(token.start) || !token.alphabet.test(first)) continue;
+        let value = first;
+        for (let next = at + 1; next < lines.length; next += 1) {
+            const piece = lines[next]!;
+            if (!piece || !token.alphabet.test(piece)) break;
+            value += piece;
+        }
+        if (token.shape.test(value)) found = value;
+    }
+    return found;
 }

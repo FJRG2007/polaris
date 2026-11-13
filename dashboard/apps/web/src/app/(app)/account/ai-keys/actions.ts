@@ -168,8 +168,8 @@ export async function agentSigninIdentityAction(input: unknown): Promise<SigninI
 }
 
 /**
- * The credential file the open login wrote, for a tool that keeps its login in
- * a file rather than printing a token.
+ * The credential the open login produced: the token it printed, read off its
+ * screen, or the file it wrote for a tool that keeps its login in one.
  *
  * Handed to the dialog the way a pasted token is, so it reaches the store
  * through the same add - encrypted, named, ordered - rather than a second write

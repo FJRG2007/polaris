@@ -14,13 +14,12 @@
  * into a dialog with a line to type back into. That is the whole of the hard
  * part: an OAuth flow that wants a browser round-trip, driven from a browser.
  *
- * **What is deliberately NOT automated: reading the credential off the screen.**
- * The command prints its result in a shape nobody here has verified, on a stream
- * nobody here has verified, and a parser written against a guess is a parser that
- * silently stores the wrong line - a wrong credential looks exactly like a right
- * one until a session fails at its login prompt a week later. The person is
- * looking straight at it, so they copy it into the field beneath. Polaris does
- * the four things that were hard and leaves the one that was easy.
+ * **The credential is read off the screen only in a shape a real login printed.**
+ * A parser written against a guess silently stores the wrong line, and a wrong
+ * credential looks exactly like a right one until a session fails at its login
+ * prompt a week later. So only a token whose printed form was seen
+ * (`screens.SCREEN_TOKENS`, Claude's since 2026-11-13) is kept on its own; any
+ * other still goes through the field beneath, copied by the person.
  *
  * Nothing here has been exercised: this machine has no Docker, and the box that
  * does was unreachable. The parts that are shared with a session's runtime are
@@ -489,7 +488,13 @@ export async function signinScreen(userId: string, id: string): Promise<SigninVi
         };
     }
 
-    const progress = screens.readSigninScreen(await runIn(userId, id, signinCaptureCommand()));
+    const read = screens.readSigninScreen(await runIn(userId, id, signinCaptureCommand()));
+    // A login that prints its token has finished once the whole token is on the
+    // screen, whether or not the command has returned yet.
+    const progress =
+        !read.finished && screens.screenTokenIn(attempt.env, read.screen) !== null
+            ? { ...read, finished: true }
+            : read;
 
     const answers = login?.autoAnswers ?? [];
     const reply = screens.pendingAutoAnswer(progress.screen, answers);
@@ -785,12 +790,18 @@ export function parseCredentialFile(output: string): string | null {
 }
 
 /**
- * The credential file an open login wrote, ready to be kept, or null while the
- * login has not finished. Throws only when the attempt is not this person's.
+ * The credential an open login produced, ready to be kept, or null while the
+ * login has not finished: the token it printed, for a login that prints one,
+ * otherwise the file it wrote. Throws only when the attempt is not this person's.
  */
 export async function captureSignin(userId: string, id: string, env: string): Promise<string | null> {
+    if (!(env in LOGIN_COMMANDS)) return null;
+    if (screens.hasScreenToken(env)) {
+        const screen = await runIn(userId, id, signinCaptureCommand());
+        return screens.screenTokenIn(env, screens.readSigninScreen(screen).screen);
+    }
     const file = signinCredentialFile(env);
-    if (!file || !(env in LOGIN_COMMANDS)) return null;
+    if (!file) return null;
     const pending = directAttempts.get(id);
     if (pending) {
         if (pending.userId !== userId) throw new Error("That sign-in is no longer open.");

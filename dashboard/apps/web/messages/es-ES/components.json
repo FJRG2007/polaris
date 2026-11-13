@@ -1103,12 +1103,17 @@
         "linked": "Vinculada. Las sesiones que la necesiten la usan.",
         "showTerminal": "Ver terminal",
         "hideTerminal": "Ocultar terminal",
-        "pasteStep": "Abre la página de acceso y apruébalo. Cuando muestre un código, pégalo en la línea bajo el terminal y pulsa Intro.",
         "ended": "El acceso se detuvo antes de terminar. Reinicia para otro código.",
         "expired": "Este acceso caducó. Reinicia para obtener otro código.",
         "restart": "Reiniciar",
         "done": "Listo",
-        "fellBack": "El acceso rápido no respondió, así que Polaris usa el de la propia herramienta."
+        "fellBack": "El acceso rápido no respondió, así que Polaris usa el de la propia herramienta.",
+        "pasteStepOpen": "Abre la página de acceso y apruébalo.",
+        "pasteStepCode": "Pega aquí el código que aparece.",
+        "codePlaceholder": "Código de acceso",
+        "gettingPage": "Obteniendo la página...",
+        "tokenHint": "Polaris guarda cifrado el token que imprime el acceso. No hay nada que copiar.",
+        "tokenMissed": "Polaris no pudo leer el token. Cópialo desde el terminal."
     },
     "providerSelect": {
         "free": {
