@@ -42,38 +42,50 @@ describe("auto-update policy", () => {
         expect(parseAutoUpdatePolicy(stringifyAutoUpdatePolicy(policy))).toEqual(policy);
     });
 
-    it("falls back to installing nothing when the stored policy cannot be read", () => {
+    it("installs at the quiet hour when nobody chose, and keeps a stored choice", () => {
+        expect(parseAutoUpdatePolicy(null)).toEqual({ mode: "quiet", at: "05:00" });
+        const chosen = { mode: "off" as const, at: "05:00" };
+        expect(parseAutoUpdatePolicy(stringifyAutoUpdatePolicy(chosen))).toEqual(chosen);
+    });
+
+    it("falls back to the default when the stored policy cannot be read", () => {
         expect(parseAutoUpdatePolicy(null)).toEqual(DEFAULT_AUTO_UPDATE);
         expect(parseAutoUpdatePolicy("")).toEqual(DEFAULT_AUTO_UPDATE);
         expect(parseAutoUpdatePolicy("not json")).toEqual(DEFAULT_AUTO_UPDATE);
         expect(parseAutoUpdatePolicy('{"mode":"daily","at":"tea time"}')).toEqual(DEFAULT_AUTO_UPDATE);
-        expect(DEFAULT_AUTO_UPDATE.mode).toBe("off");
+        expect(DEFAULT_AUTO_UPDATE.mode).toBe("quiet");
     });
 });
 
 describe("when an update installs", () => {
+    it("waits for the first quiet hour after the build appeared", () => {
+        const policy = { mode: "quiet" as const, at: "05:00" };
+        expect(autoUpdateRunsAt(policy, new Date(2026, 6, 31, 1, 10), 2)).toEqual(new Date(2026, 6, 31, 2, 0));
+        expect(autoUpdateRunsAt(policy, new Date(2026, 6, 31, 14, 12), 2)).toEqual(new Date(2026, 7, 1, 2, 0));
+    });
+
     it("never installs while the policy is off", () => {
-        expect(autoUpdateRunsAt({ mode: "off", at: "05:00" }, new Date())).toBeNull();
+        expect(autoUpdateRunsAt({ mode: "off", at: "05:00" }, new Date(), 4)).toBeNull();
     });
 
     it("installs a published build straight away when told to", () => {
         const seen = new Date(2026, 6, 31, 14, 12);
-        expect(autoUpdateRunsAt({ mode: "immediate", at: "05:00" }, seen)).toEqual(seen);
+        expect(autoUpdateRunsAt({ mode: "immediate", at: "05:00" }, seen, 4)).toEqual(seen);
     });
 
     it("takes the same day's window when the build arrived before it", () => {
         const seen = new Date(2026, 6, 31, 2, 0);
-        expect(autoUpdateRunsAt(daily("05:00"), seen)).toEqual(new Date(2026, 6, 31, 5, 0));
+        expect(autoUpdateRunsAt(daily("05:00"), seen, 4)).toEqual(new Date(2026, 6, 31, 5, 0));
     });
 
     it("waits for tomorrow when the build arrived after today's window", () => {
         const seen = new Date(2026, 6, 31, 7, 0);
-        expect(autoUpdateRunsAt(daily("05:00"), seen)).toEqual(new Date(2026, 7, 1, 5, 0));
+        expect(autoUpdateRunsAt(daily("05:00"), seen, 4)).toEqual(new Date(2026, 7, 1, 5, 0));
     });
 
     it("runs at once when the build arrives exactly on the window", () => {
         const seen = new Date(2026, 6, 31, 5, 0);
-        expect(autoUpdateRunsAt(daily("05:00"), seen)).toEqual(seen);
+        expect(autoUpdateRunsAt(daily("05:00"), seen, 4)).toEqual(seen);
     });
 
     it("rolls over a month boundary rather than producing an invalid date", () => {

@@ -3730,6 +3730,9 @@
             "off": "Solo avisarme",
             "immediate": "En cuanto se publique una",
             "daily": "A diario a las",
+            "quiet": "En la hora más tranquila ({at})",
+            "quietHint": "Se instala a las {at}, cuando menos se usa Polaris. Si falla, lo vuelve a intentar la noche siguiente.",
+            "quietUnavailable": "Esta máquina no puede instalar versiones sola, así que Polaris solo avisa.",
             "offHint": "Se avisa a quien puede actualizar Polaris cuando hay una compilación lista. Nada se instala solo.",
             "immediateHint": "Una compilación publicada se instala sola. El panel sigue funcionando mientras se hace el relevo.",
             "dailyHint": "Se instala a las {at} siguientes a que aparezca una compilación. Si Polaris está apagado a esa hora, se instala cuando vuelva."

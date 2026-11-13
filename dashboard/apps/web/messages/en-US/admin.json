@@ -3730,6 +3730,9 @@
             "off": "Only tell me",
             "immediate": "As soon as one is published",
             "daily": "Every day at",
+            "quiet": "At the quietest hour ({at})",
+            "quietHint": "Installs at {at}, when Polaris is least used. If an install fails, it tries again the next night.",
+            "quietUnavailable": "This host cannot install updates on its own, so Polaris only tells you.",
             "offHint": "Everyone who can update Polaris is told when a build is ready. Nothing installs on its own.",
             "immediateHint": "A published build installs itself. The dashboard keeps serving while it rolls over.",
             "dailyHint": "Installs at the first {at} after a build appears. If Polaris is off then, it installs when it comes back."

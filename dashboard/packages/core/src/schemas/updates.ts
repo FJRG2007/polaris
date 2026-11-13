@@ -2,10 +2,11 @@
  * When Polaris is allowed to install its own updates, and where an update comes
  * from.
  *
- * Three answers cover what an operator actually wants: never (tell me, I will
- * press the button), as soon as a build is published, or at a fixed time of day
- * so a restart lands when nobody is using the box. The third is the reason this
- * is a policy rather than a boolean.
+ * Four answers cover what an operator actually wants: never (tell me, I will
+ * press the button), as soon as a build is published, at the hour this
+ * deployment is least used, or at a fixed time of day. The quiet hour is the
+ * default, so a deployment nobody looks after still stays current, and the
+ * restart lands when nobody is using the box.
  *
  * The schedule is anchored to the moment an update became available, not to a
  * calendar day, so "daily at 05:00" means the first 05:00 after the build
@@ -48,7 +49,7 @@ export function parseUpdateSource(raw: string | null | undefined): UpdateSource 
 }
 
 /** How an update gets installed once one is published. */
-export const AUTO_UPDATE_MODES = ["off", "immediate", "daily"] as const;
+export const AUTO_UPDATE_MODES = ["off", "immediate", "quiet", "daily"] as const;
 
 export type AutoUpdateMode = (typeof AUTO_UPDATE_MODES)[number];
 
@@ -63,8 +64,15 @@ export const autoUpdatePolicySchema = z.object({
 
 export type AutoUpdatePolicy = z.infer<typeof autoUpdatePolicySchema>;
 
-/** What a deployment does before anyone chooses: nothing but tell the operator. */
-export const DEFAULT_AUTO_UPDATE: AutoUpdatePolicy = { mode: "off", at: "05:00" };
+/**
+ * What a deployment does before anyone chooses: install at the quiet hour.
+ *
+ * Only an absent row reads as this. The row is written by nothing but the
+ * schedule control in Settings, so a stored "off" is somebody's choice and is
+ * kept; a deployment where nobody ever picked follows this default, including
+ * those installed while the default was "off".
+ */
+export const DEFAULT_AUTO_UPDATE: AutoUpdatePolicy = { mode: "quiet", at: "05:00" };
 
 /** Read the stored policy, falling back to the default rather than failing - an
  *  unreadable setting must never leave the watcher unable to decide. */
@@ -91,11 +99,24 @@ export function nextDailyRun(at: string, from: Date): Date {
     return run;
 }
 
+/** The first time the quiet hour (0-23, server time) comes round on or after
+ *  `from`. */
+export function nextQuietRun(quietHour: number, from: Date): Date {
+    const hour = Math.min(23, Math.max(0, Math.trunc(quietHour)));
+    return nextDailyRun(`${String(hour).padStart(2, "0")}:00`, from);
+}
+
 /** When an update that became available at `availableSince` installs itself, or
- *  null when this policy never installs one. */
-export function autoUpdateRunsAt(policy: AutoUpdatePolicy, availableSince: Date): Date | null {
+ *  null when this policy never installs one. `quietHour` is the hour this
+ *  deployment is least used, read only in `quiet`. */
+export function autoUpdateRunsAt(
+    policy: AutoUpdatePolicy,
+    availableSince: Date,
+    quietHour: number
+): Date | null {
     if (policy.mode === "off") return null;
     if (policy.mode === "immediate") return availableSince;
+    if (policy.mode === "quiet") return nextQuietRun(quietHour, availableSince);
     return nextDailyRun(policy.at, availableSince);
 }
 
@@ -223,6 +244,5 @@ export function securityUpdateRunsAt(
     if (answer === "daily") {
         return nextDailyRun(policy.times[severity] ?? DEFAULT_SECURITY_DAILY_AT, availableSince);
     }
-    const hour = Math.min(23, Math.max(0, Math.trunc(quietHour)));
-    return nextDailyRun(`${String(hour).padStart(2, "0")}:00`, availableSince);
+    return nextQuietRun(quietHour, availableSince);
 }

@@ -26,6 +26,8 @@ export function UpdatesViewLoader({
                 <UpdatesView
                     initialPolicy={data.policy}
                     initialSource={data.source}
+                    quietHour={data.quietHour}
+                    canInstall={data.canInstall}
                     deployment={deployment}
                 />
             )}

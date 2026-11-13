@@ -37,7 +37,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { getSetting } from "@/lib/setting-store";
-import { getAutoUpdatePolicy } from "@/lib/update-watcher";
+import { autoUpdatePolicyHere } from "@/lib/update-watcher";
 import { badgeMarks, DISMISSED_KEYS, markSeen, type BadgeScreen } from "@/lib/badge-seen";
 
 /** The key the update watcher claims once per published build, holding the short
@@ -123,7 +123,7 @@ export function updateIsWaiting(input: {
     readonly running: string | null;
     /** The short sha the watcher last announced, or null before it has. */
     readonly announced: string | null;
-    /** What the deployment does about updates by itself: off, immediate, daily. */
+    /** What the deployment does about updates by itself: off, immediate, quiet, daily. */
     readonly autoUpdate: string;
 }): boolean {
     if (!input.running || !input.announced) return false;
@@ -143,7 +143,7 @@ async function announcedBuild(): Promise<string | null> {
 async function updateWaiting(): Promise<string | null> {
     const running = loadEnv().POLARIS_BUILD_SHA ?? null;
     if (!running) return null;
-    const [announced, policy] = await Promise.all([announcedBuild(), getAutoUpdatePolicy()]);
+    const [announced, policy] = await Promise.all([announcedBuild(), autoUpdatePolicyHere()]);
     return updateIsWaiting({ running, announced, autoUpdate: policy.mode }) ? announced : null;
 }
 

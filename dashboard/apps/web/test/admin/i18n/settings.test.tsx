@@ -47,6 +47,8 @@ function settings(locale: "en-US" | "es-ES", kind: "updates" | "both" = "both") 
                 <UpdatesView
                     initialPolicy={{ mode: "daily", at: "04:00" }}
                     initialSource="image"
+                    quietHour={4}
+                    canInstall
                     deployment={{ branch: "main", autoUpdate: true }}
                 />
                 {kind === "updates" ? null : (

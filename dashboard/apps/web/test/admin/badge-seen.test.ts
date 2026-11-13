@@ -16,7 +16,7 @@ let countedSince: (Date | undefined)[] = [];
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_BUILD_SHA: "running123" }) }));
 vi.mock("@/lib/setting-store", () => ({ getSetting: async () => "new4567 2026-09-29T10:00:00Z" }));
-vi.mock("@/lib/update-watcher", () => ({ getAutoUpdatePolicy: async () => ({ mode: "off" }) }));
+vi.mock("@/lib/update-watcher", () => ({ autoUpdatePolicyHere: async () => ({ mode: "off" }) }));
 
 const count = async ({ where }: { where: { createdAt?: { gt: Date } } }) => {
     countedSince.push(where.createdAt?.gt);

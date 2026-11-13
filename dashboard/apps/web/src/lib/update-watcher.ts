@@ -16,11 +16,13 @@
  * The claims are keyed by the published build, so the announcement, the install
  * and the report of a failed install each happen once per version - never once
  * per tick, and never again for a version already dealt with. A failed install
- * is reported and then left alone: retrying a broken update every few minutes is
- * how one bad build takes a deployment down all night.
+ * is reported and then left alone until the next quiet hour at the earliest:
+ * retrying a broken update every few minutes is how one bad build takes a
+ * deployment down all night.
  */
 
 import { prisma } from "@polaris/db";
+import { getCapabilities } from "@polaris/config";
 import { dataSaverActive } from "@/lib/backup-access";
 import { usersWithPermission } from "@polaris/auth";
 import { getUpdateSource } from "@/lib/update-source";
@@ -49,6 +51,7 @@ import {
 } from "@/lib/update-runner";
 import {
     autoUpdateRunsAt,
+    nextQuietRun,
     parseAutoUpdatePolicy,
     stringifyAutoUpdatePolicy,
     type AutoUpdatePolicy,
@@ -111,6 +114,10 @@ const POLICY_KEY = "updates.auto";
 const ANNOUNCED_KEY = "updates.announced";
 const INSTALLED_KEY = "updates.installed";
 
+/** A run whose log was written this recently and has no exit code yet is
+ *  still going. Older than this without one, it was cut off. */
+const RUNNING_MS = 15 * 60_000;
+
 /** Close enough that a schedule set to 05:00 runs at 05:00, cheap enough to
  *  leave running: the status behind it is cached, so most ticks read nothing. */
 const INTERVAL_MS = Number(process.env.POLARIS_UPDATE_WATCH_MS) || 5 * 60_000;
@@ -124,6 +131,18 @@ let bellSwept = false;
 /** How this deployment installs updates on its own. */
 export async function getAutoUpdatePolicy(): Promise<AutoUpdatePolicy> {
     return parseAutoUpdatePolicy(await getSetting(POLICY_KEY));
+}
+
+/**
+ * The policy the watcher acts on. The quiet hour is the default, so a host that
+ * cannot install from here (no host agent, or updates blocked on it) reads it
+ * as "only tell me": it would otherwise try every night and fail every night.
+ * A schedule somebody set by hand is left as they set it.
+ */
+export async function autoUpdatePolicyHere(): Promise<AutoUpdatePolicy> {
+    const policy = await getAutoUpdatePolicy();
+    if (policy.mode === "quiet" && !getCapabilities().autoUpdate) return { ...policy, mode: "off" };
+    return policy;
 }
 
 export async function saveAutoUpdatePolicy(policy: AutoUpdatePolicy): Promise<void> {
@@ -207,7 +226,8 @@ async function recipientsFor(now: Date, earlier: string | null): Promise<string[
 async function firstSeen(
     sha: string,
     policy: AutoUpdatePolicy,
-    security: SecurityPlan | null
+    security: SecurityPlan | null,
+    quiet: number
 ): Promise<Date> {
     const now = new Date();
     const earlier = await getSetting(ANNOUNCED_KEY);
@@ -238,6 +258,8 @@ async function firstSeen(
                               })
                         : policy.mode === "daily"
                             ? t("update.planDaily", { at: policy.at })
+                            : policy.mode === "quiet"
+                              ? t("update.planQuiet", { at: hourText(quiet) })
                             : policy.mode === "immediate"
                               ? t("update.planNow")
                               : t("update.planManual")
@@ -281,7 +303,7 @@ async function install(sha: string): Promise<void> {
     }
     // Nothing was started, so nothing will report back: this is the only chance
     // to say that an unattended update did not happen.
-    await setSetting(INSTALLED_KEY, `${sha} failed`);
+    await setSetting(INSTALLED_KEY, `${sha} failed ${new Date().toISOString()}`);
     await tellOperators({
         event: "system.updated",
         ...inWords((t) => ({
@@ -324,7 +346,7 @@ async function reportFailedInstall(sha: string): Promise<void> {
     if (outcome.endedAt < startedAt) return;
     const claimed = await prisma.setting.updateMany({
         where: { key: INSTALLED_KEY, value: { startsWith: `${sha} started` } },
-        data: { value: `${sha} failed` }
+        data: { value: `${sha} failed ${new Date().toISOString()}` }
     });
     if (claimed.count !== 1) return;
     const exitCode = outcome.exitCode;
@@ -368,10 +390,54 @@ async function retireLandedNotices(status: UpdateStatus): Promise<void> {
         where: { key: ANNOUNCED_KEY, value: { startsWith: `${announced} ` } }
     });
     if (claimed.count !== 1) return;
+    const unattended = (await getSetting(INSTALLED_KEY))?.startsWith(`${announced} started`);
     await prisma.setting.deleteMany({
         where: { key: INSTALLED_KEY, value: { startsWith: `${announced} ` } }
     });
     await markNotificationsReadByType(UPDATE_EVENTS);
+    // An install nobody pressed for: whoever can update is told it landed, and
+    // on which build. One pressed from Settings was watched on that screen.
+    if (!unattended) return;
+    const sha = status.current ?? announced;
+    await tellOperators({
+        event: "system.updated",
+        ...inWords((t) => ({
+            title: t("update.installedTitle"),
+            body: t("update.installedBody", { sha })
+        }))
+    });
+}
+
+/** "HH:00" for an hour of the day. */
+function hourText(hour: number): string {
+    return `${String(hour).padStart(2, "0")}:00`;
+}
+
+/** Whether an update run is writing its log right now - the button in
+ *  Settings, or one started here a moment ago. */
+async function updateRunning(): Promise<boolean> {
+    const outcome = await lastUpdateOutcome().catch(() => null);
+    return Boolean(outcome && outcome.exitCode === null && Date.now() - outcome.endedAt < RUNNING_MS);
+}
+
+/**
+ * Take a failed install of `sha` back for another go, once the quiet hour after
+ * the failure has come round. Claimed like the first attempt, so one container
+ * retries; a failure with no time on it (written before times were kept) is
+ * left alone.
+ */
+async function retryFailedInstall(sha: string, hour: number): Promise<boolean> {
+    const row = await getSetting(INSTALLED_KEY);
+    const [rowSha, state, at] = row?.split(" ") ?? [];
+    if (!row || rowSha !== sha || state !== "failed") return false;
+    const failedAt = Date.parse(at ?? "");
+    if (Number.isNaN(failedAt)) return false;
+    if (Date.now() < nextQuietRun(hour, new Date(failedAt + 1)).getTime()) return false;
+    const taken = await prisma.setting.updateMany({
+        where: { key: INSTALLED_KEY, value: { startsWith: row } },
+        data: { value: `${sha} started ${new Date().toISOString()}` }
+    });
+    return taken.count === 1;
 }
 
 /** What a security fix in the build on offer asks of this deployment. */
@@ -407,7 +473,7 @@ async function securityPlan(current: string | null, sha: string): Promise<Securi
         hour,
         at:
             timing === "quiet"
-                ? `${String(hour).padStart(2, "0")}:00`
+                ? hourText(hour)
                 : timing === "daily"
                   ? (policy.times[severity] ?? DEFAULT_SECURITY_DAILY_AT)
                   : null,
@@ -444,22 +510,33 @@ export async function checkForUpdate(): Promise<void> {
     if (status.phase !== "available" || !status.latest) return;
     const sha = status.latest;
 
-    const policy = await getAutoUpdatePolicy();
+    const policy = await autoUpdatePolicyHere();
     const security = await securityPlan(status.current, sha);
-    const seen = await firstSeen(sha, policy, security);
+    // The same hour, worked out the same way, as a security fix waits for.
+    const quiet =
+        policy.mode === "quiet" ? await quietHour().catch(() => DEFAULT_QUIET_HOUR) : DEFAULT_QUIET_HOUR;
+    const seen = await firstSeen(sha, policy, security, quiet);
 
     // Whichever comes first: the general schedule, or the one a security fix in
     // this build asks for. A fix never waits longer than the operator's own
     // schedule would have.
     const runsAt = earliest(
-        autoUpdateRunsAt(policy, seen),
+        autoUpdateRunsAt(policy, seen, quiet),
         security ? securityUpdateRunsAt(security.policy, security.severity, seen, security.hour) : null
     );
     if (!runsAt || Date.now() < runsAt.getTime()) return;
+    // Never on top of a run already going; the next tick looks again.
+    if (await updateRunning()) return;
 
     // The moment goes in the row: it is what tells this run's result from the one
     // still sitting in the log the updater has not truncated yet.
     if (await claim(INSTALLED_KEY, sha, `${sha} started ${new Date().toISOString()}`)) {
+        await install(sha);
+        return;
+    }
+    // On the quiet-hour schedule a failed build gets another go the next night,
+    // so one bad night does not leave the deployment behind for good.
+    if (policy.mode === "quiet" && (await retryFailedInstall(sha, quiet))) {
         await install(sha);
         return;
     }

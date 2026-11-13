@@ -122,6 +122,8 @@ function view(kind: "updates" | "both" | "general" = "updates") {
                 <UpdatesView
                     initialPolicy={{ mode: "daily", at: "04:00" }}
                     initialSource="image"
+                    quietHour={4}
+                    canInstall
                     deployment={{ branch: "main", autoUpdate: true }}
                 />
                 )}

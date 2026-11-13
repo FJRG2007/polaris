@@ -128,18 +128,41 @@ const TAIL_BYTES = 128 * 1024;
 /** The updater's completion marker, which is bookkeeping rather than output. */
 const MARKER_RE = /^.*POLARIS_UPDATE_EXIT=-?\d+.*$\n?/gm;
 
-function updateModes(t: Translate): { value: AutoUpdateMode; label: string }[] {
+/** "HH:00" for the quiet hour. */
+function hourText(hour: number): string {
+    return `${String(hour).padStart(2, "0")}:00`;
+}
+
+/** The quiet hour needs this host to install on its own; without that it is
+ *  shown, disabled, so the reason sits under it. */
+function updateModes(
+    t: Translate,
+    quietHour: number,
+    canInstall: boolean
+): { value: AutoUpdateMode; label: string; disabled?: boolean }[] {
     return [
-        { value: "off", label: t("settings.schedule.off") },
+        {
+            value: "quiet",
+            label: t("settings.schedule.quiet", { at: hourText(quietHour) }),
+            disabled: !canInstall
+        },
         { value: "immediate", label: t("settings.schedule.immediate") },
-        { value: "daily", label: t("settings.schedule.daily") }
+        { value: "daily", label: t("settings.schedule.daily") },
+        { value: "off", label: t("settings.schedule.off") }
     ];
 }
 
 /** A complete 24-hour time. The time field reports "" until one is typed. */
 const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-function scheduleHint(policy: AutoUpdatePolicy, t: Translate): string {
+function scheduleHint(
+    policy: AutoUpdatePolicy,
+    t: Translate,
+    quietHour: number,
+    canInstall: boolean
+): string {
+    if (policy.mode === "quiet") return t("settings.schedule.quietHint", { at: hourText(quietHour) });
+    if (!canInstall) return t("settings.schedule.quietUnavailable");
     if (policy.mode === "immediate") return t("settings.schedule.immediateHint");
     if (policy.mode === "daily") return t("settings.schedule.dailyHint", { at: policy.at });
     return t("settings.schedule.offHint");
@@ -186,10 +209,16 @@ function currentStep(log: string): string | null {
 export function UpdatesView({
     initialPolicy,
     initialSource,
+    quietHour,
+    canInstall,
     deployment
 }: {
     initialPolicy: AutoUpdatePolicy;
     initialSource: UpdateSource;
+    /** The hour (0-23, server time) this deployment is least used. */
+    quietHour: number;
+    /** Whether this host can install an update on its own. */
+    canInstall: boolean;
     deployment: Deployment;
 }) {
     const format = useDisplayFormat();
@@ -203,7 +232,11 @@ export function UpdatesView({
     // anybody has looked is the one thing this line must never say.
     const { status, setStatus } = useSettingsOverview(UPDATE_PARTS);
     const [checkFailed, setCheckFailed] = useState(false);
-    const [policy, setPolicy] = useState(initialPolicy);
+    // The quiet hour is the default, and a host that cannot install on its own
+    // acts on it as "only tell me" - so that is what the control says there.
+    const [policy, setPolicy] = useState<AutoUpdatePolicy>(
+        initialPolicy.mode === "quiet" && !canInstall ? { ...initialPolicy, mode: "off" } : initialPolicy
+    );
     const [source, setSource] = useState(initialSource);
     // What the time field shows. A time input empties itself between segments, so
     // it cannot be driven straight from the saved schedule without fighting the
@@ -835,7 +868,7 @@ export function UpdatesView({
                                 onValueChange={(mode) =>
                                     void onSchedule({ ...policy, mode: mode as AutoUpdateMode })
                                 }
-                                options={updateModes(t)}
+                                options={updateModes(t, quietHour, canInstall)}
                                 className="w-60 max-w-full"
                                 disabled={updating}
                             />
@@ -857,7 +890,7 @@ export function UpdatesView({
                                 />
                             ) : null}
                         </div>
-                        <p className="text-xs text-muted-foreground">{scheduleHint(policy, t)}</p>
+                        <p className="text-xs text-muted-foreground">{scheduleHint(policy, t, quietHour, canInstall)}</p>
                         {policyError ? <p className="text-xs text-danger">{policyError}</p> : null}
                     </div>
 
