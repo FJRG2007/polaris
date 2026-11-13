@@ -12,15 +12,17 @@ Decided on 2026-11-13.
 
 ### A shared Rust core
 
-One Rust library, `crates/polaris-client`, holds what every client needs: the
-API client, sign-in, the local cache and the realtime connection. The desktop
-app uses it first, and future native mobile apps use the same crate. It is
-planned; it does not exist in the repository yet.
+One Rust library, `desktop-tauri/polaris-client`, holds what every client
+needs: the API client, sign-in, the local cache and the realtime connection.
+The desktop app uses it first, and future native mobile apps use the same
+crate. Today it has the server address, the API key calls and the reachability
+checks; the rest is tracked in the parity ledger. It sits in its own Cargo
+workspace so that no existing CI job builds it.
 
 ### The desktop app moves from Electron to Tauri 2
 
 The desktop app becomes a Tauri 2 shell over the same web UI it shows today. The
-Tauri build is made side by side with the Electron one, shipped as a beta, and
+Tauri build is made side by side with the Electron one as a beta that nobody receives, and
 tracked module by module in the
 [desktop parity ledger](desktop-tauri-parity.md).
 

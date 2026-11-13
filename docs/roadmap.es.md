@@ -13,17 +13,19 @@ Decidida el 2026-11-13.
 
 ### Un núcleo compartido en Rust
 
-Una sola biblioteca en Rust, `crates/polaris-client`, reúne lo que necesita
-cualquier cliente: el cliente de la API, el inicio de sesión, la caché local y
-la conexión en tiempo real. La usa primero la app de escritorio, y las futuras
-apps móviles nativas usarán el mismo crate. Está planificada; todavía no existe
-en el repositorio.
+Una sola biblioteca en Rust, `desktop-tauri/polaris-client`, reúne lo que
+necesita cualquier cliente: el cliente de la API, el inicio de sesión, la caché
+local y la conexión en tiempo real. La usa primero la app de escritorio, y las
+futuras apps móviles nativas usarán el mismo crate. Hoy tiene la dirección del
+servidor, las llamadas con clave de API y las comprobaciones de conexión; el
+resto se sigue en el registro de paridad. Está en su propio workspace de Cargo
+para que ningún trabajo de CI existente la compile.
 
 ### La app de escritorio pasa de Electron a Tauri 2
 
 La app de escritorio pasa a ser un contenedor de Tauri 2 sobre la misma
 interfaz web que muestra hoy. La versión con Tauri se construye en paralelo a la
-de Electron, se publica como beta y se sigue módulo a módulo en el
+de Electron como una beta que nadie recibe, y se sigue módulo a módulo en el
 [registro de paridad del escritorio](desktop-tauri-parity.md).
 
 Electron solo se retira cuando se cumple todo esto:
