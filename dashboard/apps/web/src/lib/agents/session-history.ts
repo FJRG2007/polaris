@@ -14,6 +14,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { runInSession } from "./session-runtime";
+import { touchSession } from "./session-live";
 import {
     decodeClaudeLine,
     promptKey,
@@ -24,8 +25,10 @@ import {
 import { readableTranscriptPath, readTranscript } from "./session-transcript";
 import { claudeLineUsage, recordSessionUsage, type TurnUsage } from "./session-usage";
 
-/** The shortest gap between two reads of one transcript. */
-export const SYNC_DEBOUNCE_MS = 3_000;
+/** The shortest gap between two reads of one transcript. One second: the end of
+ *  a turn usually lands within a few seconds of its last tool, and at three the
+ *  answer waited that long behind the tool's read before it reached the screen. */
+export const SYNC_DEBOUNCE_MS = 1_000;
 
 /** Rows stored per read at most; the rest wait for the next one. */
 export const MAX_ROWS_PER_SYNC = 200;
@@ -268,6 +271,9 @@ export async function storeHistoryRows(
         })),
         skipDuplicates: true
     });
+    // The answer is on the screen the moment it is stored, not on the screen's
+    // next poll.
+    if (created.count > 0) touchSession(sessionId);
     return created.count;
 }
 export interface HistoryMessage {

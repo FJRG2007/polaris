@@ -219,6 +219,7 @@
             "permissionAnswered": "Esa petición ya tiene respuesta."
         },
         "taskNote": "Entregada a un agente. Está trabajando en `{branch}` en {repo}: [la sesión]({href}).",
+        "taskNoteWorkspace": "Pasada a un agente: [la sesión]({href}).",
         "start": "Iniciar una sesión",
         "none": "Aún no hay sesiones",
         "noneHint": "Una sesión pone un agente de código en una rama propia, en una máquina que ya tienes. Puedes verlo trabajar, responder a sus preguntas y enviarle lo siguiente.",

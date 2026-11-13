@@ -45,6 +45,7 @@ import { CodeModelPicker } from "@/components/polar/code-model-picker";
 import { CodeView } from "@/components/json-view";
 import { Work } from "@/components/polar/elements/work";
 import { Shimmer } from "@/components/polar/elements/shimmer";
+import { BusyVerb } from "@/components/polar/elements/busy-verb";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, cn, SegmentedControl } from "@polaris/ui";
@@ -202,6 +203,15 @@ function useSpareWarmup(enabled: boolean): void {
 export function titleFromPrompt(prompt: string): string {
     const line = prompt.trim().split(/\r?\n/, 1)[0]?.trim() ?? "";
     return line.length > TITLE_MAX ? `${line.slice(0, TITLE_MAX - 3).trimEnd()}...` : line;
+}
+
+/** Call `onChange` whenever the session changes on the server, until the
+ *  returned function is called. Silent where streams are not available. */
+export function watchSession(sessionId: string, onChange: () => void): () => void {
+    if (typeof EventSource === "undefined") return () => undefined;
+    const source = new EventSource(`/api/agents/sessions/${encodeURIComponent(sessionId)}/live`);
+    source.addEventListener("change", onChange);
+    return () => source.close();
 }
 
 /** One block of a session's thread: something somebody said, or the run of
@@ -1139,12 +1149,27 @@ function CodeThread({
         }, THREAD_MS);
         return () => clearInterval(timer);
     }, [live, read]);
+    // Told the moment the session changes - an answer stored, a step taken -
+    // rather than on the next poll, which stays underneath as the fallback.
+    useEffect(() => (live ? watchSession(sessionId, read) : undefined), [live, sessionId, read]);
+
+    // What was just sent, shown at once and until the thread carries a new
+    // message from the person - counted, so a repeat of an earlier line is not
+    // mistaken for this one.
+    const said = thread?.entries.filter((entry) => entry.role === "user").length ?? 0;
+    const [sent, setSent] = useState<{ text: string; said: number } | null>(null);
+    const pending = sent !== null && said <= sent.said;
+    useEffect(() => {
+        if (sent !== null && !pending) setSent(null);
+    }, [sent, pending]);
 
     const send = () => {
         const text = slash.expand(reply.trim());
         if (!text || busy || parts.uploads.uploading || parts.uploads.failed) return;
         const attachments = parts.uploads.ids;
         setError(null);
+        setSent({ text, said });
+        setReply("");
         startTransition(() => {
             void runAction(
                 () => postCode<{ error?: string }>("/api/polar/code/prompt", {
@@ -1154,12 +1179,14 @@ function CodeThread({
                     }),
                 setError
             ).then((result) => {
-                if (!result) return;
-                if (result.error) setError(result.error);
-                else {
-                    setReply("");
-                    parts.uploads.clear();
+                // Refused: the message goes back where it was typed.
+                if (!result || result.error) {
+                    setSent(null);
+                    setReply(text);
+                    if (result?.error) setError(result.error);
+                    return;
                 }
+                parts.uploads.clear();
                 read();
             });
         });
@@ -1167,6 +1194,12 @@ function CodeThread({
 
     const session = thread?.session;
     const blocks = useMemo(() => codeBlocks(thread?.entries ?? []), [thread]);
+    // The agent mid-turn draws its steps moving; a message on its way to it
+    // draws the indicator under it. A session that is only open - waiting,
+    // idle - draws nothing that moves.
+    const turning = live && session?.state === "working";
+    const indicator =
+        live && (pending || (turning && blocks.length > 0 && blocks.at(-1)?.kind !== "work"));
 
     /** Carry on in a new session on the same branch, with the conversation so
      *  far where the agent can take it, and open it here. */
@@ -1309,7 +1342,7 @@ function CodeThread({
                                 <Work
                                     key={`${block.entries[0]?.at}-${index}`}
                                     messageId={`code:${sessionId}:${index}`}
-                                    streaming={live && index === blocks.length - 1}
+                                    streaming={turning && !pending && index === blocks.length - 1}
                                     current={block.entries.at(-1)?.text ?? null}
                                     tools={block.entries.length}
                                     failed={0}
@@ -1346,6 +1379,21 @@ function CodeThread({
                                 </MessageContent>
                             </Message>
                         ) : null}
+                        {sent !== null && pending ? (
+                            <Message from="user">
+                                <MessageContent from="user">
+                                    <p className="whitespace-pre-wrap">{sent.text}</p>
+                                </MessageContent>
+                            </Message>
+                        ) : null}
+                        {indicator ? (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
+                                <ThinkingOrb state="solving" size={20} decorative />
+                                <Shimmer>
+                                    <BusyVerb />
+                                </Shimmer>
+                            </div>
+                        ) : null}
                         {thread.entries.length === 0 && live ? (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <ThinkingOrb state="breathing" size={20} decorative />
@@ -1364,6 +1412,7 @@ function CodeThread({
                     open={workspace}
                     onOpenChange={setWorkspace}
                     session={thread.view}
+                    branch={thread.session.branch}
                     live={live}
                 />
             ) : null}

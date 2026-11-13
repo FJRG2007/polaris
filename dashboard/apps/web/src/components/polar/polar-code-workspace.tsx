@@ -53,11 +53,14 @@ export function PolarCodeWorkspace({
     open,
     onOpenChange,
     session,
+    branch,
     live
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     session: SessionView;
+    /** The branch to name, empty until the session changed something. */
+    branch: string;
     live: boolean;
 }) {
     const t = useTranslations("polar");
@@ -72,7 +75,9 @@ export function PolarCodeWorkspace({
                         </ui.DialogTitle>
                         <ui.DialogDescription className="truncate">
                             {session.repoFullName
-                                ? `${session.repoFullName} - ${session.branch}`
+                                ? branch
+                                    ? `${session.repoFullName} - ${branch}`
+                                    : session.repoFullName
                                 : t("code.pane.noRepo")}
                         </ui.DialogDescription>
                     </ui.DialogHeader>

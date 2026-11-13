@@ -79,3 +79,16 @@ export const polarCodeEditSchema = z.discriminatedUnion("action", [
         })
         .strict()
 ]);
+
+/** As many lines of activity as the thread shows; the session's own page keeps
+ *  the rest. */
+const EVENTS_SHOWN = 80;
+
+/** Events that only mark a reply as over. The answer itself says that, so a
+ *  line for it is noise; a failed turn, a stop or a question still shows. */
+const QUIET_EVENTS = new Set(["turn.end"]);
+
+/** The events a thread draws, newest last and bounded. */
+export function threadEvents<T extends { kind: string }>(events: readonly T[]): T[] {
+    return events.filter((event) => !QUIET_EVENTS.has(event.kind)).slice(-EVENTS_SHOWN);
+}

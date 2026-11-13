@@ -415,8 +415,11 @@ async function credentialEnvFor(
  */
 export async function refreshCredentials(sessionId: string): Promise<void> {
     try {
-        const session = await sessionViewById(sessionId);
-        const placement = await sessionPlacement(sessionId);
+        // Both reads at once: this runs before every prompt, ahead of the agent.
+        const [session, placement] = await Promise.all([
+            sessionViewById(sessionId),
+            sessionPlacement(sessionId)
+        ]);
         if (!session || !placement || core.isSessionOver(placement.state)) return;
         const cli = agentCommandFor(session, false).cli;
         const fresh = await credentialEnvFor(session, cli);
@@ -890,7 +893,9 @@ async function steer(sessionId: string, command: string, whatFor: string): Promi
  *  boots by cloning a repository and installing an agent, so the budget is a slow
  *  network's worth of that rather than a click's worth. */
 const AGENT_READY_TIMEOUT_MS = 10 * 60 * 1000;
-const AGENT_READY_POLL_MS = 5000;
+/** How often the first prompt asks whether the agent is up. Each ask is one
+ *  short command; at 5 s the prompt sat for up to 5 s after the agent was ready. */
+const AGENT_READY_POLL_MS = 1000;
 
 /**
  * Wait until there is a terminal to type into.
@@ -942,10 +947,14 @@ async function waitForAgent(
 export async function promptSession(sessionId: string, text: string): Promise<void> {
     // Before the prompt is queued, so the turn it starts reads the credentials
     // as they are now rather than as they were when the machine booted.
-    await refreshCredentials(sessionId);
+    // The placement is read alongside, rather than after, so a turn waits on one
+    // round trip of reads instead of two.
+    const [, placement] = await Promise.all([
+        refreshCredentials(sessionId),
+        sessionPlacement(sessionId)
+    ]);
     // A session whose runner takes its prompts gets this one as a file in the
     // queue: nothing typed, nothing that has to look ready first.
-    const placement = await sessionPlacement(sessionId);
     if (!placement) throw new Error("That session no longer exists.");
     const queued = await runInSession(
         sessionId,

@@ -89,3 +89,11 @@ describe("Claude Code without its interface", () => {
         expect((claudeHookSettings("/s/hook.sh").hooks as Record<string, unknown>).SessionEnd).toBeDefined();
     });
 });
+
+describe("the runner's wait for a prompt", () => {
+    it("looks at an empty queue every fifth of a second, not every second", () => {
+        const script = commands.RUNNER_SCRIPT;
+        expect(script).toContain('if [ -z "$next" ]; then sleep 0.2; continue; fi');
+        expect(script).not.toContain('if [ -z "$next" ]; then sleep 1;');
+    });
+});

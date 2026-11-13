@@ -37,8 +37,9 @@ import { userHasManage, type SessionUser } from "@/lib/session";
 import { sessionCursor } from "@/lib/agents/session-cursor";
 import { priceSlugs } from "@/lib/agents/session-usage";
 import { getCatalogModel } from "@/lib/agents/model-catalog";
-import { dedupeCodeRows, POLAR_CODE_PAGE, polarCodeEditSchema } from "@/lib/polar/code-history";
+import { dedupeCodeRows, POLAR_CODE_PAGE, polarCodeEditSchema, threadEvents } from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
+import { shownSessionBranch } from "@/lib/agents/session-branch";
 import * as repoOptions from "@/lib/agents/repo-options";
 import {
     getSession,
@@ -130,10 +131,6 @@ async function contextOf(sessionId: string): Promise<PolarCodeThread["context"]>
     return null;
 }
 
-/** As many lines of activity as the thread shows; the session's own page keeps
- *  the rest. */
-const EVENTS_SHOWN = 80;
-
 async function accessOf(user: SessionUser): Promise<PolarCodeAccess> {
     if (await userHasManage(user, "agents.manage")) return "manage";
     if (await userHasManage(user, "agents.read")) return "read";
@@ -142,21 +139,22 @@ async function accessOf(user: SessionUser): Promise<PolarCodeAccess> {
 
 function rowOf(
     t: NamespaceTranslator<"agents">,
-    session: {
+    session: Parameters<typeof shownSessionBranch>[0] & {
         id: string;
         title: string;
-        repoFullName: string;
-        branch: string;
         state: core.AgentSessionState;
         lastEventAt: string | null;
         createdAt: string;
-    }
+    },
+    events: Parameters<typeof shownSessionBranch>[1] = []
 ): PolarCodeRow {
     return {
         id: session.id,
         title: session.title,
         repo: session.repoFullName,
-        branch: session.branch,
+        // None without a repository, and none until the session changed
+        // something: a session that only talked has no branch worth naming.
+        branch: shownSessionBranch(session, events),
         state: session.state,
         stateLabel: sessionStateWord(t, session.state, session.lastEventAt !== null),
         live: !core.isSessionOver(session.state),
@@ -229,7 +227,7 @@ export async function polarCodeThread(
         text: message.body,
         detail: ""
     }));
-    const events: PolarCodeEntry[] = detail.events.slice(-EVENTS_SHOWN).map((event) => {
+    const events: PolarCodeEntry[] = threadEvents(detail.events).map((event) => {
         const key = SESSION_EVENT_KEYS[event.kind];
         return {
             at: event.at,
@@ -248,7 +246,7 @@ export async function polarCodeThread(
     // they were written in.
     const entries = [...messages, ...events].sort((a, b) => a.at.localeCompare(b.at));
     return {
-        session: rowOf(t, detail.session),
+        session: rowOf(t, detail.session, detail.events),
         entries,
         error: detail.session.error ? agentText(t, detail.session.error) : null,
         view: detail.session,

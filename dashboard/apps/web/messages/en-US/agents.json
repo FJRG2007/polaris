@@ -219,6 +219,7 @@
             "permissionAnswered": "That prompt was already answered."
         },
         "taskNote": "Handed to an agent. It is working on `{branch}` in {repo}: [the session]({href}).",
+        "taskNoteWorkspace": "Handed to an agent: [the session]({href}).",
         "start": "Start a session",
         "none": "No sessions yet",
         "noneHint": "A session puts a coding agent in a branch of its own, on a machine you already have. You can watch it work, answer its questions, and send it the next thing.",

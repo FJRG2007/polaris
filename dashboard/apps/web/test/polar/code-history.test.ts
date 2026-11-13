@@ -10,6 +10,7 @@ import {
     dedupeCodeRows,
     filterCodeRows,
     mergeCodeRows,
+    threadEvents,
     polarCodeEditSchema
 } from "@/lib/polar/code-history";
 
@@ -169,5 +170,34 @@ describe("polarCodeEditSchema", () => {
         expect(
             polarCodeEditSchema.safeParse({ action: "delete", sessionId, title: "x" }).success
         ).toBe(false);
+    });
+});
+
+describe("threadEvents", () => {
+    it("drops the end of a normal turn, so a reply shows no status line", () => {
+        const events = [
+            { kind: "session.start" },
+            { kind: "prompt" },
+            { kind: "turn.end" },
+            { kind: "prompt" },
+            { kind: "turn.end" }
+        ];
+        expect(threadEvents(events).map((event) => event.kind)).toEqual([
+            "session.start",
+            "prompt",
+            "prompt"
+        ]);
+    });
+
+    it("keeps what tells the reader something", () => {
+        const kinds = ["turn.failed", "error", "session.end", "permission", "question"];
+        expect(threadEvents(kinds.map((kind) => ({ kind }))).map((event) => event.kind)).toEqual(kinds);
+    });
+
+    it("stays bounded to the newest lines", () => {
+        const events = Array.from({ length: 200 }, (_, index) => ({ kind: "tool.start", index }));
+        const shown = threadEvents(events);
+        expect(shown).toHaveLength(80);
+        expect(shown.at(-1)?.index).toBe(199);
     });
 });

@@ -13,6 +13,7 @@
 
 import { prisma, type Prisma } from "@polaris/db";
 import { touchSession } from "./session-live";
+import { createdSessionBranch } from "./session-branch";
 import { expirePermissions, settlesPermissions } from "./session-permissions";
 import * as core from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
@@ -495,7 +496,7 @@ export async function createSession(
             modelPayer: input.modelChoice?.payer ?? null,
             hostId: input.hostId,
             baseRef: input.baseRef,
-            branch: core.sessionBranchName(id, input.title),
+            branch: createdSessionBranch(id, input.repoId, input.title),
             taskId: input.taskId,
             enigma: input.enigma ? JSON.stringify(input.enigma) : null,
             issueNumber: input.issueNumber ?? null,
@@ -767,6 +768,7 @@ export async function addSessionMessage(
     authorId: string | null = null
 ): Promise<void> {
     await prisma.agentSessionMessage.create({ data: { sessionId, role, body, authorId } });
+    touchSession(sessionId);
 }
 
 export async function sessionMessages(

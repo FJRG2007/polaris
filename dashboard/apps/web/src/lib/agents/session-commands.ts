@@ -875,7 +875,9 @@ export const RUNNER_SCRIPT = [
     "while :; do",
     `  if tmux list-windows -t "$POLARIS_TMUX" -F '#{window_name}' 2>/dev/null | grep -qx ${INTERFACE_WINDOW}; then sleep 1; continue; fi`,
     '  next="$(ls "$q" 2>/dev/null | grep -v "^\\." | head -n 1)"',
-    '  if [ -z "$next" ]; then sleep 1; continue; fi',
+    // A fifth of a second: a whole second here was up to a second of every
+    // prompt spent waiting for the runner to look again.
+    '  if [ -z "$next" ]; then sleep 0.2; continue; fi',
     '  mv "$q/$next" "$d/turn.txt" 2>/dev/null || { sleep 1; continue; }',
     '  chmod 0644 "$d/turn.txt" 2>/dev/null || true',
     '  rm -f "$d/turn.rc" "$d/interrupted"',

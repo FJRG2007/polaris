@@ -425,11 +425,14 @@ async function noteOnTask(session: sessions.SessionView, userId: string): Promis
         const t = await wordsFor(userId, "agents");
         await addComment(userId, {
             taskId: session.taskId,
-            body: t("sessions.taskNote", {
-                branch: session.branch ?? "",
-                repo: session.repoFullName ?? "",
-                href: polarSession(session.id)
-            }),
+            // A session without a repository has no branch to name.
+            body: session.repoFullName
+                ? t("sessions.taskNote", {
+                      branch: session.branch ?? "",
+                      repo: session.repoFullName,
+                      href: polarSession(session.id)
+                  })
+                : t("sessions.taskNoteWorkspace", { href: polarSession(session.id) }),
             parentId: null,
             assignedToId: null
         });
