@@ -89,6 +89,9 @@ export interface FirstCheck {
     readonly installed: Promise<boolean>;
     /** Ask now, from a press, and say what was found. Never throws. */
     readonly checkNow: () => Promise<UpdateCheck>;
+    /** After a check said "downloading": settles once that download is
+     *  installed or has failed, with what it came to. Never throws. */
+    readonly downloaded: () => Promise<UpdateCheck>;
 }
 
 export function watchForUpdates(found: (update: Update) => void): FirstCheck {
@@ -96,11 +99,13 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
     let began: (version: string | null) => void = () => undefined;
     let ended: (installed: boolean) => void = () => undefined;
     let checkNow: () => Promise<UpdateCheck> = async () => ({ kind: "unsupported" });
+    let downloaded: () => Promise<UpdateCheck> = async () => ({ kind: "unsupported" });
     const first: FirstCheck = {
         asked: new Promise((resolve) => (ready = resolve)),
         installing: new Promise((resolve) => (began = resolve)),
         installed: new Promise((resolve) => (ended = resolve)),
-        checkNow: () => checkNow()
+        checkNow: () => checkNow(),
+        downloaded: () => downloaded()
     };
     const source = releaseSource(repository);
     if (!source) {
@@ -115,12 +120,19 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
     let how: Promise<Installer> | null = null;
     /** The version installed and waiting for a restart. */
     let waiting: string | null = null;
+    /** What the download in flight comes to, for a press waiting on it. */
+    let outcome: { readonly done: Promise<UpdateCheck>; readonly settle: (check: UpdateCheck) => void; } | null = null;
+    const settleDownload = (check: UpdateCheck) => {
+        outcome?.settle(check);
+        outcome = null;
+    };
 
     // The page is the way left: say it once for the version that failed.
     const fallBack = () => {
         const failed = installing;
         installing = null;
         ended(false);
+        if (failed) settleDownload({ kind: "available", version: failed });
         if (failed && failed !== announced) {
             announced = failed;
             found({ version: failed, page: source.page(`desktop-v${failed}`) });
@@ -131,6 +143,7 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
         waiting = version;
         found({ version, page: source.page(`desktop-v${version}`), restart });
         ended(true);
+        settleDownload({ kind: "ready", version });
     };
 
     const listenToSquirrel = () => {
@@ -191,6 +204,8 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
                 return { kind: "available", version: release.version };
             }
             installing = release.version;
+            let settle: (check: UpdateCheck) => void = () => undefined;
+            outcome = { done: new Promise((resolve) => (settle = resolve)), settle: (check) => settle(check) };
             began(release.version);
             if (mode.kind === "appimage") {
                 void viaAppImage(release, mode.path).catch(fallBack);
@@ -211,6 +226,9 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
     /** One question at a time: a second press waits for the answer in flight. */
     let asking: Promise<UpdateCheck> | null = null;
     checkNow = () => (asking ??= check().finally(() => (asking = null)));
+    // Nothing in flight any more: it ended before the page asked, and a check
+    // says what it ended as - installed and waiting, or its page.
+    downloaded = () => outcome?.done ?? checkNow();
 
     // Nothing began: settled here, and later rounds are nobody's start.
     const settle = () => {
