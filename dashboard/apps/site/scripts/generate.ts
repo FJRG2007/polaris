@@ -47,6 +47,7 @@ import {
 } from "node:fs";
 import * as site from "../src/data/builders";
 import * as docs from "../src/data/docs";
+import * as apiPages from "../src/data/api-pages";
 import * as searchIndex from "../src/lib/search-index";
 import { tvGallerySources } from "../src/lib/tv-gallery";
 import enWords from "../src/messages/en.json";
@@ -498,6 +499,9 @@ const docMedia = new Set<string>();
 const escapeHtml = (text: string) =>
     text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/** Each guide's own Markdown by its source path, served beside its page as `.md`. */
+const guideMarkdown = new Map<string, string>();
+
 async function renderDoc(
     slug: string,
     markdown: string,
@@ -547,6 +551,7 @@ async function renderDoc(
     for (let at = 1; at < parts.length; at += 2)
         text[parts[at]!] = docs.plainText(parts[at + 1] ?? "");
     const summary = docs.plainText(/<p>([\s\S]*?)<\/p>/.exec(html)?.[1] ?? "");
+    guideMarkdown.set(source, markdown);
     return { slug, source, title, summary, headings, html, text };
 }
 
@@ -690,6 +695,40 @@ for (const locale of site.SITE_LOCALES) {
     indexSizes.push(
         `${locale}: ${manifest.records.length} records, manifest ${kb(manifestJson.length)} + ${chunks.length} chunks, ${kb(total)} total`
     );
+}
+
+// Every docs page's Markdown beside it (`/en/docs/chat.md` for `/en/docs/chat/`),
+// for "Copy page" and for an assistant handed the address: a guide's own source,
+// and the API pages written out from the same data they are drawn from.
+const siteRoot = `${process.env.SITE_ORIGIN ?? "https://fjrg2007.github.io"}${base}`;
+for (const locale of site.SITE_LOCALES) {
+    const dir = join(siteDir, "public", locale);
+    rmSync(dir, { recursive: true, force: true });
+    const emit = (pagePath: string, markdown: string) => {
+        const file = join(dir, apiPages.markdownPath(pagePath));
+        mkdirSync(dirname(file), { recursive: true });
+        writeFileSync(file, markdown);
+    };
+    for (const page of data.docs[locale]) {
+        const markdown = guideMarkdown.get(page.source);
+        if (!markdown) continue;
+        const from = `https://github.com/${repo}/blob/main/${page.source}`;
+        emit(`docs/${page.slug}/`, `<!-- ${from} -->\n\n${markdown.trimEnd()}\n`);
+    }
+    const apiWords = (locale === "es" ? esWords : enWords).api;
+    const undocumented = data.api.routes.filter((route) => !route.operation);
+    for (const page of apiPages.apiPages(data.api.groups, undocumented.length))
+        emit(
+            page.path,
+            apiPages.apiMarkdown(page, {
+                groups: data.api.groups,
+                undocumented,
+                words: apiWords,
+                origin: "https://polaris.example.com",
+                samples: (op) => docs.requestSamples(op, "https://polaris.example.com"),
+                link: (path) => `${siteRoot}/${locale}/${path}`
+            })
+        );
 }
 
 // Only the pictures a page shows, not the whole media folder.

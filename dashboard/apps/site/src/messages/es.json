@@ -184,7 +184,22 @@
         "previous": "Anterior",
         "next": "Siguiente",
         "breadcrumb": "Ruta de navegación",
-        "emptyRecent": "Busca en las guías, sus apartados y la referencia de la API."
+        "emptyRecent": "Busca en las guías, sus apartados y la referencia de la API.",
+        "copyPage": "Copiar todo",
+        "pageActions": "Más formas de usar esta página",
+        "copyMarkdown": "Copiar como Markdown",
+        "copyMarkdownHint": "Copia el contenido en Markdown",
+        "openClaude": "Abrir en Claude",
+        "openChatGpt": "Abrir en ChatGPT",
+        "askHint": "Pregunta sobre esta página",
+        "copied": "Página copiada como Markdown",
+        "copyFailed": "No se pudo copiar la página. Reinténtalo.",
+        "prompt": "Lee {url} para que pueda preguntarte sobre ella.",
+        "contribute": "Contribuir",
+        "reportIssue": "Avisar de un fallo",
+        "requestFeature": "Pedir una función",
+        "editPage": "Editar página",
+        "issueBody": "Página: {url}"
     },
     "notFound": {
         "title": "Página no encontrada",

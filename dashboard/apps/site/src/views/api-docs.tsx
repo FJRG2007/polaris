@@ -24,6 +24,7 @@ import {
     CARD,
     DocsLayout,
     NeighborLink,
+    PageHead,
     SIDE_LINK,
     SideSection
 } from "@/views/docs";
@@ -115,6 +116,7 @@ function ApiFrame({
         <DocsLayout
             locale={locale}
             label={t.title}
+            page={current}
             aside={aside}
             sidebar={
                 <>
@@ -313,7 +315,9 @@ export async function ApiOverviewView({ locale }: { locale: SiteLocale }) {
             aside={<PageToc label={words(locale).docs.onThisPage} items={toc} />}
         >
             <div className="flex flex-col gap-2">
-                <h1 className="text-3xl font-semibold tracking-tight">{t.title}</h1>
+                <PageHead locale={locale} page={pages.apiPath.overview()}>
+                    <h1 className="text-3xl font-semibold tracking-tight">{t.title}</h1>
+                </PageHead>
                 <p className="text-muted-foreground">{t.intro}</p>
                 {api.description ? (
                     <p className="text-sm text-muted-foreground">{api.description}</p>
@@ -383,14 +387,16 @@ export function ApiGroupView({ locale, group }: { locale: SiteLocale; group: pag
     const path = pages.apiPath.group(group.tag);
     return (
         <ApiFrame locale={locale} current={path}>
-            <Breadcrumb
-                label={words(locale).docs.breadcrumb}
-                trail={[
-                    { label: words(locale).docs.title, to: href(locale, "docs/") },
-                    { label: t.title, to: href(locale, pages.apiPath.overview()) },
-                    { label: group.tag }
-                ]}
-            />
+            <PageHead locale={locale} page={path}>
+                <Breadcrumb
+                    label={words(locale).docs.breadcrumb}
+                    trail={[
+                        { label: words(locale).docs.title, to: href(locale, "docs/") },
+                        { label: t.title, to: href(locale, pages.apiPath.overview()) },
+                        { label: group.tag }
+                    ]}
+                />
+            </PageHead>
             <div className="flex flex-col gap-2">
                 <h1 className="text-3xl font-semibold tracking-tight">{group.tag}</h1>
                 <p className="text-muted-foreground">{t.groupIntro.replace("{group}", group.tag)}</p>
@@ -456,15 +462,17 @@ export async function ApiOperationView({
             aside={<PageToc label={words(locale).docs.onThisPage} items={toc} />}
         >
             <article className="flex min-w-0 flex-col gap-6">
-                <Breadcrumb
-                    label={words(locale).docs.breadcrumb}
-                    trail={[
-                        { label: words(locale).docs.title, to: href(locale, "docs/") },
-                        { label: t.title, to: href(locale, pages.apiPath.overview()) },
-                        { label: group.tag, to: href(locale, pages.apiPath.group(group.tag)) },
-                        { label: op.summary || op.path }
-                    ]}
-                />
+                <PageHead locale={locale} page={path}>
+                    <Breadcrumb
+                        label={words(locale).docs.breadcrumb}
+                        trail={[
+                            { label: words(locale).docs.title, to: href(locale, "docs/") },
+                            { label: t.title, to: href(locale, pages.apiPath.overview()) },
+                            { label: group.tag, to: href(locale, pages.apiPath.group(group.tag)) },
+                            { label: op.summary || op.path }
+                        ]}
+                    />
+                </PageHead>
                 <div className="flex min-w-0 flex-col gap-3">
                     <h1 className="text-3xl font-semibold tracking-tight">{op.summary || op.path}</h1>
                     <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
@@ -596,14 +604,16 @@ export function ApiMoreView({ locale }: { locale: SiteLocale }) {
     const routes = undocumentedRoutes();
     return (
         <ApiFrame locale={locale} current={path}>
-            <Breadcrumb
-                label={words(locale).docs.breadcrumb}
-                trail={[
-                    { label: words(locale).docs.title, to: href(locale, "docs/") },
-                    { label: t.title, to: href(locale, pages.apiPath.overview()) },
-                    { label: t.undocumented }
-                ]}
-            />
+            <PageHead locale={locale} page={path}>
+                <Breadcrumb
+                    label={words(locale).docs.breadcrumb}
+                    trail={[
+                        { label: words(locale).docs.title, to: href(locale, "docs/") },
+                        { label: t.title, to: href(locale, pages.apiPath.overview()) },
+                        { label: t.undocumented }
+                    ]}
+                />
+            </PageHead>
             <div className="flex flex-col gap-2">
                 <h1 className="text-3xl font-semibold tracking-tight">{t.undocumented}</h1>
                 <p className="text-muted-foreground">{t.undocumentedHint}</p>

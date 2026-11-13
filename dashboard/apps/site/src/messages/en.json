@@ -184,7 +184,22 @@
         "previous": "Previous",
         "next": "Next",
         "breadcrumb": "Breadcrumb",
-        "emptyRecent": "Search the guides, their sections and the API reference."
+        "emptyRecent": "Search the guides, their sections and the API reference.",
+        "copyPage": "Copy page",
+        "pageActions": "More ways to use this page",
+        "copyMarkdown": "Copy as Markdown",
+        "copyMarkdownHint": "Copy page content in Markdown",
+        "openClaude": "Open in Claude",
+        "openChatGpt": "Open in ChatGPT",
+        "askHint": "Ask questions about this page",
+        "copied": "Page copied as Markdown",
+        "copyFailed": "Could not copy the page. Try again.",
+        "prompt": "Read {url} so I can ask you questions about it.",
+        "contribute": "Contribute",
+        "reportIssue": "Report an issue",
+        "requestFeature": "Request a feature",
+        "editPage": "Edit this page",
+        "issueBody": "Docs page: {url}"
     },
     "notFound": {
         "title": "Page not found",

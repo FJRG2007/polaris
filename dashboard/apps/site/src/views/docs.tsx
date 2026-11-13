@@ -7,8 +7,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { SiteLocale } from "@/data/builders";
-import { href, siteData, words } from "@/lib/site";
-import { ArrowLeft, ArrowRight, ChevronRight } from "lucide-react";
+import { SITE_ORIGIN, asset, href, siteData, words } from "@/lib/site";
+import { ArrowLeft, ArrowRight, Bug, ChevronRight, Lightbulb, Pencil } from "lucide-react";
 import { docNeighbors, type DocPage, type DocSection } from "@/data/docs";
 import { DocsSearch, type DocsSearchWords } from "@/components/docs-search";
 import { HostField, HostedHtml } from "@/components/example-host";
@@ -16,7 +16,8 @@ import { EXAMPLE_HOST } from "@/lib/example-origin";
 import { SiteTvChecker, SiteTvGallery } from "@/components/site-tv-checker";
 import { TV_COMPAT_SLUG, TV_PRIVACY_SLUG } from "@/data/builders";
 import { PageToc, PageTocFolded } from "@/components/page-toc";
-import { apiPath } from "@/data/api-pages";
+import { apiPath, markdownPath } from "@/data/api-pages";
+import { PageActions, type PageActionsWords } from "@/components/page-actions";
 
 /** The sidebar's groups in a locale, as the site was generated with them. */
 export function docSections(locale: SiteLocale): readonly DocSection[] {
@@ -52,6 +53,8 @@ export function DocsLayout({
     locale,
     label,
     sidebar,
+    page,
+    source,
     aside,
     children
 }: {
@@ -59,6 +62,10 @@ export function DocsLayout({
     /** The sidebar list's name, read aloud and shown on its folded form. */
     label: string;
     sidebar: ReactNode;
+    /** The page's path in the locale (`docs/chat/`), named in the issues filed from it. */
+    page: string;
+    /** The page's file in the repository, when it has one, for "Edit this page". */
+    source?: string;
     aside?: ReactNode;
     children: ReactNode;
 }) {
@@ -69,10 +76,96 @@ export function DocsLayout({
                 className="flex shrink-0 flex-col gap-3 text-sm lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-56 lg:self-start lg:overflow-y-auto"
             >
                 <DocsSearch locale={locale} words={searchWords(locale)} className="w-full" />
-                <SideList label={label}>{sidebar}</SideList>
+                <SideList label={label}>
+                    {sidebar}
+                    <Contribute locale={locale} page={page} source={source} />
+                </SideList>
             </nav>
             <div className="flex min-w-0 flex-1 flex-col gap-6">{children}</div>
             {aside}
+        </div>
+    );
+}
+
+/** A page's address as a reader shares it. */
+export function pageUrl(locale: SiteLocale, page: string): string {
+    return `${SITE_ORIGIN}${asset(href(locale, page))}`;
+}
+
+/**
+ * The foot of the sidebar: an issue or a feature request filed against the
+ * repository's own templates with this page already named, and the page's
+ * file to edit when it has one.
+ */
+function Contribute({ locale, page, source }: { locale: SiteLocale; page: string; source?: string }) {
+    const t = words(locale).docs;
+    const { repo } = siteData();
+    const body = t.issueBody.replace("{url}", pageUrl(locale, page));
+    const issue = (template: string, field: string) =>
+        `https://github.com/${repo}/issues/new?template=${template}&${field}=${encodeURIComponent(body)}`;
+    const links = [
+        { to: issue("bug_report.yml", "what-happened"), label: t.reportIssue, Icon: Bug },
+        { to: issue("feature_request.yml", "problem"), label: t.requestFeature, Icon: Lightbulb },
+        ...(source
+            ? [{ to: `https://github.com/${repo}/edit/main/${source}`, label: t.editPage, Icon: Pencil }]
+            : [])
+    ];
+    return (
+        <div className="flex flex-col gap-0.5 border-t border-border pt-3">
+            <p className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-foreground-subtle">
+                {t.contribute}
+            </p>
+            {links.map(({ to, label, Icon }) => (
+                <a
+                    key={label}
+                    href={to}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={SIDE_LINK}
+                >
+                    <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+                    <span className="min-w-0 truncate">{label}</span>
+                </a>
+            ))}
+        </div>
+    );
+}
+
+/** The words of "Copy page" and its menu. */
+export function pageActionWords(locale: SiteLocale): PageActionsWords {
+    const t = words(locale).docs;
+    return {
+        copyPage: t.copyPage,
+        pageActions: t.pageActions,
+        copyMarkdown: t.copyMarkdown,
+        copyMarkdownHint: t.copyMarkdownHint,
+        openClaude: t.openClaude,
+        openChatGpt: t.openChatGpt,
+        askHint: t.askHint,
+        copied: t.copied,
+        copyFailed: t.copyFailed,
+        prompt: t.prompt
+    };
+}
+
+/** A page's first row: where it sits on the left, "Copy page" on the right. */
+export function PageHead({
+    locale,
+    page,
+    children
+}: {
+    locale: SiteLocale;
+    page: string;
+    children?: ReactNode;
+}) {
+    return (
+        <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-4 gap-y-2">
+            <div className="min-w-0 flex-1">{children}</div>
+            <PageActions
+                markdown={asset(`${locale}/${markdownPath(page)}`)}
+                url={pageUrl(locale, page)}
+                words={pageActionWords(locale)}
+            />
         </div>
     );
 }
@@ -110,11 +203,13 @@ export const SIDE_LINK =
 function DocsFrame({
     locale,
     current,
+    source,
     aside,
     children
 }: {
     locale: SiteLocale;
     current: string | null;
+    source?: string;
     aside?: ReactNode;
     children: ReactNode;
 }) {
@@ -124,6 +219,8 @@ function DocsFrame({
         <DocsLayout
             locale={locale}
             label={t.guides}
+            page={current ? `docs/${current}/` : "docs/"}
+            source={source}
             aside={aside}
             sidebar={
                 <>
@@ -313,19 +410,22 @@ export function DocView({ locale, page }: { locale: SiteLocale; page: DocPage })
         <DocsFrame
             locale={locale}
             current={page.slug}
+            source={page.source}
             aside={
                 page.headings.length ? <PageToc label={t.onThisPage} items={page.headings} /> : null
             }
         >
             <article className="flex min-w-0 flex-col gap-4">
-                <Breadcrumb
-                    label={t.breadcrumb}
-                    trail={[
-                        { label: t.title, to: href(locale, "docs/") },
-                        ...(section ? [{ label: section }] : []),
-                        { label: page.title }
-                    ]}
-                />
+                <PageHead locale={locale} page={`docs/${page.slug}/`}>
+                    <Breadcrumb
+                        label={t.breadcrumb}
+                        trail={[
+                            { label: t.title, to: href(locale, "docs/") },
+                            ...(section ? [{ label: section }] : []),
+                            { label: page.title }
+                        ]}
+                    />
+                </PageHead>
                 <h1 className="text-3xl font-semibold tracking-tight">{page.title}</h1>
                 {page.headings.length ? (
                     <PageTocFolded label={t.onThisPage} items={page.headings} />
