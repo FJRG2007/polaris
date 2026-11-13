@@ -383,6 +383,7 @@
         "theirScreen": "{name} - pantalla",
         "backToTheGrid": "Volver al mosaico",
         "streamFormat": "{height}P {fps}FPS",
+        "streamHeight": "{height}P",
         "backToThePeople": "Volver a las personas",
         "you": "Tú",
         "guest": "invitado",

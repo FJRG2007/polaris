@@ -8,6 +8,12 @@
  * thing the reader wants to know - a share sent at 1080p and thinned to 720p on
  * the way, or a film that has dropped to twelve frames a second - and the
  * `<video>` element knows both: its height, and how many frames it has painted.
+ *
+ * The rate is said as a standard one (15, 24, 30, 60) and held. A shared screen
+ * only sends a frame when something on it changes, so a still page paints one
+ * or two a second while it looks perfect, and a tile that said "1FPS" over it
+ * read as broken. Seconds with nothing moving say nothing about the rate and are
+ * left out; the number only comes down when moving frames keep arriving slower.
  */
 
 import { useEffect, useState, type RefObject } from "react";
@@ -15,6 +21,43 @@ import { useEffect, useState, type RefObject } from "react";
 export interface StreamFormat {
     readonly height: number;
     readonly fps: number;
+}
+
+/** What the tile says: the height, and a standard rate once one is known. */
+export interface ShownFormat {
+    readonly height: number;
+    readonly fps: number | null;
+}
+
+/** The rates a stream is said to run at. */
+const STANDARD_FPS = [15, 24, 30, 60] as const;
+/** Below this, a second had too little moving on it to say anything. */
+const MOVING_FROM_FPS = 10;
+/** Moving seconds in a row below the shown rate before it comes down. */
+const DROP_AFTER = 10;
+
+/** The standard rate nearest a measured one; a tie goes up. */
+export function standardRate(fps: number): number {
+    return STANDARD_FPS.reduce((best, rate) =>
+        Math.abs(rate - fps) <= Math.abs(best - fps) ? rate : best
+    );
+}
+
+export interface SteadyRate {
+    readonly shown: number | null;
+    /** Moving readings below `shown` since it was last met. */
+    readonly lower: readonly number[];
+}
+
+export const NO_RATE: SteadyRate = { shown: null, lower: [] };
+
+/** Fold one second's measured rate into the rate the tile says. */
+export function steadyRate(state: SteadyRate, measured: number): SteadyRate {
+    if (measured < MOVING_FROM_FPS) return state;
+    const rate = standardRate(measured);
+    if (state.shown === null || rate >= state.shown) return { shown: rate, lower: [] };
+    const lower = [...state.lower, rate];
+    return lower.length >= DROP_AFTER ? { shown: Math.max(...lower), lower: [] } : { ...state, lower };
 }
 
 /**
@@ -50,14 +93,15 @@ function paintedFrames(element: HTMLVideoElement): number | null {
 export function useStreamFormat(
     video: RefObject<HTMLVideoElement | null>,
     enabled: boolean
-): StreamFormat | null {
-    const [format, setFormat] = useState<StreamFormat | null>(null);
+): ShownFormat | null {
+    const [format, setFormat] = useState<ShownFormat | null>(null);
     useEffect(() => {
         if (!enabled) {
             setFormat(null);
             return;
         }
         let before: { frames: number | null; at: number } | null = null;
+        let rate = NO_RATE;
         const read = () => {
             const element = video.current;
             if (!element) return;
@@ -69,8 +113,10 @@ export function useStreamFormat(
                     now.frames,
                     (now.at - before.at) / 1000
                 );
+                if (next) rate = steadyRate(rate, next.fps);
+                const shown = next ? { height: next.height, fps: rate.shown } : null;
                 setFormat((was) =>
-                    was?.height === next?.height && was?.fps === next?.fps ? was : next
+                    was?.height === shown?.height && was?.fps === shown?.fps ? was : shown
                 );
             }
             before = now;

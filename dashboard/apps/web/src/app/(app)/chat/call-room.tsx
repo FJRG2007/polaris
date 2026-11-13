@@ -3071,7 +3071,9 @@ function Tile({
                 >
                     {format && (
                         <span className="whitespace-nowrap rounded bg-background/80 px-1 text-[0.625rem] font-bold leading-4 tabular-nums">
-                            {t("callRoom.streamFormat", { height: format.height, fps: format.fps })}
+                            {format.fps === null
+                                ? t("callRoom.streamHeight", { height: format.height })
+                                : t("callRoom.streamFormat", { height: format.height, fps: format.fps })}
                         </span>
                     )}
                     <LiveBadge />

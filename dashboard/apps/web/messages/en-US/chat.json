@@ -383,6 +383,7 @@
         "theirScreen": "{name} - screen",
         "backToTheGrid": "Back to the grid",
         "streamFormat": "{height}P {fps}FPS",
+        "streamHeight": "{height}P",
         "backToThePeople": "Back to the people",
         "you": "You",
         "guest": "guest",
