@@ -42,6 +42,7 @@ const state = {
     hit: null as null | { used: number; amount: number; period: string },
     recorded: [] as unknown[],
     web: true,
+    enigma: false,
     models: [] as MockLanguageModelV4[],
     unreadable: null as string | null,
     failWith: null as null | { statusCode: number; message: string },
@@ -50,6 +51,19 @@ const state = {
 };
 
 vi.mock("@/lib/polar/skills/store", () => ({ enabledSkills: async () => [], agentSkills: async () => [] }));
+vi.mock("@/lib/agents/agent-defaults-service", () => ({
+    ownEnigma: async () => ({ own: {}, resolved: { enabled: state.enigma, skillsOff: ["ci-policy"] } })
+}));
+vi.mock("@/lib/polar/skills/enigma-catalogue", () => ({
+    enigmaCatalogue: async () => ({
+        version: "1.0.0",
+        available: true,
+        skills: [
+            { name: "git-policy", description: "Commits and branches.", instructions: "Commit small." },
+            { name: "ci-policy", description: "Pipelines.", instructions: "Cache by hash." }
+        ]
+    })
+}));
 vi.mock("@/lib/polar/agents/store", () => ({ polarThreadAgent: async () => null }));
 vi.mock("@/lib/polar/agents/defaults", () => ({ polarAgentDefault: async () => null }));
 vi.mock("@/lib/polar/access", async () => ({
@@ -274,6 +288,7 @@ function post(payload: unknown): Promise<Response> {
 
 beforeEach(() => {
     state.user = USER;
+    state.enigma = false;
     state.limited = false;
     state.resolved = "ok";
     state.source = "own";
@@ -629,6 +644,22 @@ describe("Polar on the web", () => {
         const call = state.models[0]?.doStreamCalls[0];
         return (call?.tools ?? []).map((entry) => entry.name).sort();
     }
+
+    it("adds nothing of Enigma while it is off", async () => {
+        expect(await offered(body())).not.toContain("use_skill");
+        const prompt = JSON.stringify(state.prompts.at(-1));
+        expect(prompt).not.toContain("git-policy");
+        expect(prompt).not.toContain("Enigma");
+    });
+
+    it("lists Enigma's skills, minus the ones switched off, while Enigma is on", async () => {
+        state.enigma = true;
+        expect(await offered(body())).toContain("use_skill");
+        const prompt = JSON.stringify(state.prompts.at(-1));
+        expect(prompt).toContain("git-policy: Commits and branches.");
+        expect(prompt).not.toContain("ci-policy");
+        expect(prompt).not.toContain("Commit small.");
+    });
 
     it("offers the provider's own search and the page reader when the web is allowed", async () => {
         const names = await offered(body());

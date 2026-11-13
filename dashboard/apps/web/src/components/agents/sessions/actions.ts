@@ -313,7 +313,8 @@ async function startParsed(
                   scope: value.enigma.scope ?? null,
                   gate: value.enigma.gate ?? null,
                   version: value.enigma.version ?? null,
-                  config: value.enigma.config ?? null
+                  config: value.enigma.config ?? null,
+                  skillsOff: value.enigma.skillsOff ?? null
               }
             : null
     },

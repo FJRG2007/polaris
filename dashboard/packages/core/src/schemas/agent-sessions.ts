@@ -12,7 +12,7 @@
  */
 
 import { z } from "zod";
-import { ENIGMA_SCOPES } from "../enigma.js";
+import { ENIGMA_SCOPES, ENIGMA_SKILL_NAME, ENIGMA_SKILLS_OFF_MOST } from "../enigma.js";
 import { AGENT_GATE_MODES } from "../agents.js";
 import {
     agentTakesModel,
@@ -65,6 +65,12 @@ export const enigmaSettingsSchema = z.object({
     config: z
         .record(z.string().trim().min(1).max(60), z.string().trim().max(200))
         .refine((value) => Object.keys(value).length <= 40, "Too many settings")
+        .nullable()
+        .default(null),
+    /** Enigma skills switched off at this tier, by name. */
+    skillsOff: z
+        .array(z.string().regex(ENIGMA_SKILL_NAME))
+        .max(ENIGMA_SKILLS_OFF_MOST)
         .nullable()
         .default(null)
 });

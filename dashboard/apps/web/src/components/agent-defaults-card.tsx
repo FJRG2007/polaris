@@ -110,7 +110,7 @@ function storedOf(tier: AgentDefaultsView) {
         poolId: tier.poolId,
         model: tier.model,
         fallback: tier.fallback,
-        enigma: tier.enigma,
+        enigma: { ...tier.enigma, skillsOff: tier.enigma.skillsOff ? [...tier.enigma.skillsOff] : null },
         review: tier.review,
         effort: tier.effort,
         push: tier.push,

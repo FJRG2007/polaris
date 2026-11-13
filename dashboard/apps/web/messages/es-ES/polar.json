@@ -782,6 +782,74 @@
                 "tooLong": "La guía es demasiado larga.",
                 "notAllowed": "No puedes cambiar los ajustes de esta organización."
             }
+        },
+        "enigma": {
+            "intro": "Las skills, reglas y comprobaciones de tus agentes de código.",
+            "use": "Usar Enigma",
+            "chatNote": "En Chat solo se aplican las skills y las reglas.",
+            "skillsTitle": "Skills de Enigma",
+            "useSkill": "Usar {name}",
+            "unavailable": "Ahora no se puede cargar la lista de skills.",
+            "failed": "No se pudo guardar. Inténtalo de nuevo.",
+            "fields": {
+                "output-style": {
+                    "label": "Extensión",
+                    "hint": "Lo breve que te escribe el agente.",
+                    "values": {
+                        "off": "Normal",
+                        "lite": "Corta",
+                        "full": "Más corta",
+                        "ultra": "Mínima"
+                    }
+                },
+                "minimal-code": {
+                    "label": "Código mínimo",
+                    "hint": "Prefiere el cambio más simple que funcione.",
+                    "values": {
+                        "off": "No",
+                        "lite": "Ligero",
+                        "full": "Total",
+                        "ultra": "Estricto"
+                    }
+                },
+                "gate-severity": {
+                    "label": "Se detiene en",
+                    "hint": "Lo inferior se informa, sin esperar.",
+                    "values": {
+                        "error": "Errores",
+                        "warning": "Avisos",
+                        "info": "Todo"
+                    }
+                },
+                "gate": {
+                    "label": "Revisar antes de subir",
+                    "hint": "Revisión, tests y lint antes de subir el trabajo."
+                },
+                "commit-emoji": {
+                    "label": "Emoji en títulos de commit",
+                    "hint": "Un emoji inicial según el tipo de cambio."
+                },
+                "recall": {
+                    "label": "Recordar sesiones",
+                    "hint": "Recuerda sesiones anteriores del mismo código."
+                },
+                "code-graph": {
+                    "label": "Mapa del código",
+                    "hint": "Indexa el código para ver qué toca un cambio."
+                },
+                "compress": {
+                    "label": "Compresión de contexto",
+                    "hint": "Reduce la salida larga de las herramientas."
+                },
+                "guardrails": {
+                    "label": "Revisar convenciones",
+                    "hint": "Marca cambios que rompen las convenciones."
+                },
+                "verify": {
+                    "label": "Comprobar el terminado",
+                    "hint": "Impide terminar con trabajo sin acabar."
+                }
+            }
         }
     },
     "temporary": {

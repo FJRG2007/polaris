@@ -782,6 +782,74 @@
                 "tooLong": "The guide is too long.",
                 "notAllowed": "You cannot change this organization's settings."
             }
+        },
+        "enigma": {
+            "intro": "The skills, rules and checks your coding agents work with.",
+            "use": "Use Enigma",
+            "chatNote": "In Chat, only the skills and rules apply.",
+            "skillsTitle": "Enigma skills",
+            "useSkill": "Use {name}",
+            "unavailable": "The skill list can't be loaded right now.",
+            "failed": "Couldn't save. Try again.",
+            "fields": {
+                "output-style": {
+                    "label": "Reply length",
+                    "hint": "How briefly the agent writes to you.",
+                    "values": {
+                        "off": "Normal",
+                        "lite": "Short",
+                        "full": "Shorter",
+                        "ultra": "Shortest"
+                    }
+                },
+                "minimal-code": {
+                    "label": "Minimal code",
+                    "hint": "Prefer the simplest change that works.",
+                    "values": {
+                        "off": "Off",
+                        "lite": "Light",
+                        "full": "Full",
+                        "ultra": "Strict"
+                    }
+                },
+                "gate-severity": {
+                    "label": "Checks stop at",
+                    "hint": "Findings below this are reported, not waited on.",
+                    "values": {
+                        "error": "Errors",
+                        "warning": "Warnings",
+                        "info": "Everything"
+                    }
+                },
+                "gate": {
+                    "label": "Check before pushing",
+                    "hint": "Review, tests and lint before the work is pushed."
+                },
+                "commit-emoji": {
+                    "label": "Emoji in commit titles",
+                    "hint": "A leading emoji for the kind of change."
+                },
+                "recall": {
+                    "label": "Session memory",
+                    "hint": "Remembers past sessions in the same code."
+                },
+                "code-graph": {
+                    "label": "Map of the code",
+                    "hint": "Indexes the code to find what a change touches."
+                },
+                "compress": {
+                    "label": "Context compression",
+                    "hint": "Shrinks long tool output to save tokens."
+                },
+                "guardrails": {
+                    "label": "Convention checks",
+                    "hint": "Flags edits that break the project's conventions."
+                },
+                "verify": {
+                    "label": "Check claims of done",
+                    "hint": "Stops a finish while work is still unfinished."
+                }
+            }
         }
     },
     "temporary": {

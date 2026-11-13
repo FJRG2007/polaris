@@ -42,19 +42,30 @@ function field(header: Buffer, start: number, length: number): string {
     return raw.subarray(0, end < 0 ? length : end).toString("utf8");
 }
 
+/** More entries than any caller here keeps from one archive. */
+const MAX_KEPT_ENTRIES = 1000;
+
 /**
- * The image names a gzipped `docker save` archive would load, or null when it is
- * not one. Reads `gzipped` to the end.
+ * The files of a gzipped tar archive whose names `wanted` accepts, by name with
+ * any leading `./` dropped, or null when it is not a tar archive. Reads
+ * `gzipped` to its end-of-archive marker, holding only the wanted entries: one
+ * larger than `maxEntryBytes` is skipped rather than kept, and so are links,
+ * directories and anything past the first thousand kept.
  */
-export async function archiveImageTags(gzipped: NodeJS.ReadableStream): Promise<string[] | null> {
+export async function readTarEntries(
+    gzipped: NodeJS.ReadableStream,
+    wanted: (name: string) => boolean,
+    maxEntryBytes: number
+): Promise<Map<string, Buffer> | null> {
     const stream = Readable.from(gzipped).pipe(createGunzip());
+    const files = new Map<string, Buffer>();
     let pending = Buffer.alloc(0);
     // Bytes of the current entry still to come, and whether they are kept.
     let remaining = 0;
     let padding = 0;
-    let keeping: Buffer[] | null = null;
-    let manifest: string | null = null;
+    let keeping: { name: string; parts: Buffer[] } | null = null;
     let zeroBlocks = 0;
+    let headers = 0;
 
     for await (const chunk of stream as AsyncIterable<Buffer>) {
         pending = pending.length > 0 ? Buffer.concat([pending, chunk]) : chunk;
@@ -62,12 +73,12 @@ export async function archiveImageTags(gzipped: NodeJS.ReadableStream): Promise<
             if (remaining > 0) {
                 const take = Math.min(remaining, pending.length);
                 if (take === 0) break;
-                if (keeping) keeping.push(pending.subarray(0, take));
+                if (keeping) keeping.parts.push(pending.subarray(0, take));
                 pending = pending.subarray(take);
                 remaining -= take;
                 if (remaining > 0) break;
                 if (keeping) {
-                    manifest = Buffer.concat(keeping).toString("utf8");
+                    files.set(keeping.name, Buffer.concat(keeping.parts));
                     keeping = null;
                 }
             }
@@ -86,22 +97,36 @@ export async function archiveImageTags(gzipped: NodeJS.ReadableStream): Promise<
                 continue;
             }
             zeroBlocks = 0;
+            headers += 1;
             const size = Number.parseInt(field(header, 124, 12).trim() || "0", 8);
             if (!Number.isFinite(size) || size < 0) return null;
             // Only a ustar header has a prefix field; an older one keeps other bytes there.
             const prefix = field(header, 257, 5) === "ustar" ? field(header, 345, 155) : "";
-            const name = (prefix ? `${prefix}/` : "") + field(header, 0, 100);
+            const name = ((prefix ? `${prefix}/` : "") + field(header, 0, 100)).replace(/^\.\//, "");
             const type = String.fromCharCode(header[156] ?? 0);
             remaining = size;
             padding = (BLOCK - (size % BLOCK)) % BLOCK;
-            const isManifest = (type === "0" || type === "\0") && name.replace(/^\.\//, "") === "manifest.json";
-            if (isManifest) {
-                if (size > MAX_MANIFEST) return null;
-                keeping = [];
-                if (size === 0) manifest = "";
+            const keep =
+                (type === "0" || type === "\0") &&
+                size <= maxEntryBytes &&
+                files.size < MAX_KEPT_ENTRIES &&
+                wanted(name);
+            if (keep) {
+                if (size === 0) files.set(name, Buffer.alloc(0));
+                else keeping = { name, parts: [] };
             }
         }
         if (zeroBlocks >= 2) break;
     }
-    return manifest === null ? null : manifestTags(manifest);
+    return headers > 0 ? files : null;
+}
+
+/**
+ * The image names a gzipped `docker save` archive would load, or null when it is
+ * not one. Reads `gzipped` to the end.
+ */
+export async function archiveImageTags(gzipped: NodeJS.ReadableStream): Promise<string[] | null> {
+    const files = await readTarEntries(gzipped, (name) => name === "manifest.json", MAX_MANIFEST);
+    const manifest = files?.get("manifest.json");
+    return manifest === undefined ? null : manifestTags(manifest.toString("utf8"));
 }

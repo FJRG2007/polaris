@@ -210,6 +210,56 @@ export async function saveAgentDefaults(ownerId: string, input: AgentDefaultsInp
     });
 }
 
+/**
+ * A tier's Enigma settings with its older `gate` column folded in. `gate`
+ * predates the settings column and is still its own field on a tier, so it
+ * counts only where the settings say nothing about the gate.
+ */
+export function withTierGate(
+    settings: core.EnigmaSettings,
+    gate: string | null | undefined
+): core.EnigmaSettings {
+    return settings.gate === null && gate && core.isEnigmaGateMode(gate)
+        ? { ...settings, gate }
+        : settings;
+}
+
+/**
+ * A person's own Enigma settings - their general tier, its `gate` column folded
+ * in - what the instance's tier beneath it resolves to on its own, and what the
+ * two resolve to together. One row and one setting read.
+ */
+export async function ownEnigma(ownerId: string): Promise<{
+    own: core.EnigmaSettings;
+    inherited: core.ResolvedEnigma;
+    resolved: core.ResolvedEnigma;
+}> {
+    const [row, platform] = await Promise.all([
+        prisma.agentDefaults.findUnique({
+            where: { ownerId_scope: { ownerId, scope: GENERAL_SCOPE } },
+            select: { enigma: true, gate: true }
+        }),
+        getPlatformAgentDefaults()
+    ]);
+    const own = withTierGate(core.parseEnigmaSettings(row?.enigma ?? null), row?.gate);
+    const beneath = withTierGate(platform.enigma, platform.gate);
+    return {
+        own,
+        inherited: core.resolveEnigma(beneath),
+        resolved: core.resolveEnigma(own, beneath)
+    };
+}
+
+/** Store a person's own Enigma settings, leaving the rest of their tier as it is. */
+export async function saveOwnEnigma(ownerId: string, enigma: core.EnigmaSettings): Promise<void> {
+    const value = JSON.stringify(enigma);
+    await prisma.agentDefaults.upsert({
+        where: { ownerId_scope: { ownerId, scope: GENERAL_SCOPE } },
+        create: { ownerId, scope: GENERAL_SCOPE, enigma: value },
+        update: { enigma: value }
+    });
+}
+
 export async function removeAgentDefaults(ownerId: string, scope: string): Promise<void> {
     await prisma.agentDefaults.deleteMany({ where: { ownerId, scope } });
 }

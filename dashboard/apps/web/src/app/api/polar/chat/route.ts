@@ -50,9 +50,12 @@ import { polarThreadAgent } from "@/lib/polar/agents/store";
 import { agentPrompt, agentTurnChoices, polarTurnChoices } from "@/lib/polar/agents/shared";
 import { polarAgentDefault } from "@/lib/polar/agents/defaults";
 import { trialSkillSchema } from "@/lib/polar/skills/shared";
+import { ownEnigma } from "@/lib/agents/agent-defaults-service";
+import { enigmaCatalogue } from "@/lib/polar/skills/enigma-catalogue";
 import {
     USE_SKILL,
     chatSkills,
+    enigmaPrompt,
     polarSkillTools,
     readTrialSkill,
     skillsPrompt
@@ -367,7 +370,7 @@ export async function POST(request: Request): Promise<Response> {
             await savePolarGoal(user.id, body.data.threadId, goal);
         }
     }
-    const [instructions, remembers, savedSkills] = await Promise.all([
+    const [instructions, remembers, savedSkills, enigma] = await Promise.all([
         polarThreadInstructions(user.id, body.data.threadId),
         temporary ? Promise.resolve(false) : polarMemoryEnabled(user.id),
         // A chat still answers when the skills cannot be read; it just lists none.
@@ -377,12 +380,30 @@ export async function POST(request: Request): Promise<Response> {
         ).catch((error: unknown) => {
             console.error("polar: could not read the skills", error);
             return [];
-        })
+        }),
+        // Enigma's skills, for a person who has it on: names in the prompt,
+        // bodies through the same tool. Unreadable is simply none.
+        ownEnigma(user.id)
+            .then(async ({ resolved }) => {
+                if (!resolved.enabled) return null;
+                const off = new Set(resolved.skillsOff);
+                const { skills } = await enigmaCatalogue();
+                return skills.filter((skill) => !off.has(skill.name));
+            })
+            .catch((error: unknown) => {
+                console.error("polar: could not read the Enigma settings", error);
+                return null;
+            })
     ]);
     // The person's enabled skills, and the one a temporary chat is trying -
     // read again from the request on every turn, never stored.
     const skills = chatSkills(savedSkills, temporary ? readTrialSkill(body.data.trialSkill) : null);
-    const skillTools = skills.length > 0 ? polarSkillTools(skills) : {};
+    // A person's own skill keeps its name; Enigma's of the same name steps aside.
+    const enigmaSkills = (enigma ?? []).filter(
+        (skill) => !skills.some((own) => own.name === skill.name)
+    );
+    const allSkills = [...skills, ...enigmaSkills];
+    const skillTools = allSkills.length > 0 ? polarSkillTools(allSkills) : {};
     const memories = remembers ? await polarMemoryPrompt(user.id) : "";
     // The web is the administrator's to allow and the person's to switch off
     // for a turn; either one off and the tools are simply not offered.
@@ -527,6 +548,7 @@ export async function POST(request: Request): Promise<Response> {
                 agent ? agentPrompt(agent) : "",
                 codeTaskPrompt(body.data.code),
                 skillsPrompt(skills),
+                enigma ? enigmaPrompt(enigmaSkills) : "",
                 fenceSummary(compacted.summary),
                 // Only on a turn asked again from an answer's row: that turn's
                 // prefix is not cached, every other one is.

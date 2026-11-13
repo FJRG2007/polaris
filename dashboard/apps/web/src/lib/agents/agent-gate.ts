@@ -19,16 +19,11 @@
  * this widens nothing.
  */
 
+import * as core from "@polaris/core";
 import type { AgentGateMode } from "@polaris/core";
 
-/**
- * The version of Enigma a run installs and gates with.
- *
- * Pinned rather than `latest` so two runs of the same repository work to the same
- * standards, and so a release upstream cannot change what a repository's gate
- * accepts without anybody here choosing it.
- */
-export const ENIGMA_VERSION = "1.35.2";
+/** The version of Enigma a run installs and gates with: the one sessions install. */
+export const ENIGMA_VERSION = core.ENIGMA_VERSION;
 
 /**
  * The steps a run reports, in the order the gate runs them.

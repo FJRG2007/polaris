@@ -22,6 +22,10 @@ import { PolarRoutingSettings } from "./polar-routing";
 import { Card, CardBody, Skeleton } from "@polaris/ui";
 import { PolarBrowserSites } from "./polar-browser-sites";
 import { PolarSkills } from "./polar-skills";
+import { EnigmaSettings } from "./enigma-settings";
+import { enigmaPrefsOf } from "@/lib/polar/enigma-prefs";
+import { ownEnigma } from "@/lib/agents/agent-defaults-service";
+import { enigmaCatalogue } from "@/lib/polar/skills/enigma-catalogue";
 import { listSkills } from "@/lib/polar/skills/store";
 import { PolarAgents } from "./polar-agents";
 import { listAgents } from "@/lib/polar/agents/store";
@@ -95,6 +99,19 @@ async function ConnectorsSection({
 /** The skills, once read; a viewer acting as somebody else reads and never writes. */
 async function SkillsSection({ userId, readOnly }: { userId: string; readOnly: boolean }) {
     return <PolarSkills initial={await listSkills(userId)} readOnly={readOnly} />;
+}
+
+/** Enigma's settings and skills, from the person's own tier and the pinned catalogue. */
+async function EnigmaSection({ userId, readOnly }: { userId: string; readOnly: boolean }) {
+    const [{ resolved }, catalogue] = await Promise.all([ownEnigma(userId), enigmaCatalogue()]);
+    return (
+        <EnigmaSettings
+            initial={enigmaPrefsOf(resolved)}
+            available={catalogue.available}
+            skills={catalogue.skills.map(({ name, description }) => ({ name, description }))}
+            readOnly={readOnly}
+        />
+    );
 }
 
 /** The writing settings, with the names of the skills a rewrite may follow. */
@@ -228,9 +245,14 @@ export async function SettingsSectionPage({
             );
         case "skills":
             return (
-                <Suspense fallback={<ListSkeleton />}>
-                    <SkillsSection userId={user.id} readOnly={Boolean(user.viewingAs)} />
-                </Suspense>
+                <div className="flex flex-col gap-8">
+                    <Suspense fallback={<ListSkeleton />}>
+                        <SkillsSection userId={user.id} readOnly={Boolean(user.viewingAs)} />
+                    </Suspense>
+                    <Suspense fallback={<ListSkeleton />}>
+                        <EnigmaSection userId={user.id} readOnly={Boolean(user.viewingAs)} />
+                    </Suspense>
+                </div>
             );
         case "agents":
             return (

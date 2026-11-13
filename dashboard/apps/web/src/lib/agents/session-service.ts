@@ -18,7 +18,7 @@ import { expirePermissions, settlesPermissions } from "./session-permissions";
 import * as core from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { readSessionCursor } from "./session-cursor";
-import { GENERAL_SCOPE, getPlatformAgentDefaults, scopeOf } from "./agent-defaults-service";
+import { GENERAL_SCOPE, getPlatformAgentDefaults, scopeOf, withTierGate } from "./agent-defaults-service";
 import { clearSessionWaiting, noticeSessionEnded, noticeSessionWaiting } from "./agent-notices";
 
 /**
@@ -918,29 +918,19 @@ export async function resolveSessionEnigma(sessionId: string): Promise<core.Reso
     ]);
     const byScope = (scope: string): core.EnigmaSettings => {
         const row = tiers.find((tier) => tier.scope === scope);
-        if (!row) return core.INHERIT_ENIGMA;
-        const parsed = core.parseEnigmaSettings(row.enigma);
-        // `gate` predates this settings column and is still its own field on the
-        // tier, so it is folded in here rather than being asked for twice.
-        return parsed.gate === null && row.gate && core.isEnigmaGateMode(row.gate)
-            ? { ...parsed, gate: row.gate }
-            : parsed;
+        return row ? withTierGate(core.parseEnigmaSettings(row.enigma), row.gate) : core.INHERIT_ENIGMA;
     };
 
-    const repoSettings = core.parseEnigmaSettings(session.repo?.enigma ?? null);
-    const repoTier: core.EnigmaSettings =
-        repoSettings.gate === null && session.repo?.gate && core.isEnigmaGateMode(session.repo.gate)
-            ? { ...repoSettings, gate: session.repo.gate }
-            : repoSettings;
+    const repoTier = withTierGate(
+        core.parseEnigmaSettings(session.repo?.enigma ?? null),
+        session.repo?.gate
+    );
 
     // The instance tier last, and from the setting store rather than from a row:
     // it is an administrator's answer for the whole deployment, so it has no owner
     // to key a row on. Its own `gate` column is folded in the same way the others
     // are, so an administrator who set only that still reaches a session.
-    const platformEnigma: core.EnigmaSettings =
-        platform.enigma.gate === null && platform.gate && core.isEnigmaGateMode(platform.gate)
-            ? { ...platform.enigma, gate: platform.gate }
-            : platform.enigma;
+    const platformEnigma = withTierGate(platform.enigma, platform.gate);
 
     return core.resolveEnigma(
         core.parseEnigmaSettings(session.enigma),

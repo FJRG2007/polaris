@@ -29,6 +29,22 @@
 import { AGENT_GATE_MODES, type AgentGateMode } from "./agents.js";
 
 /**
+ * The version of Enigma every session and every runner run installs, unless a
+ * tier pins another.
+ *
+ * One constant for both, so a session and the gate that checks its push work to
+ * the same rules, and so anything read from the package - its skills catalogue -
+ * can be cached once per version instead of once per request.
+ */
+export const ENIGMA_VERSION = "1.72.2";
+
+/** A skill name as Enigma ships them, and as `enigma skills disable` takes it. */
+export const ENIGMA_SKILL_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/** More skills switched off than the package has ever shipped. */
+export const ENIGMA_SKILLS_OFF_MOST = 100;
+
+/**
  * Which of Enigma's parts an install lands.
  *
  * `all` is what the CLI does with `--all`, and is the default. `policies` is the
@@ -75,6 +91,11 @@ export interface EnigmaSettings {
      * Enigma setting: anything Enigma can be told, it can be told here.
      */
     readonly config: Readonly<Record<string, string>> | null;
+    /**
+     * Enigma skills this tier switches off, by name. The nearest tier with a list
+     * decides the whole list: a list is one answer, not several settings.
+     */
+    readonly skillsOff?: readonly string[] | null;
 }
 
 /** Nothing decided at this tier. */
@@ -83,7 +104,8 @@ export const INHERIT_ENIGMA: EnigmaSettings = {
     scope: null,
     gate: null,
     version: null,
-    config: null
+    config: null,
+    skillsOff: null
 };
 
 /** Everything decided, and every default it is decided to. On rather than off:
@@ -95,7 +117,8 @@ export const DEFAULT_ENIGMA: Required<{
     scope: "all",
     gate: "checks",
     version: "",
-    config: {}
+    config: {},
+    skillsOff: []
 };
 
 /** A fully decided setup, with nothing left to ask anybody. */
@@ -135,7 +158,8 @@ export function resolveEnigma(
         scope: first("scope") ?? DEFAULT_ENIGMA.scope,
         gate: first("gate") ?? DEFAULT_ENIGMA.gate,
         version: first("version") ?? DEFAULT_ENIGMA.version,
-        config
+        config,
+        skillsOff: first("skillsOff") ?? DEFAULT_ENIGMA.skillsOff
     };
 }
 
@@ -155,7 +179,19 @@ export function enigmaInstallArgv(settings: ResolvedEnigma): string[] {
 /** The npm spec a resolved setup names, pinned or not. One place, so an install
  *  and the config calls that follow it can never reach two different versions. */
 export function enigmaPackageSpec(settings: ResolvedEnigma): string {
-    return settings.version ? `enigma-cli@${settings.version}` : "enigma-cli";
+    return `enigma-cli@${settings.version || ENIGMA_VERSION}`;
+}
+
+/**
+ * The `enigma skills disable` calls a resolved setup means, one argv per skill.
+ * A name that is not a plain skill name is dropped, for the same reason a config
+ * key is: these become a command line on somebody else's machine.
+ */
+export function enigmaSkillsArgv(settings: ResolvedEnigma): string[][] {
+    return [...new Set(settings.skillsOff)]
+        .filter((name) => ENIGMA_SKILL_NAME.test(name))
+        .slice(0, ENIGMA_SKILLS_OFF_MOST)
+        .map((name) => ["skills", "disable", name]);
 }
 
 /**
@@ -228,7 +264,12 @@ export function parseEnigmaSettings(raw: string | null | undefined): EnigmaSetti
             typeof record.version === "string" && record.version.trim()
                 ? record.version.trim()
                 : null,
-        config: Object.keys(config).length > 0 ? config : null
+        config: Object.keys(config).length > 0 ? config : null,
+        skillsOff: Array.isArray(record.skillsOff)
+            ? record.skillsOff
+                  .filter((name): name is string => typeof name === "string" && ENIGMA_SKILL_NAME.test(name))
+                  .slice(0, ENIGMA_SKILLS_OFF_MOST)
+            : null
     };
 }
 
@@ -296,6 +337,7 @@ export function enigmaConfigureScript(settings: ResolvedEnigma): string {
         `enigma install ${settings.scope === "all" ? "--all" : "--policies"} --yes || echo "polaris: Enigma installed but its own setup did not finish"`
     ];
     for (const argv of enigmaConfigArgv(settings)) lines.push(`enigma ${argv.join(" ")} || true`);
+    for (const argv of enigmaSkillsArgv(settings)) lines.push(`enigma ${argv.join(" ")} || true`);
     const gate = enigmaGateArgv(settings);
     if (gate.length > 0) lines.push(`enigma ${gate.join(" ")} || true`);
     lines.push('echo "polaris: Enigma ready"');

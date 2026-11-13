@@ -14,6 +14,9 @@ import * as store from "@/lib/polar/skills/store";
 import { polarAccessFor } from "@/lib/polar/access";
 import { getTranslations } from "@/lib/i18n/request";
 import * as remote from "@/lib/polar/skills/remote";
+import { enigmaCatalogue } from "@/lib/polar/skills/enigma-catalogue";
+import { ownEnigma, saveOwnEnigma } from "@/lib/agents/agent-defaults-service";
+import { applyEnigmaPrefs, enigmaPrefsSchema } from "@/lib/polar/enigma-prefs";
 import {
     DIRECTORY_SOURCE,
     skillInputSchema,
@@ -231,4 +234,31 @@ export async function importSkillsAction(
         results.push(await answer(await store.createSkill(caller.id, item.skill, source)));
     }
     return { ok: true, value: results };
+}
+
+/**
+ * Store the caller's Enigma settings on their own general tier. A skill switched
+ * off must be one the pinned version ships - or one already off, so a catalogue
+ * that cannot be read right now never blocks the other settings.
+ */
+export async function saveEnigmaAction(input: unknown): Promise<Result<null>> {
+    const caller = await writer();
+    if ("error" in caller) return { ok: false, error: caller.error };
+    const t = await getTranslations("polar");
+    const [catalogue, current] = await Promise.all([enigmaCatalogue(), ownEnigma(caller.id)]);
+    const known = new Set([
+        ...catalogue.skills.map((skill) => skill.name),
+        ...(current.own.skillsOff ?? [])
+    ]);
+    const parsed = enigmaPrefsSchema
+        .refine((prefs) => prefs.skillsOff.every((name) => known.has(name)))
+        .safeParse(input);
+    if (!parsed.success) return { ok: false, error: t("settings.enigma.failed") };
+    try {
+        await saveOwnEnigma(caller.id, applyEnigmaPrefs(current.own, parsed.data, current.inherited));
+    } catch (error) {
+        console.error("polar: could not save the Enigma settings", error);
+        return { ok: false, error: t("settings.enigma.failed") };
+    }
+    return { ok: true, value: null };
 }

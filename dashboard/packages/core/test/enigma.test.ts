@@ -11,11 +11,14 @@
 import { describe, expect, it } from "vitest";
 import {
     DEFAULT_ENIGMA,
+    ENIGMA_VERSION,
     INHERIT_ENIGMA,
     enigmaConfigArgv,
+    enigmaConfigureScript,
     enigmaGateArgv,
     enigmaInstallArgv,
     enigmaPackageSpec,
+    enigmaSkillsArgv,
     parseEnigmaSettings,
     resolveEnigma
 } from "../src/enigma.js";
@@ -58,8 +61,8 @@ describe("enigmaInstallArgv", () => {
         expect(enigmaInstallArgv(DEFAULT_ENIGMA)).toContain("--yes");
     });
 
-    it("takes whatever ships when no version is pinned, and the pin when one is", () => {
-        expect(enigmaInstallArgv(DEFAULT_ENIGMA)).toContain("enigma-cli");
+    it("takes the version Polaris ships against when no tier pins one, and the pin when one does", () => {
+        expect(enigmaInstallArgv(DEFAULT_ENIGMA)).toContain(`enigma-cli@${ENIGMA_VERSION}`);
         expect(enigmaInstallArgv({ ...DEFAULT_ENIGMA, version: "1.4.0" })).toContain(
             "enigma-cli@1.4.0"
         );
@@ -112,7 +115,7 @@ describe("enigmaPackageSpec", () => {
         expect(enigmaInstallArgv({ ...DEFAULT_ENIGMA, version: "1.4.0" })).toContain(
             enigmaPackageSpec({ ...DEFAULT_ENIGMA, version: "1.4.0" })
         );
-        expect(enigmaPackageSpec(DEFAULT_ENIGMA)).toBe("enigma-cli");
+        expect(enigmaPackageSpec(DEFAULT_ENIGMA)).toBe(`enigma-cli@${ENIGMA_VERSION}`);
     });
 });
 
@@ -130,5 +133,29 @@ describe("parseEnigmaSettings", () => {
         expect(parseEnigmaSettings("{not json")).toEqual(INHERIT_ENIGMA);
         expect(parseEnigmaSettings(JSON.stringify({ gate: "paranoid" })).gate).toBeNull();
         expect(parseEnigmaSettings(null)).toEqual(INHERIT_ENIGMA);
+    });
+});
+
+describe("enigmaSkillsArgv", () => {
+    it("switches off each skill once, in the configure script the agent's account runs", () => {
+        const settings = { ...DEFAULT_ENIGMA, skillsOff: ["git-policy", "git-policy", "ci-policy"] };
+        expect(enigmaSkillsArgv(settings)).toEqual([
+            ["skills", "disable", "git-policy"],
+            ["skills", "disable", "ci-policy"]
+        ]);
+        expect(enigmaConfigureScript(settings)).toContain("enigma skills disable git-policy || true");
+        expect(enigmaConfigureScript(DEFAULT_ENIGMA)).not.toContain("skills disable");
+    });
+
+    it("drops a name that is not a plain skill name rather than running it", () => {
+        expect(enigmaSkillsArgv({ ...DEFAULT_ENIGMA, skillsOff: ["x; rm -rf /", "Git", "ok"] })).toEqual([
+            ["skills", "disable", "ok"]
+        ]);
+    });
+
+    it("lets the nearest tier with a list decide it, and reads back only plain names", () => {
+        expect(resolveEnigma({ ...INHERIT_ENIGMA, skillsOff: ["a"] }, { ...INHERIT_ENIGMA, skillsOff: ["b"] }).skillsOff).toEqual(["a"]);
+        expect(resolveEnigma().skillsOff).toEqual([]);
+        expect(parseEnigmaSettings(JSON.stringify({ skillsOff: ["git-policy", 3, "Bad Name"] })).skillsOff).toEqual(["git-policy"]);
     });
 });

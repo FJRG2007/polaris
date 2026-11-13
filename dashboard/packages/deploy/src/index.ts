@@ -37,7 +37,7 @@ export {
     type ReleaseContainer
 } from "./release-containers.js";
 export { MAX_SHIPPED_BYTES, shipImage } from "./runtime/ship.js";
-export { archiveImageTags, manifestTags } from "./image-archive.js";
+export { archiveImageTags, manifestTags, readTarEntries } from "./image-archive.js";
 export { magicDomain, releaseDomain, isMagicBase, DEFAULT_SUBDOMAIN_BASE } from "./subdomain.js";
 export {
     defaultZones,
