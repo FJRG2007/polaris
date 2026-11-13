@@ -15,6 +15,7 @@ import {
     AppWindow,
     ClipboardPaste,
     Copy,
+    Scissors,
     ExternalLink,
     Languages,
     Link2,
@@ -112,6 +113,24 @@ async function copyText(text: string): Promise<boolean> {
         } catch {
             return false;
         }
+    }
+}
+
+/** Whether the text can be changed where it was selected: a field that is not
+ *  read-only or disabled, or a rich editor. Text on the page cannot. */
+function canEdit(field: Element | null): boolean {
+    if (!field) return false;
+    if (isTextField(field)) return !field.readOnly && !field.disabled;
+    return (field as HTMLElement).isContentEditable;
+}
+
+/** Takes the selection out of the field the way the keyboard would, so the
+ *  field's own undo and change handling see it. */
+function deleteSelection(field: Element): void {
+    if (document.execCommand("delete")) return;
+    if (isTextField(field)) {
+        field.setRangeText("", field.selectionStart ?? 0, field.selectionEnd ?? 0, "end");
+        field.dispatchEvent(new Event("input", { bubbles: true }));
     }
 }
 
@@ -287,7 +306,20 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
         return items;
     }, [copy]);
 
-    const canPaste = paste !== "denied" && !!menu?.found.field;
+    const editable = canEdit(menu?.found.field ?? null);
+    const canPaste = paste !== "denied" && editable;
+
+    const cutHere = async () => {
+        if (!menu?.found.field) return;
+        const opened = menu;
+        restore(opened);
+        if (!(await copyText(opened.found.text))) {
+            toast.show({ title: t("selectionMenu.copyFailed") });
+            return;
+        }
+        restore(opened);
+        deleteSelection(opened.found.field!);
+    };
 
     const pasteHere = async () => {
         if (!menu?.found.field) return;
@@ -330,6 +362,13 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
                             if (menu.found.field) restore(menu);
                         }}
                     >
+                        {editable ? (
+                            <DropdownMenuItem onSelect={() => void cutHere()}>
+                                <Scissors />
+                                {t("selectionMenu.cut")}
+                                <MenuShortcut keys="Mod+X" />
+                            </DropdownMenuItem>
+                        ) : null}
                         <DropdownMenuItem onSelect={() => void copy(menu.found.text)}>
                             <Copy />
                             {t("selectionMenu.copy")}

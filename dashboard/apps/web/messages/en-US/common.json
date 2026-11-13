@@ -139,6 +139,7 @@
         "withDetail": "{sentence} ({detail})"
     },
     "selectionMenu": {
+        "cut": "Cut",
         "copy": "Copy",
         "paste": "Paste",
         "selectAll": "Select all",

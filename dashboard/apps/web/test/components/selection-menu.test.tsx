@@ -164,6 +164,40 @@ describe("selection menu", () => {
         expect(screen.getByRole("menuitem", { name: /Paste/ })).toBeTruthy();
     });
 
+    it("offers Cut and Paste in a field that can be edited", async () => {
+        page();
+        const field = screen.getByTestId("field") as HTMLInputElement;
+        field.focus();
+        field.setSelectionRange(0, 5);
+        rightClick(field);
+        expect(screen.getByRole("menuitem", { name: /Paste/ })).toBeTruthy();
+        const written: string[] = [];
+        Object.defineProperty(navigator, "clipboard", {
+            configurable: true,
+            value: {
+                readText: async () => "pasted",
+                writeText: async (text: string) => void written.push(text)
+            }
+        });
+        // jsdom has no editing commands, so the field's own fallback takes it out.
+        document.execCommand = () => false;
+        await act(async () => {
+            fireEvent.click(screen.getByRole("menuitem", { name: /Cut/ }));
+        });
+        expect(written).toEqual(["hello"]);
+        expect(field.value).toBe(" world");
+    });
+
+    it("offers no Cut or Paste in a field that cannot be edited", () => {
+        page(<input data-testid="locked" readOnly defaultValue="read only text" />);
+        const field = screen.getByTestId("locked") as HTMLInputElement;
+        field.setSelectionRange(0, 4);
+        rightClick(field);
+        expect(screen.getByRole("menuitem", { name: /^Copy/ })).toBeTruthy();
+        expect(screen.queryByRole("menuitem", { name: /Cut/ })).toBeNull();
+        expect(screen.queryByRole("menuitem", { name: /Paste/ })).toBeNull();
+    });
+
     it("never offers a password", () => {
         const field = document.createElement("input");
         field.type = "password";
