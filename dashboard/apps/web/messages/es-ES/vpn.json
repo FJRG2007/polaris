@@ -118,13 +118,8 @@
         "notRunning": "La VPN aún no está encendida, así que no se puede añadir ningún dispositivo.",
         "openOverview": "Abrir el resumen",
         "platformTitle": "Tu dispositivo",
-        "copyCommand": "Copiar comando",
         "keyTitle": "Una clave para servidor, router o TV",
         "keyBody": "Para un dispositivo que no puede abrir un navegador para iniciar sesión. La clave añade un dispositivo a tu cuenta y deja de funcionar al cabo de una hora.",
-        "createKey": "Crear una clave",
-        "anotherKey": "Crear otra clave",
-        "copyKey": "Copiar clave",
-        "keyExpires": "Funciona hasta las {time}, para un dispositivo.",
         "windows": {
             "name": "Windows",
             "step1": "Instala Tailscale para Windows desde tailscale.com/download.",
@@ -168,8 +163,8 @@
         },
         "router": {
             "name": "Router o servidor",
-            "step1": "Instala Tailscale en él: la mayoría de routers con OpenWrt, pfSense u OPNsense lo ofrecen como paquete.",
-            "step2": "Crea una clave abajo y ejecuta el comando con ella en el dispositivo. Se une a tus dispositivos sin navegador."
+            "step1": "Instala en él la app Tailscale, el cliente de esta VPN. Casi todo router con OpenWrt, pfSense u OPNsense la ofrece como paquete.",
+            "step2": "Crea una clave abajo. El comando que lo conecta sale con la clave."
         },
         "join": "Unirse a esta red",
         "joined": "Este ordenador se ha unido a la red.",
@@ -449,5 +444,27 @@
         "mapHint": "O pulsa un país en el mapa.",
         "automatic": "Usar su dirección",
         "close": "Cerrar"
+    },
+    "keys": {
+        "title": "Claves VPN",
+        "intro": "Claves de un uso para unir un router, servidor o TV a la VPN.",
+        "empty": "Aún no hay claves.",
+        "state": {
+            "unused": "Sin usar",
+            "used": "Usada",
+            "expired": "Caducada"
+        },
+        "created": "Hecha {date}",
+        "expires": "Fin {date}",
+        "revoke": "Revocar",
+        "revokeTitle": "¿Revocar clave?",
+        "revokeBody": "Ningún equipo nuevo podrá unirse con ella. Los ya añadidos siguen.",
+        "create": "Crear clave",
+        "another": "Crear otra clave",
+        "copyKey": "Copiar clave",
+        "expiresAt": "Vale hasta las {time}, un equipo.",
+        "commandHint": "Ejecútalo en el router o servidor para unirlo a tu VPN.",
+        "copyCommand": "Copiar comando",
+        "manage": "Ver y revocar claves"
     }
 }

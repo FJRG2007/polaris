@@ -592,6 +592,12 @@
                 "client": "Client error",
                 "server": "Server error"
             }
+        },
+        "kind": {
+            "label": "Key type",
+            "api": "API key",
+            "vpn": "VPN device",
+            "vpnHint": "Adds a router, server or TV to your VPN, once, within an hour."
         }
     },
     "connections": {

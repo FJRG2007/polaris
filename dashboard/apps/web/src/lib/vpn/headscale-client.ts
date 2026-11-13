@@ -83,7 +83,16 @@ export const preAuthKeySchema = z.object({
         .boolean()
         .nullish()
         .transform((value) => value ?? false),
-    expiration: timestamp
+    used: z
+        .boolean()
+        .nullish()
+        .transform((value) => value ?? false),
+    expiration: timestamp,
+    createdAt: timestamp,
+    aclTags: strings,
+    /** Who the key signs a device in as. Older control servers leave it out of
+     *  a listing they were asked for by user. */
+    user: z.object({ id }).nullish()
 });
 export type PreAuthKey = z.infer<typeof preAuthKeySchema>;
 
@@ -92,6 +101,7 @@ const userResponse = z.object({ user: headscaleUserSchema });
 const nodesResponse = z.object({ nodes: z.array(headscaleNodeSchema).nullish() });
 const nodeResponse = z.object({ node: headscaleNodeSchema });
 const preAuthKeyResponse = z.object({ preAuthKey: preAuthKeySchema });
+const preAuthKeysResponse = z.object({ preAuthKeys: z.array(preAuthKeySchema).nullish() });
 const healthResponse = z.object({
     databaseConnectivity: z
         .boolean()
@@ -136,6 +146,11 @@ export interface HeadscaleClient {
         /** Tags the signed-in device takes instead of belonging to the user. */
         tags?: readonly string[];
     }): Promise<PreAuthKey>;
+    /** The keys made for one user. Newer control servers list every user's
+     *  keys whatever is asked, so the caller filters by `user`. */
+    listPreAuthKeys(userId: string): Promise<PreAuthKey[]>;
+    /** Stop a key from signing in any more device. */
+    expirePreAuthKey(input: { id: string; userId: string; key: string }): Promise<void>;
     registerNode(user: string, authId: string): Promise<HeadscaleNode>;
     /** Replace the access policy (policy mode `database`). */
     setPolicy(policy: string): Promise<void>;
@@ -217,6 +232,21 @@ export function headscaleClient(
                     ...(input.tags ? { acl_tags: input.tags } : {})
                 })
             ).preAuthKey;
+        },
+        async listPreAuthKeys(userId) {
+            return (
+                (await call("GET", `/preauthkey?user=${segment(userId)}`, preAuthKeysResponse))
+                    .preAuthKeys ?? []
+            );
+        },
+        async expirePreAuthKey(input) {
+            // Older control servers name a key by its user and value, newer
+            // ones by its id; both read the fields they know and ignore the rest.
+            await call("POST", "/preauthkey/expire", z.unknown(), {
+                id: input.id,
+                user: input.userId,
+                key: input.key
+            });
         },
         async registerNode(user, authId) {
             return (await call("POST", "/auth/register", nodeResponse, { user, auth_id: authId }))

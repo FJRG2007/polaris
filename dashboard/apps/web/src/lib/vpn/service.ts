@@ -28,6 +28,8 @@ import { listDeployZones } from "@/lib/domain-zones";
 import { hostPortForApp } from "@/lib/deploy/host-port";
 import { dnsBlockerStatus } from "@/lib/dns-blocker/service";
 import { readNetworks, sharedCidrs, type PrivateNetwork } from "./networks";
+import { deviceKeysOf, type DeviceKey } from "./device-keys";
+export type { DeviceKey } from "./device-keys";
 import type { RuntimePorts } from "@polaris/deploy";
 import { GATEWAY_PROJECT } from "@/lib/polaris-parts";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
@@ -763,9 +765,10 @@ async function ensureUser(api: HeadscaleClient, account: Account) {
 /** A one-time key that signs one device in as `account`, valid for an hour. */
 export async function createDeviceKey(
     account: Account & { isAdmin: boolean }
-): Promise<{ key: string; expiresAt: string }> {
+): Promise<{ key: string; expiresAt: string; loginServer: string | null }> {
     if (!(await mayJoin(account))) throw new VpnRefusal("noAccess");
     const api = await client();
+    const { settings } = await requireApp();
     const user = await ensureUser(api, account);
     const expiration = new Date(Date.now() + PREAUTH_TTL_MS);
     const key = await api.createPreAuthKey({
@@ -774,7 +777,42 @@ export async function createDeviceKey(
         ephemeral: false,
         expiration
     });
-    return { key: key.key, expiresAt: expiration.toISOString() };
+    return {
+        key: key.key,
+        expiresAt: expiration.toISOString(),
+        loginServer: settings.hostname ? `https://${settings.hostname}` : null
+    };
+}
+
+/** The device keys `account` made, as the control server has them. Nothing
+ *  when the VPN is off or the account may not join it, so the account screen
+ *  can leave the section out. */
+export async function listDeviceKeys(
+    account: Account & { isAdmin: boolean }
+): Promise<DeviceKey[] | null> {
+    if (!(await mayJoin(account))) return null;
+    const api = await client().catch((error: unknown) => {
+        if (error instanceof VpnRefusal) return null;
+        throw error;
+    });
+    if (!api) return null;
+    const user = await ensureUser(api, account);
+    return deviceKeysOf(await api.listPreAuthKeys(user.id), user.id, Date.now());
+}
+
+/** Stop one of `account`'s device keys from adding any more devices. A key of
+ *  somebody else's is answered as not found. */
+export async function revokeDeviceKey(
+    account: Account & { isAdmin: boolean },
+    keyId: string
+): Promise<void> {
+    const api = await client();
+    const user = await ensureUser(api, account);
+    const key = (await api.listPreAuthKeys(user.id)).find(
+        (one) => one.id === keyId && (one.user ? one.user.id === user.id : true)
+    );
+    if (!key) throw new VpnRefusal("notFound");
+    await api.expirePreAuthKey({ id: key.id, userId: user.id, key: key.key });
 }
 
 /** The private networks as stored. */

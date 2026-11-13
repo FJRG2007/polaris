@@ -9,6 +9,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { listApiKeys } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
 import { ApiKeysView } from "./api-keys-view";
+import { Messages } from "@/components/i18n/messages";
+import { VpnDeviceKeys } from "@/components/vpn/device-keys";
 import { isClientKey } from "@/lib/vault/client-key";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +40,9 @@ export default async function ApiKeysPage() {
                 <p className="text-sm text-muted-foreground">{t("apiKeys.page.intro")}</p>
             </div>
             <ApiKeysView keys={keys} />
+            <Messages namespaces={["vpn"]}>
+                <VpnDeviceKeys />
+            </Messages>
         </div>
     );
 }

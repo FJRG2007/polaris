@@ -118,13 +118,8 @@
         "notRunning": "The VPN is not on yet, so no device can be added.",
         "openOverview": "Open the Overview",
         "platformTitle": "Your device",
-        "copyCommand": "Copy command",
         "keyTitle": "A key for a server, router or TV",
         "keyBody": "For a device that cannot open a browser to sign in. The key adds one device to your account and stops working after an hour.",
-        "createKey": "Create a key",
-        "anotherKey": "Create another key",
-        "copyKey": "Copy the key",
-        "keyExpires": "Works until {time}, for one device.",
         "windows": {
             "name": "Windows",
             "step1": "Install Tailscale for Windows from tailscale.com/download.",
@@ -168,8 +163,8 @@
         },
         "router": {
             "name": "Router or server",
-            "step1": "Install Tailscale on it: most routers that run OpenWrt, pfSense or OPNsense offer it as a package.",
-            "step2": "Create a key below and run the command with it on the device. It joins your devices with no browser."
+            "step1": "Install the Tailscale app on it, the client this VPN uses. Most routers with OpenWrt, pfSense or OPNsense offer it as a package.",
+            "step2": "Create a key below. The command that connects it appears with the key."
         },
         "join": "Join this network",
         "joined": "This computer joined the network.",
@@ -449,5 +444,27 @@
         "mapHint": "Or press a country on the map.",
         "automatic": "Use its address",
         "close": "Close"
+    },
+    "keys": {
+        "title": "VPN device keys",
+        "intro": "One-time keys that add a router, server or TV to your VPN.",
+        "empty": "No device keys yet.",
+        "state": {
+            "unused": "Unused",
+            "used": "Used",
+            "expired": "Expired"
+        },
+        "created": "Made {date}",
+        "expires": "Ends {date}",
+        "revoke": "Revoke",
+        "revokeTitle": "Revoke this key?",
+        "revokeBody": "No new device can join with it. Devices already added stay connected.",
+        "create": "Create a key",
+        "another": "Create another key",
+        "copyKey": "Copy the key",
+        "expiresAt": "Works until {time}, for one device.",
+        "commandHint": "Run this on the router or server to connect it to your VPN.",
+        "copyCommand": "Copy command",
+        "manage": "See and revoke keys"
     }
 }

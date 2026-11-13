@@ -592,6 +592,12 @@
                 "client": "Error cliente",
                 "server": "Error servidor"
             }
+        },
+        "kind": {
+            "label": "Tipo",
+            "api": "Clave API",
+            "vpn": "Equipo VPN",
+            "vpnHint": "Une un router, servidor o TV a tu VPN, una vez, en una hora."
         }
     },
     "connections": {

@@ -9,7 +9,9 @@
  * the operator's own to run.
  *
  * A device that cannot open a browser to sign in - a server, a router, a TV
- * without a keyboard - takes a one-time key instead, made here for an hour.
+ * without a keyboard - takes a one-time key instead, made here for an hour and
+ * listed in Account > API keys, where it can be revoked. Only a router or
+ * server is shown the command, filled in with the key once there is one.
  *
  * The platform list is a radio group of buttons, so it moves with the arrow
  * keys and a TV remote's D-pad as well as a pointer.
@@ -21,7 +23,8 @@ import * as actions from "../actions";
 import { QRCodeSVG } from "qrcode.react";
 import { useVpnRead } from "../use-vpn-read";
 import { desktopBridge } from "@/lib/desktop-bridge";
-import { KeyRound, Loader2, Network } from "lucide-react";
+import { Loader2, Network } from "lucide-react";
+import { VpnKeyCreator } from "@/components/vpn/device-keys";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRef, useState, useTransition, type KeyboardEvent } from "react";
 
@@ -51,13 +54,6 @@ const STEPS: Record<Platform, number> = {
 
 const COMPUTERS: ReadonlySet<Platform> = new Set(["windows", "macos", "linux"]);
 
-/** The command a platform's guide shows, with the login server filled in. */
-function commandFor(platform: Platform, server: string, key: string | null): string | null {
-    if (platform === "router")
-        return `tailscale up --login-server=${server} --authkey=${key ?? "<key>"}`;
-    return null;
-}
-
 export function AddDeviceSection() {
     const t = useTranslations("vpn");
     const read = useVpnRead<actions.VpnOverview>(
@@ -66,8 +62,7 @@ export function AddDeviceSection() {
         t("errors.generic")
     );
     const [platform, setPlatform] = useState<Platform>("windows");
-    const [key, setKey] = useState<{ key: string; expiresAt: string } | null>(null);
-    const [keyError, setKeyError] = useState<string | null>(null);
+    const [joinError, setJoinError] = useState<string | null>(null);
     const [joined, setJoined] = useState(false);
     const [pending, startTransition] = useTransition();
     const tabs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -88,34 +83,22 @@ export function AddDeviceSection() {
         tabs.current[next]?.focus();
     }
 
-    function createKey(): void {
-        setKeyError(null);
-        startTransition(async () => {
-            const result = await actions
-                .createVpnKeyAction()
-                .catch(() => ({ error: t("errors.generic") }));
-            if (result.error !== undefined) setKeyError(result.error);
-            else setKey({ key: result.key, expiresAt: result.expiresAt });
-        });
-    }
-
     function join(target: string): void {
         const vpn = desktopBridge()?.vpn;
         if (!vpn) return;
-        setKeyError(null);
+        setJoinError(null);
         setJoined(false);
         startTransition(async () => {
             const made = await actions
                 .createVpnKeyAction()
                 .catch(() => ({ error: t("errors.generic") }));
-            if (made.error !== undefined) return setKeyError(made.error);
+            if (made.error !== undefined) return setJoinError(made.error);
             const outcome = await vpn.joinNetwork({ server: target, key: made.key });
             if (outcome.ok) setJoined(true);
-            else setKeyError(t(outcome.error === "noClient" ? "add.noClient" : "add.joinFailed"));
+            else setJoinError(t(outcome.error === "noClient" ? "add.noClient" : "add.joinFailed"));
         });
     }
 
-    const command = server ? commandFor(platform, server, key?.key ?? null) : null;
     const canJoin = COMPUTERS.has(platform) && desktopBridge()?.vpn && server;
 
     return (
@@ -225,16 +208,10 @@ export function AddDeviceSection() {
                             ) : null}
                         </div>
                     ) : null}
-                    {command ? (
-                        <div className="flex min-w-0 items-center gap-2 rounded-md bg-muted px-3 py-2">
-                            <code
-                                className="min-w-0 flex-1 truncate font-mono text-xs"
-                                title={command}
-                            >
-                                {command}
-                            </code>
-                            <ui.CopyButton value={command} label={t("add.copyCommand")} />
-                        </div>
+                    {joinError ? (
+                        <p role="alert" className="text-sm text-danger">
+                            {joinError}
+                        </p>
                     ) : null}
                 </ui.CardBody>
             </ui.Card>
@@ -245,39 +222,10 @@ export function AddDeviceSection() {
                 </ui.CardHeader>
                 <ui.CardBody className="flex flex-col items-start gap-3">
                     <p className="text-sm text-muted-foreground">{t("add.keyBody")}</p>
-                    {key ? (
-                        <div className="flex w-full min-w-0 flex-col gap-1">
-                            <div className="flex min-w-0 items-center gap-2 rounded-md bg-muted px-3 py-2">
-                                <code
-                                    className="min-w-0 flex-1 truncate font-mono text-xs"
-                                    title={key.key}
-                                >
-                                    {key.key}
-                                </code>
-                                <ui.CopyButton value={key.key} label={t("add.copyKey")} />
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                {t("add.keyExpires", {
-                                    time: new Date(key.expiresAt).toLocaleTimeString()
-                                })}
-                            </p>
-                        </div>
-                    ) : null}
-                    <ui.Button
-                        size="sm"
-                        variant="outline"
-                        disabled={pending || status?.state !== "running"}
-                        title={status?.state !== "running" ? t("add.notRunning") : undefined}
-                        onClick={createKey}
-                    >
-                        {pending ? <Loader2 className="animate-spin" /> : <KeyRound />}
-                        {key ? t("add.anotherKey") : t("add.createKey")}
-                    </ui.Button>
-                    {keyError ? (
-                        <p role="alert" className="text-sm text-danger">
-                            {keyError}
-                        </p>
-                    ) : null}
+                    <VpnKeyCreator
+                        withCommand={platform === "router"}
+                        disabledReason={status?.state === "running" ? null : t("add.notRunning")}
+                    />
                 </ui.CardBody>
             </ui.Card>
         </div>

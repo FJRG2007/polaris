@@ -258,7 +258,9 @@ export async function setVpnDeviceRoutesAction(
 }
 
 /** A one-time key for a device that cannot open a browser to sign in. */
-export async function createVpnKeyAction(): Promise<Result<{ key: string; expiresAt: string }>> {
+export async function createVpnKeyAction(): Promise<
+    Result<{ key: string; expiresAt: string; loginServer: string | null }>
+> {
     const user = await requireUser();
     try {
         return await vpn.createDeviceKey({
@@ -267,6 +269,45 @@ export async function createVpnKeyAction(): Promise<Result<{ key: string; expire
             email: user.email,
             isAdmin: user.isAdmin
         });
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** The reader's device keys; `keys` is null when the VPN is off or they may not
+ *  join it, and the account screen then leaves the section out. */
+export async function listVpnKeysAction(): Promise<Result<{ keys: vpn.DeviceKey[] | null }>> {
+    const user = await requireUser();
+    try {
+        return {
+            keys: await vpn.listDeviceKeys({
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                isAdmin: user.isAdmin
+            })
+        };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Revoke one of the reader's device keys on the control server. */
+export async function revokeVpnKeyAction(input: unknown): Promise<Result> {
+    const user = await requireUser();
+    try {
+        const { keyId } = z.object({ keyId: nodeIdSchema }).parse(input);
+        await vpn.revokeDeviceKey(
+            { id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin },
+            keyId
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "vpn.key.revoke",
+            targetType: "vpnKey",
+            targetId: keyId
+        });
+        return {};
     } catch (error) {
         return failed(error);
     }
