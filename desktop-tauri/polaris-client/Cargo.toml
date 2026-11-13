@@ -1,0 +1,22 @@
+[package]
+name = "polaris-client"
+version = "0.1.0"
+description = "Talking to a Polaris instance from a native client: addresses, identity probe and the API-key calls."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+reqwest = { version = "=0.13.5", default-features = false, features = ["rustls", "json"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+thiserror = "=2.0.21"
+tokio = { version = "=1.54.1", features = ["time"] }
+url = "=2.5.8"
+
+[dev-dependencies]
+tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread"] }
+wiremock = "=0.6.5"

@@ -1,0 +1,19 @@
+# The Tauri desktop beta and the client core it shares.
+#
+# Its own workspace, not a member of the root one: the root workspace is what
+# `.github/workflows/ci.yml` lints and tests (`cargo clippy --all-targets`,
+# `cargo test --all`) and what `dashboard-publish.yml` rebuilds the host daemon
+# for when `Cargo.toml`/`Cargo.lock` change. A Tauri app there would add a
+# WebView toolchain and minutes to every one of those runs. No workflow builds
+# this directory (see docs/desktop-tauri-parity.md).
+[workspace]
+resolver = "2"
+members = ["polaris-client", "src-tauri"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.90"
+license = "AGPL-3.0-only"
+repository = "https://github.com/FJRG2007/polaris"
+authors = ["FJRG2007"]
+publish = false

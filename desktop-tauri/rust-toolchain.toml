@@ -1,0 +1,5 @@
+# Overrides the root toolchain file, whose musl targets are for the host daemon's
+# cross builds and are not needed for a desktop app.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]

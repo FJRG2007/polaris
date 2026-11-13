@@ -1,0 +1,7 @@
+{
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "local",
+    "description": "The app's own first-run page. No `remote` entry: a Polaris loaded in the window gets no access to the app.",
+    "windows": ["main"],
+    "permissions": ["core:default"]
+}

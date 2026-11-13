@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Polaris Beta</title>
+        <link rel="stylesheet" href="styles.css" />
+        <script src="main.js" defer></script>
+    </head>
+    <body>
+        <main>
+            <h1>Open your Polaris</h1>
+            <form id="connect" novalidate>
+                <label for="address">Address</label>
+                <input id="address" name="address" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://polaris.example.com" required autofocus />
+                <p id="problem" role="alert" hidden></p>
+                <button id="open" type="submit">Open</button>
+            </form>
+        </main>
+    </body>
+</html>

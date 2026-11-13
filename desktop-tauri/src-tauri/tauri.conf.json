@@ -1,0 +1,27 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "productName": "Polaris Beta",
+    "version": "0.0.1",
+    "identifier": "io.github.fjrg2007.polaris.beta",
+    "build": {
+        "frontendDist": "../ui"
+    },
+    "app": {
+        "withGlobalTauri": true,
+        "windows": [],
+        "security": {
+            "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
+        }
+    },
+    "bundle": {
+        "active": false,
+        "icon": ["icons/icon.png", "icons/icon.ico"]
+    },
+    "plugins": {
+        "deep-link": {
+            "desktop": {
+                "schemes": ["polaris"]
+            }
+        }
+    }
+}
