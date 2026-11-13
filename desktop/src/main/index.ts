@@ -41,7 +41,7 @@ import { installScreenShare } from "./screen-share";
 import { installTray } from "./tray";
 import { appItems, hideMenuBar, installMenu, type MenuActions, type MenuUpdate } from "./menu";
 import { serverAddressSchema } from "@/shared/server-address";
-import { listServers, normalizeServerName, renameServer, sameInstanceWords, SERVER_NAME_MAX, withoutServer } from "@/shared/servers";
+import { describeServer, listServers, normalizeServerName, renameServer, replaceServer, sameInstanceWords, SERVER_NAME_MAX, withoutServer } from "@/shared/servers";
 import { setOpenAtLogin, startedAtLogin } from "./login-item";
 import { restoredPlace } from "@/shared/window-place";
 import * as settings from "./settings";
@@ -527,16 +527,44 @@ async function connectSubmit(raw: unknown, typedName = ""): Promise<Outcome> {
     const problem = await probe(origin);
     if (problem) return { ok: false, error: problem };
 
-    const changed = origin !== current;
     setServerAddress(origin);
     if (name) setSavedServers(renameServer(savedServers(), origin, name));
-    if (changed) leaveServer();
+    openServer(origin);
+    return { ok: true };
+}
+
+/** Put the windows on a server already kept as the one in use. */
+function openServer(origin: string): void {
+    if (origin !== current) leaveServer();
     dropAlternate();
     current = origin;
     loadError = null;
     refreshMenu();
     showPolaris();
     closeConnect();
+}
+
+/** A row edited: its name, and its address if that changed. A new address must be
+ *  a Polaris and not already listed; the host in use moves its windows with it. */
+async function editServer(origin: string, typed: string, typedName: string): Promise<Outcome> {
+    const saved = savedServers();
+    if (!saved.some((server) => server.origin === origin)) return { ok: false, error: "That host is not on the list any more." };
+    const parsed = serverAddressSchema.safeParse(typed);
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "That is not an address." };
+    const next = parsed.data;
+    if (next === origin) return nameServer(origin, typedName);
+    const name = normalizeServerName(typedName);
+    if (name && name.length > SERVER_NAME_MAX) return { ok: false, error: `Use at most ${SERVER_NAME_MAX} characters.` };
+    const taken = servers().find((server) => server.origin === next);
+    if (taken) return { ok: false, error: `Already on your list as ${describeServer(taken)}.` };
+    const problem = await probe(next);
+    if (problem) return { ok: false, error: problem };
+    const inUse = origin === current;
+    // The address in use first, so the list kept next never puts the old one back.
+    if (inUse) setServerAddress(next);
+    setSavedServers(replaceServer(savedServers(), origin, next, name));
+    if (inUse) openServer(next);
+    else refreshMenu();
     return { ok: true };
 }
 
@@ -722,6 +750,7 @@ function start(): void {
             connectCheck,
             switchServer,
             nameServer,
+            editServer,
             removeServer,
             hosts: {
                 copy: () => hostTransfer.copyHosts(hostStore),

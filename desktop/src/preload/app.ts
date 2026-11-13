@@ -9,6 +9,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import { followTitleBarColors } from "@/shared/title-bar";
+import { reportTextSize } from "./text-size";
 import { readUpdateReady } from "@/shared/update-ready";
 import { readUpdateCheck } from "@/shared/update-check";
 import type { CallHotkey } from "@/shared/call-hotkeys";
@@ -133,3 +134,4 @@ const bridge: PolarisDesktop = {
 contextBridge.exposeInMainWorld("polarisDesktop", bridge);
 
 followTitleBarColors((colors) => void ipcRenderer.invoke(CHANNELS.titleBarColors, colors));
+reportTextSize((raw) => void ipcRenderer.invoke(CHANNELS.textSizeSeen, raw));

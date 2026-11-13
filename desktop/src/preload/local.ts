@@ -10,6 +10,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { readUpdateCheck } from "@/shared/update-check";
 import type { StrokeInput } from "@/shared/annotate";
 import type { WidgetView } from "@/shared/voice-widget";
+import { applyTextSize } from "./text-size";
 import { CHANNELS, type PolarisLocal, type PushEvent, type TvInstallState } from "@/shared/bridge";
 
 const bridge: PolarisLocal = {
@@ -19,6 +20,7 @@ const bridge: PolarisLocal = {
         check: (address) => ipcRenderer.invoke(CHANNELS.connectCheck, address),
         switchTo: (origin) => ipcRenderer.invoke(CHANNELS.connectSwitch, origin),
         rename: (origin, name) => ipcRenderer.invoke(CHANNELS.connectRename, { origin, name }),
+        edit: (origin, address, name) => ipcRenderer.invoke(CHANNELS.connectEdit, { origin, address, name }),
         remove: (origin) => ipcRenderer.invoke(CHANNELS.connectRemove, origin),
         copyHosts: () => ipcRenderer.invoke(CHANNELS.connectHostsCopy),
         exportHostsFile: () => ipcRenderer.invoke(CHANNELS.connectHostsExport),
@@ -83,3 +85,11 @@ const bridge: PolarisLocal = {
 };
 
 contextBridge.exposeInMainWorld("polarisLocal", bridge);
+
+// Every window of the app's own reads at the account's text size.
+void ipcRenderer.invoke(CHANNELS.textSize).then((size: unknown) => {
+    if (typeof size === "number") applyTextSize(size);
+}, () => undefined);
+ipcRenderer.on(CHANNELS.textSizeChanged, (_event: unknown, size: unknown) => {
+    if (typeof size === "number") applyTextSize(size);
+});

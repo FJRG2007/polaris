@@ -290,6 +290,8 @@ export interface PolarisLocal {
         /** Open a server from the list. */
         switchTo(origin: string): Promise<Outcome>;
         rename(origin: string, name: string): Promise<Outcome>;
+        /** Change a listed host's address and name together. */
+        edit(origin: string, address: string, name: string): Promise<Outcome>;
         remove(origin: string): Promise<Outcome>;
         /** The program's own settings, kept with the servers. */
         preferences(): Promise<Preferences | null>;
@@ -532,6 +534,9 @@ export const CHANNELS = {
     openServers: "desktop:open-servers",
     openMailDefaults: "desktop:open-mail-defaults",
     appBadge: "desktop:app-badge",
+    textSizeSeen: "desktop:text-size-seen",
+    textSize: "local:text-size",
+    textSizeChanged: "local:text-size-changed",
     shareSources: "desktop:share-sources",
     chooseShare: "desktop:choose-share",
     drawOnShare: "desktop:draw-on-share",
@@ -559,6 +564,7 @@ export const CHANNELS = {
     connectRelaunch: "local:connect-relaunch",
     connectSwitch: "local:connect-switch",
     connectRename: "local:connect-rename",
+    connectEdit: "local:connect-edit",
     connectRemove: "local:connect-remove",
     connectHostsCopy: "local:connect-hosts-copy",
     connectHostsExport: "local:connect-hosts-export",

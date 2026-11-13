@@ -29,17 +29,25 @@
         <p id="failure" class="banner bad" role="alert" hidden></p>
         <section id="servers-page" role="tabpanel">
             <ul id="server-list" class="server-list" aria-label="Your hosts" hidden></ul>
-            <button id="show-add" class="ghost" type="button" hidden>Add a host</button>
+            <button id="show-add" class="ghost with-icon" type="button" hidden><span data-icon="plus"></span>Add a host</button>
             <section class="transfer" aria-labelledby="transfer-title">
-                <p id="transfer-title" class="name">Move your hosts</p>
-                <p class="hint">To another computer or phone. Only the addresses and names travel, never a sign-in.</p>
-                <div class="row">
-                    <button id="hosts-qr" type="button" data-needs-hosts>Show QR</button>
-                    <button id="hosts-scan" type="button">Scan QR</button>
-                    <button id="hosts-copy" type="button" data-needs-hosts>Copy code</button>
-                    <button id="hosts-paste" type="button">Paste code</button>
-                    <button id="hosts-export" type="button" data-needs-hosts>Export file</button>
-                    <button id="hosts-import" type="button">Import file</button>
+                <p id="transfer-title" class="section-title">Move your hosts</p>
+                <p class="hint">Only addresses and names travel, never a sign-in.</p>
+                <div class="tiles">
+                    <button id="hosts-send" class="tile" type="button" data-needs-hosts>
+                        <span class="tile-icon" data-icon="send"></span>
+                        <span class="tile-text">
+                            <span class="name">Send to another device</span>
+                            <span class="hint">QR code, code or file</span>
+                        </span>
+                    </button>
+                    <button id="hosts-receive" class="tile" type="button">
+                        <span class="tile-icon" data-icon="receive"></span>
+                        <span class="tile-text">
+                            <span class="name">Receive from another device</span>
+                            <span class="hint">Scan, paste or open a file</span>
+                        </span>
+                    </button>
                 </div>
                 <p id="transfer-note" class="hint" role="status" aria-live="polite" hidden></p>
             </section>
@@ -128,31 +136,40 @@
             </div>
         </section>
         </div>
-        <dialog id="qr-dialog" class="wide" aria-labelledby="qr-title">
-            <p id="qr-title" class="name">Scan with the other device</p>
-            <p class="hint">Open Polaris there, then Hosts &gt; Scan QR.</p>
+        <dialog id="send-dialog" class="wide" aria-labelledby="send-title">
+            <p id="send-title" class="name">Send your hosts</p>
+            <p class="hint">On the other device, open Polaris and choose Receive from another device.</p>
             <svg id="qr-code" class="qr" role="img" aria-label="QR code of your hosts"></svg>
-            <p id="qr-too-long" class="hint" hidden>Too many hosts for one QR. Use Copy code or Export file instead.</p>
+            <p id="qr-too-long" class="banner" hidden>Too many hosts for one QR code. Copy the code or save a file instead.</p>
+            <p class="divider"><span>or</span></p>
+            <div class="alts">
+                <button id="hosts-copy" type="button"><span data-icon="copy"></span>Copy code</button>
+                <button id="hosts-export" type="button"><span data-icon="save"></span>Save as file</button>
+            </div>
+            <p id="send-note" class="hint" role="status" aria-live="polite" hidden></p>
             <div class="row end">
-                <button id="qr-close" class="primary" type="button">Done</button>
+                <button id="send-close" class="primary" type="button">Done</button>
             </div>
         </dialog>
-        <dialog id="scan-dialog" class="wide" aria-labelledby="scan-title">
-            <p id="scan-title" class="name">Scan a QR of hosts</p>
-            <p id="scan-note" class="hint" role="status" aria-live="polite">Hold the other device's QR up to the camera.</p>
-            <video id="scan-video" class="scan" muted playsinline></video>
-            <div class="row end">
-                <button id="scan-cancel" class="ghost" type="button">Cancel</button>
+        <dialog id="receive-dialog" class="wide" aria-labelledby="receive-title">
+            <p id="receive-title" class="name">Receive hosts</p>
+            <div id="receive-scan">
+                <p id="scan-note" class="hint" role="status" aria-live="polite">Hold the other device's QR code up to the camera.</p>
+                <video id="scan-video" class="scan" muted playsinline></video>
             </div>
-        </dialog>
-        <dialog id="paste-dialog" class="wide" aria-labelledby="paste-title">
-            <p id="paste-title" class="name">Paste a code of hosts</p>
-            <p class="hint">The code starts with polaris-hosts: and comes from Copy code on the other device.</p>
-            <textarea id="paste-text" rows="4" spellcheck="false" aria-labelledby="paste-title"></textarea>
-            <p id="paste-error" class="hint error" role="alert" hidden></p>
+            <div id="receive-paste" hidden>
+                <p class="hint">Paste the code from Copy code on the other device.</p>
+                <textarea id="paste-text" rows="4" spellcheck="false" placeholder="polaris-hosts:..." aria-label="Code of hosts"></textarea>
+                <p id="paste-error" class="error" role="alert" hidden></p>
+            </div>
+            <p class="divider"><span>or</span></p>
+            <div class="alts">
+                <button id="receive-mode" type="button"><span data-icon="paste"></span><span id="receive-mode-label">Paste a code</span></button>
+                <button id="hosts-import" type="button"><span data-icon="open"></span>Open a file</button>
+            </div>
             <div class="row end">
-                <button id="paste-cancel" class="ghost" type="button">Cancel</button>
-                <button id="paste-confirm" class="primary" type="button" aria-disabled="true">Import</button>
+                <button id="receive-cancel" class="ghost" type="button">Cancel</button>
+                <button id="paste-confirm" class="primary" type="button" aria-disabled="true" hidden>Import</button>
             </div>
         </dialog>
         <dialog id="confirm-remove" aria-labelledby="remove-title" aria-describedby="remove-body">

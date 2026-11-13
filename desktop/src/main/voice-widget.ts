@@ -14,6 +14,7 @@
 
 import * as settings from "./settings";
 import { CHANNELS } from "@/shared/bridge";
+import { textScale } from "@/shared/text-size";
 import { holdGlobalKey } from "./call-hotkeys";
 import { openVoiceWidgetWindow } from "./windows";
 import { screen, type BrowserWindow, type WebContents } from "electron";
@@ -126,9 +127,15 @@ function startPoint(height: number): { x: number; y: number; } {
     return { x: workArea.x + MARGIN, y: workArea.y + MARGIN };
 }
 
+/** The widget's size, grown with the account's text size: its page is drawn in rem. */
+function size(people: number, open: boolean): { width: number; height: number; } {
+    const scale = textScale(settings.textSize());
+    return { width: Math.round(WIDGET_WIDTH * scale), height: Math.round(widgetHeight(people, open) * scale) };
+}
+
 function open(): NonNullable<typeof widget> {
-    const height = widgetHeight(state?.participants.length ?? 0, false);
-    const window = openVoiceWidgetWindow({ ...startPoint(height), width: WIDGET_WIDTH, height });
+    const { width, height } = size(state?.participants.length ?? 0, false);
+    const window = openVoiceWidgetWindow({ ...startPoint(height), width, height });
     const opened = { window, ready: false };
     window.webContents.once("did-finish-load", () => {
         opened.ready = true;
@@ -176,14 +183,17 @@ function toggleLock(): void {
     draw();
 }
 
+/** The account's text size changed: the widget takes its new size at once. */
+export function followTextSize(): void {
+    draw();
+}
+
 function draw(): void {
     if (!widget || widget.window.isDestroyed() || !state) return;
     const { window } = widget;
     const bounds = window.getBounds();
-    const height = widgetHeight(state.participants.length, unlocked);
-    if (bounds.height !== height || bounds.width !== WIDGET_WIDTH) {
-        window.setBounds({ x: bounds.x, y: bounds.y, width: WIDGET_WIDTH, height });
-    }
+    const { width, height } = size(state.participants.length, unlocked);
+    if (bounds.height !== height || bounds.width !== width) window.setBounds({ x: bounds.x, y: bounds.y, width, height });
     if (!widget.ready) return;
     const view: WidgetView = { state, unlocked, lockKey: lockLabel };
     window.webContents.send(CHANNELS.widgetView, view);

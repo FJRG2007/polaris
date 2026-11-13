@@ -15,9 +15,11 @@ vi.mock("electron", () => ({ app: { getPath: () => folder.path } }));
 const {
     hardwareAcceleration,
     rememberHardwareAcceleration,
+    rememberTextSize,
     rememberToggle,
     serverAddress,
     setUpdateAttempted,
+    textSize,
     toggle,
     updateAttempted
 } = await import("@/main/settings");
@@ -87,5 +89,29 @@ describe("the version last restarted into", () => {
     it("falls back to none when the file holds something else", () => {
         writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ updateAttempted: 3 }));
         expect(updateAttempted()).toBeNull();
+    });
+});
+
+describe("the account's text size", () => {
+    it("is the dashboard default before any was seen, and a file from before it still reads", () => {
+        const origin = "https://polaris.example.test";
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ server: origin, servers: [], pushes: {} }));
+        expect(textSize()).toBe(16);
+        expect(serverAddress()).toBe(origin);
+    });
+
+    it("keeps a size once and reports only a change", () => {
+        expect(rememberTextSize(20)).toBe(true);
+        expect(textSize()).toBe(20);
+        expect(rememberTextSize(20)).toBe(false);
+        expect(rememberTextSize(14)).toBe(true);
+        expect(textSize()).toBe(14);
+    });
+
+    it("reads a size stored as the root element carries it, and ignores one not offered", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ textSize: "18px" }));
+        expect(textSize()).toBe(18);
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ textSize: 17 }));
+        expect(textSize()).toBe(16);
     });
 });

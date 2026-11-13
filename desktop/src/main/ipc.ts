@@ -15,7 +15,9 @@ import { chooseShare, endShare, listShareSources, SOURCE_ID } from "./screen-sha
 import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
 import { strokeSchema } from "@/shared/annotate";
 import { setCallHotkeys } from "./call-hotkeys";
-import { setVoiceState, voiceWidgetAction } from "./voice-widget";
+import { followTextSize as followWidgetTextSize, setVoiceState, voiceWidgetAction } from "./voice-widget";
+import { rememberTextSize, textSize } from "./settings";
+import { readTextSize } from "@/shared/text-size";
 import { voiceActionSchema, voiceStateSchema } from "@/shared/voice-widget";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
 import { closeNotice, showNotice } from "./notices";
@@ -56,7 +58,8 @@ import {
     shell,
     type IpcMainInvokeEvent,
     type NativeImage,
-    type WebContents
+    type WebContents,
+    webContents
 } from "electron";
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
 
@@ -79,6 +82,8 @@ export interface IpcHost extends PushHost {
     readonly connectCheck: (raw: unknown) => Promise<AddressCheck>;
     readonly switchServer: (origin: string) => Promise<Outcome>;
     readonly nameServer: (origin: string, name: string) => Outcome;
+    /** Give a listed host another address and name; a new address is checked first. */
+    readonly editServer: (origin: string, address: string, name: string) => Promise<Outcome>;
     readonly removeServer: (origin: string) => Outcome;
     /** Moving the list of hosts to and from another device. */
     readonly hosts: {
@@ -335,6 +340,22 @@ export function registerIpc(host: IpcHost): void {
         return { ok: true };
     });
 
+    // The account's text size, seen in the Polaris window and kept, so the app's
+    // own windows read at it - including those opened signed out or offline.
+    ipcMain.handle(CHANNELS.textSizeSeen, (event, raw: unknown): boolean => {
+        const size = readTextSize(raw);
+        if (!fromPolaris(event) || size === null) return false;
+        if (!rememberTextSize(size)) return true;
+        for (const contents of webContents.getAllWebContents()) {
+            const kind = kindOf(contents);
+            if (kind && kind !== "polaris" && !contents.isDestroyed()) contents.send(CHANNELS.textSizeChanged, size);
+        }
+        followWidgetTextSize();
+        return true;
+    });
+    // Asked by every page of the app's own as it loads; the size is no secret.
+    ipcMain.handle(CHANNELS.textSize, () => textSize());
+
     // The window that asked is the one whose taskbar button carries it.
     ipcMain.handle(CHANNELS.appBadge, (event, raw: unknown): boolean => {
         if (!fromPolaris(event)) return false;
@@ -555,6 +576,12 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.connectRename, (event, raw: unknown) => {
         const input = z.object({ origin: listedSchema, name: z.string().max(200) }).safeParse(raw);
         return from(event, "connect") && input.success ? host.nameServer(input.data.origin, input.data.name) : REFUSED;
+    });
+    ipcMain.handle(CHANNELS.connectEdit, (event, raw: unknown) => {
+        const input = z.object({ origin: listedSchema, address: z.string().max(2048), name: z.string().max(200) }).safeParse(raw);
+        return from(event, "connect") && input.success
+            ? host.editServer(input.data.origin, input.data.address, input.data.name)
+            : REFUSED;
     });
     ipcMain.handle(CHANNELS.connectPreferences, (event) => (from(event, "connect") ? host.preferences() : null));
     ipcMain.handle(CHANNELS.connectOpenAtLogin, (event, raw: unknown): boolean => {

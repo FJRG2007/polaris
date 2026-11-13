@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { readServerAddress } from "@/shared/server-address";
 import type { WindowPlace } from "@/shared/window-place";
 import { readServers, withServer, type SavedServer } from "@/shared/servers";
+import { DEFAULT_TEXT_SIZE, readTextSize, type TextSize } from "@/shared/text-size";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 
 /** A platform `docker build --platform` takes, or "" for this computer's own. */
@@ -60,7 +61,9 @@ const settingsSchema = z.object({
     // Off unless somebody turned it on: the widget only while a game runs.
     voiceWidgetGameOnly: z.boolean().catch(false),
     // Where the widget was dragged to, or null for its corner.
-    voiceWidgetPlace: z.object({ x: z.number().int(), y: z.number().int() }).nullable().catch(null)
+    voiceWidgetPlace: z.object({ x: z.number().int(), y: z.number().int() }).nullable().catch(null),
+    // The account's text size last seen in the Polaris window, or null before one was.
+    textSize: z.unknown().transform(readTextSize).catch(null)
 });
 
 type Settings = z.infer<typeof settingsSchema>;
@@ -77,7 +80,8 @@ const EMPTY: Settings = {
     startMinimized: false,
     voiceWidget: true,
     voiceWidgetGameOnly: false,
-    voiceWidgetPlace: null
+    voiceWidgetPlace: null,
+    textSize: null
 };
 
 function file(): string {
@@ -189,6 +193,19 @@ export function voiceWidgetPlace(): { x: number; y: number } | null {
 
 export function rememberVoiceWidgetPlace(place: { x: number; y: number }): void {
     save({ ...load(), voiceWidgetPlace: place });
+}
+
+/** The account's text size, as last seen in the Polaris window. */
+export function textSize(): TextSize {
+    return load().textSize ?? DEFAULT_TEXT_SIZE;
+}
+
+/** Keep a size seen in the Polaris window. Whether it changed. */
+export function rememberTextSize(size: TextSize): boolean {
+    const settings = load();
+    if (settings.textSize === size) return false;
+    save({ ...settings, textSize: size });
+    return true;
 }
 
 /** What was used the last time this service was pushed from here. */

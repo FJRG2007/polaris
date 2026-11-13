@@ -10,6 +10,7 @@ import {
     normalizeServerName,
     readServers,
     renameServer,
+    replaceServer,
     sameInstanceWords,
     SERVERS_MAX,
     withoutServer,
@@ -67,5 +68,30 @@ describe("sameInstanceWords", () => {
         expect(sameInstanceWords({ name: "Home", host: "polaris.example.com" })).toBe(
             "This is the same Polaris as Home, already on your list."
         );
+    });
+});
+
+describe("replaceServer", () => {
+    const saved = [
+        { origin: "https://a.example.com", name: "A" },
+        { origin: "https://b.example.com", name: null },
+        { origin: "https://c.example.com", name: "C" }
+    ];
+
+    it("moves a server to another address and name where it stood", () => {
+        expect(replaceServer(saved, "https://b.example.com", "https://d.example.com", "D")).toEqual([
+            { origin: "https://a.example.com", name: "A" },
+            { origin: "https://d.example.com", name: "D" },
+            { origin: "https://c.example.com", name: "C" }
+        ]);
+    });
+
+    it("never lists an address twice", () => {
+        const moved = replaceServer(saved, "https://b.example.com", "https://c.example.com", null);
+        expect(moved.map((server) => server.origin)).toEqual(["https://a.example.com", "https://c.example.com"]);
+    });
+
+    it("renames in place when the address stays", () => {
+        expect(replaceServer(saved, "https://a.example.com", "https://a.example.com", "Home")[0]).toEqual({ origin: "https://a.example.com", name: "Home" });
     });
 });

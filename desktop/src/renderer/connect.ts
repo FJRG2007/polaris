@@ -150,6 +150,23 @@ function icon(...paths: string[]): SVGSVGElement {
 const PENCIL = ["M12 20h9", "M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"];
 const BIN = ["M3 6h18", "M8 6V4h8v2", "M19 6l-1 14H6L5 6"];
 
+/** The icons the page names with `data-icon`, drawn once it loads. */
+const ICONS: Record<string, string[]> = {
+    send: ["M14.5 21.7a.5.5 0 0 0 .9 0l6.5-19a.5.5 0 0 0-.6-.6l-19 6.5a.5.5 0 0 0 0 .9l7.9 3.2a2 2 0 0 1 1.1 1.1Z", "m21.9 2.1-11 11"],
+    receive: ["M12 3v12", "m7 10 5 5 5-5", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"],
+    copy: ["M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2Z", "M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"],
+    save: ["M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z", "M14 2v4a2 2 0 0 0 2 2h4", "M12 18v-6", "m9 15 3 3 3-3"],
+    open: ["M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z", "M14 2v4a2 2 0 0 0 2 2h4", "M12 12v6", "m15 15-3-3-3 3"],
+    paste: ["M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z", "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"],
+    scan: ["M3 7V5a2 2 0 0 1 2-2h2", "M17 3h2a2 2 0 0 1 2 2v2", "M21 17v2a2 2 0 0 1-2 2h-2", "M7 21H5a2 2 0 0 1-2-2v-2", "M7 12h10"],
+    plus: ["M12 5v14", "M5 12h14"]
+};
+
+for (const slot of document.querySelectorAll<HTMLElement>("[data-icon]")) {
+    const paths = ICONS[slot.dataset.icon ?? ""];
+    if (paths) slot.replaceChildren(icon(...paths));
+}
+
 function iconButton(label: string, paths: string[], onPress: () => void): HTMLButtonElement {
     const button = document.createElement("button");
     button.type = "button";
@@ -187,6 +204,7 @@ async function act(run: () => Promise<{ ok: boolean; error?: string; }>): Promis
 }
 
 function viewRow(server: ServerRow, row: HTMLLIElement): void {
+    row.classList.remove("editing");
     const label = describeServer(server);
     const open = document.createElement("button");
     open.type = "button";
@@ -217,37 +235,105 @@ function viewRow(server: ServerRow, row: HTMLLIElement): void {
     const acts = document.createElement("div");
     acts.className = "acts";
     acts.append(
-        // A host with no name says so in words: a pencil alone was easy to miss.
-        server.name
-            ? iconButton(`Rename ${label}`, PENCIL, () => editRow(server, row))
-            : textButton("Add a name", () => editRow(server, row)),
+        iconButton(`Edit ${label}`, PENCIL, () => editRow(server, row)),
         iconButton(`Remove ${label}`, BIN, () => askRemove(server))
     );
     row.replaceChildren(open, acts);
 }
 
-/** The row as a name field: Enter or Save keeps it, Escape or Cancel leaves it. */
+/** What an edited row would keep, or why it cannot: the same address schema and
+ *  name normalizer as the form that adds a host. Null when there is nothing to save. */
+function checkEdit(server: ServerRow, address: string, typedName: string): { origin: string; } | { problem: string | null; } {
+    const parsed = serverAddressSchema.safeParse(address);
+    if (!parsed.success) return { problem: address.trim() ? (parsed.error.issues[0]?.message ?? null) : null };
+    const other = rows.find((row) => row.origin === parsed.data && row.origin !== server.origin);
+    if (other) return { problem: `Already on your list as ${describeServer(other)}.` };
+    const unchanged = parsed.data === server.origin && normalizeServerName(typedName) === server.name;
+    return unchanged ? { problem: null } : { origin: parsed.data };
+}
+
+/** The row as its address and name: Enter or Save keeps them, Escape or Cancel leaves it. */
 function editRow(server: ServerRow, row: HTMLLIElement): void {
-    const field = document.createElement("input");
-    field.type = "text";
-    field.value = server.name ?? "";
-    field.placeholder = server.host;
-    field.maxLength = SERVER_NAME_MAX;
-    field.setAttribute("aria-label", `Name for ${server.host}`);
-    const save = () => {
-        const name = normalizeServerName(field.value) ?? "";
-        void act(() => window.polarisLocal.connect.rename(server.origin, name));
+    const editor = document.createElement("form");
+    editor.className = "row-edit";
+    editor.noValidate = true;
+    const field = (text: string, input: HTMLInputElement) => {
+        const label = document.createElement("label");
+        label.className = "field-label";
+        const caption = document.createElement("span");
+        caption.textContent = text;
+        label.append(caption, input);
+        return label;
     };
-    field.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") save();
+    const address = document.createElement("input");
+    address.type = "url";
+    address.inputMode = "url";
+    address.spellcheck = false;
+    address.value = server.origin;
+    address.placeholder = "https://polaris.example.com";
+    const name = document.createElement("input");
+    name.type = "text";
+    name.spellcheck = false;
+    name.value = server.name ?? "";
+    name.placeholder = server.host;
+    name.maxLength = SERVER_NAME_MAX;
+    const message = document.createElement("p");
+    message.className = "hint";
+    message.setAttribute("aria-live", "polite");
+    const quiet = "A new address is checked before it is kept.";
+    message.textContent = quiet;
+    const save = textButton("Save", () => editor.requestSubmit(), true);
+    save.type = "submit";
+    const cancel = textButton("Cancel", () => viewRow(server, row));
+    cancel.classList.add("ghost");
+    const buttons = document.createElement("div");
+    buttons.className = "row end";
+    buttons.append(cancel, save);
+    let saving = false;
+    const update = () => {
+        const verdict = checkEdit(server, address.value, name.value);
+        const problem = "problem" in verdict ? verdict.problem : null;
+        address.setAttribute("aria-invalid", String(Boolean(problem)));
+        message.textContent = problem ?? quiet;
+        message.className = problem ? "error" : "hint";
+        available(save, "origin" in verdict && !saving);
+        return verdict;
+    };
+    address.addEventListener("input", update);
+    name.addEventListener("input", update);
+    editor.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
         // The row's own Escape, not the sheet's.
         event.preventDefault();
         viewRow(server, row);
     });
-    row.replaceChildren(field, textButton("Save", save, true), textButton("Cancel", () => viewRow(server, row)));
-    field.focus();
-    field.select();
+    editor.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const verdict = update();
+        if (saving || !("origin" in verdict)) return;
+        saving = true;
+        available(save, false);
+        if (verdict.origin !== server.origin) message.textContent = `Checking ${new URL(verdict.origin).host}...`;
+        void window.polarisLocal.connect
+            .edit(server.origin, address.value, normalizeServerName(name.value) ?? "")
+            .catch(() => ({ ok: false, error: "Something went wrong. Try again." }))
+            .then(async (outcome) => {
+                saving = false;
+                if (!outcome.ok) {
+                    update();
+                    message.textContent = outcome.error ?? "Something went wrong. Try again.";
+                    message.className = "error";
+                    return;
+                }
+                await refresh();
+            });
+    });
+    editor.append(field("Address *", address), field("Name", name), message, buttons);
+    row.classList.add("editing");
+    row.replaceChildren(editor);
+    available(save, false);
+    name.focus();
+    name.select();
 }
 
 /** Asked first and named, as in the extension. Cancel has the focus. */
@@ -327,11 +413,15 @@ if (new URLSearchParams(location.search).has("sheet")) {
 // ---- Moving the list to and from another device ----
 
 const transferNote = byId<HTMLParagraphElement>("transfer-note");
-const qrDialog = byId<HTMLDialogElement>("qr-dialog");
-const scanDialog = byId<HTMLDialogElement>("scan-dialog");
+const sendDialog = byId<HTMLDialogElement>("send-dialog");
+const sendNote = byId<HTMLParagraphElement>("send-note");
+const receiveDialog = byId<HTMLDialogElement>("receive-dialog");
+const receiveScan = byId<HTMLElement>("receive-scan");
+const receivePaste = byId<HTMLElement>("receive-paste");
+const receiveModeLabel = byId<HTMLSpanElement>("receive-mode-label");
+const receiveModeIcon = byId<HTMLButtonElement>("receive-mode").querySelector<HTMLElement>("[data-icon]");
 const scanVideo = byId<HTMLVideoElement>("scan-video");
 const scanNote = byId<HTMLParagraphElement>("scan-note");
-const pasteDialog = byId<HTMLDialogElement>("paste-dialog");
 const pasteText = byId<HTMLTextAreaElement>("paste-text");
 const pasteError = byId<HTMLParagraphElement>("paste-error");
 const pasteConfirm = byId<HTMLButtonElement>("paste-confirm");
@@ -355,7 +445,10 @@ async function afterImport(outcome: HostImport): Promise<void> {
     if (outcome.ok) await refresh();
 }
 
-function showQr(): void {
+/** Send: the QR code first, with the code and the file for when a camera is not at hand. */
+function openSend(): void {
+    say(transferNote, null);
+    say(sendNote, null);
     const modules = encodeQr(encodeHostList(rows));
     const svg = byId<HTMLElement>("qr-code") as unknown as SVGSVGElement;
     byId("qr-too-long").hidden = modules !== null;
@@ -368,18 +461,18 @@ function showQr(): void {
         drawn.setAttribute("fill", "#000000");
         svg.replaceChildren(drawn);
     }
-    qrDialog.showModal();
+    sendDialog.showModal();
+    byId<HTMLButtonElement>("send-close").focus();
 }
 
 let scanStream: MediaStream | null = null;
 let scanFrame = 0;
 
-function stopScan(): void {
+function stopCamera(): void {
     cancelAnimationFrame(scanFrame);
     for (const track of scanStream?.getTracks() ?? []) track.stop();
     scanStream = null;
     scanVideo.srcObject = null;
-    if (scanDialog.open) scanDialog.close();
 }
 
 /** Read frames until one holds a list of hosts; anything else is ignored. */
@@ -394,34 +487,57 @@ function readFrames(canvas: HTMLCanvasElement): void {
             const image = context.getImageData(0, 0, canvas.width, canvas.height);
             const found = jsQR(image.data, image.width, image.height, { inversionAttempts: "dontInvert" });
             if (found?.data.startsWith(HOST_LIST_PREFIX)) {
-                stopScan();
+                receiveDialog.close();
                 void window.polarisLocal.connect.importHosts(found.data).then(afterImport, () => undefined);
                 return;
             }
-            if (found) say(scanNote, "That QR is not a list of Polaris hosts.");
+            if (found) say(scanNote, "That QR code is not a list of Polaris hosts.");
         }
         scanFrame = requestAnimationFrame(frame);
     };
     scanFrame = requestAnimationFrame(frame);
 }
 
-async function startScan(): Promise<void> {
-    say(transferNote, null);
-    say(scanNote, "Hold the other device's QR up to the camera.");
-    scanDialog.showModal();
+async function startCamera(): Promise<void> {
+    say(scanNote, "Hold the other device's QR code up to the camera.");
+    let stream: MediaStream;
     try {
-        scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
     } catch {
-        say(scanNote, "Polaris could not use a camera. Check that one is connected and allowed, or use Paste code.");
+        say(scanNote, "Polaris could not use a camera. Paste a code or open a file instead.");
         return;
     }
-    if (!scanDialog.open) {
-        stopScan();
+    // Closed, or switched to pasting, while the camera was being asked for.
+    if (!receiveDialog.open || receiveScan.hidden) {
+        for (const track of stream.getTracks()) track.stop();
         return;
     }
-    scanVideo.srcObject = scanStream;
+    scanStream = stream;
+    scanVideo.srcObject = stream;
     await scanVideo.play().catch(() => undefined);
     readFrames(document.createElement("canvas"));
+}
+
+/** Receive shows one way at a time: the camera, or a field to paste the code in. */
+function receiveMode(pasting: boolean): void {
+    receiveScan.hidden = pasting;
+    receivePaste.hidden = !pasting;
+    pasteConfirm.hidden = !pasting;
+    receiveModeLabel.textContent = pasting ? "Scan a QR code" : "Paste a code";
+    receiveModeIcon?.replaceChildren(icon(...(ICONS[pasting ? "scan" : "paste"] ?? [])));
+    if (pasting) {
+        stopCamera();
+        say(pasteError, null);
+        checkPaste();
+        pasteText.focus();
+    } else void startCamera();
+}
+
+function openReceive(): void {
+    say(transferNote, null);
+    pasteText.value = "";
+    receiveDialog.showModal();
+    receiveMode(false);
 }
 
 function checkPaste(): boolean {
@@ -437,49 +553,43 @@ async function confirmPaste(): Promise<void> {
         say(pasteError, outcome?.error ?? "Something went wrong. Try again.");
         return;
     }
-    pasteDialog.close();
+    receiveDialog.close();
     await afterImport(outcome);
 }
 
-byId("hosts-qr").addEventListener("click", showQr);
-byId("qr-close").addEventListener("click", () => qrDialog.close());
-byId("hosts-scan").addEventListener("click", () => void startScan());
-byId("scan-cancel").addEventListener("click", stopScan);
-scanDialog.addEventListener("close", stopScan);
+byId("hosts-send").addEventListener("click", openSend);
+byId("send-close").addEventListener("click", () => sendDialog.close());
 byId("hosts-copy").addEventListener("click", () => {
     void window.polarisLocal.connect.copyHosts().then(
-        (copied) => say(transferNote, copied.ok ? `Code for ${plural(copied.count, "host", "hosts")} copied. Paste it on the other device.` : "Polaris could not copy the code."),
-        () => say(transferNote, "Polaris could not copy the code.")
+        (copied) => say(sendNote, copied.ok ? `Code for ${plural(copied.count, "host", "hosts")} copied. Paste it on the other device.` : "Polaris could not copy the code."),
+        () => say(sendNote, "Polaris could not copy the code.")
     );
 });
-byId("hosts-paste").addEventListener("click", () => {
-    say(transferNote, null);
-    pasteText.value = "";
-    say(pasteError, null);
-    checkPaste();
-    pasteDialog.showModal();
-    pasteText.focus();
+byId("hosts-export").addEventListener("click", () => {
+    say(sendNote, null);
+    void window.polarisLocal.connect.exportHostsFile().then(
+        (outcome) => say(sendNote, outcome.ok ? "Hosts saved. Open the file on the other device." : outcome.error),
+        () => say(sendNote, "Something went wrong. Try again.")
+    );
 });
+byId("hosts-receive").addEventListener("click", openReceive);
+byId("receive-mode").addEventListener("click", () => receiveMode(receivePaste.hidden));
+byId("receive-cancel").addEventListener("click", () => receiveDialog.close());
+receiveDialog.addEventListener("close", stopCamera);
 pasteText.addEventListener("input", () => {
     say(pasteError, null);
     checkPaste();
 });
-byId("paste-cancel").addEventListener("click", () => pasteDialog.close());
-pasteConfirm.addEventListener("click", () => void confirmPaste());
-byId("hosts-export").addEventListener("click", () => {
-    say(transferNote, null);
-    void window.polarisLocal.connect.exportHostsFile().then(
-        (outcome) => say(transferNote, outcome.ok ? "Hosts exported." : outcome.error),
-        () => say(transferNote, "Something went wrong. Try again.")
-    );
+pasteText.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) void confirmPaste();
 });
+pasteConfirm.addEventListener("click", () => void confirmPaste());
 byId("hosts-import").addEventListener("click", () => {
-    say(transferNote, null);
+    receiveDialog.close();
     void window.polarisLocal.connect.importHostsFile().then(afterImport, () =>
         say(transferNote, "Something went wrong. Try again.")
     );
 });
-
 showAdd.addEventListener("click", () => showForm(true));
 hideAdd.addEventListener("click", () => showForm(false));
 byId("tab-servers").addEventListener("click", () => showPage("servers"));

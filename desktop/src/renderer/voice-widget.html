@@ -15,47 +15,47 @@
                 height: 100%;
                 overflow: hidden;
                 background: transparent;
-                font: 13px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
+                font: 0.8125rem/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
                 color: #f4f4f6;
                 user-select: none;
             }
             #panel {
                 box-sizing: border-box;
                 height: 100%;
-                padding: 8px;
-                border-radius: 10px;
+                padding: 0.5rem;
+                border-radius: 0.625rem;
                 background: rgba(11, 12, 14, 0.55);
                 display: flex;
                 flex-direction: column;
             }
             #panel.unlocked {
                 background: rgba(11, 12, 14, 0.85);
-                outline: 1px dashed rgba(255, 255, 255, 0.35);
-                outline-offset: -1px;
+                outline: 0.0625rem dashed rgba(255, 255, 255, 0.35);
+                outline-offset: -0.0625rem;
                 -webkit-app-region: drag;
             }
             .row {
                 display: flex;
                 align-items: center;
-                gap: 8px;
-                height: 34px;
+                gap: 0.5rem;
+                height: 2.125rem;
                 min-width: 0;
             }
             .face {
                 flex: none;
-                width: 26px;
-                height: 26px;
+                width: 1.625rem;
+                height: 1.625rem;
                 border-radius: 50%;
                 display: grid;
                 place-items: center;
-                font-size: 11px;
+                font-size: 0.6875rem;
                 font-weight: 600;
                 color: #fff;
-                box-shadow: 0 0 0 2px transparent;
+                box-shadow: 0 0 0 0.125rem transparent;
                 transition: box-shadow 80ms linear;
             }
             .face.speaking {
-                box-shadow: 0 0 0 2px #3ba55d;
+                box-shadow: 0 0 0 0.125rem #3ba55d;
             }
             .name {
                 flex: 1 1 auto;
@@ -63,17 +63,17 @@
                 overflow: hidden;
                 white-space: nowrap;
                 text-overflow: ellipsis;
-                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+                text-shadow: 0 0.0625rem 0.125rem rgba(0, 0, 0, 0.8);
             }
             .state {
                 flex: none;
                 display: flex;
-                gap: 2px;
+                gap: 0.125rem;
                 color: #ed4245;
             }
             svg {
-                width: 14px;
-                height: 14px;
+                width: 0.875rem;
+                height: 0.875rem;
                 flex: none;
                 fill: none;
                 stroke: currentColor;
@@ -82,16 +82,16 @@
                 stroke-linejoin: round;
             }
             .more {
-                height: 22px;
-                font-size: 12px;
+                height: 1.375rem;
+                font-size: 0.75rem;
                 opacity: 0.75;
             }
             #controls {
                 display: flex;
                 align-items: center;
-                gap: 6px;
-                height: 44px;
-                padding-top: 6px;
+                gap: 0.375rem;
+                height: 2.75rem;
+                padding-top: 0.375rem;
                 box-sizing: border-box;
             }
             #controls[hidden] {
@@ -101,10 +101,10 @@
                 -webkit-app-region: no-drag;
                 display: grid;
                 place-items: center;
-                width: 32px;
-                height: 32px;
+                width: 2rem;
+                height: 2rem;
                 border: 0;
-                border-radius: 8px;
+                border-radius: 0.5rem;
                 background: rgba(255, 255, 255, 0.12);
                 color: #f4f4f6;
                 cursor: pointer;
@@ -119,14 +119,14 @@
                 background: #da373c;
             }
             button svg {
-                width: 16px;
-                height: 16px;
+                width: 1rem;
+                height: 1rem;
             }
             .hint {
                 flex: 1 1 auto;
                 min-width: 0;
                 text-align: right;
-                font-size: 11px;
+                font-size: 0.6875rem;
                 opacity: 0.7;
                 overflow: hidden;
                 white-space: nowrap;

@@ -64,6 +64,14 @@ export function renameServer(saved: readonly SavedServer[], origin: string, name
     return saved.map((server) => (server.origin === origin ? { origin, name } : server));
 }
 
+/** The list with one server moved to another address and name, where it stood.
+ *  An entry already at the new address is dropped, so it is never listed twice. */
+export function replaceServer(saved: readonly SavedServer[], origin: string, next: string, name: string | null): SavedServer[] {
+    return saved
+        .filter((server) => server.origin !== next || next === origin)
+        .map((server) => (server.origin === origin ? { origin: next, name } : server));
+}
+
 export function withoutServer(saved: readonly SavedServer[], origin: string): SavedServer[] {
     return saved.filter((server) => server.origin !== origin);
 }
