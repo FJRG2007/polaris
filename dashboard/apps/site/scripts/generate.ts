@@ -27,7 +27,13 @@ import { appProvenance } from "@/lib/apps/provenance";
 import { categoryLabel, localizeApp } from "@/lib/apps/app-words";
 import { CAPABILITY_KEYS } from "@/lib/apps/capability-words";
 import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
-import { appPreview, appScreenshots, builtInScenes } from "@/lib/apps/app-screenshots";
+import { APP_CATEGORIES, type AppEntry } from "@/lib/apps";
+import {
+    appPreview,
+    appScreenshots,
+    builtInPreview,
+    builtInScenes
+} from "@/lib/apps/app-screenshots";
 import {
     ADDED_ON,
     builtInApps,
@@ -244,6 +250,8 @@ function storeWords(webLocale: string): site.StoreWords {
         shelves: { polaris: t("view.shelves.polaris"), community: t("view.shelves.community") },
         noMatch: t("view.noMatch"),
         details: t("card.details"),
+        install: t("card.install"),
+        more: t("card.more"),
         comingSoon: t("card.comingSoon"),
         consent: t("card.consent"),
         about: t("detail.about"),
@@ -276,11 +284,23 @@ function localize(sections: site.ShowcaseSection[], locale: "en" | "es"): site.S
  */
 function builtIn(webLocale: string, showcase: site.ShowcaseSection[]): site.BuiltInSiteApp[] {
     const nav = JSON.parse(read(join(web, "messages", webLocale, "nav.json")));
+    const t = translator(messages(webLocale, "marketplace"));
     const items = showcase.flatMap((section) => section.items);
+    const category = (id: string) => {
+        const label = APP_CATEGORIES.find((entry) => entry.id === id)?.label ?? id;
+        return nav.labels?.[label] ?? label;
+    };
     return builtInApps().map((app) => ({
         id: app.id,
         name: nav.labels?.[app.label] ?? app.label,
         description: nav.apps?.[app.id]?.description ?? app.description,
+        categoryLabel: category(app.category),
+        mark: builtInTile(app, 40),
+        markPreview: builtInTile(app, 44),
+        tint: tintFor(app.id),
+        ink: initialsInk(tintFor(app.id)),
+        alt: t("card.preview", { name: nav.labels?.[app.label] ?? app.label }),
+        shot: builtInPreview(app.id, webLocale),
         replaces: appReplaces(app.id)
             .filter((item) => logos.has(`${item.logo}.svg`))
             .map((item) => ({ name: item.name, logo: item.logo })),
@@ -289,6 +309,33 @@ function builtIn(webLocale: string, showcase: site.ShowcaseSection[]): site.Buil
             return listed ? [listed] : captured(scene, webLocale);
         })
     }));
+}
+
+/**
+ * A built-in app's tile for one without a logo of its own - its switcher icon
+ * on its own colour, as the dashboard's `BuiltInMark` falls back to - rendered
+ * here because the icon is a component the page's data cannot carry.
+ */
+function builtInTile(app: AppEntry, size: number): string {
+    const tint = tintFor(app.id);
+    return renderToStaticMarkup(
+        createElement(
+            "span",
+            {
+                className: "grid shrink-0 place-items-center rounded-md",
+                style: {
+                    width: size,
+                    height: size,
+                    backgroundColor: tint,
+                    color: initialsInk(tint)
+                }
+            },
+            createElement(app.icon, {
+                style: { width: size * 0.5, height: size * 0.5 },
+                "aria-hidden": "true"
+            })
+        )
+    );
 }
 
 /** The feature pages under `docs/features`, by language, read once. */
@@ -361,6 +408,8 @@ function builtInWords(webLocale: string): site.BuiltInWords {
     const all = JSON.parse(read(join(web, "messages", webLocale, "marketplace.json")));
     return {
         title: all.polaris.builtIn,
+        badge: all.polaris.builtIn,
+        builtInBy: all.polaris.builtInBy,
         open: all.card.open,
         replaces: all.detail.replaces,
         back: all.detail.back,
@@ -797,7 +846,7 @@ for (const game of data.locales.en.apps.flatMap((app) => app.games)) {
 // The marketplace captures, from the dashboard's own public folder.
 mkdirSync(join(siteDir, "public", "marketplace"), { recursive: true });
 for (const locale of Object.values(data.locales))
-    for (const app of locale.apps)
+    for (const app of [...locale.apps, ...locale.builtIn])
         for (const theme of app.shot ? [app.shot.dark, app.shot.light] : [])
             for (const path of [theme.desktop, theme.mobile])
                 copyFileSync(join(web, "public", path), join(siteDir, "public", path));

@@ -25,7 +25,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowUpCircle, Loader2, Search, Store } from "lucide-react";
+import { ArrowUpCircle, Loader2, Store } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
 import { CAPABILITY_KEYS } from "@/lib/apps/capability-words";
 import { appSettingsHref, builtInSettingsHref } from "@/lib/apps/app-settings";
@@ -86,6 +86,7 @@ import {
     type OverflowEntry
 } from "./store-card";
 import * as store from "@polaris/ui/store-card";
+import { StoreFilters, StoreNoMatch, StoreSection } from "@polaris/ui/store-layout";
 import {
     Badge,
     Button,
@@ -295,49 +296,27 @@ export function MarketplaceView({
         <div className="flex min-w-0 flex-col gap-6">
             {header}
 
-            <div className="flex min-w-0 flex-col gap-3">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <div className="relative min-w-0 flex-1 basis-60 sm:max-w-md">
-                        <Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
-                        <Input
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            placeholder={t("view.search")}
-                            aria-label={t("view.search")}
-                            className="pl-8"
-                        />
-                    </div>
-                    <Select
-                        value={sort}
-                        onValueChange={(value) => setSort(value as StoreSort)}
-                        aria-label={t("view.sortLabel")}
-                        className="w-44"
-                        options={STORE_SORTS.map((value) => ({
-                            value,
-                            label: t(`view.sort.${value}`)
-                        }))}
-                    />
-                </div>
-                <div
-                    role="group"
-                    aria-label={t("view.categories")}
-                    className="flex min-w-0 flex-wrap gap-1.5"
-                >
-                    {(["all", ...categories] as StoreCategory[]).map((value) => (
-                        <Button
-                            key={value}
-                            size="sm"
-                            variant={category === value ? "primary" : "secondary"}
-                            aria-pressed={category === value}
-                            onClick={() => setCategory(value)}
-                        >
-                            {value === "all"
-                                ? t("view.allCategories")
-                                : categoryLabel(words, value, navLabel)}
-                        </Button>
-                    ))}
-                </div>
-            </div>
+            <StoreFilters
+                query={query}
+                onQueryChange={setQuery}
+                sort={sort}
+                onSortChange={setSort}
+                sorts={STORE_SORTS.map((value) => ({ value, label: t(`view.sort.${value}`) }))}
+                category={category}
+                onCategoryChange={setCategory}
+                categories={(["all", ...categories] as StoreCategory[]).map((value) => ({
+                    value,
+                    label:
+                        value === "all"
+                            ? t("view.allCategories")
+                            : categoryLabel(words, value, navLabel)
+                }))}
+                words={{
+                    search: t("view.search"),
+                    sortLabel: t("view.sortLabel"),
+                    categories: t("view.categories")
+                }}
+            />
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
@@ -375,44 +354,28 @@ export function MarketplaceView({
             )}
 
             {featured.length > 0 && (
-                <section className="flex min-w-0 flex-col gap-3" aria-label={t("view.featured")}>
-                    <h2 className="text-sm font-medium text-muted-foreground">
-                        {t("view.featured")}
-                    </h2>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {featured.map((app) => card(app, true))}
-                    </div>
-                </section>
+                <StoreSection label={t("view.featured")} featured>
+                    {featured.map((app) => card(app, true))}
+                </StoreSection>
             )}
 
             {shown.length === 0 && builtIns.length === 0 ? (
-                <p className="text-muted-foreground py-10 text-center text-sm">
-                    {t("view.noMatch")}
-                </p>
+                <StoreNoMatch>{t("view.noMatch")}</StoreNoMatch>
             ) : (
                 shelvesWith(storeShelves(shown), builtIns.length > 0).map((group) => (
-                    <section
-                        key={group.shelf}
-                        className="flex min-w-0 flex-col gap-3"
-                        aria-label={t(`view.shelves.${group.shelf}`)}
-                    >
-                        <h2 className="text-sm font-medium text-muted-foreground">
-                            {t(`view.shelves.${group.shelf}`)}
-                        </h2>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                            {group.apps.map((app) => card(app))}
-                            {group.shelf === "polaris" &&
-                                builtIns.map((entry) => (
-                                    <div
-                                        key={`built-in:${entry.id}`}
-                                        data-built-in={entry.id}
-                                        className="min-w-0"
-                                    >
-                                        <BuiltInCard entry={entry} />
-                                    </div>
-                                ))}
-                        </div>
-                    </section>
+                    <StoreSection key={group.shelf} label={t(`view.shelves.${group.shelf}`)}>
+                        {group.apps.map((app) => card(app))}
+                        {group.shelf === "polaris" &&
+                            builtIns.map((entry) => (
+                                <div
+                                    key={`built-in:${entry.id}`}
+                                    data-built-in={entry.id}
+                                    className="min-w-0"
+                                >
+                                    <BuiltInCard entry={entry} />
+                                </div>
+                            ))}
+                    </StoreSection>
                 ))
             )}
 

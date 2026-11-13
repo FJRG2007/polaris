@@ -67,6 +67,10 @@
             "types": "./src/marketplace/store-card.tsx",
             "import": "./src/marketplace/store-card.tsx"
         },
+        "./store-layout": {
+            "types": "./src/marketplace/store-layout.tsx",
+            "import": "./src/marketplace/store-layout.tsx"
+        },
         "./built-in-apps": {
             "types": "./src/marketplace/built-in-apps.tsx",
             "import": "./src/marketplace/built-in-apps.tsx"

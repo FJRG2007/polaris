@@ -2,6 +2,14 @@
    both themes, then Tailwind. In CSS the order is the meaning. */
 @import "@polaris/ui/styles.css";
 
+/* The dashboard's typeface, loaded in `lib/fonts.ts`, in the token the design
+   system reads. */
+:root {
+    --font-sans:
+        var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+        sans-serif;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

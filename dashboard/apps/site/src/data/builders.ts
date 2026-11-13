@@ -493,6 +493,18 @@ export interface BuiltInSiteApp {
     readonly id: string;
     readonly name: string;
     readonly description: string;
+    /** Its switcher category, in words, as its card's badge reads it. */
+    readonly categoryLabel: string;
+    /** Its icon on its own colour at 40 and 44 px, for a built-in app without a logo file. */
+    readonly mark: string;
+    readonly markPreview: string;
+    /** The placeholder preview's colour and the text colour on it. */
+    readonly tint: string;
+    readonly ink: string;
+    /** What the card's preview shows, for a screen reader. */
+    readonly alt: string;
+    /** The card's preview: its first capture, as the dashboard's card shows it. */
+    readonly shot: StoreShot | null;
     /** The products it replaces; `logo` names a tile in `public/logos`. */
     readonly replaces: readonly { readonly name: string; readonly logo: string }[];
     /** Every capture of it, the README's first; none for an app nobody has captured yet. */
@@ -502,6 +514,10 @@ export interface BuiltInSiteApp {
 /** The dashboard's own words for the built-in row and an app's page. */
 export interface BuiltInWords {
     readonly title: string;
+    /** The "Built in" badge on its card. */
+    readonly badge: string;
+    /** Its card's byline, "Part of every Polaris". */
+    readonly builtInBy: string;
     readonly open: string;
     readonly replaces: string;
     readonly back: string;
@@ -523,6 +539,9 @@ export interface StoreWords {
     readonly shelves: Readonly<Record<StoreShelf, string>>;
     readonly noMatch: string;
     readonly details: string;
+    readonly install: string;
+    /** "More for {name}", the overflow menu's label. */
+    readonly more: string;
     readonly comingSoon: string;
     /** "Installing accepts the <link>{label}</link>." */
     readonly consent: string;
