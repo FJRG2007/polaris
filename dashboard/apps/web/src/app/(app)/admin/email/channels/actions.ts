@@ -2,8 +2,8 @@
 
 /**
  * Channel server actions. Every action is scoped to the signed-in user, who owns
- * their own channels; input is validated with Zod. Connecting reaches the bridge
- * through the server-only messaging service.
+ * their own channels; input is validated with Zod. Connecting runs the channel
+ * in this process through the server-only messaging service.
  */
 
 import { revalidatePath } from "next/cache";
@@ -12,16 +12,13 @@ import { PLATFORMS } from "@polaris/messaging";
 import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceKey } from "@/lib/i18n/types";
-import { bridgeConfigured } from "@/lib/messaging/bridge-client";
 import {
     channelState,
     connectChannel,
     deleteChannel,
-    listChannels,
     reconnectChannel,
     updateChannelCredentials,
-    type ChannelLiveState,
-    type ChannelView
+    type ChannelLiveState
 } from "@/lib/messaging-service";
 
 /** A reply in the language of whoever pressed the button. */
@@ -37,16 +34,6 @@ const connectChannelSchema = z.object({
     token: z.string().trim().min(1).max(8192).optional(),
     config: z.record(z.string(), z.string().max(256)).optional()
 });
-
-/** The owner's channels and whether the bridge answers. */
-export async function channelsStateAction(): Promise<{
-    bridgeConfigured: boolean;
-    channels: ChannelView[];
-}> {
-    const user = await requirePermission("inbox.read");
-    const [ready, channels] = await Promise.all([bridgeConfigured(), listChannels(user.id)]);
-    return { bridgeConfigured: ready, channels };
-}
 
 export async function connectChannelAction(
     input: z.infer<typeof connectChannelSchema>

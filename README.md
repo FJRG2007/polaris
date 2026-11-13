@@ -618,7 +618,7 @@ flowchart TB
         apps[apps/calendar, places, game-servers, crm]
         ext[apps/extension: browser extension]
         pkgs[packages: core, db, ui, storage, deploy, ...]
-        svc[services: edge-guard, messaging-bridge, camera-relay, vision, face, hytale]
+        svc[services: edge-guard, camera-relay, vision, face, hytale]
         cli[packages/cli: developer CLI]
     end
     hostd[crates/polaris-hostd: Rust host daemon]

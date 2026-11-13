@@ -76,7 +76,6 @@ jobs:
             polaris-mdns
             polaris-hostd
             polaris-updater
-            polaris-messaging-bridge
             polaris-edge-guard
             polaris-camera-relay
             polaris-matter-bridge

@@ -255,8 +255,8 @@ install_cli() {
 ensure_networks() {
     # Shared with deployed apps and the edge, for name-based routing.
     docker network create polaris-proxy >/dev/null 2>&1 || true
-    # Dedicated web<->hub network a locally-installed messaging bridge joins to
-    # reach the web by service DNS.
+    # Dedicated web<->hub network a local app joins to reach the web by service
+    # DNS.
     docker network create polaris-hub >/dev/null 2>&1 || true
 }
 

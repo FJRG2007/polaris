@@ -147,7 +147,12 @@ const nextConfig = {
         // it: the viewer reaches it from the browser through another package,
         // and externalising it breaks that import instead.
         "sharp",
-        "@napi-rs/canvas"
+        "@napi-rs/canvas",
+        // Messaging channels: discord.js reaches optional native modules and
+        // Baileys loads a WebAssembly module of its own, so both load from
+        // node_modules at runtime.
+        "discord.js",
+        "@whiskeysockets/baileys"
     ],
     // Trace from the monorepo root so the standalone server lands at the path the
     // Docker image expects (apps/web/.next/standalone/apps/web/server.js).

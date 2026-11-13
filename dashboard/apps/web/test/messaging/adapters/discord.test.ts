@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DiscordAdapter } from "../../src/adapters/discord.js";
+import { DiscordAdapter } from "@/lib/messaging/adapters/discord";
 import type { AdapterContext } from "@polaris/messaging";
 
 /**

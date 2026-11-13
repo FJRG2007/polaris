@@ -205,9 +205,9 @@ link, read-only.
 
 ## Inbox: Telegram, WhatsApp, Discord and Slack
 
-Conversations from these platforms in one place, answered from Polaris. Install
-**Messaging bridge** from **Apps > Marketplace**; **Management > Inbox** then
-appears. Choose **Connect channel**, pick a platform and how to connect it.
+Conversations from these platforms in one place, answered from Polaris, with
+nothing to install. In **Management > Email > Channels** choose **Connect
+channel**, pick a platform and how to connect it.
 
 | Platform | How | What you give it |
 | --- | --- | --- |

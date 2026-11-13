@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ReactElement } from "react";
+import { Suspense, use, useState, type ReactElement } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
@@ -16,13 +16,11 @@ import { ConnectChannelDialog } from "@/app/(app)/admin/email/channels/connect-c
 import { channelCatalog, type ChannelKind } from "@/app/(app)/admin/email/channels/channel-catalog";
 
 export function ConnectChannelView({
-    bridgeReady,
-    bridgeHref
+    canManage
 }: {
-    bridgeReady: boolean;
-    /** The installed bridge's own page, where it is started, when it is stopped
-     *  and this viewer can open it. */
-    bridgeHref?: string;
+    /** Whether this viewer holds inbox.manage, which connecting needs. Streamed,
+     *  so the page does not wait on it to paint. */
+    canManage: Promise<boolean>;
 }) {
     const t = useTranslations("admin");
     const router = useRouter();
@@ -59,44 +57,73 @@ export function ConnectChannelView({
                     <p className="text-xs text-muted-foreground">
                         {t("inboxChannels.connectPage.messagingHint")}
                     </p>
-                    {bridgeReady ? null : (
-                        <p className="mt-1 text-xs text-warning">
-                            {bridgeHref
-                                ? t.rich("inboxChannels.connectPage.bridgeStopped", {
-                                      link: (chunks) => (
-                                          <Link key="link" href={bridgeHref} className="underline">
-                                              {chunks}
-                                          </Link>
-                                      )
-                                  })
-                                : t("inboxChannels.connectPage.bridgeStoppedNoAccess")}
-                        </p>
-                    )}
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {channelCatalog(t).map((entry) => (
-                        <MarketplaceCard
-                            key={entry.kind}
-                            Logo={entry.Logo}
-                            color={entry.color}
-                            name={entry.name}
-                            badge={entry.badge}
-                            summary={entry.tagline}
-                            disabled={!bridgeReady}
-                            onPick={() => setKind(entry.kind)}
-                        />
-                    ))}
-                </div>
+                <Suspense fallback={<ChannelCards t={t} disabled onPick={setKind} />}>
+                    <ManagedCards t={t} canManage={canManage} onPick={setKind} />
+                </Suspense>
             </section>
 
             {kind && (
                 <ConnectChannelDialog
-                    bridgeReady={bridgeReady}
                     initialKind={kind}
                     onClose={() => setKind(null)}
                     onConnected={done}
                 />
             )}
+        </div>
+    );
+}
+
+type Translate = ReturnType<typeof useTranslations>;
+
+/** The cards once the permission is known: open for a manager, locked with the
+ *  reason for anybody else. */
+function ManagedCards({
+    t,
+    canManage,
+    onPick
+}: {
+    t: Translate;
+    canManage: Promise<boolean>;
+    onPick: (kind: ChannelKind) => void;
+}) {
+    const allowed = use(canManage);
+    return (
+        <>
+            {allowed ? null : (
+                <p className="-mt-2 text-xs text-muted-foreground">
+                    {t("inboxChannels.connectPage.needsManage")}
+                </p>
+            )}
+            <ChannelCards t={t} disabled={!allowed} onPick={onPick} />
+        </>
+    );
+}
+
+/** Every platform as a card; locked while the permission is still loading. */
+function ChannelCards({
+    t,
+    disabled,
+    onPick
+}: {
+    t: Translate;
+    disabled: boolean;
+    onPick: (kind: ChannelKind) => void;
+}) {
+    return (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {channelCatalog(t).map((entry) => (
+                <MarketplaceCard
+                    key={entry.kind}
+                    Logo={entry.Logo}
+                    color={entry.color}
+                    name={entry.name}
+                    badge={entry.badge}
+                    summary={entry.tagline}
+                    disabled={disabled}
+                    onPick={() => onPick(entry.kind)}
+                />
+            ))}
         </div>
     );
 }

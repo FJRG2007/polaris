@@ -157,12 +157,6 @@ import {
     type RuntimePorts
 } from "@polaris/deploy";
 
-/** A locally-installed messaging hub (this catalog app) joins a dedicated web<->hub
- *  network. Computed at deploy time from the install and the current target, never
- *  persisted, so a retarget to a remote server drops it automatically. */
-const HUB_CATALOG_ID = "messaging-bridge";
-const HUB_NETWORK = "polaris-hub";
-
 /** Re-exported: a deploy is a row plus this file, and callers of this module ask
  *  it where the file is rather than knowing about the directory themselves. */
 export { deployLogPath };
@@ -2920,17 +2914,11 @@ async function releaseInstallsOf(applicationId: string, keep: readonly string[])
         select: { catalogId: true }
     });
     if (installs.length === 0) return;
-    // Removed means no bridge left to dial, so not the credential either.
+    // Removed means nothing left to dial, so not the credential either.
     await prisma.installedApp.updateMany({
         where: { applicationId, id: { notIn: [...keep] } },
         data: { status: "removed", encryptedSecret: null, secretNonce: null, secretKeyId: null }
     });
-    // Cycle: bridge-endpoint reaches this module for the hub's port, so the cache
-    // it owns is resolved at call time rather than at load.
-    if (installs.some((install) => install.catalogId === "messaging-bridge")) {
-        const { invalidateBridgeCache } = await import("./messaging/bridge-endpoint");
-        invalidateBridgeCache();
-    }
 }
 
 /**
@@ -3118,16 +3106,6 @@ async function buildAppPlan(
     // And may decide variables it always runs with, over whatever was stored, so
     // an install made before one existed gets it on its next deploy.
     Object.assign(env, releaseEnvFor(imageRef));
-    // A locally-targeted messaging hub joins the dedicated hub network; detected
-    // from the install + target here, not persisted.
-    const isLocalHub =
-        app.target.kind === "local" &&
-        Boolean(
-            await prisma.installedApp.findFirst({
-                where: { catalogId: HUB_CATALOG_ID, applicationId, status: { not: "removed" } },
-                select: { id: true }
-            })
-        );
     const healthcheck = app.healthcheck
         ? (JSON.parse(app.healthcheck) as AppDeployPlan["healthcheck"])
         : undefined;
@@ -3325,9 +3303,8 @@ async function buildAppPlan(
         env,
         replicas: app.replicas,
         limits: limitsOf(app),
-        // Extra external networks the service joins: a locally-installed messaging
-        // hub joins the dedicated web<->hub network,
-        // and any service the networks of the operator's own it was asked to join,
+        // Extra external networks the service joins: the networks of the operator's
+        // own it was asked to join,
         // under the names their services call it by (its own name when none given).
         ...(() => {
             const external = externalNetworkPlan(
@@ -3336,7 +3313,7 @@ async function buildAppPlan(
                     aliases: entry.aliases.length > 0 ? entry.aliases : [app.slug]
                 }))
             );
-            const extra = [...(isLocalHub ? [HUB_NETWORK] : []), ...external.networks];
+            const extra = external.networks;
             return {
                 extraNetworks: extra.length > 0 ? extra : undefined,
                 ...(Object.keys(external.aliases).length > 0

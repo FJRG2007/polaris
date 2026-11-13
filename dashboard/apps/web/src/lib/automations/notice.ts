@@ -205,13 +205,13 @@ async function sendToMessaging(
     const targets = await import("./notice-targets");
     if (!(await targets.mayUseMessagingChannel(notice.userId, messaging.channelId)))
         return "messagingGone";
-    const { bridgeSend } = await import("@/lib/messaging/bridge-client");
+    const { sendThroughChannel } = await import("@/lib/messaging/channel-runtime");
     const text = (notice.body ? `${notice.title}\n${notice.body}` : notice.title).slice(
         0,
         core.AUTOMATION_LIMITS.textLength
     );
     try {
-        await bridgeSend(messaging.channelId, { peerId: messaging.peerId, text });
+        await sendThroughChannel(messaging.channelId, { peerId: messaging.peerId, text });
         return null;
     } catch (caught) {
         console.error("polaris: an automation notice could not use a messaging channel:", caught);

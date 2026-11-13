@@ -39,12 +39,10 @@ import {
 import { DiscordSetupPanel } from "./discord-setup-panel";
 
 export function ConnectChannelDialog({
-    bridgeReady,
     initialKind,
     onClose,
     onConnected
 }: {
-    bridgeReady: boolean;
     /** Skip the picker and connect this kind straight away (the marketplace). */
     initialKind?: ChannelKind;
     onClose: () => void;
@@ -75,7 +73,6 @@ export function ConnectChannelDialog({
     const isDiscordBot = kind === "discord";
     const needsToken = Boolean(meta.tokenLabel);
     const ready =
-        bridgeReady &&
         name.trim() !== "" &&
         (!needsToken || token.trim() !== "") &&
         (!meta.needsPhoneNumberId || phoneNumberId.trim() !== "");
@@ -115,7 +112,7 @@ export function ConnectChannelDialog({
         setPhase("form");
     }
 
-    // While onboarding whatsapp-web, poll the bridge for the QR and connected state.
+    // While onboarding whatsapp-web, poll for the QR and connected state.
     useEffect(() => {
         if (phase !== "qr" || !connectedId) return;
         let active = true;
@@ -248,7 +245,6 @@ export function ConnectChannelDialog({
                                     <button
                                         key={item.platform}
                                         type="button"
-                                        disabled={!bridgeReady}
                                         onClick={() => pickPlatform(item)}
                                         className="flex items-start gap-3 rounded-md border border-border p-3 text-left transition-colors hover:border-foreground/30 disabled:cursor-not-allowed disabled:opacity-50"
                                     >

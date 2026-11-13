@@ -15,8 +15,6 @@ import type { AppManifest } from "@/lib/apps/catalog";
 export type InstallResource =
     /** The InstalledApp row itself. */
     | "install-row"
-    /** The hub's shared secret, stored encrypted on the install row. */
-    | "install-secret"
     /** Access people were given to this install (ResourceGrant rows). */
     | "grants"
     /** The switcher's cached "is this app installed" answer and every open switcher. */
@@ -56,8 +54,6 @@ export type InstallResource =
     | "analytics"
     /** Scheduled jobs and runtime log lines on its service. */
     | "service-children"
-    /** The messaging bridge's cached endpoint. */
-    | "bridge-cache"
     /** The owner's shared Marketplace project and its environment. */
     | "marketplace-project"
     /** The server it runs on, as a deploy target. */
@@ -152,8 +148,6 @@ export function installFootprint(app: AppManifest): InstallResource[] {
         "deploy-target"
     ];
     if ((app.template?.volumes?.length ?? 0) > 0) resources.push("volume-rows", "volume-data");
-    if (app.capabilities.includes("messaging-hub")) resources.push("install-secret");
-    if (app.id === "messaging-bridge") resources.push("bridge-cache");
     return resources;
 }
 
@@ -181,8 +175,6 @@ function stepFor(resource: InstallResource, { deleteData }: UninstallOptions): U
                       action: "keep",
                       why: "marked removed, secret cleared, so reinstalling finds its data"
                   };
-        case "install-secret":
-            return { action: "remove", how: "encrypted secret cleared from the row" };
         case "grants":
             return { action: "remove", how: "clearResourceGrants(installRef)" };
         case "presence":
@@ -241,8 +233,6 @@ function stepFor(resource: InstallResource, { deleteData }: UninstallOptions): U
             return deleteData
                 ? { action: "remove", how: "AnalyticsSite scoped to the service deleted" }
                 : { action: "keep", why: "collected history, deleted only with the data" };
-        case "bridge-cache":
-            return { action: "remove", how: "invalidateBridgeCache" };
         case "marketplace-project":
             return { action: "keep", why: "shared by every app the owner installs" };
         case "deploy-target":
@@ -296,7 +286,6 @@ export function phaseOf(resource: InstallResource): UninstallPhase {
         case "install-data":
             return "data";
         case "install-row":
-        case "install-secret":
         case "grants":
         case "application":
         case "env-vars":
@@ -306,7 +295,6 @@ export function phaseOf(resource: InstallResource): UninstallPhase {
             return "rows";
         case "presence":
         case "app-bundle":
-        case "bridge-cache":
         case "audit":
             return "after";
     }

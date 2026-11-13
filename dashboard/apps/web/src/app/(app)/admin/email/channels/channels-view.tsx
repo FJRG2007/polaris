@@ -136,6 +136,15 @@ export function ChannelsView({ initialChannels }: { initialChannels: ChannelView
                                 ]
                                     .filter(Boolean)
                                     .join(" - ")}
+                                error={
+                                    // A WhatsApp Web device that is not linked (its session
+                                    // expired, or it was linked before channels ran here)
+                                    // sends nothing until its QR is scanned again.
+                                    channelKind(channel) === "whatsapp-web" &&
+                                    (channel.status === "disconnected" || channel.status === "error")
+                                        ? t("inboxChannels.scanAgain")
+                                        : null
+                                }
                                 ready={
                                     channel.status === "connected"
                                         ? t("inboxChannels.connected")
@@ -193,7 +202,7 @@ function ChannelManageDialog({
     const [qr, setQr] = useState<string | null>(null);
     const [qrStatus, setQrStatus] = useState<string>("connecting");
 
-    // While re-linking whatsapp-web, poll the bridge for the QR and the eventual
+    // While re-linking whatsapp-web, poll for the QR and the eventual
     // connected status - the same onboarding the connect flow uses, so a dead session
     // is re-linked in place instead of removing and re-adding the channel.
     useEffect(() => {
@@ -210,7 +219,7 @@ function ChannelManageDialog({
                 setLinking(false);
             } else if (state.status === "error" || state.status === "disconnected") {
                 // Terminal failure (e.g. QR retries exhausted): stop polling so we stop
-                // hammering the bridge and re-persisting the dead status every 2.5s, and
+                // hammering the server and re-persisting the dead status every 2.5s, and
                 // re-enable the Re-link button so "try Re-link again" is actionable.
                 setQr(null);
                 onUpdated(channel.id, { status: state.status });

@@ -840,6 +840,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: removeLeftoverVolumes
     },
     {
+        key: "retired-apps",
+        // Hourly, so an update takes a retired app down soon after it boots and a
+        // pass that failed (a server out of reach) tries again.
+        everyMs: 60 * MINUTE,
+        // Leased: during an update two dashboards run, and one uninstall is enough.
+        leaseMs: 30 * MINUTE,
+        run: async () => (await import("@/lib/apps/retired-apps")).retireRetiredApps()
+    },
+    {
         key: "removed-install-secrets",
         // Daily: it only catches rows left before an uninstall cleared them itself.
         everyMs: 24 * 60 * MINUTE,

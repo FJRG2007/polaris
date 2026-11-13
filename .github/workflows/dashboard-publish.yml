@@ -39,7 +39,6 @@ on:
       - "dashboard/docker/**"
       - "dashboard/resources/**"
       - "dashboard/mdns/**"
-      - "dashboard/services/messaging-bridge/**"
       - "dashboard/services/edge-guard/**"
       - "dashboard/services/hytale/**"
       - "dashboard/services/camera-relay/**"
@@ -126,7 +125,6 @@ jobs:
       mdns: ${{ steps.filter.outputs.mdns }}
       hostd: ${{ steps.filter.outputs.hostd }}
       updater: ${{ steps.filter.outputs.updater }}
-      bridge: ${{ steps.filter.outputs.bridge }}
       guard: ${{ steps.filter.outputs.guard }}
       hytale: ${{ steps.filter.outputs.hytale }}
       relay: ${{ steps.filter.outputs.relay }}
@@ -150,7 +148,7 @@ jobs:
         run: |
           set -euo pipefail
           out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out hytale true; out relay true; out matter true; out broker true; out dnsblock true; out vpn true; out vision true; out face true; }
+          all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out guard true; out hytale true; out relay true; out matter true; out broker true; out dnsblock true; out vpn true; out vision true; out face true; }
           # Measured from the last run that published, not from the push before
           # this one. A run that failed its suites or was cancelled built nothing
           # that got tagged, so its changes are still unpublished - and measured
@@ -229,7 +227,6 @@ jobs:
           has '^dashboard/mdns/' && out mdns true || out mdns false
           has '^crates/polaris-hostd/|^Cargo\.(toml|lock)$' && out hostd true || out hostd false
           has '^dashboard/docker/updater/' && out updater true || out updater false
-          has '^dashboard/services/messaging-bridge/|^dashboard/packages/messaging/|^dashboard/package(-lock)?\.json$' && out bridge true || out bridge false
           # The guard bundles @polaris/core, so a change there is a change to the guard.
           has '^dashboard/services/edge-guard/|^dashboard/packages/core/|^dashboard/package(-lock)?\.json$' && out guard true || out guard false
           has '^dashboard/services/hytale/' && out hytale true || out hytale false
@@ -264,7 +261,7 @@ jobs:
   # filter anyway.
   dashboard-ci:
     needs: changes
-    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.extension == 'true' || needs.changes.outputs.bridge == 'true' || needs.changes.outputs.guard == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.extension == 'true' || needs.changes.outputs.guard == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     uses: ./.github/workflows/dashboard-ci.yml
     with:
       # The web image builds the same app from the same commit; building it twice
@@ -582,51 +579,8 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:updater
           cache-to: ${{ env.PUBLISH == 'true' && 'type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:updater,mode=max' || '' }}
 
-  # Messaging bridge sidecar. The marketplace installs this image as a managed
-  # Deploy app (it is not part of the web image), so it must be published for
-  # installs to pull. amd64 only, matching the runtime servers. Its build context
-  # is the dashboard root so the workspace and @polaris/messaging are available.
-  bridge:
-    needs: changes
-    if: ${{ needs.changes.outputs.bridge == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
-    steps:
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4
-        with:
-          buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
-          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
-          cleanup: false
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: build
-        uses: docker/build-push-action@v7
-        with:
-          pull: true
-          no-cache: ${{ github.event_name == 'schedule' }}
-          context: dashboard
-          file: dashboard/services/messaging-bridge/Dockerfile
-          cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:bridge
-          cache-to: ${{ env.PUBLISH == 'true' && 'type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:bridge,mode=max' || '' }}
-          outputs: type=image,name=ghcr.io/fjrg2007/polaris-messaging-bridge,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
-          # No attestation manifests. buildx attaches one to the index by
-          # default, and it is an extra untagged child that every puller then has
-          # to resolve: a daemon on the containerd image store fetches the whole
-          # index, and a deployment was left unable to upgrade with "content
-          # digest ... not found" pointing at exactly that child while the two
-          # real platform manifests were fine. Nothing here reads the provenance,
-          # so the index carries the two images and nothing else.
-          provenance: false
-          sbom: false
-
-  # WAF sidecar that sits at each server's edge. Published for the same reason the
-  # bridge is: it was build-only, so an update pulled a newer dashboard and left the
+  # WAF sidecar that sits at each server's edge. Published because it was
+  # build-only, and an update pulled a newer dashboard and left the
   # guard at whatever was built on install day. The two have to move together - the
   # dashboard writes edge routes that name the guard's listeners.
   guard:
@@ -1003,7 +957,7 @@ jobs:
   # the extension does run dashboard-ci, so this runs and tags nothing - every
   # step below is guarded on its own image's result, and all of them were skipped.
   tag:
-    needs: [dashboard-ci, web, bridge, guard, hytale, relay, matter, broker, dnsblock, vpn, vision, face]
+    needs: [dashboard-ci, web, guard, hytale, relay, matter, broker, dnsblock, vpn, vision, face]
     if: ${{ !cancelled() && (needs.dashboard-ci.result == 'success' || needs.dashboard-ci.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1037,11 +991,6 @@ jobs:
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-dashboard:latest \
             ghcr.io/fjrg2007/polaris-dashboard@${{ needs.web.outputs.digest }}
-      - name: Tag the messaging bridge
-        if: ${{ env.PUBLISH == 'true' && needs.bridge.result == 'success' }}
-        run: |
-          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-messaging-bridge:latest \
-            ghcr.io/fjrg2007/polaris-messaging-bridge@${{ needs.bridge.outputs.digest }}
       - name: Tag the edge guard
         if: ${{ env.PUBLISH == 'true' && needs.guard.result == 'success' }}
         run: |

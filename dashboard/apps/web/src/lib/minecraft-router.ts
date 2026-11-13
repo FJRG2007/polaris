@@ -89,7 +89,7 @@ export async function routerPlacement(): Promise<RouterPlacement | null> {
             Mounts?: { Destination?: string; Name?: string; Type?: string }[];
         };
         // The dashboard is on more than one network - the control plane's own, and
-        // the dedicated one a locally installed messaging bridge joins - and the
+        // the dedicated hub network (polaris-hub) - and the
         // order they come back in is not ours to rely on. The control plane's is the
         // compose project's default network, which is the one whose name ends there.
         const joined = Object.keys(body.NetworkSettings?.Networks ?? {});

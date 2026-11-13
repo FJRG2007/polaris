@@ -10,7 +10,7 @@
  *
  * Minted here and sent by the caller, exactly as a phone confirmation is: this
  * package knows how to mint and check a short secret, and nothing about mail
- * channels or messaging bridges.
+ * or messaging channels.
  *
  * The code is stored the way every low-entropy secret in Polaris is - hashed
  * with the password hasher - with an expiry and a hard cap on wrong guesses, so

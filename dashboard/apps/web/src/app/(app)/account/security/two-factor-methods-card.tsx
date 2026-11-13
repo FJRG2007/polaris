@@ -7,7 +7,7 @@
  *
  * The authenticator is listed but not switchable: it is what arms the factor,
  * and it is the only method that keeps working when a mail channel is removed or
- * the messaging bridge goes down. Turning it into a choice would let somebody
+ * a messaging channel goes down. Turning it into a choice would let somebody
  * make the deployment's health the thing standing between them and their account.
  *
  * Sign-in approval sits in the same list because it is one of the ways the

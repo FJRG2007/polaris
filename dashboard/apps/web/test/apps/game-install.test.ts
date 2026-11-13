@@ -111,19 +111,19 @@ describe("adopting what is already installed", () => {
             row("mc-manager", "minecraft-manager", "2026-01-01"),
             row("survival", "minecraft", "2026-01-02"),
             row("island", "ark", "2026-01-03"),
-            row("bridge", "messaging-bridge", "2026-01-04")
+            row("pages", "status-pages", "2026-01-04")
         ];
         await adoptGameServersApp(OWNER);
-        for (const id of ["survival", "island", "bridge"]) {
+        for (const id of ["survival", "island", "pages"]) {
             expect(find(id)?.status, id).toBe("running");
         }
         expect(find("survival")?.catalogId).toBe("minecraft");
     });
 
     it("says nothing is on for somebody who never turned it on", async () => {
-        rows = [row("bridge", "messaging-bridge", "2026-01-04")];
+        rows = [row("pages", "status-pages", "2026-01-04")];
         expect(await adoptGameServersApp(OWNER)).toBeNull();
-        expect(find("bridge")?.status).toBe("running");
+        expect(find("pages")?.status).toBe("running");
     });
 
     it("does nothing the second time", async () => {

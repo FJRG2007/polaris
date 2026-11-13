@@ -1,6 +1,6 @@
 /**
  * Shared per-platform presentation for the channel surfaces (the Channels page,
- * the senders list, the bridge's app page), so each renders the same brand
+ * the senders list), so each renders the same brand
  * marks, labels and status tones.
  */
 

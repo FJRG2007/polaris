@@ -2069,7 +2069,6 @@
         "web/src/lib/office/ooxml.ts",
         "web/src/lib/office/sheet-menu.ts",
         "web/src/app/(app)/apps/installed/[id]/tabs.ts",
-        "web/src/app/(app)/apps/installed/[id]/messaging-bridge-panel.tsx",
         "web/src/app/(app)/apps/installed/[id]/installed-app-dashboard.tsx",
         "web/src/app/(app)/apps/installed/[id]/access-actions.ts",
         "web/src/app/(app)/apps/installed/[id]/actions.ts",

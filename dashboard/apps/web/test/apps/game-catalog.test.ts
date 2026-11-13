@@ -129,7 +129,7 @@ describe("every game", () => {
     it("is found from any of its catalog ids, and nothing else is", () => {
         expect(gameForCatalogId("minecraft-bedrock")?.id).toBe("minecraft");
         expect(gameForCatalogId("ark-manager")?.id).toBe("ark");
-        expect(gameForCatalogId("messaging-bridge")).toBeUndefined();
+        expect(gameForCatalogId("status-pages")).toBeUndefined();
         // The one app belongs to no single game, so it must not answer as one:
         // every screen that asks this is asking which game to dispatch on.
         expect(gameForCatalogId(GAME_SERVERS_APP_ID)).toBeUndefined();

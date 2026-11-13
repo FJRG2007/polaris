@@ -4,7 +4,7 @@
  * An app's own mark, wherever one is drawn.
  *
  * Every card in the marketplace wore a line-drawing from the icon set - a little
- * grey gamepad for Minecraft, a grey chat bubble for the messaging bridge - which
+ * grey gamepad for Minecraft, a grey robot for an assistant - which
  * is what a category looks like, not what an app looks like. A store where every
  * shelf is the same six glyphs is a store nobody can scan.
  *
@@ -29,7 +29,7 @@ import { AppLogo, cn, hasAppLogo } from "@polaris/ui";
 import type { JSX, SVGProps } from "react";
 import { initialsInk, tintFor } from "@polaris/core";
 import type { AppManifest } from "@/lib/apps/catalog";
-import { DiscordMark, SteamMark } from "@/components/brand-icons";
+import { SteamMark } from "@/components/brand-icons";
 
 /**
  * The marks Polaris holds that belong to an app in the catalog.
@@ -41,9 +41,6 @@ import { DiscordMark, SteamMark } from "@/components/brand-icons";
  * they keep their icon.
  */
 const BRAND_MARKS: Record<string, (props: SVGProps<SVGSVGElement>) => JSX.Element> = {
-    // The bridge speaks to several platforms; the one Polaris has an asset for
-    // is Discord, and it is the one most operators recognise the app by.
-    "messaging-bridge": DiscordMark,
     // ARK is a Steam title and the app installs a Steam-based server image.
     ark: SteamMark,
     "ark-manager": SteamMark

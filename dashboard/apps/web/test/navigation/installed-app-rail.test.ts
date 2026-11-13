@@ -94,7 +94,7 @@ describe("installedAppSubapp", () => {
     });
 
     it("is nothing for an install that has no screens of its own", () => {
-        expect(installedAppSubapp(ID, { name: "Messaging bridge", tabs: [] })).toBeNull();
+        expect(installedAppSubapp(ID, { name: "Status pages", tabs: [] })).toBeNull();
     });
 
     it("lights the overview only on the overview, not on every screen below it", () => {

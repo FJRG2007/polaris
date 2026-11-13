@@ -8,11 +8,9 @@
 
 import type { ReactNode } from "react";
 import { paintRead } from "../../paint-read";
-import { MovedRegion } from "../../moved-region";
 import { AfterPaint } from "@/components/after-paint";
 import { ChannelsView } from "./channels-view";
 import { CardSkeleton } from "../../region-skeletons";
-import { ConnectChannelView } from "./connect/connect-view";
 
 type Shell = { skeleton: ReactNode; revision: number };
 
@@ -25,32 +23,6 @@ export function ChannelsLoader({ skeleton, revision }: Shell) {
             skeleton={skeleton}
         >
             {(data) => <ChannelsView initialChannels={data.channels} />}
-        </AfterPaint>
-    );
-}
-
-/** The channel picker, the way to the bridge, or - with no bridge - the email screen. */
-export function ConnectChannelLoader({ skeleton, revision }: Shell) {
-    return (
-        <AfterPaint
-            cacheKey="admin.channels.connect"
-            load={() => paintRead("channels.connect")}
-            persist={false}
-            revision={revision}
-            skeleton={skeleton}
-        >
-            {(data) =>
-                data.screen === "moved" ? (
-                    <MovedRegion to={data.to}>{skeleton}</MovedRegion>
-                ) : data.screen === "ready" ? (
-                    <ConnectChannelView bridgeReady />
-                ) : (
-                    <ConnectChannelView
-                        bridgeReady={false}
-                        bridgeHref={data.bridgeHref ?? undefined}
-                    />
-                )
-            }
         </AfterPaint>
     );
 }

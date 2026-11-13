@@ -1699,6 +1699,7 @@
         "status": "{status, select, connected {connected} connecting {connecting} qr {qr} error {error} disconnected {disconnected} ready {ready} other {{status}}}",
         "connected": "Connected",
         "readyToSend": "Ready to send",
+        "scanAgain": "Not linked. Open Manage and press Re-link to scan the QR again.",
         "edit": {
             "telegram": "From @BotFather. Leave the token blank to keep the current one.",
             "discord": "From the Discord Developer Portal (Bot > Token). Leave blank to keep the current one.",
@@ -1724,8 +1725,7 @@
             "messaging": "Messaging",
             "messagingHint": "Where alerts, notices and sign-in codes are sent.",
             "setUp": "Set up",
-            "bridgeStopped": "The messaging bridge is not running. <link>Open it</link> to start it.",
-            "bridgeStoppedNoAccess": "The messaging bridge is not running. Your administrators can start it."
+            "needsManage": "Ask an admin to connect channels."
         },
         "email": {
             "saveFailed": "Could not save the channel.",

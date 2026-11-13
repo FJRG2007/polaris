@@ -92,14 +92,6 @@ describe("uninstall plan", () => {
             "keep"
         );
     });
-
-    it("the hub's shared secret never survives an uninstall", () => {
-        const hub = findApp("messaging-bridge")!;
-        expect(installFootprint(hub)).toContain("install-secret");
-        expect(uninstallPlan(hub, { deleteData: false }).get("install-secret")?.action).toBe(
-            "remove"
-        );
-    });
 });
 
 describe("install-scoped tables", () => {

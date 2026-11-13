@@ -2,11 +2,9 @@
  * Email channels: the control plane for how Polaris sends mail.
  *
  * They live in the same Channel table as the messaging channels and are set up
- * under Management > Email & SMS, but nothing about them goes through the
- * bridge. Mail is sent from this process, over HTTPS or SMTP, so verification
- * links and sign-in codes keep working on a deployment that never installed the
- * messaging bridge at all - an account locked out because an optional app is not
- * running would be a poor trade.
+ * under Management > Email & SMS. Mail is sent from this process, over HTTPS or
+ * SMTP, so verification links and sign-in codes keep working on a deployment with
+ * no messaging channel at all.
  *
  * Credentials use the same envelope encryption as the messaging channels and
  * storage connections: one AES-256-GCM master key, ciphertext in the row, and no

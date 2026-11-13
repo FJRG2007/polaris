@@ -1699,6 +1699,7 @@
         "status": "{status, select, connected {conectado} connecting {conectando} qr {QR} error {error} disconnected {desconectado} ready {listo} other {{status}}}",
         "connected": "Conectado",
         "readyToSend": "Listo para enviar",
+        "scanAgain": "Sin vincular. Abre Gestionar y pulsa Enlazar para escanear el QR.",
         "edit": {
             "telegram": "De @BotFather. Deja el token en blanco para mantener el actual.",
             "discord": "Del Discord Developer Portal (Bot > Token). Déjalo en blanco para mantener el actual.",
@@ -1724,8 +1725,7 @@
             "messaging": "Mensajería",
             "messagingHint": "Donde se envían alertas, avisos y códigos de acceso.",
             "setUp": "Preparar",
-            "bridgeStopped": "El puente de mensajería no está activo. <link>Ábrelo</link> para iniciarlo.",
-            "bridgeStoppedNoAccess": "El puente de mensajería no está activo. Tus administradores pueden iniciarlo."
+            "needsManage": "Pide a un admin que conecte canales."
         },
         "email": {
             "saveFailed": "No se pudo guardar el canal.",

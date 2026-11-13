@@ -37,7 +37,6 @@ export type StoreShelf = "polaris" | "community";
  * "Recently added" sorts by; an app missing here sorts after every dated one.
  */
 export const ADDED_ON: Readonly<Record<string, string>> = {
-    "messaging-bridge": "2026-07-23",
     openclaw: "2026-07-23",
     hermes: "2026-07-23",
     "game-servers": "2026-08-12",
@@ -216,8 +215,7 @@ export function storeScope(app: AppManifest): StoreScope {
 /**
  * The store's own order: what most deployments install first, first. The
  * catalog's array order is where an app's manifest happens to live, not a
- * judgement of it, and it had put the messaging bridge - on its way out - at
- * the top of the store. Anything not named here keeps the catalog's order after
+ * judgement of it. Anything not named here keeps the catalog's order after
  * these, and `SUNSET` goes last.
  */
 export const STORE_RANK: readonly string[] = [
@@ -241,7 +239,7 @@ export const STORE_RANK: readonly string[] = [
 
 /** Still installable for the deployments that rely on them, but being retired:
  *  never featured, and last in the store. */
-export const SUNSET: ReadonlySet<string> = new Set(["messaging-bridge"]);
+export const SUNSET: ReadonlySet<string> = new Set<string>();
 
 /** The apps the featured row may show, in this order (those with a capture). */
 export const FEATURED: readonly string[] = ["home", "vpn", "calendar", "game-servers", "crm", "mail-server"];

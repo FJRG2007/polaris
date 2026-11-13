@@ -88,11 +88,6 @@
         "Games": "Juegos"
     },
     "apps": {
-        "messaging-bridge": {
-            "name": "Puente de mensajería",
-            "summary": "Envía alertas y códigos por WhatsApp, Telegram, Discord y Slack.",
-            "description": "Ejecuta el puente de mensajería de Polaris para que alertas, avisos y códigos de acceso salgan por WhatsApp, Telegram, Discord y Slack. Autoalojado: la única dependencia externa es cada plataforma y un número de teléfono para WhatsApp."
-        },
         "tools": {
             "summary": "Convierte, redimensiona, optimiza, recorta y traduce sin salir de Polaris.",
             "description": "Los trabajos para los que se abre una web cualquiera y se le dan los archivos al servidor de otro: pasar un PDF a documento de Word, una imagen a otro formato, una hoja de cálculo a CSV. Redimensiona y optimiza imágenes, mira qué contiene de verdad un archivo, recorta y silencia un vídeo, acorta un enlace, traduce un texto. Los archivos se quedan en tu propio equipo y no se suben a ningún sitio donde no estuvieran ya."
@@ -128,12 +123,12 @@
         "openclaw": {
             "name": "Asistente OpenClaw",
             "summary": "Un asistente de IA que responde en tus canales de mensajería.",
-            "description": "Despliega un asistente de IA de OpenClaw que se conecta al puente de mensajería y puede responder solo en cualquier canal conectado, pasando cada conversación a una persona cuando hace falta."
+            "description": "Despliega un asistente de IA de OpenClaw que puede responder solo en cualquier canal conectado, pasando cada conversación a una persona cuando hace falta."
         },
         "hermes": {
             "name": "Asistente Hermes",
             "summary": "Un agente de IA de Hermes para tus canales de mensajería.",
-            "description": "Despliega un agente de IA de Hermes que usa el puente de mensajería para llevar conversaciones por su cuenta y pasar a una persona cuando hace falta."
+            "description": "Despliega un agente de IA de Hermes que lleva las conversaciones de tus canales por su cuenta y pasa a una persona cuando hace falta."
         },
         "status-pages": {
             "summary": "Páginas públicas que muestran si tus servicios funcionan.",

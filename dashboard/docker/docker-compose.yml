@@ -154,10 +154,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # Default network (edge routing + database) plus the dedicated hub network, so a
-    # locally-installed messaging bridge - deployed as its own compose stack - can
-    # POST inbound events to the web by service DNS (http://web:3000). Edge labels
-    # still reference polaris_default, so routing is unchanged.
+    # Default network (edge routing + database) plus the dedicated hub network, so
+    # a local app deployed as its own compose stack can reach the web by service
+    # DNS (http://web:3000). Edge labels still reference polaris_default, so routing
+    # is unchanged.
     networks:
       - default
       - polaris-hub
@@ -810,7 +810,7 @@ networks:
   polaris-proxy:
     external: true
     name: polaris-proxy
-  # Dedicated web<->hub network for a locally-installed messaging bridge. External
+  # Dedicated web<->hub network for apps deployed on this machine. External
   # (install.sh creates it before `up`, like polaris-proxy) so the hub, deployed as
   # a separate compose stack, can join the same named network and reach the web by
   # service DNS without sharing the control-plane default network with postgres.

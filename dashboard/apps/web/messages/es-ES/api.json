@@ -159,7 +159,7 @@
             "tooManyCodes": "Se han pedido demasiados códigos. Espera antes de pedir otro.",
             "noWay": "Esta cuenta no tiene ninguna forma de recibir un código.",
             "noWhatsApp": "No hay ningún canal de WhatsApp por el que enviar.",
-            "bridgeRefused": "El puente de mensajería rechazó el mensaje."
+            "channelRefused": "El canal no pudo enviar el mensaje."
         },
         "users": {
             "banSelf": "No puedes vetarte a ti mismo.",

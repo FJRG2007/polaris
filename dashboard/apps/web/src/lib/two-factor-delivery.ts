@@ -17,7 +17,7 @@ import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { normalizePeerId } from "@/lib/messaging-service";
-import { bridgeSend } from "@/lib/messaging/bridge-client";
+import { sendThroughChannel } from "@/lib/messaging/channel-runtime";
 import { getAuthMailStatus, sendAuthEmail } from "@/lib/auth-mail";
 import { getUserPhone, getUserSecurity, noteSecondFactor, twoFactorEnabled } from "@polaris/auth";
 import {
@@ -295,19 +295,19 @@ export async function sendTwoFactorCode(input: {
 }
 
 /**
- * Hand the message straight to the bridge rather than through the inbox, so it
+ * Hand the message straight to the channel rather than through the inbox, so it
  * is never written into the conversation history: a code that outlives the
  * minute it was good for is a code sitting in a database for no reason.
  */
 async function sendByWhatsApp(destination: Destination, text: string): Promise<{ error?: string }> {
     if (!destination.channelId) return { error: (await readerWords("api"))("refusals.twoFactor.noWhatsApp") };
     try {
-        await bridgeSend(destination.channelId, {
+        await sendThroughChannel(destination.channelId, {
             peerId: normalizePeerId("whatsapp", destination.address),
             text
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await readerWords("api"))("refusals.twoFactor.bridgeRefused") };
+        return { error: caught instanceof Error ? caught.message : (await readerWords("api"))("refusals.twoFactor.channelRefused") };
     }
 }

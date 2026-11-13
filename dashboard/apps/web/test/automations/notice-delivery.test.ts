@@ -26,11 +26,11 @@ const targets = vi.hoisted(() => ({
 const deploy = vi.hoisted(() => ({
     sendToProjectWebhook: vi.fn(async () => null as "gone" | "off" | "failed" | null)
 }));
-const bridge = vi.hoisted(() => ({ bridgeSend: vi.fn(async () => ({})) }));
+const channels = vi.hoisted(() => ({ sendThroughChannel: vi.fn(async () => ({})) }));
 const db = vi.hoisted(() => ({ hookExists: true }));
 vi.mock("../../src/lib/automations/notice-targets", () => targets);
 vi.mock("@/lib/deploy-project-service", () => deploy);
-vi.mock("@/lib/messaging/bridge-client", () => bridge);
+vi.mock("@/lib/messaging/channel-runtime", () => channels);
 vi.mock("@polaris/db", () => ({
     prisma: {
         projectWebhook: {
@@ -61,7 +61,7 @@ beforeEach(() => {
     targets.mayUseProjectWebhook.mockReset().mockResolvedValue(true);
     targets.mayUseMessagingChannel.mockReset().mockResolvedValue(true);
     deploy.sendToProjectWebhook.mockReset().mockResolvedValue(null);
-    bridge.bridgeSend.mockReset().mockResolvedValue({});
+    channels.sendThroughChannel.mockReset().mockResolvedValue({});
     db.hookExists = true;
 });
 
@@ -188,7 +188,7 @@ describe("the targets Watch alarms used", () => {
             }
         });
         expect(result.delivered).toEqual(["messaging"]);
-        expect(bridge.bridgeSend).toHaveBeenCalledWith(CHANNEL, {
+        expect(channels.sendThroughChannel).toHaveBeenCalledWith(CHANNEL, {
             peerId: "12345",
             text: `${BASE.title}\n${BASE.body}`
         });
@@ -208,11 +208,11 @@ describe("the targets Watch alarms used", () => {
         ).rejects.toMatchObject({
             output: { missed: [{ channel: "messaging", reason: "messagingGone" }] }
         });
-        expect(bridge.bridgeSend).not.toHaveBeenCalled();
+        expect(channels.sendThroughChannel).not.toHaveBeenCalled();
     });
 
     it("counts a disconnected channel as a miss, not a failed step", async () => {
-        bridge.bridgeSend.mockRejectedValue(new Error("not connected"));
+        channels.sendThroughChannel.mockRejectedValue(new Error("not connected"));
         const result = await deliverAutomationNotice({
             ...BASE,
             delivery: {

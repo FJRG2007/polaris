@@ -436,14 +436,14 @@ describe("an app that makes other installs", () => {
     });
 
     it("leaves an install nothing owns as its own row", () => {
-        const alone = claim("install:bridge", { group: "apps", id: "bridge", name: "Messaging bridge" });
+        const alone = claim("install:relay", { group: "apps", id: "relay", name: "Mail relay" });
         const groups = attribute(
             [container({ name: "bridge", composeProject: `polaris-${subjectHash(APP)}`, memUsedBytes: 50 })],
             index({ applications: new Map([[subjectHash(APP), alone]]) }),
             "local"
         );
         expect(group(groups, "apps").rows).toEqual([
-            expect.objectContaining({ name: "Messaging bridge", parts: [] })
+            expect.objectContaining({ name: "Mail relay", parts: [] })
         ]);
     });
 });
@@ -451,17 +451,17 @@ describe("an app that makes other installs", () => {
 describe("what Polaris started and then forgot", () => {
     // The case that was being read as somebody else's: a compose project of ours
     // whose Application row is gone. It happened on a live deployment - a
-    // messaging bridge holding 374 MB and a Minecraft server in a restart loop,
+    // mail relay holding 374 MB and a Minecraft server in a restart loop,
     // both filed under "Polaris did not start this", which is how they went on
     // holding it.
     it("is left behind rather than filed as a stranger's", () => {
         const groups = attribute(
-            [container({ name: "marketplace-messaging-bridge-4b4d", composeProject: "polaris-4b4d3c47", memUsedBytes: 374 })],
+            [container({ name: "marketplace-mail-relay-4b4d", composeProject: "polaris-4b4d3c47", memUsedBytes: 374 })],
             index(),
             "local"
         );
         expect(group(groups, "leftover").rows).toEqual([
-            expect.objectContaining({ name: "marketplace-messaging-bridge-4b4d", memUsedBytes: 374 })
+            expect.objectContaining({ name: "marketplace-mail-relay-4b4d", memUsedBytes: 374 })
         ]);
         expect(group(groups, "other").rows).toHaveLength(0);
     });

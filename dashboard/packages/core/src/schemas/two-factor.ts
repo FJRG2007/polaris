@@ -5,7 +5,7 @@
  * The authenticator is the baseline: it is what arms the factor in the first
  * place, it needs nothing from the deployment, and it cannot be turned off while
  * the factor is on - an account whose only remaining method depended on a mail
- * channel or a messaging bridge would be locked out the moment that broke. Every
+ * channel or a messaging channel would be locked out the moment that broke. Every
  * other method is opt-in and delivers a code Polaris has to send somewhere, so
  * each one costs a proved address and a working way to reach it.
  *
@@ -97,7 +97,7 @@ export type TwoFactorPreferencesInput = z.infer<typeof twoFactorPreferencesSchem
 
 /**
  * A phone number in international form. Stored and sent exactly as written: the
- * messaging bridge addresses WhatsApp by digits, and guessing at a country code
+ * WhatsApp channel addresses a number by digits, and guessing at a country code
  * for a bare local number would send someone else's code to a stranger.
  *
  * The spaces, dashes and brackets a number is usually copied with are dropped

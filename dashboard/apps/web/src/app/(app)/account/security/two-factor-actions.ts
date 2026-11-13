@@ -23,7 +23,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { methodLabel } from "./known-sentences";
 import { firstIssue, localized } from "./action-messages";
 import { normalizePeerId } from "@/lib/messaging-service";
-import { bridgeSend } from "@/lib/messaging/bridge-client";
+import { sendThroughChannel } from "@/lib/messaging/channel-runtime";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import {
     otpCodeField,
@@ -113,7 +113,7 @@ export async function sendPhoneCodeAction(): Promise<ActionResult> {
     }
 
     try {
-        await bridgeSend(channel.id, {
+        await sendThroughChannel(channel.id, {
             peerId: normalizePeerId("whatsapp", issued.phone),
             // Sent to this same person, so in the language they are reading in.
             text: t("phone.confirmationMessage", { code: issued.code, minutes: TWO_FACTOR_CODE_TTL_MINUTES })

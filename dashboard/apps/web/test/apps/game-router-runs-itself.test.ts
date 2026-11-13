@@ -74,8 +74,8 @@ describe("where the router has to be", () => {
     });
 
     it("is the control plane's network, not whichever came back first", async () => {
-        // The dashboard is also on the network a locally installed messaging bridge
-        // joins, and the order is not ours to rely on. A router on the wrong one
+        // The dashboard is also on the dedicated hub network (polaris-hub)
+        // too, and the order is not ours to rely on. A router on the wrong one
         // reaches nothing.
         docker.answer = JSON.stringify({
             NetworkSettings: { Networks: { "polaris-hub": {}, polaris_default: {} } },

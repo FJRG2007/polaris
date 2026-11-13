@@ -17,7 +17,7 @@ import { prisma } from "@polaris/db";
 import { notify } from "@/lib/notifications/dispatch";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { watchText } from "@/lib/watch/words";
-import { bridgeSend } from "@/lib/messaging/bridge-client";
+import { sendThroughChannel } from "@/lib/messaging/channel-runtime";
 import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
 import { stepAlarm } from "@/lib/alarm-state";
 import { localMachineIdentity, type LocalMachineIdentity } from "@/lib/local-machine";
@@ -230,7 +230,7 @@ async function notifyTransition(
     });
     if (alarm.notifyChannelId && alarm.notifyPeerId) {
         try {
-            await bridgeSend(alarm.notifyChannelId, {
+            await sendThroughChannel(alarm.notifyChannelId, {
                 peerId: alarm.notifyPeerId,
                 text: triggered
                     ? t("notices.alarmMessage", { name: alarm.name, detail: said })

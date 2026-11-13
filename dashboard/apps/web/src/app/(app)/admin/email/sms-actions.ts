@@ -2,7 +2,7 @@
 
 /**
  * SMS-sender actions, beside the email-sender ones for the same reason: nothing
- * here touches the messaging bridge. A text is posted to the provider by this process, so
+ * here touches a messaging channel. A text is posted to the provider by this process, so
  * the sender is stored and its credential checked in the request that asked.
  *
  * They live with the other senders rather than under a user's own notification

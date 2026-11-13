@@ -14,8 +14,8 @@ const WEB_INTERNAL_INGEST_URL = "http://web:3000/api/inbox/ingest";
 
 function basePlan(overrides: Partial<AppDeployPlan> = {}): AppDeployPlan {
     return {
-        ref: { name: "messaging-bridge", project: "polaris-abcd1234" },
-        build: { method: "image", name: "messaging-bridge", contextPath: "/ctx", imageRef: "polaris/messaging-bridge:latest" },
+        ref: { name: "chat-hub", project: "polaris-abcd1234" },
+        build: { method: "image", name: "chat-hub", contextPath: "/ctx", imageRef: "polaris/chat-hub:latest" },
         env: { BRIDGE_TOKEN: "tok", INGEST_KEY: "key", WEB_INGEST_URL: WEB_INTERNAL_INGEST_URL },
         replicas: 1,
         domains: [],
@@ -27,7 +27,7 @@ function basePlan(overrides: Partial<AppDeployPlan> = {}): AppDeployPlan {
 describe("hub deploy networks", () => {
     it("joins a local hub to the proxy network AND the dedicated hub network", () => {
         const plan = basePlan({ extraNetworks: [HUB_NETWORK] });
-        const spec = appComposeSpec(plan, "polaris/messaging-bridge:latest", PROXY_NETWORK);
+        const spec = appComposeSpec(plan, "polaris/chat-hub:latest", PROXY_NETWORK);
 
         // Service attaches to both networks (proxy first so edge routing is unchanged).
         expect(spec.services[0].networks).toEqual([PROXY_NETWORK, HUB_NETWORK]);
@@ -51,7 +51,7 @@ describe("hub deploy networks", () => {
 
     it("renders remote-path compose YAML with the hub network wired end to end", () => {
         const plan = basePlan({ extraNetworks: [HUB_NETWORK] });
-        const spec = appComposeSpec(plan, "polaris/messaging-bridge:latest", PROXY_NETWORK);
+        const spec = appComposeSpec(plan, "polaris/chat-hub:latest", PROXY_NETWORK);
         const yaml = renderComposeYaml(spec, "/var/polaris/volumes", "/var/polaris/mounts");
 
         // The service joins both networks and forwards inbound events to the web's

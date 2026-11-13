@@ -1,7 +1,7 @@
 /**
  * An installed app's adapted dashboard. The shell (status, lifecycle controls,
  * runtime logs) is shared; app-specific panels mount inside it keyed by the
- * catalog id (e.g. the Messaging bridge's channel panel). Apps without an adapted
+ * catalog id (e.g. a game server's console). Apps without an adapted
  * panel fall back to the shared log view.
  *
  * One catch-all route rather than a file per screen, so a game server's console,

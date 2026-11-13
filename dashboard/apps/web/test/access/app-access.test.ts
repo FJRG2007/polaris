@@ -124,7 +124,7 @@ describe("the Email & SMS door inside Management", () => {
         expect(await reachableAppIds(holding("drive.read"))).not.toContain("admin");
     });
 
-    it("opens the same senders whether or not the messaging bridge is installed", async () => {
+    it("opens the same senders whether or not any app is installed", async () => {
         const input = { ...holding("inbox.read"), isInstalled: async () => false };
         const app = (await reachableApps(input)).find((entry) => entry.id === "admin");
         expect(app?.label).toBe("Email & SMS");

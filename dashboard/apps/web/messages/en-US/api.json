@@ -159,7 +159,7 @@
             "tooManyCodes": "Too many codes asked for. Wait before asking for another.",
             "noWay": "This account has no way to be sent a code.",
             "noWhatsApp": "No WhatsApp channel to send through.",
-            "bridgeRefused": "The messaging bridge refused the message."
+            "channelRefused": "The channel could not send the message."
         },
         "users": {
             "banSelf": "You can't ban yourself.",

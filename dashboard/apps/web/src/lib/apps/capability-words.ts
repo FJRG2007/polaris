@@ -7,7 +7,6 @@ import type { AppCapability } from "@/lib/apps/catalog";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
 export const CAPABILITY_KEYS: Record<AppCapability, NamespaceKey<"marketplace">> = {
-    "messaging-hub": "capabilities.messagingHub",
     "messaging-channel": "capabilities.messagingChannel",
     "ai-assistant": "capabilities.aiAssistant",
     "game-manager": "capabilities.gameManager",

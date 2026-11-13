@@ -5,7 +5,7 @@
  * pixels is the one thing this process must never do: it is the dashboard, and a
  * dashboard that decodes video is a dashboard that stops answering. So it runs in
  * a worker, on the machine the owner picked per camera, and reports back over
- * HTTP - the same shape as the messaging bridge.
+ * HTTP.
  *
  * What the worker is told is deliberately small: which streams to watch, how
  * sensitive to be, how long to wait between detections, and where to ask who

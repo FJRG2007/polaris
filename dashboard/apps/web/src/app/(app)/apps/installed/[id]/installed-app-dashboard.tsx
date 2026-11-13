@@ -17,7 +17,6 @@ import { useRuntimeLog } from "./use-runtime-log";
 import { RedeployNote } from "./redeploy-note";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import { LogViewer } from "@/components/log-viewer";
-import { MessagingBridgePanel } from "./messaging-bridge-panel";
 import { appName } from "@/lib/apps/app-words";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -60,14 +59,9 @@ function adaptedPanelFor(
     /** Handed to a panel that polls, so what it learns reaches the header. */
     onStatus: (label: string | null, tone?: "danger") => void
 ) {
-    switch (app.catalogId) {
-        case "messaging-bridge":
-            return <MessagingBridgePanel />;
-        default:
-            return slot ? (
-                <AppSlotView slot={slot} host={{ app, settings, running, held, onStatus }} />
-            ) : null;
-    }
+    return slot ? (
+        <AppSlotView slot={slot} host={{ app, settings, running, held, onStatus }} />
+    ) : null;
 }
 
 export function InstalledAppDashboard({

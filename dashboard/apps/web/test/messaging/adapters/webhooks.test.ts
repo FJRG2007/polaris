@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DiscordWebhookAdapter } from "../../src/adapters/discord-webhook.js";
-import { SlackWebhookAdapter } from "../../src/adapters/slack-webhook.js";
+import { DiscordWebhookAdapter } from "@/lib/messaging/adapters/discord-webhook";
+import { SlackWebhookAdapter } from "@/lib/messaging/adapters/slack-webhook";
 import type { AdapterContext } from "@polaris/messaging";
 
 /**

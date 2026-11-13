@@ -28,7 +28,6 @@ import {
     Cloud,
     House,
     Mails,
-    MessagesSquare,
     ScanFace,
     Video,
     RadioTower,
@@ -44,7 +43,6 @@ export type AppCategory =
 /** What an installed app provides, driving derived nav and which adapted
  *  dashboard is mounted. An app may declare several. */
 export type AppCapability =
-    | "messaging-hub"
     | "messaging-channel"
     | "ai-assistant"
     | "game-manager"
@@ -264,27 +262,6 @@ export interface AppManifest {
 
 // i18n-ignore (marked per line below): manifest words are data; screens draw them through `app-words.ts` and the `catalog` namespace.
 export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
-    {
-        id: "messaging-bridge",
-        name: "Messaging bridge",
-        category: "Messaging",
-        icon: MessagesSquare,
-        summary: "Send alerts and codes over WhatsApp, Telegram, Discord and Slack.",
-        description:
-            "Runs the Polaris messaging bridge so alerts, notices and sign-in codes can go out over WhatsApp, Telegram, Discord and Slack. Self-hosted: the only external dependency is each platform and a phone number for WhatsApp.", // i18n-ignore
-        installMethod: "compose-template",
-        capabilities: ["messaging-hub"],
-        dashboard: "builtin",
-        singleton: true,
-        template: {
-            // Published by CI (.github/workflows/dashboard-publish.yml, `bridge` job)
-            // from dashboard/services/messaging-bridge; the marketplace installs it as
-            // a managed Deploy app rather than building from source on the host.
-            image: "ghcr.io/fjrg2007/polaris-messaging-bridge:latest",
-            volumes: [{ name: "sessions", mountPath: "/app/.sessions", label: "Channel sessions" }], // i18n-ignore
-            ports: [{ container: 8787, protocol: "http", label: "Bridge API" }] // i18n-ignore
-        }
-    },
     {
         // Every small job somebody opens a website for, done here instead. It is
         // one app rather than a dozen because the jobs share their halves: the
@@ -1600,7 +1577,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: Bot,
         summary: "An AI assistant that answers your messaging channels.",
         description:
-            "Deploys an OpenClaw AI assistant that connects to the messaging bridge and can auto-reply on any connected channel, with per-conversation handoff to a human agent.", // i18n-ignore
+            "Deploys an OpenClaw AI assistant that can auto-reply on any connected channel, with per-conversation handoff to a human agent.", // i18n-ignore
         installMethod: "compose-template",
         capabilities: ["ai-assistant"],
         dashboard: "builtin",
@@ -1614,7 +1591,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: Bot,
         summary: "A Hermes AI agent for your messaging channels.",
         description:
-            "Deploys a Hermes AI agent that reuses the messaging bridge to handle conversations autonomously, escalating to a human when needed.", // i18n-ignore
+            "Deploys a Hermes AI agent that handles conversations on your channels autonomously, escalating to a human when needed.", // i18n-ignore
         installMethod: "compose-template",
         capabilities: ["ai-assistant"],
         dashboard: "builtin",

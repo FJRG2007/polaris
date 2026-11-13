@@ -3,8 +3,8 @@
 [Read in English](marketplace.md) - [Volver al README](../../README.es.md)
 
 Las apps que Polaris puede añadir, instaladas con un clic: Calendario, CRM,
-Herramientas, un servidor de correo para tus dominios, servidores de juegos,
-Places para cámaras y dispositivos, y el puente de mensajería detrás del Inbox.
+Herramientas, un servidor de correo para tus dominios, servidores de juegos
+y Places para cámaras y dispositivos.
 
 Hay dos catálogos. Las apps propias de Polaris las activa para todos un
 administrador, desde **Gestión > Apps de Polaris**, que también lista las

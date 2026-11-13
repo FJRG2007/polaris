@@ -1,6 +1,7 @@
 /**
  * Messaging channels. The web is the source of truth: it stores channels (with
- * envelope-encrypted credentials) and drives the bridge to connect them; alerts,
+ * envelope-encrypted credentials) and runs them in this process (channel-runtime);
+ * alerts,
  * automation notices and two-factor codes are sent through them. Channel secrets
  * use the same AES-256-GCM master key as integrations and storage credentials.
  */
@@ -8,15 +9,11 @@
 import { EMAIL_PLATFORM } from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
-import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { encryptSecret } from "@polaris/storage";
 import { capabilitiesFor } from "@polaris/messaging";
 import type { ChannelCapabilities, ChannelSetup, Platform } from "@polaris/messaging";
-import {
-    bridgeChannelState,
-    bridgeConfigured,
-    bridgeConnectChannel,
-    bridgeDisconnectChannel
-} from "./messaging/bridge-client";
+import { hasWhatsAppSession } from "./messaging/whatsapp-session";
+import { connectLive, connectRequestFor, disconnectLive, liveState } from "./messaging/channel-runtime";
 
 export interface ChannelView {
     id: string;
@@ -37,7 +34,7 @@ function parseCapabilities(config: string): ChannelCapabilities | null {
     }
 }
 
-/** The owner's channels. Email channels share the table but are not the bridge's
+/** The owner's channels. Email channels share the table but have no live adapter
  *  to run, so they are left to the mail service (see EMAIL_PLATFORM). */
 export async function listChannels(ownerId: string): Promise<ChannelView[]> {
     const rows = await prisma.channel.findMany({
@@ -56,7 +53,7 @@ export async function listChannels(ownerId: string): Promise<ChannelView[]> {
 }
 
 /** Connect a new channel: persist it (encrypting the credential), then bring it
- *  online in the bridge. On failure the row is kept with an "error" status so the
+ *  online. On failure the row is kept with an "error" status so the
  *  operator can retry. */
 export async function connectChannel(
     ownerId: string,
@@ -102,7 +99,7 @@ export async function connectChannel(
         }
     });
     try {
-        const result = await bridgeConnectChannel({
+        const result = await connectLive({
             channelId: channel.id,
             platform: input.platform,
             provider: input.provider,
@@ -135,41 +132,16 @@ export async function connectChannel(
     }
 }
 
-/** Re-establish a channel's live adapter in the bridge, reusing its stored
- *  credentials (no need to re-enter a token). For token channels this fixes an
- *  errored connection in place; whatsapp-web restores from its session when valid. */
+/** Re-establish a channel's live adapter, reusing its stored credentials (no
+ *  need to re-enter a token). For token channels this fixes an errored connection
+ *  in place; whatsapp-web restores from its session when valid, or shows a QR. */
 export async function reconnectChannel(
     ownerId: string,
     channelId: string
 ): Promise<{ status: string }> {
-    const env = loadEnv();
     const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId } });
     if (!channel) throw new Error("Channel not found");
-    const token =
-        channel.encryptedSecret && channel.secretNonce && channel.secretKeyId
-            ? decryptSecret(
-                  {
-                      ciphertext: Buffer.from(channel.encryptedSecret),
-                      nonce: Buffer.from(channel.secretNonce),
-                      keyId: channel.secretKeyId
-                  },
-                  env.POLARIS_MASTER_KEY
-              )
-            : undefined;
-    let providerConfig: Record<string, string> | undefined;
-    try {
-        providerConfig = (JSON.parse(channel.config) as { providerConfig?: Record<string, string> })
-            .providerConfig;
-    } catch {
-        providerConfig = undefined;
-    }
-    const result = await bridgeConnectChannel({
-        channelId: channel.id,
-        platform: channel.platform as Platform,
-        provider: channel.provider ?? undefined,
-        token,
-        config: providerConfig
-    });
+    const result = await connectLive(connectRequestFor(channel));
     const status = result.externalId ? "connected" : "connecting";
     await prisma.channel.update({
         where: { id: channel.id },
@@ -247,11 +219,7 @@ export async function updateChannelCredentials(
 export async function deleteChannel(ownerId: string, channelId: string): Promise<void> {
     const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId } });
     if (!channel) throw new Error("Channel not found");
-    try {
-        await bridgeDisconnectChannel(channelId);
-    } catch {
-        // The bridge may not know it (restarted); removing the record still proceeds.
-    }
+    await disconnectLive(channelId);
     await prisma.channel.delete({ where: { id: channel.id } });
 }
 
@@ -283,7 +251,7 @@ export interface ChannelLiveState {
     setup?: ChannelSetup;
 }
 
-/** Poll the bridge for a channel's live state (QR / connected), persisting a
+/** Read a channel's live state (QR / connected), persisting a
  *  connected or errored result. Drives the whatsapp-web QR onboarding UI. */
 export async function channelState(ownerId: string, channelId: string): Promise<ChannelLiveState> {
     const channel = await prisma.channel.findFirst({
@@ -291,7 +259,9 @@ export async function channelState(ownerId: string, channelId: string): Promise<
         select: { id: true }
     });
     if (!channel) throw new Error("Channel not found");
-    const state = await bridgeChannelState(channelId);
+    // No adapter here (it failed, or was never started since a restart) reads as
+    // disconnected, which the list offers to reconnect.
+    const state = liveState(channelId) ?? { status: "disconnected" as const };
     if (state.status === "connected") {
         await prisma.channel.update({
             where: { id: channelId },
@@ -311,7 +281,7 @@ export async function channelState(ownerId: string, channelId: string): Promise<
  *
  * This runs every minute forever, so a reason reported on every pass is a line
  * per channel per minute for as long as the condition lasts - which, for a
- * bridge that is down for an afternoon, is hundreds of copies of one fact. Kept
+ * channel whose token stopped working for an afternoon, is hundreds of copies of one fact. Kept
  * here so the same reason is said once and a *changed* one is said again, and
  * cleared the moment a channel comes back so the next failure is not swallowed
  * by the memory of the last one.
@@ -325,28 +295,13 @@ function reportTrouble(channelId: string, reason: string): void {
     console.error(`reconcileChannels: could not re-establish ${channelId}:`, reason);
 }
 
-/** Re-establish live adapters in the bridge for channels the DB considers up. The
- *  bridge holds adapters in memory, so a bridge (or web) restart leaves a channel
- *  "connected" in the DB but dead at the bridge; this reconnects any whose bridge
- *  state is missing. whatsapp-web restores from its LocalAuth session without a new
- *  QR when the session is still valid. Best-effort and idempotent - channels the
- *  bridge already runs are left alone, so it never churns a healthy adapter. */
+/** Start adapters for channels the DB considers up. Adapters live in memory, so
+ *  a web restart leaves a channel "connected" in the DB with nothing running;
+ *  this starts any that are missing. whatsapp-web restores from its LocalAuth
+ *  session without a new QR when the session is still valid; one with no session
+ *  is marked disconnected instead of opening a browser nobody is watching.
+ *  Best-effort and idempotent - a running adapter is never churned. */
 export async function reconcileChannels(): Promise<void> {
-    // No bridge, nothing to reconcile - and nothing wrong. The bridge is an app
-    // somebody installs, so an instance that never installed one is not a broken
-    // instance, and every channel row left over from before it was removed is
-    // not a fault either.
-    //
-    // Reported as an error this was one line per channel per minute, forever,
-    // about a feature nobody had turned on. It is the first thing Polaris' own
-    // telemetry caught once it started listening, and it would have buried
-    // everything real underneath it.
-    if (!(await bridgeConfigured())) {
-        reconcileTrouble.clear();
-        return;
-    }
-
-    const env = loadEnv();
     const channels = await prisma.channel.findMany({
         where: { status: { in: ["connected", "connecting"] }, platform: { not: EMAIL_PLATFORM } }
     });
@@ -358,44 +313,24 @@ export async function reconcileChannels(): Promise<void> {
     }
 
     for (const channel of channels) {
-        try {
-            await bridgeChannelState(channel.id);
-            // The bridge already runs an adapter for this channel (in any state), so
-            // leave it. Never re-initialize a live whatsapp-web client just because it
-            // reports an error - a fresh init re-links the device, which WhatsApp flags
-            // as suspicious. Only (re)establish a channel whose adapter is truly gone.
+        // Already running here (in any state): leave it. Never re-initialize a live
+        // whatsapp-web client just because it reports an error - a fresh init
+        // re-links the device, which WhatsApp flags as suspicious.
+        if (liveState(channel.id)) {
             reconcileTrouble.delete(channel.id);
             continue;
-        } catch {
-            // Adapter absent (404) or bridge unreachable: (re)establish it below.
         }
         try {
-            const token =
-                channel.encryptedSecret && channel.secretNonce && channel.secretKeyId
-                    ? decryptSecret(
-                          {
-                              ciphertext: Buffer.from(channel.encryptedSecret),
-                              nonce: Buffer.from(channel.secretNonce),
-                              keyId: channel.secretKeyId
-                          },
-                          env.POLARIS_MASTER_KEY
-                      )
-                    : undefined;
-            let providerConfig: Record<string, string> | undefined;
-            try {
-                providerConfig = (
-                    JSON.parse(channel.config) as { providerConfig?: Record<string, string> }
-                ).providerConfig;
-            } catch {
-                providerConfig = undefined;
+            if (channel.platform === "whatsapp" && channel.provider !== "whatsapp-cloud") {
+                if (!hasWhatsAppSession(channel.id)) {
+                    await prisma.channel.update({
+                        where: { id: channel.id },
+                        data: { status: "disconnected" }
+                    });
+                    continue;
+                }
             }
-            await bridgeConnectChannel({
-                channelId: channel.id,
-                platform: channel.platform as Platform,
-                provider: channel.provider ?? undefined,
-                token,
-                config: providerConfig
-            });
+            await connectLive(connectRequestFor(channel));
             reconcileTrouble.delete(channel.id);
         } catch (caught) {
             reportTrouble(channel.id, caught instanceof Error ? caught.message : String(caught));
@@ -404,7 +339,7 @@ export async function reconcileChannels(): Promise<void> {
 }
 
 /** Run channel reconcile at startup and on an interval, so channels self-heal
- *  after a bridge or web restart without any manual reconnection. */
+ *  after a restart without any manual reconnection. */
 export function startChannelReconcile(): void {
     // The pass itself handles a channel that will not come back; what reaches
     // here is the pass failing outright - the database away, mostly. Said once

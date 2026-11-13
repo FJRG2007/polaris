@@ -963,12 +963,9 @@ const ADMIN_AREAS: AppSubapp[] = [
             },
             {
                 // The channels alerts, notices and sign-in codes go out through.
-                // Only here once the messaging bridge is installed: without it
-                // nothing on this screen can connect.
                 label: "Channels", // i18n-ignore
                 href: "/admin/email/channels",
                 needs: "inbox.read",
-                requiresApp: "messaging-bridge",
                 icon: Radio,
                 keywords: ["whatsapp", "telegram", "slack", "discord", "bot", "messaging"]
             },

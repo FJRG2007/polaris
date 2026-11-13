@@ -3,8 +3,8 @@
 [Leer en español](marketplace.es.md) - [Back to the README](../../README.md)
 
 The apps Polaris can add, installed with one press: Calendar, CRM, Tools, a
-mail server for your own domains, game servers, Places for cameras and smart
-devices, and the messaging bridge behind the Inbox.
+mail server for your own domains, game servers, and Places for cameras and smart
+devices.
 
 There are two marketplaces. Polaris's own apps are switched on for everybody
 by an administrator, from **Management > Polaris apps**, which also lists

@@ -42,7 +42,7 @@ export async function gameServerAccess(
     const install = await getInstalledApp(access.ownerId, installedAppId);
     // The games grants are about game servers, so they may not be spent on an
     // arbitrary install: without this a games.manage holder could stop or delete
-    // the messaging bridge by passing its id to a game action.
+    // any other app by passing its id to a game action.
     if (!install || !isGameServerApp(install.catalogId)) return null;
     return { ...access, install };
 }

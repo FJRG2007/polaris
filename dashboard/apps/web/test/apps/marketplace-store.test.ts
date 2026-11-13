@@ -18,6 +18,17 @@ import {
 
 const offered = (): AppManifest[] => appsByCategory().flatMap((group) => group.apps);
 const app = (id: string): AppManifest => findApp(id)!;
+/** An app that runs a container of its own and has its own page, as a community
+ *  app does - the catalog itself no longer ships one. */
+const containerApp: AppManifest = {
+    ...findApp("calendar")!,
+    id: "relay-fixture",
+    name: "Relay fixture",
+    dashboard: "generic",
+    opensAt: undefined,
+    installMethod: "compose-template",
+    template: { image: "ghcr.io/example/relay-fixture:1.0.0" }
+};
 const ids = (apps: readonly AppManifest[]) => apps.map((item) => item.id);
 
 describe("filtering and sorting the listing", () => {
@@ -77,11 +88,10 @@ describe("filtering and sorting the listing", () => {
 
 describe("shelves and the featured row", () => {
     it("puts Polaris's own apps on their shelf and somebody else's image on the other", () => {
-        const bridge = app("messaging-bridge");
         const theirs: AppManifest = {
-            ...bridge,
+            ...containerApp,
             id: "someone-elses",
-            template: { ...bridge.template, image: "nginx:1.27" }
+            template: { ...containerApp.template, image: "nginx:1.27" }
         };
         const shelves = storeShelves([app("calendar"), theirs]);
         expect(shelves.map((group) => group.shelf)).toEqual(["polaris", "community"]);
@@ -114,7 +124,6 @@ describe("the preview a card shows", () => {
     });
 
     it("is null for an app nobody has captured, so the card draws its placeholder", () => {
-        expect(appPreview("messaging-bridge", "en-US")).toBeNull();
         expect(appPreview("not-an-app", "en-US")).toBeNull();
     });
 });
@@ -123,7 +132,7 @@ describe("the action a card leads with", () => {
     const base = { installs: [], canInstall: true, installing: false };
 
     it("offers Install, with Configure only for an app that runs a container", () => {
-        expect(primaryAction(app("messaging-bridge"), base)).toEqual({
+        expect(primaryAction(containerApp, base)).toEqual({
             kind: "install",
             configurable: true
         });
@@ -144,7 +153,7 @@ describe("the action a card leads with", () => {
             kind: "installing"
         });
         expect(
-            primaryAction(app("messaging-bridge"), {
+            primaryAction(containerApp, {
                 ...base,
                 installs: [{ id: "i-1", status: "installing" }]
             })
@@ -160,7 +169,7 @@ describe("the action a card leads with", () => {
             })
         ).toEqual({ kind: "open", href: "/calendar" });
         expect(
-            primaryAction(app("messaging-bridge"), {
+            primaryAction(containerApp, {
                 ...base,
                 installs: [{ id: "i-2", status: "running" }]
             })
@@ -172,7 +181,7 @@ describe("the action a card leads with", () => {
     });
 
     it("badges a running install by its status and a builtin one as installed", () => {
-        expect(installBadge(app("messaging-bridge"), [{ id: "i", status: "running" }])).toEqual({
+        expect(installBadge(containerApp, [{ id: "i", status: "running" }])).toEqual({
             kind: "status",
             status: "running"
         });
@@ -184,13 +193,12 @@ describe("the action a card leads with", () => {
 });
 
 describe("the store's order", () => {
-    it("leads with the apps most deployments install, and puts the one being retired last", async () => {
+    it("leads with the apps most deployments install", async () => {
         const store = await import("@/lib/apps/marketplace-store");
         const ids = store.storeApps().map((app) => app.id);
         expect(ids[0]).toBe("home");
         const ranked = store.STORE_RANK.filter((id) => ids.includes(id));
         expect(ranked.map((id) => ids.indexOf(id))).toEqual([...ranked.keys()]);
-        expect(ids.indexOf("messaging-bridge")).toBeGreaterThan(ids.indexOf("arcade"));
     });
 
     it("never features an app being retired, and features the chosen ones in order", async () => {

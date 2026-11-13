@@ -51,7 +51,6 @@ vi.mock("@/lib/mail-server/app-install", () => ({
 const appUninstalled = vi.fn(async () => undefined);
 vi.mock("@/lib/app-bundles/lifecycle", () => ({ appUninstalled, appInstalled: vi.fn() }));
 vi.mock("@/lib/access-live", () => ({ publishAccessChange: vi.fn() }));
-vi.mock("@/lib/messaging/bridge-endpoint", () => ({ invalidateBridgeCache: vi.fn() }));
 vi.mock("@/lib/apps/install-presence", () => ({ invalidateInstallPresence: vi.fn() }));
 const purgeInstallFiles = vi.fn(async () => undefined);
 vi.mock("@/lib/app-extensions/registry", async (importOriginal) => ({

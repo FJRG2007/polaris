@@ -5,9 +5,19 @@ manages external apps Polaris runs) and the unified messaging system (a
 multi-platform support inbox plus a channel-adapter abstraction reusable by AI
 assistants).
 
-Status: Phase 0 complete; Phase 1 (Telegram) code-complete and typechecked
-(runtime verification pending an operator bot token + a running bridge). This
-document is the source of truth; keep it current as phases land.
+Status: Phase 0 complete; Phase 1 (Telegram) code-complete and typechecked.
+This document is the source of truth; keep it current as phases land.
+
+**2026-11-13: the messaging bridge is gone.** Every adapter now runs inside the
+web process (`apps/web/src/lib/messaging/adapters/`, started by
+`lib/messaging/channel-runtime.ts`) and channels are connected from Management >
+Email > Channels with nothing to install. WhatsApp Web talks WhatsApp's socket
+protocol through Baileys (no browser); a linked device's keys live under the data
+volume (`lib/messaging/whatsapp-session.ts`), so channels linked by the old
+bridge are scanned once more. Installs that still have the `messaging-bridge`
+app have it removed by the `retired-apps` cron job (`lib/apps/retired-apps.ts`).
+Sections below that describe the bridge service, its env vars and the
+`MESSAGING_BRIDGE_*` keys are history.
 
 ## Progress
 

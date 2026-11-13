@@ -4831,7 +4831,7 @@ model MinecraftChallengeLedger {
 
 // A connected account on a messaging platform (a Telegram bot, a WhatsApp number
 // via a chosen provider, a Discord/Slack app). The live adapter runs in the
-// messaging bridge; this row is the control-plane record. Credentials are
+// web process (lib/messaging/channel-runtime); this row is its record. Credentials are
 // envelope-encrypted with the same master key as integrations. owner/assignee/
 // assistant are bare uuids (no FK), per the InstalledApp precedent.
 model Channel {

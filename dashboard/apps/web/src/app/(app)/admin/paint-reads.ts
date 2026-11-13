@@ -56,7 +56,6 @@ export const PAINT_READS = {
     diagnostics: read(none, () => diagnostics.loadDiagnosticsAction()),
     email: read(none, () => email.loadEmailAdminAction(), true),
     channels: read(none, () => channels.loadChannelsAction(), true),
-    "channels.connect": read(none, () => channels.loadConnectChannelAction(), true),
     integrations: read(none, () => integrations.loadIntegrationsAction()),
     "integrations.runners": read(none, () => integrations.loadRunnerAccessAction()),
     "integrations.models": read(none, () => models.loadModelProvidersAction()),

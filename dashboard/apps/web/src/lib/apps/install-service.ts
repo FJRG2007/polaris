@@ -9,10 +9,8 @@
 import { prisma } from "@polaris/db";
 import { MARKETPLACE_PROJECT_SLUG } from "@/lib/deploy/managed-projects";
 import { randomBytes } from "node:crypto";
-import { loadEnv } from "@polaris/config";
 import { slugify } from "@polaris/deploy";
 import { listHosts } from "@/lib/host-service";
-import { encryptSecret } from "@polaris/storage";
 import { publishAccessChange } from "@/lib/access-live";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { availableHostPort } from "@/lib/apps/port-registry";
@@ -38,7 +36,6 @@ import {
     pauseOwnedServices,
     resumeOwnedServices
 } from "@/lib/apps/app-lifecycle";
-import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
 import { isPluginServer, purgeInstallFiles } from "@/lib/app-extensions/registry";
 import {
     getOrCreateHostTarget,
@@ -57,7 +54,6 @@ import {
     uninstallRefusal as mailServerUninstallRefusal
 } from "@/lib/mail-server/app-install";
 import {
-    appHasCapability,
     findApp,
     isAllowedEnvValue,
     isInstallable,
@@ -230,12 +226,6 @@ export async function installApp(
     const template = app.template!;
     const image = template.image!;
 
-    // The messaging hub needs the web and the bridge to share the API bearer.
-    // Minted here, injected as the bridge's env, and stored (encrypted) on the
-    // install so the web can resolve it later.
-    const isHub = appHasCapability(app, "messaging-hub");
-    const bridgeToken = isHub ? randomBytes(32).toString("hex") : null;
-
     // Resolve the server the operator chose: the local host, or an SSH host
     // adopted as a deploy target on first use (same path as Deploy).
     const target =
@@ -329,12 +319,6 @@ export async function installApp(
             });
         }
     }
-    // Hub wiring: the bridge reads these at startup (see services/messaging-bridge).
-    if (isHub && bridgeToken) {
-        const bridgePort = template.ports?.[0]?.container ?? 8787;
-        envByKey.set("BRIDGE_TOKEN", { value: bridgeToken, isSecret: true });
-        envByKey.set("BRIDGE_PORT", { value: String(bridgePort), isSecret: false });
-    }
     for (const entry of seed?.env ?? []) {
         envByKey.set(entry.key, { value: entry.value, isSecret: entry.isSecret });
     }
@@ -359,13 +343,6 @@ export async function installApp(
         });
     }
 
-    // Persist the hub's shared secret (encrypted) on the install, so the web can
-    // resolve the bridge's bearer when it dials it later.
-    const secretBlob =
-        isHub && bridgeToken
-            ? encryptSecret(JSON.stringify({ token: bridgeToken }), loadEnv().POLARIS_MASTER_KEY)
-            : null;
-
     const installed = await prisma.installedApp.create({
         data: {
             ...(seed ? { id: seed.installedAppId } : {}),
@@ -375,14 +352,7 @@ export async function installApp(
             targetId: target.id,
             applicationId: application.id,
             status: "installing",
-            installedById: actorId,
-            ...(secretBlob
-                ? {
-                      encryptedSecret: secretBlob.ciphertext,
-                      secretNonce: secretBlob.nonce,
-                      secretKeyId: secretBlob.keyId
-                  }
-                : {})
+            installedById: actorId
         }
     });
 
@@ -401,9 +371,6 @@ export async function installApp(
             where: { id: installed.id },
             data: { status: "running" }
         });
-        // The inbox resolves the bridge from installs; drop the cache so it appears
-        // configured immediately after this hub install rather than after the TTL.
-        if (isHub) invalidateBridgeCache();
     } catch {
         await prisma.installedApp.update({
             where: { id: installed.id },
@@ -713,8 +680,7 @@ export async function uninstallApp(
         }
         await prisma.installedApp.deleteMany({ where: { id: { in: ids } } });
     } else {
-        // Kept so a reinstall finds what was made in it, but not the credential:
-        // a removed install has no bridge to dial.
+        // Kept so a reinstall finds what was made in it, but not a credential.
         await prisma.installedApp.updateMany({
             where: { id: { in: ids } },
             data: {
@@ -743,8 +709,6 @@ export async function uninstallApp(
     // And gone: a switcher still offering it opens a screen for something that
     // is no longer installed.
     publishAccessChange();
-    // Forget any cached bridge endpoint so the inbox reflects the removal at once.
-    if (row.catalogId === "messaging-bridge") invalidateBridgeCache();
     // A private network the app was the last one on is not wanted any more. Not
     // awaited: the scheduled reconcile does the same, this only does it now.
     if (application) void reconcilePrivateNetworks().catch(() => undefined);

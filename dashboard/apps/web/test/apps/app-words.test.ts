@@ -68,15 +68,13 @@ describe("a server setting", () => {
 
 describe("an app in the marketplace", () => {
     it("reads in Spanish without changing what is installed", () => {
-        const app = findApp("messaging-bridge");
+        const app = findApp("translate");
         expect(app).toBeDefined();
         const read = localizeApp(es, app!);
-        expect(read.name).toBe("Puente de mensajería");
-        expect(read.summary).toContain("WhatsApp");
+        expect(read.summary).toContain("Traduce");
         expect(read.summary).not.toBe(app!.summary);
         expect(read.id).toBe(app!.id);
-        expect(read.template?.volumes?.[0]?.name).toBe("sessions");
-        expect(read.template?.volumes?.[0]?.label).toBe("Sesiones de canales");
+        expect(read.opensAt).toBe(app!.opensAt);
     });
 
     it("names a category, or hands it to the fallback when this catalog has none", () => {

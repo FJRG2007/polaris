@@ -125,7 +125,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/notifications/dispatch", () => ({ notify: vi.fn(async () => undefined) }));
-vi.mock("@/lib/messaging/bridge-client", () => ({ bridgeSend: vi.fn(async () => undefined) }));
+vi.mock("@/lib/messaging/channel-runtime", () => ({ sendThroughChannel: vi.fn(async () => ({})) }));
 vi.mock("@/lib/local-machine", () => ({
     localMachineIdentity: vi.fn(async () => ({
         hostId: null,
