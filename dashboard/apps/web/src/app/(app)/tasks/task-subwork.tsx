@@ -989,9 +989,12 @@ export function DependencySection({
     } | null>(null);
     const { shown, apply } = useOverlay(dependencies, onChanged, onError);
 
+    // A task already linked either way is not offered again: the same side would
+    // be a duplicate, and the other side a loop the server refuses.
+    const linked = new Set([taskId, ...shown.map((edge) => edge.taskId)]);
     const matches = query.trim()
         ? candidates
-              .filter((task) => task.id !== taskId)
+              .filter((task) => !linked.has(task.id))
               .filter(
                   (task) =>
                       task.name.toLowerCase().includes(query.trim().toLowerCase()) ||
