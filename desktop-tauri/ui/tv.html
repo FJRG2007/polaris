@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src ipc: http://ipc.localhost; base-uri 'none'; form-action 'none'"
+        />
+        <title data-text-window="tv.window">Install on a TV - Polaris</title>
+        <link rel="stylesheet" href="page.css" />
+    </head>
+    <body>
+        <div class="stack">
+            <div>
+                <h1 id="title" data-text="tv.title">Install on a TV</h1>
+                <p class="hint" data-text="tv.intro">
+                    For Android TV and Google TV. On the TV, open Settings, About, press Build 7 times, then
+                    turn on USB debugging in Developer options, and Network debugging to install over the
+                    network.
+                </p>
+            </div>
+
+            <nav class="tabs" role="tablist" aria-label="Connection" data-text-label="tv.connection">
+                <button id="tab-network" type="button" role="tab" aria-selected="true" data-text="tv.network">Network</button>
+                <button id="tab-usb" type="button" role="tab" aria-selected="false" data-text="tv.usb">USB cable</button>
+            </nav>
+
+            <div id="network" class="stack">
+                <label>
+                    <span data-text="tv.address">TV address</span>
+                    <input id="address" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" />
+                </label>
+                <p id="address-error" class="hint" role="alert" hidden></p>
+                <label id="code-field" hidden>
+                    <span data-text="tv.code">Pairing code</span>
+                    <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" spellcheck="false" />
+                </label>
+
+                <div class="row">
+                    <button id="find" type="button" data-text="tv.find">Find TVs</button>
+                    <div id="found" class="row"></div>
+                </div>
+            </div>
+
+            <div id="usb" class="stack" hidden>
+                <p class="hint" data-text="tv.usb-intro">
+                    Connect the TV to this computer with a USB cable. Close adb, Android Studio or scrcpy if
+                    they are open.
+                </p>
+                <div class="row">
+                    <button id="find-usb" type="button" data-text="tv.find">Find TVs</button>
+                    <div id="usb-found" class="row"></div>
+                </div>
+                <p id="usb-none" class="hint" role="status" data-text="tv.usb-none" hidden>
+                    No TV found on this computer's USB ports. Check the cable and that USB debugging is on.
+                </p>
+            </div>
+
+            <fieldset class="stack">
+                <legend data-text="tv.how">How to install it</legend>
+                <label class="row">
+                    <input id="mode-system" type="radio" name="mode" value="system" checked />
+                    <span data-text="tv.mode-system">As the TV's system: it becomes the Home screen and gets every permission this TV allows. The
+                    TV's own Home stays installed and enabled.</span>
+                </label>
+                <label class="row">
+                    <input id="mode-app" type="radio" name="mode" value="app" />
+                    <span data-text="tv.mode-app">Only as an app: nothing else on the TV changes.</span>
+                </label>
+            </fieldset>
+
+            <label class="row">
+                <input id="block-ads" type="checkbox" />
+                <span data-text="tv.block-ads">Let it block ads and trackers. Turn it on later in the TV's Launcher settings; it checks itself
+                and puts the TV's own DNS back if it does not work. Android 9 or newer.</span>
+            </label>
+
+            <p class="hint" data-text="tv.backup-note">
+                A backup of the TV's settings, its DNS included, is saved here first. Nothing is uninstalled or disabled, and
+                debugging is turned off when it finishes.
+            </p>
+
+            <p id="step" class="hint" hidden></p>
+            <p id="waiting" role="status" hidden></p>
+            <p id="home-rule" class="hint" hidden></p>
+            <p id="result" role="status" hidden></p>
+            <ul id="control" class="hint" hidden></ul>
+            <p id="closed" class="hint" hidden></p>
+            <p id="backup" class="hint path" hidden></p>
+
+            <div class="row">
+                <button id="start" type="button" data-text="tv.install">Install</button>
+            </div>
+        </div>
+        <script src="i18n.js"></script>
+        <script src="dom.js"></script>
+        <script src="tv.js"></script>
+    </body>
+</html>

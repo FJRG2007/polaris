@@ -304,16 +304,66 @@ mod tests {
             .collect();
         let unknown: Vec<_> = called.difference(&granted).collect();
         assert!(unknown.is_empty(), "not Polaris commands: {unknown:?}");
-        // The push window's own steps: `pushLocal` opens that window in the
-        // Electron app, and the beta has no such window yet.
-        let unmapped: BTreeSet<String> = granted.difference(&called).cloned().collect();
-        assert_eq!(
-            unmapped,
-            ["push-cancel", "push-choose-folder", "push-start"]
-                .map(String::from)
-                .into(),
-            "a Polaris command bridge.js does not map"
+        // Every Polaris command is reached from the bridge: the push window's own
+        // steps went to that window's capability with `pushLocal`.
+        let unmapped: Vec<_> = granted.difference(&called).collect();
+        assert!(
+            unmapped.is_empty(),
+            "a Polaris command bridge.js does not map: {unmapped:?}"
         );
+    }
+
+    /// The commands a page of the app's own calls, by their Tauri names.
+    fn page_commands(script: &str) -> BTreeSet<String> {
+        script
+            .match_indices("invoke(\"")
+            .map(|(at, _)| {
+                let rest = &script[at + 8..];
+                rest[..rest.find('"').expect("a closed name")].replace('_', "-")
+            })
+            .collect()
+    }
+
+    /// The commands a capability file grants.
+    fn granted(capability: &str) -> BTreeSet<String> {
+        let parsed: Value = serde_json::from_str(capability).expect("a capability");
+        parsed["permissions"]
+            .as_array()
+            .expect("permissions")
+            .iter()
+            .filter_map(|one| one.as_str()?.strip_prefix("allow-").map(str::to_owned))
+            .collect()
+    }
+
+    #[test]
+    fn the_push_and_tv_pages_call_exactly_what_their_windows_are_granted() {
+        for (script, capability) in [
+            (
+                include_str!("../../ui/push.js"),
+                include_str!("../capabilities/push.json"),
+            ),
+            (
+                include_str!("../../ui/tv.js"),
+                include_str!("../capabilities/tv.json"),
+            ),
+        ] {
+            assert_eq!(page_commands(script), granted(capability));
+        }
+        // No Polaris window is granted the push window's steps, and the push page
+        // is the only one granted them.
+        for step in [
+            "push-state",
+            "push-choose-folder",
+            "push-start",
+            "push-cancel",
+            "push-open-service",
+        ] {
+            assert!(!crate::ipc::POLARIS_COMMANDS.contains(&step), "{step}");
+        }
+        let push: Value =
+            serde_json::from_str(include_str!("../capabilities/push.json")).expect("push");
+        assert_eq!(push["windows"], serde_json::json!(["push-*"]));
+        assert_eq!(push["local"], true);
     }
 
     #[test]
@@ -348,6 +398,7 @@ mod tests {
     #[test]
     fn the_update_check_answers_a_build_that_does_not_update() {
         assert!(BRIDGE_JS.contains("return answer({ kind: \"unsupported\" });"));
-        assert!(BRIDGE_JS.contains("updateReady: function () {\n        return answer(null);"));
+        assert!(BRIDGE_JS.contains("return ask(\"update_ready\", {}, null);"));
+        assert!(BRIDGE_JS.contains("return listen(\"polaris://update-ready\", listener);"));
     }
 }

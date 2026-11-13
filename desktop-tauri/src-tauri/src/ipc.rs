@@ -370,15 +370,13 @@ pub fn open_window(app: AppHandle, window: WebviewWindow, input: OpenWindow) -> 
 }
 
 /// The commands a Polaris window may call, each checked again with `from_polaris`.
-pub const POLARIS_COMMANDS: [&str; 31] = [
+pub const POLARIS_COMMANDS: [&str; 36] = [
     "open-servers",
     "open-window",
     "show-notice",
     "set-app-badge",
     "set-call-hotkeys",
-    "push-choose-folder",
-    "push-start",
-    "push-cancel",
+    "push-local",
     "upload-folder",
     "install-tool",
     "running-game",
@@ -402,6 +400,13 @@ pub const POLARIS_COMMANDS: [&str; 31] = [
     "can-draw-on-share",
     "stop-drawing",
     "text-size-seen",
+    "open-tv-install",
+    "open-mail-defaults",
+    "default-browser",
+    "system-idle",
+    "close-notice",
+    "update-ready",
+    "install-update",
 ];
 
 /// What `bridge.js` needs beyond the commands: hearing the events the app

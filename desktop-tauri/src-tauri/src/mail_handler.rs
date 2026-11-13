@@ -19,7 +19,7 @@ const PROG_ID: &str = "Polaris.Beta.Url.mailto";
 const APP_KEY: &str = r"Software\Polaris Beta";
 const CAPABILITIES: &str = r"Software\Polaris Beta\Capabilities";
 const REGISTERED: &str = r"Software\RegisteredApplications";
-const REGISTERED_NAME: &str = "Polaris Beta";
+pub const REGISTERED_NAME: &str = "Polaris Beta";
 
 /// One value written under HKCU: the key, the value's name (`None` for the
 /// key's default) and its text.

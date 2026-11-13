@@ -1,6 +1,9 @@
-// The servers page: first run and the list. Every check and change happens in
-// the app (src-tauri/src/ipc.rs); this page only shows what it answers.
+// The servers page (`desktop/src/renderer/connect.ts`): first run and the list -
+// open, rename, change the address of and remove each server, add one, and pass
+// the list to another computer. Every check and change happens in the app
+// (src-tauri/src/ipc.rs, host_transfer.rs); this page only shows what it answers.
 const invoke = (command, args) => window.__TAURI__.core.invoke(command, args);
+const t = window.polarisText.t;
 const $ = (id) => document.getElementById(id);
 const form = $("connect");
 const field = $("address");
@@ -9,6 +12,7 @@ const problem = $("problem");
 const check = $("check");
 const button = $("open");
 const list = $("servers");
+const shared = $("shared");
 
 function say(element, text) {
     element.textContent = text || "";
@@ -16,7 +20,7 @@ function say(element, text) {
 }
 
 function failed(error) {
-    return typeof error === "string" ? error : "Polaris could not do that. Try again.";
+    return typeof error === "string" ? error : t("app.retry");
 }
 
 function rowButton(text, onPress) {
@@ -30,8 +34,23 @@ function rowButton(text, onPress) {
 
 async function act(row, command, args) {
     const outcome = await invoke(command, args).catch((error) => ({ ok: false, error: failed(error) }));
-    if (!outcome?.ok) say(row.querySelector(".problem"), outcome?.error ?? "Polaris could not do that. Try again.");
+    if (!outcome?.ok) say(row.querySelector(".problem"), outcome?.error ?? t("app.retry"));
     else await refresh();
+}
+
+/** An inline field over the row's label: Enter saves, Escape puts the row back. */
+function editInPlace(label, value, ariaLabel, save) {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = value;
+    input.setAttribute("aria-label", ariaLabel);
+    input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") save(input.value);
+        if (event.key === "Escape") refresh();
+    });
+    label.replaceWith(input);
+    input.focus();
+    return input;
 }
 
 function drawRow(server) {
@@ -44,30 +63,34 @@ function drawRow(server) {
     if (server.active) {
         const badge = document.createElement("span");
         badge.className = "badge";
-        badge.textContent = "In use";
+        badge.textContent = t("connect.in-use");
         row.append(badge);
     }
-    row.append(rowButton(server.active ? "Show" : "Open", () => act(row, "connect_switch", { origin: server.origin })));
     row.append(
-        rowButton("Rename", () => {
-            const input = document.createElement("input");
-            input.type = "text";
+        rowButton(server.active ? t("connect.show") : t("connect.open"), () =>
+            act(row, "connect_switch", { origin: server.origin })
+        )
+    );
+    row.append(
+        rowButton(t("connect.rename"), () => {
+            const input = editInPlace(label, server.name ?? "", t("connect.new-name", { host: server.host }), (name) =>
+                act(row, "connect_rename", { input: { origin: server.origin, name } })
+            );
             input.maxLength = 40;
-            input.value = server.name ?? "";
-            input.setAttribute("aria-label", `New name for ${server.host}`);
-            input.addEventListener("keydown", (event) => {
-                if (event.key === "Enter") act(row, "connect_rename", { input: { origin: server.origin, name: input.value } });
-                if (event.key === "Escape") refresh();
-            });
-            label.replaceWith(input);
-            input.focus();
         })
     );
+    row.append(
+        rowButton(t("connect.move"), () =>
+            editInPlace(label, server.origin, t("connect.new-address", { host: server.host }), (address) =>
+                act(row, "connect_edit", { input: { origin: server.origin, address, name: server.name ?? "" } })
+            )
+        )
+    );
     // Removing asks twice on the row itself: no native confirm.
-    const remove = rowButton("Remove", () => {
+    const remove = rowButton(t("connect.remove"), () => {
         if (remove.dataset.armed) return act(row, "connect_remove", { origin: server.origin });
         remove.dataset.armed = "1";
-        remove.textContent = "Remove for good?";
+        remove.textContent = t("connect.remove-sure");
     });
     row.append(remove);
     const rowProblem = document.createElement("p");
@@ -83,6 +106,7 @@ async function refresh() {
     say($("load-error"), state.error);
     list.replaceChildren(...state.servers.map(drawRow));
     $("empty").hidden = state.servers.length > 0;
+    $("share").hidden = state.servers.length === 0;
     $("close").hidden = !state.address;
 }
 
@@ -106,15 +130,47 @@ form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!field.value.trim() || button.disabled) return;
     button.disabled = true;
-    button.textContent = "Checking...";
+    button.textContent = t("connect.checking");
     say(problem, "");
     const outcome = await invoke("connect_submit", { input: { address: field.value, name: nameField.value } }).catch(
         (error) => ({ ok: false, error: failed(error) })
     );
     button.disabled = false;
-    button.textContent = "Add and open";
-    if (!outcome?.ok) say(problem, outcome?.error ?? "Could not open that address. Try again.");
+    button.textContent = t("connect.submit");
+    if (!outcome?.ok) say(problem, outcome?.error ?? t("connect.open-failed"));
     else await refresh();
+});
+
+/** What an import or a file answered, in one line. */
+async function imported(command, args) {
+    const outcome = await invoke(command, args).catch((error) => ({ ok: false, error: failed(error) }));
+    if (outcome?.ok && typeof outcome.added === "number") {
+        say(shared, t("connect.added", { count: outcome.added }));
+        await refresh();
+    } else if (outcome && !outcome.ok && outcome.error) say(shared, outcome.error);
+    else say(shared, "");
+    return outcome;
+}
+
+$("copy").addEventListener("click", async () => {
+    const copied = await invoke("copy_hosts").catch((error) => ({ ok: false, error: failed(error) }));
+    say(shared, copied?.ok ? t("connect.copied") : failed(copied?.error));
+});
+$("save-file").addEventListener("click", () => imported("save_hosts_file"));
+$("open-file").addEventListener("click", () => imported("import_hosts_file"));
+$("import").addEventListener("click", async () => {
+    const text = $("paste").value.trim();
+    if (!text) return;
+    const outcome = await imported("import_hosts", { text });
+    if (outcome?.ok) $("paste").value = "";
+});
+$("show-qr").addEventListener("click", async () => {
+    const qr = await invoke("hosts_qr").catch(() => null);
+    const svg = $("qr");
+    if (!qr) return say(shared, t("app.retry"));
+    svg.setAttribute("viewBox", `0 0 ${qr.size} ${qr.size}`);
+    $("qr-path").setAttribute("d", qr.path);
+    svg.hidden = false;
 });
 
 $("close").addEventListener("click", () => invoke("connect_close"));

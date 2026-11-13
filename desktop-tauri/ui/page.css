@@ -1,0 +1,921 @@
+/*
+ * The app's own pages: the address form, the key form and the push window.
+ * The dashboard's palette - its backgrounds in each theme, the violet of the mark -
+ * so moving from one of these to the dashboard does not look like two programs.
+ */
+
+:root {
+    color-scheme: light dark;
+    --ground: #f6f6f9;
+    --surface: #ffffff;
+    --text: #16171a;
+    --muted: #5f6470;
+    --line: #dcdde3;
+    --accent: #7632ec;
+    --accent-text: #ffffff;
+    --danger: #c62828;
+    --success: #1f7a4d;
+    --code: #0f1013;
+    --code-text: #d6d8de;
+    --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    /* The dashboard's type scale (dashboard/docs/design.md), in rem of the root
+       below, so every step follows the account's text size exactly as the
+       dashboard's do: 13px body at the default 16. */
+    --text-title: 1.0625rem;
+    --text-dialog: 0.9375rem;
+    --text-heading: 0.875rem;
+    --text-body: 0.8125rem;
+    --text-small: 0.75rem;
+    --text-label: 0.6875rem;
+    font-family: var(--font-sans);
+    /* The root is the account's text size, as the dashboard's html is; the
+       preload sets it before the first paint. */
+    font-size: 16px;
+}
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-weight: 400;
+    font-display: block;
+    src: url("fonts/IBMPlexSans-Regular.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-weight: 500;
+    font-display: block;
+    src: url("fonts/IBMPlexSans-Medium.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-weight: 600;
+    font-display: block;
+    src: url("fonts/IBMPlexSans-SemiBold.woff2") format("woff2");
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ground: #0b0c0e;
+        --surface: #131418;
+        --text: #eceef2;
+        --muted: #9a9fab;
+        --line: #272930;
+        --danger: #f0716b;
+        --success: #4cc38a;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 20px 20px 16px;
+    background: var(--ground);
+    color: var(--text);
+    font-size: var(--text-body);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Everything that takes a press says so; what cannot be pressed now says that. */
+button,
+select,
+summary,
+a[href],
+[role="tab"],
+[role="switch"],
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"],
+label:has(> input[type="checkbox"]),
+label:has(> input[type="radio"]) {
+    cursor: pointer;
+}
+
+button:disabled,
+button[aria-disabled="true"],
+select:disabled,
+input:disabled,
+label:has(> input:disabled) {
+    cursor: not-allowed;
+}
+
+h1 {
+    margin: 0 0 4px;
+    font-size: var(--text-title);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+p {
+    margin: 0;
+}
+
+.lead {
+    color: var(--muted);
+    margin-bottom: 20px;
+}
+
+.mark {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 16px;
+    display: block;
+}
+
+form,
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: var(--text-small);
+    font-weight: 500;
+    color: var(--muted);
+}
+
+fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+legend {
+    padding: 0;
+    margin-bottom: 6px;
+    font-size: var(--text-small);
+    font-weight: 500;
+    color: var(--muted);
+}
+
+.field {
+    position: relative;
+    display: flex;
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    font: inherit;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.3125rem 0.625rem;
+}
+
+.field input {
+    padding-right: 64px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+input[aria-invalid="true"] {
+    border-color: var(--danger);
+}
+
+.reveal {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 4px 8px;
+    font-size: var(--text-small);
+}
+
+.hint {
+    font-size: var(--text-small);
+    color: var(--muted);
+    font-weight: 400;
+}
+
+.error {
+    font-size: var(--text-body);
+    color: var(--danger);
+}
+
+.found {
+    font-size: var(--text-small);
+    color: var(--success);
+}
+
+.banner {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: var(--text-body);
+}
+
+.banner.bad {
+    border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+    color: var(--danger);
+}
+
+.banner.good {
+    border-color: color-mix(in srgb, var(--success) 45%, transparent);
+    color: var(--success);
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+/* A checkbox or radio beside its text: label alone stacks them in a column. */
+label.row {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+}
+
+label.row > input {
+    flex-shrink: 0;
+    width: auto;
+    padding: 0;
+    margin-top: 2px;
+}
+
+.row.end {
+    justify-content: flex-end;
+}
+
+.spread {
+    flex: 1;
+    min-width: 0;
+}
+
+button {
+    font: inherit;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+    min-height: 2rem;
+    padding: 0 0.75rem;
+    font-weight: 500;
+    transition: background-color 120ms, border-color 120ms, color 120ms;
+}
+
+button:not(.primary, .danger, .link, .icon, [role="tab"], .server-open):hover {
+    border-color: color-mix(in srgb, var(--text) 22%, var(--line));
+    background: color-mix(in srgb, var(--text) 5%, var(--surface));
+}
+
+button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+    font-weight: 500;
+}
+
+button.link {
+    border: none;
+    background: none;
+    min-height: 0;
+    padding: 0;
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+button[aria-disabled="true"],
+button:disabled {
+    opacity: 0.55;
+}
+
+.path {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--text-small);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted);
+}
+
+.steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: var(--text-small);
+    color: var(--muted);
+}
+
+.steps li {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 10px;
+}
+
+.steps li[data-state="current"] {
+    border-color: var(--accent);
+    color: var(--text);
+}
+
+.steps li[data-state="done"] {
+    color: var(--success);
+}
+
+.steps li[data-state="failed"] {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.steps li[data-state="cancelled"] {
+    color: var(--text);
+}
+
+progress {
+    width: 100%;
+    height: 6px;
+    accent-color: var(--accent);
+}
+
+pre.log {
+    margin: 0;
+    height: 300px;
+    overflow: auto;
+    background: var(--code);
+    color: var(--code-text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--text-small);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+h2 {
+    margin: 0 0 8px;
+    font-size: var(--text-body);
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.brand .mark {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+}
+
+.brand h1 {
+    margin: 0;
+}
+
+.tabs {
+    display: flex;
+    gap: 2px;
+    margin: 0 0 12px;
+    border-bottom: 1px solid var(--line);
+}
+
+.tabs button {
+    margin-bottom: -1px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: none;
+    color: var(--muted);
+    padding: 0 0.625rem;
+}
+
+.tabs button:hover {
+    color: var(--text);
+}
+
+#usb-found button[aria-pressed="true"] {
+    border-color: var(--accent);
+}
+
+.tabs button[aria-selected="true"] {
+    border-bottom-color: var(--accent);
+    color: var(--text);
+}
+
+.server-list {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.server {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 4px;
+}
+
+.server-open {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 0;
+    background: none;
+    color: inherit;
+    min-height: 0;
+    padding: 4px 8px;
+    font-weight: 400;
+    text-align: left;
+}
+
+.server-open[aria-current="true"] {
+    cursor: default;
+}
+
+.server .acts {
+    display: flex;
+    flex-shrink: 0;
+    gap: 2px;
+}
+
+.server .names {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.server .name,
+.server .host {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.name {
+    color: var(--text);
+    font-weight: 500;
+}
+
+dialog > .name:first-child {
+    font-size: var(--text-dialog);
+    font-weight: 600;
+}
+
+.server .host {
+    color: var(--muted);
+    font-size: var(--text-body);
+}
+
+.server .host:empty {
+    display: none;
+}
+
+.server .badge {
+    flex-shrink: 0;
+    color: var(--muted);
+    font-size: var(--text-small);
+}
+
+.server input {
+    flex: 1;
+    min-width: 0;
+}
+
+.field-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+button.ghost {
+    background: none;
+}
+
+button.danger {
+    border-color: transparent;
+    background: var(--danger);
+    color: var(--accent-text);
+}
+
+label.setting {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 -10px;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: var(--text-body);
+    color: var(--text);
+    cursor: pointer;
+}
+
+/* Rows of switches read as one list: no box around each, only a tint under
+   the one the pointer is on. */
+label.setting:hover {
+    background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.setting-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.switch {
+    appearance: none;
+    flex-shrink: 0;
+    position: relative;
+    width: 2.25rem;
+    height: 1.25rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: var(--line);
+    transition: background-color 120ms;
+}
+
+.switch::after {
+    content: "";
+    position: absolute;
+    top: 0.125rem;
+    left: 0.125rem;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 120ms;
+}
+
+.switch:checked {
+    background: var(--accent);
+}
+
+.switch:checked::after {
+    transform: translateX(1rem);
+}
+
+.version {
+    margin-top: 12px;
+}
+
+/* The app's own line under the settings: set apart from them, not one more row. */
+.version-row {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+}
+
+.version-row .version {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+}
+
+dialog {
+    width: min(340px, calc(100vw - 32px));
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    padding: 20px;
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+}
+
+dialog.wide {
+    width: min(420px, calc(100vw - 32px));
+}
+
+/* A list's heading, with the actions on the whole list beside it. */
+.section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.section-head .acts {
+    display: flex;
+    gap: 2px;
+}
+
+.transfer-note {
+    margin-bottom: 8px;
+}
+
+svg.qr {
+    display: block;
+    width: min(13rem, 100%);
+    height: auto;
+    margin: 0 auto 14px;
+    padding: 10px;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+video.scan {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    /* A large text size grows everything around the camera: it gives way so the
+       buttons below stay in the window. */
+    max-height: calc(100vh - 17rem);
+    object-fit: cover;
+    margin-bottom: 14px;
+    border-radius: 8px;
+    background: #000000;
+    object-fit: cover;
+}
+
+dialog textarea {
+    resize: vertical;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+    font-family: ui-monospace, monospace;
+    font-size: var(--text-small);
+    word-break: break-all;
+}
+
+dialog::backdrop {
+    background: rgb(0 0 0 / 50%);
+}
+
+dialog .hint {
+    display: block;
+    margin: 4px 0 14px;
+}
+
+button.icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border-color: transparent;
+    background: none;
+    color: var(--muted);
+}
+
+button.icon:hover {
+    color: var(--text);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+button.icon svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+
+button.icon [data-icon] {
+    display: inline-flex;
+}
+
+/* The window shown while an update goes in. */
+.splash {
+    min-height: 100vh;
+    padding: 24px;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    overflow: hidden;
+    user-select: none;
+    app-region: drag;
+    background: radial-gradient(circle 112px at 50% 38%, rgb(118 50 236 / 0.2), transparent), var(--ground);
+}
+
+.splash-mark {
+    display: block;
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 24px;
+    animation: splash-breathe 2.4s ease-in-out infinite;
+}
+
+.splash h1 {
+    font-size: 1.25rem;
+}
+
+.splash p {
+    color: var(--muted);
+}
+
+.splash-line {
+    width: 180px;
+    height: 3px;
+    margin: 28px auto 0;
+    overflow: hidden;
+    border-radius: 3px;
+    background: var(--line);
+}
+
+.splash-line span {
+    display: block;
+    width: 40%;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent);
+    animation: splash-cross 1.5s ease-in-out infinite;
+}
+
+@keyframes splash-breathe {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+@keyframes splash-cross {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(250%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .splash-mark {
+        animation: none;
+    }
+
+    .splash-line span {
+        width: 100%;
+        animation: none;
+        opacity: 0.6;
+    }
+}
+
+/* The settings laid over the Polaris window (`openLocalSheet`). */
+.panel {
+    position: relative;
+}
+
+.sheet {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 56px 24px 24px;
+    background: rgb(5 6 8 / 0.55);
+}
+
+.sheet::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto;
+    height: 48px;
+    app-region: drag;
+}
+
+.sheet .panel {
+    width: min(540px, 100%);
+    max-height: calc(100vh - 80px);
+    overflow: auto;
+    padding: 20px 20px 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 24px 80px rgb(0 0 0 / 0.4);
+}
+
+/* The card rises in once it is shown, not while it waits for its state. */
+.sheet .panel:not([data-loading]) {
+    animation: sheet-in 160ms ease-out;
+}
+
+.sheet-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+@keyframes sheet-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sheet .panel {
+        animation: none;
+    }
+}
+
+.switch:disabled {
+    opacity: 0.5;
+}
+
+/* Kept out of sight until its first state is drawn (connect.ts). */
+.panel[data-loading] {
+    visibility: hidden;
+}
+
+.section-title {
+    color: var(--text);
+    font-size: var(--text-heading);
+    font-weight: 600;
+}
+.divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: var(--text-small);
+}
+.divider::before,
+.divider::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--line);
+}
+.alts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+}
+.alts button,
+button.with-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 0;
+}
+.alts svg,
+button.with-icon svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+.alts [data-icon],
+button.with-icon [data-icon] {
+    display: inline-flex;
+}
+button.with-icon {
+    align-self: flex-start;
+}
+dialog .banner {
+    margin-bottom: 14px;
+}
+dialog #send-note {
+    margin-top: -4px;
+}
+/* A host being edited: its address and name in place of the row. */
+.server.editing {
+    display: block;
+    padding: 12px;
+}
+.row-edit {
+    gap: 10px;
+}
+.row-edit .error,
+.row-edit .hint {
+    margin: 0;
+}

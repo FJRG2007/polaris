@@ -15,7 +15,6 @@
     if (Object.prototype.hasOwnProperty.call(window, "polarisDesktop")) return;
 
     var REFUSAL = "This window may not do that.";
-    var ABSENT = "This version of the app cannot do that yet.";
 
     function internals() {
         var found = window.__TAURI_INTERNALS__;
@@ -138,18 +137,24 @@
         if (input.body !== undefined) notice.body = input.body;
         return ask("show_notice", { notice: notice }, false);
     },
-    closeNotice: function () {
-        return answer(undefined);
+    closeNotice: function (tag) {
+        return ask("close_notice", { tag: tag === undefined ? null : tag }, undefined).then(nothing);
     },
-    onNoticeReply: stop,
-    onNoticeAction: stop,
+    // The notification plugin has no reply box or buttons on desktop, so these
+    // events are never sent; a listener is kept as the Electron app keeps it.
+    onNoticeReply: function (listener) {
+        return listen("polaris://notice-reply", listener);
+    },
+    onNoticeAction: function (listener) {
+        return listen("polaris://notice-action", listener);
+    },
     pickFolder: function () {
         return invoke("upload_folder").then(readFolder, function () {
             return { ok: false, error: REFUSAL };
         });
     },
-    pushLocal: function () {
-        return answer({ ok: false, error: ABSENT });
+    pushLocal: function (input) {
+        return ask("push_local", { input: input === undefined ? null : input }, { ok: false, error: REFUSAL });
     },
     openWindow: function (input) {
         return ask("open_window", { input: input }, { ok: false, error: "That is not a page of this Polaris." });
@@ -172,7 +177,7 @@
         return ask("install_tool", { request: input }, { ok: false, reason: "refused" });
     },
     openTvInstall: function () {
-        return answer(false);
+        return ask("open_tv_install", {}, false);
     },
     tv: {
         state: function () {
@@ -195,10 +200,10 @@
         }
     },
     defaultBrowser: function () {
-        return answer(null);
+        return ask("default_browser", {}, null);
     },
     systemIdle: function () {
-        return answer("unknown");
+        return ask("system_idle", {}, "unknown");
     },
     setCallHotkeys: function (input) {
         return ask("set_call_hotkeys", { input: input === undefined ? null : input }, { mic: false, deafen: false });
@@ -216,7 +221,7 @@
         return ask("open_servers", {}, undefined).then(nothing);
     },
     openMailDefaults: function () {
-        return answer(false);
+        return ask("open_mail_defaults", {}, false);
     },
     setAppBadge: function (input) {
         return ask("set_app_badge", { badge: input }, false).then(function (done) {
@@ -238,12 +243,16 @@
     stopDrawing: function () {
         return ask("stop_drawing", {}, undefined).then(nothing);
     },
+    // The beta's updater has no endpoint, so no update is ever ready and the
+    // event is never sent (`pages.rs`).
     updateReady: function () {
-        return answer(null);
+        return ask("update_ready", {}, null);
     },
-    onUpdateReady: stop,
+    onUpdateReady: function (listener) {
+        return listen("polaris://update-ready", listener);
+    },
     installUpdate: function () {
-        return answer({ ok: false, error: ABSENT });
+        return ask("install_update", {}, { ok: false, error: REFUSAL });
     },
     checkForUpdates: function () {
         return answer({ kind: "unsupported" });

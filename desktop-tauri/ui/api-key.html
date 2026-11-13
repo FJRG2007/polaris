@@ -5,22 +5,23 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>API key - Polaris</title>
         <link rel="stylesheet" href="styles.css" />
-        <script src="api-key.js" defer></script>
     </head>
     <body>
         <main>
-            <h1>An API key for pushing</h1>
-            <p>Pushing from this computer calls <span id="server">your Polaris</span> with an API key that may manage deploys. You paste it once.</p>
+            <h1 data-text="key.title">An API key for pushing</h1>
+            <p><span data-text="key.intro-before">Pushing from this computer calls </span><span id="server" data-text="key.your-polaris">your Polaris</span><span data-text="key.intro-after"> with an API key that may manage deploys. You paste it once.</span></p>
             <form id="form" novalidate>
-                <label for="key">API key *</label>
+                <label for="key" data-text="key.label">API key *</label>
                 <input id="key" name="key" type="password" autocomplete="off" spellcheck="false" placeholder="plk_..." aria-describedby="key-note" autofocus />
-                <button id="reveal" type="button" aria-controls="key">Show</button>
-                <p id="key-note">Kept encrypted by this computer's password store.</p>
+                <button id="reveal" type="button" aria-controls="key" data-text="key.show">Show</button>
+                <p id="key-note" data-text="key.kept">Kept encrypted by this computer's password store.</p>
                 <p id="problem" role="alert" hidden></p>
-                <p>No key yet? <button id="open-keys" type="button">Create one in Account &gt; API keys</button></p>
-                <button id="cancel" type="button">Cancel</button>
-                <button id="submit" type="submit" aria-disabled="true">Save key</button>
+                <p><span data-text="key.none-yet">No key yet? </span><button id="open-keys" type="button" data-text="key.create">Create one in Account &gt; API keys</button></p>
+                <button id="cancel" type="button" data-text="key.cancel">Cancel</button>
+                <button id="submit" type="submit" aria-disabled="true" data-text="key.save">Save key</button>
             </form>
         </main>
+        <script src="i18n.js"></script>
+        <script src="api-key.js"></script>
     </body>
 </html>

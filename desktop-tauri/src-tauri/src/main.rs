@@ -21,6 +21,7 @@ mod mail_handler;
 mod measure;
 mod notices;
 mod os_prefs;
+mod pages;
 mod share;
 mod tray;
 mod tv;
@@ -921,6 +922,7 @@ fn main() {
         .manage(developer::Developer::default())
         .manage(voice_widget::VoiceWidget::default())
         .manage(share::Share::default())
+        .manage(pages::Updates::default())
         .invoke_handler(tauri::generate_handler![
             ipc::connect_state,
             ipc::connect_submit,
@@ -945,9 +947,12 @@ fn main() {
             host_transfer::save_hosts_file,
             host_transfer::import_hosts_file,
             host_transfer::hosts_qr,
+            developer::push_local,
+            developer::push_state,
             developer::push_choose_folder,
             developer::push_start,
             developer::push_cancel,
+            developer::push_open_service,
             developer::upload_folder,
             developer::install_tool,
             developer::running_game,
@@ -970,7 +975,14 @@ fn main() {
             share::choose_share,
             share::draw_on_share,
             share::can_draw_on_share,
-            share::stop_drawing
+            share::stop_drawing,
+            pages::open_tv_install,
+            pages::open_mail_defaults,
+            pages::default_browser,
+            pages::system_idle,
+            pages::close_notice,
+            pages::update_ready,
+            pages::install_update
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-push-local"
+description = "Enables the push_local command without any pre-configured scope."
+commands.allow = ["push_local"]
+
+[[permission]]
+identifier = "deny-push-local"
+description = "Denies the push_local command without any pre-configured scope."
+commands.deny = ["push_local"]

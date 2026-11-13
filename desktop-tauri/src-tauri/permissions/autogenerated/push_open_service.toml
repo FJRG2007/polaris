@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-push-open-service"
+description = "Enables the push_open_service command without any pre-configured scope."
+commands.allow = ["push_open_service"]
+
+[[permission]]
+identifier = "deny-push-open-service"
+description = "Denies the push_open_service command without any pre-configured scope."
+commands.deny = ["push_open_service"]

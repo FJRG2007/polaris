@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-open-tv-install"
+description = "Enables the open_tv_install command without any pre-configured scope."
+commands.allow = ["open_tv_install"]
+
+[[permission]]
+identifier = "deny-open-tv-install"
+description = "Denies the open_tv_install command without any pre-configured scope."
+commands.deny = ["open_tv_install"]

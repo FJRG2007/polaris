@@ -5,25 +5,38 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Polaris Beta</title>
         <link rel="stylesheet" href="styles.css" />
-        <script src="main.js" defer></script>
     </head>
     <body>
         <main>
-            <h1>Your Polaris servers</h1>
+            <h1 data-text="connect.title">Your Polaris servers</h1>
             <p id="load-error" class="problem" role="alert" hidden></p>
-            <ul id="servers" aria-label="Servers"></ul>
-            <p id="empty" hidden>Add the address of your Polaris to open it here.</p>
+            <ul id="servers" aria-label="Servers" data-text-label="connect.servers"></ul>
+            <p id="empty" data-text="connect.empty" hidden>Add the address of your Polaris to open it here.</p>
             <form id="connect" novalidate>
-                <h2>Add a server</h2>
-                <label for="address">Address *</label>
+                <h2 data-text="connect.add">Add a server</h2>
+                <label for="address" data-text="connect.address">Address *</label>
                 <input id="address" name="address" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://polaris.example.com" required autofocus />
                 <p id="check" class="hint" aria-live="polite" hidden></p>
-                <label for="name">Name</label>
-                <input id="name" name="name" type="text" maxlength="40" placeholder="Shown instead of the address" />
+                <label for="name" data-text="connect.name">Name</label>
+                <input id="name" name="name" type="text" maxlength="40" placeholder="Shown instead of the address" data-text-placeholder="connect.name-hint" />
                 <p id="problem" class="problem" role="alert" hidden></p>
-                <button id="open" type="submit">Add and open</button>
+                <button id="open" type="submit" data-text="connect.submit">Add and open</button>
             </form>
-            <button id="close" type="button" class="quiet" hidden>Back to Polaris</button>
+            <section id="share" aria-labelledby="share-title">
+                <h2 id="share-title" data-text="connect.share">Share the list</h2>
+                <button id="copy" type="button" class="quiet" data-text="connect.copy">Copy the list</button>
+                <button id="save-file" type="button" class="quiet" data-text="connect.save-file">Save to a file</button>
+                <button id="open-file" type="button" class="quiet" data-text="connect.open-file">Add from a file</button>
+                <button id="show-qr" type="button" class="quiet" data-text="connect.qr">Show as a QR code</button>
+                <svg id="qr" role="img" aria-label="The list as a QR code" data-text-label="connect.qr-label" hidden><path id="qr-path" /></svg>
+                <label for="paste" data-text="connect.paste">Paste a list</label>
+                <textarea id="paste" rows="2" spellcheck="false" placeholder="A list copied from another computer" data-text-placeholder="connect.paste-label"></textarea>
+                <button id="import" type="button" class="quiet" data-text="connect.import">Add these servers</button>
+                <p id="shared" class="hint" role="status" hidden></p>
+            </section>
+            <button id="close" type="button" class="quiet" data-text="connect.back" hidden>Back to Polaris</button>
         </main>
+        <script src="i18n.js"></script>
+        <script src="main.js"></script>
     </body>
 </html>

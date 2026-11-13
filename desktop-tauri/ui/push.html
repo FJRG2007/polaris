@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src ipc: http://ipc.localhost; base-uri 'none'; form-action 'none'"
+        />
+        <title data-text-window="push.window">Push - Polaris</title>
+        <link rel="stylesheet" href="page.css" />
+    </head>
+    <body>
+        <div class="stack">
+            <div>
+                <h1 id="title" data-text="push.title">Push from this computer</h1>
+                <p id="subtitle" class="hint" data-text="push.subtitle">Built here with Docker, then deployed as the next release.</p>
+            </div>
+            <div class="row">
+                <div class="spread">
+                    <span class="hint" data-text="push.folder">Folder to build</span>
+                    <p id="folder" class="path" data-text="push.none">None chosen</p>
+                </div>
+                <button id="choose" type="button" data-text="push.choose">Choose folder</button>
+            </div>
+            <label>
+                <span data-text="push.build-for">Build for</span>
+                <select id="platform">
+                    <option value="" data-text="push.here">This computer's platform</option>
+                    <option value="linux/amd64" data-text="push.amd64">linux/amd64 - most servers</option>
+                    <option value="linux/arm64" data-text="push.arm64">linux/arm64 - Raspberry Pi and other ARM servers</option>
+                </select>
+                <span class="hint" data-text="push.platform-hint">The platform of the server the service runs on. An image built for another one does not start.</span>
+            </label>
+            <ol id="steps" class="steps" aria-label="Progress" data-text-label="push.progress">
+                <li data-phase="checking" data-text="push.docker">Docker</li>
+                <li data-phase="building" data-text="push.build">Build</li>
+                <li data-phase="saving" data-text="push.save">Save</li>
+                <li data-phase="sending" data-text="push.send">Send</li>
+                <li data-phase="deploying" data-text="push.deploy">Deploy</li>
+            </ol>
+            <progress id="progress" max="1" value="0" hidden></progress>
+            <p id="result" class="banner" role="status" hidden></p>
+            <pre id="log" class="log" aria-label="Output" data-text-label="push.output" tabindex="0"></pre>
+            <div class="row end">
+                <button id="open" type="button" data-text="push.open" hidden>Open in Polaris</button>
+                <button id="cancel" type="button" data-text="push.cancel" hidden>Cancel</button>
+                <button id="start" class="primary" type="button" aria-disabled="true" data-text="push.start">Build and deploy</button>
+            </div>
+        </div>
+        <script src="i18n.js"></script>
+        <script src="dom.js"></script>
+        <script src="push.js"></script>
+    </body>
+</html>

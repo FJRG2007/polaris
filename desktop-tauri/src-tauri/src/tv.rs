@@ -6,7 +6,8 @@
 //! The install itself is `polaris_client::tv_install`. Only a Polaris window on
 //! its own saved Polaris may drive it, as `fromPolaris` allows in the Electron
 //! app; anything else is answered with nothing, as the Electron handlers answer
-//! `null`/`false`. The beta has no TV window of its own yet.
+//! `null`/`false`. The app's own TV window (`ui/tv.html`, opened by
+//! `pages::open_tv_install`) may drive it too.
 
 use crate::{saved_server, MAIN};
 use polaris_client::tv_install::{release_client, TvHost, TvInstallState, TvInstaller};
@@ -77,6 +78,13 @@ impl Tv {
 
 /// Whether the caller is the main window showing the saved Polaris, on its own origin.
 fn from_polaris(app: &AppHandle, webview: &Webview) -> bool {
+    // The app's own Install on a TV window (`kindOf(sender) === "tv"`).
+    if app
+        .get_webview_window(webview.label())
+        .is_some_and(|window| crate::ipc::from_local(&window, crate::pages::TV_WINDOW))
+    {
+        return true;
+    }
     if webview.window().label() != MAIN {
         return false;
     }

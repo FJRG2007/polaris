@@ -11,9 +11,9 @@ use polaris_client::game_detect::{self, CustomGame, GameWatcher, RunningGame};
 use polaris_client::install_tools::{
     self as tools, InstallFailure, InstallRequest, InstallResult, InstallTool, InstallVia,
 };
-use polaris_client::push_local::{self, PushEvent, PushPlan, SystemTools};
+use polaris_client::push_local::{self, PushEvent, PushPhase, PushPlan, SystemTools};
 use polaris_client::ApiClient;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -25,8 +25,8 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tokio_util::sync::CancellationToken;
 
-/// Per service: the folder picked for it, and the push running, if any.
-type Pushes = HashMap<String, (Option<PathBuf>, Option<CancellationToken>)>;
+/// Per service with its push window open: that window's push.
+type Pushes = HashMap<String, PushSlot>;
 
 /// What this module keeps while the app runs.
 #[derive(Default)]
@@ -83,11 +83,146 @@ async fn confirm(app: &AppHandle, question: String, detail: &str) -> bool {
     rx.await.unwrap_or(false)
 }
 
-#[derive(Deserialize)]
+/// The push window for a service: `push-<service id>`.
+pub const PUSH_PREFIX: &str = "push-";
+
+/// What the dashboard asks to push (`pushTargetSchema`).
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ServiceInput {
+pub struct PushTarget {
     service_id: String,
     name: String,
+    #[serde(default)]
+    href: Option<String>,
+}
+
+impl PushTarget {
+    /// The same rules as `pushTargetSchema`: a UUID, a name of 1 to 200
+    /// characters once trimmed, and a path of at most 2048.
+    pub fn read(mut self) -> Result<Self, String> {
+        uuid(&self.service_id)?;
+        self.name = self.name.trim().to_owned();
+        let named = !self.name.is_empty() && self.name.chars().count() <= 200;
+        let href = self
+            .href
+            .as_ref()
+            .is_none_or(|href| href.chars().count() <= 2048);
+        if named && href {
+            Ok(self)
+        } else {
+            Err("That service could not be read.".into())
+        }
+    }
+}
+
+/// One push window: what it pushes, the choices made in it, and its run.
+pub struct PushSlot {
+    target: PushTarget,
+    folder: Option<PathBuf>,
+    platform: String,
+    phase: PushPhase,
+    cancel: Option<CancellationToken>,
+}
+
+/// What the push page draws (`PushState`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PushState {
+    service: String,
+    server: String,
+    folder: String,
+    platform: String,
+    phase: PushPhase,
+}
+
+fn push_state_of(slot: &PushSlot, server: Option<String>) -> PushState {
+    PushState {
+        service: slot.target.name.clone(),
+        server: server.unwrap_or_default(),
+        folder: slot
+            .folder
+            .as_ref()
+            .map(|folder| folder.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        platform: slot.platform.clone(),
+        phase: slot.phase,
+    }
+}
+
+/// The service a push window was opened for, when the caller is that window
+/// showing the app's own push page (`pushOf(event.sender)`).
+fn push_window(window: &WebviewWindow, state: &Developer) -> Option<String> {
+    let service = window.label().strip_prefix(PUSH_PREFIX)?;
+    (crate::ipc::from_local(window, window.label()) && lock(&state.pushes).contains_key(service))
+        .then(|| service.to_owned())
+}
+
+/// `pushLocal`: open the push window for a service, or bring its open one forward.
+#[tauri::command]
+pub fn push_local(
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, Developer>,
+    input: PushTarget,
+) -> crate::Outcome {
+    if !crate::ipc::from_polaris(&app, &window) {
+        return crate::Outcome::error(crate::ipc::REFUSAL);
+    }
+    let target = match input.read() {
+        Ok(target) => target,
+        Err(error) => return crate::Outcome::error(error),
+    };
+    let service = target.service_id.clone();
+    let label = format!("{PUSH_PREFIX}{service}");
+    if let Some(open) = app.get_webview_window(&label) {
+        let _ = open.unminimize();
+        let _ = open.show();
+        let _ = open.set_focus();
+        return crate::Outcome::ok();
+    }
+    let title = format!("Push {} - Polaris", target.name);
+    lock(&state.pushes).insert(
+        service.clone(),
+        PushSlot {
+            target,
+            folder: None,
+            platform: String::new(),
+            phase: PushPhase::Ready,
+            cancel: None,
+        },
+    );
+    match crate::pages::open_page(&app, &label, crate::pages::Page::Push, &title) {
+        Ok(opened) => {
+            let handle = app.clone();
+            opened.on_window_event(move |event| {
+                if matches!(event, tauri::WindowEvent::Destroyed) {
+                    let removed = lock(&handle.state::<Developer>().pushes).remove(&service);
+                    if let Some(cancel) = removed.and_then(|slot| slot.cancel) {
+                        cancel.cancel();
+                    }
+                }
+            });
+            crate::Outcome::ok()
+        }
+        Err(error) => {
+            eprintln!("polaris: the push window could not open: {error}");
+            lock(&state.pushes).remove(&service);
+            crate::Outcome::error("The push window could not open. Try again.")
+        }
+    }
+}
+
+/// The push window's state, as it first draws.
+#[tauri::command]
+pub fn push_state(
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, Developer>,
+) -> Option<PushState> {
+    let service = push_window(&window, &state)?;
+    let server = crate::saved_server(&app).map(|server| server.to_string());
+    lock(&state.pushes)
+        .get(&service)
+        .map(|slot| push_state_of(slot, server))
 }
 
 /// The push window's "Choose folder": the app's own picker, kept per service.
@@ -96,28 +231,26 @@ pub async fn push_choose_folder(
     app: AppHandle,
     window: WebviewWindow,
     state: State<'_, Developer>,
-    input: ServiceInput,
 ) -> Result<Option<String>, String> {
-    if !crate::ipc::from_polaris(&app, &window) {
-        return Err(crate::ipc::REFUSAL.to_owned());
-    }
-    uuid(&input.service_id)?;
-    let name = input.name.trim();
-    if name.is_empty() || name.chars().count() > 200 {
-        return Err("That service could not be read.".into());
-    }
+    let service = push_window(&window, &state).ok_or(crate::ipc::REFUSAL)?;
+    let Some(name) = lock(&state.pushes)
+        .get(&service)
+        .map(|slot| slot.target.name.clone())
+    else {
+        return Ok(None);
+    };
     let picked = pick_folder(&app, format!("The folder to build {name} from")).await;
     if let Some(folder) = &picked {
-        lock(&state.pushes).entry(input.service_id).or_default().0 = Some(folder.clone());
+        if let Some(slot) = lock(&state.pushes).get_mut(&service) {
+            slot.folder = Some(folder.clone());
+        }
     }
     Ok(picked.map(|folder| folder.to_string_lossy().into_owned()))
 }
 
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub struct PushInput {
-    service_id: String,
-    name: String,
     platform: String,
 }
 
@@ -131,85 +264,101 @@ pub async fn push_start(
     input: PushInput,
     events: Channel<PushEvent>,
 ) -> Result<push_local::PushEnd, String> {
-    if !crate::ipc::from_polaris(&app, &window) {
-        return Err(crate::ipc::REFUSAL.to_owned());
-    }
-    uuid(&input.service_id)?;
-    let name = input.name.trim().to_owned();
-    if name.is_empty() || name.chars().count() > 200 {
-        return Err("That service could not be read.".into());
-    }
+    let service = push_window(&window, &state).ok_or(crate::ipc::REFUSAL)?;
     if !push_local::is_platform(&input.platform) {
         return Err("Choose a platform from the list.".into());
     }
     // The Polaris in use and its key from the key store, as the Electron app
     // does: a page never names where its image and key go.
     let server = crate::saved_server(&app).ok_or("Choose the Polaris to push to first.")?;
-    let key = crate::key_flow::api_key_for(&app, &server)
-        .await
-        .ok_or("Add an API key for this Polaris to push to it.")?;
     let cancel = CancellationToken::new();
-    let folder = {
+    let (folder, name) = {
         let mut pushes = lock(&state.pushes);
-        let entry = pushes.entry(input.service_id.clone()).or_default();
-        if entry.1.is_some() {
+        let slot = pushes.get_mut(&service).ok_or(crate::ipc::REFUSAL)?;
+        if slot.cancel.is_some() {
             return Err("A push is already running.".into());
         }
-        let folder = entry.0.clone().ok_or("Choose the folder to build first.")?;
-        entry.1 = Some(cancel.clone());
-        folder
+        let folder = slot
+            .folder
+            .clone()
+            .ok_or("Choose the folder to build first.")?;
+        slot.cancel = Some(cancel.clone());
+        (folder, slot.target.name.clone())
     };
-    let release = || {
-        if let Some(entry) = lock(&state.pushes).get_mut(&input.service_id) {
-            entry.1 = None;
+    let release = |app: &AppHandle| {
+        if let Some(slot) = lock(&app.state::<Developer>().pushes).get_mut(&service) {
+            slot.cancel = None;
         }
     };
     if !tokio::fs::metadata(&folder)
         .await
         .is_ok_and(|info| info.is_dir())
     {
-        release();
+        release(&app);
         return Err("That folder is not there any more. Choose it again.".into());
     }
+    if let Some(slot) = lock(&state.pushes).get_mut(&service) {
+        slot.platform.clone_from(&input.platform);
+    }
+    let Some(key) = crate::key_flow::api_key_for(&app, &server).await else {
+        release(&app);
+        return Err("Add an API key for this Polaris to push to it.".into());
+    };
     let client = ApiClient::new(http.0.clone(), server, key);
     let plan = PushPlan {
-        service_id: input.service_id.clone(),
+        service_id: service.clone(),
         name,
         folder,
         platform: input.platform,
     };
+    let heard = app.clone();
+    let slot_of = service.clone();
     let end = push_local::push(
         &client,
         &SystemTools,
         &plan,
-        move |event| drop(events.send(event)),
+        move |event| {
+            if let PushEvent::State { phase } = &event {
+                if let Some(slot) = lock(&heard.state::<Developer>().pushes).get_mut(&slot_of) {
+                    slot.phase = *phase;
+                }
+            }
+            drop(events.send(event));
+        },
         &cancel,
     )
     .await;
-    release();
+    if let Some(slot) = lock(&state.pushes).get_mut(&service) {
+        slot.phase = end.phase;
+    }
+    release(&app);
     Ok(end)
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ServiceId {
-    service_id: String,
 }
 
 /// Stop a push; once it is deploying, this only stops following it.
 #[tauri::command]
-pub fn push_cancel(
-    app: AppHandle,
-    window: WebviewWindow,
-    state: State<'_, Developer>,
-    input: ServiceId,
-) {
-    if !crate::ipc::from_polaris(&app, &window) {
+pub fn push_cancel(window: WebviewWindow, state: State<'_, Developer>) {
+    let Some(service) = push_window(&window, &state) else {
         return;
-    }
-    if let Some((_, Some(cancel))) = lock(&state.pushes).get(&input.service_id) {
+    };
+    if let Some(cancel) = lock(&state.pushes)
+        .get(&service)
+        .and_then(|slot| slot.cancel.clone())
+    {
         cancel.cancel();
     }
+}
+
+/// "Open in Polaris": the service's page, in the main window.
+#[tauri::command]
+pub fn push_open_service(app: AppHandle, window: WebviewWindow, state: State<'_, Developer>) {
+    let Some(service) = push_window(&window, &state) else {
+        return;
+    };
+    let href = lock(&state.pushes)
+        .get(&service)
+        .and_then(|slot| slot.target.href.clone());
+    crate::show_polaris(&app, href.as_deref());
 }
 
 /// "Upload a folder": the app's picker, then the folder zipped by the browser

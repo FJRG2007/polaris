@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src ipc: http://ipc.localhost; base-uri 'none'; form-action 'none'"
+        />
+        <title>Polaris</title>
+        <link rel="stylesheet" href="page.css" />
+    </head>
+    <body class="splash">
+        <main>
+            <img class="splash-mark" src="mark.svg" alt="" />
+            <h1 id="title" role="status" data-text="updating.title">Updating Polaris</h1>
+            <p id="detail" data-text="updating.detail">It opens by itself when it is done.</p>
+            <div class="splash-line" aria-hidden="true"><span></span></div>
+        </main>
+        <script src="i18n.js"></script>
+        <script src="updating.js"></script>
+    </body>
+</html>

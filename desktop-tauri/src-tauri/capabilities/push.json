@@ -1,0 +1,17 @@
+{
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "push",
+    "description": "The app's own push window, one per service: its push and nothing else.",
+    "local": true,
+    "windows": [
+        "push-*"
+    ],
+    "permissions": [
+        "core:default",
+        "allow-push-state",
+        "allow-push-choose-folder",
+        "allow-push-start",
+        "allow-push-cancel",
+        "allow-push-open-service"
+    ]
+}
