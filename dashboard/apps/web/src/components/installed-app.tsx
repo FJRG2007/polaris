@@ -20,7 +20,7 @@
 import { Download } from "lucide-react";
 import { listenToWorker } from "@/lib/desktop-notify";
 import { useDesktopBridge } from "@/components/desktop-app";
-import { readDesktopUpdateCheck, type DesktopUpdateCheck } from "@/lib/desktop-bridge";
+import { readDesktopUpdate, readDesktopUpdateCheck, type DesktopUpdateCheck } from "@/lib/desktop-bridge";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button } from "@polaris/ui";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -80,6 +80,17 @@ function UsingDesktop({ version }: { version: string }) {
     const [restarting, setRestarting] = useState(false);
     const [restartFailed, setRestartFailed] = useState(false);
     const check = desktop?.checkForUpdates;
+    const downloading = found?.kind === "downloading" ? found.version : null;
+
+    // A download the check began ends in the app, which says so when it is
+    // installed: the restart is offered then, without a second check.
+    useEffect(() => {
+        if (!downloading || !desktop?.onUpdateReady) return;
+        return desktop.onUpdateReady((raw) => {
+            const update = readDesktopUpdate(raw);
+            if (update) setFound({ kind: "ready", version: update.version });
+        });
+    }, [desktop, downloading]);
 
     const run = async (): Promise<void> => {
         if (!check) return;

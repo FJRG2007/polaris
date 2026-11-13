@@ -105,6 +105,30 @@ describe("Check for updates on the Desktop app page", () => {
         expect(installUpdate).toHaveBeenCalledOnce();
     });
 
+    it("offers the restart when the download one check began is installed", async () => {
+        let tell: ((update: unknown) => void) | null = null;
+        const stop = vi.fn();
+        install(
+            fakeBridge({
+                checkForUpdates: vi.fn(async () => ({ kind: "downloading", version: "0.1.15" })),
+                installUpdate: vi.fn(async () => ({ ok: true as const })),
+                onUpdateReady: vi.fn((listener: (update: unknown) => void) => {
+                    tell = listener;
+                    return stop;
+                })
+            })
+        );
+        await show();
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+        });
+        expect(screen.queryByRole("button", { name: "Restart to update" })).toBeNull();
+        await act(async () => tell?.({ version: "0.1.15" }));
+        expect(screen.getByRole("status").textContent).toContain("0.1.15 is installed");
+        expect(screen.getByRole("button", { name: "Restart to update" })).toBeTruthy();
+        expect(stop).toHaveBeenCalled();
+    });
+
     it("says a restart that was refused", async () => {
         install(
             fakeBridge({

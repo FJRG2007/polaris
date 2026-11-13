@@ -86,6 +86,37 @@ describe("the first check of a start", () => {
         await expect(watchForUpdates(vi.fn()).asked).resolves.toBeUndefined();
     });
 
+    it("lets a press that found a download wait for it to be installed", async () => {
+        answers([release("desktop-v0.1.3")]);
+        const first = watchForUpdates(vi.fn());
+        await first.installing;
+        expect(await first.checkNow()).toEqual({ kind: "downloading", version: "0.1.3" });
+        const ended = first.downloaded();
+        let settled = false;
+        void ended.then(() => (settled = true));
+        await Promise.resolve();
+        expect(settled).toBe(false);
+        electron.listeners.get("update-downloaded")?.();
+        expect(await ended).toEqual({ kind: "ready", version: "0.1.3" });
+    });
+
+    it("says the download page is the way when the download a press waits on fails", async () => {
+        answers([release("desktop-v0.1.3")]);
+        const first = watchForUpdates(vi.fn());
+        await first.installing;
+        const ended = first.downloaded();
+        electron.listeners.get("error")?.();
+        expect(await ended).toEqual({ kind: "available", version: "0.1.3" });
+    });
+
+    it("answers at once when the download ended before the press waited on it", async () => {
+        answers([release("desktop-v0.1.3")]);
+        const first = watchForUpdates(vi.fn());
+        await first.installing;
+        electron.listeners.get("update-downloaded")?.();
+        expect(await first.downloaded()).toEqual({ kind: "ready", version: "0.1.3" });
+    });
+
     it("says so when the install fails", async () => {
         answers([release("desktop-v0.1.3")]);
         const first = watchForUpdates(vi.fn());
