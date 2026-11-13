@@ -230,6 +230,8 @@ describe("the work Polaris runs on a schedule", () => {
             // Two passes would each repoint the same records to the new address
             // and each announce that it moved.
             "public-ip-follow",
+            // Two dashboards during an update would uninstall the same app twice.
+            "retired-apps",
             // A capture stores the lines after the newest one it has; two at once
             // would both read the same newest line and store what follows twice.
             "runtime-logs",

@@ -212,7 +212,7 @@ export function ProfileActions({
                     <DropdownMenuContent align="end" className="w-52">
                         {friendship === "friends" && !blocked ? (
                             <>
-                                <DropdownMenuItem className="gap-2" onSelect={() => void drop()}>
+                                <DropdownMenuItem variant="danger" className="gap-2" onSelect={() => void drop()}>
                                     <UserMinus className="size-3.5" />
                                     {t("profile.removeFriend")}
                                 </DropdownMenuItem>

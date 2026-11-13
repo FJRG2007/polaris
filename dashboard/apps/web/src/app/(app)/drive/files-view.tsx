@@ -1679,7 +1679,7 @@ export function FilesView({
                             </ContextMenuSubTrigger>
                             <ContextMenuSubContent>
                                 {onDelete ? (
-                                    <ContextMenuItem onSelect={() => onDelete(targets)}>
+                                    <ContextMenuItem variant="danger" onSelect={() => onDelete(targets)}>
                                         <Trash2 className="size-4" />
                                         {t("filesView.menu.trash")}
                                         <ShortcutHint id="drive.delete" />

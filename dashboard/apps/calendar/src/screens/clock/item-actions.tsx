@@ -77,7 +77,7 @@ export function ItemMenu({
                     {t("time.sendCopy")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={actions.onDelete}>
+                <DropdownMenuItem variant="danger" onSelect={actions.onDelete}>
                     <Trash2 />
                     {t("time.delete")}
                 </DropdownMenuItem>

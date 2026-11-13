@@ -558,7 +558,7 @@ export function RulesView({
                                                 <Copy className="size-4 shrink-0" aria-hidden />
                                                 {t("rules.list.duplicate")}
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onSelect={() => void remove(rule)}>
+                                            <DropdownMenuItem variant="danger" onSelect={() => void remove(rule)}>
                                                 <Trash2 className="size-4 shrink-0" aria-hidden />
                                                 {t("rules.list.delete")}
                                             </DropdownMenuItem>

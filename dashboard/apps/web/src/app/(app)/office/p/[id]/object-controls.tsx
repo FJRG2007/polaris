@@ -104,6 +104,7 @@ export function TableControls({
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
+                            variant="danger"
                             disabled={tables.rowCount(table) <= 1}
                             onSelect={() => onTable((one) => tables.removeRow(one, at.row))}
                         >
@@ -111,6 +112,7 @@ export function TableControls({
                             {t("slides.table.deleteRow")}
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                            variant="danger"
                             disabled={tables.colCount(table) <= 1}
                             onSelect={() => onTable((one) => tables.removeCol(one, at.col))}
                         >

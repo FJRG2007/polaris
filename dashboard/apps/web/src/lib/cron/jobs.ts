@@ -845,7 +845,9 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // pass that failed (a server out of reach) tries again.
         everyMs: 60 * MINUTE,
         // Leased: during an update two dashboards run, and one uninstall is enough.
-        leaseMs: 30 * MINUTE,
+        // Longer than the interval, like every lease, so a slow pass is never
+        // started a second time beside itself.
+        leaseMs: 90 * MINUTE,
         run: async () => (await import("@/lib/apps/retired-apps")).retireRetiredApps()
     },
     {

@@ -230,6 +230,7 @@ export function WorldPanel({
                                                 </DropdownMenuItem>
                                             ) : null}
                                             <DropdownMenuItem
+                                                variant="danger"
                                                 onSelect={() =>
                                                     save(
                                                         saved.filter((entry) => entry !== cityZone)
