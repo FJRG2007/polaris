@@ -34,7 +34,7 @@ All of these hold, measured, before the Electron app stops being the shipped one
 | `polaris-client`: failover, streamed upload, docker, push, folder zip, install tools, games | scaffolded |
 | Tauri shell: single instance, servers page, Polaris window with navigation, permissions, failover and local CA pin, tray, `polaris://` links, OS switches, notices, push and developer commands | scaffolded |
 | Everything else in the tables below | todo |
-| Startup / memory measurement against Electron | todo |
+| Startup / memory measurement against Electron | scaffolded: beta measured hidden by `tools/measure-startup`; Electron by hand only (see [Startup and memory](#startup-and-memory)) |
 
 Statuses: `todo` (nothing yet), `scaffolded` (exists in the beta, not at parity),
 `done` (at parity, verified on all three systems).
@@ -233,6 +233,57 @@ jobs, so CI on every push stays exactly as fast.
   Tauri app after the Tauri app has opened, and Electron's `userData` is not deleted,
   so a failed Tauri install leaves Electron opening as before and offering the switch
   again in the background, never before opening twice.
+
+## Startup and memory
+
+**Tool.** `desktop-tauri/tools/measure-startup` (a workspace bin) serves a static
+page on 127.0.0.1, starts the beta built with the `measure` feature
+(`src-tauri/src/measure.rs`) against it, and prints JSON: per run, the time from
+spawning the process to the page's load event, and the working set of the whole
+process tree (the app and every WebView process under it) after a settle (5 s).
+
+    cargo build --release -p polaris-desktop-beta --features measure
+    cargo run --release -p measure-startup -- --runs 3
+
+The measured start never shows anything: its one window is created hidden,
+off-screen and off the taskbar, no tray icon is added, the one-instance plugin is
+left out (a running beta is not woken), the process is started with
+`CREATE_NO_WINDOW`, and no settings are read or written. It runs the same Tauri
+runtime, WebView and plugins as a normal start, but not the settings load, the
+Electron import, the tray or the failover probe, so it is a lower bound for the
+beta's own start. The `measure` feature is in no build anybody runs.
+
+**Electron, by hand.** Not automated, because it cannot be without changing
+`desktop/`: the app opens only its saved server (no way to give it a page), a
+static page is refused by its servers page (it must prove it is a Polaris), its
+`--hidden` start uses the owner's own settings, and a second launch hands over to a
+running Electron app, which then shows its window. To compare on one machine, with
+the same Polaris server in both:
+1. Quit both apps (tray > Quit) and wait 30 s.
+2. Start Electron (`%LOCALAPPDATA%\polaris\polaris.exe`), stopwatch from launch to
+   the dashboard drawn; after 5 s more, in PowerShell:
+   `(Get-Process polaris | Measure-Object WorkingSet64 -Sum).Sum / 1MB`
+   (Electron's own processes are all named `polaris`).
+3. The same for the beta with its normal start, adding the WebView processes:
+   the beta's process plus every `msedgewebview2` whose parent chain leads to it
+   (`Get-CimInstance Win32_Process` gives `ParentProcessId`), or run the tool above
+   for the lower bound.
+4. Three runs each; the first after a reboot is the cold one. Then again in a call.
+
+**Numbers.**
+
+Beta, hidden start (`measure` feature, release build), 2026-11-13, Windows 11 Pro
+26200, AMD Ryzen 9 9950X3D, 125 GB RAM, WebView2 Runtime 157.0.4341.46, local static
+page, 5 s settle, 7 processes in the tree each run:
+
+| Run | Spawn to page loaded | Working set, whole tree |
+| --- | --- | --- |
+| 1 (first after the build, cold) | 1292 ms | 322 MiB |
+| 2 (warm) | 367 ms | 303 MiB |
+| 3 (warm) | 371 ms | 301 MiB |
+
+Electron: not measured (see above). Criterion 3 stays open until it is, on this
+machine, against the same Polaris, idle and in a call.
 
 ## Electron main process (`desktop/src/main`)
 
