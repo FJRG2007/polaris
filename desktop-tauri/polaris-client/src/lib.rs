@@ -5,6 +5,9 @@
 //! shares it. Each module names the Electron file it mirrors; the two must say
 //! the same thing until the Electron app is retired.
 
+pub mod adb_client;
+pub mod adb_pairing;
+pub mod adb_spake2;
 pub mod address;
 pub mod api;
 pub mod identity;
