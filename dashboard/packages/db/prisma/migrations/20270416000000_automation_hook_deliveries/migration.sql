@@ -19,7 +19,5 @@ ALTER TABLE "AutomationHookDelivery" ADD COLUMN IF NOT EXISTS "detail" TEXT;
 
 CREATE INDEX IF NOT EXISTS "AutomationHookDelivery_automationId_nodeId_at_idx" ON "AutomationHookDelivery"("automationId", "nodeId", "at");
 
-DO $$ BEGIN
-    ALTER TABLE "AutomationHookDelivery" ADD CONSTRAINT "AutomationHookDelivery_automationId_fkey" FOREIGN KEY ("automationId") REFERENCES "Automation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "AutomationHookDelivery" DROP CONSTRAINT IF EXISTS "AutomationHookDelivery_automationId_fkey";
+ALTER TABLE "AutomationHookDelivery" ADD CONSTRAINT "AutomationHookDelivery_automationId_fkey" FOREIGN KEY ("automationId") REFERENCES "Automation"("id") ON DELETE CASCADE ON UPDATE CASCADE;

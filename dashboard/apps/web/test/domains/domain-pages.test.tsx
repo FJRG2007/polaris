@@ -77,6 +77,9 @@ vi.mock("@/app/(app)/admin/domains/call-ports-card", () => ({
 vi.mock("@/app/(app)/admin/domains/certificate-contact-card", () => ({
     CertificateContactCard: stub("CertificateContactCard")
 }));
+vi.mock("@/app/(app)/admin/domains/wildcard-certificate-card", () => ({
+    WildcardCertificateCard: stub("WildcardCertificateCard")
+}));
 vi.mock("@/components/domain-security/security-inventory", () => ({
     SecurityInventory: stub("SecurityInventory")
 }));

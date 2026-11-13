@@ -39,12 +39,9 @@ CREATE TABLE IF NOT EXISTS "AlertDelivery" (
 
 CREATE INDEX IF NOT EXISTS "AlertDelivery_topicId_createdAt_idx" ON "AlertDelivery"("topicId", "createdAt");
 
-DO $$ BEGIN
-    ALTER TABLE "AlertTopic" ADD CONSTRAINT "AlertTopic_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-    ALTER TABLE "AlertTopic" ADD CONSTRAINT "AlertTopic_orgId_fkey" FOREIGN KEY ("orgId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-    ALTER TABLE "AlertDelivery" ADD CONSTRAINT "AlertDelivery_topicId_fkey" FOREIGN KEY ("topicId") REFERENCES "AlertTopic"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "AlertTopic" DROP CONSTRAINT IF EXISTS "AlertTopic_ownerId_fkey";
+ALTER TABLE "AlertTopic" ADD CONSTRAINT "AlertTopic_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "AlertTopic" DROP CONSTRAINT IF EXISTS "AlertTopic_orgId_fkey";
+ALTER TABLE "AlertTopic" ADD CONSTRAINT "AlertTopic_orgId_fkey" FOREIGN KEY ("orgId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "AlertDelivery" DROP CONSTRAINT IF EXISTS "AlertDelivery_topicId_fkey";
+ALTER TABLE "AlertDelivery" ADD CONSTRAINT "AlertDelivery_topicId_fkey" FOREIGN KEY ("topicId") REFERENCES "AlertTopic"("id") ON DELETE CASCADE ON UPDATE CASCADE;

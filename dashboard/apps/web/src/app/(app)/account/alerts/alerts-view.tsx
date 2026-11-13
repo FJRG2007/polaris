@@ -7,6 +7,7 @@
  */
 
 import * as core from "@polaris/core";
+import { CodeView } from "@/components/json-view";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useState, useTransition } from "react";
@@ -627,14 +628,13 @@ function Snippets({ base, topicId, secret }: { base: string; topicId: string; se
             <h3 className="text-sm font-medium">{t("alerts.setup")}</h3>
             {!secret && <p className="text-xs text-muted-foreground">{t("alerts.secretHidden")}</p>}
             {snippets.map((snippet) => (
-                <div key={snippet.id} className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium">{t(`alerts.snippets.${snippet.id}`)}</span>
-                        <CopyButton value={snippet.text} label={t("alerts.copy")} />
-                    </div>
-                    <pre className="max-w-full overflow-x-auto rounded-md bg-muted p-2 text-xs">
-                        <code>{snippet.text}</code>
-                    </pre>
+                <div key={snippet.id} className="flex min-w-0 flex-col gap-1">
+                    <span className="text-xs font-medium">{t(`alerts.snippets.${snippet.id}`)}</span>
+                    <CodeView
+                        value={snippet.text}
+                        language={snippet.id === "kuma" || snippet.id === "grafana" ? "plaintext" : "bash"}
+                        label={t(`alerts.snippets.${snippet.id}`)}
+                    />
                 </div>
             ))}
         </div>

@@ -27,9 +27,9 @@ export function permissionLabel(t: Translate, permission: Permission): string {
 /**
  * The app each area belongs to, by the id the app switcher draws it under, so a
  * permission list shows the logo people already know the app by. `null` is an
- * area with no logo of its own (Inbox is part of Management, not an app; Family
- * has no app yet), and an area missing here - one an organization or a later
- * version adds - draws none.
+ * area with no logo of its own (Inbox is part of Management and alert topics of
+ * the account, not apps; Family has no app yet), and an area missing here - one
+ * an organization or a later version adds - draws none.
  */
 export const AREA_APPS: Readonly<Record<string, string | null>> = {
     Drive: "drive",
@@ -42,7 +42,7 @@ export const AREA_APPS: Readonly<Record<string, string | null>> = {
     CRM: "crm",
     Translate: "translate",
     Automations: "automations",
-    Alerts: "alerts",
+    Alerts: null,
     "Status pages": "status-pages",
     Chat: "chat",
     Games: "arcade",

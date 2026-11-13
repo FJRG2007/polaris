@@ -27,6 +27,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { downloadBytes } from "@/lib/download";
 import type { FormSubmissionView } from "@/lib/automations/webhook-service";
 import { Button, CopyButton, Input, SegmentedControl, Select, Textarea, cn, useToast } from "@polaris/ui";
+import { CodeView } from "@/components/json-view";
 import { ChevronDown, Download, Eye, EyeOff, FlaskConical, Globe, RefreshCw, ShieldAlert } from "lucide-react";
 import {
     exportFormSubmissionsAction,
@@ -474,12 +475,7 @@ function TestBlock({
                 {saved ? t("webhook.testHint") : t("webhook.saveFirst")}
             </p>
             {shown ? (
-                <div className="relative min-w-0">
-                    <pre className="max-h-56 min-w-0 overflow-auto overscroll-contain rounded-md border border-border bg-field p-2 pr-9 font-mono text-xs">
-                        {curl}
-                    </pre>
-                    <CopyButton value={curl} className="absolute right-1 top-1" />
-                </div>
+                <CodeView value={curl} language="bash" label={t("webhook.curl")} className="max-h-56 min-w-0" />
             ) : null}
         </div>
     );
@@ -802,7 +798,7 @@ function Deliveries({
                                     <span
                                         className={cn(
                                             "shrink-0 rounded px-1.5 font-mono",
-                                            refused ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"
+                                            refused ? "bg-destructive-soft text-destructive" : "bg-success-soft text-success"
                                         )}
                                     >
                                         {row.status}
@@ -892,12 +888,7 @@ function FormSettings({
             </Labeled>
             <div className="min-w-0 space-y-1 text-sm">
                 <span>{t("form.snippet")}</span>
-                <div className="relative min-w-0">
-                    <pre className="max-h-56 min-w-0 overflow-auto overscroll-contain rounded-md border border-border bg-field p-2 pr-9 font-mono text-xs">
-                        {snippet}
-                    </pre>
-                    <CopyButton value={snippet} className="absolute right-1 top-1" />
-                </div>
+                <CodeView value={snippet} language="html" label={t("form.snippet")} className="max-h-56 min-w-0" />
                 <span className="block text-xs text-muted-foreground">{t("form.snippetHint")}</span>
             </div>
         </div>
