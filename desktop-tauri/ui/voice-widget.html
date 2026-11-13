@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Voice - Polaris</title>
+        <style>
+            html,
+            body {
+                margin: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background: transparent;
+                font: 0.8125rem/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
+                color: #f4f4f6;
+                user-select: none;
+            }
+            #panel {
+                box-sizing: border-box;
+                height: 100%;
+                padding: 0.5rem;
+                border-radius: 0.625rem;
+                background: rgba(11, 12, 14, 0.55);
+                display: flex;
+                flex-direction: column;
+            }
+            #panel.unlocked {
+                background: rgba(11, 12, 14, 0.85);
+                outline: 0.0625rem dashed rgba(255, 255, 255, 0.35);
+                outline-offset: -0.0625rem;
+                cursor: move;
+            }
+            .row {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                height: 2.125rem;
+                min-width: 0;
+            }
+            .face {
+                flex: none;
+                width: 1.625rem;
+                height: 1.625rem;
+                border-radius: 50%;
+                display: grid;
+                place-items: center;
+                font-size: 0.6875rem;
+                font-weight: 600;
+                color: #fff;
+                box-shadow: 0 0 0 0.125rem transparent;
+                transition: box-shadow 80ms linear;
+            }
+            .face.speaking {
+                box-shadow: 0 0 0 0.125rem #3ba55d;
+            }
+            .name {
+                flex: 1 1 auto;
+                min-width: 0;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+                text-shadow: 0 0.0625rem 0.125rem rgba(0, 0, 0, 0.8);
+            }
+            .state {
+                flex: none;
+                display: flex;
+                gap: 0.125rem;
+                color: #ed4245;
+            }
+            svg {
+                width: 0.875rem;
+                height: 0.875rem;
+                flex: none;
+                fill: none;
+                stroke: currentColor;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+            }
+            .more {
+                height: 1.375rem;
+                font-size: 0.75rem;
+                opacity: 0.75;
+            }
+            #controls {
+                display: flex;
+                align-items: center;
+                gap: 0.375rem;
+                height: 2.75rem;
+                padding-top: 0.375rem;
+                box-sizing: border-box;
+            }
+            #controls[hidden] {
+                display: none;
+            }
+            button {
+                display: grid;
+                place-items: center;
+                width: 2rem;
+                height: 2rem;
+                border: 0;
+                border-radius: 0.5rem;
+                background: rgba(255, 255, 255, 0.12);
+                color: #f4f4f6;
+                cursor: pointer;
+            }
+            button:hover {
+                background: rgba(255, 255, 255, 0.22);
+            }
+            button.on {
+                color: #ed4245;
+            }
+            button.leave {
+                background: #da373c;
+            }
+            button svg {
+                width: 1rem;
+                height: 1rem;
+            }
+            .hint {
+                flex: 1 1 auto;
+                min-width: 0;
+                text-align: right;
+                font-size: 0.6875rem;
+                opacity: 0.7;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="panel">
+            <div id="people"></div>
+            <div id="controls" hidden>
+                <button id="mic" type="button"></button>
+                <button id="deafen" type="button"></button>
+                <button id="leave" class="leave" type="button"></button>
+                <span id="lock-hint" class="hint"></span>
+            </div>
+        </div>
+        <script src="voice-widget.js"></script>
+    </body>
+</html>

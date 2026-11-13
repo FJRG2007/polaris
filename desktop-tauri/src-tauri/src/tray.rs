@@ -93,7 +93,7 @@ fn tray_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     if let Some(switch) = switch {
         items.push(Box::new(switch));
     }
-    items.extend::<[Box<dyn IsMenuItem<Wry>>; 9]>([
+    items.extend::<[Box<dyn IsMenuItem<Wry>>; 11]>([
         Box::new(separator()?),
         Box::new(item(app, "api-keys", "API keys", server)?),
         // The TV installer is not in the beta yet.
@@ -120,6 +120,22 @@ fn tray_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             "Offer this beta for email links",
             cfg!(windows),
             settings.mail_handler,
+            None::<&str>,
+        )?),
+        Box::new(CheckMenuItem::with_id(
+            app,
+            "voice-widget",
+            "Show the call over other windows",
+            true,
+            settings.voice_widget,
+            None::<&str>,
+        )?),
+        Box::new(CheckMenuItem::with_id(
+            app,
+            "voice-widget-game",
+            "Only while a game is running",
+            settings.voice_widget,
+            settings.voice_widget_game_only,
             None::<&str>,
         )?),
         Box::new(separator()?),
@@ -295,6 +311,20 @@ fn handle(app: &AppHandle, id: &str) {
             if let Err(error) = crate::mail_handler::set(app, on) {
                 say(app, &error);
             }
+            refresh(app);
+        }
+        "voice-widget" | "voice-widget-game" => {
+            let saved = crate::os_prefs::update_settings(app, |settings| {
+                if id == "voice-widget" {
+                    settings.voice_widget = !settings.voice_widget;
+                } else {
+                    settings.voice_widget_game_only = !settings.voice_widget_game_only;
+                }
+            });
+            if let Err(error) = saved {
+                say(app, &error);
+            }
+            crate::voice_widget::refresh(app);
             refresh(app);
         }
         _ => {

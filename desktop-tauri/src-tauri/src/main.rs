@@ -18,9 +18,11 @@ mod login_item;
 mod mail_handler;
 mod notices;
 mod os_prefs;
+mod share;
 mod tray;
 mod tv;
 mod updater;
+mod voice_widget;
 mod vpn;
 #[cfg(windows)]
 mod webview2;
@@ -478,6 +480,9 @@ fn open_main(app: &AppHandle, url: &str) -> tauri::Result<()> {
         .on_page_load(move |window, payload| {
             if payload.event() == PageLoadEvent::Finished {
                 page_loaded(&loaded, &window, payload.url().as_str());
+            } else {
+                // A page that loads another one mid-call is out of the call.
+                voice_widget::page_left(&loaded, window.label());
             }
         })
         .on_document_title_changed(move |window, title| title_changed(&titled, &window, &title))
@@ -879,6 +884,8 @@ fn main() {
         .manage(tray::Zoom::default())
         .manage(Http(http.clone()))
         .manage(developer::Developer::default())
+        .manage(voice_widget::VoiceWidget::default())
+        .manage(share::Share::default())
         .invoke_handler(tauri::generate_handler![
             ipc::connect_state,
             ipc::connect_submit,
@@ -920,7 +927,14 @@ fn main() {
             vpn::vpn_up,
             vpn::vpn_down,
             vpn::vpn_status,
-            vpn::vpn_join
+            vpn::vpn_join,
+            voice_widget::set_voice_state,
+            voice_widget::voice_widget_act,
+            share::share_sources,
+            share::choose_share,
+            share::draw_on_share,
+            share::can_draw_on_share,
+            share::stop_drawing
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-can-draw-on-share"
+description = "Enables the can_draw_on_share command without any pre-configured scope."
+commands.allow = ["can_draw_on_share"]
+
+[[permission]]
+identifier = "deny-can-draw-on-share"
+description = "Denies the can_draw_on_share command without any pre-configured scope."
+commands.deny = ["can_draw_on_share"]

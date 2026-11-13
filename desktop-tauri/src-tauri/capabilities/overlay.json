@@ -1,0 +1,8 @@
+{
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "overlay",
+    "description": "The app's own drawing overlay page: it only hears the strokes to draw.",
+    "local": true,
+    "windows": ["overlay"],
+    "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}

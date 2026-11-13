@@ -370,7 +370,7 @@ pub fn open_window(app: AppHandle, window: WebviewWindow, input: OpenWindow) -> 
 }
 
 /// The commands a Polaris window may call, each checked again with `from_polaris`.
-pub const POLARIS_COMMANDS: [&str; 24] = [
+pub const POLARIS_COMMANDS: [&str; 30] = [
     "open-servers",
     "open-window",
     "show-notice",
@@ -395,6 +395,12 @@ pub const POLARIS_COMMANDS: [&str; 24] = [
     "vpn-down",
     "vpn-status",
     "vpn-join",
+    "set-voice-state",
+    "share-sources",
+    "choose-share",
+    "draw-on-share",
+    "can-draw-on-share",
+    "stop-drawing",
 ];
 
 /// Grants the Polaris commands to the configured origin. Tauri cannot take a

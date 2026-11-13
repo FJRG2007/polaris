@@ -47,6 +47,13 @@ fn main() {
             "vpn_down",
             "vpn_status",
             "vpn_join",
+            "set_voice_state",
+            "voice_widget_act",
+            "share_sources",
+            "choose_share",
+            "draw_on_share",
+            "can_draw_on_share",
+            "stop_drawing",
         ]),
     ))
     .expect("the Tauri build step runs");

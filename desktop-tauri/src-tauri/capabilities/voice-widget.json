@@ -1,0 +1,8 @@
+{
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "voice-widget",
+    "description": "The app's own voice widget page: its one command, hearing what to draw, and dragging itself while unlocked.",
+    "local": true,
+    "windows": ["voice-widget"],
+    "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "core:window:allow-start-dragging", "allow-voice-widget-act"]
+}

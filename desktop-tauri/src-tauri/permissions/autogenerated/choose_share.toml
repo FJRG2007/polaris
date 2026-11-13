@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-choose-share"
+description = "Enables the choose_share command without any pre-configured scope."
+commands.allow = ["choose_share"]
+
+[[permission]]
+identifier = "deny-choose-share"
+description = "Denies the choose_share command without any pre-configured scope."
+commands.deny = ["choose_share"]

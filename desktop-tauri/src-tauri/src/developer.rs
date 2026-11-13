@@ -20,7 +20,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::ipc::{Channel, Response};
-use tauri::{AppHandle, State, WebviewWindow};
+use tauri::{AppHandle, Manager, State, WebviewWindow};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tokio_util::sync::CancellationToken;
@@ -383,28 +383,41 @@ fn programs(system: &mut Option<sysinfo::System>) -> Result<Vec<String>, sysinfo
         .unwrap_or_default())
 }
 
-async fn look(games: &Arc<Mutex<GameWatcher>>, system: &Arc<Mutex<Option<sysinfo::System>>>) {
+async fn look(
+    app: &AppHandle,
+    games: &Arc<Mutex<GameWatcher>>,
+    system: &Arc<Mutex<Option<sysinfo::System>>>,
+) {
     let system = Arc::clone(system);
     let programs = tokio::task::spawn_blocking(move || programs(&mut lock(&system))).await;
     let programs = programs
         .map_err(|_| ())
         .and_then(|read| read.map_err(|_| ()));
-    lock(games).check(programs, now_ms());
+    let change = lock(games).check(programs, now_ms());
+    if let Some(running) = change {
+        crate::voice_widget::set_game(app, running.is_some());
+    }
 }
 
-fn start_watching(state: &Developer) {
+/// Start the game watcher if nothing has yet (the voice widget's game-only mode).
+pub fn watch_games(app: &AppHandle) {
+    start_watching(app, &app.state::<Developer>());
+}
+
+fn start_watching(app: &AppHandle, state: &Developer) {
     let mut watching = lock(&state.watching);
     if *watching {
         return;
     }
     *watching = true;
     let games = Arc::clone(&state.games);
+    let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let system = Arc::new(Mutex::new(None));
         let mut every = tokio::time::interval(game_detect::CHECK);
         loop {
             every.tick().await;
-            look(&games, &system).await;
+            look(&app, &games, &system).await;
         }
     });
 }
@@ -419,7 +432,7 @@ pub fn running_game(
     if !crate::ipc::from_polaris(&app, &window) {
         return None;
     }
-    start_watching(&state);
+    start_watching(&app, &state);
     lock(&state.games).running().cloned()
 }
 
@@ -450,9 +463,9 @@ pub async fn set_custom_games(
         return Err("Those games could not be read.".into());
     }
     lock(&state.games).set_custom_games(input.games);
-    start_watching(&state);
+    start_watching(&app, &state);
     let system = Arc::new(Mutex::new(None));
-    look(&state.games, &system).await;
+    look(&app, &state.games, &system).await;
     Ok(())
 }
 

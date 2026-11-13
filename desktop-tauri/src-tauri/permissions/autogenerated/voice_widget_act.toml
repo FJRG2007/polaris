@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-voice-widget-act"
+description = "Enables the voice_widget_act command without any pre-configured scope."
+commands.allow = ["voice_widget_act"]
+
+[[permission]]
+identifier = "deny-voice-widget-act"
+description = "Denies the voice_widget_act command without any pre-configured scope."
+commands.deny = ["voice_widget_act"]

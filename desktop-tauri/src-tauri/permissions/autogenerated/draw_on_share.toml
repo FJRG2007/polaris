@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-draw-on-share"
+description = "Enables the draw_on_share command without any pre-configured scope."
+commands.allow = ["draw_on_share"]
+
+[[permission]]
+identifier = "deny-draw-on-share"
+description = "Denies the draw_on_share command without any pre-configured scope."
+commands.deny = ["draw_on_share"]

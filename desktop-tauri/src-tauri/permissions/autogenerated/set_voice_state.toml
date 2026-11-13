@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-voice-state"
+description = "Enables the set_voice_state command without any pre-configured scope."
+commands.allow = ["set_voice_state"]
+
+[[permission]]
+identifier = "deny-set-voice-state"
+description = "Denies the set_voice_state command without any pre-configured scope."
+commands.deny = ["set_voice_state"]
