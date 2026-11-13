@@ -5,13 +5,14 @@
  */
 
 import * as core from "@polaris/core";
-import { prisma } from "@polaris/db";
+import { Prisma, prisma } from "@polaris/db";
 import type { RunActor } from "./types";
 import { hookPath } from "./triggers";
 import { startTestRun } from "./history";
 import { appBaseUrl } from "@/lib/domain-service";
 import { AutomationAccessError, load } from "./service";
-import { hookSecret, inspectHook, recordDelivery, signHookHeaders } from "./webhook-guard";
+import { submissionsCsv } from "./website-form";
+import { KEPT_SUBMISSIONS, hookSecret, inspectHook, recordDelivery, signHookHeaders } from "./webhook-guard";
 
 async function webhookNode(actor: RunActor, automationId: string, nodeId: string) {
     const row = await load(actor, automationId, true);
@@ -128,8 +129,58 @@ export async function sendHookTest(
         status: inspection.ok ? config.response.status : inspection.status,
         reason: inspection.ok ? null : inspection.reason,
         detail: inspection.ok ? undefined : inspection.detail,
-        test: true
+        test: true,
+        ...(inspection.ok && inspection.fields ? { fields: inspection.fields, spam: inspection.spam } : {})
     });
     if (!inspection.ok) return { refused: inspection.reason, status: inspection.status };
     return startTestRun(actor, automationId, nodeId, { ...inspection.payload });
+}
+
+export interface FormSubmissionView {
+    readonly id: string;
+    readonly at: string;
+    readonly ip: string | null;
+    readonly country: string | null;
+    readonly test: boolean;
+    readonly fields: Record<string, string>;
+}
+
+function fieldsOf(value: unknown): Record<string, string> {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([key, entry]) => [key, String(entry ?? "")])
+    );
+}
+
+async function submissions(automationId: string, nodeId: string, spam: boolean, take: number) {
+    const rows = await prisma.automationHookDelivery.findMany({
+        where: { automationId, nodeId, spam, fields: { not: Prisma.DbNull } },
+        orderBy: { at: "desc" },
+        take,
+        select: { id: true, at: true, ip: true, country: true, test: true, fields: true }
+    });
+    return rows.map((row) => ({ ...row, at: row.at.toISOString(), fields: fieldsOf(row.fields) }));
+}
+
+/** A website form's latest posts: the ones taken, or the ones kept as spam. */
+export async function listFormSubmissions(
+    actor: RunActor,
+    automationId: string,
+    nodeId: string,
+    spam: boolean
+): Promise<FormSubmissionView[]> {
+    await load(actor, automationId, true);
+    return submissions(automationId, nodeId, spam, 100);
+}
+
+/** Every post a website form kept, as CSV, oldest first. */
+export async function exportFormSubmissions(
+    actor: RunActor,
+    automationId: string,
+    nodeId: string,
+    spam: boolean
+): Promise<string> {
+    await load(actor, automationId, true);
+    const rows = await submissions(automationId, nodeId, spam, KEPT_SUBMISSIONS);
+    return submissionsCsv(rows.reverse());
 }

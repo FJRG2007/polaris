@@ -4,6 +4,10 @@
  * outbox event, matched like any other. Every call that reached a trigger is
  * written to its recent deliveries, refused ones with the reason. Refusals
  * answer with their status and a short word, never with an internal.
+ *
+ * A website form trigger answers browsers: CORS for its sites, a preflight
+ * without checks, a post that filled the honeypot kept as spam and answered
+ * as if taken, and a plain form sent on to the owner's thank-you page.
  */
 
 import { prisma } from "@polaris/db";
@@ -12,6 +16,7 @@ import { randomUUID } from "node:crypto";
 import { hookHash } from "@/lib/automations/triggers";
 import { emitAutomationEvent, kickIntake } from "@/lib/automations/outbox";
 import { hookSecret, inspectHook, recordDelivery, refusalResponse } from "@/lib/automations/webhook-guard";
+import { formAnswerMode, formCorsHeaders, requestOrigin } from "@/lib/automations/website-form";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,6 +72,7 @@ async function handle(request: Request, token: string): Promise<Response> {
         : undefined;
     const parsed = core.CORE_NODE_CONFIGS["core.webhook"].safeParse(node?.config ?? {});
     const config = parsed.success ? parsed.data : core.webhookConfigSchema.parse({});
+    if (core.webhookIsForm(config)) return handleForm(request, trigger, config, hash);
     const inspection = await inspectHook({
         request,
         config,
@@ -114,6 +120,59 @@ async function handle(request: Request, token: string): Promise<Response> {
         run ? { accepted: true, event: eventId, run: run.id, status: run.status } : { accepted: true, event: eventId },
         { status: response.status }
     );
+}
+
+function withHeaders(response: Response, headers: Record<string, string>): Response {
+    for (const [name, value] of Object.entries(headers)) response.headers.set(name, value);
+    return response;
+}
+
+async function handleForm(
+    request: Request,
+    trigger: {
+        nodeId: string;
+        automationId: string;
+        automation: { orgId: string | null; userId: string | null };
+    },
+    config: core.WebhookConfig & { form: core.WebhookForm },
+    hash: string
+): Promise<Response> {
+    const cors = formCorsHeaders(config.form, requestOrigin(request.headers));
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+    const inspection = await inspectHook({
+        request,
+        config,
+        secret: hookSecret(trigger.automationId, trigger.nodeId, config.secretRotation),
+        hash
+    });
+    const delivery = {
+        automationId: trigger.automationId,
+        nodeId: trigger.nodeId,
+        method: request.method,
+        ip: inspection.ip,
+        userAgent: inspection.userAgent
+    };
+    if (!inspection.ok) {
+        void recordDelivery({ ...delivery, status: inspection.status, reason: inspection.reason, detail: inspection.detail });
+        return withHeaders(refusalResponse(inspection, config), cors);
+    }
+    void recordDelivery({ ...delivery, status: 200, reason: null, fields: inspection.fields ?? {}, spam: inspection.spam });
+    // Spam is answered exactly like a real post, so a bot learns nothing.
+    if (!inspection.spam) {
+        await emitAutomationEvent("core.webhook", {
+            orgId: trigger.automation.orgId,
+            userId: trigger.automation.userId,
+            subjectKey: hash,
+            payload: inspection.payload,
+            dedupeKey: `${hash}:${randomUUID()}`
+        });
+        void kickIntake().catch((caught) =>
+            console.error("polaris: automations intake failed:", caught)
+        );
+    }
+    if (config.form.redirectUrl && formAnswerMode(request.headers) === "redirect")
+        return new Response(null, { status: 303, headers: { ...cors, location: config.form.redirectUrl } });
+    return Response.json({ ok: true }, { status: 200, headers: cors });
 }
 
 type Context = { params: Promise<{ token: string }> };

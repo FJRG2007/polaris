@@ -1092,7 +1092,9 @@
             "yearly": "Fechas elegidas cada año, como un cumple.",
             "once": "Una sola vez, en una fecha y hora.",
             "every": "Una y otra vez, cada pocos minutos u horas."
-        }
+        },
+        "websiteForm": "Formulario web",
+        "websiteFormHint": "Envíos de un formulario de tu web"
     },
     "code": {
         "code": "Código",
@@ -1301,10 +1303,34 @@
             "signatureExpired": "Firma caducada",
             "invalidJson": "El cuerpo no es JSON",
             "headers": "Falta una cabecera",
-            "shape": "No encaja la forma"
+            "shape": "No encaja la forma",
+            "origin": "Desde un sitio fuera de la lista"
         },
         "bodyShape": "Forma cuerpo",
         "queryShape": "Forma query",
         "requiredHeaders": "Cabeceras exigidas"
+    },
+    "form": {
+        "noSecret": "Un formulario en una página pública no puede guardar un secreto, así que este no lleva token. Solo envían los sitios de la lista, un campo oculto atrapa bots y cada dirección tiene 5 envíos por minuto.",
+        "sites": "Sitios",
+        "sitesAny": "Vacío: cualquier sitio envía. Añade el tuyo.",
+        "sitesHint": "Incluye subdominios.",
+        "siteInvalid": "Escribe un sitio como example.com",
+        "redirect": "Tras enviar, ir a",
+        "redirectHint": "Vacío: el formulario recibe JSON.",
+        "redirectInvalid": "Usa una dirección http o https",
+        "honeypot": "Campo oculto",
+        "honeypotHint": "Los bots lo rellenan; esos envíos van a Spam.",
+        "honeypotInvalid": "Solo letras, cifras, - y _",
+        "snippet": "HTML para tu web",
+        "snippetHint": "Cambia o añade campos; se envían todos.",
+        "submissions": "Envíos",
+        "inbox": "Recibidos",
+        "spam": "Spam",
+        "export": "Exportar CSV",
+        "spamHint": "Guardados, sin ejecutar la automatización.",
+        "noSpam": "Sin spam.",
+        "noSubmissions": "Aún no hay envíos.",
+        "empty": "Sin campos"
     }
 }

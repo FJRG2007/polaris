@@ -1092,7 +1092,9 @@
             "yearly": "On chosen dates every year, like a birthday.",
             "once": "A single run on a date and time.",
             "every": "Again and again, every few minutes or hours."
-        }
+        },
+        "websiteForm": "Website form",
+        "websiteFormHint": "Posts from a form on your site"
     },
     "code": {
         "code": "Code",
@@ -1301,10 +1303,34 @@
             "signatureExpired": "Signature too old",
             "invalidJson": "Body is not valid JSON",
             "headers": "Missing required header",
-            "shape": "Payload does not match"
+            "shape": "Payload does not match",
+            "origin": "From a site not on the list"
         },
         "bodyShape": "Body shape",
         "queryShape": "Query shape",
         "requiredHeaders": "Required headers"
+    },
+    "form": {
+        "noSecret": "A form on a public page cannot keep a secret, so this one has no token. Only the sites you list can post, a hidden field catches bots, and each address gets 5 posts a minute.",
+        "sites": "Sites",
+        "sitesAny": "Empty: any site can post. Add yours.",
+        "sitesHint": "Subdomains are included.",
+        "siteInvalid": "Enter a site such as example.com",
+        "redirect": "After sending, go to",
+        "redirectHint": "Empty: the form gets a JSON answer.",
+        "redirectInvalid": "Use an http or https address",
+        "honeypot": "Hidden field",
+        "honeypotHint": "Bots fill it in; those posts go to Spam.",
+        "honeypotInvalid": "Letters, digits, - and _ only",
+        "snippet": "HTML for your site",
+        "snippetHint": "Rename or add fields as you like; every field is sent.",
+        "submissions": "Submissions",
+        "inbox": "Received",
+        "spam": "Spam",
+        "export": "Export CSV",
+        "spamHint": "Kept, but the automation did not run.",
+        "noSpam": "No spam.",
+        "noSubmissions": "Nothing sent yet.",
+        "empty": "No fields"
     }
 }

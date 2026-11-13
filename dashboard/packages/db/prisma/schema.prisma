@@ -15868,6 +15868,10 @@ model AutomationHookDelivery {
     // The field a refused payload failed on, for the owner only.
     detail       String?
     test         Boolean  @default(false)
+    // A website form's post: the fields it sent, kept for its submissions list.
+    fields       Json?
+    // A form post that filled the hidden field: kept, never run.
+    spam         Boolean  @default(false)
 
     automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
 

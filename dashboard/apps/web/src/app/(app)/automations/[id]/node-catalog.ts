@@ -33,6 +33,8 @@ export interface CatalogItem {
     readonly preset?: PresetKey;
     /** Set on a schedule preset: its key under `picker.schedules`. */
     readonly schedule?: SchedulePresetKey;
+    /** Set on the website form: the webhook trigger as a form endpoint. */
+    readonly form?: true;
 }
 
 export interface CatalogGroup {
@@ -96,6 +98,9 @@ const schedule = (key: SchedulePresetKey): CatalogItem => ({
     type: "core.schedule",
     schedule: key
 });
+/** The webhook trigger set up as a website form's endpoint. */
+export const WEBSITE_FORM_VALUE = "core.webhook#form";
+const websiteForm: CatalogItem = { value: WEBSITE_FORM_VALUE, type: "core.webhook", form: true };
 const preset = (key: PresetKey): CatalogItem => ({
     value: `core.onEvent#${key}`,
     type: "core.onEvent",
@@ -159,7 +164,8 @@ export function catalogGroups(options: {
                     plain("core.manual"),
                     plain("core.schedule"),
                     ...(Object.keys(SCHEDULE_PRESETS) as SchedulePresetKey[]).map(schedule),
-                    plain("core.webhook")
+                    plain("core.webhook"),
+                    websiteForm
                 ]
             },
             {
@@ -248,6 +254,7 @@ export function pickedNode(
 ): { type: string; config?: unknown } | null {
     const [type, key] = value.split("#", 2) as [string, string | undefined];
     if (key === undefined) return { type };
+    if (value === WEBSITE_FORM_VALUE) return { type, config: core.newWebsiteFormConfig() };
     if (type === "core.schedule") {
         if (!Object.hasOwn(SCHEDULE_PRESETS, key)) return null;
         const preset = SCHEDULE_PRESETS[key as SchedulePresetKey];

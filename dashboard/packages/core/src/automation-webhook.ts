@@ -110,6 +110,53 @@ export const WEBHOOK_MAX_BODY_KB = 256;
 
 const statusCode = z.number().int().min(200).max(299);
 
+/** A site a website form takes posts from, kept as its host name. */
+const formHost = z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(253)
+    .regex(/^(localhost|[a-z0-9-]+(\.[a-z0-9-]+)+)$/);
+
+const thankYouUrl = z
+    .string()
+    .trim()
+    .max(2000)
+    .url()
+    .refine((value) => /^https?:\/\//i.test(value));
+
+/**
+ * What makes a webhook a website form: a page cannot keep a secret, so a form
+ * has no credential and is held to the sites it is on, a hidden field bots
+ * fill in, and a per-address rate limit instead.
+ */
+export const webhookFormSchema = z.object({
+    /** Hosts whose pages may post; `example.com` covers its subdomains. Empty admits any. */
+    allowedOrigins: z.array(formHost).max(50).default([]),
+    /** A field people never see; a post that fills it is kept as spam. */
+    honeypotField: z
+        .string()
+        .trim()
+        .min(1)
+        .max(64)
+        .regex(/^[A-Za-z0-9_-]+$/)
+        .default("_gotcha"),
+    /** Where a plain form post is sent after it is taken; empty answers JSON. */
+    redirectUrl: z.union([z.literal(""), thankYouUrl]).default("")
+});
+
+export type WebhookForm = z.infer<typeof webhookFormSchema>;
+
+/** The per-address ceiling a form keeps when none is set. */
+export const WEBSITE_FORM_PER_IP = { count: 5, windowSeconds: 60 } as const;
+
+/** The media types a form post arrives in. */
+export const WEBSITE_FORM_TYPES = [
+    "application/x-www-form-urlencoded",
+    "multipart/form-data",
+    "application/json"
+] as const;
+
 export const webhookConfigSchema = z.object({
     /** The single method a trigger saved before `methods` existed answered. */
     method: z.enum(["POST", "GET", "any"]).default("POST"),
@@ -155,26 +202,97 @@ export const webhookConfigSchema = z.object({
             /** Sent instead of the default JSON when not empty. */
             body: z.string().max(4000).default("")
         })
-        .default({ mode: "immediately", status: 202, body: "" })
+        .default({ mode: "immediately", status: 202, body: "" }),
+    /** Set on a website form trigger; absent on a plain webhook. */
+    form: webhookFormSchema.optional()
 });
 
 export type WebhookConfig = z.infer<typeof webhookConfigSchema>;
 
 /** The methods a trigger answers, legacy `method` included. */
-export function webhookMethods(config: Pick<WebhookConfig, "method" | "methods">): WebhookMethod[] {
+export function webhookMethods(
+    config: Pick<WebhookConfig, "method" | "methods"> & { form?: unknown }
+): WebhookMethod[] {
+    if (config.form) return ["POST"];
     if (config.methods && config.methods.length > 0) return [...new Set(config.methods)];
     if (config.method === "any") return [...WEBHOOK_METHODS];
     return [config.method];
 }
 
 /** The check a trigger applies; a trigger with none saved is "none". */
-export function webhookAuth(config: Pick<WebhookConfig, "auth">): WebhookAuth {
+export function webhookAuth(config: Pick<WebhookConfig, "auth"> & { form?: unknown }): WebhookAuth {
+    if (config.form) return { mode: "none" };
     return config.auth ?? { mode: "none" };
 }
 
 /** A trigger saved before checks existed, which the editor flags. */
-export function webhookIsLegacyOpen(config: Pick<WebhookConfig, "auth">): boolean {
-    return config.auth === undefined;
+export function webhookIsLegacyOpen(config: Pick<WebhookConfig, "auth"> & { form?: unknown }): boolean {
+    return config.auth === undefined && !config.form;
+}
+
+/** Whether a trigger is a website form. */
+export function webhookIsForm(config: { form?: unknown }): config is { form: WebhookForm } {
+    return config.form !== undefined && config.form !== null;
+}
+
+/** What a new website form starts with: POST, no credential, 5 posts a minute per address. */
+export function newWebsiteFormConfig(): Record<string, unknown> {
+    return {
+        method: "POST",
+        methods: ["POST"],
+        rotation: 0,
+        auth: { mode: "none" },
+        secretRotation: 0,
+        rateLimit: { perIp: { ...WEBSITE_FORM_PER_IP }, total: { ...WEBHOOK_DEFAULT_TOTAL_RATE } },
+        form: { allowedOrigins: [], honeypotField: "_gotcha", redirectUrl: "" }
+    };
+}
+
+/** A typed site ("example.com", "https://www.example.com/contact") as its host. */
+export function formSiteHost(value: string): string {
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed) return "";
+    try {
+        const host = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`).hostname;
+        return formHost.safeParse(host).success ? host : "";
+    } catch {
+        return "";
+    }
+}
+
+/** Whether a browser origin is one of the form's sites. An empty list admits any. */
+export function formOriginAllowed(allowed: readonly string[], origin: string): boolean {
+    if (allowed.length === 0) return true;
+    if (!origin) return false;
+    let host: string;
+    try {
+        host = new URL(origin).hostname.toLowerCase();
+    } catch {
+        return false;
+    }
+    return allowed.some((site) => host === site || host.endsWith(`.${site}`));
+}
+
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+/** The HTML a site pastes to post to a form trigger, honeypot included. */
+export function websiteFormSnippet(url: string, form: Pick<WebhookForm, "honeypotField">): string {
+    const trap = escapeHtml(form.honeypotField);
+    return [
+        `<form action="${escapeHtml(url)}" method="POST">`,
+        `  <label>Name <input name="name" required></label>`,
+        `  <label>Email <input name="email" type="email" required></label>`,
+        `  <label>Message <textarea name="message" required></textarea></label>`,
+        `  <input name="${trap}" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px">`,
+        `  <button type="submit">Send</button>`,
+        `</form>`
+    ].join("\n");
 }
 
 /** What a new trigger starts with: a header token, POST only. */
@@ -201,7 +319,8 @@ export const WEBHOOK_REFUSALS = [
     "signatureExpired",
     "invalidJson",
     "headers",
-    "shape"
+    "shape",
+    "origin"
 ] as const;
 
 export type WebhookRefusal = (typeof WEBHOOK_REFUSALS)[number];
@@ -218,7 +337,10 @@ function headerLabel(name: string): string {
  * method, its credential, signed with openssl where it is signed. The secret is
  * a shell variable, never written into the command.
  */
-export function webhookCurl(url: string, config: Pick<WebhookConfig, "method" | "methods" | "auth">): string {
+export function webhookCurl(
+    url: string,
+    config: Pick<WebhookConfig, "method" | "methods" | "auth"> & { form?: unknown }
+): string {
     const methods = webhookMethods(config);
     const method =
         methods.find((entry) => entry !== "GET" && entry !== "HEAD" && entry !== "OPTIONS") ??

@@ -9,7 +9,7 @@
  * never stored, and compared in constant time.
  */
 
-import { prisma } from "@polaris/db";
+import { Prisma, prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { readCappedBody } from "@/lib/request-body";
@@ -17,6 +17,7 @@ import { geoAllowedForIp } from "@/lib/geo-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { countryForIp } from "@/lib/analytics-geoip";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { readFormBody, requestOrigin } from "./website-form";
 
 /** A trigger's signing secret. Derived, never stored; "New secret" bumps the rotation. */
 export function hookSecret(automationId: string, nodeId: string, rotation: number): string {
@@ -172,7 +173,9 @@ export async function limitHook(
     hash: string,
     ip: string | undefined
 ): Promise<HookVerdict> {
-    const { total, perIp } = config.rateLimit;
+    const { total } = config.rateLimit;
+    // A form has no credential, so it always keeps a per-address ceiling.
+    const perIp = config.rateLimit.perIp ?? (core.webhookIsForm(config) ? core.WEBSITE_FORM_PER_IP : null);
     const all = await rateLimit(`automation-hook:${hash}`, total.count, total.windowSeconds * 1000);
     if (!all.ok) return refuse(429, "rateLimited", Math.ceil(all.retryAfterMs / 1000));
     if (perIp && ip) {
@@ -196,7 +199,10 @@ export type HookPayload = {
     body: unknown;
 };
 
-export type HookInspection = ({ ok: true; payload: HookPayload } | HookRefusal) & {
+export type HookInspection = (
+    | { ok: true; payload: HookPayload; spam: boolean; fields?: Record<string, string> }
+    | HookRefusal
+) & {
     ip: string | undefined;
     userAgent: string | undefined;
 };
@@ -220,6 +226,9 @@ export async function inspectHook(input: {
     const method = request.method.toUpperCase();
     if (!(core.webhookMethods(config) as string[]).includes(method))
         return { ...refuse(405, "method"), ...seen };
+    const form = core.webhookIsForm(config) ? config.form : null;
+    if (!input.test && form && !core.formOriginAllowed(form.allowedOrigins, requestOrigin(request.headers)))
+        return { ...refuse(403, "origin"), ...seen };
     if (!input.test) {
         const caller = await screenHookCaller(config, ip, userAgent);
         if (!caller.ok) return { ...caller, ...seen };
@@ -234,8 +243,10 @@ export async function inspectHook(input: {
         ? new Uint8Array(0)
         : await readCappedBody(request, most).catch(() => null);
     if (!bytes) return { ...refuse(413, "tooLarge"), ...seen };
-    if (bytes.length > 0 && !contentTypeAllowed(config.contentTypes, request.headers.get("content-type")))
+    const types = form ? [...core.WEBSITE_FORM_TYPES] : config.contentTypes;
+    if (bytes.length > 0 && !contentTypeAllowed(types, request.headers.get("content-type")))
         return { ...refuse(415, "contentType"), ...seen };
+    if (form) return inspectForm(request, config, form, bytes, seen);
     const auth = verifyHookAuth(core.webhookAuth(config), input.secret, request.headers, bytes);
     if (!auth.ok) return { ...auth, ...seen };
     const raw = new TextDecoder().decode(bytes);
@@ -262,6 +273,7 @@ export async function inspectHook(input: {
     }
     return {
         ok: true,
+        spam: false,
         payload: {
             kind: "webhook",
             method,
@@ -273,8 +285,53 @@ export async function inspectHook(input: {
     };
 }
 
+function keptHeaders(request: Request, config: core.WebhookConfig): Record<string, string> {
+    const headers: Record<string, string> = {};
+    for (const name of [...KEPT_HEADERS, ...config.requiredHeaders]) {
+        const value = request.headers.get(name);
+        if (value) headers[name] = value.slice(0, 500);
+    }
+    return headers;
+}
+
+/** A website form's post: its fields, the honeypot read, the same shape checks. */
+async function inspectForm(
+    request: Request,
+    config: core.WebhookConfig,
+    form: core.WebhookForm,
+    bytes: Uint8Array,
+    seen: { ip: string | undefined; userAgent: string | undefined }
+): Promise<HookInspection> {
+    const reading = await readFormBody(bytes, request.headers.get("content-type") ?? "", form.honeypotField);
+    if (!reading.ok) return { ...refuse(reading.reason === "tooLarge" ? 413 : 400, reading.reason), ...seen };
+    const missing = config.requiredHeaders.find((name) => !request.headers.get(name));
+    if (missing) return { ...refuse(400, "headers"), detail: missing, ...seen };
+    const query = Object.fromEntries(new URL(request.url).searchParams);
+    const queryCheck = core.checkPayload(config.queryShape, query);
+    if (!queryCheck.ok) return { ...refuse(422, "shape"), detail: `query.${queryCheck.path}`, ...seen };
+    const bodyCheck = core.checkPayload(config.bodyShape, reading.fields);
+    if (!bodyCheck.ok && !reading.spam)
+        return { ...refuse(422, "shape"), detail: `body.${bodyCheck.path}`, ...seen };
+    return {
+        ok: true,
+        spam: reading.spam,
+        fields: reading.fields,
+        payload: {
+            kind: "webhook",
+            method: "POST",
+            query,
+            headers: keptHeaders(request, config),
+            body: bodyCheck.ok ? bodyCheck.value : reading.fields
+        },
+        ...seen
+    };
+}
+
 /** How many deliveries each trigger keeps. */
 export const KEPT_DELIVERIES = 50;
+
+/** How many form submissions each website form keeps, spam included. */
+export const KEPT_SUBMISSIONS = 1000;
 
 /** Write down one delivery and drop the ones past the newest 50. Never throws. */
 export async function recordDelivery(entry: {
@@ -287,6 +344,9 @@ export async function recordDelivery(entry: {
     reason: core.WebhookRefusal | null;
     detail?: string;
     test?: boolean;
+    /** A form post's fields, kept for its submissions list and export. */
+    fields?: Record<string, string>;
+    spam?: boolean;
 }): Promise<void> {
     try {
         await prisma.automationHookDelivery.create({
@@ -300,13 +360,20 @@ export async function recordDelivery(entry: {
                 status: entry.status,
                 reason: entry.reason,
                 detail: entry.detail?.slice(0, 200) ?? null,
-                test: entry.test ?? false
+                test: entry.test ?? false,
+                ...(entry.fields ? { fields: entry.fields } : {}),
+                spam: entry.spam ?? false
             }
         });
+        const submission = entry.fields !== undefined;
         const stale = await prisma.automationHookDelivery.findMany({
-            where: { automationId: entry.automationId, nodeId: entry.nodeId },
+            where: {
+                automationId: entry.automationId,
+                nodeId: entry.nodeId,
+                fields: submission ? { not: Prisma.DbNull } : { equals: Prisma.DbNull }
+            },
             orderBy: { at: "desc" },
-            skip: KEPT_DELIVERIES,
+            skip: submission ? KEPT_SUBMISSIONS : KEPT_DELIVERIES,
             take: 100,
             select: { id: true }
         });
@@ -332,7 +399,8 @@ export const REFUSAL_REPLY: Record<core.WebhookRefusal, string> = {
     signatureExpired: "unauthorized",
     invalidJson: "invalid json",
     headers: "missing header",
-    shape: "payload does not match"
+    shape: "payload does not match",
+    origin: "forbidden"
 };
 
 /** The answer to a refused call, with the headers its status calls for. */

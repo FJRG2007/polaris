@@ -383,6 +383,36 @@ export async function listHookDeliveriesAction(
     }
 }
 
+const formList = z.tuple([id, z.string().min(1).max(64), z.boolean()]);
+
+export async function listFormSubmissionsAction(
+    automationId: unknown,
+    nodeId: unknown,
+    spam: unknown
+): Promise<Result<{ submissions: hooks.FormSubmissionView[] }>> {
+    const parsed = formList.safeParse([automationId, nodeId, spam]);
+    if (!parsed.success) return invalid();
+    try {
+        return { ok: true, submissions: await hooks.listFormSubmissions(await actor(), ...parsed.data) };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+export async function exportFormSubmissionsAction(
+    automationId: unknown,
+    nodeId: unknown,
+    spam: unknown
+): Promise<Result<{ csv: string }>> {
+    const parsed = formList.safeParse([automationId, nodeId, spam]);
+    if (!parsed.success) return invalid();
+    try {
+        return { ok: true, csv: await hooks.exportFormSubmissions(await actor(), ...parsed.data) };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
 export async function deleteAutomationAction(automationId: unknown): Promise<Result> {
     const parsed = id.safeParse(automationId);
     if (!parsed.success) return invalid();

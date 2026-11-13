@@ -24,9 +24,13 @@ import type { AutomationDetail } from "@/lib/automations/service";
 import { ClientRulesEditor } from "@/components/client-rules-editor";
 import type { HookDeliveryView } from "@/lib/automations/webhook-service";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { Button, CopyButton, Input, Select, Textarea, cn, useToast } from "@polaris/ui";
-import { ChevronDown, Eye, EyeOff, FlaskConical, RefreshCw, ShieldAlert } from "lucide-react";
+import { downloadBytes } from "@/lib/download";
+import type { FormSubmissionView } from "@/lib/automations/webhook-service";
+import { Button, CopyButton, Input, SegmentedControl, Select, Textarea, cn, useToast } from "@polaris/ui";
+import { ChevronDown, Download, Eye, EyeOff, FlaskConical, Globe, RefreshCw, ShieldAlert } from "lucide-react";
 import {
+    exportFormSubmissionsAction,
+    listFormSubmissionsAction,
     listHookDeliveriesAction,
     revealHookSecretAction,
     rotateHookAction,
@@ -577,11 +581,14 @@ export function advancedSummary(
 function Advanced({
     view,
     issues,
-    set
+    set,
+    form = false
 }: {
     view: core.WebhookConfig;
     issues: Set<string>;
     set: (change: Config) => void;
+    /** A website form fixes its media types and its answer, so those are not offered. */
+    form?: boolean;
 }) {
     const t = useTranslations("automations");
     const [open, setOpen] = useState(false);
@@ -665,6 +672,7 @@ function Advanced({
                             onChange={(event) => set({ maxBodyKb: numberField(event.target.value) })}
                         />
                     </Labeled>
+                    {form ? null : (
                     <RuleListInput
                         label={t("webhook.contentTypes")}
                         placeholder="application/json"
@@ -678,6 +686,7 @@ function Advanced({
                         }}
                         onChange={(contentTypes) => set({ contentTypes })}
                     />
+                    )}
                     <PayloadShapeEditor
                         label={t("webhook.bodyShape")}
                         value={view.bodyShape}
@@ -700,6 +709,8 @@ function Advanced({
                         }}
                         onChange={(requiredHeaders) => set({ requiredHeaders })}
                     />
+                    {form ? null : (
+                    <>
                     <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                         <Labeled label={t("webhook.respond")}>
                             <Select
@@ -736,6 +747,8 @@ function Advanced({
                             onChange={(event) => set({ response: { ...view.response, body: event.target.value } })}
                         />
                     </Labeled>
+                    </>
+                    )}
                 </div>
             ) : null}
         </div>
@@ -817,6 +830,192 @@ function Deliveries({
     );
 }
 
+function FormSettings({
+    form,
+    issues,
+    url,
+    set
+}: {
+    form: core.WebhookForm;
+    issues: Set<string>;
+    url: string | null;
+    set: (change: Config) => void;
+}) {
+    const t = useTranslations("automations");
+    const put = (change: Partial<core.WebhookForm>) => set({ form: { ...form, ...change } });
+    const snippet = core.websiteFormSnippet(url ?? "/api/automations/hooks/<token>", form);
+    return (
+        <div className="min-w-0 space-y-4">
+            <div className="flex min-w-0 gap-2 rounded-md bg-muted/50 p-2.5 text-xs text-muted-foreground">
+                <Globe className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <p className="min-w-0">{t("form.noSecret")}</p>
+            </div>
+            <RuleListInput
+                label={t("form.sites")}
+                placeholder="example.com"
+                hint={form.allowedOrigins.length === 0 ? t("form.sitesAny") : t("form.sitesHint")}
+                values={form.allowedOrigins}
+                tone="allow"
+                validate={(draft) => {
+                    const host = core.formSiteHost(draft);
+                    return host ? { value: host } : { error: t("form.siteInvalid") };
+                }}
+                onChange={(allowedOrigins) => put({ allowedOrigins })}
+            />
+            <Labeled
+                label={t("form.redirect")}
+                hint={t("form.redirectHint")}
+                error={issues.has("form.redirectUrl") ? t("form.redirectInvalid") : null}
+            >
+                <Input
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://example.com/thanks"
+                    value={form.redirectUrl}
+                    maxLength={2000}
+                    aria-invalid={issues.has("form.redirectUrl")}
+                    onChange={(event) => put({ redirectUrl: event.target.value })}
+                />
+            </Labeled>
+            <Labeled
+                label={t("form.honeypot")}
+                hint={t("form.honeypotHint")}
+                error={issues.has("form.honeypotField") ? t("form.honeypotInvalid") : null}
+            >
+                <Input
+                    className="font-mono"
+                    value={form.honeypotField}
+                    maxLength={64}
+                    aria-invalid={issues.has("form.honeypotField")}
+                    onChange={(event) => put({ honeypotField: event.target.value })}
+                />
+            </Labeled>
+            <div className="min-w-0 space-y-1 text-sm">
+                <span>{t("form.snippet")}</span>
+                <div className="relative min-w-0">
+                    <pre className="max-h-56 min-w-0 overflow-auto overscroll-contain rounded-md border border-border bg-field p-2 pr-9 font-mono text-xs">
+                        {snippet}
+                    </pre>
+                    <CopyButton value={snippet} className="absolute right-1 top-1" />
+                </div>
+                <span className="block text-xs text-muted-foreground">{t("form.snippetHint")}</span>
+            </div>
+        </div>
+    );
+}
+
+function Submissions({ detail, nodeId, saved }: { detail: AutomationDetail; nodeId: string; saved: boolean }) {
+    const t = useTranslations("automations");
+    const toast = useToast();
+    const [box, setBox] = useState<"inbox" | "spam">("inbox");
+    const [rows, setRows] = useState<FormSubmissionView[] | null>(saved ? null : []);
+    const [loading, setLoading] = useState(false);
+    const [exporting, setExporting] = useState(false);
+    const load = useCallback(async () => {
+        if (!saved) return setRows([]);
+        setLoading(true);
+        const answer = await listFormSubmissionsAction(detail.id, nodeId, box === "spam");
+        setLoading(false);
+        setRows(answer.ok ? answer.submissions : []);
+    }, [saved, detail.id, nodeId, box]);
+    useEffect(() => {
+        void load();
+    }, [load]);
+    return (
+        <div className="min-w-0 space-y-1.5 text-sm">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="min-w-0 flex-1 truncate">{t("form.submissions")}</span>
+                <SegmentedControl
+                    size="sm"
+                    value={box}
+                    onValueChange={(next) => {
+                        if (next === box) return;
+                        setRows(null);
+                        setBox(next);
+                    }}
+                    options={[
+                        { value: "inbox", label: t("form.inbox") },
+                        { value: "spam", label: t("form.spam") }
+                    ]}
+                    aria-label={t("form.submissions")}
+                />
+                <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t("form.export")}
+                    title={t("form.export")}
+                    disabled={exporting || !rows || rows.length === 0}
+                    onClick={async () => {
+                        setExporting(true);
+                        const answer = await exportFormSubmissionsAction(detail.id, nodeId, box === "spam");
+                        setExporting(false);
+                        if (!answer.ok) return void toast.show({ title: answer.error });
+                        downloadBytes(
+                            new Blob([answer.csv], { type: "text/csv;charset=utf-8" }),
+                            box === "spam" ? "form-spam.csv" : "form-submissions.csv"
+                        );
+                    }}
+                >
+                    <Download className="size-4" aria-hidden="true" />
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t("webhook.refresh")}
+                    title={t("webhook.refresh")}
+                    disabled={loading}
+                    onClick={() => void load()}
+                >
+                    <RefreshCw className={cn("size-4", loading && "animate-spin")} aria-hidden="true" />
+                </Button>
+            </div>
+            {box === "spam" ? <p className="text-xs text-muted-foreground">{t("form.spamHint")}</p> : null}
+            {rows === null ? (
+                <div className="h-10 animate-pulse rounded-md bg-muted" />
+            ) : rows.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                    {box === "spam" ? t("form.noSpam") : t("form.noSubmissions")}
+                </p>
+            ) : (
+                <ul className="max-h-72 min-w-0 divide-y divide-border overflow-y-auto overscroll-contain rounded-md border border-border">
+                    {rows.map((row) => {
+                        const where = [row.ip, row.country].filter(Boolean).join(" - ");
+                        const entries = Object.entries(row.fields);
+                        return (
+                            <li key={row.id} className="min-w-0 space-y-0.5 px-2 py-1.5 text-xs">
+                                <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                                    <span className="min-w-0 flex-1 truncate" title={where}>
+                                        {row.test ? t("webhook.testDelivery") : where}
+                                    </span>
+                                    <span className="shrink-0">
+                                        <RelativeTime iso={row.at} />
+                                    </span>
+                                </div>
+                                {entries.length === 0 ? (
+                                    <p className="text-muted-foreground">{t("form.empty")}</p>
+                                ) : (
+                                    <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-2">
+                                        {entries.map(([name, value]) => (
+                                            <div key={name} className="contents">
+                                                <dt className="max-w-32 truncate font-mono text-muted-foreground" title={name}>
+                                                    {name}
+                                                </dt>
+                                                <dd className="min-w-0 truncate" title={value}>
+                                                    {value}
+                                                </dd>
+                                            </div>
+                                        ))}
+                                    </dl>
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+}
+
 export function WebhookFields({
     node,
     config,
@@ -833,6 +1032,9 @@ export function WebhookFields({
     const t = useTranslations("automations");
     const view = webhookView(config);
     const issues = webhookIssues(config);
+    const form = core.webhookIsForm(view) ? view.form : null;
+    const base = useAppUrl();
+    const hookUrl = detail.hooks[node.id] ? `${base}${detail.hooks[node.id]}` : null;
     const saved = detail.draft.nodes.some((entry) => entry.id === node.id);
     const [rows, setRows] = useState<HookDeliveryView[] | null>(saved ? null : []);
     const [loading, setLoading] = useState(false);
@@ -855,10 +1057,17 @@ export function WebhookFields({
                 onRotate={(rotation) => set({ rotation })}
                 onChanged={onChanged}
             />
-            <Methods view={view} set={set} />
-            <Auth view={view} raw={config} issues={issues} set={set} detail={detail} nodeId={node.id} />
+            {form ? (
+                <FormSettings form={form} issues={issues} url={hookUrl} set={set} />
+            ) : (
+                <>
+                    <Methods view={view} set={set} />
+                    <Auth view={view} raw={config} issues={issues} set={set} detail={detail} nodeId={node.id} />
+                </>
+            )}
             <TestBlock detail={detail} nodeId={node.id} view={view} onDelivered={() => void load()} />
-            <Advanced view={view} issues={issues} set={set} />
+            <Advanced view={view} issues={issues} set={set} form={form !== null} />
+            {form ? <Submissions detail={detail} nodeId={node.id} saved={saved} /> : null}
             <Deliveries rows={rows} loading={loading} onRefresh={() => void load()} />
             {issues.size > 0 ? <p className="text-xs text-destructive">{t("webhook.fixFields")}</p> : null}
         </div>

@@ -889,14 +889,18 @@ export function Palette({
                                 ? t(`picker.presets.${item.preset}`)
                                 : item.schedule
                                   ? t(`picker.schedules.${item.schedule}`)
-                                  : nodeTitle(t, item.type),
+                                  : item.form
+                                    ? t("picker.websiteForm")
+                                    : nodeTitle(t, item.type),
                             description: item.preset
                                 ? t("picker.presetHint", {
                                       name: catalog.EVENT_PRESETS[item.preset].name
                                   })
                                 : item.schedule
                                   ? t(`picker.scheduleHints.${item.schedule}`)
-                                  : (nodeHint(t, item.type) ?? undefined),
+                                  : item.form
+                                    ? t("picker.websiteFormHint")
+                                    : (nodeHint(t, item.type) ?? undefined),
                             icon: <NodeIcon type={item.type} />
                         }))
                     };
