@@ -99,6 +99,7 @@ export { refusalOf };
 import * as polarRuns from "@/components/polar/polar-runs";
 import * as polarCompare from "@/components/polar/polar-compare";
 import * as polarShared from "@/lib/polar/shared";
+import * as polarSlash from "@/lib/polar/slash";
 import * as embedBridge from "@/lib/polar/embed-bridge";
 import * as settingsPath from "@/lib/polar/settings-path";
 import { SIDEBAR_KEY, THREAD_KEY, readStored, writeStored } from "@/lib/polar/stored";
@@ -629,24 +630,9 @@ export type SlashMatch =
     | { kind: "control"; command: Control }
     | { kind: "own"; row: polarShared.PolarCommandRow };
 
-/** How well a shortcut answers what was typed after the "/": 0 when it starts
- *  with it, 1 when it holds it, 2 when it holds its letters in order; null when
- *  it does not match at all. */
-export function shortcutRank(shortcut: string, query: string): number | null {
-    if (shortcut.startsWith(query)) return 0;
-    if (shortcut.includes(query)) return 1;
-    let at = 0;
-    for (const letter of shortcut) if (letter === query[at]) at++;
-    return at === query.length ? 2 : null;
-}
-
-function ranked<T>(items: readonly T[], key: (item: T) => string, query: string): T[] {
-    return items
-        .map((item, index) => ({ item, index, rank: shortcutRank(key(item), query) }))
-        .filter((entry): entry is { item: T; index: number; rank: number } => entry.rank !== null)
-        .sort((a, b) => a.rank - b.rank || a.index - b.index)
-        .map((entry) => entry.item);
-}
+export { ownCommandIn, shortcutRank } from "@/lib/polar/slash";
+const ranked = polarSlash.rankedByShortcut;
+const ownCommandIn = polarSlash.ownCommandIn;
 
 /** The "/" commands that match what has been typed, Polar's first and the
  *  person's own after, or none once the token has a space in it (a command
@@ -671,18 +657,6 @@ export function slashMatches(
             row
         }))
     ];
-}
-
-/** The person's command a message starts with, and what follows its shortcut. */
-export function ownCommandIn(
-    raw: string,
-    own: readonly polarShared.PolarCommandRow[]
-): { row: polarShared.PolarCommandRow; rest: string } | null {
-    const found = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(raw.trim());
-    if (!found) return null;
-    const shortcut = polarShared.normalizeShortcut(found[1] ?? "");
-    const row = own.find((entry) => entry.shortcut === shortcut);
-    return row ? { row, rest: found[2] ?? "" } : null;
 }
 
 const NEW_COMMAND = "new-command";

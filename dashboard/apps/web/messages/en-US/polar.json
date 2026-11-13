@@ -204,7 +204,8 @@
         "groups": {
             "polar": "Polar",
             "control": "This chat",
-            "own": "Yours"
+            "own": "Yours",
+            "skills": "Skills"
         },
         "control": {
             "clear": "Start over; this chat stays in your history",

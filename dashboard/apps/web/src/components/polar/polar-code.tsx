@@ -54,6 +54,7 @@ import { Message, MessageContent, MessageResponse } from "@/components/polar/ele
 import {
     useCallback,
     useEffect,
+    useLayoutEffect,
     useId,
     useMemo,
     useRef,
@@ -72,6 +73,8 @@ import {
     type ModelSelectorProvider
 } from "@/components/polar/elements/model-selector";
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
+import { useCodeSlash } from "@/components/polar/polar-code-slash";
+import { usePolarCommands } from "@/components/polar/polar-commands";
 import { ContextBar } from "@/components/polar/polar-context";
 import { estimateTokens } from "@/lib/polar/compaction";
 import {
@@ -268,7 +271,10 @@ export function usePolarCode({ enabled = true }: { enabled?: boolean } = {}): Po
         if (!paged.current) setNext(answer.next ?? null);
     }, []);
 
-    useEffect(() => {
+    // Before the first paint, so a panel that was left on Code opens on it
+    // with the access it had, instead of drawing Chat for a frame and
+    // swapping (test/polar/code-start-layout.test.tsx).
+    useLayoutEffect(() => {
         if (readStored(MODE_KEY) === "code") setPicked("code");
         const cached = readStored(OVERVIEW_KEY, "session");
         if (!cached) return;
@@ -418,13 +424,31 @@ export function PolarModeSwitch({ code }: { code: PolarCodeState }) {
     );
 }
 
+/** The choices read last in this tab, so the side panel and the full page open
+ *  on them at once instead of filling in a moment later. Read again behind. */
+let choicesCache: Choices | null = null;
+/** Told to every open Code when the repository pick changes in this tab; the
+ *  `storage` event tells the other tabs. */
+const REPO_EVENT = "polar:code-repo";
+
+/** The repository a Code opens on: the one picked last when the choices are
+ *  already known, else nothing until they are. */
+export function initialRepo(cached: Choices | null, stored: string | null): string {
+    if (!cached || !stored) return "";
+    return stored === NO_REPO || cached.repos.some((repo) => repo.id === stored) ? stored : "";
+}
+
 /** What a new task offers - repositories and agents - read once Code may start
  *  one, and again on a refresh (after adding repositories on GitHub). */
 function useCodeChoices(canStart: boolean) {
-    const [choices, setChoices] = useState<Choices | null>(null);
+    // The cache is empty on a page's first load, so this matches the server's
+    // render; it is only filled on screens opened after it.
+    const [choices, setChoices] = useState<Choices | null>(() => choicesCache);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
-    const [repoId, setRepoId] = useState("");
+    const [repoId, setRepoId] = useState(() =>
+        initialRepo(choicesCache, choicesCache ? readStored(REPO_KEY) : null)
+    );
     // The pick as of now, for a refresh that lands after it changed.
     const picked = useRef(repoId);
     useEffect(() => {
@@ -439,6 +463,7 @@ function useCodeChoices(canStart: boolean) {
             .then((loaded) => {
                 if (!loaded) return;
                 setError(null);
+                choicesCache = loaded;
                 setChoices(loaded);
                 // A pick that is gone (a repository disconnected meanwhile) falls back.
                 // One past the first page is asked about by id rather than taken
@@ -494,6 +519,24 @@ function useCodeChoices(canStart: boolean) {
     const pickRepo = useCallback((id: string) => {
         setRepoId(id);
         writeStored(REPO_KEY, id);
+        window.dispatchEvent(new CustomEvent(REPO_EVENT, { detail: id }));
+    }, []);
+    // A pick made in another Code - the full page, the side panel, another
+    // tab - is this one's too, "No repository" like any other.
+    useEffect(() => {
+        const follow = (id: unknown) => {
+            if (typeof id === "string" && id !== "") setRepoId(id);
+        };
+        const local = (event: Event) => follow((event as CustomEvent<unknown>).detail);
+        const other = (event: StorageEvent) => {
+            if (event.key === REPO_KEY) follow(event.newValue);
+        };
+        window.addEventListener(REPO_EVENT, local);
+        window.addEventListener("storage", other);
+        return () => {
+            window.removeEventListener(REPO_EVENT, local);
+            window.removeEventListener("storage", other);
+        };
     }, []);
 
     return {
@@ -738,6 +781,14 @@ function CodeStart({
     const [issuePick, setIssue] = useState<{ repoId: string; issue: PickedIssue } | null>(null);
     const issue = issuePick?.repoId === repoId ? issuePick.issue : null;
     const [skill, setSkill] = useState<string | null>(null);
+    const own = usePolarCommands().commands;
+    const slash = useCodeSlash({
+        value: prompt,
+        onValueChange: setPrompt,
+        skills: choices?.skills ?? [],
+        own,
+        onSkill: setSkill
+    });
     // What was just sent, shown at once as the first message of the session
     // while the machine for it comes up, rather than a composer that only
     // greys out for the minute that can take.
@@ -814,7 +865,7 @@ function CodeStart({
     const submit = () => {
         if (!ready || busy) return;
         if (polar && model) {
-            const text = prompt.trim();
+            const text = slash.expand(prompt.trim());
             setPrompt("");
             onPolarTask({
                 text,
@@ -826,7 +877,7 @@ function CodeStart({
         if (!tool || !runOn) return;
         setError(null);
         setGap(null);
-        const text = prompt.trim();
+        const text = slash.expand(prompt.trim());
         const started = { issue, skill };
         setSent(text || (issue ? `#${issue.number} ${issue.title}` : ""));
         setPrompt("");
@@ -906,7 +957,10 @@ function CodeStart({
                     </div>
                 </div>
             ) : null}
+            <div className="relative">
+            {slash.list}
             <PolarComposer
+                textareaProps={slash.textareaProps}
                 kit={voiceKit}
                 notice={parts.notice}
                 onNotice={parts.setNotice}
@@ -920,14 +974,14 @@ function CodeStart({
                 onSubmit={submit}
                 sendable={!polar && issue !== null}
                 picker={
-                    canStart ? (
+                    canStart || pending ? (
                         <>
                             <CodeModelPicker
                                 sources={sources}
                                 value={current}
                                 onChange={onPick}
                                 automatic={polarSources.length > 0}
-                                disabled={busy}
+                                disabled={busy || pending}
                             />
                             {asksMode ? (
                                 <PermissionModePicker
@@ -949,7 +1003,11 @@ function CodeStart({
                     onStop: () => undefined
                 }}
             />
-            {canStart ? (
+            </div>
+            {/* Drawn from the first paint, switched off until access and the
+                choices are read, so nothing under the composer moves when they
+                land (test/polar/code-start-layout.test.tsx). */}
+            {canStart || pending ? (
                 <div className="flex min-w-0 flex-wrap items-center gap-1.5 px-1">
                     <CodeWhereChip
                         choices={choices}
@@ -959,21 +1017,21 @@ function CodeStart({
                         refreshing={refreshing}
                         branch={baseRef}
                         onBranch={onBaseRef}
-                        disabled={busy}
+                        disabled={busy || pending}
                     />
-                    {repoId && repoId !== NO_REPO ? (
+                    {repoId !== NO_REPO ? (
                         <CodeIssueChip
                             repoId={repoId}
                             issue={issue}
                             onIssue={(next) => setIssue(next ? { repoId, issue: next } : null)}
-                            disabled={busy}
+                            disabled={busy || repoId === ""}
                         />
                     ) : null}
                     <CodeSkillChip
                         skills={choices?.skills ?? []}
                         skill={skill}
                         onSkill={setSkill}
-                        disabled={busy}
+                        disabled={busy || choices === null}
                     />
                     {(choices?.code?.personas.length ?? 0) > 0 ? (
                         <CodePersonaChip
@@ -1040,6 +1098,9 @@ function CodeThread({
     const [workspace, setWorkspace] = useState(false);
     const [failed, setFailed] = useState(false);
     const [reply, setReply] = useState("");
+    const own = usePolarCommands().commands;
+    // A running session has its skill already; only the person's commands apply.
+    const slash = useCodeSlash({ value: reply, onValueChange: setReply, skills: [], own, onSkill: null });
     const [error, setError] = useState<string | null>(null);
     const [busy, startTransition] = useTransition();
     const parts = useCodeComposerParts(busy);
@@ -1066,7 +1127,7 @@ function CodeThread({
     }, [live, read]);
 
     const send = () => {
-        const text = reply.trim();
+        const text = slash.expand(reply.trim());
         if (!text || busy || parts.uploads.uploading || parts.uploads.failed) return;
         const attachments = parts.uploads.ids;
         setError(null);
@@ -1143,7 +1204,10 @@ function CodeThread({
                     onCompact={null}
                 />
             ) : null}
+            <div className="relative">
+            {slash.list}
             <PolarComposer
+                textareaProps={slash.textareaProps}
                 kit={voiceKit}
                 notice={parts.notice}
                 onNotice={parts.setNotice}
@@ -1167,6 +1231,7 @@ function CodeThread({
                     onStop: () => undefined
                 }}
             />
+            </div>
             {error ? <Notice error>{error}</Notice> : null}
         </div>
     );

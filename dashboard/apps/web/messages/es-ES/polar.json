@@ -204,7 +204,8 @@
         "groups": {
             "polar": "Polar",
             "control": "Este chat",
-            "own": "Tuyos"
+            "own": "Tuyos",
+            "skills": "Skills"
         },
         "control": {
             "clear": "Empezar de cero; el chat sigue en tu historial",
