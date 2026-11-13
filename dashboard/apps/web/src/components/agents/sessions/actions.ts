@@ -215,11 +215,8 @@ async function startParsed(
         if (!host) return { error: t("sessions.errors.serverNotYours") };
     }
 
-    // A workspace opens on a directory that outlives it, and every workspace
-    // session on that machine opens on the same one. Two at once is two agents
-    // editing each other's files and, because this session's reporting token is
-    // written into that directory, the later boot's credential answering for the
-    // earlier session.
+    // Several sessions of one person may share a workspace (see
+    // `workspaceRefusal`); only the shared machine held by somebody else refuses.
     if (!value.repoId) {
         const claim = {
             userId: user.id,

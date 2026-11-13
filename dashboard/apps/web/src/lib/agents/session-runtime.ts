@@ -690,6 +690,7 @@ async function startOnHost(session: SessionView, boot: Bootstrap): Promise<void>
             .join("\n");
         const script = [
             "set -eu",
+            commands.hostSessionScope(session.id, true),
             assignments,
             `export ${Object.keys(bootEnv(boot)).join(" ")}`,
             'mkdir -p "$(dirname "$POLARIS_WORKDIR")"',
@@ -765,7 +766,8 @@ export async function runInSession(
         try {
             let output = "";
             const result = await execCommand(lease.client, "sh -s", {
-                input: command,
+                // Its own tmux server and temporary directory. See `hostSessionScope`.
+                input: `${commands.hostSessionScope(sessionId)}\n${command}`,
                 onStdout: (chunk) => {
                     if (output.length < 200_000) output += chunk.toString("utf8");
                 }

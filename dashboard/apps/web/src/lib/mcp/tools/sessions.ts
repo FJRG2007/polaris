@@ -122,19 +122,43 @@ const promptSessionTool: McpTool<z.infer<typeof promptInput>> = {
     async run(input, caller) {
         const session = await sessions.getSession(input.sessionId, caller.userId);
         if (!session) throw new McpRefusal("No session with that id that this key can reach.");
+        if (session.id === caller.sessionId)
+            throw new McpRefusal("That is this session. Send it to another one.");
         if (core.isSessionOver(session.state)) throw new McpRefusal("That session has ended.");
         if (core.isSessionQueued(session.state))
             throw new McpRefusal(
                 "That session is still waiting for a free slot. It gets its first prompt when it starts."
             );
-        await sessions.addSessionMessage(session.id, "user", input.text, caller.userId);
-        await runtime.promptSession(session.id, input.text);
+        const sender = caller.sessionId
+            ? await sessions.getSession(caller.sessionId, caller.userId)
+            : null;
+        const text = sender ? fromSession(sender, input.text) : input.text;
+        await sessions.addSessionMessage(session.id, "user", text, caller.userId);
+        await runtime.promptSession(session.id, text);
         return { text: "Sent." };
     }
 };
 
+/**
+ * A message one agent sends another, as the receiving agent reads it.
+ *
+ * Says who sent it and how to answer, because the receiver has no other way to
+ * know the prompt came from an agent rather than from its person, or where a
+ * reply should go: an answer is just another `agent_session_prompt`, back.
+ */
+export function fromSession(sender: { id: string; title: string }, text: string): string {
+    return `[Message from the agent session "${sender.title}" (${sender.id}). To reply, call agent_session_prompt with sessionId ${sender.id}.]\n\n${text}`;
+}
+
 const startInput = z.object({
-    repo: z.string().trim().min(3).max(140).describe('The repository, as "owner/name".'),
+    repo: z
+        .string()
+        .trim()
+        .max(140)
+        .default("")
+        .describe(
+            'The repository, as "owner/name". Empty starts it where the calling session works: the same repository, or the same workspace directory.'
+        ),
     title: z.string().trim().min(1).max(80).describe("What the session is for, in a few words."),
     prompt: z.string().trim().min(1).max(20_000).describe("What to ask it to do."),
     agent: core.agentCliIdSchema.default("claude"),
@@ -146,27 +170,55 @@ const startInput = z.object({
         .describe("Branch to start from. Empty takes the repository's default.")
 });
 
+/**
+ * Where a started session works.
+ *
+ * A named repository is looked up as before. With none, a session started BY a
+ * session lands beside it - its repository (on a branch of its own), or the same
+ * workspace directory on the same machine - which is what "start an agent on
+ * the backend" means from inside a project. With neither, a workspace on the
+ * person's own machine. Never the shared machine (see below).
+ */
+export async function startPlace(
+    repoName: string,
+    caller: { userId: string; sessionId?: string | null }
+): Promise<{ repoId: string | null; place: core.AgentSessionPlace; hostId: string | null }> {
+    if (repoName.length > 0) {
+        const repo = await prisma.agentRepo.findFirst({
+            where: { ownerId: caller.userId, repoFullName: repoName, enabled: true },
+            select: { id: true }
+        });
+        if (!repo)
+            throw new McpRefusal(
+                `${repoName} is not a repository the Agents app reaches for this key.`
+            );
+        return { repoId: repo.id, place: "local", hostId: null };
+    }
+    const parent = caller.sessionId
+        ? await sessions.getSession(caller.sessionId, caller.userId)
+        : null;
+    if (!parent) return { repoId: null, place: "local", hostId: null };
+    return {
+        repoId: parent.repoId,
+        place: parent.place,
+        hostId: parent.place === "host" ? parent.hostId : null
+    };
+}
+
 const startSessionTool: McpTool<z.infer<typeof startInput>> = {
     name: "agent_session_start",
     // i18n-ignore shown by the calling client, which has no locale to ask for
     title: "Start an agent session",
     description:
         // i18n-ignore read by the calling model, not shown to a person
-        "Put a coding agent on a piece of work in its own branch. Use this to hand off something separable from what you are doing - not to split the work you were asked to do yourself.",
+        "Put another coding agent on a piece of work, in its own branch or beside you in the same workspace. Use this to hand off something separable from what you are doing - not to split the work you were asked to do yourself.",
     input: startInput,
     category: "development",
     scope: "agents.manage",
     readOnly: false,
     destructive: false,
     async run(input, caller) {
-        const repo = await prisma.agentRepo.findFirst({
-            where: { ownerId: caller.userId, repoFullName: input.repo, enabled: true },
-            select: { id: true }
-        });
-        if (!repo)
-            throw new McpRefusal(
-                `${input.repo} is not a repository the Agents app reaches for this key.`
-            );
+        const where = await startPlace(input.repo, caller);
 
         // Through the same admission as the screen, so a model cannot start past
         // the ceilings a person is held to: over one, the session queues.
@@ -174,7 +226,7 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
         try {
             admission = await queue.admitSession(
                 {
-            repoId: repo.id,
+            repoId: where.repoId,
             startedById: caller.userId,
             title: input.title,
             cli: input.agent,
@@ -191,14 +243,14 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
             // form about a machine they signed in; a tool call has no machine in
             // mind and would be choosing it blind.
             useMachineLogin: false,
-            // Always on the Polaris box. A session started by a model is not the
-            // moment to be choosing somebody's server for them.
-            place: "local",
+            // The Polaris box, or the server the calling session already runs
+            // on - which its person chose. A model never picks a server itself.
+            place: where.place,
             // Never the shared machine. A tool call is an agent acting for one
             // person, and putting that on a container holding everybody's logins
             // is not something an agent gets to decide.
             sharedHome: false,
-            hostId: null,
+            hostId: where.hostId,
             baseRef: input.baseRef,
             taskId: null,
             enigma: null

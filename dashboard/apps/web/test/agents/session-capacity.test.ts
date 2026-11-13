@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 import {
     capacityRefusal,
     clampLimits,
+    workspaceHolders,
     workspaceRefusal,
     DEFAULT_CPUS,
     DEFAULT_MEMORY_MB,
@@ -73,12 +74,11 @@ describe("capacityRefusal", () => {
 /**
  * The one directory a workspace opens on.
  *
- * A session with no checkout works in a directory that outlives it, and every
- * workspace session on that machine opens on the same one. Two live agents there
- * edit each other's files, and - because Polaris writes the session's own
- * reporting token into that directory - the second to boot answers for the
- * first: its events land on the wrong session record and its Polaris tools act
- * as whoever booted last. On the shared machine those are two different people.
+ * Several sessions of one person in one workspace are what that person asked
+ * for - several agents on one project - and nothing of a session's own lives in
+ * that directory any more (token, hooks and MCP registration are in its own
+ * state directory), so the only refusal left is the shared machine while
+ * somebody else is in it.
  */
 describe("workspaceRefusal", () => {
     const mine: WorkspaceClaim = {
@@ -94,18 +94,30 @@ describe("workspaceRefusal", () => {
         expect(workspaceRefusal({ ...mine, place: "host", hostId: "h1" }, 0)).toBeNull();
     });
 
-    it("refuses the second one, which is where the token would change hands", () => {
-        expect(workspaceRefusal(mine, 1)).not.toBeNull();
-        expect(workspaceRefusal({ ...mine, sharedHome: true }, 1)).not.toBeNull();
-        expect(workspaceRefusal({ ...mine, place: "host", hostId: "h1" }, 1)).not.toBeNull();
+    it("lets one person open a second and a third session on their own workspace", () => {
+        expect(workspaceRefusal(mine, 1)).toBeNull();
+        expect(workspaceRefusal(mine, 2)).toBeNull();
+        expect(workspaceRefusal({ ...mine, place: "host", hostId: "h1" }, 2)).toBeNull();
     });
 
-    it("tells somebody what would free it, in terms of the machine they picked", () => {
-        expect(workspaceRefusal(mine, 1)).toContain("Stop that session");
+    it("never counts holders of an own workspace, so no query can refuse it", async () => {
+        await expect(workspaceHolders(mine)).resolves.toBe(0);
+        await expect(workspaceHolders({ ...mine, place: "host", hostId: "h1" })).resolves.toBe(0);
+    });
+
+    it("still refuses the shared machine while somebody else works in it", () => {
+        const refusal = workspaceRefusal({ ...mine, sharedHome: true }, 1);
+        expect(refusal).not.toBeNull();
         // Not "stop it": the session holding the shared machine is somebody
         // else's, and it is not theirs to stop.
-        expect(workspaceRefusal({ ...mine, sharedHome: true }, 1)).not.toContain("Stop that");
-        expect(workspaceRefusal({ ...mine, place: "host", hostId: "h1" }, 1)).toContain("server");
+        expect(refusal).not.toContain("Stop that");
+    });
+
+    it("keeps the account ceiling: a full account still waits", () => {
+        expect(
+            capacityRefusal({ mine: 3, perAccount: 3, total: 3, totalCeiling: 12 })
+        ).toContain("most one account may have");
+        expect(capacityRefusal({ mine: 1, perAccount: 3, total: 1, totalCeiling: 12 })).toBeNull();
     });
 });
 

@@ -239,6 +239,10 @@ async function callerFor(
     const role = await sessionRole(session.id).catch(() => ({ coordinates: false, works: false }));
     const scopes: McpScope[] = [
         ...SESSION_SCOPES,
+        // A session on its own may start and message other sessions of its
+        // person (agent_session_start / agent_session_prompt), as several
+        // agents on one project do. A worker in a run may not: its run decides.
+        ...(role.works || role.coordinates ? [] : (["agents.manage"] as const)),
         ...(role.coordinates ? (["agents.coordinate"] as const) : []),
         ...(role.works ? (["agents.report"] as const) : [])
     ];

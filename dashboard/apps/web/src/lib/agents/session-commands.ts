@@ -389,9 +389,9 @@ const INSTALL_ENIGMA = [
     '  echo "polaris: installing Enigma"',
     // Not fatal. A session without Enigma works to weaker standards; one that
     // died because a registry was slow works to none.
-    '  printf %s "$POLARIS_ENIGMA_SETUP" | base64 -d > /tmp/polaris-enigma-setup.sh',
-    '  as_agent "sh /tmp/polaris-enigma-setup.sh" || echo "polaris: Enigma did not install"',
-    "  rm -f /tmp/polaris-enigma-setup.sh",
+    '  printf %s "$POLARIS_ENIGMA_SETUP" | base64 -d > $(printenv TMPDIR || echo /tmp)/polaris-enigma-setup.sh',
+    '  as_agent "sh $(printenv TMPDIR || echo /tmp)/polaris-enigma-setup.sh" || echo "polaris: Enigma did not install"',
+    "  rm -f $(printenv TMPDIR || echo /tmp)/polaris-enigma-setup.sh",
     "fi"
 ];
 
@@ -430,7 +430,7 @@ const REQUIRE_AGENT = [
  * seconds in which the flag says yes and there is nothing there to type into.
  * See `agentReadyCommand`.
  */
-export const AGENT_READY_FLAG = "/tmp/polaris-agent-started";
+export const AGENT_READY_FLAG = "$(printenv TMPDIR || echo /tmp)/polaris-agent-started";
 
 /**
  * A settled agent that never took the terminal, and the wait after which Polaris
@@ -907,7 +907,7 @@ const LAUNCH_SCRIPT_BASE64 = Buffer.from(LAUNCH_SCRIPT, "utf8").toString("base64
 
 /** Where the answers land on the way in. Beside the other scripts the setup
  *  writes and removes, and holding nothing secret - the tool's own defaults. */
-const FIRST_RUN_FILE = "/tmp/polaris-first-run.json";
+const FIRST_RUN_FILE = "$(printenv TMPDIR || echo /tmp)/polaris-first-run.json";
 
 /**
  * The repository's own setup script - installing dependencies, seeding a
@@ -946,10 +946,10 @@ const START_AGENT = [
     // it ever ran: the variable was cleared two lines above the `if` that tested
     // it, so every session installed Enigma and then configured nothing.
     'if [ -n "$POLARIS_ENIGMA_CONFIGURE" ]; then',
-    '  printf %s "$POLARIS_ENIGMA_CONFIGURE" | base64 -d > /tmp/polaris-enigma.sh',
-    "  chmod 0755 /tmp/polaris-enigma.sh",
-    '  as_agent "sh /tmp/polaris-enigma.sh" || true',
-    "  rm -f /tmp/polaris-enigma.sh",
+    '  printf %s "$POLARIS_ENIGMA_CONFIGURE" | base64 -d > $(printenv TMPDIR || echo /tmp)/polaris-enigma.sh',
+    "  chmod 0755 $(printenv TMPDIR || echo /tmp)/polaris-enigma.sh",
+    '  as_agent "sh $(printenv TMPDIR || echo /tmp)/polaris-enigma.sh" || true',
+    "  rm -f $(printenv TMPDIR || echo /tmp)/polaris-enigma.sh",
     "fi",
     // A login the tool keeps in a file of its own (Codex, Gemini CLI, Copilot
     // CLI), put back from Polaris's copy when the home has none - and only
@@ -976,12 +976,12 @@ const START_AGENT = [
     // which is the last moment anything can answer a question the tool is about
     // to ask on a screen nobody can reach. Only where Polaris owns the home.
     'if [ -n "$POLARIS_FIRST_RUN" ] && [ -n "$POLARIS_HOME" ]; then',
-    '  printf %s "$POLARIS_FIRST_RUN" | base64 -d > /tmp/polaris-first-run.sh',
-    "  chmod 0755 /tmp/polaris-first-run.sh",
+    '  printf %s "$POLARIS_FIRST_RUN" | base64 -d > $(printenv TMPDIR || echo /tmp)/polaris-first-run.sh',
+    "  chmod 0755 $(printenv TMPDIR || echo /tmp)/polaris-first-run.sh",
     // Best effort, like everything else that prepares the home: a session that
     // has to answer its own theme menu is worse than one that does not start.
-    '  as_agent "sh /tmp/polaris-first-run.sh" || true',
-    "  rm -f /tmp/polaris-first-run.sh",
+    '  as_agent "sh $(printenv TMPDIR || echo /tmp)/polaris-first-run.sh" || true',
+    "  rm -f $(printenv TMPDIR || echo /tmp)/polaris-first-run.sh",
     "fi",
     "unset GIT_AUTH_HEADER",
     "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP",
@@ -1172,6 +1172,32 @@ export const SPARE_BOOT = [
     `set -a; . ${CLAIM_FILE}; set +a`,
     ...SESSION_BOOT.split("\n").slice(1)
 ].join("\n");
+
+/**
+ * What makes one session on an enrolled server its own, prepended to every
+ * script Polaris runs there for it.
+ *
+ * A container session has a machine to itself, so its tmux server, its tmux
+ * session name and its `/tmp` flags are its own by construction. A server
+ * session runs straight on somebody's machine, where all of those are shared:
+ * the second session to boot found `polaris-agent` already taken and failed,
+ * and its ready flag and setup files were the first one's. A tmux socket
+ * directory and a temporary directory per session (tmux reads `TMUX_TMPDIR`,
+ * and every path here goes through `TMPDIR`, read with `printenv` so the
+ * boot scripts stay free of `${...}`) separate them without renaming
+ * anything the steering commands address.
+ *
+ * Only exported where the directory exists, so a session that booted before
+ * this keeps finding its tmux on the default socket. `create` is the boot's.
+ */
+export function hostSessionScope(sessionId: string, create = false): string {
+    if (!/^[A-Za-z0-9-]{1,64}$/.test(sessionId)) throw new Error("That is not a session id.");
+    return [
+        `POLARIS_SCOPE="$HOME/.polaris/sessions/${sessionId}/tmp"`,
+        ...(create ? ['mkdir -p "$POLARIS_SCOPE"', 'chmod 0700 "$POLARIS_SCOPE"'] : []),
+        'if [ -d "$POLARIS_SCOPE" ]; then TMUX_TMPDIR="$POLARIS_SCOPE"; TMPDIR="$POLARIS_SCOPE"; export TMUX_TMPDIR TMPDIR; fi'
+    ].join("\n");
+}
 
 /**
  * The same boot, on a machine that is not Polaris's.

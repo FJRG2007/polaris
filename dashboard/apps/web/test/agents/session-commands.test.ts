@@ -1051,3 +1051,43 @@ describe("the conversation id a hook leaves behind", () => {
         expect(hook("{}")).toBeNull();
     });
 });
+
+/**
+ * Two sessions on one enrolled server. Each gets its own tmux server and
+ * temporary directory, so the second boot no longer finds `polaris-agent` taken
+ * and neither reads the other's ready flag.
+ */
+describe("hostSessionScope", () => {
+    const run = (home: string, script: string) =>
+        spawnSync("sh", ["-c", script], { env: { ...process.env, HOME: home }, encoding: "utf8" })
+            .stdout.trim();
+
+    it("gives each session its own tmux socket and temporary directory", () => {
+        const home = mkdtempSync(join(tmpdir(), "polaris-scope-"));
+        const show = 'printf "%s|%s" "$TMUX_TMPDIR" "$TMPDIR"';
+        const a = run(home, `${commands.hostSessionScope("aaaa-1", true)}\n${show}`);
+        const b = run(home, `${commands.hostSessionScope("bbbb-2", true)}\n${show}`);
+        expect(a).toMatch(/\/\.polaris\/sessions\/aaaa-1\/tmp\|.+\/\.polaris\/sessions\/aaaa-1\/tmp$/);
+        expect(b).toContain("/.polaris/sessions/bbbb-2/tmp");
+        expect(a).not.toBe(b);
+        // A later command for the same session finds the same one.
+        expect(run(home, `${commands.hostSessionScope("aaaa-1")}\n${show}`)).toBe(a);
+    });
+
+    it("leaves a session that booted before this on the default socket", () => {
+        const home = mkdtempSync(join(tmpdir(), "polaris-scope-"));
+        const out = run(
+            home,
+            `unset TMUX_TMPDIR; ${commands.hostSessionScope("old-1")}\nprintf "%s" "\${TMUX_TMPDIR:-default}"`
+        );
+        expect(out).toBe("default");
+    });
+
+    it("refuses anything that is not a session id", () => {
+        expect(() => commands.hostSessionScope('x"; rm -rf ~')).toThrow();
+    });
+
+    it("keeps the ready flag in that directory", () => {
+        expect(commands.AGENT_READY_FLAG).toBe("$(printenv TMPDIR || echo /tmp)/polaris-agent-started");
+    });
+});

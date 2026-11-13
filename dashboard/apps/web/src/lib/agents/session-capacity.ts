@@ -136,20 +136,21 @@ export function capacityRefusal(capacity: Capacity): string | null {
 }
 
 /**
- * Whether the persistent workspace a session would open on is already taken.
+ * Whether the workspace a session would open on is held by somebody else.
  *
- * A workspace has no checkout, so it is one directory that outlives the session
- * and every workspace session on that machine opens on the same one: the
- * account's own home, the machine everybody shares, or a single directory on an
- * enrolled server. Two live agents in one directory is not a busy directory, it
- * is two agents editing each other's files - and, because Polaris writes this
- * session's own reporting token into `.claude` and `.mcp.json` there, the second
- * one to boot also takes the first one's credential over: its events land on the
- * wrong session and its Polaris tools act as whoever booted last. On the shared
- * machine those two are different people.
+ * A workspace has no checkout, so it is one directory that outlives the session:
+ * the account's own home, the machine everybody shares, or one directory on an
+ * enrolled server. Several sessions of ONE person in that directory are what the
+ * person asked for - the same as several agent terminals open in one project -
+ * and nothing of a session's own lives there: its reporting token, hooks, MCP
+ * registration and state are in its own directory (`stateDirFor` in
+ * session-runtime), and on a server each session gets its own tmux server and
+ * temporary directory (`hostSessionScope`). So the only case refused is the
+ * shared machine while somebody ELSE is working in it: those files would be
+ * edited by two people who never agreed to it.
  *
- * A session with a repository is not asked about. It clones into a directory of
- * its own and nothing of it survives, which is the whole difference.
+ * A session with a repository is not asked about: it clones into a directory of
+ * its own on a branch of its own.
  */
 export interface WorkspaceClaim {
     readonly userId: string;
@@ -158,37 +159,31 @@ export interface WorkspaceClaim {
     readonly hostId: string | null;
 }
 
-/** How many live sessions are already in that directory. Split from the sentence
- *  below for the same reason `sessionCapacity` is: the count is the query and the
- *  refusal is a pure function that can be asserted without one. */
+/** How many live sessions of OTHER people are in that directory. Zero without a
+ *  query for anything but the shared machine: an own home and an own server are
+ *  only ever opened by their owner. */
 export async function workspaceHolders(claim: WorkspaceClaim): Promise<number> {
-    const where =
-        claim.place === "host"
-            ? { place: "host", hostId: claim.hostId }
-            : claim.sharedHome
-              ? { place: "local", sharedHome: true }
-              : { place: "local", sharedHome: false, startedById: claim.userId };
+    if (claim.place !== "local" || !claim.sharedHome) return 0;
     return prisma.agentSession.count({
-        where: { repoId: null, state: { in: ALIVE }, ...where }
+        where: {
+            repoId: null,
+            state: { in: ALIVE },
+            place: "local",
+            sharedHome: true,
+            startedById: { not: claim.userId }
+        }
     });
 }
 
 /**
  * Why a workspace may not be opened right now, or null.
  *
- * Refuses rather than queues, for the same reason the ceilings above do: the
- * person is looking at it and can stop the session holding the directory, which
- * is a better answer than one that arrives twenty minutes later.
+ * Refuses rather than queues: the person is looking at it, and the other
+ * person's session ending is not something they control.
  */
 export function workspaceRefusal(claim: WorkspaceClaim, holders: number): string | null {
-    if (holders <= 0) return null;
-    if (claim.place === "host") {
-        return "That server already has a workspace session open, and a workspace is one directory. Stop that session and this will start.";
-    }
-    if (claim.sharedHome) {
-        return "Somebody already has a session open on the shared machine, and it has one workspace. Wait for that to finish, or open this one on your own machine.";
-    }
-    return "You already have a workspace session open, and it is the same directory this one would use. Stop that session and this will start.";
+    if (holders <= 0 || claim.place !== "local" || !claim.sharedHome) return null;
+    return "Somebody already has a session open on the shared machine, and it has one workspace. Wait for that to finish, or open this one on your own machine.";
 }
 
 /** What an administrator may change a session container's share of the box to. */

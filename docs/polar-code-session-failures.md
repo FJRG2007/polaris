@@ -14,6 +14,8 @@ show a recurrence is listed).
 | PC-2 | "Starting" for hours, then "Polaris could not send the first prompt: its agent never opened a terminal to type into" and "The machine running this session stopped reporting" | Not proven on the old build; boot works on 8bc8928dc6 | watch | - |
 | PC-3 | "API Error: 400 This API key is not scoped to a workspace..." although a Claude subscription was picked | A stored Anthropic API key was handed to the agent beside the picked subscription | fixed | 3f7c9fa8fc |
 | PC-4 | Screen shows "Starting" well after the agent has answered | Not proven | open | - |
+| PC-5 | A second "No repository" session refused: "You already have a workspace session open, and it is the same directory this one would use" | A guard written for a token that no longer lives in the workspace | fixed | this change |
+| PC-6 | Second session on one enrolled server cannot start (any repository) | Every server session used the same tmux server, session name and `/tmp` flags | watch | this change |
 
 ## PC-1 - session ends at start with no reply
 
@@ -84,6 +86,43 @@ show a recurrence is listed).
   comes from a stale cached overview (`polar.code.overview.v2`).
 - **Next time:** open the browser's network panel on the thread, or check the
   web container's log for `/api/polar/code/thread` errors in the same minute.
+
+## PC-5 - a second workspace session refused
+
+- **Seen:** 2026-11-13 on the reference server: starting a second "No
+  repository" session while one was open was refused with "You already have a
+  workspace session open...". People run several agents on one project at once,
+  so this blocked the main way Polar Code is used.
+- **Cause:** `workspaceRefusal` (lib/agents/session-capacity.ts) refused any
+  second live session in the same workspace directory. Its reason - the
+  session's reporting token written into `.claude` / `.mcp.json` in that
+  directory - stopped being true when the hook script, hook settings and MCP
+  config moved to the per-session state directory (`stateDirFor`,
+  session-runtime.ts; `--settings` / `--mcp-config` in the launch script). On a
+  container session that directory is the session's own mount; on a server it
+  is `~/.polaris/sessions/<id>/polaris`. Nothing per-session is in the workspace.
+- **Fix:** an own workspace (own home, own server) is never refused; the
+  account and deployment ceilings still apply and queue past them. Only the
+  shared machine while somebody else works in it is refused.
+- **Regression tests:** `test/agents/session-capacity.test.ts`
+  ("lets one person open a second and a third session...").
+
+## PC-6 - two sessions on one enrolled server
+
+- **Found by reading the code**, not seen on a server: a server session runs
+  straight on the machine over SSH, and every one used tmux's default socket
+  with session name `polaris-agent` and the fixed `/tmp/polaris-agent-started`
+  flag. The second boot's `tmux new-session -s polaris-agent` fails on
+  "duplicate session" under `set -eu`, and the steering commands of both
+  sessions would address the same terminal.
+- **Fix:** `hostSessionScope` (session-commands.ts) prepends, to the boot and to
+  every command run for that session, a `TMUX_TMPDIR` and `TMPDIR` of
+  `~/.polaris/sessions/<id>/tmp`; the ready flag and the setup's temporary files
+  read `TMPDIR`. Only exported where the directory exists, so a session booted
+  before the update keeps its default socket.
+- **Unverified:** not exercised on a real server from here (no SSH target, no
+  Docker on the development machine). If it recurs: `ls
+  ~/.polaris/sessions/*/tmp` on the server and `TMUX_TMPDIR=<that> tmux ls`.
 
 ## How to diagnose a failing session
 
