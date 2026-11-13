@@ -332,6 +332,16 @@ pub async fn push_start(
         slot.phase = end.phase;
     }
     release(&app);
+    // How the deployment went, worded like the dashboard's own alert and marked
+    // `once`, so the two are shown once (`push-local.ts`).
+    if let Some((deployment, outcome)) = &end.deployment {
+        let notice = crate::notices::NoticeInput::deployment(deployment, outcome);
+        if let Err(error) =
+            crate::notices::show(&app, &app.state::<crate::notices::Notices>(), notice)
+        {
+            eprintln!("polaris: the deployment notice was not shown: {error}");
+        }
+    }
     Ok(end)
 }
 

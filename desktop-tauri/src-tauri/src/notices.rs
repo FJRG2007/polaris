@@ -67,6 +67,22 @@ impl NoticeInput {
         }
     }
 
+    /// How a followed deployment ended (`push-local.ts`): tagged by the
+    /// deployment and `once`, since the dashboard announces the same event in
+    /// the same words. The plugin has no click on desktop, so it cannot open
+    /// the service the way Electron's notice does; the push window's "Open in
+    /// Polaris" does.
+    pub fn deployment(deployment: &str, outcome: &polaris_client::deploy_outcome::Outcome) -> Self {
+        Self {
+            title: outcome.title.clone(),
+            subtitle: None,
+            body: Some(outcome.body.clone()),
+            tag: format!("deploy:{deployment}"),
+            silent: false,
+            once: true,
+        }
+    }
+
     fn checked(self) -> Result<Self, String> {
         let long =
             |text: &Option<String>, max| text.as_ref().is_some_and(|t| t.chars().count() > max);
@@ -170,4 +186,30 @@ fn dock(window: &tauri::WebviewWindow, label: Option<String>) -> tauri::Result<(
 #[cfg(not(target_os = "macos"))]
 fn dock(_window: &tauri::WebviewWindow, _label: Option<String>) -> tauri::Result<()> {
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use polaris_client::deploy_outcome::deploy_outcome;
+
+    #[test]
+    fn a_deployment_notice_is_the_outcome_tagged_by_its_deployment() {
+        let outcome = deploy_outcome(
+            "web",
+            "failed",
+            Some(
+                "exit 1
+more",
+            ),
+        );
+        let notice = NoticeInput::deployment("dep_1", &outcome)
+            .checked()
+            .unwrap();
+        assert_eq!(notice.title, outcome.title);
+        assert_eq!(notice.body.as_deref(), Some(outcome.body.as_str()));
+        assert_eq!(notice.tag, "deploy:dep_1");
+        assert!(notice.once);
+        assert!(!notice.silent);
+    }
 }

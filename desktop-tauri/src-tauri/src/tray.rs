@@ -2,7 +2,7 @@
 //! (`menu.ts`).
 //!
 //! The tray holds what is the app's own - the servers, the saved API key, the
-//! update entry - the way Discord and Slack keep theirs. The beta never
+//! update entry, Install on a TV - the way Discord and Slack keep theirs. The beta never
 //! updates, so that entry is there and disabled. The application menu is drawn
 //! only on macOS: on Windows and Linux a Tauri menu is a strip across every
 //! window, which the Electron app hides, so there the engine's own keys (reload,
@@ -96,8 +96,7 @@ fn tray_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     items.extend::<[Box<dyn IsMenuItem<Wry>>; 11]>([
         Box::new(separator()?),
         Box::new(item(app, "api-keys", "API keys", server)?),
-        // The TV installer is not in the beta yet.
-        Box::new(item(app, "tv", "Install on a TV...", false)?),
+        Box::new(item(app, "tv", "Install on a TV...", true)?),
         Box::new(item(app, "forget-key", "Forget the saved API key", server)?),
         Box::new(item(
             app,
@@ -183,7 +182,7 @@ fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         )?)
         .item(&separator()?)
         .item(&item(app, "api-keys", "API keys", server)?)
-        .item(&item(app, "tv", "Install on a TV...", false)?)
+        .item(&item(app, "tv", "Install on a TV...", true)?)
         .item(&item(
             app,
             "forget-key",
@@ -281,6 +280,7 @@ fn handle(app: &AppHandle, id: &str) {
         "settings" => crate::open_servers_window(app),
         "api-keys" => show_polaris(app, Some("/account/api-keys")),
         "forget-key" => crate::key_flow::forget(app),
+        "tv" => install_on_tv(app),
         "browser" => {
             if let Some(server) = saved_server(app) {
                 let _ = app.opener().open_url(server.to_string(), None::<&str>);
@@ -333,6 +333,24 @@ fn handle(app: &AppHandle, id: &str) {
             }
         }
     }
+}
+
+/// The dashboard's own TV dialog when there is a Polaris to show it, the
+/// beta's TV window when there is not (`installOnTv` in Electron's `index.ts`).
+fn install_on_tv(app: &AppHandle) {
+    let state = crate::shared(app);
+    if tv_in_dashboard(state.current().is_some(), state.load_error().is_some()) {
+        show_polaris(app, Some(TV_IN_DASHBOARD));
+    } else {
+        crate::pages::show_tv_window(app);
+    }
+}
+
+/// The dashboard's own install dialog.
+const TV_IN_DASHBOARD: &str = "/account/downloads?tv=install";
+
+fn tv_in_dashboard(server: bool, failed_to_load: bool) -> bool {
+    server && !failed_to_load
 }
 
 /// Go to another kept Polaris: the servers page's own switch, checked like an
@@ -395,6 +413,14 @@ pub fn refresh(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn install_on_a_tv_opens_the_dashboard_only_when_it_loads() {
+        assert!(tv_in_dashboard(true, false));
+        assert!(!tv_in_dashboard(true, true));
+        assert!(!tv_in_dashboard(false, false));
+        assert_eq!(TV_IN_DASHBOARD, "/account/downloads?tv=install");
+    }
 
     #[test]
     fn names_a_host_by_its_name_or_its_address() {

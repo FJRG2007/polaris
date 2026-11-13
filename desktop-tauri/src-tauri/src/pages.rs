@@ -76,14 +76,17 @@ fn bring_forward(window: &WebviewWindow) {
 /// `openTvInstall`: the Install on a TV window, or its open one brought forward.
 #[tauri::command]
 pub fn open_tv_install(app: AppHandle, window: WebviewWindow) -> bool {
-    if !crate::ipc::from_polaris(&app, &window) {
-        return false;
-    }
+    crate::ipc::from_polaris(&app, &window) && show_tv_window(&app)
+}
+
+/// The TV window, or its open one brought forward; the tray's Install on a TV
+/// opens it too when no Polaris is loaded.
+pub fn show_tv_window(app: &AppHandle) -> bool {
     if let Some(open) = app.get_webview_window(TV_WINDOW) {
         bring_forward(&open);
         return true;
     }
-    match open_page(&app, TV_WINDOW, Page::Tv, "Install on a TV - Polaris") {
+    match open_page(app, TV_WINDOW, Page::Tv, "Install on a TV - Polaris") {
         Ok(_) => true,
         Err(error) => {
             eprintln!("polaris: the TV window could not open: {error}");
