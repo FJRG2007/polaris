@@ -23,8 +23,6 @@ const ALLOWED: Record<string, string> = {
         "public upload link: the visitor is not signed in and has no Drive",
     "apps/web/src/app/s/[token]/share-explorer.tsx":
         "public share link: the visitor is not signed in and has no Drive",
-    "apps/web/src/app/(app)/chat/composer.tsx":
-        "the phone's gallery and camera (capture), which only the browser opens; the paperclip uses the picker",
     "apps/web/src/app/(app)/apps/deploy/upload-source.tsx":
         "a whole folder, which the picker cannot choose; the .zip button uses the picker",
     "apps/web/src/app/(app)/vault/qr-scan.tsx":

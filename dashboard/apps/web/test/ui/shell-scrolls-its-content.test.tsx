@@ -47,8 +47,10 @@ function renderShell() {
     return screen.getByRole("main");
 }
 
-/** Every app's sources, the dashboard's own included. The extension is not
- *  drawn inside the shell. */
+/** Every app's sources, the dashboard's own included. The extension and the
+ *  docs site are not drawn inside the shell: the site is a static page whose
+ *  window does scroll. */
+const OUTSIDE_SHELL = new Set(["extension", "site"]);
 const APPS = join(__dirname, "..", "..", "..");
 
 /** Readings that only make sense when the window is what scrolls. */
@@ -96,7 +98,7 @@ describe("the shell scrolls its content, not the window", () => {
     it("has no screen measuring against a window that does not scroll", async () => {
         const apps = await readdir(APPS, { withFileTypes: true });
         const roots = apps
-            .filter((entry) => entry.isDirectory() && entry.name !== "extension")
+            .filter((entry) => entry.isDirectory() && !OUTSIDE_SHELL.has(entry.name))
             .map((entry) => join(APPS, entry.name, "src"));
         const files = (await Promise.all(roots.map(sources))).flat();
         expect(files.length).toBeGreaterThan(100);
