@@ -585,42 +585,44 @@ export function MinecraftPlayers({
     /**
      * Tie somebody to a Polaris account - following its sign-ins, or only as who
      * they are, in which case the address and note typed with it are saved too.
+     * Whether the account was told comes back for the dialog to say so; a link
+     * that told nobody closes it here.
      */
-    function linkPlayer(input: {
+    async function linkPlayer(input: {
         username: string;
         userId: string;
         followSignIns: boolean;
         address?: string;
         note?: string;
-    }): void {
+    }): Promise<{ told: boolean }> {
         setFormError(null);
-        startTransition(async () => {
-            const result = await actions.linkPlayerAccountAction({
+        // The address first, so the notice the account gets says where it may
+        // join from.
+        if (!input.followSignIns && input.address) {
+            const saved = await actions.grantPlayerAccessAction({
                 installedAppId,
                 username: input.username,
-                userId: input.userId,
-                followSignIns: input.followSignIns
+                address: input.address,
+                ...(input.note ? { note: input.note } : {})
             });
-            if (result.error) {
-                setFormError(result.error);
-                return;
+            if (saved.error) {
+                setFormError(saved.error);
+                return { told: false };
             }
-            if (!input.followSignIns && input.address) {
-                const saved = await actions.grantPlayerAccessAction({
-                    installedAppId,
-                    username: input.username,
-                    address: input.address,
-                    ...(input.note ? { note: input.note } : {})
-                });
-                if (saved.error) {
-                    setFormError(saved.error);
-                    onChanged();
-                    return;
-                }
-            }
-            setActing(null);
-            onChanged();
+        }
+        const result = await actions.linkPlayerAccountAction({
+            installedAppId,
+            username: input.username,
+            userId: input.userId,
+            followSignIns: input.followSignIns
         });
+        onChanged();
+        if (result.error) {
+            setFormError(result.error);
+            return { told: false };
+        }
+        if (!result.told) setActing(null);
+        return { told: result.told === true };
     }
 
     /** Register somebody, or save a change to somebody already registered. Both are

@@ -49,7 +49,7 @@ const OWNERS: Record<core.ResourceKind, (id: string) => Promise<string | null>> 
 
 /** The owner of one thing, resolved once per request: a screen asks about the
  *  same server several times over, and none of those should pay for the lookup. */
-const ownerOf = cache(async (kind: core.ResourceKind, id: string): Promise<string | null> => OWNERS[kind](id));
+export const ownerOf = cache(async (kind: core.ResourceKind, id: string): Promise<string | null> => OWNERS[kind](id));
 
 /**
  * This user's standing on one thing, or null when they have none.

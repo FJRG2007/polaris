@@ -728,20 +728,22 @@ export function PlayerAccessDialog({
         error?: string;
     }>;
     /** Tie the player to a Polaris account. `followSignIns` false keeps the
-     *  addresses typed for them; `address` and `note` are then saved with it. */
+     *  addresses typed for them; `address` and `note` are then saved with it.
+     *  `told` is whether the account was sent a notice of it. */
     onLink?: (input: {
         username: string;
         userId: string;
         followSignIns: boolean;
         address?: string;
         note?: string;
-    }) => void;
+    }) => Promise<{ told: boolean }>;
     /** Untie a linked player. */
     onUnlink?: (username: string) => void;
     /** Invite somebody with no Polaris account, so the one they make is tied to
      *  this player. */
     onInvite?: (input: { username: string; email: string; followSignIns: boolean }) => Promise<{
         linked?: true;
+        told?: boolean;
         invite?: { url?: string; sendError?: string };
         error?: string;
     }>;
@@ -774,12 +776,11 @@ export function PlayerAccessDialog({
     const [suggested, setSuggested] = useState<readonly string[]>([]);
     const [addressesHidden, setAddressesHidden] = useState(false);
     const [inviting, startInviting] = useTransition();
-    const [invited, setInvited] = useState<{
-        email: string;
-        url?: string;
-        sendError?: string;
-    } | null>(null);
+    const [invited, setInvited] = useState<{ email: string; url: string } | null>(null);
     const [inviteError, setInviteError] = useState<string | null>(null);
+    const [saving, startSaving] = useTransition();
+    /** Who was just linked and sent a notice of it, to say so before closing. */
+    const [notified, setNotified] = useState<string | null>(null);
 
     /** Fill the name in from a Polaris account, spelled the way Mojang spells it. */
     function lookUp(query: string): void {
@@ -885,12 +886,21 @@ export function PlayerAccessDialog({
                 return;
             }
             if (result.linked) {
-                onClose();
+                if (result.told) setNotified(inviteEmail);
+                else onClose();
                 return;
             }
-            setInvited({ email: inviteEmail, ...result.invite });
+            // Polaris sends no email: without the link there is nothing to share.
+            if (!result.invite?.url) {
+                setInviteError(t("players.inviteNoLink"));
+                return;
+            }
+            setInvited({ email: inviteEmail, url: result.invite.url });
         });
     }
+
+    // Nothing left to do but close: an invite to hand over, or a notice sent.
+    const finished = invited !== null || notified !== null;
 
     return (
         <PlayerFormDialog
@@ -915,7 +925,7 @@ export function PlayerAccessDialog({
                         : t("players.aPlayerIsLetIn")
             }
             confirmLabel={
-                following || invited
+                following || finished
                     ? t("players.done")
                     : linking
                       ? t("players.link")
@@ -923,27 +933,30 @@ export function PlayerAccessDialog({
                         ? t("players.save")
                         : t("players.addPlayer")
             }
-            ready={ready || invited !== null}
-            unchanged={unchanged && invited === null}
-            pending={pending || inviting}
+            ready={ready || finished}
+            unchanged={unchanged && !finished}
+            pending={pending || inviting || saving}
             error={error}
             onClose={onClose}
             onConfirm={() => {
-                if (following || invited) {
+                if (following || finished) {
                     onClose();
                     return;
                 }
                 if (linking && account && onLink) {
-                    onLink({
-                        username: name,
-                        userId: account.userId,
-                        followSignIns: followsNow,
-                        ...(followsNow
-                            ? {}
-                            : {
-                                  address: rule.length > 0 ? rule : (player?.addresses[0] ?? ""),
-                                  note: note.trim()
-                              })
+                    startSaving(async () => {
+                        const { told } = await onLink({
+                            username: name,
+                            userId: account.userId,
+                            followSignIns: followsNow,
+                            ...(followsNow
+                                ? {}
+                                : {
+                                      address: rule.length > 0 ? rule : (player?.addresses[0] ?? ""),
+                                      note: note.trim()
+                                  })
+                        });
+                        if (told) setNotified(account.name);
                     });
                     return;
                 }
@@ -1025,27 +1038,13 @@ export function PlayerAccessDialog({
                     {inviteError && <p className="pt-1 text-xs text-danger">{inviteError}</p>}
                     {invited && (
                         <div className="flex flex-col gap-1 pt-1 text-xs text-muted-foreground">
-                            <span>
-                                {invited.sendError
-                                    ? t("players.inviteFailed", {
-                                          email: invited.email,
-                                          reason: invited.sendError
-                                      })
-                                    : invited.url
-                                      ? t("players.inviteLink", { email: invited.email, name })
-                                      : t("players.invited", { email: invited.email, name })}
+                            <span>{t("players.inviteLink", { email: invited.email, name })}</span>
+                            <span className="flex items-center gap-1">
+                                <code className="min-w-0 truncate rounded bg-muted px-1.5 py-0.5">
+                                    {invited.url}
+                                </code>
+                                <CopyButton value={invited.url} label={t("players.theInviteLink")} />
                             </span>
-                            {invited.url && (
-                                <span className="flex items-center gap-1">
-                                    <code className="min-w-0 truncate rounded bg-muted px-1.5 py-0.5">
-                                        {invited.url}
-                                    </code>
-                                    <CopyButton
-                                        value={invited.url}
-                                        label={t("players.theInviteLink")}
-                                    />
-                                </span>
-                            )}
                         </div>
                     )}
                 </PlayerFormField>
@@ -1090,6 +1089,12 @@ export function PlayerAccessDialog({
                             : t("players.linkedHint", { name: account.name })}
                     </p>
                 </div>
+            )}
+
+            {notified && (
+                <p role="status" className="text-xs text-muted-foreground">
+                    {t("players.notified", { name: notified })}
+                </p>
             )}
 
             <PlayerFormField

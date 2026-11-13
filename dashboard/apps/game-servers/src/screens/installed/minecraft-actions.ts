@@ -1022,7 +1022,7 @@ const linkSchema = z.object({
  */
 export async function linkPlayerAccountAction(
     input: z.input<typeof linkSchema>
-): Promise<{ error?: string }> {
+): Promise<{ told?: boolean; error?: string }> {
     const parsed = linkSchema.safeParse(input);
     if (!parsed.success)
         return {
@@ -1035,11 +1035,16 @@ export async function linkPlayerAccountAction(
             "games.manage",
             parsed.data.installedAppId
         );
-        await playerAccess.linkPlayerAccount(access.ownerId, parsed.data.installedAppId, user.id, {
-            username: parsed.data.username,
-            userId: parsed.data.userId,
-            followSignIns: parsed.data.followSignIns
-        });
+        const { told } = await playerAccess.linkPlayerAccount(
+            access.ownerId,
+            parsed.data.installedAppId,
+            user.id,
+            {
+                username: parsed.data.username,
+                userId: parsed.data.userId,
+                followSignIns: parsed.data.followSignIns
+            }
+        );
         await recordAudit({
             actorId: user.id,
             action: "minecraft.player-link",
@@ -1048,11 +1053,12 @@ export async function linkPlayerAccountAction(
             metadata: {
                 player: parsed.data.username,
                 userId: parsed.data.userId,
-                followSignIns: parsed.data.followSignIns
+                followSignIns: parsed.data.followSignIns,
+                told
             }
         });
         revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
-        return {};
+        return { told };
     } catch (caught) {
         return {
             error:
@@ -1077,7 +1083,12 @@ const inviteSchema = z.object({
  */
 export async function invitePlayerAccountAction(
     input: z.input<typeof inviteSchema>
-): Promise<{ linked?: true; invite?: { url?: string; sendError?: string }; error?: string }> {
+): Promise<{
+    linked?: true;
+    told?: boolean;
+    invite?: { url?: string; sendError?: string };
+    error?: string;
+}> {
     const parsed = inviteSchema.safeParse(input);
     if (!parsed.success)
         return {
@@ -1100,7 +1111,7 @@ export async function invitePlayerAccountAction(
                 userId: result.userId,
                 followSignIns: parsed.data.followSignIns
             });
-            return linked.error ? { error: linked.error } : { linked: true };
+            return linked.error ? { error: linked.error } : { linked: true, told: linked.told };
         }
         revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return { invite: result.invite ?? {} };

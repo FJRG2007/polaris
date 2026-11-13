@@ -371,13 +371,18 @@ async function applyPendingGrant(invite: InviteRow, userId: string): Promise<voi
             select: { id: true, isAdmin: true }
         });
         if (!inviter) return;
-        await applyPendingLink(promised, inviter, userId);
+        // An owner's reach over their own thing comes from owning it, not from a
+        // grant on it: without the owner here, everything a non-administrator
+        // promised on what is theirs was narrowed away to nothing.
+        const { ownerOf } = await import("@/lib/resource-access");
+        const reach = { ownerId: await ownerOf(promised.resourceKind, promised.resourceId) };
+        await applyPendingLink(promised, inviter, userId, reach);
         const still = inviter.isAdmin
             ? [...promised.actions]
             : (
                   await Promise.all(
                       promised.actions.map(async (action) =>
-                          (await canOn(inviter.id, action, ref)) ? action : null
+                          (await canOn(inviter.id, action, ref, reach)) ? action : null
                       )
                   )
               ).filter((action): action is core.Permission => action !== null);
@@ -413,12 +418,13 @@ async function applyPendingGrant(invite: InviteRow, userId: string): Promise<voi
 async function applyPendingLink(
     promised: core.PendingGrant,
     inviter: { id: string; isAdmin: boolean },
-    userId: string
+    userId: string,
+    reach: { ownerId: string | null }
 ): Promise<void> {
     const link = promised.appLink;
     if (!link || promised.resourceKind !== "install") return;
     const ref = core.resourceRef(promised.resourceKind, promised.resourceId);
-    if (!inviter.isAdmin && !(await canOn(inviter.id, "games.manage", ref))) return;
+    if (!inviter.isAdmin && !(await canOn(inviter.id, "games.manage", ref, reach))) return;
     const { claimAppLink } = await import("@/lib/app-extensions/registry");
     await claimAppLink({
         userId,

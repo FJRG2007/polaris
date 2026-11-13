@@ -1106,6 +1106,14 @@
         "noSymbiote": "Este Polaris se construyó sin Symbiote. Actualiza Polaris desde Ajustes para tenerlo."
     },
     "notify": {
+        "playerAddedTitle": "{actor} te añadió a {server}",
+        "joinAt": "Entra en {address} como {player}.",
+        "joinAtAsk": "Entra como {player}; pide la dirección a {actor}.",
+        "joinFromSignIns": "Puedes entrar desde donde tengas sesión en Polaris.",
+        "joinFromAnywhere": "Puedes entrar desde cualquier dirección.",
+        "joinFromAddresses": "Puedes entrar desde {addresses}.",
+        "joinFromAsk": "Pregunta a {actor} desde qué dirección puedes entrar.",
+        "someone": "Alguien",
         "crashLoopTitle": "{name} sigue sin poder arrancar",
         "crashLoopBody": "Se reinició {count} veces sin llegar a arrancar, así que se ha parado.",
         "outOfMemoryTitle": "{name} se quedó sin memoria",

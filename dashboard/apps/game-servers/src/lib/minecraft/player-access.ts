@@ -60,6 +60,7 @@ import {
     type ServerContainer
 } from "./service";
 import { signInAddresses } from "../game-sign-in-addresses";
+import { tellLinkedPlayer } from "./player-notice";
 import {
     ANY_ADDRESS,
     accessRefusal,
@@ -939,7 +940,7 @@ export async function linkPlayerAccount(
     installedAppId: string,
     actorId: string,
     input: { username: string; userId: string; followSignIns?: boolean }
-): Promise<void> {
+): Promise<{ readonly told: boolean }> {
     const install = await resolve(ownerId, installedAppId);
     const username = asSeenSpelling(input.username, await spellingsSeen(installedAppId));
     const followSignIns = input.followSignIns !== false;
@@ -991,6 +992,19 @@ export async function linkPlayerAccount(
         );
     });
     await enforcePlayerAddresses(ownerId, installedAppId).catch(() => null);
+    // Only a link that is new to this account is news to it: saving the same one
+    // again, or changing how it is held, tells nobody anything.
+    if (existing?.userId === input.userId) return { told: false };
+    const told = await tellLinkedPlayer({
+        ownerId,
+        installedAppId,
+        actorId,
+        userId: input.userId,
+        player: username,
+        followSignIns,
+        bindAddresses: install.bindAddresses
+    });
+    return { told };
 }
 
 /** Untie a player from their Polaris account. Their sign-in addresses go with

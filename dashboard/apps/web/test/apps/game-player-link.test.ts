@@ -168,6 +168,11 @@ vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
     writeContainerFile: async () => undefined
 }));
 
+const told = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/player-notice", () => ({
+    tellLinkedPlayer: told
+}));
+
 const service = await import("@polaris-app/game-servers/src/lib/minecraft/player-access");
 
 let relay: string | null = null;
@@ -185,6 +190,32 @@ beforeEach(() => {
     online = [];
     joinLog = "";
     commands.length = 0;
+    told.mockClear();
+});
+
+describe("the account a player is tied to", () => {
+    it("is told once, with the player and the server", async () => {
+        const result = await service.linkPlayerAccount(OWNER, SERVER, OWNER, {
+            username: "AdaMC",
+            userId: ADA
+        });
+        expect(result).toEqual({ told: true });
+        expect(told).toHaveBeenCalledTimes(1);
+        expect(told).toHaveBeenCalledWith(
+            expect.objectContaining({ userId: ADA, installedAppId: SERVER, player: "AdaMC" })
+        );
+    });
+
+    it("is not told again when the same link is saved", async () => {
+        await service.linkPlayerAccount(OWNER, SERVER, OWNER, { username: "AdaMC", userId: ADA });
+        const again = await service.linkPlayerAccount(OWNER, SERVER, OWNER, {
+            username: "AdaMC",
+            userId: ADA,
+            followSignIns: false
+        });
+        expect(again).toEqual({ told: false });
+        expect(told).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe("a linked player's addresses", () => {

@@ -1106,6 +1106,14 @@
         "noSymbiote": "This Polaris was built without Symbiote. Update Polaris from Settings to get it."
     },
     "notify": {
+        "playerAddedTitle": "{actor} added you to {server}",
+        "joinAt": "Join at {address} as {player}.",
+        "joinAtAsk": "Join as {player}; ask {actor} for the address.",
+        "joinFromSignIns": "You can join from wherever you are signed in to Polaris.",
+        "joinFromAnywhere": "You can join from any address.",
+        "joinFromAddresses": "You can join from {addresses}.",
+        "joinFromAsk": "Ask {actor} which address you can join from.",
+        "someone": "Someone",
         "crashLoopTitle": "{name} keeps failing to start",
         "crashLoopBody": "It restarted {count} times without starting, so it has been stopped.",
         "outOfMemoryTitle": "{name} ran out of memory",
