@@ -12,6 +12,12 @@ on:
       - "README.md"
       - "README.es.md"
       - "docs/assets/**"
+      # The guides the site renders as pages (scripts/generate.ts).
+      - "docs/features/**"
+      - "docs/developers/**"
+      - "docs/integrations-setup*.md"
+      - "docs/connecting-ai-assistants*.md"
+      - "docs/roadmap*.md"
       - "dashboard/apps/site/**"
       - "dashboard/packages/ui/**"
       - "dashboard/apps/web/src/lib/apps/**"
