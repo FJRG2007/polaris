@@ -22,7 +22,6 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow,
-    WebviewWindowBuilder,
 };
 
 /// The overlay window's label.
@@ -195,7 +194,7 @@ fn close_overlay(app: &AppHandle) {
 /// second time behind the ones the room already draws.
 fn open_overlay(app: &AppHandle, monitor: &tauri::Monitor) -> tauri::Result<()> {
     let loaded = app.clone();
-    let window = WebviewWindowBuilder::new(app, OVERLAY, WebviewUrl::App("overlay.html".into()))
+    let window = crate::hardware::window(app, OVERLAY, WebviewUrl::App("overlay.html".into()))
         .title("Drawing - Polaris")
         .visible(false)
         .decorations(false)

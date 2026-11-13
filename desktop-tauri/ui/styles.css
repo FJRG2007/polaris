@@ -142,3 +142,78 @@ button.quiet {
     color: inherit;
     border: 1px solid currentColor;
 }
+
+.tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+}
+
+.tabs button {
+    margin: 0;
+    border-radius: 8px 8px 0 0;
+    background: transparent;
+    color: var(--muted);
+}
+
+.tabs button[aria-selected="true"] {
+    color: var(--text);
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.setting {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    color: var(--text);
+}
+
+.setting-text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.setting input {
+    flex: none;
+    width: 2.25rem;
+    height: 1.25rem;
+    accent-color: var(--accent);
+}
+
+.setting input:disabled {
+    opacity: 0.5;
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.row.end {
+    justify-content: flex-end;
+}
+
+.row .hint {
+    flex: 1 1 8rem;
+    min-width: 0;
+}
+
+dialog {
+    max-width: min(360px, calc(100vw - 32px));
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+}
+
+dialog .name {
+    margin: 0 0 8px;
+    font-weight: 600;
+}

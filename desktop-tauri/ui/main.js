@@ -1,7 +1,8 @@
 // The servers page (`desktop/src/renderer/connect.ts`): first run and the list -
 // open, rename, change the address of and remove each server, add one, and pass
-// the list to another computer. Every check and change happens in the app
-// (src-tauri/src/ipc.rs, host_transfer.rs); this page only shows what it answers.
+// the list to another computer - and the General and Advanced tabs. Every check
+// and change happens in the app (src-tauri/src/ipc.rs, host_transfer.rs,
+// preferences.rs); this page only shows what it answers.
 const invoke = (command, args) => window.__TAURI__.core.invoke(command, args);
 const t = window.polarisText.t;
 const $ = (id) => document.getElementById(id);
@@ -108,7 +109,119 @@ async function refresh() {
     $("empty").hidden = state.servers.length > 0;
     $("share").hidden = state.servers.length === 0;
     $("close").hidden = !state.address;
+    // The settings tabs come with a list, as in Electron: the first run is the form alone.
+    $("tabs").hidden = state.servers.length === 0;
+    if (state.servers.length === 0) showPage("servers");
 }
+
+// The General and Advanced tabs (`connect.html`): each switch is saved by the
+// app and put back when the app says it did not take.
+const PAGES = ["servers", "general", "advanced"];
+function showPage(shown) {
+    for (const page of PAGES) {
+        $(`${page}-page`).hidden = page !== shown;
+        $(`tab-${page}`).setAttribute("aria-selected", String(page === shown));
+    }
+}
+for (const page of PAGES) $(`tab-${page}`).addEventListener("click", () => showPage(page));
+
+const failure = $("failure");
+const openAtLogin = $("open-at-login");
+const hardware = $("hardware-acceleration");
+const toggles = {
+    minimizeToTray: $("minimize-to-tray"),
+    startMinimized: $("start-minimized"),
+    voiceWidget: $("voice-widget"),
+    voiceWidgetGameOnly: $("voice-widget-game-only")
+};
+const restartDialog = $("confirm-restart");
+const restartFailure = $("restart-failure");
+
+/** "Only while a game is running" means nothing with the widget off. */
+function followVoiceWidget() {
+    toggles.voiceWidgetGameOnly.disabled = !toggles.voiceWidget.checked;
+}
+
+/** Ask the app to keep a switch; on a refusal, put it back and say so. */
+function keep(input, command, args, refusal) {
+    const wanted = input.checked;
+    say(failure, "");
+    followVoiceWidget();
+    return invoke(command, args(wanted))
+        .catch(() => false)
+        .then((kept) => {
+            if (kept) return true;
+            input.checked = !wanted;
+            followVoiceWidget();
+            say(failure, t(refusal));
+            return false;
+        });
+}
+
+openAtLogin.addEventListener("change", () =>
+    keep(openAtLogin, "connect_open_at_login", (open) => ({ open }), "settings.not-changed")
+);
+for (const [name, input] of Object.entries(toggles)) {
+    input.addEventListener("change", () =>
+        keep(input, "connect_toggle", (on) => ({ input: { name, on } }), "settings.not-saved")
+    );
+}
+
+async function preferences() {
+    return invoke("connect_preferences").catch(() => null);
+}
+
+/** Close and open the app again; on a refusal, say why where the press was. */
+async function relaunch() {
+    say(restartFailure, "");
+    const outcome = await invoke("connect_relaunch").catch(() => ({ ok: false, error: t("settings.restart-failed") }));
+    if (outcome?.ok) return;
+    const error = outcome?.error ?? t("settings.restart-failed");
+    if (restartDialog.open) say(restartFailure, error);
+    else say(failure, error);
+}
+
+hardware.addEventListener("change", async () => {
+    if (!(await keep(hardware, "connect_hardware_acceleration", (on) => ({ on }), "settings.not-saved"))) return;
+    const pending = (await preferences())?.restartPending ?? true;
+    $("restart-pending").hidden = !pending;
+    // Turned back to what this run already uses: nothing to restart for.
+    if (!pending) return;
+    say(restartFailure, "");
+    restartDialog.showModal();
+});
+$("restart-later").addEventListener("click", () => restartDialog.close());
+$("restart-now").addEventListener("click", relaunch);
+$("restart-pending-now").addEventListener("click", relaunch);
+
+const checkUpdates = $("check-updates");
+checkUpdates.addEventListener("click", async () => {
+    if (checkUpdates.getAttribute("aria-disabled") === "true") return;
+    checkUpdates.setAttribute("aria-disabled", "true");
+    const status = $("update-status");
+    status.className = "hint";
+    status.textContent = t("settings.checking-updates");
+    const found = await invoke("connect_check_updates").catch(() => null);
+    const unsupported = found?.kind === "unsupported";
+    status.className = unsupported ? "hint" : "problem";
+    status.textContent = t(unsupported ? "settings.update-unsupported" : "settings.update-failed");
+    checkUpdates.setAttribute("aria-disabled", "false");
+});
+
+preferences().then((saved) => {
+    if (!saved) return;
+    openAtLogin.checked = saved.openAtLogin;
+    hardware.checked = saved.hardwareAcceleration;
+    toggles.minimizeToTray.checked = saved.minimizeToTray;
+    toggles.startMinimized.checked = saved.startMinimized;
+    toggles.voiceWidget.checked = saved.voiceWidget;
+    toggles.voiceWidgetGameOnly.checked = saved.voiceWidgetGameOnly;
+    followVoiceWidget();
+    $("restart-pending").hidden = !saved.restartPending;
+    // WKWebView has no switch for it: macOS has nothing on the Advanced tab.
+    $("tab-advanced").hidden = !saved.hardwareAccelerationAvailable;
+    $("version").textContent = t("settings.version", { version: saved.version });
+});
 
 let checking = 0;
 let timer = null;

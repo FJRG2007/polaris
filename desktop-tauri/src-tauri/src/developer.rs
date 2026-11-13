@@ -36,6 +36,13 @@ pub struct Developer {
     watching: Mutex<bool>,
 }
 
+impl Developer {
+    /// Whether a push is under way, which a relaunch would cut short.
+    pub fn pushing(&self) -> bool {
+        lock(&self.pushes).values().any(|slot| slot.phase.running())
+    }
+}
+
 fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex
         .lock()

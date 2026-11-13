@@ -11,9 +11,7 @@ use polaris_client::{ApiKey, InstanceUrl};
 use serde::Serialize;
 use std::sync::Mutex;
 use tauri::async_runtime::{channel, Sender};
-use tauri::{
-    AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
-};
+use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindow, WindowEvent};
 
 pub const KEY_WINDOW: &str = "api-key";
 
@@ -91,7 +89,7 @@ pub async fn api_key_for(app: &AppHandle, server: &InstanceUrl) -> Option<ApiKey
 }
 
 fn open_key_window(app: &AppHandle) -> tauri::Result<()> {
-    let window = WebviewWindowBuilder::new(app, KEY_WINDOW, WebviewUrl::App("api-key.html".into()))
+    let window = crate::hardware::window(app, KEY_WINDOW, WebviewUrl::App("api-key.html".into()))
         .initialization_script(crate::bridge::local_script(app))
         .title("API key - Polaris")
         .inner_size(520.0, 470.0)

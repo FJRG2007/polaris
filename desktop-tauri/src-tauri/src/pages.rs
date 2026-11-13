@@ -10,7 +10,7 @@
 use crate::Outcome;
 use polaris_client::install_tools::{browser_from_name, ExtensionBrowser};
 use polaris_client::update_ready::{UpdateReady, NO_UPDATE_WAITING};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow};
 
 /// The TV window's label (`openLocalWindow("tv")`).
 pub const TV_WINDOW: &str = "tv";
@@ -59,7 +59,7 @@ pub fn open_page(
     title: &str,
 ) -> tauri::Result<WebviewWindow> {
     let (width, height) = page.size();
-    WebviewWindowBuilder::new(app, label, WebviewUrl::App(page.file().into()))
+    crate::hardware::window(app, label, WebviewUrl::App(page.file().into()))
         .initialization_script(crate::bridge::local_script(app))
         .title(title)
         .inner_size(width, height)

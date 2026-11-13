@@ -20,7 +20,7 @@ use serde_json::Value;
 use std::sync::{Mutex, MutexGuard};
 use tauri::{
     AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindow,
-    WebviewWindowBuilder, WindowEvent,
+    WindowEvent,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
@@ -216,7 +216,7 @@ fn open(app: &AppHandle, people: usize) -> tauri::Result<()> {
     // Kept in physical pixels, as the window reports where it was moved to.
     let place = start_point(settings.voice_widget_place, height, &screens, primary);
     let loaded = app.clone();
-    let window = WebviewWindowBuilder::new(
+    let window = crate::hardware::window(
         app,
         VOICE_WIDGET,
         WebviewUrl::App("voice-widget.html".into()),

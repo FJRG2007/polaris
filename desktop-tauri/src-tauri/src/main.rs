@@ -12,6 +12,7 @@
 mod bridge;
 mod call_keys;
 mod developer;
+mod hardware;
 mod host_transfer;
 mod ipc;
 mod key_flow;
@@ -22,6 +23,7 @@ mod measure;
 mod notices;
 mod os_prefs;
 mod pages;
+mod preferences;
 mod share;
 mod tray;
 mod tv;
@@ -395,7 +397,7 @@ fn open_servers_window(app: &AppHandle) {
         show(&window);
         return;
     }
-    let built = WebviewWindowBuilder::new(app, SERVERS, WebviewUrl::App("index.html".into()))
+    let built = crate::hardware::window(app, SERVERS, WebviewUrl::App("index.html".into()))
         .initialization_script(bridge::local_script(app))
         .title("Polaris Beta - Servers")
         .inner_size(560.0, 640.0)
@@ -426,7 +428,7 @@ fn polaris_builder<'a>(
 ) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
     let navigating = app.clone();
     let opening = app.clone();
-    let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::External(url));
+    let builder = crate::hardware::window(app, label, WebviewUrl::External(url));
     // `window.polarisDesktop`, on the Polaris in use and nowhere else.
     let builder = match bridge::script_for(app) {
         Some(script) => builder.initialization_script(script),
@@ -507,14 +509,19 @@ fn open_main(app: &AppHandle, url: &str) -> tauri::Result<()> {
         .on_document_title_changed(move |window, title| title_changed(&titled, &window, &title))
         .build()?;
     bridge::keep_reachable(&window);
-    // Closing keeps the app in the tray, as the Electron app does on Windows and
-    // Linux; Quit in the tray menu ends it.
+    // Closing keeps the app in the tray, as the Electron app does, unless
+    // "Minimize to tray" is off: then the window closes and, on Windows and
+    // Linux, the app with it. macOS keeps the app, as Electron does there.
     let handle = window.clone();
     let blurred = app.clone();
     window.on_window_event(move |event| match event {
         WindowEvent::CloseRequested { api, .. } => {
-            api.prevent_close();
-            let _ = handle.hide();
+            if cfg!(target_os = "macos")
+                || os_prefs::read_settings(handle.app_handle()).minimize_to_tray
+            {
+                api.prevent_close();
+                let _ = handle.hide();
+            }
         }
         WindowEvent::Focused(false) => {
             let state = shared(&blurred);
@@ -883,6 +890,13 @@ fn main() {
     if let Some(page) = measure::page() {
         return measure::run(page, std::time::Instant::now());
     }
+    let context = tauri::generate_context!();
+    // Where Tauri keeps `app_config_dir`, read before any window exists.
+    hardware::start(
+        dirs::config_dir()
+            .map(|dir| dir.join(&context.config().identifier))
+            .as_deref(),
+    );
     let probe_http = probe_client().expect("the HTTP client builds with its defaults");
     let pins = PinVerifier::new().expect("the system certificate verifier loads");
     let http = pins
@@ -932,6 +946,12 @@ fn main() {
             ipc::connect_edit,
             ipc::connect_remove,
             ipc::connect_close,
+            preferences::connect_preferences,
+            preferences::connect_open_at_login,
+            preferences::connect_hardware_acceleration,
+            preferences::connect_toggle,
+            preferences::connect_relaunch,
+            preferences::connect_check_updates,
             ipc::open_servers,
             ipc::open_window,
             bridge::text_size_seen,
@@ -1045,8 +1065,11 @@ fn main() {
                 tauri::async_runtime::spawn(async move { links.open(link).await });
             }
             tray::install(&handle)?;
-            // A start the computer made opens in the tray, as the Electron app does.
-            if login_item::started_at_login(&std::env::args().collect::<Vec<_>>()) {
+            // A start the computer made opens in the tray when "Start minimized"
+            // is on, as the Electron app does.
+            if login_item::started_at_login(&std::env::args().collect::<Vec<_>>())
+                && settings.start_minimized
+            {
                 if let Some(window) = handle.get_webview_window(MAIN) {
                     let _ = window.hide();
                 }
@@ -1055,7 +1078,7 @@ fn main() {
             mail_handler::restore(&handle);
             Ok(())
         })
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("the Tauri beta failed to start");
 }
 

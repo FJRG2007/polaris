@@ -3777,6 +3777,7 @@ dependencies = [
 name = "polaris-desktop-beta"
 version = "0.0.1"
 dependencies = [
+ "dirs 6.0.0",
  "polaris-client",
  "reqwest",
  "serde",

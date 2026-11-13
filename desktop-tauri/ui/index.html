@@ -9,6 +9,13 @@
     <body>
         <main>
             <h1 data-text="connect.title">Your Polaris servers</h1>
+            <nav id="tabs" class="tabs" role="tablist" aria-label="Settings" data-text-label="settings.tabs" hidden>
+                <button id="tab-servers" type="button" role="tab" aria-selected="true" aria-controls="servers-page" data-text="settings.tab-servers"></button>
+                <button id="tab-general" type="button" role="tab" aria-selected="false" aria-controls="general-page" data-text="settings.tab-general"></button>
+                <button id="tab-advanced" type="button" role="tab" aria-selected="false" aria-controls="advanced-page" data-text="settings.tab-advanced"></button>
+            </nav>
+            <p id="failure" class="problem" role="alert" hidden></p>
+            <section id="servers-page" role="tabpanel">
             <p id="load-error" class="problem" role="alert" hidden></p>
             <ul id="servers" aria-label="Servers" data-text-label="connect.servers"></ul>
             <p id="empty" data-text="connect.empty" hidden>Add the address of your Polaris to open it here.</p>
@@ -34,6 +41,71 @@
                 <button id="import" type="button" class="quiet" data-text="connect.import">Add these servers</button>
                 <p id="shared" class="hint" role="status" hidden></p>
             </section>
+            </section>
+            <section id="general-page" role="tabpanel" hidden>
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name" data-text="settings.open-at-login"></span>
+                        <span class="hint" data-text="settings.open-at-login-hint"></span>
+                    </span>
+                    <input id="open-at-login" type="checkbox" role="switch" />
+                </label>
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name" data-text="settings.start-minimized"></span>
+                        <span class="hint" data-text="settings.start-minimized-hint"></span>
+                    </span>
+                    <input id="start-minimized" type="checkbox" role="switch" />
+                </label>
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name" data-text="settings.minimize-to-tray"></span>
+                        <span class="hint" data-text="settings.minimize-to-tray-hint"></span>
+                    </span>
+                    <input id="minimize-to-tray" type="checkbox" role="switch" />
+                </label>
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name" data-text="settings.voice-widget"></span>
+                        <span class="hint" data-text="settings.voice-widget-hint"></span>
+                    </span>
+                    <input id="voice-widget" type="checkbox" role="switch" />
+                </label>
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name" data-text="settings.game-only"></span>
+                        <span class="hint" data-text="settings.game-only-hint"></span>
+                    </span>
+                    <input id="voice-widget-game-only" type="checkbox" role="switch" />
+                </label>
+                <div class="row">
+                    <p id="version" class="hint"></p>
+                    <button id="check-updates" type="button" class="quiet" data-text="settings.check-updates"></button>
+                </div>
+                <p id="update-status" class="hint" role="status" aria-live="polite"></p>
+            </section>
+            <section id="advanced-page" role="tabpanel" hidden>
+                <label class="setting">
+                    <span class="setting-text">
+                        <span class="name" data-text="settings.hardware"></span>
+                        <span class="hint" data-text="settings.hardware-hint"></span>
+                    </span>
+                    <input id="hardware-acceleration" type="checkbox" role="switch" />
+                </label>
+                <div id="restart-pending" class="row" hidden>
+                    <p class="hint" data-text="settings.restart-applies"></p>
+                    <button id="restart-pending-now" type="button" data-text="settings.restart-now"></button>
+                </div>
+            </section>
+            <dialog id="confirm-restart" aria-labelledby="restart-title" aria-describedby="restart-body">
+                <p id="restart-title" class="name" data-text="settings.restart-title"></p>
+                <p id="restart-body" class="hint" data-text="settings.restart-body"></p>
+                <p id="restart-failure" class="problem" role="alert" hidden></p>
+                <div class="row end">
+                    <button id="restart-later" type="button" class="quiet" data-text="settings.later"></button>
+                    <button id="restart-now" type="button" data-text="settings.restart-now"></button>
+                </div>
+            </dialog>
             <button id="close" type="button" class="quiet" data-text="connect.back" hidden>Back to Polaris</button>
         </main>
         <script src="i18n.js"></script>

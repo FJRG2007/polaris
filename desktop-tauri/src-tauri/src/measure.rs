@@ -45,7 +45,7 @@ pub fn run(page: url::Url, started: Instant) {
         .plugin(crate::updater::plugin())
         .setup(move |app| {
             let reported = std::sync::atomic::AtomicBool::new(false);
-            WebviewWindowBuilder::new(app, "measure", WebviewUrl::External(page))
+            crate::hardware::window(app, "measure", WebviewUrl::External(page))
                 .title("Polaris Beta")
                 .visible(false)
                 .focused(false)

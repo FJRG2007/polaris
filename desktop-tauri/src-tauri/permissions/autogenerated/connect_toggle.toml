@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-connect-toggle"
+description = "Enables the connect_toggle command without any pre-configured scope."
+commands.allow = ["connect_toggle"]
+
+[[permission]]
+identifier = "deny-connect-toggle"
+description = "Denies the connect_toggle command without any pre-configured scope."
+commands.deny = ["connect_toggle"]

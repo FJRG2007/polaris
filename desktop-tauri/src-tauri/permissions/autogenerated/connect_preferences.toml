@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-connect-preferences"
+description = "Enables the connect_preferences command without any pre-configured scope."
+commands.allow = ["connect_preferences"]
+
+[[permission]]
+identifier = "deny-connect-preferences"
+description = "Denies the connect_preferences command without any pre-configured scope."
+commands.deny = ["connect_preferences"]
