@@ -40,8 +40,8 @@ describe("the provider list", () => {
 
         // Groq's is an allowance that comes back; Cohere's runs out. Both are
         // free to start on, and the badge says which kind it is.
-        expect(screen.getByRole("option", { name: /Groq/ }).textContent).toContain("Free tier");
-        expect(screen.getByRole("option", { name: /Cohere/ }).textContent).toContain("Free trial");
+        expect(screen.getByRole("menuitem", { name: /Groq/ }).textContent).toContain("Free tier");
+        expect(screen.getByRole("menuitem", { name: /Cohere/ }).textContent).toContain("Free trial");
     });
 
     it("says nothing about a provider that bills from the first token", async () => {
@@ -49,7 +49,7 @@ describe("the provider list", () => {
         render(<Harness />, { wrapper: MessagesWrapper });
         await open(user);
 
-        const anthropic = screen.getByRole("option", { name: /Anthropic/ });
+        const anthropic = screen.getByRole("menuitem", { name: /Anthropic/ });
         expect(anthropic.textContent).not.toContain("Free");
     });
 
@@ -59,7 +59,7 @@ describe("the provider list", () => {
         const field = await open(user);
 
         await user.type(field, "free tier");
-        const shown = screen.getAllByRole("option");
+        const shown = screen.getAllByRole("menuitem");
         expect(shown.length).toBeGreaterThan(1);
         for (const option of shown) expect(option.textContent).toContain("Free tier");
     });
@@ -70,7 +70,7 @@ describe("the provider list", () => {
         const field = await open(user);
 
         await user.type(field, "qwen");
-        const names = screen.getAllByRole("option").map((option) => option.textContent ?? "");
+        const names = screen.getAllByRole("menuitem").map((option) => option.textContent ?? "");
         expect(names.some((name) => name.includes("Alibaba"))).toBe(true);
     });
 
@@ -80,6 +80,6 @@ describe("the provider list", () => {
         const field = await open(user);
 
         await user.type(field, "venice");
-        expect(screen.getByRole("option", { name: /Venice AI/ }).textContent).toContain("VA");
+        expect(screen.getByRole("menuitem", { name: /Venice AI/ }).textContent).toContain("VA");
     });
 });
