@@ -70,7 +70,9 @@ describe("what Claude Code is told about the preview", () => {
     it.runIf(process.platform !== "win32")("reaches the agent as one argument, with the session's path in it", () => {
         const lines = commands.LAUNCH_SCRIPT.split("\n");
         const start = lines.findIndex((line) => line.startsWith('if [ "$POLARIS_AGENT_CONFIG" = "claude" ]'));
-        const block = lines.slice(start, start + 4).join("\n");
+        // The whole block, to its closing `fi`, however many lines it grows.
+        const end = lines.indexOf("fi", start);
+        const block = lines.slice(start, end + 1).join("\n");
         const script = `line=claude\n${block}\nsh -c "printf '%s\\n' $line"`;
         const result = spawnSync("/bin/sh", ["-c", script], {
             env: {
