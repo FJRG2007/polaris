@@ -46,6 +46,9 @@ export interface IdentityPreview {
     readonly address: string;
     /** The whole name, given names first. */
     readonly name: string;
+    /** The emails and phones beyond the primary ones, to be picked instead. */
+    readonly otherEmails?: readonly string[];
+    readonly otherPhones?: readonly string[];
 }
 
 /** The parts of an identity a sign-up form can ask for. Empty where unset. */
@@ -71,6 +74,16 @@ export interface IdentityValues {
     readonly birthCountry: string;
     readonly nationality: string;
     readonly maritalStatus: string;
+    /** The street line in its parts (`ADDRESS_FIELDS`), read off the line
+     *  where they were never stored and it reads with certainty. */
+    readonly streetType: string;
+    readonly streetName: string;
+    readonly houseNumber: string;
+    readonly floor: string;
+    readonly door: string;
+    /** The emails and phones beyond the primary ones above. */
+    readonly otherEmails?: readonly string[];
+    readonly otherPhones?: readonly string[];
 }
 
 /** One decrypted login, reduced to what a list needs to draw it. */

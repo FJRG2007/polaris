@@ -202,7 +202,12 @@ export const PROFILE_PARTS = [
     "city",
     "state",
     "postalCode",
-    "country"
+    "country",
+    "streetType",
+    "streetName",
+    "houseNumber",
+    "floor",
+    "door"
 ] as const;
 
 export type ProfilePart = (typeof PROFILE_PARTS)[number];
@@ -225,13 +230,32 @@ const PROFILE_TOKENS: Readonly<Record<string, ProfilePart>> = {
     "country-name": "country"
 };
 
+/** A box or dropdown asking for the street type alone ("Tipo de vía"). */
+export const STREET_TYPE_WORDS = /tipo de v[ií]a|tipo de calle|street.?type|road.?type|street.?suffix|type de voie/i;
+
+/** A box asking for the street's name alone - never somebody's name. */
+const STREET_NAME_WORDS = /street.?name|nombre de (?:la )?(?:v[ií]a|calle)|stra(?:ss|ß)en.?name|nom de (?:la )?(?:voie|rue)/i;
+
+/** A box asking for the house number alone. "Número" on its own counts, which
+ *  is why `NOT_A_HOUSE` is asked too: a phone, document or card number is not. */
+const HOUSE_NUMBER_WORDS =
+    /house.?(?:number|no\b)|street.?(?:number|no\b)|building.?number|hausnummer|num[ée]ro de (?:rue|voie)|n[uú]mero de (?:la )?(?:calle|v[ií]a|portal|casa)|\bportal\b|\bn[uú]mero\b|\bn[uú]m\b|\bn[º°]/i;
+const NOT_A_HOUSE =
+    /tel[eé]f|phone|m[oó]vil|mobile|fax|document|dni|\bnie\b|pasaporte|passport|tarjeta|card|cuenta|account|pedido|order|cliente|customer|seguridad social|ident|cup[oó]n|coupon|socio|member|licen/i;
+
 /** The words each part tends to carry, in the order they are tried: the second
  *  address line before the first, because "address line 2" says "address". */
 const PROFILE_WORDS: readonly (readonly [ProfilePart, RegExp])[] = [
     ["email", /e-?mail|correo/i],
     ["phone", /phone|tel[eé]fono|\btel\b|m[oó]vil|mobile|celular/i],
     ["postalCode", /\bzip|postal|post.?code|\bcp\b/i],
-    ["address2", /address.?(?:line)?.?2|\bapt\b|apartment|suite|piso|puerta|bloque/i],
+    ["streetType", STREET_TYPE_WORDS],
+    ["houseNumber", HOUSE_NUMBER_WORDS],
+    ["streetName", STREET_NAME_WORDS],
+    // One box for both is the second address line, which holds them together.
+    ["address2", /address.?(?:line)?.?2|\bapt\b|apartment|suite|piso.{0,3}(?:y|\/|,).{0,3}puerta|floor.{0,3}(?:and|\/|,).{0,3}door|bloque/i],
+    ["floor", /\bpiso\b|\bfloor\b|\bplanta\b|[ée]tage|\bstockwerk\b/i],
+    ["door", /\bpuerta\b|\bdoor\b|\bletra\b|\bporte\b/i],
     ["address1", /address|street|direcci[oó]n|\bcalle\b|domicilio/i],
     ["city", /\bcity\b|\btown\b|ciudad|localidad|municipio|poblaci[oó]n/i],
     ["state", /\bstate\b|province|county|region|provincia|estado|regi[oó]n/i],
@@ -290,7 +314,11 @@ export function profilePart(field: FieldFacts | undefined): ProfilePart | null {
     if (field.type === "email") return "email";
     if (NOT_THE_ADDRESS.test(field.words)) return null;
     if (field.type === "tel") return "phone";
-    for (const [part, words] of PROFILE_WORDS) if (words.test(field.words)) return part;
+    for (const [part, words] of PROFILE_WORDS) {
+        if (!words.test(field.words)) continue;
+        if (part === "houseNumber" && NOT_A_HOUSE.test(field.words)) continue;
+        return part;
+    }
     return null;
 }
 
@@ -496,7 +524,11 @@ function nameKind(field: FieldFacts | undefined): NameKind | null {
         return "family";
     }
     if (token !== "" && token !== "off") return null;
-    if (NOT_A_LOGIN.test(field.words) || /user|login|company|empresa/i.test(field.words))
+    if (
+        NOT_A_LOGIN.test(field.words) ||
+        STREET_NAME_WORDS.test(field.words) ||
+        /user|login|company|empresa/i.test(field.words)
+    )
         return null;
     if (MIDDLE_WORDS.test(field.words)) return "middle";
     if (FIRST_SURNAME_WORDS.test(field.words)) return "firstSurname";

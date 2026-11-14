@@ -12,8 +12,9 @@
  * without a browser.
  */
 
-import { PERSON_KEYS } from "@polaris/core/identity-person";
+import { ADDRESS_KEYS, composeFloorDoor, composeStreet, PERSON_KEYS } from "@polaris/core/identity-person";
 import { onShelf, type ShelfOrganization } from "@/lib/shelf";
+import { isPlaceholder, normalizePlace, type PlaceOption } from "@/lib/place-match";
 import { autocompleteToken, type PageFields, type ProfilePart } from "@/lib/fields";
 import {
     ACCOUNT_IDENTITY,
@@ -50,11 +51,14 @@ export interface OpenIdentity {
     readonly values: IdentityValues;
 }
 
+/** The fields of an identity that are one line of text each. */
+export type IdentityTextKey = Exclude<keyof IdentityValues, "otherEmails" | "otherPhones">;
+
 /** Every field empty, to start from. */
-export function blankIdentity(): Record<keyof IdentityValues, string> {
+export function blankIdentity(): Record<IdentityTextKey, string> {
     return Object.fromEntries(
-        [...IDENTITY_KEYS, ...PERSON_KEYS].map((key) => [key, ""])
-    ) as Record<keyof IdentityValues, string>;
+        [...IDENTITY_KEYS, ...PERSON_KEYS, ...ADDRESS_KEYS].map((key) => [key, ""])
+    ) as Record<IdentityTextKey, string>;
 }
 
 /** The whole name an identity carries, in the order it is written. */
@@ -155,6 +159,8 @@ export function countryForBox(stored: string, autocomplete: string, locale: stri
 /** The few values of an identity a menu row can lead with: never more than a
  *  sign-up box could show anyway. */
 export function previewOf(values: IdentityValues): IdentityPreview {
+    const otherEmails = (values.otherEmails ?? []).map((one) => one.trim()).filter(Boolean);
+    const otherPhones = (values.otherPhones ?? []).map((one) => one.trim()).filter(Boolean);
     return {
         email: values.email.trim(),
         phone: values.phone.trim(),
@@ -162,7 +168,10 @@ export function previewOf(values: IdentityValues): IdentityPreview {
             .map((part) => part.trim())
             .filter(Boolean)
             .join(", "),
-        name: wholeName(values)
+        name: wholeName(values),
+        // Only where there are any, so a card stays as small as it was.
+        ...(otherEmails.length > 0 ? { otherEmails } : {}),
+        ...(otherPhones.length > 0 ? { otherPhones } : {})
     };
 }
 
@@ -225,7 +234,12 @@ export const ADDRESS_SLOTS = [
     "city",
     "state",
     "postalCode",
-    "country"
+    "country",
+    "streetType",
+    "streetName",
+    "houseNumber",
+    "floor",
+    "door"
 ] as const satisfies readonly FillSlot[];
 
 /**
@@ -248,7 +262,8 @@ export function replacedSlots(opened: FillSlot | null): ReadonlySet<FillSlot> {
 export function slotValue(
     values: IdentityValues,
     slot: FillSlot,
-    asks: PageFields["usernameAsks"]
+    asks: PageFields["usernameAsks"],
+    page: StreetBoxes = NO_STREET_BOXES
 ): string {
     switch (slot) {
         case "login":
@@ -270,17 +285,65 @@ export function slotValue(
             return splitSurnames(values.lastName)[0];
         case "secondSurname":
             return splitSurnames(values.lastName)[1];
+        case "address1":
+            return streetLine(values, page);
+        case "address2":
+            // The floor and door go here where the page has no box of their own.
+            return values.address2 || (page.floor || page.door ? "" : composeFloorDoor(values, values.country));
+        case "floor":
+            // An older identity keeps them in the second line: given whole to a
+            // floor box only when no door box asks for half of it.
+            return values.floor || values.door || page.door ? values.floor : values.address2;
         default:
             return values[slot];
     }
 }
+
+/** Which parts of the street the page asks for in boxes of their own. */
+export interface StreetBoxes {
+    readonly streetType: boolean;
+    readonly streetName: boolean;
+    readonly houseNumber: boolean;
+    readonly floor: boolean;
+    readonly door: boolean;
+}
+
+export const NO_STREET_BOXES: StreetBoxes = {
+    streetType: false,
+    streetName: false,
+    houseNumber: false,
+    floor: false,
+    door: false
+};
+
+/**
+ * What the street line box gets: the whole line in the country's order where
+ * it is the only street box, and only what no other box asks for where the page
+ * splits it - the name alone beside a type box and a number box. An identity
+ * whose parts could not be read keeps its line whole as the name.
+ */
+export function streetLine(values: IdentityValues, page: StreetBoxes): string {
+    if (page.streetName) return "";
+    if (!values.streetName && !values.streetType && !values.houseNumber) return values.address1;
+    return composeStreet(
+        {
+            streetType: page.streetType ? "" : values.streetType,
+            streetName: values.streetName,
+            houseNumber: page.houseNumber ? "" : values.houseNumber
+        },
+        values.country
+    );
+}
+
+/** The preview values a menu row can lead with. */
+export type PreviewKey = "email" | "phone" | "address" | "name";
 
 /** Which preview value a menu opened on this box leads each row with, or null
  *  for a box no preview covers. */
 export function previewKey(
     slot: FillSlot | null,
     asks: PageFields["usernameAsks"]
-): keyof IdentityPreview | null {
+): PreviewKey | null {
     if (slot === null) return null;
     if (slot === "login") return asks === "phone" ? "phone" : asks === "username" ? null : "email";
     if (slot === "email" || slot === "phone") return slot;
@@ -296,6 +359,9 @@ export interface IdentityRow {
     readonly label: string;
     /** The line under it. */
     readonly detail: string;
+    /** An email or phone other than the identity's primary one, to fill
+     *  instead of it. */
+    readonly pick?: { readonly key: "email" | "phone"; readonly value: string };
 }
 
 /**
@@ -303,11 +369,13 @@ export interface IdentityRow {
  * saved addresses: each row leads with what that identity would type into the
  * box, and says under it which identity that is. Identities that would type the
  * same thing are one row - the first, which is the best ranked. An identity with
- * nothing for the box is drawn as before, by its name and its usual detail.
+ * nothing for the box is drawn as before, by its name and its usual detail. On
+ * an email or phone box, an identity's other emails or phones follow its
+ * primary one as rows of their own.
  */
 export function identityRows(
     cards: readonly IdentityCard[],
-    key: keyof IdentityPreview | null,
+    key: PreviewKey | null,
     defaultLabel: string
 ): IdentityRow[] {
     const seen = new Set<string>();
@@ -323,10 +391,31 @@ export function identityRows(
             });
             continue;
         }
-        const same = value.toLowerCase().replace(/\s+/g, " ");
-        if (seen.has(same)) continue;
-        seen.add(same);
-        rows.push({ card, label: value, detail: [card.name, where].filter(Boolean).join(" - ") });
+        const others =
+            key === "email"
+                ? (card.preview?.otherEmails ?? [])
+                : key === "phone"
+                  ? (card.preview?.otherPhones ?? [])
+                  : [];
+        const detail = [card.name, where].filter(Boolean).join(" - ");
+        for (const [at, one] of [value, ...others.map((other) => other.trim())].entries()) {
+            const same = one.toLowerCase().replace(/\s+/g, " ");
+            if (one === "" || seen.has(same)) continue;
+            seen.add(same);
+            const pick = at > 0 && (key === "email" || key === "phone") ? { key, value: one } : undefined;
+            rows.push(pick ? { card, label: one, detail, pick } : { card, label: one, detail });
+        }
     }
     return rows;
+}
+
+/** The option of a street type dropdown that is the stored type, or -1: by its
+ *  text or its value, ignoring case, accents and a closing full stop. */
+export function pickStreetType(options: readonly PlaceOption[], stored: string): number {
+    const plain = (raw: string): string => normalizePlace(raw).replace(/\.$/, "");
+    const wanted = plain(stored);
+    if (wanted === "") return -1;
+    return options.findIndex(
+        (option) => !isPlaceholder(option) && (plain(option.text) === wanted || plain(option.value) === wanted)
+    );
 }

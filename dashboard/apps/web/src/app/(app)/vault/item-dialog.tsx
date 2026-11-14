@@ -52,6 +52,8 @@ import {
 import { IDENTITY_GROUPS, identityHintKey, identityLabelKey } from "./identity-fields";
 import { CountryField, RegionField } from "./identity-place-fields";
 import { IdentityPersonFields } from "./identity-person-fields";
+import { IdentityStreetFields } from "./identity-street-fields";
+import { contactProblem, IdentityContactList } from "./identity-contact-list";
 import { countryCodeOf } from "./identity-places";
 import { cipherTypeLabel, uriMatchLabel } from "./vault-labels";
 import { accountIdentityAction } from "./vault-actions";
@@ -119,7 +121,25 @@ function openedAs(item: VaultItem) {
         email: core.fieldValue(item.fields, core.EMAIL_FIELD),
         apiKey: core.readApiKey(item.fields),
         // An identity's personal details, kept in custom fields - see `PERSON_FIELDS`.
-        person: core.readPerson(item.fields)
+        person: core.readPerson(item.fields),
+        // The street in its parts: stored ones while they still make up the
+        // street line, else that line read again - see `streetParts`.
+        address: core.streetParts(
+            core.readAddress(item.fields),
+            item.identity.address1 ?? "",
+            item.identity.country ?? ""
+        ),
+        // The emails and phones beyond the main ones - see `contactField`.
+        contacts: core.readContacts(item.fields)
+    };
+}
+
+/** The extra emails and phones as they are compared and stored: empty rows,
+ *  which are only unfinished, left out. */
+function filledContacts(contacts: core.ExtraContacts): core.ExtraContacts {
+    return {
+        emails: contacts.emails.filter((one) => one.trim() !== ""),
+        phones: contacts.phones.filter((one) => one.trim() !== "")
     };
 }
 
@@ -177,6 +197,10 @@ export function ItemDialog({
     const [apiKey, setApiKey] = useState<core.ApiKeyParts>({ key: "", secret: "", endpoint: "" });
     /** An identity's personal details, kept in custom fields - see `PERSON_FIELDS`. */
     const [person, setPerson] = useState<core.PersonValues>(() => core.readPerson([]));
+    /** An identity's street in its parts, kept in custom fields - see `ADDRESS_FIELDS`. */
+    const [address, setAddress] = useState<core.AddressParts>(() => core.readAddress([]));
+    /** An identity's emails and phones beyond the main ones. */
+    const [contacts, setContacts] = useState<core.ExtraContacts>({ emails: [], phones: [] });
     const [newFolder, setNewFolder] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -211,14 +235,18 @@ export function ItemDialog({
         setEmail(opened.email);
         setApiKey(opened.apiKey);
         setPerson(opened.person);
+        setAddress(opened.address);
+        setContacts(opened.contacts);
     }, [item]);
     // An item that exists, edited back to what it holds, has nothing to save.
     // Compared exactly: a space in a password is part of the password.
     const unchanged =
         item !== null &&
         Boolean(item.id) &&
-        !isDirty(openedAs(item), { draft, expiry, bank, codes, email, apiKey, person }, (value) =>
-            JSON.stringify(value)
+        !isDirty(
+            { ...openedAs(item), contacts: filledContacts(openedAs(item).contacts) },
+            { draft, expiry, bank, codes, email, apiKey, person, address, contacts: filledContacts(contacts) },
+            (value) => JSON.stringify(value)
         );
 
     /**
@@ -336,8 +364,35 @@ export function ItemDialog({
         typedEmail !== "" &&
         !core.looksLikeEmail(typedEmail);
 
+    /** An identity's email or phone row that is not one; empty rows are only unfinished. */
+    const contactInvalid =
+        draft.type === core.CIPHER_IDENTITY &&
+        ([draft.identity.email ?? "", ...contacts.emails].some((one) => contactProblem("email", one) !== null) ||
+            [draft.identity.phone ?? "", ...contacts.phones].some((one) => contactProblem("phone", one) !== null));
+
+    /** The street parts changed from what the identity opened with: only then
+     *  is the street line rewritten, so an identity opened and saved again
+     *  keeps the line it was stored with. */
+    const addressEdited =
+        item !== null &&
+        draft.type === core.CIPHER_IDENTITY &&
+        JSON.stringify(core.normalizeAddress(address)) !== JSON.stringify(core.normalizeAddress(openedAs(item).address));
+
+    /** The identity as it is stored: the street line composed from its parts
+     *  where they changed, the main email and phone normalized. */
+    function identityToSave(from: VaultItem): VaultItem["identity"] {
+        if (from.type !== core.CIPHER_IDENTITY) return from.identity;
+        const parts = core.normalizeAddress(address);
+        return {
+            ...from.identity,
+            email: core.normalizeContactEmail(from.identity.email ?? ""),
+            phone: core.normalizeContactPhone(from.identity.phone ?? ""),
+            ...(addressEdited ? { address1: core.composeStreet(parts, countryCodeOf(from.identity.country ?? "", [locale]) ?? from.identity.country ?? "") } : {})
+        };
+    }
+
     async function onSubmit(): Promise<void> {
-        if (emailInvalid) return;
+        if (emailInvalid || contactInvalid) return;
         const intoVault = !draft.id && draft.organizationId !== null;
         if (intoVault && !collectionId) {
             setError(t("item.pickCollection"));
@@ -357,7 +412,7 @@ export function ItemDialog({
                       type: core.CIPHER_SECURE_NOTE,
                       fields: core.writeApiKey(draft.fields, apiKey)
                   }
-                : { ...draft, fields: foldFields(draft) };
+                : { ...draft, identity: identityToSave(draft), fields: foldFields(draft) };
         const failure = await onSave(saving, intoVault ? [collectionId] : []);
         setPending(false);
         if (failure) {
@@ -372,7 +427,15 @@ export function ItemDialog({
         if (from.type === core.CIPHER_CARD) {
             return core.withChangedField(from.fields, core.BANK_FIELD, bank, core.FIELD_TEXT);
         }
-        if (from.type === core.CIPHER_IDENTITY) return core.writePerson(from.fields, core.normalizePerson(person));
+        if (from.type === core.CIPHER_IDENTITY) {
+            const extras = filledContacts(contacts);
+            const withPerson = core.writePerson(from.fields, core.normalizePerson(person));
+            const withContacts = core.writeContacts(withPerson, {
+                emails: extras.emails.map(core.normalizeContactEmail),
+                phones: extras.phones.map(core.normalizeContactPhone)
+            });
+            return addressEdited ? core.writeAddress(withContacts, core.normalizeAddress(address)) : withContacts;
+        }
         if (from.type !== core.CIPHER_LOGIN) return from.fields;
         // Hidden, because a recovery code is a password and belongs behind the
         // same press as one.
@@ -993,7 +1056,62 @@ export function ItemDialog({
                                         {t(`identity.groups.${group.id}`)}
                                     </legend>
                                     <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
-                                        {group.fields.map(({ field, span }) => (
+                                        {group.fields.map(({ field, span }) =>
+                                            field === "email" || field === "phone" ? (
+                                                <div
+                                                    key={field}
+                                                    className="flex min-w-0 flex-col gap-1 text-sm min-[400px]:col-span-2"
+                                                >
+                                                    {t(identityLabelKey(field))}
+                                                    <IdentityContactList
+                                                        kind={field}
+                                                        label={t(identityLabelKey(field))}
+                                                        values={[
+                                                            draft.identity[field] ?? "",
+                                                            ...(field === "email" ? contacts.emails : contacts.phones)
+                                                        ]}
+                                                        onChange={(rows) => {
+                                                            patch({
+                                                                identity: { ...draft.identity, [field]: rows[0] ?? "" }
+                                                            });
+                                                            setContacts({
+                                                                ...contacts,
+                                                                [field === "email" ? "emails" : "phones"]: rows.slice(1)
+                                                            });
+                                                        }}
+                                                    />
+                                                    {field === "email" && accountEmails.length > 1 ? (
+                                                        <Select
+                                                            value={
+                                                                accountEmails.includes(draft.identity.email ?? "")
+                                                                    ? (draft.identity.email ?? "")
+                                                                    : ""
+                                                            }
+                                                            onValueChange={(picked) =>
+                                                                patch({ identity: { ...draft.identity, email: picked } })
+                                                            }
+                                                            options={accountEmails.map((one) => ({
+                                                                value: one,
+                                                                label: one
+                                                            }))}
+                                                            placeholder={t("identity.pickEmail")}
+                                                            aria-label={t("identity.pickEmail")}
+                                                        />
+                                                    ) : null}
+                                                </div>
+                                            ) : field === "address1" ? (
+                                                <div key={field} className="min-w-0 min-[400px]:col-span-2">
+                                                    <IdentityStreetFields
+                                                        value={address}
+                                                        country={
+                                                            countryCodeOf(draft.identity.country ?? "", [locale]) ??
+                                                            draft.identity.country ??
+                                                            ""
+                                                        }
+                                                        onChange={setAddress}
+                                                    />
+                                                </div>
+                                            ) : (
                                             <label
                                                 key={field}
                                                 className={cn(
@@ -1056,33 +1174,9 @@ export function ItemDialog({
                                                         autoComplete="off"
                                                     />
                                                 )}
-                                                {field === "email" && accountEmails.length > 1 ? (
-                                                    <Select
-                                                        value={
-                                                            accountEmails.includes(
-                                                                draft.identity.email ?? ""
-                                                            )
-                                                                ? (draft.identity.email ?? "")
-                                                                : ""
-                                                        }
-                                                        onValueChange={(email) =>
-                                                            patch({
-                                                                identity: {
-                                                                    ...draft.identity,
-                                                                    email
-                                                                }
-                                                            })
-                                                        }
-                                                        options={accountEmails.map((email) => ({
-                                                            value: email,
-                                                            label: email
-                                                        }))}
-                                                        placeholder={t("identity.pickEmail")}
-                                                        aria-label={t("identity.pickEmail")}
-                                                    />
-                                                ) : null}
                                             </label>
-                                        ))}
+                                            )
+                                        )}
                                     </div>
                                 </fieldset>
                             ))}
@@ -1339,7 +1433,7 @@ export function ItemDialog({
                     <Button
                         type="button"
                         onClick={onSubmit}
-                        disabled={pending || emailInvalid || unchanged}
+                        disabled={pending || emailInvalid || contactInvalid || unchanged}
                     >
                         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                         {tc("actions.save")}

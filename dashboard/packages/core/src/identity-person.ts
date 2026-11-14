@@ -13,6 +13,9 @@
 
 import { withChangedField } from "./vault-items.js";
 
+// The street parts and the extra emails and phones ship from the same entry.
+export * from "./identity-address.js";
+
 export const PERSON_KEYS = ["nationalId", "birthDate", "birthCountry", "nationality", "maritalStatus"] as const;
 export type PersonKey = (typeof PERSON_KEYS)[number];
 export type PersonValues = Record<PersonKey, string>;

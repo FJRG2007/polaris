@@ -1281,20 +1281,31 @@ export function VaultApp() {
                                                       </Button>
                                                   </div>
                                               ) : (
-                                                  rows.map(({ field }) => (
-                                                      <Row
-                                                          key={field}
-                                                          label={t(identityLabelKey(field))}
-                                                          value={current.identity[field] ?? ""}
-                                                          copied={copied === `id-${field}`}
-                                                          onCopy={() =>
-                                                              copy(
-                                                                  `id-${field}`,
-                                                                  current.identity[field] ?? ""
-                                                              )
+                                                  rows.flatMap(({ field }) => {
+                                                      // The other emails and phones follow the main one,
+                                                      // numbered the way they are stored.
+                                                      const extras =
+                                                          field === "email" || field === "phone"
+                                                              ? core.readContacts(current.fields)[
+                                                                    field === "email" ? "emails" : "phones"
+                                                                ]
+                                                              : [];
+                                                      return [current.identity[field] ?? "", ...extras].map(
+                                                          (value, at) => {
+                                                              const id = at === 0 ? `id-${field}` : `id-${field}-${at + 1}`;
+                                                              const label = t(identityLabelKey(field));
+                                                              return (
+                                                                  <Row
+                                                                      key={id}
+                                                                      label={at === 0 ? label : `${label} ${at + 1}`}
+                                                                      value={value}
+                                                                      copied={copied === id}
+                                                                      onCopy={() => copy(id, value)}
+                                                                  />
+                                                              );
                                                           }
-                                                      />
-                                                  ))
+                                                      );
+                                                  })
                                               )}
                                           </Section>
                                       );

@@ -88,7 +88,15 @@ export function loginEmail(item: Pick<VaultItem, "type" | "fields">): string {
 export function managedFieldNames(item: Pick<VaultItem, "type" | "fields">): Set<string> {
     const names = new Set<string>([core.RECOVERY_CODES_FIELD, core.BANK_FIELD, core.ICON_FIELD]);
     if (item.type === core.CIPHER_LOGIN) names.add(core.EMAIL_FIELD);
-    if (item.type === core.CIPHER_IDENTITY) for (const key of core.PERSON_KEYS) names.add(core.PERSON_FIELDS[key]);
+    if (item.type === core.CIPHER_IDENTITY) {
+        for (const key of core.PERSON_KEYS) names.add(core.PERSON_FIELDS[key]);
+        // Drawn as the street line's parts and as more email and phone rows.
+        for (const key of core.ADDRESS_KEYS) names.add(core.ADDRESS_FIELDS[key]);
+        for (let n = 2; n <= core.MAX_EXTRA_CONTACTS + 1; n++) {
+            names.add(core.contactField("email", n));
+            names.add(core.contactField("phone", n));
+        }
+    }
     // The editor holds an API key as `ITEM_API_KEY` until it is saved.
     if (item.type === ITEM_API_KEY || core.isApiKeyItem(item)) {
         for (const name of core.API_KEY_FIELDS) names.add(name);

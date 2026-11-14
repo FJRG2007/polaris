@@ -76,7 +76,19 @@ describe("what a pick types into each box", () => {
 describe("what a pick replaces even when filled", () => {
     it("replaces the whole address when opened on any part of it", () => {
         expect([...identity.replacedSlots("city")].sort()).toEqual(
-            ["address1", "address2", "city", "country", "postalCode", "state"].sort()
+            [
+                "address1",
+                "address2",
+                "city",
+                "country",
+                "postalCode",
+                "state",
+                "streetType",
+                "streetName",
+                "houseNumber",
+                "floor",
+                "door"
+            ].sort()
         );
     });
 

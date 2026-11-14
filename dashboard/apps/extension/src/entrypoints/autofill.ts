@@ -61,16 +61,19 @@ import {
     profilePart,
     PROFILE_PARTS,
     readForm,
+    STREET_TYPE_WORDS,
     type PageFields,
     type PlacePart
 } from "@/lib/fields";
 import {
     identityRows,
     NAME_SLOTS,
+    pickStreetType,
     previewKey,
     replacedSlots,
     slotValue,
-    type FillSlot
+    type FillSlot,
+    type StreetBoxes
 } from "@/lib/identity";
 import {
     countryInput,
@@ -597,7 +600,11 @@ async function start(): Promise<void> {
                 () => {
                     void askBackground({ kind: "identity", id: row.card.id }).then((answer) => {
                         if (answer.ok && "identity" in answer) {
-                            void fillIdentity(answer.identity, field);
+                            // A row for another of its emails or phones fills that one.
+                            const values = row.pick
+                                ? { ...answer.identity, [row.pick.key]: row.pick.value }
+                                : answer.identity;
+                            void fillIdentity(values, field);
                         }
                     });
                 },
@@ -654,9 +661,22 @@ async function start(): Promise<void> {
             field.ownerDocument.documentElement.lang || null,
             navigator.languages ?? [navigator.language]
         );
+        // The street parts this page asks for apart, so the street line box
+        // gets only what no other box does.
+        const typeSelect = [...(field.form?.elements ?? (fillScope(field) ?? field.ownerDocument).querySelectorAll("select"))].some(
+            (element) =>
+                element.nodeName === "SELECT" && STREET_TYPE_WORDS.test(describeSelect(element as HTMLSelectElement).words)
+        );
+        const boxes: StreetBoxes = {
+            streetType: fields.profile.streetType !== null || typeSelect,
+            streetName: fields.profile.streetName !== null,
+            houseNumber: fields.profile.houseNumber !== null,
+            floor: fields.profile.floor !== null,
+            door: fields.profile.door !== null
+        };
         const into = (box: HTMLInputElement | null, slot: FillSlot): void => {
             if (!box) return;
-            const stored = slotValue(values, slot, fields.usernameAsks);
+            const stored = slotValue(values, slot, fields.usernameAsks, boxes);
             // A country box that takes text gets the name in the page's own
             // language, or the code where the box asks for one.
             const value =
@@ -704,7 +724,17 @@ async function start(): Promise<void> {
         for (const element of pool) {
             if (element.nodeName === "SELECT") {
                 const select = element as HTMLSelectElement;
-                const slot = personSlot(describeSelect(select), groupWords(select));
+                const described = describeSelect(select);
+                if (STREET_TYPE_WORDS.test(described.words)) {
+                    if (done.has("streetType")) continue;
+                    done.add("streetType");
+                    const chosen = select.options[select.selectedIndex];
+                    if (chosen && !isPlaceholder(optionOf(chosen))) continue;
+                    const index = pickStreetType(optionsOf(select), values.streetType);
+                    if (index !== -1 && index !== select.selectedIndex) putSelect(select, index);
+                    continue;
+                }
+                const slot = personSlot(described, groupWords(select));
                 if (slot === null || done.has(slot)) continue;
                 done.add(slot);
                 const chosen = select.options[select.selectedIndex];

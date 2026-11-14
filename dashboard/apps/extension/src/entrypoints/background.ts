@@ -30,7 +30,15 @@ import {
     type UriMatch
 } from "@polaris/core";
 import { z } from "zod";
-import { PERSON_FIELDS, readPerson } from "@polaris/core/identity-person";
+import {
+    ADDRESS_FIELDS,
+    isContactField,
+    PERSON_FIELDS,
+    readAddress,
+    readContacts,
+    readPerson,
+    streetParts
+} from "@polaris/core/identity-person";
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
 import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
@@ -1428,7 +1436,7 @@ async function readLogin(cipher: Record<string, unknown>): Promise<Login | null>
 }
 
 /** The custom fields an identity's personal details are kept in. */
-const PERSON_FIELD_NAMES = new Set<string>(Object.values(PERSON_FIELDS));
+const PERSON_FIELD_NAMES = new Set<string>([...Object.values(PERSON_FIELDS), ...Object.values(ADDRESS_FIELDS)]);
 
 /** The identity type, as the wire numbers it. */
 const CIPHER_IDENTITY = 4;
@@ -1452,16 +1460,21 @@ async function readIdentity(
     for (const field of Array.isArray(cipher["fields"]) ? (cipher["fields"] as unknown[]) : []) {
         const one = (field ?? {}) as Record<string, unknown>;
         const name = await say(one["name"]);
-        if (PERSON_FIELD_NAMES.has(name)) custom.push({ name, value: await say(one["value"]) });
+        if (PERSON_FIELD_NAMES.has(name) || isContactField(name)) {
+            custom.push({ name, value: await say(one["value"]) });
+        }
     }
     Object.assign(values, readPerson(custom));
+    // The street in its parts, read off the line where they were never stored.
+    Object.assign(values, streetParts(readAddress(custom), values.address1, values.country));
+    const extras = readContacts(custom);
     return {
         id,
         name: (await say(cipher["name"])) || "Untitled",
         organizationId:
             typeof cipher["organizationId"] === "string" ? cipher["organizationId"] : null,
         isDefault: cipher["defaultIdentity"] === true,
-        values
+        values: { ...values, otherEmails: extras.emails, otherPhones: extras.phones }
     };
 }
 

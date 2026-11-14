@@ -224,6 +224,25 @@
         "noRegion": "Nothing by that name",
         "pickRegion": "Choose one",
         "useTyped": "Use \"{typed}\"",
+        "street": {
+            "type": "Street type",
+            "pickType": "Choose a type",
+            "searchType": "Search types",
+            "noType": "No type by that name",
+            "name": "Street name",
+            "number": "Number",
+            "floor": "Floor",
+            "door": "Door"
+        },
+        "contacts": {
+            "addEmail": "Add another email",
+            "addPhone": "Add another phone",
+            "primary": "Primary",
+            "makePrimary": "Set as primary",
+            "remove": "Remove",
+            "invalidEmail": "That does not look like an email address.",
+            "invalidPhone": "That does not look like a phone number."
+        },
         "person": {
             "nationalId": "Identity document",
             "nationalIdHint": "DNI, NIE, national ID card",

@@ -356,7 +356,12 @@ describe("the rest of a sign-up", () => {
             city: 7,
             state: 8,
             postalCode: 9,
-            country: 10
+            country: 10,
+            streetType: null,
+            streetName: null,
+            houseNumber: null,
+            floor: null,
+            door: null
         });
     });
 

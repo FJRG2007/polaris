@@ -224,6 +224,25 @@
         "noRegion": "Nada con ese nombre",
         "pickRegion": "Elige una",
         "useTyped": "Usar \"{typed}\"",
+        "street": {
+            "type": "Tipo de vía",
+            "pickType": "Elige un tipo",
+            "searchType": "Buscar tipos",
+            "noType": "Ningún tipo así",
+            "name": "Nombre de vía",
+            "number": "Número",
+            "floor": "Piso",
+            "door": "Puerta"
+        },
+        "contacts": {
+            "addEmail": "Añadir correo",
+            "addPhone": "Añadir teléfono",
+            "primary": "Principal",
+            "makePrimary": "Hacer principal",
+            "remove": "Quitar",
+            "invalidEmail": "Eso no parece un correo electrónico.",
+            "invalidPhone": "Eso no parece un número de teléfono."
+        },
         "person": {
             "nationalId": "Documento",
             "nationalIdHint": "DNI, NIE, documento nacional",
