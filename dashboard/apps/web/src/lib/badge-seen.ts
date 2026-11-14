@@ -45,6 +45,24 @@ export const DISMISSED_KEYS = {
 
 export type DismissedKey = (typeof DISMISSED_KEYS)[keyof typeof DISMISSED_KEYS];
 
+/**
+ * How far somebody has cleared an app's badge from the app list, by app.
+ *
+ * Marking an app read from the app list is the phone's gesture: the number on
+ * the icon goes, and what is inside the app does not. The conversations and the
+ * mail behind it are still unread when the app is opened, and stay so until
+ * they are opened there. So the mark is a moment, kept here and nowhere in the
+ * app's own data: the badge counts only what arrived after it, and anything new
+ * raises it again. An account that never marked keeps the count it always had.
+ */
+export const APP_BADGE_KEYS = {
+    chat: "cleared.chat",
+    mail: "cleared.mail"
+} as const;
+
+export type BadgeClearedApp = keyof typeof APP_BADGE_KEYS;
+export type AppBadgeKey = (typeof APP_BADGE_KEYS)[BadgeClearedApp];
+
 export function isBadgeScreen(value: unknown): value is BadgeScreen {
     return typeof value === "string" && Object.hasOwn(BADGE_SCREENS, value);
 }
@@ -79,7 +97,7 @@ export async function seenMarks(userId: string): Promise<ReadonlyMap<string, str
  *  the announced build for the update, and now for a queue. */
 export async function markSeen(
     userId: string,
-    key: BadgeKey | DismissedKey,
+    key: BadgeKey | DismissedKey | AppBadgeKey,
     mark: string
 ): Promise<void> {
     await prisma.userBadgeSeen.upsert({
@@ -87,4 +105,34 @@ export async function markSeen(
         update: { mark },
         create: { userId, key, mark }
     });
+}
+
+/** The later of an item's own read mark and an app's badge mark: what the badge
+ *  counts from. Either may be missing. */
+export function laterMark(read: Date | null | undefined, cleared: Date | null): Date | null {
+    if (!read) return cleared;
+    if (!cleared) return read;
+    return read.getTime() >= cleared.getTime() ? read : cleared;
+}
+
+/** When an account last cleared an app's badge from the app list, or null if it
+ *  never has - which counts everything, exactly as before the mark existed. */
+export async function badgeClearedAt(userId: string, app: BadgeClearedApp): Promise<Date | null> {
+    const row = await prisma.userBadgeSeen.findUnique({
+        where: { userId_key: { userId, key: APP_BADGE_KEYS[app] } },
+        select: { mark: true }
+    });
+    if (!row) return null;
+    const at = new Date(row.mark);
+    return Number.isNaN(at.getTime()) ? null : at;
+}
+
+/** Clear an app's badge as of `at`: everything up to then stops counting on it,
+ *  and nothing inside the app changes. */
+export async function clearAppBadge(
+    userId: string,
+    app: BadgeClearedApp,
+    at: Date = new Date()
+): Promise<void> {
+    await markSeen(userId, APP_BADGE_KEYS[app], at.toISOString());
 }

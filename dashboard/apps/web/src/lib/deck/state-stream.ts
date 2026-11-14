@@ -44,7 +44,12 @@ export function chatChangeConcerns(
     userId: string,
     reachable: ReadonlySet<string>
 ): boolean {
-    if (change.kind !== "posted" && change.kind !== "read" && change.kind !== "channels")
+    if (
+        change.kind !== "posted" &&
+        change.kind !== "read" &&
+        change.kind !== "channels" &&
+        change.kind !== "badge"
+    )
         return false;
     if (change.audience?.includes(userId)) return true;
     return change.channelId !== undefined && reachable.has(change.channelId);

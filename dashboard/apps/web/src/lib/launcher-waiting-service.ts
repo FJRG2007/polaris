@@ -1,10 +1,10 @@
 /**
- * The entries the app menu lists under its grid, and marking them read.
+ * The entries the app menu lists under its grid, and clearing their badges.
  *
  * Every group is asked the same question its badge asks - the same shelf, the
- * same mutes, the same folders - so the group's total is the badge's number and
- * marking an entry read moves both. What "read" means is the app's own: see
- * `launcher-waiting` for why Management's entries are "seen" instead.
+ * same mutes, the same folders, the same badge mark - so the group's total is
+ * the badge's number. Marking an app read from the menu clears its badge and
+ * nothing inside it, the way a phone's launcher does: see `launcher-waiting`.
  *
  * Bounded on purpose: a group lists the newest few, read with a grouped query,
  * and "mark all read" in Mail takes the unread mail in batches rather than one
@@ -17,7 +17,10 @@ import { onShelf } from "@/lib/mailbox/access";
 import { addressesFrom } from "@/lib/mailbox/json";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { actOnMessages } from "@/lib/mailbox/messages";
+import { publishMail } from "@/lib/mailbox/live";
+import { publishChatChange } from "@/lib/chat/live";
 import { readNoticesAboutThreads } from "@/lib/mailbox/mail-notices";
+import { badgeClearedAt, clearAppBadge } from "@/lib/badge-seen";
 import { markChannelsRead } from "@/lib/chat/messages";
 import { adminWaiting, dismissAdminWaiting } from "@/lib/admin-waiting";
 import { listChannels, unreadConversations } from "@/lib/chat/chat-service";
@@ -40,12 +43,11 @@ export interface LauncherReach {
     readonly admin: boolean;
 }
 
-/** How many unread messages one "mark all read" in Mail takes at a time. */
+/** How many unread messages one conversation's "mark read" takes. */
 const MAIL_BATCH = 500;
 
-/** How many batches one press goes through before it answers. Past it, the
- *  rest is still unread and the group says how many - a press is not a job. */
-const MAIL_BATCHES = 20;
+/** How many conversations' bell notices one badge clear takes with it. */
+const MAIL_NOTICE_THREADS = 2000;
 
 // ---------------------------------------------------------------------------
 // Chat
@@ -108,7 +110,7 @@ async function markChatRead(userId: string, channelIds: readonly string[]): Prom
 // Mail
 // ---------------------------------------------------------------------------
 
-/** Unread mail as the badge counts it (see `unreadCounts`): the open shelf's
+/** Unread mail as Mail counts it (see `unreadCounts`): the open shelf's
  *  inboxes, not snoozed. */
 async function unreadMailWhere(userId: string) {
     return {
@@ -119,8 +121,18 @@ async function unreadMailWhere(userId: string) {
     };
 }
 
+/** Unread mail as the badge counts it (see `mailWaitingOnShelf`): the same,
+ *  arrived since the badge was last cleared from the app list. */
+async function badgeMailWhere(userId: string) {
+    const [where, cleared] = await Promise.all([
+        unreadMailWhere(userId),
+        badgeClearedAt(userId, "mail")
+    ]);
+    return cleared ? { ...where, createdAt: { gt: cleared } } : where;
+}
+
 async function mailGroup(userId: string): Promise<LauncherWaitingGroup | null> {
-    const where = await unreadMailWhere(userId);
+    const where = await badgeMailWhere(userId);
     const [threads, total] = await Promise.all([
         prisma.mailMessage.groupBy({
             by: ["threadId"],
@@ -177,30 +189,27 @@ async function markThreadRead(userId: string, threadId: string): Promise<void> {
     await readNoticesAboutThreads(userId, [threadId]);
 }
 
-/** Every unread message the badge counts, read in batches. */
-async function markAllMailRead(userId: string): Promise<void> {
-    const where = await unreadMailWhere(userId);
-    const threads = new Set<string>();
-    for (let batch = 0; batch < MAIL_BATCHES; batch += 1) {
-        const rows = await prisma.mailMessage.findMany({
-            where,
-            select: { id: true, threadId: true },
-            orderBy: { sentAt: "desc" },
-            take: MAIL_BATCH
-        });
-        if (rows.length === 0) break;
-        const done = await actOnMessages(
-            userId,
-            rows.map((row) => row.id),
-            "read"
-        );
-        // Nothing moved: the server refused, and asking again would only get the
-        // same rows back.
-        if (done === 0) break;
-        for (const row of rows) threads.add(row.threadId);
-    }
-    // The bell's notices about what was just read, so its count goes with it.
-    await readNoticesAboutThreads(userId, [...threads]);
+/**
+ * Mail's badge cleared from the app list: what it counted stops counting, and
+ * every message stays unread in Mail. The bell's notices about those
+ * conversations are read with it - they are the app's notifications, and the
+ * tab icon counts them - while the mail they point at is not.
+ */
+async function clearMailBadge(userId: string): Promise<void> {
+    const at = new Date();
+    const where = await badgeMailWhere(userId);
+    const threads = await prisma.mailMessage.findMany({
+        where: { AND: [where, { createdAt: { lte: at } }] },
+        select: { threadId: true },
+        distinct: ["threadId"],
+        take: MAIL_NOTICE_THREADS
+    });
+    await clearAppBadge(userId, "mail", at);
+    await readNoticesAboutThreads(
+        userId,
+        threads.map((row) => row.threadId)
+    );
+    publishMail({ kind: "badge", accountId: "", actorId: userId });
 }
 
 // ---------------------------------------------------------------------------
@@ -262,22 +271,33 @@ export async function launcherWaiting(
     return groups.filter((group): group is LauncherWaitingGroup => group !== null);
 }
 
-/** Mark one entry read, or every entry of an app. Each app's own act - see the
- *  module comment. An id that names nothing this account can reach does
- *  nothing: Chat and Mail both check ownership on the way in. */
+/**
+ * Clear an app's badge, or mark one named entry read.
+ *
+ * A whole app - the tile's "mark read", "mark everything read" - clears its
+ * badge and nothing inside it: Chat's conversations and Mail's messages are
+ * still unread when the app is opened (see `launcher-waiting`). Management's
+ * entries are marked seen, which is what its badge counts. One named entry is
+ * that entry read, the app's own act. An id that names nothing this account
+ * can reach does nothing: Chat and Mail both check ownership on the way in.
+ */
 export async function markLauncherRead(
     userId: string,
     app: LauncherWaitingApp,
     id: string | null
 ): Promise<void> {
     if (app === "chat") {
-        const ids = id ? [id] : (await newestUnread(userId)).map((channel) => channel.id);
-        if (ids.length > 0) await markChatRead(userId, ids);
+        if (id) {
+            await markChatRead(userId, [id]);
+            return;
+        }
+        await clearAppBadge(userId, "chat");
+        publishChatChange({ kind: "badge", actorId: userId, audience: [userId] });
         return;
     }
     if (app === "mail") {
         if (id) await markThreadRead(userId, id);
-        else await markAllMailRead(userId);
+        else await clearMailBadge(userId);
         return;
     }
     if (id && !isAdminItem(id)) return;

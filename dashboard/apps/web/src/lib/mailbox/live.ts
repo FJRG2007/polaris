@@ -15,6 +15,7 @@
 
 /** Something worth waking a Mail tab for. */
 export interface MailChange {
+    /** Empty on `badge`, which is about the person rather than a mailbox. */
     readonly accountId: string;
     /** Whose mailbox it is. The only thing the stream filters on. */
     readonly actorId: string;
@@ -23,8 +24,10 @@ export interface MailChange {
      * messages - a folder's contents changed, pull it again.
      * sending - a queued message changed state, so the composer's own tab and
      *     the Outbox both stop showing it as waiting.
+     * badge - the person cleared Mail's badge from the app list, so the badge
+     *     on their other screens counts again. No message was read.
      */
-    readonly kind: "folders" | "messages" | "sending";
+    readonly kind: "folders" | "messages" | "sending" | "badge";
     /** Only on `messages`: which folder, so a tab looking at another one does
      *  nothing. */
     readonly folderId?: string;

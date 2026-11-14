@@ -140,6 +140,12 @@ export async function GET(request: Request): Promise<Response> {
 
             unsubscribe = subscribeMail((change) => {
                 if (closed) return;
+                // Mail's badge cleared from the app list on another of this
+                // person's screens: the badge here counts again.
+                if (change.kind === "badge") {
+                    if (change.actorId === readerId) send({ kind: "badge" });
+                    return;
+                }
                 // A queued message changing state is what the composer's own tab
                 // is waiting for, so it is never coalesced and never skipped for
                 // being this person's own doing: the tab that pressed Send is

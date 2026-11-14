@@ -18,6 +18,7 @@
 
 import { unreadCounts } from "@/lib/mailbox/views";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
+import { badgeClearedAt } from "@/lib/badge-seen";
 import { unreadTotal, type ChatUnread } from "@/lib/chat/chat-service";
 
 export interface MailWaiting {
@@ -29,16 +30,22 @@ export interface MailWaiting {
 export const NO_CHAT_WAITING: ChatUnread = { messages: 0, conversations: 0 };
 export const NO_MAIL_WAITING: MailWaiting = { messages: 0, mailboxes: 0 };
 
-/** Unread mail in the open shelf's mailboxes - the ones Mail lists there. */
+/** Unread mail in the open shelf's mailboxes - the ones Mail lists there -
+ *  that arrived since the badge was last cleared from the app list. */
 export async function mailWaitingOnShelf(userId: string): Promise<MailWaiting> {
-    const counts = await unreadCounts(userId, await mailShelfFor(userId));
+    const [shelf, cleared] = await Promise.all([
+        mailShelfFor(userId),
+        badgeClearedAt(userId, "mail")
+    ]);
+    const counts = await unreadCounts(userId, shelf, cleared?.toISOString() ?? null);
     return {
         messages: counts.total,
         mailboxes: Object.values(counts.byAccount).filter((one) => one > 0).length
     };
 }
 
-/** Unread chat in the conversations the open shelf's chat lists. The shelf is
+/** Unread chat in the conversations the open shelf's chat lists, since the
+ *  badge was last cleared (see `unreadConversations`). The shelf is
  *  resolved inside Chat, which is where an organization keeping a chat of its
  *  own is decided - see `chat/isolation`. */
 export async function chatWaitingOnShelf(userId: string): Promise<ChatUnread> {

@@ -47,6 +47,7 @@ import {
 } from "./access";
 import * as history from "./history-visibility";
 import { concealedFrom, listedFor } from "./chat-lock";
+import { badgeClearedAt, laterMark } from "@/lib/badge-seen";
 
 /** A space as the rail draws it. */
 export interface ChatSpaceView {
@@ -2375,19 +2376,27 @@ export interface ChatUnreadConversation {
 }
 
 /** The conversations the badge counts - see `ChatUnread` - each with
- *  something waiting, without anything the rail needs to draw them. */
+ *  something waiting, without anything the rail needs to draw them.
+ *
+ *  Counted from the later of each conversation's own read mark and the moment
+ *  the reader last cleared Chat's badge from the app list (`badge-seen`). That
+ *  clears the number on the icon and nothing else: the rail inside Chat counts
+ *  from the read marks alone, so the conversations are still unread there. */
 export async function unreadConversations(actor: ChatActor): Promise<ChatUnreadConversation[]> {
-    const memberships = await prisma.chatChannelMember.findMany({
-        where: { userId: actor.id },
-        select: {
-            channelId: true,
-            lastReadAt: true,
-            muted: true,
-            mutedUntil: true,
-            locked: true,
-            hiddenAt: true
-        }
-    });
+    const [memberships, cleared] = await Promise.all([
+        prisma.chatChannelMember.findMany({
+            where: { userId: actor.id },
+            select: {
+                channelId: true,
+                lastReadAt: true,
+                muted: true,
+                mutedUntil: true,
+                locked: true,
+                hiddenAt: true
+            }
+        }),
+        badgeClearedAt(actor.id, "chat")
+    ]);
     const concealed = await concealedFrom(actor.id, memberships);
     // Worked out rather than read, for the reason the rail works it out: a mute
     // with an end that has passed is not a mute, and nothing runs to clear it.
@@ -2426,7 +2435,12 @@ export async function unreadConversations(actor: ChatActor): Promise<ChatUnreadC
     const counts = await unreadCounts(
         actor,
         live,
-        new Map(heard.map((row) => [row.channelId, row]))
+        new Map(
+            heard.map((row) => [
+                row.channelId,
+                { lastReadAt: laterMark(row.lastReadAt, cleared) }
+            ])
+        )
     );
     return live.flatMap((channel) => {
         const unread = counts.get(channel.id) ?? 0;

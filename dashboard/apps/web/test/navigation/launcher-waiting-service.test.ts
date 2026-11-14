@@ -3,10 +3,12 @@
  *
  * Chat lists what its badge counts - conversations the reader is in, not muted,
  * not archived, with something unread - newest first, names only the few it
- * lists, and marks them read the way Chat does. Mail lists the newest unread threads of the open shelf's
- * inboxes and reads them on the mail server through Mail's own action. A group
- * the reader cannot reach is never asked for, and no subject or name is long
- * enough to fail the answer the menu validates.
+ * lists. Mail lists the newest unread threads of the open shelf's inboxes. A
+ * group the reader cannot reach is never asked for, and no subject or name is
+ * long enough to fail the answer the menu validates.
+ *
+ * Marking a whole app read is the phone's gesture: the badge goes and nothing
+ * inside the app is read. One named entry is that entry read, the app's way.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,13 +19,23 @@ const dismissed: string[][] = [];
 const named: string[][] = [];
 let mailIdsLeft = 0;
 let subject = "  ";
+/** The badge marks kept, by `userId:key`. */
+const marks = new Map<string, string>();
+const published: { bus: string; change: Record<string, unknown> }[] = [];
+const noticesRead: string[][] = [];
+/** Every `where` the mail badge was counted with. */
+const mailCounted: unknown[] = [];
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         mailMessage: {
-            groupBy: async () => [{ threadId: "t1", _count: { _all: 2 }, _max: { sentAt: new Date() } }],
+            groupBy: async ({ where }: { where: unknown }) => {
+                mailCounted.push(where);
+                return [{ threadId: "t1", _count: { _all: 2 }, _max: { sentAt: new Date() } }];
+            },
             count: async () => 9,
             findMany: async ({ select, where }: { select: Record<string, true>; where: { threadId?: unknown } }) => {
+                if (select.threadId && !select.id && !select.subject) return [{ threadId: "t1" }, { threadId: "t2" }];
                 if (select.subject)
                     return [
                         {
@@ -37,7 +49,27 @@ vi.mock("@polaris/db", () => ({
                 mailIdsLeft -= batch;
                 return Array.from({ length: batch }, (_, at) => ({ id: `x${at}` }));
             }
+        },
+        userBadgeSeen: {
+            findUnique: async ({ where }: { where: { userId_key: { userId: string; key: string } } }) => {
+                const mark = marks.get(`${where.userId_key.userId}:${where.userId_key.key}`);
+                return mark === undefined ? null : { mark };
+            },
+            upsert: async ({ create }: { create: { userId: string; key: string; mark: string } }) => {
+                marks.set(`${create.userId}:${create.key}`, create.mark);
+            }
         }
+    }
+}));
+vi.mock("@/lib/mailbox/live", () => ({
+    publishMail: (change: Record<string, unknown>) => published.push({ bus: "mail", change })
+}));
+vi.mock("@/lib/chat/live", () => ({
+    publishChatChange: (change: Record<string, unknown>) => published.push({ bus: "chat", change })
+}));
+vi.mock("@/lib/mailbox/mail-notices", () => ({
+    readNoticesAboutThreads: async (_user: string, threads: string[]) => {
+        noticesRead.push(threads);
     }
 }));
 vi.mock("@/lib/chat/chat-service", () => ({
@@ -80,6 +112,10 @@ beforeEach(() => {
     named.length = 0;
     mailIdsLeft = 0;
     subject = "  ";
+    marks.clear();
+    published.length = 0;
+    noticesRead.length = 0;
+    mailCounted.length = 0;
 });
 
 describe("what the menu lists", () => {
@@ -116,10 +152,18 @@ describe("what the menu lists", () => {
 });
 
 describe("marking read", () => {
-    it("reads a conversation, or every one the badge counts", async () => {
+    it("reads one named conversation the way Chat does", async () => {
         await markLauncherRead("ada", "chat", "a");
+        expect(chatRead).toEqual([["a"]]);
+    });
+
+    it("clears Chat's badge without reading a single conversation", async () => {
         await markLauncherRead("ada", "chat", null);
-        expect(chatRead).toEqual([["a"], ["c", "a"]]);
+        expect(chatRead).toEqual([]);
+        expect(marks.has("ada:cleared.chat")).toBe(true);
+        expect(published).toEqual([
+            { bus: "chat", change: { kind: "badge", actorId: "ada", audience: ["ada"] } }
+        ]);
     });
 
     it("reads a mail thread as a conversation, the way Mail does", async () => {
@@ -127,10 +171,25 @@ describe("marking read", () => {
         expect(mailRead).toEqual([{ ids: ["m1", "m2"], scope: "conversation" }]);
     });
 
-    it("reads all unread mail in batches until none is left", async () => {
+    it("clears Mail's badge without reading a single message", async () => {
         mailIdsLeft = 1200;
         await markLauncherRead("ada", "mail", null);
-        expect(mailRead.map((call) => call.ids.length)).toEqual([500, 500, 200]);
+        expect(mailRead).toEqual([]);
+        expect(marks.has("ada:cleared.mail")).toBe(true);
+        // The bell's notices about those conversations go with the badge.
+        expect(noticesRead).toEqual([["t1", "t2"]]);
+        expect(published).toEqual([
+            { bus: "mail", change: { kind: "badge", accountId: "", actorId: "ada" } }
+        ]);
+    });
+
+    it("lists only mail that arrived after the badge was cleared", async () => {
+        await launcherWaiting("ada", { chat: false, mail: true, admin: false });
+        expect(JSON.stringify(mailCounted.at(-1))).not.toContain("createdAt");
+        await markLauncherRead("ada", "mail", null);
+        const cleared = marks.get("ada:cleared.mail")!;
+        await launcherWaiting("ada", { chat: false, mail: true, admin: false });
+        expect(mailCounted.at(-1)).toMatchObject({ createdAt: { gt: new Date(cleared) } });
     });
 
     it("marks Management entries seen, and an unknown one not at all", async () => {

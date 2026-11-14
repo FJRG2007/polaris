@@ -160,13 +160,13 @@ describe("before the waiting route has answered", () => {
         expect(nudges).toEqual([["admin", -4]]);
     });
 
-    it("marks Mail read on Mail's own ledger", async () => {
+    it("clears Mail's badge without touching the ledger Mail's rail reads", async () => {
         const user = userEvent.setup();
         renderRail();
         await user.click(screen.getByRole("button", { name: "Mark all read in Mail" }));
         expect(marked).toEqual([{ scope: "app", app: "mail" }]);
-        expect(mailChanges).toEqual([-3]);
-        expect(nudges).toEqual([]);
+        expect(mailChanges).toEqual([]);
+        expect(nudges).toEqual([["mail", -3]]);
     });
 
     it("puts each badge back when the server refuses", async () => {
@@ -181,7 +181,15 @@ describe("before the waiting route has answered", () => {
             ])
         );
         await user.click(screen.getByRole("button", { name: "Mark all read in Mail" }));
-        await waitFor(() => expect(mailChanges).toEqual([-3, 3]));
+        await waitFor(() =>
+            expect(nudges).toEqual([
+                ["admin", -4],
+                ["admin", 4],
+                ["mail", -3],
+                ["mail", 3]
+            ])
+        );
+        expect(mailChanges).toEqual([]);
     });
 
     it("offers the tile's corner and the right click in the app menu", async () => {

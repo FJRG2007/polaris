@@ -97,6 +97,7 @@ vi.mock("@/lib/chat/access", async (original) => ({
 vi.mock("@polaris/db", () => ({
     prisma: {
         userBlock: { findMany: async () => [] },
+        userBadgeSeen: { findUnique: async () => null },
         chatSpace: {
             findMany: async ({ where }: { where: { id?: { in: string[] } } }) =>
                 [...new Set(rooms.map((room) => room.spaceId).filter(Boolean))]

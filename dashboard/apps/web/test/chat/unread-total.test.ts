@@ -80,6 +80,8 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         // Nobody has blocked anybody here; blocking has its own test.
         userBlock: { findMany: async () => [] },
+        // When the reader last cleared Chat's badge from the app list, if ever.
+        userBadgeSeen: { findUnique: async () => (badgeCleared ? { mark: badgeCleared } : null) },
         chatChannelMember: { findMany: async () => members },
         chatLock: { findUnique: async () => lockRow },
         chatChannel: {
@@ -107,6 +109,8 @@ vi.mock("@polaris/db", () => ({
 const { conversationsElsewhere, unreadConversations, unreadTotal } =
     await import("@/lib/chat/chat-service");
 
+/** When the reader cleared Chat's badge from the app list, as stored. */
+let badgeCleared: string | null = null;
 /** The reader's chat lock settings, when they have a code. */
 let lockRow: { hideLocked: boolean } | null = null;
 /** Every `where` the badge asked for its rooms with. */
@@ -140,6 +144,7 @@ beforeEach(() => {
     shelfChats = new Set([null]);
     lockRow = null;
     roomQuestions = [];
+    badgeCleared = null;
 });
 
 describe("what is waiting in Chat, off the usual list", () => {
@@ -321,5 +326,52 @@ describe("what is waiting in Chat, asked of the database", () => {
         channels = [room("a")];
         say("a", 150);
         expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 99, conversations: 1 });
+    });
+});
+
+describe("Chat's badge cleared from the app list", () => {
+    const cleared = new Date("2026-08-18T10:00:00Z");
+
+    it("stops counting what came before, and counts what comes after", async () => {
+        members = [member("a"), member("b", new Date("2026-08-18T08:00:00Z"))];
+        channels = [room("a"), room("b")];
+        say("a", 5, new Date("2026-08-18T09:00:00Z"));
+        say("b", 3, new Date("2026-08-18T09:00:00Z"));
+        expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 8, conversations: 2 });
+        badgeCleared = cleared.toISOString();
+        expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 0, conversations: 0 });
+        // A new message raises the badge again, by exactly what is new.
+        say("b", 1, new Date("2026-08-18T11:00:00Z"));
+        expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 1, conversations: 1 });
+    });
+
+    it("counts from a conversation's own read mark when it is the later one", async () => {
+        badgeCleared = cleared.toISOString();
+        members = [member("a", new Date("2026-08-18T12:00:00Z"))];
+        channels = [room("a")];
+        say("a", 2, new Date("2026-08-18T11:00:00Z"));
+        say("a", 1, new Date("2026-08-18T13:00:00Z"));
+        expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 1, conversations: 1 });
+    });
+
+    it("leaves every conversation unread inside Chat", async () => {
+        badgeCleared = cleared.toISOString();
+        shelfChats = new Set();
+        channels = [room("a", { orgId: "o1" })];
+        members = [member("a")];
+        say("a", 4, new Date("2026-08-18T09:00:00Z"));
+        expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 0, conversations: 0 });
+        // The rail inside Chat counts from the read marks alone.
+        const [elsewhere] = await conversationsElsewhere({ id: "u1" });
+        expect(elsewhere?.unread).toBe(4);
+        expect(members[0]?.lastReadAt).toBeNull();
+    });
+
+    it("is ignored when the stored mark is not a moment", async () => {
+        badgeCleared = "not a date";
+        members = [member("a")];
+        channels = [room("a")];
+        say("a", 2);
+        expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 2, conversations: 1 });
     });
 });

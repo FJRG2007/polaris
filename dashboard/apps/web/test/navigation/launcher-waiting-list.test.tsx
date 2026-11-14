@@ -220,13 +220,14 @@ describe("marking read from the app menu", () => {
         const { user } = await open();
         await user.click(screen.getByRole("menuitem", { name: "Mark everything read" }));
         expect(marked).toEqual([{ scope: "all" }]);
-        // Mail's count moves on Mail's own ledger, which every unread count of
-        // mail reads, rather than on the tile's nudge.
+        // Mail's badge moves on the tile's nudge like every other app's, and
+        // never on Mail's own ledger: no mail was read, so Mail's rail keeps it.
         expect(nudges).toEqual([
             ["chat", -7],
+            ["mail", -2],
             ["admin", -3]
         ]);
-        expect(unreadOverlay(0).inbox).toBe(-2);
+        expect(unreadOverlay(0).inbox).toBe(0);
         expect(screen.queryByRole("menuitem", { name: "Mark all seen in Management" })).toBeNull();
         expect(screen.queryByRole("menuitem", { name: "Mark everything read" })).toBeNull();
     });

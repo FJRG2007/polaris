@@ -55,7 +55,10 @@ export interface ChatChange {
      *      rooms asks for the list again through the same check.
      *  call-settled - somebody declined a call ringing for them on one of their
      *      devices. Sent to that person alone (`audience`), so every other
-     *      device and tab of theirs stops ringing too. */
+     *      device and tab of theirs stops ringing too.
+     *  badge - somebody cleared Chat's badge from the app list. Sent to that
+     *      person alone (`audience`), so the badge on their other screens counts
+     *      again. Nothing inside Chat moves: no conversation was read. */
     readonly kind:
         | "posted"
         | "channels"
@@ -67,7 +70,8 @@ export interface ChatChange {
         | "pins"
         | "emoji"
         | "game-invite"
-        | "call-settled";
+        | "call-settled"
+        | "badge";
     /** Only on `read`: the mark moved BACKWARDS - somebody put a conversation
      *  back to unread. The same fact changing, so it is the same frame, but the
      *  opposite instruction for anything that withdraws a notice about it. */

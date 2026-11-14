@@ -8,15 +8,18 @@
  * answers with, so the menu knows which tiles may be marked and by how much a
  * mark moves each badge.
  *
- * "Read" here means what the app itself means by it, never a second flag only
- * the menu knows about. A conversation marked read in the menu is read in Chat,
- * a message marked read is read in Mail (and on the mail server). Management has
- * no "read": its entries are work - a report nobody settled, an update nobody
- * installed - and they stay in Management until somebody does it. What the menu
- * can say there is "I have seen this", which is what the badge counts, so it is
- * stored exactly where a visit to the screen stores it (`badge-seen`). A Google
- * API switched off is a fault rather than news, and is never dismissed: it is
- * listed with the way to the screen that fixes it.
+ * Marking an app read here is what it is on a phone's home screen: the badge
+ * goes - on the tile, the rail, the switcher's dot and the tab icon - and
+ * nothing inside the app changes. The conversations in Chat and the messages in
+ * Mail are still unread when the app is opened, and stay so until they are
+ * opened there. The menu keeps a moment per app (`badge-seen`) and the badge
+ * counts only what arrived after it, so anything new raises it again.
+ * Management has no "read": its entries are work - a report nobody settled, an
+ * update nobody installed - and they stay in Management until somebody does it.
+ * What the menu can say there is "I have seen this", which is what the badge
+ * counts, so it is stored exactly where a visit to the screen stores it
+ * (`badge-seen`). A Google API switched off is a fault rather than news, and is
+ * never dismissed: it is listed with the way to the screen that fixes it.
  *
  * Pure and safe in the browser: the shapes the route answers with and the
  * inputs the actions accept, so both ends validate against one schema.

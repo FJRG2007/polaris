@@ -149,6 +149,13 @@ export async function GET(request: Request): Promise<Response> {
             unsubscribe = subscribeChatChanges((change) => {
                 if (closed) return;
 
+                // Chat's badge cleared from the app list on one of this person's
+                // screens: theirs alone, so the badge on the others counts again.
+                if (change.kind === "badge") {
+                    if (!change.audience?.includes(actor.id)) return;
+                    send({ kind: "badge" });
+                    return;
+                }
                 // A call declined on another of this person's devices: theirs
                 // alone, so every other screen of theirs stops ringing it.
                 if (change.kind === "call-settled") {

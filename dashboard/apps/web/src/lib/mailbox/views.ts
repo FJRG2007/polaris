@@ -753,7 +753,12 @@ export async function readThreadView(
 export const unreadCounts = cache(
     async (
         userId: string,
-        shelfOrgId: MailShelf
+        shelfOrgId: MailShelf,
+        /** For the badge outside Mail: only mail that arrived after this ISO
+         *  moment, when the reader cleared the badge from the app list. A string
+         *  so the request memo keys on it. Mail's own rail never passes it -
+         *  clearing the badge reads nothing. */
+        arrivedAfter: string | null = null
     ): Promise<{ total: number; byAccount: Record<string, number> }> => {
         const rows = await prisma.mailMessage.groupBy({
             by: ["accountId"],
@@ -761,7 +766,8 @@ export const unreadCounts = cache(
                 account: onShelf(userId, shelfOrgId),
                 folder: { role: "inbox" },
                 seen: false,
-                OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }]
+                OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }],
+                ...(arrivedAfter ? { createdAt: { gt: new Date(arrivedAfter) } } : {})
             },
             _count: { _all: true }
         });

@@ -112,11 +112,12 @@ describe("the counts that read it", () => {
         expect(shell).toContain('inbox: folder.role === "inbox"');
     });
 
-    it("the app menu marks mail on the ledger and answers it", async () => {
+    it("the app menu clears the badge and never touches the ledger Mail's rail reads", async () => {
+        // Marking Mail read from the app list reads no mail, so the folders in
+        // Mail must not move: the badge moves on the menu's own nudge instead.
         const menu = await readFile(`${COMPONENTS}launcher-waiting.tsx`, "utf8");
-        expect(menu).toContain("? beginUnreadChange([");
-        expect(menu).toContain("mail?.abandon();");
-        expect(menu).toContain("mail?.settle();");
+        expect(menu).not.toContain("beginUnreadChange");
+        expect(menu).toContain("touched.map((one) => [one, nudge(one, by(one))])");
     });
 
     it("every action in Mail answers its handle on both outcomes", async () => {

@@ -48,8 +48,9 @@ const unreadSchema = z.object({ messages: z.number(), conversations: z.number() 
 
 /** The frames worth re-counting for. A message arriving moves it up, somebody
  *  catching up moves it down, and a conversation appearing or going changes what
- *  there is to count. Typing and calls do not. */
-const COUNTED = new Set(["posted", "read", "channels"]);
+ *  there is to count - as does the badge being cleared from the app list on
+ *  another screen. Typing and calls do not. */
+const COUNTED = new Set(["posted", "read", "channels", "badge"]);
 
 /** How long a burst is gathered before asking again. The stream already
  *  coalesces, and this covers the case it cannot: a frame per conversation when

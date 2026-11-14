@@ -6,8 +6,8 @@
  *
  * The menu lists apps and nothing else: what is waiting is the count on each
  * tile, and a tile with something it may dismiss carries a small "mark read" on
- * its corner. The foot of the menu has "mark everything read". What "read"
- * means is the app's own - see `lib/launcher-waiting`.
+ * its corner. The foot of the menu has "mark everything read". A mark clears
+ * the badge and nothing inside the app - see `lib/launcher-waiting`.
  *
  * Which tiles may be marked is the badges' answer, from the first paint: every
  * app whose badge is up offers the mark, and a mark takes the whole badge down.
@@ -26,7 +26,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useToast, type AppTileAction, type PolarisApp } from "@polaris/ui";
 import { useAppUnread, useNudgeAppUnread, useServerUnread } from "@/components/app-unread";
-import { beginUnreadChange } from "@/lib/mailbox/unread-overlay";
 import { useHoldConversationNotices } from "@/components/notifications/notifications-provider";
 import { markLauncherReadAction } from "@/app/(app)/launcher-waiting-actions";
 import {
@@ -129,11 +128,11 @@ export function useLauncherMarks(
                 -Math.max(0, (shown[one] ?? 0) - undismissable(before, one));
             const after = before ? (app ? withoutApp(before, app) : withoutAll(before)) : null;
             if (after) apply(after);
-            // Mail's badge moves on Mail's own ledger, which every count of
-            // unread mail reads - the tile, the tab, the rail inside Mail - and
-            // which keeps the change over a recount asked for before it landed.
-            // And the bell's notices about the conversations listed here, which
-            // the server reads in the same action.
+            // Every badge moves by this browser's overlay, Mail's included -
+            // never on Mail's own ledger, which the rail inside Mail reads: the
+            // mail is still unread there. The bell's notices about the
+            // conversations listed here go too, which the server reads in the
+            // same action.
             const notices = touched.includes("mail")
                 ? holdNotices(
                       before?.groups
@@ -141,14 +140,7 @@ export function useLauncherMarks(
                           ?.items.map((item) => item.id) ?? []
                   )
                 : null;
-            const mail = touched.includes("mail")
-                ? beginUnreadChange([
-                      { folderId: null, accountId: null, inbox: true, by: by("mail") }
-                  ])
-                : null;
-            const undo = new Map(
-                touched.filter((one) => one !== "mail").map((one) => [one, nudge(one, by(one))])
-            );
+            const undo = new Map(touched.map((one) => [one, nudge(one, by(one))]));
             marking.current += 1;
             const result = await markLauncherReadAction(
                 app ? { scope: "app", app } : { scope: "all" }
@@ -159,14 +151,12 @@ export function useLauncherMarks(
                 });
             if (result.error) {
                 for (const one of undo.values()) one();
-                mail?.abandon();
                 notices?.abandon();
                 if (before && latest.current === after) apply(before);
                 toast.show({ title: result.error });
                 void refresh();
                 return;
             }
-            mail?.settle();
             notices?.settle();
             const admin = undo.get("admin");
             if (admin) {

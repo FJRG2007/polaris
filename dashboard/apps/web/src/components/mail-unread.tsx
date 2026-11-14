@@ -357,6 +357,12 @@ export function MailUnreadProvider({
             // gone, so it is treated as one. The first opening is not: that
             // would announce what was waiting before the page was opened.
             if (kind === "ready" && !cursor.current) return;
+            // Mail's badge cleared on another screen: a recount, and nothing
+            // to announce - no mail arrived.
+            if (kind === "badge") {
+                recount();
+                return;
+            }
             // A queued message changing state does not change what is unread.
             if (kind !== "mail" && kind !== "ready") return;
             if (timer.current) clearTimeout(timer.current);
