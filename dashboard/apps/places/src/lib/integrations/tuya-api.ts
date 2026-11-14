@@ -68,7 +68,7 @@ const LAPSED_CODES = new Set([
 
 /** What a lapsed plan is called on screen, whatever their own words were. */
 export const TUYA_LAPSED =
-    "Tuya stopped the cloud project's IoT Core subscription, so it refuses every command. Extend it in the Tuya developer platform under Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period - or connect the Smart Life app instead, which needs no subscription.";
+    "Tuya stopped the cloud project's IoT Core subscription, so it refuses every command. Extend it in the Tuya developer platform under Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period (the trial lasts about six months, so this comes back) - or connect the Smart Life app instead, which needs no subscription.";
 
 const envelopeSchema = z.object({
     success: z.boolean().optional(),

@@ -785,7 +785,7 @@
         "labelTaken": "Ya hay una etiqueta con ese nombre",
         "labelsFull": "Este lugar ya tiene todas las etiquetas posibles",
         "labelElsewhere": "Esa etiqueta es de otro lugar",
-        "tuyaLapsed": "Tuya ha detenido la suscripción IoT Core del proyecto en la nube, así que rechaza cada orden. Amplíala en la plataforma de desarrolladores de Tuya en Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period, o conecta la app Smart Life, que no necesita suscripción."
+        "tuyaLapsed": "Tuya ha detenido la suscripción IoT Core del proyecto en la nube, así que rechaza cada orden. Amplíala en la plataforma de desarrolladores de Tuya en Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period (la prueba dura unos seis meses, así que volverá a pasar), o conecta la app Smart Life, que no necesita suscripción."
     },
     "connections": {
         "nuki-web": {
@@ -888,7 +888,7 @@
         "tuya-cloud": {
             "label": "Proyecto de Tuya Cloud",
             "summary": "Todo lo de la cuenta de la app Smart Life o Tuya, lleve la marca que lleve: interruptores, enchufes y luces.",
-            "note": "Tuya es lo que hay dentro de unos miles de marcas, así que un enchufe con otro nombre en la caja suele ser esto. Las claves salen de su consola de desarrollo, que es gratuita, y la cuenta de la app tiene que estar vinculada al proyecto allí: unas claves que funcionan sin la cuenta vinculada son la única forma de que esto falle en silencio, así que Polaris lo dice en lugar de mostrar una lista vacía.",
+            "note": "Tuya es lo que hay dentro de unos miles de marcas, así que un enchufe con otro nombre en la caja suele ser esto. Las claves salen de su consola de desarrollo, que es gratuita, y la cuenta de la app tiene que estar vinculada al proyecto allí: unas claves que funcionan sin la cuenta vinculada son la única forma de que esto falle en silencio, así que Polaris lo dice en lugar de mostrar una lista vacía. La prueba gratuita de IoT Core del proyecto dura unos seis meses y hay que ampliarla a mano cada vez (Cloud, Cloud Services, IoT Core, Extend Trial Period), o Tuya deja de responder; la conexión con la app Smart Life no tiene ese límite.",
             "steps": {
                 "s0": "Abre la consola de Tuya IoT y crea un proyecto en la nube, eligiendo el centro de datos en el que está tu cuenta de la app.",
                 "s1": "En la pestaña Devices del proyecto, vincula la cuenta de la app Smart Life o Tuya en la que están tus dispositivos.",

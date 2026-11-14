@@ -261,7 +261,7 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ],
     ["Tuya refused the request.", "refusals.tuyaRefused"],
     [
-        "Tuya stopped the cloud project's IoT Core subscription, so it refuses every command. Extend it in the Tuya developer platform under Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period - or connect the Smart Life app instead, which needs no subscription.",
+        "Tuya stopped the cloud project's IoT Core subscription, so it refuses every command. Extend it in the Tuya developer platform under Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period (the trial lasts about six months, so this comes back) - or connect the Smart Life app instead, which needs no subscription.",
         "refusals.tuyaLapsed"
     ],
     ["That connection is missing its sign-in", "refusals.noSignIn"],

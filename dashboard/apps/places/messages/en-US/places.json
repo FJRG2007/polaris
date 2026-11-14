@@ -785,7 +785,7 @@
         "labelTaken": "A label with that name is already here",
         "labelsFull": "This place has all the labels it can",
         "labelElsewhere": "That label is at another place",
-        "tuyaLapsed": "Tuya stopped the cloud project's IoT Core subscription, so it refuses every command. Extend it in the Tuya developer platform under Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period - or connect the Smart Life app instead, which needs no subscription."
+        "tuyaLapsed": "Tuya stopped the cloud project's IoT Core subscription, so it refuses every command. Extend it in the Tuya developer platform under Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period (the trial lasts about six months, so this comes back) - or connect the Smart Life app instead, which needs no subscription."
     },
     "connections": {
         "nuki-web": {
@@ -888,7 +888,7 @@
         "tuya-cloud": {
             "label": "Tuya cloud project",
             "summary": "Everything on the Smart Life or Tuya app account, whatever brand is printed on it: switches, sockets and lights.",
-            "note": "Tuya is what is inside a few thousand makes, so a plug with somebody else's name on the box is usually this. The keys come from their developer console, which is free, and the app account has to be linked to the project there - keys that work while the account is not linked are the one way this goes wrong quietly, so Polaris says so rather than showing an empty list.",
+            "note": "Tuya is what is inside a few thousand makes, so a plug with somebody else's name on the box is usually this. The keys come from their developer console, which is free, and the app account has to be linked to the project there - keys that work while the account is not linked are the one way this goes wrong quietly, so Polaris says so rather than showing an empty list. The free IoT Core trial that comes with the project lasts about six months and has to be extended by hand each time (Cloud, Cloud Services, IoT Core, Extend Trial Period), or Tuya stops answering; the Smart Life app way in has no such limit.",
             "steps": {
                 "s0": "Open the Tuya IoT console and create a cloud project, choosing the data center your app account is in.",
                 "s1": "On the project's Devices tab, link the Smart Life or Tuya app account your devices are on.",
