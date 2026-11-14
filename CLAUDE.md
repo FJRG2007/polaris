@@ -376,6 +376,39 @@ it off did nothing.
 - A surface outside the dashboard (the browser extension, desktop, TV) offers
   an app only when the same check says yes.
 
+## The desktop app
+
+Each of these cost a release to find, and none shows up in the browser, where
+the same dashboard runs fine.
+
+- **Nothing on a timer may start a process.** The game check ran `tasklist`
+  every 15 s: 1.2-1.5 s of processor and ~3 s of wall time a run, for as long as
+  the app was open, and the window stuttered with it. Windows now asks one
+  PowerShell that stays open (`WindowsLister` in `desktop/src/main/game-detect.ts`).
+- **No `ipcRenderer.sendSync`, and preloads stay small.** A preload runs before
+  every load of the dashboard; the full zod build made it ~1 MB. Preloads and the
+  schemas they import use `zod/mini`. `desktop/test/build/page-weight.test.ts`
+  fails on a preload over its ceiling or any `sendSync` in `src`.
+- **Never listen on a network address.** Binding `0.0.0.0` or joining a
+  multicast group is what raises Windows' "allow on private/public networks"
+  prompt, again for every binary and install path. TV discovery asks with mDNS
+  QU queries from a port the system picks (`desktop/src/main/tv-mdns.ts`, and
+  `tv_mdns.rs` in the Tauri beta); the only listener left is the VPN helper on
+  loopback.
+- **A release is the pushed `desktop-v<version>` tag**, after the version bump
+  is on main. Without the tag nobody gets the change.
+
+## Code sessions
+
+A state that holds a slot needs a way out. Idle sessions (the agent finished its
+turn) counted against the per-account ceiling and nothing ever ended them, and
+the queue only moves when a session ends, so a new session sat on "Queued"
+forever behind yesterday's conversations, its container waiting for a
+`claim.env` nobody would write. Admission now stops the account's own oldest
+idle sessions first (`makeRoom` in `apps/web/src/lib/agents/session-queue.ts`),
+and a session that still has to wait says why, where it stands, and offers
+Cancel.
+
 ## This machine
 
 Docker is not available on the development machine and must never be started
