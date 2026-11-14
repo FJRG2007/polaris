@@ -443,8 +443,8 @@ export function PolarThreads({
                                 </ProjectItem>
                             ))}
                         </Section>
-                        {/* The same list in Chat and in Code: a coding agent's
-                            sessions are one more section of it. */}
+                        {/* The chats are the same in Chat and in Code; the
+                            Code side adds its sessions as one more section. */}
                         {code ? (
                             <CodeList code={code} query="" emptyPresses={emptyPresses} />
                         ) : null}

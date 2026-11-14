@@ -1306,6 +1306,11 @@
         "ended": "This session has ended.",
         "continue": "Continue in a new session",
         "continueFailed": "Couldn't continue this session. Try again.",
+        "queued": {
+            "waiting": "Waiting for a free slot. It starts on its own.",
+            "position": "Place in your queue: {position}.",
+            "cancel": "Cancel"
+        },
         "reply": "Reply to the agent",
         "send": "Send",
         "history": "Code",

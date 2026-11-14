@@ -10,6 +10,7 @@ import {
     dedupeCodeRows,
     filterCodeRows,
     mergeCodeRows,
+    listsCodeSessions,
     threadEvents,
     polarCodeEditSchema
 } from "@/lib/polar/code-history";
@@ -199,5 +200,19 @@ describe("threadEvents", () => {
         const shown = threadEvents(events);
         expect(shown).toHaveLength(80);
         expect(shown.at(-1)?.index).toBe(199);
+    });
+});
+
+describe("listsCodeSessions", () => {
+    it("lists the Code sessions on the Code side only, so Chat never shows them", () => {
+        expect(listsCodeSessions("code", "manage")).toBe(true);
+        expect(listsCodeSessions("code", "read")).toBe(true);
+        expect(listsCodeSessions("chat", "manage")).toBe(false);
+        expect(listsCodeSessions("chat", "read")).toBe(false);
+    });
+
+    it("lists nothing for somebody without Code, or before access is known", () => {
+        expect(listsCodeSessions("code", "none")).toBe(false);
+        expect(listsCodeSessions("code", null)).toBe(false);
     });
 });

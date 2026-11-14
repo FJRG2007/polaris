@@ -1306,6 +1306,20 @@ function CodeThread({
         });
     };
 
+    /** Take this session out of the queue it is waiting in. */
+    const cancelQueued = () => {
+        setError(null);
+        startTransition(() => {
+            void runAction(
+                () => postCode<{ error?: string }>("/api/polar/code/cancel", { sessionId }),
+                setError
+            ).then((result) => {
+                if (result?.error) setError(result.error);
+                read();
+            });
+        });
+    };
+
     const dock = !thread ? null : !live ? (
         <div className="flex min-w-0 flex-col gap-2">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
@@ -1322,6 +1336,19 @@ function CodeThread({
         <Notice>{t("code.readOnly")}</Notice>
     ) : (
         <div className="flex min-w-0 flex-col gap-2">
+            {thread.queued ? (
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                    <Notice>
+                        {thread.queued.reason ?? t("code.queued.waiting")}
+                        {thread.queued.position
+                            ? ` ${t("code.queued.position", { position: thread.queued.position })}`
+                            : ""}
+                    </Notice>
+                    <Button type="button" size="sm" variant="outline" onClick={cancelQueued} disabled={busy}>
+                        {t("code.queued.cancel")}
+                    </Button>
+                </div>
+            ) : null}
             {thread.permission ? (
                 <CodePermission
                     key={thread.permission.id}

@@ -19,7 +19,9 @@ const state = {
     owner: true,
     startedWith: null as unknown,
     issue: null as unknown,
-    skills: [] as { name: string; description: string; instructions: string }[]
+    skills: [] as { name: string; description: string; instructions: string }[],
+    stopped: [] as string[],
+    full: false
 };
 
 const session = {
@@ -65,6 +67,13 @@ vi.mock("@polaris/db", () => ({
                 where.id === "r1" && where.ownerId === "u1" ? { repoFullName: "acme/web" } : null
         }
     }
+}));
+vi.mock("@/lib/agents/session-queue", () => ({
+    queuePosition: async () => 2
+}));
+vi.mock("@/lib/agents/session-capacity", () => ({
+    sessionCapacity: async () => ({ mine: 3, perAccount: 3, total: 3, totalCeiling: 12 }),
+    capacityRefusal: () => (state.full ? "You already have 3 sessions running." : null)
 }));
 vi.mock("@/lib/polar/skills/store", () => ({
     listSkills: async () => state.skills,
@@ -148,6 +157,10 @@ vi.mock("@/components/agents/sessions/actions", () => ({
         return { id: "started" };
     },
     promptSessionAction: async () => ({}),
+    stopSessionAction: async (sessionId: string) => {
+        state.stopped.push(sessionId);
+        return {};
+    },
     sessionDetailAction: async () => {
         state.detailed += 1;
         return {
@@ -164,7 +177,7 @@ vi.mock("@/components/agents/sessions/actions", () => ({
     }
 }));
 
-const { polarCodeChoices, polarCodeOverview, polarCodeStart, polarCodeThread } =
+const { polarCodeCancel, polarCodeChoices, polarCodeOverview, polarCodeStart, polarCodeThread } =
     await import("@/lib/polar/code");
 
 beforeEach(() => {
@@ -176,6 +189,9 @@ beforeEach(() => {
     state.asked = null;
     state.owner = true;
     state.startedWith = null;
+    state.stopped = [];
+    state.full = false;
+    session.state = "working";
     state.issue = {
         number: 42,
         title: "Login fails",
@@ -308,6 +324,45 @@ describe("polarCodeThread", () => {
         expect((await polarCodeThread(USER, SESSION))?.permission).toEqual(asked);
         state.owner = false;
         expect((await polarCodeThread(USER, SESSION))?.permission).toBeNull();
+    });
+});
+
+describe("polarCodeThread queued", () => {
+    it("says why a queued session waits and where it stands, to whoever may steer it", async () => {
+        session.state = "queued";
+        state.full = true;
+        state.held.add("agents.read");
+        expect((await polarCodeThread(USER, SESSION))?.queued).toBeNull();
+        state.held.add("agents.manage");
+        expect((await polarCodeThread(USER, SESSION))?.queued).toEqual({
+            reason: "You already have 3 sessions running.",
+            position: 2
+        });
+        // Nothing full any more: still waiting on the next sweep, no reason given.
+        state.full = false;
+        expect((await polarCodeThread(USER, SESSION))?.queued).toEqual({ reason: null, position: 2 });
+    });
+
+    it("is null for a session that has started", async () => {
+        state.held.add("agents.read");
+        state.held.add("agents.manage");
+        expect((await polarCodeThread(USER, SESSION))?.queued).toBeNull();
+    });
+});
+
+describe("polarCodeCancel", () => {
+    it("refuses somebody who cannot steer sessions, and cancels nothing", async () => {
+        state.held.add("agents.read");
+        expect(await polarCodeCancel(USER, { sessionId: SESSION })).toEqual({ error: "t:code.noAccess" });
+        expect(state.stopped).toEqual([]);
+    });
+
+    it("cancels the session named, and reads a body that is not one as no session", async () => {
+        state.held.add("agents.manage");
+        expect(await polarCodeCancel(USER, { sessionId: SESSION })).toEqual({});
+        await polarCodeCancel(USER, { sessionId: "not-an-id" });
+        await polarCodeCancel(USER, null);
+        expect(state.stopped).toEqual([SESSION, "", ""]);
     });
 });
 

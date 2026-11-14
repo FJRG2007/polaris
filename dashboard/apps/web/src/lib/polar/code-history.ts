@@ -15,6 +15,19 @@ import type { PolarCodeRow } from "@/lib/polar/code";
 
 type HistoryRow = Pick<PolarCodeRow, "id" | "title" | "repo" | "branch" | "live" | "createdAt">;
 
+/**
+ * Whether the sidebar lists the Code sessions: only on the Code side, and only
+ * for somebody who may read them. The chats are one list on both sides, but a
+ * coding session listed in Chat opened Code from there, so switching to Chat
+ * kept showing the sessions it had just left.
+ */
+export function listsCodeSessions(
+    mode: "chat" | "code",
+    access: "none" | "read" | "manage" | null
+): boolean {
+    return mode === "code" && access !== null && access !== "none";
+}
+
 /** Sessions to a page of the history. */
 export const POLAR_CODE_PAGE = 20;
 

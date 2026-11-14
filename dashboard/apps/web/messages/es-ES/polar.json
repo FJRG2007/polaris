@@ -1306,6 +1306,11 @@
         "ended": "Esta sesión terminó.",
         "continue": "Seguir en una sesión nueva",
         "continueFailed": "No se pudo seguir con esta sesión. Inténtalo de nuevo.",
+        "queued": {
+            "waiting": "Esperando un hueco libre. Empieza solo.",
+            "position": "Puesto en tu cola: {position}.",
+            "cancel": "Cancelar"
+        },
         "reply": "Responder al agente",
         "send": "Enviar",
         "history": "Código",

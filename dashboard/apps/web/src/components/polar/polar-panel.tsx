@@ -206,6 +206,7 @@ import { AgentBar, type ChatAgent } from "@/components/polar/polar-agent-bar";
 import { agentNameAction } from "@/app/(app)/polar/settings/agents-actions";
 import { useAnnounceWrites } from "@/lib/polar/tool-changes";
 import { PolarReachContext } from "@/components/polar/polar-reach";
+import { listsCodeSessions } from "@/lib/polar/code-history";
 
 // ---------------------------------------------------------------------------
 // Page context
@@ -2222,7 +2223,7 @@ export function PolarChat({
         setInCode(false);
         code.open(null);
     };
-    // One history for both sides: the chats, and the Code sessions beside them.
+    // The chats on both sides; the Code sessions only on the Code side.
     const threadList = (hide: Parameters<typeof PolarThreads>[0]["hide"]) => (
         <PolarThreads
             sidebar={sidebar}
@@ -2248,7 +2249,7 @@ export function PolarChat({
             hide={hide}
             newLabel={chatMode ? undefined : t("code.newTask")}
             code={
-                code.access === null || code.access === "none"
+                !listsCodeSessions(code.mode, code.access)
                     ? null
                     : {
                           history: code.history,

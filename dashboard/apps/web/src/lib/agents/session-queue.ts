@@ -136,6 +136,109 @@ async function firstPrompt(sessionId: string): Promise<string | null> {
     return message?.body ?? null;
 }
 
+/**
+ * How long a session must have sat idle before it may be stopped to make room.
+ * A session that just finished a turn, or one that has only just come up and
+ * not reported yet, is left alone; one idle for longer is somebody's earlier
+ * conversation, still readable and carried on with Continue.
+ */
+export const IDLE_RETIRE_AFTER_MS = 60_000;
+
+/**
+ * How many of an account's sessions to stop so that `wanted` more can start:
+ * as many as it is over its ceiling, never more than the idle ones it has.
+ */
+export function idleToRetire(
+    mine: number,
+    perAccount: number,
+    wanted: number,
+    idle: number
+): number {
+    const needed = mine + Math.min(wanted, perAccount) - perAccount;
+    return Math.max(0, Math.min(needed, idle));
+}
+
+/**
+ * Free this account's slots by stopping its own sessions that sit idle, oldest
+ * first, so that `wanted` new ones can start.
+ *
+ * Idle is a session whose agent finished its turn and is waiting for the next
+ * message - nothing is running and nothing is asked. Those held their slot
+ * forever: the per-account ceiling counted them, nothing ever ended them, and
+ * the queue only moves when a session ends, so the fourth session somebody
+ * opened waited behind three conversations from yesterday and never started.
+ * Stopping one saves its work to its branch first (`stopSession`) and keeps its
+ * conversation, which is what an older chat is to anybody used to one.
+ *
+ * Only the account's own sessions, and only idle ones: a session that is
+ * working or waiting on an answer is somebody's live work, and the
+ * deployment-wide ceiling is never relieved at another person's expense.
+ * Returns how many were stopped.
+ */
+export async function makeRoom(userId: string | null, wanted = 1, now = Date.now()): Promise<number> {
+    if (!userId || wanted <= 0) return 0;
+    const current = await capacity.sessionCapacity(userId);
+    const target = idleToRetire(current.mine, current.perAccount, wanted, current.perAccount);
+    if (target === 0) return 0;
+    const where = retirable(userId, new Date(now - IDLE_RETIRE_AFTER_MS));
+    const idle = await prisma.agentSession.findMany({
+        where,
+        orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+        select: { id: true },
+        take: current.perAccount
+    });
+    let stopped = 0;
+    for (const row of idle) {
+        if (stopped >= target) break;
+        // Claimed with a conditional write, so two admissions at once never
+        // stop the same session twice, and a session that started a turn or got
+        // a message since the read above is no longer idle and is left alone.
+        const won = await prisma.agentSession.updateMany({
+            where: { ...where, id: row.id },
+            data: { state: "stopped", finishedAt: new Date(now), tokenHash: null }
+        });
+        if (won.count !== 1) continue;
+        stopped += 1;
+        // The slot is already free; this saves the work and takes the machine
+        // down. A failure there is the same one Stop swallows, so it is logged.
+        await runtime.stopSession(row.id).catch((error: unknown) => {
+            console.error(`[agent-queue] could not take down idle session ${row.id}:`, error);
+        });
+    }
+    return stopped;
+}
+
+/** An account's sessions that may give their slot up: idle since before
+ *  `cutoff`, with nothing said to them since. A message somebody just sent is
+ *  recorded before it reaches the machine, while the session still reads idle
+ *  until the agent reports the turn, so the message is what marks it busy. */
+function retirable(userId: string, cutoff: Date) {
+    return {
+        startedById: userId,
+        state: "idle",
+        updatedAt: { lt: cutoff },
+        messages: { none: { role: "user", createdAt: { gte: cutoff } } }
+    } as const;
+}
+
+/** Make room, for every account with sessions waiting, among its own idle
+ *  sessions. Bounded by the queue read the sweep makes anyway. */
+async function makeRoomForQueue(): Promise<void> {
+    const waiting = await prisma.agentSession.groupBy({
+        by: ["startedById"],
+        where: { state: "queued" },
+        _count: { _all: true },
+        // Prisma refuses a bounded groupBy without an order.
+        orderBy: { startedById: "asc" },
+        take: 100
+    });
+    for (const group of waiting) {
+        await makeRoom(group.startedById, group._count._all).catch((error: unknown) => {
+            console.error(`[agent-queue] could not make room for ${group.startedById}:`, error);
+        });
+    }
+}
+
 /** Claim what fits, under one lock, and return the ids that are now ours. */
 async function claim(): Promise<string[]> {
     return prisma.$transaction(async (tx) => {
@@ -189,6 +292,7 @@ async function claim(): Promise<string[]> {
  * wanted: what one call claimed the next one does not see as queued.
  */
 export async function sweepSessionQueue(): Promise<number> {
+    await makeRoomForQueue().catch(() => undefined);
     const claimed = await claim();
     for (const id of claimed) {
         const reissued = await sessions.reissueSessionToken(id);
@@ -227,6 +331,11 @@ export async function admitSession(
     input: sessions.SessionCreateInput,
     prompt: string | null
 ): Promise<Admission> {
+    // The person's own conversations that sit idle give their slot up first,
+    // so a new session starts now instead of queueing behind them.
+    await makeRoom(input.startedById).catch((error: unknown) => {
+        console.error(`[agent-queue] could not make room for ${input.startedById}:`, error);
+    });
     const full = capacity.capacityRefusal(await capacity.sessionCapacity(input.startedById));
     if (full) {
         const waiting = await prisma.agentSession.count({

@@ -54,6 +54,8 @@ import {
     type SessionView
 } from "@/lib/agents/session-service";
 import { keepSpare } from "@/lib/agents/session-spares";
+import { queuePosition } from "@/lib/agents/session-queue";
+import { capacityRefusal, sessionCapacity } from "@/lib/agents/session-capacity";
 import { pendingPermission, type PendingPermission } from "@/lib/agents/session-permissions";
 import { lastTurnRefused, refusedAccountName } from "@/lib/agents/signin-refusal";
 import {
@@ -63,7 +65,8 @@ import {
     promptSessionAction,
     sessionChoicesAction,
     sessionDetailAction,
-    startSessionAction
+    startSessionAction,
+    stopSessionAction
 } from "@/components/agents/sessions/actions";
 
 /** What this account may do on the Code side: nothing, read sessions, or start them. */
@@ -119,6 +122,10 @@ export interface PolarCodeThread {
      *  agent signs in with: what to call that account (null when the session
      *  picked none). Only for somebody who may steer it; null otherwise. */
     readonly refusedSignIn: { readonly account: string | null } | null;
+    /** Why a session that has not started is still waiting, and where it stands:
+     *  the screen says so, with a Cancel, instead of a bare "Queued". Only for
+     *  somebody who may steer it; null for a session that is not queued. */
+    readonly queued: { readonly reason: string | null; readonly position: number | null } | null;
 }
 
 /** The session's last reported size against its model's window, or null. */
@@ -207,6 +214,20 @@ function endReason(t: NamespaceTranslator<"agents">, reason: string): string {
     return reason ? t("session.events.endReason.other") : "";
 }
 
+/** Why a queued session waits - the ceiling that is full, in the person's words -
+ *  and where it stands in their queue. Read live, so it follows what frees. */
+async function queuedReason(
+    t: NamespaceTranslator<"agents">,
+    userId: string,
+    sessionId: string
+): Promise<NonNullable<PolarCodeThread["queued"]>> {
+    const [refusal, position] = await Promise.all([
+        sessionCapacity(userId).then(capacityRefusal).catch(() => null),
+        queuePosition(sessionId).catch(() => null)
+    ]);
+    return { reason: refusal ? agentText(t, refusal) : null, position };
+}
+
 /** One session as the thread shows it, or null when it is not this account's. */
 export async function polarCodeThread(
     user: SessionUser,
@@ -263,6 +284,10 @@ export async function polarCodeThread(
         refusedSignIn:
             access === "manage" && lastTurnRefused(detail.events)
                 ? { account: await refusedAccountName(detail.session.accountId) }
+                : null,
+        queued:
+            access === "manage" && core.isSessionQueued(detail.session.state)
+                ? await queuedReason(t, user.id, sessionId)
                 : null
     };
 }
@@ -526,6 +551,18 @@ export async function polarCodeInterrupt(
     const parsed = polarCodeInterruptSchema.safeParse(input);
     // An id that is not one reads as a session that is not there.
     return interruptSessionAction(parsed.success ? parsed.data.sessionId : "");
+}
+
+/** Take a session that has not started out of the queue, from its thread. One
+ *  that started meanwhile is stopped the ordinary way. */
+export async function polarCodeCancel(
+    user: SessionUser,
+    input: unknown
+): Promise<{ error?: string }> {
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    const parsed = polarCodeInterruptSchema.safeParse(input);
+    return stopSessionAction(parsed.success ? parsed.data.sessionId : "");
 }
 
 /**
