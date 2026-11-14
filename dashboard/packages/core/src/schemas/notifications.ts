@@ -1107,7 +1107,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         level: "info",
         defaults: { inapp: true, email: false }
     },
-    // Alerts other systems post to a topic (lib/alerts). One event per
+    // Alerts other systems post to an automation's alert address (lib/alerts). One event per
     // severity, so each can be muted or scheduled on its own; only urgent
     // breaks through quiet hours and do not disturb.
     {

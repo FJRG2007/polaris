@@ -108,7 +108,7 @@
         "settings_manage": "Change instance settings",
         "system_manage": "Run updates and system operations",
         "translate_use": "Translate text",
-        "alerts_topics": "Manage alert topics"
+        "alerts_topics": "Manage alert addresses"
     },
     "page": {
         "title": "AI assistants",

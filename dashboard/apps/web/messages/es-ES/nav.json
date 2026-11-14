@@ -449,8 +449,7 @@
         "Calls": "Llamadas",
         "Updates": "Versiones",
         "General settings": "Ajustes generales",
-        "Seasonal themes": "Temas de temporada",
-        "Alert topics": "Temas de aviso"
+        "Seasonal themes": "Temas de temporada"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

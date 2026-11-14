@@ -892,7 +892,33 @@ export const CORE_NODE_CONFIGS = {
     "core.connectivity": connectivityTriggerConfigSchema,
     /** Deploy a service again, as Redeploy on its page does. */
     "core.redeploy": z.object({ applicationId: z.string().uuid("serviceRequired") }),
-    /** An alert raised on one of the run-as account's topics, as a post to it would be. */
+    /**
+     * "When an alert arrives": an address other systems post alerts to, in
+     * ntfy's, Gotify's or Polaris' own JSON shape. The address is made from the
+     * trigger's settings (`addressId`, empty until then); its secret is shown once.
+     */
+    "core.alertIn": z.object({
+        addressId: z.union([z.string().uuid(), z.literal("")]).default(""),
+        /** The severity of an alert that names none, on ntfy's 1-5 scale. */
+        defaultPriority: z.number().int().min(1).max(5).default(3)
+    }),
+    /**
+     * Notify people of an alert, graded by its severity: urgent comes through
+     * quiet hours, minimum stays on the bell. Fields are templates over the run.
+     * An organization's automation also reaches the people and teams it names.
+     */
+    "core.alertNotify": z.object({
+        title: text(ALERT_LIMITS.title).default("{{trigger.title}}"),
+        body: text(AUTOMATION_LIMITS.textLength).default("{{trigger.message}}"),
+        priority: text(40).default("{{trigger.priority}}"),
+        /** The lowest severity also pushed to devices. */
+        pushFrom: z.number().int().min(2).max(5).default(3),
+        click: text(ALERT_LIMITS.url).default("{{trigger.click}}"),
+        dedupKey: text(ALERT_LIMITS.dedupKey).default("{{trigger.dedupKey}}"),
+        recipientUserIds: z.array(z.string().uuid()).max(ALERT_LIMITS.recipients).default([]),
+        recipientTeamIds: z.array(z.string().uuid()).max(ALERT_LIMITS.teams).default([])
+    }),
+    /** An alert sent to another automation's alert address, as a post to it would be. */
     "core.alert": z.object({
         topicId: z.string().uuid("topicRequired"),
         title: text(ALERT_LIMITS.title).default(""),
@@ -982,6 +1008,8 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     "core.announce": { role: "action", ports: [], idempotent: true },
     "core.redeploy": { role: "action", ports: [], idempotent: false },
     "core.alert": { role: "action", ports: [], idempotent: false },
+    "core.alertIn": { role: "trigger", ports: [], idempotent: true },
+    "core.alertNotify": { role: "action", ports: [], idempotent: false },
     "core.agentWork": { role: "action", ports: [], idempotent: false },
     // A model's answer differs every time, and every ask is spent.
     "core.askAgent": { role: "action", ports: [], idempotent: false },
@@ -1914,7 +1942,8 @@ export const AUTOMATION_TEMPLATES = [
     "gameServerCrashed",
     "playerJoined",
     "deployFailed",
-    "calendarStarting"
+    "calendarStarting",
+    "forwardAlerts"
 ] as const;
 export type AutomationTemplate = (typeof AUTOMATION_TEMPLATES)[number];
 
@@ -1996,6 +2025,26 @@ ${words.body}`
         apps: ["calendar"],
         params: { event: payload("title"), calendar: payload("calendar") },
         graph: (timeZone, words) => eventThen(timeZone, "calendar.event-starting", notice(words))
+    },
+    forwardAlerts: {
+        apps: [],
+        params: { title: "{{trigger.title}}", message: "{{trigger.message}}" },
+        graph: (timeZone, words) => {
+            const graph = emptyGraph(timeZone);
+            const trigger = automationNodeId();
+            const then = automationNodeId();
+            graph.nodes.push(
+                { id: trigger, type: "core.alertIn", typeVersion: 1, config: { addressId: "", defaultPriority: 3 } },
+                {
+                    id: then,
+                    type: "core.alertNotify",
+                    typeVersion: 1,
+                    config: { ...CORE_NODE_CONFIGS["core.alertNotify"].parse({}), title: words.title, body: words.body }
+                }
+            );
+            graph.edges.push({ from: { node: trigger, port: "next" }, to: { node: then } });
+            return graph;
+        }
     }
 };
 

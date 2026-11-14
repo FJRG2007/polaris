@@ -1,6 +1,7 @@
 /**
  * The publish endpoints' shared handling: who is posting, how much they may
- * post, and what is answered.
+ * post, and what is answered. Each address is an automation's "When an alert
+ * arrives" trigger; an accepted alert starts a run of it.
  *
  * Addresses (all `POST`, `PUT` also taken as ntfy does):
  * - `/api/alerts/<id>/<secret>` - ntfy: a text body plus headers, or JSON.
@@ -19,7 +20,7 @@ import { NextResponse } from "next/server";
 import { clientIp } from "@/lib/request-context";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { deliverAlert, topicFor, topicPostAllowed, type AlertSource } from "./topics";
+import { addressFor, addressPostAllowed, fireAlert, type AlertAddress, type AlertSource } from "./addresses";
 
 /** Wrong addresses one caller may present per window. */
 const MISSES = 30;
@@ -28,8 +29,6 @@ const PER_IP = 120;
 const WINDOW_MS = 60_000;
 /** The most a body may be: a 4,096-character message and its fields, with room. */
 export const MAX_BODY_BYTES = 32 * 1024;
-
-type Topic = NonNullable<Awaited<ReturnType<typeof topicFor>>>;
 
 function limited(retryAfterMs: number): Response {
     const seconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
@@ -62,13 +61,13 @@ export function presentedSecret(request: Request): string | null {
     return request.headers.get("x-gotify-key") ?? url.searchParams.get("token") ?? null;
 }
 
-/** The topic, or the 404/429 to answer with. Also holds each caller to its own ceiling. */
-export async function resolveTopic(id: string, secret: string | null): Promise<Topic | Response> {
+/** The address, or the 404/429 to answer with. Also holds each caller to its own ceiling. */
+export async function resolveAddress(id: string, secret: string | null): Promise<AlertAddress | Response> {
     const ip = (await clientIp()) ?? "unknown";
     const caller = await rateLimit(`alert-post-ip:${ip}`, PER_IP, WINDOW_MS);
     if (!caller.ok) return limited(caller.retryAfterMs);
-    const topic = secret ? await topicFor(id, secret) : null;
-    if (topic) return topic;
+    const address = secret ? await addressFor(id, secret) : null;
+    if (address) return address;
     const misses = await rateLimit(`alert-miss:${ip}`, MISSES, WINDOW_MS);
     if (!misses.ok) return limited(misses.retryAfterMs);
     // i18n-ignore read by a machine, not shown to a person
@@ -89,21 +88,23 @@ export function jsonOf(text: string): unknown {
     }
 }
 
-/** Deliver a parsed alert and answer as the shape's own server would. */
+/** Start the address's automation with a parsed alert and answer as the shape's own server would. */
 export async function publish(
-    topic: Topic,
+    address: AlertAddress,
     parsed: AlertParse,
     source: AlertSource
 ): Promise<Response> {
     if (!parsed.ok) return failure(400, parsed.error);
-    const allowed = await topicPostAllowed(topic.id);
+    const allowed = await addressPostAllowed(address.id);
     if (!allowed.ok) return limited(allowed.retryAfterMs);
     try {
-        const result = await deliverAlert(topic, parsed.alert, source);
+        const result = await fireAlert(address, parsed.alert, source);
+        // i18n-ignore read by a machine, not shown to a person
+        if (!result.ok) return failure(409, "The automation behind this address is switched off");
         const time = Math.floor(Date.now() / 1000);
         if (source === "gotify") {
             return NextResponse.json({
-                id: result.id,
+                id: result.runId,
                 appid: 0,
                 title: parsed.alert.title,
                 message: parsed.alert.message,
@@ -112,15 +113,14 @@ export async function publish(
             });
         }
         return NextResponse.json({
-            id: result.id,
+            id: result.runId,
             time,
             event: "message",
-            topic: topic.name,
+            topic: address.name,
             title: parsed.alert.title || undefined,
             message: parsed.alert.message,
             priority: result.priority,
-            tags: parsed.alert.tags.length ? parsed.alert.tags : undefined,
-            recipients: result.recipients
+            tags: parsed.alert.tags.length ? parsed.alert.tags : undefined
         });
     } catch (caught) {
         console.error("polaris: an alert could not be delivered:", caught);

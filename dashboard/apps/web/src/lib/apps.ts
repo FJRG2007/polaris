@@ -15,7 +15,6 @@ import {
     Languages,
     Archive,
     Bell,
-    Siren,
     Bot,
     BotMessageSquare,
     Blocks,
@@ -2157,7 +2156,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Automations", // i18n-ignore
             href: "/automations",
             icon: Workflow,
-            keywords: ["workflows", "rules", "triggers", "webhooks", "schedules", "flows"]
+            keywords: ["workflows", "rules", "triggers", "webhooks", "schedules", "flows", "alerts", "ntfy", "gotify"]
         },
         {
             label: "Runs", // i18n-ignore
@@ -2498,12 +2497,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/account/notifications",
             icon: Bell,
             keywords: ["alerts", "email"]
-        },
-        {
-            label: "Alert topics", // i18n-ignore
-            href: "/account/alerts",
-            icon: Siren,
-            keywords: ["ntfy", "gotify", "webhook", "monitor", "severity"]
         },
         {
             label: "Connected accounts", // i18n-ignore

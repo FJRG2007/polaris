@@ -74,6 +74,18 @@ export function armedTriggers(
                 nextDueAt: null,
                 state: { config: configKey }
             });
+        } else if (node.type === "core.alertIn") {
+            // An address is made from the trigger's settings; until then it answers nothing.
+            const config = core.CORE_NODE_CONFIGS["core.alertIn"].safeParse(node.config ?? {});
+            if (!config.success || !config.data.addressId) continue;
+            out.push({
+                nodeId: node.id,
+                eventType: "core.alert",
+                subjectKey: config.data.addressId,
+                hookHash: null,
+                nextDueAt: null,
+                state: { config: configKey }
+            });
         } else if (node.type === "core.onEvent") {
             const config = core.CORE_NODE_CONFIGS["core.onEvent"].safeParse(node.config);
             if (!config.success) continue;

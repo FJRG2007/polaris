@@ -1,13 +1,11 @@
 /**
- * Alert topics: addresses other systems post alerts to, delivered as Polaris
- * notifications graded by severity.
+ * Alerts: what other systems post to an automation's "When an alert arrives"
+ * address, delivered as Polaris notifications graded by severity.
  *
  * The severity scale is ntfy's (1 min, 2 low, 3 default, 4 high, 5 urgent), so
  * a tool that already speaks ntfy keeps its meaning here. Gotify's 0-10 scale is
  * folded onto it by `gotifyPriority`.
  */
-
-import { z } from "zod";
 
 export const ALERT_PRIORITIES = [1, 2, 3, 4, 5] as const;
 
@@ -65,25 +63,3 @@ export function gotifyPriority(value: number): AlertPriority {
     if (value < 10) return 4;
     return 5;
 }
-
-const priority = z.number().int().min(1).max(5);
-
-/** What the topic form sends. Normalized (trimmed) before it is checked. */
-export const alertTopicFormSchema = z.object({
-    name: z.string().trim().min(1, "nameRequired").max(ALERT_LIMITS.name, "nameTooLong"),
-    /** The organization that owns it, or null for the account's own. */
-    orgId: z.string().uuid().nullable(),
-    /** The severity of an alert that names none. */
-    defaultPriority: priority.default(3),
-    /** The lowest severity that is also pushed to devices. Min is never pushed. */
-    pushFrom: z.number().int().min(2).max(5).default(3),
-    /** An organization's topic only: who gets it besides its creator. */
-    recipientUserIds: z.array(z.string().uuid()).max(ALERT_LIMITS.recipients).default([]),
-    recipientTeamIds: z.array(z.string().uuid()).max(ALERT_LIMITS.teams).default([])
-});
-
-export type AlertTopicForm = z.infer<typeof alertTopicFormSchema>;
-
-export const alertTopicUpdateSchema = alertTopicFormSchema.omit({ orgId: true }).extend({
-    topicId: z.string().uuid()
-});

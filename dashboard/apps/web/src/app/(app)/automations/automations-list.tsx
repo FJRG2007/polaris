@@ -21,6 +21,7 @@ import {
     Rocket,
     Gamepad2,
     CalendarClock,
+    Siren,
     X,
     type LucideIcon
 } from "lucide-react";
@@ -863,7 +864,8 @@ const TEMPLATE_ICONS: Record<core.AutomationTemplate, LucideIcon> = {
     gameServerCrashed: Gamepad2,
     playerJoined: UserPlus,
     deployFailed: Rocket,
-    calendarStarting: CalendarClock
+    calendarStarting: CalendarClock,
+    forwardAlerts: Siren
 };
 
 /**

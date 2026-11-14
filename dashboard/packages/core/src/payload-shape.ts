@@ -1,6 +1,6 @@
 /**
  * The shape a payload is expected to have, as data: saved with whatever
- * receives payloads (a webhook trigger, a form, an alert topic), validated and
+ * receives payloads (a webhook trigger, a form, an alert address), validated and
  * bounded by its own schema, and compiled to a zod schema when a payload
  * arrives. "Any" accepts whatever JSON comes; a structured shape is strict by
  * default, so an unknown key is refused rather than carried along.

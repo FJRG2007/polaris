@@ -28,7 +28,8 @@ type Declared =
     | "core.try"
     | "core.waitCondition"
     | "core.threshold"
-    | "core.connectivity";
+    | "core.connectivity"
+    | "core.alertIn";
 
 /** A node with no work of its own here: a trigger (its step is written when the run starts) or one the engine runs. */
 function declared(type: Declared): ServerNode {
@@ -261,6 +262,7 @@ export const CORE_SERVER_NODES: readonly ServerNode[] = [
     declared("core.failed"),
     declared("core.threshold"),
     declared("core.connectivity"),
+    declared("core.alertIn"),
     ifNode as ServerNode,
     switchNode as ServerNode,
     parallelNode as ServerNode,

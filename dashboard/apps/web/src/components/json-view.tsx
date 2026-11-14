@@ -94,13 +94,10 @@ export function CodeView({
     /** What the copy button copies, for its name. */
     label: string;
 }) {
+    // The copy button sits on a frame that does not scroll, so it stays in its
+    // corner while a long line is scrolled sideways under it.
     return (
-        <div
-            className={cn(
-                "group relative overflow-auto overscroll-contain rounded-md border border-border bg-muted/40",
-                className
-            )}
-        >
+        <div className={cn("group relative flex min-w-0 flex-col rounded-md border border-border bg-muted/40", className)}>
             {copyable ? (
                 <CopyButton
                     value={value}
@@ -108,7 +105,9 @@ export function CodeView({
                     className="absolute right-2 top-2 z-10 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
                 />
             ) : null}
-            <Painted code={value} language={language} />
+            <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
+                <Painted code={value} language={language} />
+            </div>
         </div>
     );
 }

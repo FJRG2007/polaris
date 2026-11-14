@@ -148,7 +148,9 @@
         "code": "Código JS",
         "agentWork": "El agente trabaja en el repo",
         "askAgent": "Usar un agente",
-        "alert": "Enviar alerta a un tema"
+        "alert": "Enviar alerta a una automatización",
+        "alertIn": "Al llegar una alerta",
+        "alertNotify": "Avisar de la alerta"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -253,12 +255,12 @@
         "askAgentNone": "Aún no hay agentes. Crea uno en los ajustes de Polar.",
         "askAgentPrompt": "Pregunta",
         "askAgentHint": "Inserta valores de pasos previos. Los siguientes leen la respuesta como text.",
-        "alertTopic": "Tema",
-        "alertTopicPick": "Elige un tema",
-        "alertTopicSearch": "Buscar temas",
-        "alertTopicNone": "Aún no hay temas.",
-        "alertTopicOpen": "Crear uno",
-        "alertTopicGone": "Ese tema ya no existe.",
+        "alertTopic": "URL de alertas",
+        "alertTopicPick": "Elige automatización",
+        "alertTopicSearch": "Buscar automatizaciones",
+        "alertTopicNone": "Aún no hay direcciones de alerta.",
+        "alertTopicOpen": "Las direcciones se crean en un disparador \"Al llegar una alerta\".",
+        "alertTopicGone": "Esa dirección ya no existe.",
         "alertTitle": "Título",
         "alertBody": "Mensaje",
         "alertSeverity": "Gravedad",
@@ -399,9 +401,10 @@
         "polarNoKey": "Ninguna clave de IA responde por la cuenta que lo ejecuta",
         "polarLimit": "La cuenta que lo ejecuta llegó al límite de la clave compartida",
         "polarFailed": "El proveedor de IA no respondió",
-        "alertForbidden": "La cuenta con la que corre no puede usar temas",
-        "alertTopicGone": "Ese tema ya no existe o no está a tu alcance",
-        "alertInvalid": "La alerta quedó vacía o es demasiado larga"
+        "alertForbidden": "La cuenta con la que corre no puede usar direcciones de alerta",
+        "alertTopicGone": "Esa dirección de alertas ya no existe o no está a tu alcance",
+        "alertInvalid": "La alerta quedó vacía o es demasiado larga",
+        "alertTopicOff": "La automatización de esa dirección está apagada o sin publicar"
     },
     "secrets": {
         "title": "Secretos",
@@ -733,7 +736,9 @@
         "code": "Cambia elementos con JavaScript y pásalos al siguiente paso.",
         "agentWork": "Inicia una ejecución o sesión del agente en un repositorio conectado.",
         "askAgent": "Pregunta a uno de tus agentes de Polar y usa su respuesta después.",
-        "alert": "Lanza una alerta en uno de tus temas de alertas."
+        "alert": "Envía una alerta a la dirección de otra automatización.",
+        "alertIn": "Una dirección a la que monitores, scripts y ntfy o Gotify envían alertas.",
+        "alertNotify": "Avisa a personas de una alerta, según su gravedad."
     },
     "flow": {
         "conditionGroup": "Condiciones",
@@ -1014,6 +1019,12 @@
             "description": "Recibe un aviso cuando salta el recordatorio de un evento del calendario.",
             "noticeTitle": "{event} empieza pronto",
             "noticeBody": "En {calendar}."
+        },
+        "forwardAlerts": {
+            "name": "Recibir alertas de otros sistemas",
+            "description": "Una dirección para monitores y scripts; cada alerta llega como aviso.",
+            "noticeTitle": "{title}",
+            "noticeBody": "{message}"
         }
     },
     "picker": {
@@ -1332,5 +1343,45 @@
         "noSpam": "Sin spam.",
         "noSubmissions": "Aún no hay envíos.",
         "empty": "Sin campos"
+    },
+    "alertIn": {
+        "severity": "Gravedad si no se indica",
+        "address": "Dirección",
+        "none": "Aún sin dirección. Créala y luego publica.",
+        "lastUsed": "Última alerta",
+        "neverUsed": "Sin alertas aún",
+        "publishHint": "Las alertas inician ejecuciones si está publicada y activa.",
+        "reset": "Nueva URL",
+        "create": "Crear dirección",
+        "resetTitle": "¿Crear una nueva dirección?",
+        "resetBody": "La dirección actual deja de funcionar ya. Lo que envíe a ella necesita la nueva.",
+        "cancel": "Cancelar",
+        "confirm": "Crear dirección",
+        "shownTitle": "URL de alertas",
+        "shownBody": "Cópiala ya. Solo se muestra una vez; crea otra si la pierdes.",
+        "copy": "Copiar",
+        "done": "Hecho",
+        "setup": "Configurar",
+        "secretHidden": "Cambia YOUR_SECRET por la última parte de la dirección. ¿Perdida? Crea otra.",
+        "snippets": {
+            "curl": "Texto plano (curl)",
+            "powershell": "Windows PowerShell",
+            "ntfy": "Cabeceras ntfy",
+            "json": "JSON",
+            "gotify": "Gotify",
+            "kuma": "Uptime Kuma, ntfy",
+            "grafana": "Grafana, webhook"
+        }
+    },
+    "alertNotify": {
+        "title": "Título",
+        "body": "Mensaje",
+        "severity": "Gravedad",
+        "pushFrom": "Push a dispositivos desde",
+        "pushHint": "Las de menor gravedad solo van a la campana. Las urgentes saltan el silencio.",
+        "personal": "Llega a la cuenta con la que corre esta automatización.",
+        "people": "Personas",
+        "teams": "Equipos",
+        "noTeams": "Esta organización no tiene equipos."
     }
 }

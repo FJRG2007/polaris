@@ -6,6 +6,7 @@
  * anything unexpected is logged here and answered with a generic sentence.
  */
 
+import type { AddressView } from "@/lib/alerts/addresses";
 import { appAutomationNodeSlots } from "@/lib/app-extensions/registry";
 import { z } from "zod";
 import * as core from "@polaris/core";
@@ -1014,10 +1015,67 @@ export async function noticeChannelsAction(): Promise<
     }
 }
 
-/** The alert topics a "Send an alert to a topic" step may pick: the ones its author manages. */
+const alertChoicesSchema = z.object({
+    query: z.string().max(100).default(""),
+    cursor: z.string().nullish(),
+    ids: z.array(z.string().uuid()).max(50).optional()
+});
+
+/** The alert addresses a "Send an alert" step may pick: those of automations its author may edit. */
 export async function alertTopicChoicesAction(
     input: unknown
 ): Promise<OptionsPage<{ id: string; name: string }> | { error: string }> {
-    const { alertTopicChoicesAction: choices } = await import("@/app/(app)/account/alerts/actions");
-    return choices(input);
+    try {
+        const user = await actor();
+        const parsed = alertChoicesSchema.safeParse(input);
+        if (!parsed.success) return { items: [], next: null };
+        const { addressChoices } = await import("@/lib/alerts/addresses");
+        const all = await addressChoices(user.id, parsed.data.ids ? "" : parsed.data.query);
+        const items = parsed.data.ids ? all.filter((one) => parsed.data.ids?.includes(one.id)) : all;
+        return { items, next: null };
+    } catch {
+        return { items: [], next: null };
+    }
+}
+
+const alertNode = z.tuple([id, z.string().min(1).max(64)]);
+
+/** What the editor shows of a "When an alert arrives" trigger's address: never its secret. */
+export async function alertAddressAction(
+    automationId: unknown,
+    nodeId: unknown,
+    addressId: unknown
+): Promise<Result<{ address: AddressView | null }>> {
+    const parsed = z
+        .tuple([id, z.string().min(1).max(64), z.string().max(64)])
+        .safeParse([automationId, nodeId, addressId]);
+    if (!parsed.success) return invalid();
+    try {
+        const [automation, node, address] = parsed.data;
+        const { addressOf } = await import("@/lib/alerts/addresses");
+        return { ok: true, address: await addressOf(await actor(), automation, address, node) };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+/**
+ * Make a trigger's address, or a new secret for it (the old one stops working
+ * at once). The secret is answered here only; the editor shows it once.
+ */
+export async function issueAlertAddressAction(
+    automationId: unknown,
+    nodeId: unknown
+): Promise<Result<{ address: AddressView; secret: string }>> {
+    const parsed = alertNode.safeParse([automationId, nodeId]);
+    if (!parsed.success) return invalid();
+    try {
+        const who = await actor();
+        await requirePermission("alerts.topics");
+        const { issueAddress } = await import("@/lib/alerts/addresses");
+        const issued = await issueAddress(who, parsed.data[0], parsed.data[1]);
+        return { ok: true, address: issued.view, secret: issued.secret };
+    } catch (caught) {
+        return failure(caught);
+    }
 }

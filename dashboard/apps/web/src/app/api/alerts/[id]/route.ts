@@ -1,12 +1,12 @@
 /**
- * `POST /api/alerts/<id>`: ntfy's JSON publish, with the topic's secret as its
+ * `POST /api/alerts/<id>`: ntfy's JSON publish, with the address's secret as its
  * `topic` field (how Uptime Kuma, Healthchecks and Home Assistant's ntfy
  * integrations post), or Polaris' JSON with the secret as a bearer token.
  * See `lib/alerts/http.ts`.
  */
 
 import { parseAlertJson, parseNtfyJson } from "@/lib/alerts/parse";
-import { bodyText, failure, jsonOf, presentedSecret, publish, resolveTopic } from "@/lib/alerts/http";
+import { bodyText, failure, jsonOf, presentedSecret, publish, resolveAddress } from "@/lib/alerts/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,11 +21,11 @@ async function handle(request: Request, { params }: Params): Promise<Response> {
     const body = jsonOf(text);
     const field = body && typeof body === "object" ? (body as Record<string, unknown>).topic : undefined;
     const fromBody = typeof field === "string" && field ? field : null;
-    const topic = await resolveTopic(id, presentedSecret(request) ?? fromBody);
-    if (topic instanceof Response) return topic;
+    const address = await resolveAddress(id, presentedSecret(request) ?? fromBody);
+    if (address instanceof Response) return address;
     return fromBody
-        ? publish(topic, parseNtfyJson(body), "ntfy")
-        : publish(topic, parseAlertJson(body), "json");
+        ? publish(address, parseNtfyJson(body), "ntfy")
+        : publish(address, parseAlertJson(body), "json");
 }
 
 export const POST = handle;

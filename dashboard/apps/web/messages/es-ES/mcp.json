@@ -108,7 +108,7 @@
         "settings_manage": "Cambiar ajustes",
         "system_manage": "Actualizar y operar el sistema",
         "translate_use": "Traducir texto",
-        "alerts_topics": "Administrar alertas"
+        "alerts_topics": "Gestionar URL de alertas"
     },
     "page": {
         "title": "Asistentes de IA",

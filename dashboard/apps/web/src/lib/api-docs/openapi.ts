@@ -152,7 +152,7 @@ export function buildOpenApi(
                 topicSecret: {
                     type: "http",
                     scheme: "bearer",
-                    description: "An alert topic's secret, from Account > Alert topics."
+                    description: "An alert address's secret, from an automation's \"When an alert arrives\" trigger."
                 }
             }
         },

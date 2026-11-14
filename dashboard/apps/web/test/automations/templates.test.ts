@@ -67,8 +67,8 @@ describe("automation templates", () => {
     });
 
     it("are offered only where their apps are here", () => {
-        expect(core.availableTemplates([])).toEqual(["internetBack"]);
-        expect(core.availableTemplates(["game-servers"])).toEqual(["internetBack", "playerJoined"]);
+        expect(core.availableTemplates([])).toEqual(["internetBack", "forwardAlerts"]);
+        expect(core.availableTemplates(["game-servers"])).toEqual(["internetBack", "playerJoined", "forwardAlerts"]);
         expect(core.availableTemplates([...core.APP_EVENT_APPS])).toEqual([
             ...core.AUTOMATION_TEMPLATES
         ]);

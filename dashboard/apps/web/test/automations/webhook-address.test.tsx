@@ -13,6 +13,7 @@ const rotated: unknown[][] = [];
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/app/(app)/account/step-up-actions", () => ({ proveStepUpAction: vi.fn() }));
+vi.mock("@/app/(app)/automations/alert-actions", () => ({}));
 vi.mock("@/app/(app)/automations/actions", () => ({
     hookAddressAction: async (...args: unknown[]) => {
         asked.push(args);

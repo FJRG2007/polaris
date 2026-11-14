@@ -34,7 +34,7 @@ export interface DocumentedRoute {
     /** The route file, relative to src/app. */
     file: string;
     tag: "Account" | "Deploy" | "MCP" | "Polar" | "Alerts";
-    /** Authenticated by an alert topic's secret rather than an API key. */
+    /** Authenticated by an alert address's secret rather than an API key. */
     topicSecret?: true;
     summary: string;
     description?: string;
@@ -604,11 +604,11 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
         file: "api/alerts/[id]/route.ts",
         tag: "Alerts",
         topicSecret: true,
-        summary: "Post an alert to a topic",
+        summary: "Post an alert to an automation",
         description:
-            "Polaris' JSON, with the topic's secret as a bearer token. ntfy's JSON publish is also taken here, with the secret as its topic field. Unknown fields are refused.",
+            "Polaris' JSON, with the alert address's secret as a bearer token. The automation whose trigger owns the address runs. ntfy's JSON publish is also taken here, with the secret as its topic field. Unknown fields are refused.",
         changes: true,
-        params: { id: z.string().uuid().describe("The topic's id.") },
+        params: { id: z.string().uuid().describe("The alert address's id.") },
         body: nativeAlertSchema,
         responses: { 200: ok(alertAnswer, false) }
     },
@@ -623,8 +623,8 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
             "The body is the message; the rest goes in headers or the query. With the token message, it is Gotify's create-message, the secret as ?token= or X-Gotify-Key.",
         changes: true,
         params: {
-            id: z.string().uuid().describe("The topic's id."),
-            token: z.string().describe("The topic's secret.")
+            id: z.string().uuid().describe("The alert address's id."),
+            token: z.string().describe("The alert address's secret.")
         },
         binaryBody: {
             contentType: "text/plain",

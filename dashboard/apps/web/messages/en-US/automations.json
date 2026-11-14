@@ -148,7 +148,9 @@
         "code": "Run code",
         "agentWork": "Agent works on the repository",
         "askAgent": "Ask an agent",
-        "alert": "Send an alert to a topic"
+        "alert": "Send an alert to an automation",
+        "alertIn": "When an alert arrives",
+        "alertNotify": "Notify about the alert"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -253,12 +255,12 @@
         "askAgentNone": "No agents yet. Create one in Polar's settings.",
         "askAgentPrompt": "Question",
         "askAgentHint": "Insert values from earlier steps. Later steps read the answer as text.",
-        "alertTopic": "Topic",
-        "alertTopicPick": "Pick a topic",
-        "alertTopicSearch": "Search topics",
-        "alertTopicNone": "No alert topics yet.",
-        "alertTopicOpen": "Create one",
-        "alertTopicGone": "That topic is gone.",
+        "alertTopic": "Alert address",
+        "alertTopicPick": "Pick an automation",
+        "alertTopicSearch": "Search automations",
+        "alertTopicNone": "No alert addresses yet.",
+        "alertTopicOpen": "Addresses are made on a \"When an alert arrives\" trigger.",
+        "alertTopicGone": "That address is gone.",
         "alertTitle": "Title",
         "alertBody": "Message",
         "alertSeverity": "Severity",
@@ -399,9 +401,10 @@
         "polarNoKey": "No AI provider key can answer for the account this runs as",
         "polarLimit": "The shared key's limit is reached for the account this runs as",
         "polarFailed": "The AI provider didn't answer",
-        "alertForbidden": "The account it runs as cannot use alert topics",
-        "alertTopicGone": "That topic is gone or out of reach",
-        "alertInvalid": "The alert came out empty or too long"
+        "alertForbidden": "The account it runs as cannot use alert addresses",
+        "alertTopicGone": "That alert address is gone or out of reach",
+        "alertInvalid": "The alert came out empty or too long",
+        "alertTopicOff": "The automation behind that address is off or unpublished"
     },
     "secrets": {
         "title": "Secrets",
@@ -733,7 +736,9 @@
         "code": "Change items with JavaScript and pass them on.",
         "agentWork": "Start an agent run or session on a connected repository.",
         "askAgent": "Ask one of your Polar agents and use its answer in later steps.",
-        "alert": "Raise an alert on one of your alert topics."
+        "alert": "Post an alert to another automation's alert address.",
+        "alertIn": "An address monitors, scripts and ntfy or Gotify clients post alerts to.",
+        "alertNotify": "Notify people of an alert, graded by its severity."
     },
     "flow": {
         "conditionGroup": "Conditions",
@@ -1014,6 +1019,12 @@
             "description": "Get a notice when a calendar event's reminder goes off.",
             "noticeTitle": "{event} starts soon",
             "noticeBody": "In {calendar}."
+        },
+        "forwardAlerts": {
+            "name": "Receive alerts from other systems",
+            "description": "An address for monitors and scripts; each alert becomes a notification.",
+            "noticeTitle": "{title}",
+            "noticeBody": "{message}"
         }
     },
     "picker": {
@@ -1332,5 +1343,45 @@
         "noSpam": "No spam.",
         "noSubmissions": "Nothing sent yet.",
         "empty": "No fields"
+    },
+    "alertIn": {
+        "severity": "Severity when none is given",
+        "address": "Address",
+        "none": "No address yet. Create one, then publish.",
+        "lastUsed": "Last alert",
+        "neverUsed": "No alerts yet",
+        "publishHint": "Alerts start runs once the automation is published and on.",
+        "reset": "New address",
+        "create": "Create address",
+        "resetTitle": "Make a new address?",
+        "resetBody": "The current address stops working at once. Anything posting to it needs the new one.",
+        "cancel": "Cancel",
+        "confirm": "Make new address",
+        "shownTitle": "Alert address",
+        "shownBody": "Copy it now. It is shown only once; make a new one if it is lost.",
+        "copy": "Copy",
+        "done": "Done",
+        "setup": "Set it up",
+        "secretHidden": "Replace YOUR_SECRET with the last part of the address. Lost it? Make a new address.",
+        "snippets": {
+            "curl": "Plain text (curl)",
+            "powershell": "Windows PowerShell",
+            "ntfy": "ntfy headers",
+            "json": "JSON",
+            "gotify": "Gotify",
+            "kuma": "Uptime Kuma, ntfy provider",
+            "grafana": "Grafana, webhook"
+        }
+    },
+    "alertNotify": {
+        "title": "Title",
+        "body": "Message",
+        "severity": "Severity",
+        "pushFrom": "Push to devices from",
+        "pushHint": "Lower severities only reach the bell. Urgent comes through quiet hours.",
+        "personal": "Reaches the account this automation runs as.",
+        "people": "People",
+        "teams": "Teams",
+        "noTeams": "This organization has no teams."
     }
 }

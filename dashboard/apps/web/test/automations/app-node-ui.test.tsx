@@ -11,6 +11,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/app/(app)/account/step-up-actions", () => ({ proveStepUpAction: vi.fn() }));
+vi.mock("@/app/(app)/automations/alert-actions", () => ({}));
 vi.mock("@/app/(app)/automations/actions", () => ({ rotateHookAction: vi.fn() }));
 const drawn = vi.hoisted(() => ({ slots: [] as unknown[] }));
 vi.mock("@/components/app-extensions/installed-client", () => ({

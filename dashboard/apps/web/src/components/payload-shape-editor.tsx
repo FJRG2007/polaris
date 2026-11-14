@@ -3,7 +3,7 @@
 /**
  * The expected shape of a payload: "Any", or a tree of fields with a type and
  * rules each, strict by default. Shared by everything that receives payloads
- * (webhook triggers, forms, alert topics). Controlled - the parent owns the
+ * (webhook triggers, forms, alert addresses). Controlled - the parent owns the
  * value; a sample pasted below is checked live against it, and can become the
  * shape in one click.
  */

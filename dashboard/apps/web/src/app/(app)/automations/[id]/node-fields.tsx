@@ -36,6 +36,7 @@ import { CodeEditor } from "@/components/json-view";
 import { ThresholdFields, useSubjectProbe } from "./threshold-fields";
 import { ScheduleFields } from "./schedule-fields";
 import { WebhookFields } from "./webhook-fields";
+import { AlertInFields, AlertNotifyFields } from "./alert-fields";
 
 export { WebhookAddress } from "./webhook-fields";
 import { NoticeDeliveryFields } from "@/components/automations/notice-delivery-fields";
@@ -66,6 +67,7 @@ export const TRIGGER_TYPES = [
     "core.failed",
     "core.threshold",
     "core.connectivity",
+    "core.alertIn",
     "core.called"
 ] as const;
 export const STEP_TYPES = [
@@ -80,6 +82,7 @@ export const STEP_TYPES = [
     "core.waitEvent",
     "core.waitCondition",
     "core.notify",
+    "core.alertNotify",
     "core.alert",
     "core.message",
     "core.http",
@@ -121,6 +124,8 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     "core.onEvent": () => ({ name: "" }),
     "core.failed": () => ({ automations: [] }),
     "core.connectivity": () => ({ event: "up" }),
+    "core.alertIn": () => core.CORE_NODE_CONFIGS["core.alertIn"].parse({}),
+    "core.alertNotify": () => core.CORE_NODE_CONFIGS["core.alertNotify"].parse({}),
     "core.threshold": () => ({
         source: "",
         subjectId: "",
@@ -433,6 +438,10 @@ export function NodeFields({
             return <RedeployFields config={config} set={set} />;
         case "core.alert":
             return <AlertTopicFields config={config} set={set} />;
+        case "core.alertIn":
+            return <AlertInFields nodeId={node.id} config={config} set={set} detail={detail} />;
+        case "core.alertNotify":
+            return <AlertNotifyFields config={config} set={set} detail={detail} />;
         case "core.agentWork":
             return <AgentWorkFields config={config} set={set} />;
         case "core.askAgent":
@@ -987,11 +996,7 @@ function AlertTopicFields({ config, set }: { config: Config; set: (change: Confi
                     aria-label={t("fields.alertTopic")}
                 />
             </Field>
-            <p className="text-xs text-muted-foreground">
-                <Link className="underline" href="/account/alerts">
-                    {t("fields.alertTopicOpen")}
-                </Link>
-            </p>
+            <p className="text-xs text-muted-foreground">{t("fields.alertTopicOpen")}</p>
             <Field label={t("fields.alertSeverity")}>
                 <Select
                     value={String(priority)}

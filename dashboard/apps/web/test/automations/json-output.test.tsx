@@ -10,6 +10,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/app/(app)/account/step-up-actions", () => ({ proveStepUpAction: vi.fn() }));
+vi.mock("@/app/(app)/automations/alert-actions", () => ({}));
 vi.mock("@/app/(app)/automations/actions", () => ({}));
 
 const { MessagesWrapper } = await import("../setup/i18n");
