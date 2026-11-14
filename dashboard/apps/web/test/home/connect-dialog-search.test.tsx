@@ -67,6 +67,16 @@ describe("the make picker", () => {
         expect(listed()[0]).toBe("Shelly");
     });
 
+    it("names what a make is sold as and its app, and finds it by them", () => {
+        const search = drawn();
+        fireEvent.change(search, { target: { value: "comfee" } });
+        expect(listed()).toEqual(["Midea"]);
+        expect(screen.getByText("Comfee - MSmartHome app")).toBeTruthy();
+        fireEvent.change(search, { target: { value: "smart life" } });
+        expect(listed()).toContain("Tuya");
+        expect(screen.getByText("Smart Life, Tuya Smart apps")).toBeTruthy();
+    });
+
     it("needs every word to match", () => {
         const search = drawn();
         fireEvent.change(search, { target: { value: "nuki light" } });

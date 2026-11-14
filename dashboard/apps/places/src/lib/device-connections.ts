@@ -188,6 +188,16 @@ export interface DeviceConnection {
      * unknown integration gets rather than something drawn to look like a logo.
      */
     readonly logo: string;
+    /**
+     * The other names its devices are sold under, where the box does not say the
+     * brand - a Comfee dehumidifier is a Midea one inside, and somebody holding
+     * it has no way to know. Shown on the make's card and searched.
+     */
+    readonly soldAs?: readonly string[];
+    /** The phone apps its owners set these devices up with, by the name on the
+     *  app store - "the one I use with MSmartHome" is how most people know it.
+     *  An app named just like the brand is left out: it tells nobody anything. */
+    readonly apps?: readonly string[];
     /** What this way in is called, in the maker's own words where they have one -
      *  somebody looking for it in their documentation has to find the same name. */
     readonly label: string;
@@ -398,6 +408,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         id: "tuya-app",
         brand: "Tuya",
         logo: "tuya",
+        apps: ["Smart Life", "Tuya Smart"],
         label: en("connections.tuya-app.label"),
         reach: "anywhere",
         // A user code and a scan with the app the devices are already in,
@@ -445,6 +456,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         id: "tuya-cloud",
         brand: "Tuya",
         logo: "tuya",
+        apps: ["Smart Life", "Tuya Smart"],
         label: en("connections.tuya-cloud.label"),
         reach: "anywhere",
         summary: en("connections.tuya-cloud.summary"),
@@ -503,6 +515,8 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         brand: "TP-Link",
         recommended: true,
         logo: "tplink",
+        soldAs: ["Tapo"],
+        apps: ["Tapo"],
         label: en("connections.tapo-local.label"),
         reach: "same-network",
         summary: en("connections.tapo-local.summary"),
@@ -553,6 +567,8 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         id: "kasa-local",
         brand: "TP-Link",
         logo: "tplink",
+        soldAs: ["Kasa"],
+        apps: ["Kasa"],
         label: en("connections.kasa-local.label"),
         reach: "same-network",
         summary: en("connections.kasa-local.summary"),
@@ -603,6 +619,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         brand: "Shelly",
         recommended: true,
         logo: "shelly",
+        apps: ["Shelly Smart Control"],
         label: en("connections.shelly-local.label"),
         reach: "same-network",
         summary: en("connections.shelly-local.summary"),
@@ -660,6 +677,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         brand: "Gree",
         recommended: true,
         logo: "gree",
+        apps: ["Gree+"],
         label: en("connections.gree-local.label"),
         reach: "same-network",
         summary: en("connections.gree-local.summary"),
@@ -699,6 +717,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         brand: "Philips",
         recommended: true,
         logo: "philips",
+        apps: ["Air+"],
         label: en("connections.philips-coap.label"),
         reach: "same-network",
         summary: en("connections.philips-coap.summary"),
@@ -739,6 +758,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         id: "philips-cloud",
         brand: "Philips",
         logo: "philips",
+        apps: ["Air+", "HomeID", "NutriU"],
         label: en("connections.philips-cloud.label"),
         reach: "anywhere",
         summary: en("connections.philips-cloud.summary"),
@@ -814,6 +834,8 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         id: "hue-bridge",
         brand: "Philips",
         logo: "philipshue",
+        soldAs: ["Hue"],
+        apps: ["Hue"],
         label: en("connections.hue-bridge.label"),
         reach: "same-network",
         summary: en("connections.hue-bridge.summary"),
@@ -863,6 +885,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         id: "philips-dynalite",
         brand: "Philips",
         logo: "philips",
+        soldAs: ["Dynalite"],
         label: en("connections.philips-dynalite.label"),
         reach: "same-network",
         summary: en("connections.philips-dynalite.summary"),
@@ -910,6 +933,8 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         id: "hue-ble",
         brand: "Philips",
         logo: "philipshue",
+        soldAs: ["Hue"],
+        apps: ["Hue"],
         label: en("connections.hue-ble.label"),
         reach: "same-network",
         summary: en("connections.hue-ble.summary"),
@@ -938,6 +963,8 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         brand: "IKEA",
         recommended: true,
         logo: "ikea",
+        soldAs: ["DIRIGERA", "TRÅDFRI"],
+        apps: ["IKEA Home smart"],
         label: en("connections.dirigera-hub.label"),
         reach: "same-network",
         summary: en("connections.dirigera-hub.summary"),
@@ -1086,6 +1113,8 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         brand: "Midea",
         recommended: true,
         logo: "midea",
+        soldAs: ["Comfee"],
+        apps: ["MSmartHome"],
         label: en("connections.midea-lan.label"),
         reach: "same-network",
         summary: en("connections.midea-lan.summary"),
@@ -1194,13 +1223,29 @@ export interface DeviceBrand {
     /** What it can bring in, across all its ways in, so a row can say "switches
      *  and sockets" before anything is typed. */
     readonly kinds: readonly DeviceKind[];
+    /** The names its devices are also sold under, across all its ways in. */
+    readonly soldAs: readonly string[];
+    /** The phone apps people know it by, across all its ways in. */
+    readonly apps: readonly string[];
+}
+
+/** Each of `more` not already in `held`, added to it in order. */
+function addMissing(held: string[], more: readonly string[] | undefined): void {
+    for (const item of more ?? []) if (!held.includes(item)) held.push(item);
 }
 
 /** The brands, in the order their first connection appears. */
 export function deviceBrands(): readonly DeviceBrand[] {
     const brands = new Map<
         string,
-        { brand: string; logo: string; count: number; kinds: DeviceKind[] }
+        {
+            brand: string;
+            logo: string;
+            count: number;
+            kinds: DeviceKind[];
+            soldAs: string[];
+            apps: string[];
+        }
     >();
     for (const connection of DEVICE_CONNECTIONS) {
         const held = brands.get(connection.brand);
@@ -1208,13 +1253,17 @@ export function deviceBrands(): readonly DeviceBrand[] {
             held.count += 1;
             for (const kind of connection.kinds)
                 if (!held.kinds.includes(kind)) held.kinds.push(kind);
+            addMissing(held.soldAs, connection.soldAs);
+            addMissing(held.apps, connection.apps);
             continue;
         }
         brands.set(connection.brand, {
             brand: connection.brand,
             logo: connection.logo,
             count: 1,
-            kinds: [...connection.kinds]
+            kinds: [...connection.kinds],
+            soldAs: [...(connection.soldAs ?? [])],
+            apps: [...(connection.apps ?? [])]
         });
     }
     return [...brands.values()];
@@ -1234,7 +1283,8 @@ export function recommendedConnection(brand: string): DeviceConnection | null {
 /**
  * What somebody typed, against everything worth matching.
  *
- * The brand, the name of the method, and the words its owner would use for it -
+ * The brand, the name of the method, the names it is sold under, the apps it is
+ * set up with, and the words its owner would use for it -
  * "smart lock" has to find Nuki, because nobody thinks of what they bought by the
  * name of its API.
  */
@@ -1242,7 +1292,13 @@ export function searchConnections(query: string): readonly DeviceConnection[] {
     const needle = query.trim().toLowerCase();
     if (!needle) return DEVICE_CONNECTIONS;
     return DEVICE_CONNECTIONS.filter((connection) =>
-        [connection.brand, connection.label, ...(connection.search ?? [])]
+        [
+            connection.brand,
+            connection.label,
+            ...(connection.soldAs ?? []),
+            ...(connection.apps ?? []),
+            ...(connection.search ?? [])
+        ]
             .join(" ")
             .toLowerCase()
             .includes(needle)

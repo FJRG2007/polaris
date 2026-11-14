@@ -2082,6 +2082,7 @@
         "reconnectIntro": "The devices keep their names, their places and everything they have done. Only what Polaris opens them with changes.",
         "intro": "Pick what you have and how Polaris should reach it. What it finds arrives as devices you can name and place.",
         "make": "Make",
+        "apps": "{count, plural, one {{apps} app} other {{apps} apps}}",
         "search": "Search for a make or a device",
         "noMatch": "Nothing matches “{query}”. Anything on MQTT or already in Home Assistant can still come in through those.",
         "change": "Change",

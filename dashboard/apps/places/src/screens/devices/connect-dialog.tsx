@@ -177,6 +177,16 @@ function kindsOf(entry: registry.DeviceBrand, t: PlacesTranslator): string {
     return entry.kinds.map((kind) => kinds.kindText(kind, t).toLowerCase()).join(", ");
 }
 
+/** The names a make is also sold under and the apps people set it up with, as
+ *  one line - "Comfee - MSmartHome app" - or nothing where it has neither. */
+function knownAs(entry: registry.DeviceBrand, t: PlacesTranslator): string {
+    const apps =
+        entry.apps.length > 0
+            ? t("connect.apps", { apps: entry.apps.join(", "), count: entry.apps.length })
+            : "";
+    return [entry.soldAs.join(", "), apps].filter(Boolean).join(" - ");
+}
+
 /** Case and accents folded away, so "cancion" finds "Canción". */
 function folded(text: string): string {
     return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
@@ -206,6 +216,8 @@ function matchingBrands(
                 kindsOf(entry, t),
                 ...ways.flatMap((way) => [
                     way.label,
+                    ...(way.soldAs ?? []),
+                    ...(way.apps ?? []),
                     registry.connectionWords(t, way).label,
                     ...(way.search ?? [])
                 ])
@@ -840,6 +852,14 @@ export function ConnectDialog({
                                                             >
                                                                 {kindsOf(entry, t)}
                                                             </span>
+                                                            {knownAs(entry, t) && (
+                                                                <span
+                                                                    className="truncate text-[0.6875rem] text-foreground-subtle"
+                                                                    title={knownAs(entry, t)}
+                                                                >
+                                                                    {knownAs(entry, t)}
+                                                                </span>
+                                                            )}
                                                         </span>
                                                         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                                                     </button>
@@ -869,6 +889,14 @@ export function ConnectDialog({
                                         >
                                             {kindsOf(picked, t)}
                                         </span>
+                                        {knownAs(picked, t) && (
+                                            <span
+                                                className="truncate text-[0.6875rem] text-foreground-subtle"
+                                                title={knownAs(picked, t)}
+                                            >
+                                                {knownAs(picked, t)}
+                                            </span>
+                                        )}
                                     </span>
                                     <Button variant="ghost" size="sm" onClick={() => pickBrand("")}>
                                         {t("connect.change")}

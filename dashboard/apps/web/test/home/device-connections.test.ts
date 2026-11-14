@@ -46,6 +46,31 @@ describe("the ways in", () => {
         const nuki = registry.deviceBrands().find((entry) => entry.brand === "Nuki");
         expect(nuki?.count).toBe(registry.connectionsOfBrand("Nuki").length);
     });
+
+    it("carries the names a make is sold under and its apps onto its card", () => {
+        const midea = registry.deviceBrands().find((entry) => entry.brand === "Midea");
+        expect(midea?.soldAs).toContain("Comfee");
+        expect(midea?.apps).toContain("MSmartHome");
+        const tplink = registry.deviceBrands().find((entry) => entry.brand === "TP-Link");
+        expect(tplink?.soldAs).toEqual(["Tapo", "Kasa"]);
+        // Each name once, however many ways in repeat it.
+        const tuya = registry.deviceBrands().find((entry) => entry.brand === "Tuya");
+        expect(tuya?.apps).toEqual(["Smart Life", "Tuya Smart"]);
+    });
+
+    it("finds a make by the name on the box and by the app it is set up with", () => {
+        const found = (query: string) => registry.searchConnections(query).map((way) => way.id);
+        expect(found("Comfee")).toContain("midea-lan");
+        expect(found("msmarthome")).toContain("midea-lan");
+        expect(found("ikea home smart")).toContain("dirigera-hub");
+        expect(found("nutriu")).toContain("philips-cloud");
+    });
+
+    it("never repeats the brand as one of its own other names or apps", () => {
+        for (const way of registry.DEVICE_CONNECTIONS)
+            for (const name of [...(way.soldAs ?? []), ...(way.apps ?? [])])
+                expect(name.toLowerCase()).not.toBe(way.brand.toLowerCase());
+    });
 });
 
 describe("what a connection was given", () => {
