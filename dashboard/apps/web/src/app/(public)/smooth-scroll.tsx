@@ -53,7 +53,7 @@ export function SmoothScroll() {
         let lenis: {
             raf: (time: number) => void;
             destroy: () => void;
-            isScrolling: false | string;
+            isScrolling: boolean | string;
         } | null = null;
         let frame = 0;
         let lastInput = 0;
