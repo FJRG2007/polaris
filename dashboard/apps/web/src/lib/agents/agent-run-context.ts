@@ -17,7 +17,7 @@
 
 import { runSecretsFor } from "@/lib/agents/model-keys";
 import { EFFORT_ALIASES } from "@polaris/agent-runtime/shared";
-import { ENIGMA_VERSION, gateScript } from "@/lib/agents/agent-gate";
+import { ENIGMA_VERSION, gateScript, runnerEnigmaInstall } from "@/lib/agents/agent-gate";
 import {
     AGENT_RUN_MODES,
     parseAgentTriggers,
@@ -45,8 +45,9 @@ export interface RunContextPayload {
         stopScript: string | null;
         /** What Enigma the run installs into the agent's home, or null when the
          *  operator turned it off. A Polaris field: the vendored runtime gained
-         *  it here rather than upstream. */
-        enigma: { version: string } | null;
+         *  it here rather than upstream. `install` is the whole install as one
+         *  shell script; a runner built before it existed ignores it. */
+        enigma: { version: string; install: string } | null;
         push: string;
         shell: string;
         prApproveEnabled: boolean;
@@ -178,7 +179,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<RunC
                 intent: input.intent
             }),
             stopScript: null,
-            enigma: { version: ENIGMA_VERSION },
+            enigma: { version: ENIGMA_VERSION, install: runnerEnigmaInstall() },
             push: input.push,
             shell: input.shell,
             // Approving and auto-merging its own work is not something an agent

@@ -1152,7 +1152,7 @@ export const opencode = agent({
     // Polaris departure: the operator's own standards, whatever model is driving
     // this run, plus the agent on PATH so the pre-push quality gate can find one.
     if (ctx.enigma) {
-      installEnigma({ home: homeEnv.HOME, version: ctx.enigma.version, env: homeEnv });
+      installEnigma({ home: homeEnv.HOME, version: ctx.enigma.version, install: ctx.enigma.install, env: homeEnv });
       exposeAgentOnPath({ name: "opencode", cliPath, tmpdir: ctx.tmpdir });
     }
 

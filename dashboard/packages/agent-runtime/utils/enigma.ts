@@ -36,6 +36,10 @@ export interface InstallEnigmaParams {
   /** Extra environment the install needs, principally the agent's own HOME
    *  overrides. */
   env: Record<string, string>;
+  /** The whole install as one shell script, from Polaris. Enigma releases from
+   *  1.73.0 on are on GitHub only, so `npx` cannot fetch them; the npx path is
+   *  kept for a Polaris that predates this field. */
+  install?: string | undefined;
 }
 
 /**
@@ -45,7 +49,10 @@ export interface InstallEnigmaParams {
  * its picker and would hang a job with no terminal.
  */
 export function installEnigma(params: InstallEnigmaParams): void {
-  const result = spawnSync("npx", ["-y", `enigma-cli@${params.version}`, "install", "--all", "--yes"], {
+  const [command, args] = params.install
+    ? ["sh", ["-c", params.install]]
+    : ["npx", ["-y", `enigma-cli@${params.version}`, "install", "--all", "--yes"]];
+  const result = spawnSync(command, args, {
     // npm walks up from cwd looking for `.npmrc`, and a repository's own can
     // carry settings that break npx binary resolution. The system tmpdir has
     // none. The install location is decided by HOME, not by cwd.
@@ -61,6 +68,19 @@ export function installEnigma(params: InstallEnigmaParams): void {
     return;
   }
 
+  // Every hook Enigma writes calls `enigma` by name, and the release install
+  // puts it in the run's home rather than on the runner's PATH. Prepended here
+  // so the agent, and every hook it runs, inherits it.
+  if (params.install) {
+    const bin = join(params.home, ".enigma", "bin");
+    if (!(process.env.PATH ?? "").split(delimiter).includes(bin)) {
+      process.env.PATH = `${bin}${delimiter}${process.env.PATH ?? ""}`;
+    }
+  }
+
+  // Polaris's script leaves Enigma's verify hook out, but its code-graph
+  // refresh also registers on Stop; this takes out whatever is left, and
+  // covers the npx path and a version that predates `--skip`.
   dropStopHook(params.home);
   log.success("installed enigma skills, memory and guardrails");
 }

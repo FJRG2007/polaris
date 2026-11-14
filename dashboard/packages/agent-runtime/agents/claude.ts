@@ -1156,7 +1156,7 @@ export const claude = agent({
         // this run. Installed before the settings below are written, because it
         // writes a settings file of its own that they have to be able to correct.
         if (ctx.enigma) {
-            installEnigma({ home: homeEnv.HOME, version: ctx.enigma.version, env: homeEnv });
+            installEnigma({ home: homeEnv.HOME, version: ctx.enigma.version, install: ctx.enigma.install, env: homeEnv });
         }
 
         const mcpConfigPath = writeMcpConfig(ctx);

@@ -582,7 +582,9 @@ describe("the home a session keeps", () => {
         expect(commands.SESSION_SETUP).toContain(
             '! command -v "$POLARIS_AGENT_BINARY" >/dev/null 2>&1'
         );
-        expect(commands.SESSION_SETUP).toContain("! command -v enigma >/dev/null 2>&1");
+        // Enigma decides for itself, by version, so a bumped pin installs again.
+        expect(commands.SESSION_SETUP).toContain('if [ -n "$POLARIS_ENIGMA_SETUP" ]; then');
+        expect(commands.SESSION_SETUP).not.toContain("! command -v enigma >/dev/null 2>&1");
     });
 
     it("points npm and the tools at that home rather than at root's", () => {
@@ -682,7 +684,9 @@ describe("how far a session is through coming up", () => {
     it("matches lines this file actually prints", () => {
         // The failure it guards is silent: reword an echo and the bar stops
         // moving, with nothing anywhere saying why.
-        const boot = WHOLE_BOOT;
+        // The Enigma line comes from the setup script core renders, printed only
+        // when it actually installs.
+        const boot = `${WHOLE_BOOT}\n${core.enigmaSetupScript(core.DEFAULT_ENIGMA)}`;
         for (const mark of [
             "polaris: preparing this account",
             "polaris: fetching ",

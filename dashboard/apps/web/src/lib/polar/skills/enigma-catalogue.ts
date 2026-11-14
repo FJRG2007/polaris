@@ -2,7 +2,7 @@
  * The skills Enigma ships, read from its published package.
  *
  * A version's package never changes once published, so its skills are read once
- * per version: fetched from the registry, read entry by entry without unpacking
+ * per version: fetched from where it is published, read entry by entry without unpacking
  * anything, and stored under that version. Every later read is the stored copy -
  * from memory, else from the setting store - and a newer pinned version simply
  * reads its own key and forgets the old one. Nothing here runs a CLI or npm.
@@ -114,13 +114,26 @@ export async function readEnigmaTarball(bytes: Uint8Array): Promise<EnigmaSkill[
     return files ? parseEnigmaSkills(files) : null;
 }
 
-/** One version's tarball from the public registry, through the vetted fetch. */
+/**
+ * Where one version's tarball is published: the GitHub release first, since
+ * releases from 1.73.0 on are published there only, then the npm registry,
+ * which holds the versions before that.
+ */
+const TARBALL_SOURCES = [
+    (version: string) => `https://github.com/FJRG2007/enigma/releases/download/v${version}/enigma-cli-${version}.tgz`,
+    (version: string) => `https://registry.npmjs.org/enigma-cli/-/enigma-cli-${version}.tgz`
+];
+
+/** One version's tarball, through the vetted fetch. */
 async function fetchTarball(version: string): Promise<Uint8Array | null> {
-    const url = safeUrl(`https://registry.npmjs.org/enigma-cli/-/enigma-cli-${version}.tgz`);
-    if (!url) return null;
-    const response = await follow(url, "application/octet-stream");
-    if (!response?.ok) return null;
-    return readCapped(response, ENIGMA_TARBALL_MAX);
+    for (const source of TARBALL_SOURCES) {
+        const url = safeUrl(source(version));
+        if (!url) continue;
+        const response = await follow(url, "application/octet-stream").catch(() => null);
+        if (response?.ok) return readCapped(response, ENIGMA_TARBALL_MAX);
+        await response?.body?.cancel().catch(() => undefined);
+    }
+    return null;
 }
 
 export type TarballFetcher = (version: string) => Promise<Uint8Array | null>;

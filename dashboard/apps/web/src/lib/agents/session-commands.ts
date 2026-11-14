@@ -384,10 +384,11 @@ const INSTALL_ENIGMA = [
     // not find. Every `enigma config` line after it failed for the same reason,
     // silently, so an account's gate mode and its own settings reached nothing.
     //
-    // Skipped outright when it is already here, which after the first session it
-    // is: the npm prefix lives in the home that is kept.
-    'if [ -n "$POLARIS_ENIGMA_SETUP" ] && ! command -v enigma >/dev/null 2>&1; then',
-    '  echo "polaris: installing Enigma"',
+    // The script itself returns at once when the pinned version is already here,
+    // which after the first session it is: the install lives in the home that is
+    // kept. Testing only for `enigma` here is what kept every home on the first
+    // version it ever installed.
+    'if [ -n "$POLARIS_ENIGMA_SETUP" ]; then',
     // Not fatal. A session without Enigma works to weaker standards; one that
     // died because a registry was slow works to none.
     '  printf %s "$POLARIS_ENIGMA_SETUP" | base64 -d > $(printenv TMPDIR || echo /tmp)/polaris-enigma-setup.sh',

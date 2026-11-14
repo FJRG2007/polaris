@@ -12,7 +12,7 @@ describe("Enigma in a Code session", () => {
         const resolved = core.resolveEnigma(core.INHERIT_ENIGMA, null, undefined);
         expect(resolved.enabled).toBe(true);
         expect(resolved.scope).toBe("all");
-        expect(core.enigmaSetupScript(resolved)).toContain("npm install -g");
+        expect(core.enigmaSetupScript(resolved)).toContain(core.ENIGMA_INSTALLER_URL);
         expect(core.enigmaConfigureScript(resolved)).toContain("enigma install --all --yes");
     });
 

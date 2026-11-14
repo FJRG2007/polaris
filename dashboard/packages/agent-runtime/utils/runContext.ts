@@ -34,6 +34,8 @@ export interface EnigmaSettings {
   /** npm version spec, pinned by Polaris so two runs of one repository work to
    *  the same standards. */
   version: string;
+  /** The install as one shell script. Absent from a Polaris that predates it. */
+  install?: string;
 }
 
 export interface RepoSettings {

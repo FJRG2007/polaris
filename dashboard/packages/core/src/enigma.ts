@@ -36,7 +36,27 @@ import { AGENT_GATE_MODES, type AgentGateMode } from "./agents.js";
  * the same rules, and so anything read from the package - its skills catalogue -
  * can be cached once per version instead of once per request.
  */
-export const ENIGMA_VERSION = "1.72.2";
+export const ENIGMA_VERSION = "1.73.0";
+
+/**
+ * Enigma's own installer, read from the tag of the version above, and the hash
+ * it has there.
+ *
+ * Releases from 1.73.0 on are published to GitHub only, not to npm, so this is
+ * the install path rather than an alternative to one. The script is checked
+ * against the hash before it runs: a tag can be moved, and whatever is at that
+ * address runs on somebody else's machine. The script itself checks every file
+ * it downloads against the release's SHA256SUMS.
+ */
+export const ENIGMA_INSTALLER_URL = `https://raw.githubusercontent.com/FJRG2007/enigma/v${ENIGMA_VERSION}/scripts/install.sh`;
+export const ENIGMA_INSTALLER_SHA256 = "6d965c35d17e5217d77adeb0fcede23f7a2f4dab1ad61394dac48ee3151c176f";
+
+/** A version the release installer can fetch. Anything else is an npm spec. */
+const EXACT_VERSION = /^\d{1,4}\.\d{1,4}\.\d{1,6}$/;
+
+/** The first version with the host commands: `config set`, batched `skills
+ *  disable` and `install --skip`. */
+const HOST_CLI_SINCE = [1, 73, 0] as const;
 
 /** A skill name as Enigma ships them, and as `enigma skills disable` takes it. */
 export const ENIGMA_SKILL_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -163,23 +183,68 @@ export function resolveEnigma(
     };
 }
 
+/** The version a resolved setup installs, pinned or not. */
+export function enigmaVersionOf(settings: ResolvedEnigma): string {
+    return settings.version || ENIGMA_VERSION;
+}
+
+/** Whether a version spec names a release with the host commands. A spec that
+ *  is not an exact version could resolve to anything, so it is treated as older. */
+export function enigmaHasHostCli(version: string): boolean {
+    if (!EXACT_VERSION.test(version)) return false;
+    const parts = version.split(".").map(Number);
+    for (const [i, since] of HOST_CLI_SINCE.entries()) {
+        const part = parts[i] ?? 0;
+        if (part !== since) return part > since;
+    }
+    return true;
+}
+
 /**
- * The install command a resolved setup means, as argv.
+ * The `enigma install` arguments a resolved setup means.
  *
  * `--yes` is not optional and is not a setting: without it the CLI opens its
  * picker, and a picker in a session nobody is watching is a process that hangs
- * until something reaps it. The version spec is appended to the package name
- * rather than passed as a flag because that is how npx selects a version.
+ * until something reaps it. `policies` is the skills, the memory file and the
+ * approval bypass: the CLI dropped its `--policies` flag, so it is spelled as
+ * the parts left out. `skip` names further parts for this run only, and is
+ * dropped for a version that predates `--skip` rather than failing its install.
  */
-export function enigmaInstallArgv(settings: ResolvedEnigma): string[] {
-    const parts = settings.scope === "all" ? ["--all"] : ["--policies"];
-    return ["-y", enigmaPackageSpec(settings), "install", ...parts, "--yes"];
+export function enigmaInstallArgv(settings: ResolvedEnigma, skip: readonly string[] = []): string[] {
+    const hostCli = enigmaHasHostCli(enigmaVersionOf(settings));
+    const parts = settings.scope === "policies" ? ["commands", "dashboard", "statusline", "mcp", ...skip] : [...skip];
+    const argv = ["install", "--all", "--yes"];
+    if (settings.scope === "policies") argv.push("--no-hooks");
+    if (hostCli && parts.length > 0) argv.push("--skip", [...new Set(parts)].join(","));
+    return argv;
 }
 
 /** The npm spec a resolved setup names, pinned or not. One place, so an install
  *  and the config calls that follow it can never reach two different versions. */
 export function enigmaPackageSpec(settings: ResolvedEnigma): string {
-    return `enigma-cli@${settings.version || ENIGMA_VERSION}`;
+    return `enigma-cli@${enigmaVersionOf(settings)}`;
+}
+
+/**
+ * Shell that installs one exact Enigma release from GitHub into the given
+ * directories, and exits non-zero when it did not.
+ *
+ * `prefix` and `bin` are shell expressions this codebase writes (such as
+ * `$HOME/.enigma/cli`), never operator input; `version` must be exact, which
+ * the caller checks. Needs curl or wget, as the installer itself does.
+ */
+export function enigmaReleaseInstallScript(version: string, prefix: string, bin: string): string {
+    if (!EXACT_VERSION.test(version)) throw new Error(`not an exact Enigma version: ${version}`);
+    return [
+        'f="$(mktemp)" || exit 1',
+        `curl -fsSL --proto '=https' --proto-redir '=https' -o "$f" ${ENIGMA_INSTALLER_URL} 2>/dev/null || wget -q --https-only -O "$f" ${ENIGMA_INSTALLER_URL} || { rm -f "$f"; exit 1; }`,
+        'sum="$( (sha256sum "$f" 2>/dev/null || shasum -a 256 "$f" 2>/dev/null) | cut -d" " -f1)"',
+        `[ "$sum" = "${ENIGMA_INSTALLER_SHA256}" ] || { echo "polaris: Enigma's installer did not match its checksum"; rm -f "$f"; exit 1; }`,
+        `ENIGMA_NO_SETUP=1 ENIGMA_INSTALL_VERSION=${version} ENIGMA_PREFIX="${prefix}" ENIGMA_BIN_DIR="${bin}" sh "$f"`,
+        'rc=$?',
+        'rm -f "$f"',
+        "exit $rc"
+    ].join("\n");
 }
 
 /**
@@ -308,15 +373,29 @@ export function enigmaSetupScript(settings: ResolvedEnigma): string {
     // and it has to be the home of whoever will actually run the agent. Doing it
     // all as root put ninety-three files in /root while the agent read
     // /home/node, so the session came up with none of them.
-    const lines = [
-        `echo "polaris: installing Enigma (${spec})"`,
-        // `--allow-scripts` because the package's own postinstall is what puts
-        // the command together, and npm declines to run it unasked: it says so
-        // in a warning nobody reads and then leaves an `enigma` that is not
-        // there. Named, so this allows one package's scripts and nothing else's.
-        `npm install -g --allow-scripts=${pkg} ${spec} || npm install -g ${spec} || true`,
+    //
+    // `--allow-scripts` because the npm package's own postinstall is what puts
+    // the command together, and npm declines to run it unasked: it says so in a
+    // warning nobody reads and then leaves an `enigma` that is not there. Named,
+    // so this allows one package's scripts and nothing else's.
+    const npm = `npm install -g --allow-scripts=${pkg} ${spec} || npm install -g ${spec}`;
+    const version = enigmaVersionOf(settings);
+    const lines = EXACT_VERSION.test(version)
+        ? [
+              // The home is kept, so after the first session this is the whole
+              // script - and a bumped version is what makes it install again.
+              `[ "$(enigma --version 2>/dev/null)" = "${version}" ] && { echo "polaris: Enigma ${version} is installed"; exit 0; }`,
+              `echo "polaris: installing Enigma ${version}"`,
+              // Next to the npm prefix the home keeps, so it survives the session
+              // and replaces the `enigma` an older npm install left there.
+              'enigma_root="${NPM_CONFIG_PREFIX:-$HOME/.local}"',
+              `( ${enigmaReleaseInstallScript(version, "$enigma_root/lib/enigma", "$enigma_root/bin").replace(/\n/g, "\n  ")} ) || ${npm} || true`,
+              'PATH="$enigma_root/bin:$PATH"'
+          ]
+        : [`command -v enigma >/dev/null 2>&1 && exit 0`, `echo "polaris: installing Enigma (${spec})"`, `${npm} || true`];
+    lines.push(
         'command -v enigma >/dev/null 2>&1 || { echo "polaris: Enigma did not install; this session runs without it"; exit 0; }'
-    ];
+    );
     return lines.join("\n");
 }
 
@@ -333,13 +412,29 @@ export function enigmaSetupScript(settings: ResolvedEnigma): string {
 export function enigmaConfigureScript(settings: ResolvedEnigma): string {
     if (!settings.enabled) return "";
     const lines = [
+        'PATH="${NPM_CONFIG_PREFIX:-$HOME/.local}/bin:$PATH"',
         'command -v enigma >/dev/null 2>&1 || exit 0',
-        `enigma install ${settings.scope === "all" ? "--all" : "--policies"} --yes || echo "polaris: Enigma installed but its own setup did not finish"`
+        `enigma ${enigmaInstallArgv(settings).join(" ")} || echo "polaris: Enigma installed but its own setup did not finish"`
     ];
-    for (const argv of enigmaConfigArgv(settings)) lines.push(`enigma ${argv.join(" ")} || true`);
-    for (const argv of enigmaSkillsArgv(settings)) lines.push(`enigma ${argv.join(" ")} || true`);
+    const config = enigmaConfigArgv(settings).filter(([, key]) => key !== "gate");
+    const skills = enigmaSkillsArgv(settings);
     const gate = enigmaGateArgv(settings);
-    if (gate.length > 0) lines.push(`enigma ${gate.join(" ")} || true`);
+    if (enigmaHasHostCli(enigmaVersionOf(settings))) {
+        // One process for every setting, and one for every skill: each call
+        // starts the CLI again, and a session waits for all of them. Both are
+        // all or nothing, so a refused batch falls back to one call per value
+        // and only the value the CLI refuses is lost.
+        const pairs = [...config, gate].map(([, key, value]) => `${key}=${value}`);
+        const single = [...config, gate].map((argv) => `enigma ${argv.join(" ")} || true`);
+        lines.push(`enigma config set ${pairs.join(" ")} >/dev/null || { ${single.join("; ")}; }`);
+        if (skills.length > 0) {
+            const names = skills.map(([, , name]) => name);
+            const each = skills.map((argv) => `enigma ${argv.join(" ")} || true`);
+            lines.push(`enigma skills disable ${names.join(" ")} || { ${each.join("; ")}; }`);
+        }
+    } else {
+        for (const argv of [...config, ...skills, gate]) lines.push(`enigma ${argv.join(" ")} || true`);
+    }
     lines.push('echo "polaris: Enigma ready"');
     return lines.join("\n");
 }

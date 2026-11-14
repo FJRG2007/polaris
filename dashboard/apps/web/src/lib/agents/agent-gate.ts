@@ -26,6 +26,20 @@ import type { AgentGateMode } from "@polaris/core";
 export const ENIGMA_VERSION = core.ENIGMA_VERSION;
 
 /**
+ * The script a runner uses to put Enigma into the agent's home: the pinned
+ * release, then its own setup. Enigma's Stop hook is left out, because the
+ * runtime owns the end of the turn with a hook of its own, and two hooks each
+ * deciding whether the agent may stop is a loop neither can see.
+ */
+export function runnerEnigmaInstall(): string {
+    const argv = core.enigmaInstallArgv(core.DEFAULT_ENIGMA, ["stop-hook"]);
+    const install = core.enigmaReleaseInstallScript(ENIGMA_VERSION, "$HOME/.enigma/cli", "$HOME/.enigma/bin");
+    return [`( ${install.replace(/\n/g, "\n  ")} ) || exit 1`, `"$HOME/.enigma/bin/enigma" ${argv.join(" ")}`].join(
+        "\n"
+    );
+}
+
+/**
  * The steps a run reports, in the order the gate runs them.
  *
  * Named for what the operator is watching rather than for the command behind
@@ -111,11 +125,23 @@ export function gateScript(input: GateScriptInput): string | null {
 
     const endpoint = quote(`${input.apiUrl}/api/agents/runs/${input.runId}/gate`);
     const auth = quote(`authorization: Bearer ${input.runToken}`);
-    const enigma = `npx -y enigma-cli@${ENIGMA_VERSION}`;
+    const enigma = "enigma";
+    const install = core
+        .enigmaReleaseInstallScript(ENIGMA_VERSION, "$enigma_dir/cli", "$enigma_dir/bin")
+        .replace(/\n/g, "\n    ");
 
     const lines = [
         "set -uo pipefail",
         'echo "-- Enigma quality gate"',
+        "",
+        // The release the run is pinned to, from GitHub: releases from 1.73.0 on
+        // are not published to npm, which is where `npx` looked. Skipped when the
+        // runner already has that version.
+        'enigma_dir="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/polaris-enigma"',
+        `if [ "$(enigma --version 2>/dev/null)" != "${ENIGMA_VERSION}" ]; then`,
+        `  ( ${install} ) || echo "polaris: Enigma ${ENIGMA_VERSION} did not install"`,
+        '  PATH="$enigma_dir/bin:$PATH"',
+        "fi",
         "",
         // A step's output as a JSON string. jq is not on every runner, so its
         // absence drops the detail rather than the report.
