@@ -20,6 +20,7 @@ import { CredentialDecryptError, decryptSecret, encryptSecret } from "@polaris/s
 import { generateText } from "ai";
 import { PLAIN_TURN } from "@/lib/polar/automatic";
 import { automaticChoice } from "@/lib/polar/shared";
+import { checkedAnswer } from "@/lib/translate/written-in";
 import { answeredBy, resolvePolarModel } from "@/lib/polar/models";
 import { deeplTranslate } from "@/lib/integrations/deepl";
 import { deeplSource, deeplTarget, googleCode } from "@/lib/translate/provider-codes";
@@ -102,9 +103,13 @@ export async function openEngineKey(sealed: string): Promise<string | null> {
     }
 }
 
-/** The model Polar would run a quick job on for this person, or null. */
-async function polarHelper(userId: string): Promise<PolarHelper | null> {
-    const resolved = await resolvePolarModel(userId, automaticChoice("fast"), PLAIN_TURN);
+/** The model Polar would run a quick job on for this person, or null. A text
+ *  the quick model would not translate goes once more to the balanced one. */
+async function polarHelper(
+    userId: string,
+    intelligence: "fast" | "balanced" = "fast"
+): Promise<PolarHelper | null> {
+    const resolved = await resolvePolarModel(userId, automaticChoice(intelligence), PLAIN_TURN);
     return typeof resolved === "string" ? null : { resolved, source: "automatic" };
 }
 
@@ -167,7 +172,22 @@ async function polarTranslate(
     from: string | null,
     to: string
 ): Promise<EngineAnswer> {
-    const helper = await polarHelper(userId);
+    const quick = await polarAsk(userId, "fast", texts, from, to);
+    const checked = checkedAnswer(texts, quick, to);
+    if (checked) return checked;
+    const again = checkedAnswer(texts, await polarAsk(userId, "balanced", texts, from, to), to);
+    if (!again) throw new EngineRefusal("failed");
+    return again;
+}
+
+async function polarAsk(
+    userId: string,
+    intelligence: "fast" | "balanced",
+    texts: readonly string[],
+    from: string | null,
+    to: string
+): Promise<EngineAnswer> {
+    const helper = await polarHelper(userId, intelligence);
     if (!helper) throw new EngineRefusal("unavailable");
     if (!(await helperMaySpend(userId, helper))) throw new EngineRefusal("limit");
     const { option } = helper.resolved;
