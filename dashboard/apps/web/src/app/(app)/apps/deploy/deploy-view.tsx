@@ -61,6 +61,7 @@ import {
     isDirty,
     type SelectOption
 } from "@polaris/ui";
+import { DomainEnabledSwitch } from "./domain-enabled-switch";
 import {
     databaseCreateSchema,
     dbEngineLabel,
@@ -1946,19 +1947,12 @@ function DomainDialog({
                                             {t("view.domainDialog.tunnel")}
                                         </Badge>
                                     ) : (
-                                        <Switch
-                                            checked={domain.enabled}
-                                            onChange={(next) =>
-                                                startTransition(async () => {
-                                                    await deployActions.setDomainEnabledAction(
-                                                        domain.id,
-                                                        next
-                                                    );
-                                                    onChanged();
-                                                })
-                                            }
-                                            aria-label={
-                                                domain.enabled
+                                        <DomainEnabledSwitch
+                                            domainId={domain.id}
+                                            enabled={domain.enabled}
+                                            onChanged={onChanged}
+                                            label={(on) =>
+                                                on
                                                     ? t("view.domainDialog.disable")
                                                     : t("view.domainDialog.enable")
                                             }

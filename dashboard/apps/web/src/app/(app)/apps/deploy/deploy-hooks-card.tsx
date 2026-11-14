@@ -28,6 +28,7 @@ import {
     Skeleton,
     Switch
 } from "@polaris/ui";
+import { useOptimisticToggle } from "@polaris/ui";
 
 type Open =
     | { kind: "add" }
@@ -65,23 +66,12 @@ export function DeployHooksCard({ applicationId }: { applicationId: string }) {
         void load();
     }, [load]);
 
-    function toggle(hook: InboundHookView, next: boolean) {
-        // Switched here first and put back if the save fails.
-        const flip = (enabled: boolean) =>
-            setHooks(
-                (current) =>
-                    current?.map((entry) =>
-                        entry.id === hook.id ? { ...entry, enabled } : entry
-                    ) ?? null
-            );
-        flip(next);
-        startTransition(async () => {
-            const result = await actions.setDeployHookEnabledAction(hook.id, next);
-            if (result.error) {
-                flip(!next);
-                setError(result.error);
-            }
-        });
+    /** Keeps the list in step with what the server now holds for one hook. */
+    function held(id: string, enabled: boolean) {
+        setHooks(
+            (current) =>
+                current?.map((entry) => (entry.id === id ? { ...entry, enabled } : entry)) ?? null
+        );
     }
 
     const atLimit = hooks !== null && max > 0 && hooks.length + others.length >= max;
@@ -155,15 +145,10 @@ export function DeployHooksCard({ applicationId }: { applicationId: string }) {
                             </div>
                             <div className="flex shrink-0 items-center gap-1">
                                 <CopyButton value={urlFor(hook.id)} label={t("deployHooks.url")} />
-                                <Switch
-                                    checked={hook.enabled}
-                                    disabled={pending}
-                                    onChange={(next) => toggle(hook, next)}
-                                    aria-label={
-                                        hook.enabled
-                                            ? t("deployHooks.switchOff")
-                                            : t("deployHooks.switchOn")
-                                    }
+                                <HookSwitch
+                                    hook={hook}
+                                    onSaved={held}
+                                    onRefused={setError}
                                 />
                                 <IconAction
                                     label={t("deployHooks.rotate")}
@@ -388,5 +373,30 @@ function Value({ value }: { value: string }) {
             <code className="min-w-0 flex-1 break-all font-mono text-xs">{value}</code>
             <CopyButton value={value} />
         </div>
+    );
+}
+
+/** On or off for one hook: moves at once, back if the save is refused. */
+function HookSwitch({
+    hook,
+    onSaved,
+    onRefused
+}: {
+    hook: InboundHookView;
+    onSaved: (id: string, enabled: boolean) => void;
+    onRefused: (message: string) => void;
+}) {
+    const t = useTranslations("deployService");
+    const [on, toggle] = useOptimisticToggle(
+        hook.enabled,
+        (next) => actions.setDeployHookEnabledAction(hook.id, next),
+        { onSaved: (enabled) => onSaved(hook.id, enabled), onRefused }
+    );
+    return (
+        <Switch
+            checked={on}
+            onChange={toggle}
+            aria-label={on ? t("deployHooks.switchOff") : t("deployHooks.switchOn")}
+        />
     );
 }

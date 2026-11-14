@@ -14,7 +14,7 @@ import type { UserOverviewAccount } from "./data";
 import { viewAsUserAction } from "@/app/(app)/view-as-actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, Select, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, Select, Switch, useOptimisticToggle } from "@polaris/ui";
 import { setAdminAccessAction, setUserRoleAction } from "../actions";
 
 /** A labelled fact in the identity grid. */
@@ -41,6 +41,12 @@ export function OverviewControls({
     const router = useRouter();
     const format = useDisplayFormat();
     const { busy, error, run } = useAccountAction();
+    // `run` already says why a refusal happened, so no toast on top of it.
+    const [isAdmin, setAdmin] = useOptimisticToggle(
+        user.isAdmin,
+        async (next) => ((await run(() => setAdminAccessAction(user.id, next))) ? null : { ok: false }),
+        { onRefused: () => undefined }
+    );
     const role = user.roles[0] ?? "";
 
     /** Leave the operator screens behind and carry on as this person. The root
@@ -134,14 +140,12 @@ export function OverviewControls({
                             </p>
                         </div>
                         <Switch
-                            checked={user.isAdmin}
-                            disabled={busy || isSelf}
+                            checked={isAdmin}
+                            disabled={isSelf}
                             aria-label={t("usersDetail.account.access.adminLabel", {
                                 name: user.name
                             })}
-                            onChange={(checked) =>
-                                void run(() => setAdminAccessAction(user.id, checked))
-                            }
+                            onChange={setAdmin}
                         />
                     </div>
                 </section>

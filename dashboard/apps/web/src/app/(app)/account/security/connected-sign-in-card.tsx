@@ -25,9 +25,9 @@ import { ShieldAlert } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { StepUpDialog } from "@/components/step-up-dialog";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { IntegrationLogo } from "@/components/logos";
-import { Card, CardBody, Switch } from "@polaris/ui";
+import { Card, CardBody, Switch, useOptimisticToggle } from "@polaris/ui";
 import { Feedback, type SettingLock } from "./setting-card";
 import { setConnectionSignInAction, setConnectionSignInChallengeAction } from "./actions";
 import * as polls from "../account-polls";
@@ -174,25 +174,19 @@ function ChallengeRow({
     guard: (change: () => void) => void;
 }) {
     const t = useTranslations("accountSecurity");
-    const [enabled, setEnabled] = useState(challenge.enabled);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
+    const [enabled, set] = useOptimisticToggle(
+        challenge.enabled,
+        async (next) =>
+            (await runAction(() => setConnectionSignInChallengeAction(next), setError)) ?? {
+                error: true
+            },
+        { onRefused: setError }
+    );
 
     function toggle(next: boolean) {
         setError(null);
-        guard(() => {
-            setEnabled(next);
-            startTransition(async () => {
-                const result = await runAction(
-                    () => setConnectionSignInChallengeAction(next),
-                    setError
-                );
-                if (!result || result.error) {
-                    setEnabled(!next);
-                    if (result?.error) setError(result.error);
-                }
-            });
-        });
+        guard(() => set(next));
     }
 
     return (
@@ -206,7 +200,7 @@ function ChallengeRow({
                 </div>
                 <Switch
                     checked={challenge.enforced || enabled}
-                    disabled={locked || pending || challenge.enforced}
+                    disabled={locked || challenge.enforced}
                     onChange={toggle}
                     aria-label={t("connected.challenge.label")}
                 />
@@ -229,25 +223,19 @@ function AccountRow({
     guard: (change: () => void) => void;
 }) {
     const t = useTranslations("accountSecurity");
-    const [enabled, setEnabled] = useState(account.signInEnabled);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
+    const [enabled, set] = useOptimisticToggle(
+        account.signInEnabled,
+        async (next) =>
+            (await runAction(() => setConnectionSignInAction(account.id, next), setError)) ?? {
+                error: true
+            },
+        { onRefused: setError }
+    );
 
     function toggle(next: boolean) {
         setError(null);
-        guard(() => {
-            setEnabled(next);
-            startTransition(async () => {
-                const result = await runAction(
-                    () => setConnectionSignInAction(account.id, next),
-                    setError
-                );
-                if (!result || result.error) {
-                    setEnabled(!next);
-                    if (result?.error) setError(result.error);
-                }
-            });
-        });
+        guard(() => set(next));
     }
 
     return (
@@ -264,7 +252,7 @@ function AccountRow({
                 </span>
                 <Switch
                     checked={enabled}
-                    disabled={locked || pending || !account.allowedHere}
+                    disabled={locked || !account.allowedHere}
                     onChange={toggle}
                     aria-label={t("connected.switch", { account: account.label })}
                 />

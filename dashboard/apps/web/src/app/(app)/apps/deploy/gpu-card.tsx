@@ -9,13 +9,13 @@
  * the running release again, and the switch goes back if the save is refused.
  */
 
-import { Switch } from "@polaris/ui";
+import { Switch, useOptimisticToggle } from "@polaris/ui";
 import { formatBytes } from "@polaris/core";
 import { CardError, CardSkeleton, SettingsCard } from "./settings-kit";
 import type { ServiceGpuView } from "@/lib/deploy/gpu-service";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { saveServiceGpuAction } from "./gpu-actions";
 import * as polls from "./deploy-polls";
 
@@ -32,7 +32,20 @@ export function GpuCard({
     const [view, setView] = useState<ServiceGpuView | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
+    // Shown as saved straight away; put back if the server refuses it.
+    const [gpuOn, toggle] = useOptimisticToggle(
+        view?.enabled ?? false,
+        async (enabled) => {
+            setNote(null);
+            const result = await saveServiceGpuAction(applicationId, enabled);
+            if (result.error) return result;
+            if (result.restartError) setNote(result.restartError);
+            else if (result.redeployed) setNote(t("gpu.saved"));
+            onChanged();
+            return null;
+        },
+        { onRefused: setNote }
+    );
 
     useEffect(() => {
         let active = true;
@@ -57,30 +70,10 @@ export function GpuCard({
         );
     }
 
-    function toggle(enabled: boolean) {
-        if (!view || pending) return;
-        const before = view;
-        // Shown as saved straight away; put back if the server refuses it.
-        setView({ ...view, enabled });
-        setNote(null);
-        startTransition(async () => {
-            const result = await saveServiceGpuAction(applicationId, enabled);
-            if (result.error) {
-                setView(before);
-                setNote(result.error);
-                return;
-            }
-            if (result.restartError) setNote(result.restartError);
-            else if (result.redeployed) setNote(t("gpu.saved"));
-            onChanged();
-        });
-    }
-
     return (
         <GpuCardBody
-            view={view}
+            view={{ ...view, enabled: gpuOn }}
             canConfigure={canConfigure}
-            pending={pending}
             note={note}
             onToggle={toggle}
             t={t}
@@ -92,14 +85,12 @@ export function GpuCard({
 export function GpuCardBody({
     view,
     canConfigure,
-    pending,
     note,
     onToggle,
     t
 }: {
     view: ServiceGpuView;
     canConfigure: boolean;
-    pending: boolean;
     note: string | null;
     onToggle: (enabled: boolean) => void;
     t: NamespaceTranslator<"deployService">;
@@ -136,7 +127,7 @@ export function GpuCardBody({
                     </span>
                     <Switch
                         checked={view.enabled}
-                        disabled={!canConfigure || blocked || pending}
+                        disabled={!canConfigure || blocked}
                         onChange={onToggle}
                         aria-label={t("gpu.use")}
                     />

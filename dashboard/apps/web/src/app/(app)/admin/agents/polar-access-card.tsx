@@ -9,10 +9,11 @@
  */
 
 import { runAction } from "@/lib/run-action";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { findPolarGroupsAction, findPolarPeopleAction, setPolarAccessAction } from "./actions";
 import { Card, CardBody, Input, SegmentedControl, Switch, cn } from "@polaris/ui";
+import { useOptimisticValue } from "@polaris/ui";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     CONNECTOR_AUDIENCES,
@@ -50,7 +51,17 @@ export function PolarAccessCard({
     people: readonly PickedPerson[];
 }) {
     const t = useTranslations("admin");
-    const [current, setCurrent] = useState(policy);
+    const [error, setError] = useState<string | null>(null);
+    // The policy on screen moves at once; saves go one at a time with the latest
+    // policy, and a refusal puts back what the server last held.
+    const [current, save] = useOptimisticValue(
+        policy,
+        async (next: PolarPolicy) => {
+            setError(null);
+            return (await runAction(() => setPolarAccessAction(next), setError)) ?? { error: true };
+        },
+        { onRefused: setError }
+    );
     const [names, setNames] = useState<readonly PickedPerson[]>(people);
     const [groupNames, setGroupNames] = useState<readonly Group[]>(() => [
         ...chosenGroups,
@@ -60,8 +71,6 @@ export function PolarAccessCard({
     const connectors = current.connectors ?? DEFAULT_CONNECTOR_POLICY;
     const [hostsDraft, setHostsDraft] = useState(connectors.hosts.join(", "));
     const [foundGroups, setFoundGroups] = useState<readonly Group[] | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
 
     useEffect(() => {
         const term = groupQuery.trim();
@@ -88,23 +97,14 @@ export function PolarAccessCard({
         };
     }, [groupQuery, moreGroups]);
 
-    const save = (next: PolarPolicy) => {
-        const before = current;
-        setError(null);
-        // Optimistic, with the policy put back if the write is refused.
-        setCurrent(next);
-        startTransition(() => {
-            void (async () => {
-                const result = await runAction(() => setPolarAccessAction(next), setError);
-                if (!result || result.error) setCurrent(before);
-            })();
-        });
-    };
     const change = (part: Part, patch: Partial<PolarAudience>) =>
-        save({ ...current, [part]: { ...current[part], ...patch } });
+        save((now) => ({ ...now, [part]: { ...now[part], ...patch } }));
 
     const changeConnectors = (patch: Partial<PolarConnectorPolicy>) =>
-        save({ ...current, connectors: { ...connectors, ...patch } });
+        save((now) => ({
+            ...now,
+            connectors: { ...(now.connectors ?? DEFAULT_CONNECTOR_POLICY), ...patch }
+        }));
     /** The typed hosts, each normalized; an entry that is no host is dropped. */
     const commitHosts = () => {
         const hosts = [
@@ -235,7 +235,6 @@ export function PolarAccessCard({
                         <Switch
                             checked={value.guests}
                             onChange={(guests) => change(part, { guests })}
-                            disabled={pending}
                             aria-label={t("agents.polarAccess.guests")}
                         />
                     </div>
@@ -259,7 +258,6 @@ export function PolarAccessCard({
                     <Switch
                         checked={current.web}
                         onChange={(web) => save({ ...current, web })}
-                        disabled={pending}
                         aria-label={t("agents.polarAccess.web.label")}
                     />
                 </div>
@@ -291,7 +289,6 @@ export function PolarAccessCard({
                                 onKeyDown={(event) => {
                                     if (event.key === "Enter") commitHosts();
                                 }}
-                                disabled={pending}
                                 placeholder={t("agents.polarAccess.connectors.hostsPlaceholder")}
                                 aria-label={t("agents.polarAccess.connectors.hosts")}
                             />
@@ -307,7 +304,6 @@ export function PolarAccessCard({
                                     onChange={(privateNetwork) =>
                                         changeConnectors({ privateNetwork })
                                     }
-                                    disabled={pending}
                                     aria-label={t("agents.polarAccess.connectors.privateNetwork")}
                                 />
                             </div>

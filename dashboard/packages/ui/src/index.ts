@@ -206,3 +206,10 @@ export {
 } from "./lib/board-gestures";
 export { StatusIcon } from "./components/status-icon";
 export * from "./shortcuts/shortcuts";
+export {
+    refusalOf,
+    useOptimisticToggle,
+    useOptimisticValue,
+    type OptimisticOptions,
+    type OptimisticToggleOptions
+} from "./lib/use-optimistic-toggle";

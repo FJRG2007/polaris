@@ -7,7 +7,7 @@
  * it; a save that fails puts the switch back where it was and says so.
  */
 
-import { useOptimisticToggle } from "@/lib/use-optimistic-toggle";
+import { useOptimisticToggle } from "@polaris/ui";
 import { useState } from "react";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { savePlayerAddressesSharedAction } from "./actions";

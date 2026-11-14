@@ -72,6 +72,8 @@ import {
     Switch,
     Textarea
 } from "@polaris/ui";
+import { useOptimisticToggle } from "@polaris/ui";
+import { DomainEnabledSwitch } from "./domain-enabled-switch";
 import {
     ArrowUpRight,
     CheckCircle2,
@@ -333,8 +335,14 @@ function NamedTunnelRow({
             })
             .catch(() => undefined);
     }, [appId, nonce]);
+    const [enabled, toggleEnabled] = useOptimisticToggle(status?.enabled ?? false, async (next) => {
+        const result = await deployActions
+            .setNamedTunnelEnabledAction({ applicationId: appId, enabled: next })
+            .catch(() => ({ error: true }));
+        onChanged();
+        return result;
+    });
     if (!status?.configured || !status.hostname) return null;
-    const enabled = status.enabled;
     return (
         <ExposureRow
             icon={<CloudflareMark className="size-3.5" />}
@@ -352,14 +360,7 @@ function NamedTunnelRow({
             tone={!enabled ? "neutral" : status.managed || status.running ? "primary" : "warning"}
             enabled={enabled}
             pending={pending}
-            onToggle={(next) =>
-                startTransition(async () => {
-                    await deployActions
-                        .setNamedTunnelEnabledAction({ applicationId: appId, enabled: next })
-                        .catch(() => undefined);
-                    onChanged();
-                })
-            }
+            onToggle={toggleEnabled}
             onRemove={() =>
                 startTransition(async () => {
                     await deployActions.stopNamedTunnelAction(appId).catch(() => undefined);
@@ -1507,7 +1508,6 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
     // and whether Polaris managed that itself is the one thing the operator has to know.
     const [dnsNote, setDnsNote] = useState<ReturnType<typeof dnsAdvice>>(null);
     const [pending, startTransition] = useTransition();
-    const [rowPending, startRowTransition] = useTransition();
     const [added, markAdded] = useSavedFlash();
 
     useEffect(() => {
@@ -1966,20 +1966,12 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                                                 onChanged={onChanged}
                                             />
                                         )}
-                                        <Switch
-                                            checked={domain.enabled}
-                                            disabled={rowPending}
-                                            onChange={(next) =>
-                                                startRowTransition(async () => {
-                                                    await deployActions.setDomainEnabledAction(
-                                                        domain.id,
-                                                        next
-                                                    );
-                                                    onChanged();
-                                                })
-                                            }
-                                            aria-label={
-                                                domain.enabled
+                                        <DomainEnabledSwitch
+                                            domainId={domain.id}
+                                            enabled={domain.enabled}
+                                            onChanged={onChanged}
+                                            label={(on) =>
+                                                on
                                                     ? t("settings.disableDomainNamed", {
                                                           hostname: domain.hostname
                                                       })

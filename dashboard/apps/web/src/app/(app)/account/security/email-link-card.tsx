@@ -18,7 +18,7 @@
 
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useOptimisticToggle } from "@/lib/use-optimistic-toggle";
+import { useOptimisticToggle } from "@polaris/ui";
 import { useState } from "react";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { setEmailLinkSignInAction } from "./actions";

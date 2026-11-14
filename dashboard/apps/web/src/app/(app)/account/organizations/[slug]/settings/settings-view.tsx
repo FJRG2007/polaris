@@ -16,6 +16,7 @@
  */
 
 import { useState } from "react";
+import { useOptimisticToggle } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -172,19 +173,13 @@ export function SettingsView({
  */
 function ChatCard({ orgId, isolated, onRun }: { orgId: string; isolated: boolean; onRun: Runner }) {
     const t = useTranslations("accountOrgs");
-    const [on, setOn] = useState(isolated);
-    const [saving, setSaving] = useState(false);
-
-    const change = async (next: boolean) => {
-        if (saving) return;
-        setSaving(true);
-        // Moved first and put back if the write is refused: a switch that waits
-        // for a round trip reads as a switch that did not take.
-        setOn(next);
-        const ok = await onRun(() => setOrgChatAction(orgId, next));
-        setSaving(false);
-        if (!ok) setOn(!next);
-    };
+    // Moved first and put back if the write is refused: a switch that waits for a
+    // round trip reads as a switch that did not take. `onRun` already shows why.
+    const [on, change] = useOptimisticToggle(
+        isolated,
+        async (next) => ((await onRun(() => setOrgChatAction(orgId, next))) ? null : { ok: false }),
+        { onRefused: () => undefined }
+    );
 
     return (
         <Card>
@@ -200,7 +195,6 @@ function ChatCard({ orgId, isolated, onRun }: { orgId: string; isolated: boolean
                     <Switch
                         checked={on}
                         onChange={change}
-                        disabled={saving}
                         aria-label={t("settings.chat.label")}
                     />
                 </div>

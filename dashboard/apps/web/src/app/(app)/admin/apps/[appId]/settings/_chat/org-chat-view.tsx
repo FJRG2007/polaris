@@ -16,7 +16,7 @@
 import { useState } from "react";
 import { Switch } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
-import { useOptimisticToggle } from "@/lib/use-optimistic-toggle";
+import { useOptimisticToggle } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setOrgChatOfferedAction } from "./actions";
 

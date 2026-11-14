@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { SEASON_ICONS, usePreviewSeason } from "@/components/seasonal/seasonal-frame";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Select, Switch } from "@polaris/ui";
+import { useOptimisticToggle } from "@polaris/ui";
 import {
     previewSeasonAction,
     saveSeasonRuleAction,
@@ -35,7 +36,6 @@ export function SeasonalAdminCard({
     const t = useTranslations("admin");
     const nav = useTranslations("nav");
     const router = useRouter();
-    const [allowed, setAllowed] = useState(initial);
     const [calendar, setCalendar] = useState(initialCalendar);
     const [preview, setPreview] = useState(initialPreview);
     // The frame is redrawn from the server whenever a preview starts or stops,
@@ -46,21 +46,15 @@ export function SeasonalAdminCard({
         if (framed !== undefined) setPreview(framed);
     }, [framed]);
     const [error, setError] = useState("");
-    const [, startSaving] = useTransition();
+    const [allowed, toggle] = useOptimisticToggle(
+        initial,
+        async (next) => {
+            setError("");
+            return setSeasonsAllowedAction(next);
+        },
+        { failure: t("settings.seasonal.notSaved"), onRefused: setError }
+    );
 
-    function toggle(next: boolean) {
-        setAllowed(next);
-        setError("");
-        startSaving(async () => {
-            const result = await setSeasonsAllowedAction(next).catch(() => ({
-                error: t("settings.seasonal.notSaved")
-            }));
-            if (result.error) {
-                setError(result.error);
-                setAllowed(!next);
-            }
-        });
-    }
 
     /** Preview a season, or stop with null. The page is drawn again from the
      *  server so the frame, the sounds and the bar all follow. */
@@ -170,8 +164,28 @@ function SeasonRow({
     const dayLabel = useDayLabel();
     const saved = calendar[season];
     const [draft, setDraft] = useState<core.SeasonWindow>(saved.window);
-    const [enabled, setEnabled] = useState(saved.enabled);
     const [error, setError] = useState<{ text: string; field?: End } | null>(null);
+    // The dates saved, not the ones being picked: the switch is its own change.
+    const [enabled, toggle] = useOptimisticToggle(
+        saved.enabled,
+        async (next) => {
+            setError(null);
+            const result = await saveSeasonRuleAction(season, {
+                enabled: next,
+                ...saved.window
+            }).catch(() => ({ error: t("settings.seasonal.notSaved") }) as const);
+            if (result.error !== undefined) {
+                setError({
+                    text: result.error,
+                    field: "field" in result ? result.field : undefined
+                });
+                return { ok: false };
+            }
+            onSaved(result.calendar);
+            return null;
+        },
+        { onRefused: () => undefined }
+    );
     const [saving, startSaving] = useTransition();
     const [previewBusy, startPreview] = useTransition();
 
@@ -234,12 +248,6 @@ function SeasonRow({
             }
             onSaved(result.calendar);
         });
-    }
-
-    function toggle(next: boolean) {
-        setEnabled(next);
-        // The dates saved, not the ones being picked: the switch is its own change.
-        save({ enabled: next, window: saved.window }, () => setEnabled(!next));
     }
 
     function pick(end: End, part: "month" | "day", value: string) {
@@ -325,7 +333,6 @@ function SeasonRow({
                 <Switch
                     checked={enabled}
                     onChange={toggle}
-                    disabled={saving}
                     aria-label={`${name}: ${t("settings.seasonal.seasonOn")}`}
                 />
             </div>

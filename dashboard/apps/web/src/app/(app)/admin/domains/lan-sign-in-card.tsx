@@ -12,7 +12,7 @@
 
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Skeleton, Switch } from "@polaris/ui";
+import { Skeleton, Switch, useOptimisticToggle } from "@polaris/ui";
 import { setLanSignInAction } from "./actions";
 import type { LanSignInView } from "@/lib/lan-sign-in";
 import { PageSection } from "@/components/page-section";
@@ -28,25 +28,19 @@ export function LanSignInCard({
     onSaved: (next: LanSignInView) => void;
 }) {
     const t = useTranslations("admin");
-    const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
-    const [optimistic, setOptimistic] = useState<boolean | null>(null);
-    const enabled = optimistic ?? view?.enabled ?? true;
-
-    async function toggle(next: boolean) {
-        if (!view || next === view.enabled) return;
-        setOptimistic(next);
-        setBusy(true);
-        setError("");
-        const result = await runAction(() => setLanSignInAction(next), setError);
-        setBusy(false);
-        setOptimistic(null);
-        if (!result || result.error || !result.view) {
-            if (result?.error) setError(result.error);
-            return;
-        }
-        onSaved(result.view);
-    }
+    const [enabled, toggle] = useOptimisticToggle(
+        view?.enabled ?? true,
+        async (next) => {
+            setError("");
+            const result = await runAction(() => setLanSignInAction(next), setError);
+            if (!result || result.error) return result ?? { error: true };
+            if (!result.view) return { ok: false };
+            onSaved(result.view);
+            return null;
+        },
+        { onRefused: setError }
+    );
 
     return (
         <PageSection
@@ -56,8 +50,8 @@ export function LanSignInCard({
             actions={
                 <Switch
                     checked={enabled}
-                    disabled={!view || busy}
-                    onChange={(next) => void toggle(next)}
+                    disabled={!view}
+                    onChange={toggle}
                     aria-label={t("domains.lanSignIn.toggle")}
                 />
             }

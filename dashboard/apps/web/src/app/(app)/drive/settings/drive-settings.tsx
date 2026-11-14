@@ -6,7 +6,7 @@
  */
 
 import { useState, useTransition } from "react";
-import { useOptimisticToggle } from "@/lib/use-optimistic-toggle";
+import { useOptimisticToggle } from "@polaris/ui";
 import { setConfirmTrashAction, setTrashKeepDaysAction } from "./actions";
 import { MAIL_TRASH_KEEP_CHOICES } from "@polaris/core";
 import type { DrivePreferences } from "@/lib/drive-preferences";

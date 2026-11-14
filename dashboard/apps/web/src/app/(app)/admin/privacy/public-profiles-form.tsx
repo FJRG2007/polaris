@@ -20,7 +20,7 @@
  */
 
 import { useState, useTransition } from "react";
-import { Card, CardBody, Select, Switch } from "@polaris/ui";
+import { Card, CardBody, Select, Switch, useOptimisticToggle } from "@polaris/ui";
 import { setFollowerDefaultAction, setPublicProfilesAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PrivacyAudience } from "@polaris/core";
@@ -39,10 +39,19 @@ export function PublicProfilesForm({
     followerDefault: PrivacyAudience;
 }) {
     const t = useTranslations("admin");
-    const [on, setOn] = useState(enabled);
     const [audience, setAudience] = useState<PrivacyAudience>(followerDefault);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    // Applied on the press and put back if the server refuses it, so the switch
+    // never reads as saved when it is not - this one decides what leaves the box.
+    const [on, toggle] = useOptimisticToggle(
+        enabled,
+        async (next) => {
+            setError(null);
+            return setPublicProfilesAction(next);
+        },
+        { onRefused: setError }
+    );
 
     return (
         <Card>
@@ -58,23 +67,9 @@ export function PublicProfilesForm({
                     </div>
                     <Switch
                         checked={on}
-                        disabled={pending}
                         aria-label={t("privacy.profiles.publicLabel")}
                         aria-describedby="privacy-public-profiles"
-                        onChange={(next: boolean) => {
-                            // Applied on the press and put back if the server
-                            // refuses it, so the switch never reads as saved when
-                            // it is not - this one decides what leaves the box.
-                            setOn(next);
-                            setError(null);
-                            startTransition(async () => {
-                                const result = await setPublicProfilesAction(next);
-                                if (result.error) {
-                                    setOn(!next);
-                                    setError(result.error);
-                                }
-                            });
-                        }}
+                        onChange={toggle}
                     />
                 </div>
                 <div className="flex flex-wrap items-start justify-between gap-3 py-3">

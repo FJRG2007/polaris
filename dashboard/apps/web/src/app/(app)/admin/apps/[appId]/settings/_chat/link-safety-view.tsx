@@ -11,12 +11,17 @@
 import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Checkbox, Switch } from "@polaris/ui";
+import { Checkbox, Switch, useOptimisticValue } from "@polaris/ui";
 import { setLinkSafetyAction } from "./actions";
 import { IntegrationLogo } from "@/components/logos";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { LINK_PROVIDER_NAMES } from "@/components/rich-text/link-providers";
 import type { LinkSafetyProvider, LinkSafetyProviderState } from "@/lib/chat/link-safety";
+
+interface Choice {
+    readonly enabled: boolean;
+    readonly providers: readonly LinkSafetyProvider[];
+}
 
 interface Overview {
     readonly enabled: boolean;
@@ -25,36 +30,32 @@ interface Overview {
 
 export function LinkSafetyView({ initial }: { initial: Overview }) {
     const t = useTranslations("admin");
-    const [enabled, setEnabled] = useState(initial.enabled);
-    const [chosen, setChosen] = useState<readonly LinkSafetyProvider[]>(
-        initial.providers.filter((entry) => entry.chosen).map((entry) => entry.provider)
-    );
-    const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const anyConfigured = initial.providers.some((entry) => entry.configured);
+    const [held] = useState<Choice>(() => ({
+        enabled: initial.enabled,
+        providers: initial.providers.filter((entry) => entry.chosen).map((entry) => entry.provider)
+    }));
+    // The switch and the provider list go up in one save. Both move at once; saves
+    // run one at a time with the latest choice, so a press during a save is never
+    // dropped, and a refusal puts back what the server last held.
+    const [choice, persist] = useOptimisticValue(
+        held,
+        async (next: Choice) => {
+            setError("");
+            return (await runAction(() => setLinkSafetyAction(next), setError)) ?? { error: true };
+        },
+        { onRefused: setError }
+    );
+    const { enabled, providers: chosen } = choice;
 
-    const save = async (nextEnabled: boolean, nextChosen: readonly LinkSafetyProvider[]) => {
-        if (saving) return;
-        setSaving(true);
-        setError("");
-        const was = { enabled, chosen };
-        setEnabled(nextEnabled);
-        setChosen(nextChosen);
-        const result = await runAction(
-            () => setLinkSafetyAction({ enabled: nextEnabled, providers: nextChosen }),
-            setError
-        );
-        setSaving(false);
-        if (!result || result.error) {
-            setEnabled(was.enabled);
-            setChosen(was.chosen);
-        }
-    };
-
-    const toggle = (provider: LinkSafetyProvider, on: boolean) => {
-        const next = on ? [...chosen, provider] : chosen.filter((entry) => entry !== provider);
-        void save(enabled, next);
-    };
+    const toggle = (provider: LinkSafetyProvider, on: boolean) =>
+        persist((now) => ({
+            ...now,
+            providers: on
+                ? [...now.providers.filter((entry) => entry !== provider), provider]
+                : now.providers.filter((entry) => entry !== provider)
+        }));
 
     return (
         <div className="flex flex-col gap-3">
@@ -65,8 +66,7 @@ export function LinkSafetyView({ initial }: { initial: Overview }) {
                 </div>
                 <Switch
                     checked={enabled}
-                    onChange={(next) => void save(next, chosen)}
-                    disabled={saving}
+                    onChange={(next) => persist((now) => ({ ...now, enabled: next }))}
                     aria-label={t("chat.linkSafety.label")}
                 />
             </div>
@@ -81,7 +81,7 @@ export function LinkSafetyView({ initial }: { initial: Overview }) {
                                     id={id}
                                     className="mt-0.5"
                                     checked={entry.configured && chosen.includes(entry.provider)}
-                                    disabled={saving || !entry.configured}
+                                    disabled={!entry.configured}
                                     onChange={(event) =>
                                         toggle(entry.provider, event.target.checked)
                                     }

@@ -8,7 +8,7 @@
 import { MessagesWrapper } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { refusalOf, useOptimisticToggle } from "@/lib/use-optimistic-toggle";
+import { refusalOf, useOptimisticToggle } from "@polaris/ui";
 
 /** An action whose answers the test hands out one at a time. */
 function controlled() {

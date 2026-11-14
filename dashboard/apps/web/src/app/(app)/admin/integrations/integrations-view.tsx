@@ -11,6 +11,7 @@
  * and nothing to name it. They are a list of keys now, on their own screen.
  */
 
+import { useOptimisticToggle } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import * as integrationActions from "./actions";
@@ -874,24 +875,19 @@ function SignInSwitch({
 }) {
     const t = useTranslations("admin");
 
-    const [value, setValue] = useState(allowed);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-
-    function toggle(next: boolean) {
-        setValue(next);
-        setError(null);
-        startTransition(async () => {
-            const result = await runAction(
-                () => integrationActions.saveConnectionSignInAction(slug, next),
-                setError
+    const [value, toggle] = useOptimisticToggle(
+        allowed,
+        async (next) => {
+            setError(null);
+            return (
+                (await runAction(() => integrationActions.saveConnectionSignInAction(slug, next), setError)) ?? {
+                    error: true
+                }
             );
-            if (!result || result.error) {
-                setValue(!next);
-                if (result?.error) setError(result.error);
-            }
-        });
-    }
+        },
+        { onRefused: setError }
+    );
 
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
@@ -904,7 +900,6 @@ function SignInSwitch({
                 </span>
                 <Switch
                     checked={value}
-                    disabled={pending}
                     onChange={toggle}
                     aria-label={t("integrations.signIn.label", { name })}
                 />
@@ -940,24 +935,19 @@ function EmailTrustSwitch({
 }) {
     const t = useTranslations("admin");
 
-    const [value, setValue] = useState(trusted);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-
-    function toggle(next: boolean) {
-        setValue(next);
-        setError(null);
-        startTransition(async () => {
-            const result = await runAction(
-                () => integrationActions.saveConnectionEmailTrustAction(slug, next),
-                setError
+    const [value, toggle] = useOptimisticToggle(
+        trusted,
+        async (next) => {
+            setError(null);
+            return (
+                (await runAction(() => integrationActions.saveConnectionEmailTrustAction(slug, next), setError)) ?? {
+                    error: true
+                }
             );
-            if (!result || result.error) {
-                setValue(!next);
-                if (result?.error) setError(result.error);
-            }
-        });
-    }
+        },
+        { onRefused: setError }
+    );
 
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
@@ -972,7 +962,6 @@ function EmailTrustSwitch({
                 </span>
                 <Switch
                     checked={value}
-                    disabled={pending}
                     onChange={toggle}
                     aria-label={t("integrations.emailTrust.label", { name })}
                 />

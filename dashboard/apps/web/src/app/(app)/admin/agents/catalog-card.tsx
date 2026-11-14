@@ -13,7 +13,7 @@
 import { RefreshCw } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
-import { Button, Card, CardBody, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, Switch, useOptimisticToggle } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -33,24 +33,20 @@ import {
  */
 export function KeySharingCard({ shared }: { shared: boolean }) {
     const t = useTranslations("admin");
-    const [on, setOn] = useState(shared);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-
-    const toggle = (next: boolean) => {
-        setError(null);
-        // Optimistic, with the switch put back if the write is refused.
-        setOn(next);
-        startTransition(() => {
-            void (async () => {
-                const result = await runAction(
-                    () => setInstanceKeySharingAction({ shared: next }),
-                    setError
-                );
-                if (!result || result.error) setOn(!next);
-            })();
-        });
-    };
+    // Optimistic, with the switch put back if the write is refused.
+    const [on, toggle] = useOptimisticToggle(
+        shared,
+        async (next) => {
+            setError(null);
+            return (
+                (await runAction(() => setInstanceKeySharingAction({ shared: next }), setError)) ?? {
+                    error: true
+                }
+            );
+        },
+        { onRefused: setError }
+    );
 
     return (
         <Card>
@@ -67,7 +63,6 @@ export function KeySharingCard({ shared }: { shared: boolean }) {
                     <Switch
                         checked={on}
                         onChange={toggle}
-                        disabled={pending}
                         aria-label={t("agents.keySharing.switch")}
                     />
                 </div>
@@ -96,23 +91,19 @@ export function KeySharingCard({ shared }: { shared: boolean }) {
  */
 export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
     const t = useTranslations("admin");
-    const [on, setOn] = useState(allowed);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-
-    const toggle = (next: boolean) => {
-        setError(null);
-        setOn(next);
-        startTransition(() => {
-            void (async () => {
-                const result = await runAction(
-                    () => setSharedWorkspaceAction({ allowed: next }),
-                    setError
-                );
-                if (!result || result.error) setOn(!next);
-            })();
-        });
-    };
+    const [on, toggle] = useOptimisticToggle(
+        allowed,
+        async (next) => {
+            setError(null);
+            return (
+                (await runAction(() => setSharedWorkspaceAction({ allowed: next }), setError)) ?? {
+                    error: true
+                }
+            );
+        },
+        { onRefused: setError }
+    );
 
     return (
         <Card>
@@ -129,7 +120,6 @@ export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
                     <Switch
                         checked={on}
                         onChange={toggle}
-                        disabled={pending}
                         aria-label={t("agents.sharedMachine.switch")}
                     />
                 </div>

@@ -19,7 +19,7 @@
  */
 
 import { runAction } from "@/lib/run-action";
-import { useOptimisticToggle } from "@/lib/use-optimistic-toggle";
+import { useOptimisticToggle } from "@polaris/ui";
 import { useState } from "react";
 import { setUsernameSignInAction } from "./actions";
 import { Card, CardBody, Switch } from "@polaris/ui";

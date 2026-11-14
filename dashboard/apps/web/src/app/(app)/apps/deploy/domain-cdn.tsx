@@ -24,6 +24,7 @@ import {
     Switch,
     cn
 } from "@polaris/ui";
+import { useOptimisticToggle } from "@polaris/ui";
 
 export function DomainCdnButton({
     domainId,
@@ -44,15 +45,17 @@ export function DomainCdnButton({
     const [pending, startTransition] = useTransition();
     const valid = cachePurgeSchema.safeParse({ domainId, prefix });
 
-    function toggle(next: boolean) {
-        setError(null);
-        setDone(null);
-        startTransition(async () => {
+    const [on, toggle] = useOptimisticToggle(
+        enabled,
+        async (next) => {
+            setError(null);
+            setDone(null);
             const result = await setDomainCdnAction({ domainId, enabled: next });
-            if (result.error) setError(result.error);
-            else onChanged();
-        });
-    }
+            if (!result.error) onChanged();
+            return result;
+        },
+        { onRefused: setError }
+    );
 
     function purge() {
         setError(null);
@@ -99,12 +102,11 @@ export function DomainCdnButton({
                     <div className="flex flex-col gap-4">
                         <label className="flex items-center gap-2 text-sm">
                             <Switch
-                                checked={enabled}
-                                disabled={pending}
+                                checked={on}
                                 onChange={toggle}
                                 aria-label={t("cdn.serve")}
                             />
-                            {enabled ? t("cdn.served") : t("cdn.notServed")}
+                            {on ? t("cdn.served") : t("cdn.notServed")}
                         </label>
                         {enabled ? (
                             <div className="flex flex-col gap-2">

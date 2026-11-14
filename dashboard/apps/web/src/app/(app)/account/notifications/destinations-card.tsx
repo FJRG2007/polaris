@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { useOptimisticToggle } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Plus, Send, Smartphone, Trash2, Webhook } from "lucide-react";
@@ -152,22 +153,9 @@ export function DestinationsCard({
                                                 {t("destinations.working")}
                                             </Badge>
                                         ) : null}
-                                        <Switch
-                                            checked={destination.enabled}
-                                            onChange={(next) =>
-                                                startTransition(async () => {
-                                                    await setDestinationEnabledAction(
-                                                        destination.id,
-                                                        next
-                                                    );
-                                                    router.refresh();
-                                                })
-                                            }
-                                            aria-label={
-                                                destination.enabled
-                                                    ? t("destinations.switchOff")
-                                                    : t("destinations.switchOn")
-                                            }
+                                        <DestinationSwitch
+                                            id={destination.id}
+                                            enabled={destination.enabled}
                                         />
                                         <button
                                             type="button"
@@ -446,5 +434,22 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                 </div>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** On or off for one destination: moves at once, back if the save fails. */
+function DestinationSwitch({ id, enabled }: { id: string; enabled: boolean }) {
+    const t = useTranslations("accountNotifications");
+    const router = useRouter();
+    const [on, toggle] = useOptimisticToggle(enabled, async (next) => {
+        await setDestinationEnabledAction(id, next);
+        router.refresh();
+    });
+    return (
+        <Switch
+            checked={on}
+            onChange={toggle}
+            aria-label={on ? t("destinations.switchOff") : t("destinations.switchOn")}
+        />
     );
 }
