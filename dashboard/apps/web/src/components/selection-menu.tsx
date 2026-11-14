@@ -215,7 +215,15 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
                 // about it are one press away. From the keyboard the menu sits
                 // under the link.
                 const linked = selectionMenu.linkAt(event.target, document);
-                if (!linked) return;
+                if (!linked) {
+                    // Empty space, a card, an icon: the browser's menu there is
+                    // Back, Reload and Inspect, which belong to the browser and
+                    // not to this app. It stays only where it does a job Polaris
+                    // has no menu for: a field (paste, spelling), a picture or a
+                    // video (save, copy), and a link this menu will not take.
+                    if (!keepsBrowserMenu(event.target)) event.preventDefault();
+                    return;
+                }
                 event.preventDefault();
                 const box = keyboard
                     ? (event.target as Element).closest("a")?.getBoundingClientRect()
@@ -480,4 +488,10 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
             <SelectionTranslation selection={translating} onClose={() => setTranslating(null)} />
         </MenuExtrasProvider>
     );
+}
+
+/** Where the browser's own right-click menu still does a job Polaris does not. */
+function keepsBrowserMenu(target: EventTarget | null): boolean {
+    if (!(target instanceof Element)) return true;
+    return target.closest("input, textarea, select, [contenteditable]:not([contenteditable='false']), img, video, audio, a[href]") !== null;
 }

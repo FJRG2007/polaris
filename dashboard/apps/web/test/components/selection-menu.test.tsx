@@ -78,10 +78,28 @@ function rightClick(target: Element, init: MouseEventInit = {}): boolean {
 }
 
 describe("selection menu", () => {
-    it("leaves the browser's menu alone with nothing selected", () => {
+    it("shows no browser menu on plain page content with nothing selected", () => {
+        // Back, Reload and Inspect on a random spot of the app is the browser
+        // showing through, not a menu for anything there.
         page();
-        expect(rightClick(screen.getByTestId("text"))).toBe(true);
+        expect(rightClick(screen.getByTestId("text"))).toBe(false);
         expect(screen.queryByRole("menu")).toBeNull();
+    });
+
+    it("keeps the browser's menu where it does a job: a field, a picture, a video", () => {
+        page(
+            <>
+                <img data-testid="picture" alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" />
+                <video data-testid="clip" />
+                <div data-testid="editor" contentEditable suppressContentEditableWarning>
+                    <span data-testid="inside">typed</span>
+                </div>
+            </>
+        );
+        expect(rightClick(screen.getByTestId("field"))).toBe(true);
+        expect(rightClick(screen.getByTestId("picture"))).toBe(true);
+        expect(rightClick(screen.getByTestId("clip"))).toBe(true);
+        expect(rightClick(screen.getByTestId("inside"))).toBe(true);
     });
 
     it("opens on selected text, with Ask Polar passing the selection as the quote", () => {
@@ -144,7 +162,8 @@ describe("selection menu", () => {
     it("is not about an old selection somewhere else on the page", () => {
         page();
         select(screen.getByTestId("text"));
-        expect(rightClick(screen.getByTestId("other"))).toBe(true);
+        rightClick(screen.getByTestId("other"));
+        expect(screen.queryByRole("menu")).toBeNull();
     });
 
     it("opens Polaris's menu on Shift+right-click too, never the browser's", () => {
