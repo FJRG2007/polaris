@@ -25,7 +25,16 @@ import { RestartPlanner } from "./restart-planner";
 import { useCallback, useEffect, useState } from "react";
 import type { ArkRules } from "../../lib/ark/settings-service";
 import { AlertTriangle, Info, Loader2, RefreshCw, RotateCcw, Search } from "lucide-react";
-import { Button, Card, CardBody, Input, Skeleton, Switch, cn } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    Input,
+    Skeleton,
+    Switch,
+    cn,
+    useOptimisticToggle
+} from "@polaris/ui";
 import {
     arkSettingGroups,
     normalizeArkValue,
@@ -117,21 +126,27 @@ export function ArkRules({
 
     /** Pin one setting, or unpin it with null. What comes back is what the file
      *  now holds, so the row never shows something that was not written. */
-    async function apply(setting: ArkSetting, value: string | null): Promise<void> {
+    async function apply(
+        setting: ArkSetting,
+        value: string | null
+    ): Promise<{ error: string } | undefined> {
         if (value !== null && normalizeArkValue(setting, value) === null) {
-            setError(t("rules.badValue", { name: t(setting.label) }));
-            return;
+            const message = t("rules.badValue", { name: t(setting.label) });
+            setError(message);
+            return { error: message };
         }
         setBusy(setting.key);
         setError(null);
         const result = await actions.setArkRulesAction(installedAppId, { [setting.key]: value });
         setBusy(null);
         if (result.error || !result.rules) {
-            setError(result.error ?? t("rules.saveFailed"));
-            return;
+            const message = result.error ?? t("rules.saveFailed");
+            setError(message);
+            return { error: message };
         }
         setRules(result.rules);
         setChanged(true);
+        return undefined;
     }
 
     const reason = schemaText(rules?.reason) ?? null;
@@ -226,6 +241,7 @@ export function ArkRules({
                                     loading={loading}
                                     disabled={!canManage || !running || !fresh}
                                     onChange={(value) => void apply(setting, value)}
+                                    onSwitch={(value) => apply(setting, value)}
                                 />
                             ))}
                         </CardBody>
@@ -256,7 +272,8 @@ function SettingRow({
     busy,
     loading,
     disabled,
-    onChange
+    onChange,
+    onSwitch
 }: {
     setting: ArkSetting;
     /** What Polaris launches the server with, or null for a setting it does not
@@ -272,11 +289,19 @@ function SettingRow({
     loading: boolean;
     disabled: boolean;
     onChange: (value: string | null) => void;
+    /** A switch's new value, saved at once; a refused save puts the switch back. */
+    onSwitch: (value: string) => Promise<unknown>;
 }) {
     const t = useGameText("ark");
     // What the row shows: what is pinned, else what the game says, else nothing -
     // and the note under it says which of the three this is.
     const shown = pinned ?? live ?? "";
+    const [on, setOn] = useOptimisticToggle(
+        setting.type === "boolean" && switchIsOn(setting, shown),
+        (next) => onSwitch(switchValue(setting, next)),
+        // `apply` has already said why on the screen.
+        { onRefused: () => undefined }
+    );
     const [draft, setDraft] = useState(shown);
     useEffect(() => setDraft(shown), [shown]);
 
@@ -354,13 +379,13 @@ function SettingRow({
                     {setting.type === "boolean" ? (
                         <Switch
                             aria-label={t(setting.label)}
-                            disabled={disabled || busy}
+                            disabled={disabled}
                             // Through the setting rather than straight off the text: a
                             // few of ARK's switches are named `DisableSomething`, and
                             // drawing those as they are stored is how somebody turns
                             // gamma on and finds it off.
-                            checked={switchIsOn(setting, shown)}
-                            onChange={(next: boolean) => onChange(switchValue(setting, next))}
+                            checked={on}
+                            onChange={setOn}
                         />
                     ) : (
                         <Input

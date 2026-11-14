@@ -21,7 +21,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Switch
+    Switch,
+    useOptimisticToggle
 } from "@polaris/ui";
 
 export function AccountOptionsDialog({
@@ -37,26 +38,7 @@ export function AccountOptionsDialog({
 }) {
     const t = usePlacesT();
     const [error, setError] = useState<string | null>(null);
-    const [saving, setSaving] = useState<string | null>(null);
     const options = account ? (registry.deviceConnection(account.connection)?.options ?? []) : [];
-
-    const flip = async (key: string, on: boolean) => {
-        if (!account || saving) return;
-        const before = account;
-        setError(null);
-        setSaving(key);
-        onChanged({ ...account, options: { ...account.options, [key]: on } });
-        const answer = await actions
-            .setDeviceAccountOptionAction({ accountId: account.id, key, on })
-            .catch(() => ({ error: t("actions.someWrong") }) as { error: string });
-        setSaving(null);
-        if (answer.error || !("account" in answer) || !answer.account) {
-            onChanged(before);
-            setError(answer.error ?? t("actions.someWrong"));
-            return;
-        }
-        onChanged(answer.account);
-    };
 
     return (
         <Dialog
@@ -96,12 +78,14 @@ export function AccountOptionsDialog({
                                               {t(`${base}.hint` as PlacesKey)}
                                           </p>
                                       </div>
-                                      <Switch
-                                          checked={account.options[option.key] ?? option.defaultOn}
-                                          disabled={saving !== null}
-                                          aria-label={label}
-                                          aria-describedby={hintId}
-                                          onChange={(on) => void flip(option.key, on)}
+                                      <OptionSwitch
+                                          account={account}
+                                          optionKey={option.key}
+                                          on={account.options[option.key] ?? option.defaultOn}
+                                          label={label}
+                                          hintId={hintId}
+                                          onChanged={onChanged}
+                                          onError={setError}
                                       />
                                   </div>
                               );
@@ -110,5 +94,50 @@ export function AccountOptionsDialog({
                 </div>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** One option's switch: it moves at once, and goes back with the reason if the
+ *  server refuses. Its own hook, so two options saved together never wait on, or
+ *  undo, each other. */
+function OptionSwitch({
+    account,
+    optionKey,
+    on,
+    label,
+    hintId,
+    onChanged,
+    onError
+}: {
+    account: DeviceAccountView;
+    optionKey: string;
+    on: boolean;
+    label: string;
+    hintId: string;
+    onChanged: (account: DeviceAccountView) => void;
+    onError: (message: string | null) => void;
+}) {
+    const t = usePlacesT();
+    const [checked, setChecked] = useOptimisticToggle(
+        on,
+        async (next) => {
+            onError(null);
+            const answer = await actions
+                .setDeviceAccountOptionAction({ accountId: account.id, key: optionKey, on: next })
+                .catch(() => ({ error: t("actions.someWrong") }) as { error: string });
+            if (answer.error || !("account" in answer) || !answer.account)
+                return { error: answer.error ?? t("actions.someWrong") };
+            onChanged(answer.account);
+            return answer;
+        },
+        { onRefused: onError }
+    );
+    return (
+        <Switch
+            checked={checked}
+            aria-label={label}
+            aria-describedby={hintId}
+            onChange={setChecked}
+        />
     );
 }

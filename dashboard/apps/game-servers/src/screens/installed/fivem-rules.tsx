@@ -23,7 +23,17 @@ import { RestartPlanner } from "./restart-planner";
 import { useCallback, useEffect, useState } from "react";
 import type { FivemRule } from "../../lib/fivem/service";
 import { AlertTriangle, Loader2, RefreshCw, RotateCcw, Search } from "lucide-react";
-import { Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    Input,
+    Select,
+    Skeleton,
+    Switch,
+    cn,
+    useOptimisticToggle
+} from "@polaris/ui";
 import {
     settingError,
     switchIsOn,
@@ -114,14 +124,17 @@ export function FivemRules({
 
     /** Write one line, or take it out with null. What is drawn afterwards is what
      *  the file now holds, so a row never shows something that was not written. */
-    async function apply(setting: FivemSetting, value: string | null): Promise<void> {
+    async function apply(
+        setting: FivemSetting,
+        value: string | null
+    ): Promise<{ error: string } | undefined> {
         if (value !== null) {
             const problem = settingError(setting, value, t);
             if (problem) {
                 setError(
                     `${t(setting.label)}: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`
                 );
-                return;
+                return { error: problem };
             }
         }
         setBusy(setting.key);
@@ -130,11 +143,12 @@ export function FivemRules({
         if (result.error) {
             setBusy(null);
             setError(result.error);
-            return;
+            return { error: result.error };
         }
         await load();
         setBusy(null);
         setChanged(true);
+        return undefined;
     }
 
     const ruleFor = (key: string): FivemRule | null =>
@@ -214,6 +228,7 @@ export function FivemRules({
                                     loading={loading}
                                     disabled={!canManage || !running || rules === null || !fresh}
                                     onChange={(value) => void apply(setting, value)}
+                                    onSwitch={(value) => apply(setting, value)}
                                 />
                             ))}
                         </CardBody>
@@ -237,7 +252,8 @@ function SettingRow({
     busy,
     loading,
     disabled,
-    onChange
+    onChange,
+    onSwitch
 }: {
     setting: FivemSetting;
     /** What the config sets, or null while the file has not been read. */
@@ -250,12 +266,20 @@ function SettingRow({
     loading: boolean;
     disabled: boolean;
     onChange: (next: string | null) => void;
+    /** A switch's new value, saved at once; a refused save puts the switch back. */
+    onSwitch: (next: string | null) => Promise<unknown>;
 }) {
     const t = useGameText("fivem");
     // Never the value for a secret: the reading does not carry one, and the row
     // says whether it is set instead - which is the only thing anybody needs to
     // read off it.
     const value = rule?.value ?? null;
+    const [on, setOn] = useOptimisticToggle(
+        setting.type === "boolean" && switchIsOn(setting, value),
+        (next) => onSwitch(switchValue(setting, next)),
+        // `apply` has already said why on the screen.
+        { onRefused: () => undefined }
+    );
     const isSet = rule?.set ?? false;
     const [draft, setDraft] = useState(value ?? "");
     useEffect(() => setDraft(value ?? ""), [value]);
@@ -320,9 +344,9 @@ function SettingRow({
                     {setting.type === "boolean" ? (
                         <Switch
                             aria-label={t(setting.label)}
-                            disabled={disabled || busy}
-                            checked={switchIsOn(setting, value)}
-                            onChange={(next: boolean) => onChange(switchValue(setting, next))}
+                            disabled={disabled}
+                            checked={on}
+                            onChange={setOn}
                         />
                     ) : setting.type === "choice" ? (
                         <Select

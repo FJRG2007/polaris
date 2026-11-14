@@ -23,7 +23,17 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 import type { GameKey } from "../../../messages";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { saveGameScheduleAction, setWakeOnJoinAction } from "./minecraft-actions";
-import { Button, Card, CardBody, Input, Select, Switch, isDirty, DateInput } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    Input,
+    Select,
+    Switch,
+    isDirty,
+    DateInput,
+    useOptimisticToggle
+} from "@polaris/ui";
 import { CalendarClock, Loader2, Moon, Plus, Power, Trash2 } from "lucide-react";
 import {
     describeSchedule,
@@ -94,8 +104,15 @@ export function MinecraftSchedule({
     const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const [schedule, setSchedule] = useState<GameSchedule>(saved);
-    const [wakes, setWakes] = useState(wakeOnJoin);
     const [error, setError] = useState<string | null>(null);
+    const [wakes, setWake] = useOptimisticToggle(
+        wakeOnJoin,
+        async (next) => {
+            setError(null);
+            return setWakeOnJoinAction(installedAppId, next);
+        },
+        { onRefused: setError }
+    );
     const [saved_, setSavedNote] = useState(false);
     const [pending, startTransition] = useTransition();
 
@@ -127,18 +144,6 @@ export function MinecraftSchedule({
     // Saved on the spot rather than with the schedule. It is one switch, and
     // holding it behind the same button as a form somebody is halfway through
     // editing is how a setting gets turned on and then lost.
-    function setWake(next: boolean): void {
-        setError(null);
-        setWakes(next);
-        startTransition(async () => {
-            const result = await setWakeOnJoinAction(installedAppId, next);
-            if (result.error) {
-                setWakes(!next);
-                setError(result.error);
-            }
-        });
-    }
-
     function save(): void {
         setError(null);
         startTransition(async () => {
@@ -261,7 +266,6 @@ export function MinecraftSchedule({
                                     <Switch
                                         checked={wakes}
                                         onChange={setWake}
-                                        disabled={pending}
                                         aria-label={t("schedule.startThisServerWhenSomebody")}
                                     />
                                 </div>

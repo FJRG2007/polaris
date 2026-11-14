@@ -637,7 +637,7 @@ function HostPanel({
                         </Button>
                         <Switch
                             checked={updates === "on"}
-                            disabled={pending || updates === "unsupported"}
+                            disabled={updates === "unsupported"}
                             onChange={(on) => void switchUpdates(on)}
                             aria-label={t("host.updates")}
                         />

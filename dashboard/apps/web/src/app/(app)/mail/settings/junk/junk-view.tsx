@@ -17,7 +17,7 @@ import { useBusy } from "@/app/(app)/mail/use-busy";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { Button, EmptyState, Switch, useToast } from "@polaris/ui";
+import { Button, EmptyState, Switch, useOptimisticToggle, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { forgetSpamAction, setSpamFilterAction } from "@/app/(app)/mail/actions";
 
@@ -58,18 +58,6 @@ export function JunkView({
     const state = taught[account.id] ?? { junk: 0, good: 0, words: 0 };
     const enabled = on[account.id] ?? account.spamFilter;
 
-    function toggle(next: boolean): void {
-        setOn((held) => ({ ...held, [account!.id]: next }));
-        startBusy(async () => {
-            const answer = await setSpamFilterAction(account!.id, next);
-            const said = refusalOf(answer);
-            if (said) {
-                setOn((held) => ({ ...held, [account!.id]: !next }));
-                toast.show({ title: said });
-            }
-        });
-    }
-
     async function forget(): Promise<void> {
         const sure = await confirm({
             title: t("junk.forgetTitle"),
@@ -106,11 +94,11 @@ export function JunkView({
                         <p className="text-[13px] font-medium">{t("junk.judge")}</p>
                         <p className="text-[12px] text-muted-foreground">{t("junk.judgeHint")}</p>
                     </div>
-                    <Switch
-                        checked={enabled}
-                        disabled={busy}
-                        onChange={toggle}
-                        aria-label={t("junk.judge")}
+                    <SpamSwitch
+                        key={account.id}
+                        accountId={account.id}
+                        enabled={enabled}
+                        onSaved={(id, next) => setOn((held) => ({ ...held, [id]: next }))}
                     />
                 </div>
                 <p className="border-t border-border px-3 py-2 text-[12px] text-foreground-subtle">
@@ -149,4 +137,25 @@ export function JunkView({
             {confirmDialog}
         </div>
     );
+}
+
+/** The filter switch for one mailbox: it moves at once and goes back with a toast
+ *  if the server refuses. Keyed by the mailbox, so switching accounts mid-save never
+ *  carries one mailbox's press onto another. */
+function SpamSwitch({
+    accountId,
+    enabled,
+    onSaved
+}: {
+    accountId: string;
+    enabled: boolean;
+    onSaved: (id: string, enabled: boolean) => void;
+}) {
+    const t = useTranslations("mailSettings");
+    const [on, toggle] = useOptimisticToggle(
+        enabled,
+        (next) => setSpamFilterAction(accountId, next),
+        { onSaved: (next) => onSaved(accountId, next) }
+    );
+    return <Switch checked={on} onChange={toggle} aria-label={t("junk.judge")} />;
 }

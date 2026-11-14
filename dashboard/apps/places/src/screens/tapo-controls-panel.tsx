@@ -14,7 +14,15 @@ import { usePlacesT } from "./use-places-t";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, RotateCcw, Siren } from "lucide-react";
 import { afterCommand, type TapoCommand, type TapoControls } from "../lib/camera-control-kinds";
-import { Button, ConfirmDeleteDialog, SegmentedControl, Switch, cn, useToast } from "@polaris/ui";
+import {
+    Button,
+    ConfirmDeleteDialog,
+    SegmentedControl,
+    Switch,
+    cn,
+    useOptimisticToggle,
+    useToast
+} from "@polaris/ui";
 
 export function TapoControlsPanel({
     cameraId,
@@ -67,6 +75,27 @@ export function TapoControlsPanel({
         if (command.kind === "reboot")
             toast.show({ key: `places-tapo-${cameraId}`, title: t("tapo.restarting") });
     };
+
+    /** A switch's command: the hook has already moved it, and puts it back on a refusal. */
+    const sendSwitch = async (command: TapoCommand) => {
+        const result = await actions.tapoCommandAction(cameraId, command).catch(() => null);
+        if (!result?.controls) return { error: result?.error ?? t("tapo.failed") };
+        setControls(result.controls);
+        return result;
+    };
+    const [led, setLed] = useOptimisticToggle(controls?.led ?? false, (on) =>
+        sendSwitch({ kind: "led", on })
+    );
+    const [flipped, setFlipped] = useOptimisticToggle(controls?.flip ?? false, (on) =>
+        sendSwitch({ kind: "flip", on })
+    );
+    const [motion, setMotion] = useOptimisticToggle(
+        controls?.motion?.enabled ?? false,
+        async (enabled) =>
+            controls?.motion
+                ? sendSwitch({ kind: "motion", enabled, sensitivity: controls.motion.sensitivity })
+                : null
+    );
 
     const panel = "w-full space-y-3 text-xs text-white";
     if (error)
@@ -160,9 +189,8 @@ export function TapoControlsPanel({
                 <Row label={t("tapo.led")}>
                     <Switch
                         aria-label={t("tapo.led")}
-                        checked={controls.led}
-                        disabled={busy === "led"}
-                        onChange={(on) => void send({ kind: "led", on })}
+                        checked={led}
+                        onChange={setLed}
                     />
                 </Row>
             ) : null}
@@ -171,9 +199,8 @@ export function TapoControlsPanel({
                 <Row label={t("tapo.flip")}>
                     <Switch
                         aria-label={t("tapo.flip")}
-                        checked={controls.flip}
-                        disabled={busy === "flip"}
-                        onChange={(on) => void send({ kind: "flip", on })}
+                        checked={flipped}
+                        onChange={setFlipped}
                     />
                 </Row>
             ) : null}
@@ -199,16 +226,8 @@ export function TapoControlsPanel({
                     <Row label={t("tapo.motion")}>
                         <Switch
                             aria-label={t("tapo.motion")}
-                            checked={controls.motion.enabled}
-                            disabled={busy === "motion"}
-                            onChange={(enabled) =>
-                                controls.motion &&
-                                void send({
-                                    kind: "motion",
-                                    enabled,
-                                    sensitivity: controls.motion.sensitivity
-                                })
-                            }
+                            checked={motion}
+                            onChange={setMotion}
                         />
                     </Row>
                     {controls.motion.enabled ? (

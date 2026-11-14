@@ -73,7 +73,8 @@ import {
     ScrollRow,
     Skeleton,
     Switch,
-    TagList
+    TagList,
+    useOptimisticToggle
 } from "@polaris/ui";
 import {
     Ban,
@@ -2055,19 +2056,16 @@ function ClosedServerCard({
 }) {
     const t = useGameText("ark");
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-
-    function run(work: () => Promise<{ error?: string }>): void {
-        setError(null);
-        startTransition(async () => {
-            const result = await work();
-            if (result.error) {
-                setError(result.error);
-                return;
-            }
-            onChanged();
-        });
-    }
+    const [logging, setLogging] = useOptimisticToggle(
+        access?.logging ?? false,
+        async (on) => {
+            setError(null);
+            const result = await actions.setArkGameLogAction(installedAppId, on);
+            if (!result.error) onChanged();
+            return result;
+        },
+        { onRefused: setError }
+    );
 
     return (
         <Card>
@@ -2082,11 +2080,9 @@ function ClosedServerCard({
                         </span>
                     </span>
                     <Switch
-                        checked={access?.logging ?? false}
-                        onChange={(on) =>
-                            run(() => actions.setArkGameLogAction(installedAppId, on))
-                        }
-                        disabled={!canManage || pending || access === null}
+                        checked={logging}
+                        onChange={setLogging}
+                        disabled={!canManage || access === null}
                         aria-label={t("panel.recordWhatHappensInThe")}
                     />
                 </label>

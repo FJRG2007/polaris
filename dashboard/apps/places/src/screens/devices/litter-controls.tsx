@@ -10,7 +10,7 @@
  * box reports. Dumping empties all the litter out, so it asks first.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Pause, Play, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import {
     Button,
@@ -60,6 +60,12 @@ export function LitterControls({
     const format = useDisplayFormat();
     const [confirmDump, setConfirmDump] = useState(false);
     const view = device.litter ?? null;
+    // An option moves under the finger at once; the unit's own reading takes over
+    // again once the command has answered, so a refused one goes back.
+    const [wanted, setWanted] = useState<Partial<Record<string, boolean>>>({});
+    useEffect(() => {
+        if (busy === null) setWanted({});
+    }, [busy, view]);
     const reason = controlReason(device, canControl, t);
     const running = kinds.litterBusy(view);
 
@@ -226,11 +232,12 @@ export function LitterControls({
                                 {kinds.litterOptionText(option, t)}
                             </span>
                             <Switch
-                                checked={view?.options[option] === true}
+                                checked={wanted[option] ?? view?.options[option] === true}
                                 disabled={reason !== "" || busy !== null}
-                                onChange={(on) =>
-                                    onAct("set-option", { action: "set-option", option, on })
-                                }
+                                onChange={(on) => {
+                                    setWanted((held) => ({ ...held, [option]: on }));
+                                    onAct("set-option", { action: "set-option", option, on });
+                                }}
                                 aria-label={kinds.litterOptionText(option, t)}
                             />
                         </label>

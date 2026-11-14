@@ -92,7 +92,7 @@ function ModAnnouncementsCard({
     );
     const [heard, setHeard] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
+    const [, startTransition] = useTransition();
     const [restartWaiting, setRestartWaiting] = useState(false);
 
     useEffect(() => {
@@ -112,7 +112,7 @@ function ModAnnouncementsCard({
 
     function flip(id: string, allow: boolean): void {
         setError(null);
-        const before = state;
+        const before = state?.mods.find((one) => one.id === id);
         // Shown at once; put back if the server refused it.
         setState((current) =>
             current
@@ -129,7 +129,15 @@ function ModAnnouncementsCard({
         startTransition(async () => {
             const answer = await setAnnouncementAction({ installedAppId, id, allow });
             if (answer.error || !answer.state) {
-                setState(before);
+                // Only this row goes back: another switch may have moved meanwhile.
+                setState((current) =>
+                    current && before
+                        ? {
+                              ...current,
+                              mods: current.mods.map((one) => (one.id === id ? before : one))
+                          }
+                        : current
+                );
                 setError(answer.error ?? t("moderation.announcements.saveFailed"));
                 return;
             }
@@ -204,7 +212,6 @@ function ModAnnouncementsCard({
                                             checked={mod.allowed}
                                             disabled={
                                                 !canManage ||
-                                                pending ||
                                                 !heard ||
                                                 mod.status === "unreadable"
                                             }

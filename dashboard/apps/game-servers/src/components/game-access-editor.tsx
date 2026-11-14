@@ -18,7 +18,7 @@ import { useGameText, useSchemaText } from "../screens/game-text";
 import { useMemo, useState, useTransition } from "react";
 import { GameAccessForm } from "./game-access-form";
 import { ACCESS_REACH_NOTE } from "../lib/minecraft/access";
-import { Badge, Button, Card, CardBody, Switch } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, Switch, useOptimisticToggle } from "@polaris/ui";
 import type { PlayerAccessView } from "../lib/minecraft/player-access";
 import {
     grantPlayerAccessAction,
@@ -100,6 +100,17 @@ export function GameAccessEditor({
         onError?.(message);
     }
 
+    const [binding, setBinding] = useOptimisticToggle(
+        access?.bindAddresses ?? true,
+        async (enabled) => {
+            report(null);
+            const result = await setAddressBindingAction(installedAppId, enabled);
+            if (!result.error) onChanged();
+            return result;
+        },
+        { onRefused: report }
+    );
+
     function run(action: () => Promise<{ error?: string }>): void {
         report(null);
         startTransition(async () => {
@@ -127,11 +138,9 @@ export function GameAccessEditor({
                                 : t("accessEditor.addressNotChecked")}
                         </span>
                         <Switch
-                            checked={access?.bindAddresses ?? true}
-                            onChange={(enabled) =>
-                                run(() => setAddressBindingAction(installedAppId, enabled))
-                            }
-                            disabled={pending || access === null || !access.addressesAvailable}
+                            checked={binding}
+                            onChange={setBinding}
+                            disabled={access === null || !access.addressesAvailable}
                             aria-label={t("accessEditor.checkEachPlayerSAddress")}
                         />
                     </div>

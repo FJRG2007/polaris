@@ -103,7 +103,8 @@ import {
     ScrollRow,
     Skeleton,
     Switch,
-    isDirty
+    isDirty,
+    useOptimisticToggle
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import type { AppHostTypes } from "@polaris/app-host";
@@ -1235,9 +1236,17 @@ function ClosedServerCard({
     onOpenPlayers: () => void;
 }) {
     const t = useGameText("fivem");
-    const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
-    const closed = access?.exclusiveJoin ?? false;
+    const [closed, setClosed] = useOptimisticToggle(
+        access?.exclusiveJoin ?? false,
+        async (next) => {
+            setError(null);
+            const result = await actions.setFivemExclusiveJoinAction(installedAppId, next);
+            if (!result.error) onChanged(result.access);
+            return result;
+        },
+        { onRefused: setError }
+    );
 
     return (
         <Card>
@@ -1251,22 +1260,9 @@ function ClosedServerCard({
                     </div>
                     <Switch
                         checked={closed}
-                        disabled={!canManage || pending || access === null}
+                        disabled={!canManage || access === null}
                         aria-label={t("panel.onlyPlayersYouAddCan")}
-                        onChange={(next: boolean) =>
-                            startTransition(async () => {
-                                setError(null);
-                                const result = await actions.setFivemExclusiveJoinAction(
-                                    installedAppId,
-                                    next
-                                );
-                                if (result.error) {
-                                    setError(result.error);
-                                    return;
-                                }
-                                onChanged(result.access);
-                            })
-                        }
+                        onChange={setClosed}
                     />
                 </div>
                 {error && <p className="text-sm text-danger">{error}</p>}

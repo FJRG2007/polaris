@@ -79,7 +79,8 @@ import {
     Switch,
     cn,
     useRowSelection,
-    TagList
+    TagList,
+    useOptimisticToggle
 } from "@polaris/ui";
 import {
     Backpack,
@@ -208,6 +209,16 @@ export function MinecraftPlayers({
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
+    const [binding, setBinding] = useOptimisticToggle(
+        access?.bindAddresses ?? true,
+        async (enabled) => {
+            setError(null);
+            const result = await actions.setAddressBindingAction(installedAppId, enabled);
+            if (!result.error) onChanged();
+            return result;
+        },
+        { onRefused: setError }
+    );
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
     /** Rows drawn so far: a server of thousands draws a screenful, then more. */
@@ -784,13 +795,9 @@ export function MinecraftPlayers({
                                     : t("playersTab.addressNotChecked")}
                             </span>
                             <Switch
-                                checked={access?.bindAddresses ?? true}
-                                onChange={(enabled) =>
-                                    run(() =>
-                                        actions.setAddressBindingAction(installedAppId, enabled)
-                                    )
-                                }
-                                disabled={pending || access === null || !access.addressesAvailable}
+                                checked={binding}
+                                onChange={setBinding}
+                                disabled={access === null || !access.addressesAvailable}
                                 aria-label={t("playersTab.checkEachPlayerSAddress")}
                             />
                         </div>

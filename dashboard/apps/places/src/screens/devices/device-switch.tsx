@@ -41,12 +41,13 @@ export function controlReason(
 export function DeviceSwitch({
     device,
     canControl,
-    busy,
     onAct,
     className
 }: {
     device: DeviceView;
     canControl: boolean;
+    /** Not a lock: the device act shows the press at once and puts it back on a
+     *  refusal, and a later press wins, so the switch stays pressable. */
     busy: boolean;
     onAct: (action: DeviceAction) => void;
     className?: string;
@@ -59,7 +60,7 @@ export function DeviceSwitch({
         <span className={cn("inline-flex items-center", className)} title={reason || undefined}>
             <Switch
                 checked={on}
-                disabled={reason !== "" || busy}
+                disabled={reason !== ""}
                 onChange={(next) => onAct(next ? "turn-on" : "turn-off")}
                 aria-label={t("devicePanel.switchName", { name: device.name })}
                 aria-describedby={reason ? reasonId : undefined}

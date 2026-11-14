@@ -9,8 +9,8 @@
 
 import { hostUi } from "@polaris/app-host/client";
 import { useGameText } from "../game-text";
-import { Card, CardBody, Switch } from "@polaris/ui";
-import { useEffect, useState, useTransition } from "react";
+import { Card, CardBody, Switch, useOptimisticToggle } from "@polaris/ui";
+import { useEffect, useState } from "react";
 import type { AnticheatState } from "../../lib/minecraft/polaris-anticheat-service";
 import { anticheatStateAction, setAnticheatAction } from "./anticheat-engine-actions";
 
@@ -42,7 +42,22 @@ export function AnticheatEngineCard({
     const [heard, setHeard] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
+    const [engineOn, setEngineOn] = useOptimisticToggle(
+        state?.on ?? false,
+        async (next) => {
+            setError(null);
+            const result = await setAnticheatAction({ installedAppId, on: next });
+            if (result.error) {
+                const answer = await anticheatStateAction(installedAppId);
+                if (answer.state) setState(answer.state);
+                return result;
+            }
+            setState((current) => (current ? { ...current, on: next } : current));
+            setNote(next ? t("engine.turnedOn") : t("engine.turnedOff"));
+            return result;
+        },
+        { onRefused: setError }
+    );
     const [confirm, confirmElement] = useConfirm();
 
     useEffect(() => {
@@ -70,18 +85,7 @@ export function AnticheatEngineCard({
             confirmLabel: on ? t("engine.turnOnAndRestart") : t("engine.turnOffAndRestart")
         });
         if (!sure) return;
-        setError(null);
-        startTransition(async () => {
-            const result = await setAnticheatAction({ installedAppId, on });
-            if (result.error) {
-                setError(result.error);
-                const answer = await anticheatStateAction(installedAppId);
-                if (answer.state) setState(answer.state);
-                return;
-            }
-            setState((current) => (current ? { ...current, on } : current));
-            setNote(on ? t("engine.turnedOn") : t("engine.turnedOff"));
-        });
+        setEngineOn(on);
     }
 
     return (
@@ -99,10 +103,9 @@ export function AnticheatEngineCard({
                         )}
                     </div>
                     <Switch
-                        checked={state?.on ?? false}
+                        checked={engineOn}
                         disabled={
                             !canManage ||
-                            pending ||
                             !heard ||
                             state === null ||
                             (!state.on && (!state.supported || !state.reachable))

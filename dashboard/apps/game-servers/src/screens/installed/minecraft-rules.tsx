@@ -433,7 +433,7 @@ function RuleRow({
             ) : rule.type === "boolean" ? (
                 <Switch
                     aria-label={t(rule.label)}
-                    disabled={disabled || busy}
+                    disabled={disabled}
                     // Off rather than a guess: an unread rule drawn as on would be
                     // a screen asserting something about somebody's world that
                     // nothing checked.

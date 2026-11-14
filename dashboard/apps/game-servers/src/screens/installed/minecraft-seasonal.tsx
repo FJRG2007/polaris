@@ -11,7 +11,7 @@
 
 import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
-import { Card, CardBody, Select, Skeleton, Switch } from "@polaris/ui";
+import { Card, CardBody, Select, Skeleton, Switch, useOptimisticToggle } from "@polaris/ui";
 import * as seasonal from "../../lib/minecraft/seasonal";
 import * as winter from "../../lib/minecraft/seasonal-winter";
 import { figureLanguage, formatPlain } from "../../lib/figures";
@@ -84,6 +84,18 @@ export function MinecraftSeasonal({
         });
     }
 
+    const [on, setOn] = useOptimisticToggle(
+        view?.on ?? false,
+        async (next) => {
+            setError(null);
+            const result = await saveSeasonalAction({ installedAppId, on: next });
+            answered.current = true;
+            if (result.view) setView(result.view);
+            return result.view ? result : { error: result.error ?? t("seasonal.notSaved") };
+        },
+        { onRefused: setError }
+    );
+
     const status = !view
         ? null
         : view.blocked
@@ -112,9 +124,9 @@ export function MinecraftSeasonal({
                     </div>
                     {view ? (
                         <Switch
-                            checked={view.on}
-                            disabled={!canManage || !heard || pending || view.blocked}
-                            onChange={(on) => save({ on })}
+                            checked={on}
+                            disabled={!canManage || !heard || view.blocked}
+                            onChange={setOn}
                             aria-label={t("seasonal.turnOn")}
                         />
                     ) : error ? null : (

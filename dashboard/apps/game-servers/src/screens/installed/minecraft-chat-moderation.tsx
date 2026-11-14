@@ -199,7 +199,7 @@ export function ChatModerationSection({
                         </div>
                         <Switch
                             checked={enabled}
-                            disabled={state === null || pending}
+                            disabled={state === null}
                             onChange={flipEnabled}
                             aria-label={t("moderation.chat.title")}
                         />
