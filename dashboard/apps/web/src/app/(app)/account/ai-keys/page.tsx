@@ -8,7 +8,9 @@
  * one for.
  */
 
+import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
+import { CardSkeleton } from "@/app/(app)/admin/region-skeletons";
 import { AiKeysPanel } from "./ai-keys-panel";
 import { getTranslations } from "@/lib/i18n/request";
 
@@ -19,14 +21,26 @@ export default async function AiKeysPage() {
     const t = await getTranslations("account");
 
     return (
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("aiKeys.page.title")}
                 </h1>
                 <p className="text-muted-foreground text-sm">{t("aiKeys.page.intro")}</p>
             </div>
-            <AiKeysPanel userId={user.id} />
+            {/* Streamed: the listing decrypts older keys once to fill their
+                hints and asks the router how each one stands, and the heading
+                has no reason to wait for either. */}
+            <Suspense
+                fallback={
+                    <>
+                        <CardSkeleton lines={4} />
+                        <CardSkeleton lines={2} />
+                    </>
+                }
+            >
+                <AiKeysPanel userId={user.id} />
+            </Suspense>
         </div>
     );
 }

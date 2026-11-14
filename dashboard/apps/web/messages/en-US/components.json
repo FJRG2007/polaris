@@ -1023,6 +1023,7 @@
         "order": "Order",
         "provider": "Provider",
         "name": "Name",
+        "key": "Key",
         "expires": "Expires",
         "lastUsed": "Last used",
         "never": "Never",
@@ -1149,7 +1150,8 @@
         },
         "pick": "Pick a provider",
         "search": "Search providers",
-        "none": "Nothing matches."
+        "none": "Nothing matches.",
+        "more": "{count, plural, one {# more - type to find it} other {# more - type to find them}}"
     },
     "viewAs": {
         "asUser": "Using Polaris as <name>{label}</name>",

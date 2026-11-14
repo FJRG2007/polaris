@@ -1023,6 +1023,7 @@
         "order": "Orden",
         "provider": "Proveedor",
         "name": "Nombre",
+        "key": "Clave",
         "expires": "Caduca",
         "lastUsed": "Último uso",
         "never": "Nunca",
@@ -1149,7 +1150,8 @@
         },
         "pick": "Elige un proveedor",
         "search": "Buscar proveedores",
-        "none": "Nada coincide."
+        "none": "Nada coincide.",
+        "more": "{count, plural, one {# más - escribe para encontrarlo} other {# más - escribe para encontrarlos}}"
     },
     "viewAs": {
         "asUser": "Usando Polaris como <name>{label}</name>",

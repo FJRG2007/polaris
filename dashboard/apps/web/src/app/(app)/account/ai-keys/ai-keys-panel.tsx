@@ -8,15 +8,14 @@ import { getTranslations } from "@/lib/i18n/request";
 import { Badge, Card, CardBody } from "@polaris/ui";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { assistedSignins } from "@/lib/agents/signin-runtime";
-import { signinProviderRows } from "@/lib/agents/agent-signins";
+import { isSigninRow, signinProviderRows } from "@/lib/agents/agent-signins";
 import { keyStatuses } from "@/lib/agents/key-status-read";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
 import { modelProviderName, modelProviderRows } from "@/lib/agents/model-key-providers";
 import {
     instanceKeysAreShared,
     keySourcesFor,
-    listAgentSignins,
-    listProviderKeys,
+    listModelKeys,
     signinEnvsFor,
     INSTANCE
 } from "@/lib/agents/model-keys";
@@ -36,14 +35,20 @@ import {
     updateModelKeyAction
 } from "./actions";
 
-export async function AiKeysPanel({ userId }: { userId: string }) {
+export async function AiKeysPanel({
+    userId,
+    narrow = false
+}: {
+    userId: string;
+    /** Drawn inside another page's reading column (Connected accounts). */
+    narrow?: boolean;
+}) {
     const t = await getTranslations("account");
-    // Two listings rather than one filtered afterwards: agent sign-ins live in
-    // the same table as provider keys and would otherwise be drawn in the
-    // provider table as a credential for a provider that does not exist.
-    const [keys, signins, sources, shared, fromPlatform] = await Promise.all([
-        listProviderKeys(userId),
-        listAgentSignins(userId),
+    // One read, split below: agent sign-ins live in the same table as provider
+    // keys and would otherwise be drawn as a credential for a provider that
+    // does not exist. Read once so any missing hint is filled once.
+    const [rows, sources, shared, fromPlatform] = await Promise.all([
+        listModelKeys(userId),
         keySourcesFor(userId),
         instanceKeysAreShared(),
         // What the deployment holds, asked as the deployment rather than as this
@@ -53,6 +58,8 @@ export async function AiKeysPanel({ userId }: { userId: string }) {
         signinEnvsFor(INSTANCE)
     ]);
 
+    const keys = rows.filter((row) => !isSigninRow(row.provider));
+    const signins = rows.filter((row) => isSigninRow(row.provider));
     const health = await keyStatuses(keys);
 
     const covered = [...sources.entries()]
@@ -65,6 +72,7 @@ export async function AiKeysPanel({ userId }: { userId: string }) {
                 providers={modelProviderRows()}
                 keys={keys}
                 health={health}
+                narrow={narrow}
                 actions={{
                     add: addModelKeyAction,
                     update: updateModelKeyAction,
@@ -96,6 +104,7 @@ export async function AiKeysPanel({ userId }: { userId: string }) {
             <ModelKeysView
                 providers={signinProviderRows()}
                 keys={signins}
+                narrow={narrow}
                 actions={{
                     add: addModelKeyAction,
                     update: updateModelKeyAction,

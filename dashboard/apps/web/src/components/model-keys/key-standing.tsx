@@ -48,13 +48,16 @@ export function KeyStanding({ status, compact = false }: { status: KeyHealthView
         status.reason && (REASONS as readonly string[]).includes(status.reason)
             ? tp(`routing.reasons.${status.reason as (typeof REASONS)[number]}`)
             : null;
+    const label = t(`modelKeys.status.${status.state}`);
+    // The column gives before the table scrolls: a long standing truncates, and
+    // the whole of it stays on hover.
     return (
-        <span className="flex min-w-0 flex-col items-start gap-0.5">
-            <Badge variant={TONE[status.state]} className="shrink-0">
-                {t(`modelKeys.status.${status.state}`)}
+        <span className="flex min-w-0 max-w-full flex-col items-start gap-0.5">
+            <Badge variant={TONE[status.state]} className="min-w-0 max-w-full" title={label}>
+                <span className="truncate">{label}</span>
             </Badge>
             {!compact && status.until ? (
-                <span className="text-xs text-muted-foreground">
+                <span className="max-w-full truncate text-xs text-muted-foreground" title={reason ?? undefined}>
                     {t("modelKeys.status.until")} <RelativeTime iso={status.until} tense="future" />
                     {reason ? ` - ${reason}` : null}
                 </span>

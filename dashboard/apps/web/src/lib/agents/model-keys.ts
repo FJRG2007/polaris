@@ -45,6 +45,7 @@ import {
     CredentialDecryptError
 } from "@polaris/storage";
 import { keyLimitsOf, type KeyLimits } from "@/lib/agents/key-limits";
+import { keyHint } from "@/lib/agents/key-hint";
 
 /** Whose keys a call is about: an account, or the deployment itself. */
 export type KeyOwner = string | null;
@@ -102,6 +103,9 @@ export interface ModelKeyView {
      *  it; null when it is ready. */
     coolingUntil: string | null;
     coolingReason: string | null;
+    /** The masked form that tells it apart ("gsk_...16189"), or "" when it
+     *  holds no single key. Never the key itself (`key-hint.ts`). */
+    keyHint: string;
 }
 
 /** The columns a screen may see. Everything absent from here is either the
@@ -118,7 +122,8 @@ const VIEW_SELECT = {
     updatedAt: true,
     limits: true,
     coolingUntil: true,
-    coolingReason: true
+    coolingReason: true,
+    keyHint: true
 } as const;
 
 function toView(row: {
@@ -134,6 +139,7 @@ function toView(row: {
     limits: string;
     coolingUntil: Date | null;
     coolingReason: string | null;
+    keyHint: string | null;
 }): ModelKeyView {
     const cooling = row.coolingUntil && row.coolingUntil > new Date() ? row.coolingUntil : null;
     return {
@@ -148,7 +154,8 @@ function toView(row: {
         updatedAt: row.updatedAt.toISOString(),
         limits: keyLimitsOf(row.limits),
         coolingUntil: cooling?.toISOString() ?? null,
-        coolingReason: cooling ? row.coolingReason : null
+        coolingReason: cooling ? row.coolingReason : null,
+        keyHint: row.keyHint ?? ""
     };
 }
 
@@ -202,7 +209,37 @@ export async function listModelKeys(owner: KeyOwner): Promise<ModelKeyView[]> {
         select: VIEW_SELECT,
         orderBy: [...BY_PRIORITY]
     });
-    return rows.map(toView);
+    const missing = rows.filter((row) => row.keyHint === null).map((row) => row.id);
+    if (missing.length === 0) return rows.map(toView);
+    const filled = await backfillKeyHints(missing);
+    return rows.map((row) => toView(filled.has(row.id) ? { ...row, keyHint: filled.get(row.id)! } : row));
+}
+
+/**
+ * Write the hint of rows stored before hints existed, and return them by id.
+ *
+ * Only the app can decrypt a key, so the migration cannot fill the column; the
+ * first listing that meets a row without one does, once. A key this deployment
+ * can no longer decrypt stays null and is retried on the next listing, since the
+ * master key it was written under may come back.
+ */
+async function backfillKeyHints(ids: string[]): Promise<Map<string, string>> {
+    const rows = await prisma.userModelKey.findMany({
+        where: { id: { in: ids }, keyHint: null },
+        select: { id: true, provider: true, config: true, encryptedSecret: true, secretNonce: true, secretKeyId: true }
+    });
+    const filled = new Map<string, string>();
+    for (const row of rows) {
+        const secret = readSecret(row);
+        if (secret === null) continue;
+        filled.set(row.id, keyHint(secret));
+    }
+    await Promise.all(
+        [...filled].map(([id, hint]) =>
+            prisma.userModelKey.updateMany({ where: { id, keyHint: null }, data: { keyHint: hint } })
+        )
+    );
+    return filled;
 }
 
 /** Which provider one of this owner's keys belongs to, or null when it holds no
@@ -270,6 +307,7 @@ function envelope(secret: string, provider: string, config?: Record<string, unkn
             fingerprintScope(provider, config),
             master
         ),
+        keyHint: keyHint(secret),
         expiryNotice: ""
     };
 }

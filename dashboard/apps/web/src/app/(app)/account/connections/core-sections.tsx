@@ -9,7 +9,8 @@
  * has no section of either.
  */
 
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+import { CardSkeleton } from "@/app/(app)/admin/region-skeletons";
 import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
 import { AiKeysPanel } from "@/app/(app)/account/ai-keys/ai-keys-panel";
@@ -45,7 +46,12 @@ export async function hubCoreSections(user: SessionUser): Promise<HubCoreSection
         id: AI_KEYS_SECTION,
         title: t("aiKeys.page.title"),
         intro: t("aiKeys.page.intro"),
-        body: <AiKeysPanel userId={user.id} />
+        // Streamed, so the rest of Connected accounts does not wait on it.
+        body: (
+            <Suspense fallback={<CardSkeleton lines={4} />}>
+                <AiKeysPanel userId={user.id} narrow />
+            </Suspense>
+        )
     });
     return {
         ids: sections.map((section) => section.id),

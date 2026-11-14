@@ -56,7 +56,7 @@ export default async function ModelProvidersPage() {
     const sharingTitle = t("integrationsModels.sharing.title");
 
     return (
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("integrationsModels.title")}

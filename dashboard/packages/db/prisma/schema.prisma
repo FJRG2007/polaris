@@ -8721,6 +8721,12 @@ model UserModelKey {
     // without decrypting, and Postgres counts nulls as distinct, so they simply
     // do not participate.
     secretFingerprint String?
+    // What the screens show to tell one key from another ("gsk_...16189"):
+    // the prefix and the last few characters, never enough to use. Written with
+    // the secret; "" for a row that holds no single key (a sign-in's credential
+    // file, a gateway with no token). Null on rows written before this existed,
+    // which the listing fills in the first time it reads them.
+    keyHint         String?
     // When the key stops being offered to a run, if its owner said. Polaris does
     // not learn this from the provider - most of them will not say - so it is
     // what the person entered when they set an expiry on their side.

@@ -52,8 +52,6 @@ import {
 import {
     Badge,
     Button,
-    Card,
-    CardBody,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -156,6 +154,29 @@ function expiryStanding(
     return days <= 7 ? { label: t("modelKeys.daysLeft", { days }), tone: "warning" } : null;
 }
 
+/**
+ * When each optional column gets its own cell, and when it rides under the name
+ * instead. Tailwind breakpoints follow the window, not the table, so the widths
+ * here are the content area's: the 14rem rail arrives at md, which is why nothing
+ * arrives there. A table drawn in a narrow column of another page (Connected
+ * accounts) keeps every optional column folded, whatever the window.
+ */
+type Columns = Record<"status" | "expires" | "key" | "lastUsed", { cell: string; fold: string }>;
+
+const WIDE_COLUMNS: Columns = {
+    status: { cell: "hidden lg:table-cell", fold: "lg:hidden" },
+    expires: { cell: "hidden xl:table-cell", fold: "xl:hidden" },
+    key: { cell: "hidden 2xl:table-cell", fold: "2xl:hidden" },
+    lastUsed: { cell: "hidden 2xl:table-cell", fold: "" }
+};
+
+const NARROW_COLUMNS: Columns = {
+    status: { cell: "hidden", fold: "" },
+    expires: { cell: "hidden", fold: "" },
+    key: { cell: "hidden", fold: "" },
+    lastUsed: { cell: "hidden", fold: "" }
+};
+
 /** A picked day ends at the end of it, local time - the day itself still works. */
 function endOfDay(date: string): Date | null {
     const [year, month, day] = date.split("-").map(Number);
@@ -185,7 +206,8 @@ export function ModelKeysView({
     copy,
     assist,
     footer,
-    health
+    health,
+    narrow = false
 }: {
     providers: ProviderRow[];
     keys: ModelKeyView[];
@@ -206,8 +228,11 @@ export function ModelKeysView({
     /** What sits under the table: what a run falls back to on an account's own
      *  screen, and who may spend these on the deployment's. */
     footer?: ReactNode;
+    /** Drawn in a narrow column of another page: optional columns stay folded. */
+    narrow?: boolean;
 }) {
     const router = useRouter();
+    const columns = narrow ? NARROW_COLUMNS : WIDE_COLUMNS;
     const t = useTranslations("components");
     const [confirm, confirmElement] = useConfirm();
     const [rows, setRows] = useState(keys);
@@ -360,95 +385,100 @@ export function ModelKeysView({
                 </p>
             ) : null}
 
-            <Card>
-                <CardBody className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                            <h2 className="text-sm font-medium">{copy.title}</h2>
-                            <p className="text-muted-foreground text-xs">{copy.hint}</p>
-                        </div>
-                        <Button size="sm" onClick={() => setAdding(true)}>
-                            <Plus className="size-4 shrink-0" />
-                            {copy.action ?? t("modelKeys.addKey")}
-                        </Button>
+            {/* No card around it, as on Account > API keys: a table inside a
+                padded card inside a reading column is a table that scrolls
+                sideways while half the screen is empty. */}
+            <section className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                        <h2 className="text-sm font-medium">{copy.title}</h2>
+                        <p className="text-muted-foreground text-xs">{copy.hint}</p>
                     </div>
+                    <Button size="sm" onClick={() => setAdding(true)}>
+                        <Plus className="size-4 shrink-0" />
+                        {copy.action ?? t("modelKeys.addKey")}
+                    </Button>
+                </div>
 
-                    <div className="overflow-x-auto rounded-lg border border-border">
-                        <table className="w-full text-sm">
-                            {/* Each column waits for the width that holds it, and nothing
-                                arrives at md: that is where the navigation rail appears, so
-                                the content area is narrower there than a breakpoint
-                                earlier. */}
-                            <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                <div className="overflow-x-auto rounded-lg border border-border">
+                    <table className="w-full text-sm">
+                        {/* Each column waits for the width that holds it, and nothing
+                            arrives at md: that is where the navigation rail appears, so
+                            the content area is narrower there than a breakpoint
+                            earlier. */}
+                        <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                            <tr>
+                                <th
+                                    className="w-10 px-2 py-2 font-medium"
+                                    aria-label={t("modelKeys.order")}
+                                />
+                                <th className="px-3 py-2 font-medium">
+                                    {t("modelKeys.provider")}
+                                </th>
+                                {/* w-full max-w-0: the name is the column that gives, so
+                                    a long one truncates instead of spilling the table
+                                    sideways. */}
+                                <th className="w-full min-w-24 max-w-0 whitespace-nowrap px-3 py-2 font-medium">
+                                    {t("modelKeys.name")}
+                                </th>
+                                <th className={`${columns.key.cell} whitespace-nowrap px-3 py-2 font-medium`}>
+                                    {t("modelKeys.key")}
+                                </th>
+                                {statuses ? (
+                                    <th className={`${columns.status.cell} whitespace-nowrap px-3 py-2 font-medium`}>
+                                        {t("modelKeys.status.title")}
+                                    </th>
+                                ) : null}
+                                <th className={`${columns.expires.cell} whitespace-nowrap px-3 py-2 font-medium`}>
+                                    {t("modelKeys.expires")}
+                                </th>
+                                <th className={`${columns.lastUsed.cell} whitespace-nowrap px-3 py-2 font-medium`}>
+                                    {t("modelKeys.lastUsed")}
+                                </th>
+                                <th className="px-3 py-2" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.length === 0 ? (
                                 <tr>
-                                    <th
-                                        className="w-10 px-2 py-2 font-medium"
-                                        aria-label={t("modelKeys.order")}
-                                    />
-                                    <th className="px-3 py-2 font-medium">
-                                        {t("modelKeys.provider")}
-                                    </th>
-                                    {/* w-full max-w-0: the name is the column that gives, so
-                                        a long one truncates instead of spilling the table
-                                        sideways. */}
-                                    <th className="w-full min-w-24 max-w-0 whitespace-nowrap px-3 py-2 font-medium">
-                                        {t("modelKeys.name")}
-                                    </th>
-                                    {statuses ? (
-                                        <th className="hidden whitespace-nowrap px-3 py-2 font-medium sm:table-cell">
-                                            {t("modelKeys.status.title")}
-                                        </th>
-                                    ) : null}
-                                    <th className="hidden whitespace-nowrap px-3 py-2 font-medium md:table-cell">
-                                        {t("modelKeys.expires")}
-                                    </th>
-                                    <th className="hidden whitespace-nowrap px-3 py-2 font-medium lg:table-cell">
-                                        {t("modelKeys.lastUsed")}
-                                    </th>
-                                    <th className="px-3 py-2" />
+                                    <td
+                                        colSpan={statuses ? 8 : 7}
+                                        className="text-muted-foreground px-3 py-8 text-center"
+                                    >
+                                        {copy.empty}
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {rows.length === 0 ? (
-                                    <tr>
-                                        <td
-                                            colSpan={statuses ? 7 : 6}
-                                            className="text-muted-foreground px-3 py-8 text-center"
-                                        >
-                                            {copy.empty}
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    rows.map((row, index) => (
-                                        <KeyRow
-                                            key={row.id}
-                                            row={row}
-                                            provider={byslug.get(row.provider) ?? null}
-                                            index={index}
-                                            total={rows.length}
-                                            onMove={move}
-                                            onEdit={() => setEditing(row)}
-                                            onRemove={() => void remove(row)}
-                                            onToggle={
-                                                toggle
-                                                    ? (enabled) => void toggle(row, enabled)
-                                                    : null
-                                            }
-                                            status={
-                                                statuses ? (statuses[row.id] ?? null) : undefined
-                                            }
-                                            onLimits={
-                                                actions.limit && statuses ? () => setLimiting(row) : null
-                                            }
-                                            onRevive={revive ? () => void revive(row) : null}
-                                        />
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </CardBody>
-            </Card>
+                            ) : (
+                                rows.map((row, index) => (
+                                    <KeyRow
+                                        key={row.id}
+                                        row={row}
+                                        columns={columns}
+                                        provider={byslug.get(row.provider) ?? null}
+                                        index={index}
+                                        total={rows.length}
+                                        onMove={move}
+                                        onEdit={() => setEditing(row)}
+                                        onRemove={() => void remove(row)}
+                                        onToggle={
+                                            toggle
+                                                ? (enabled) => void toggle(row, enabled)
+                                                : null
+                                        }
+                                        status={
+                                            statuses ? (statuses[row.id] ?? null) : undefined
+                                        }
+                                        onLimits={
+                                            actions.limit && statuses ? () => setLimiting(row) : null
+                                        }
+                                        onRevive={revive ? () => void revive(row) : null}
+                                    />
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
             {footer}
 
@@ -506,6 +536,7 @@ export function ModelKeysView({
 
 function KeyRow({
     row,
+    columns,
     provider,
     index,
     total,
@@ -518,6 +549,7 @@ function KeyRow({
     onRevive
 }: {
     row: ModelKeyView;
+    columns: Columns;
     provider: ProviderRow | null;
     index: number;
     total: number;
@@ -567,9 +599,12 @@ function KeyRow({
                 </div>
             </td>
             <td className="px-3 py-2">
-                <div className="flex items-center gap-2">
+                {/* Capped, so one long vendor name cannot push the table sideways. */}
+                <div className="flex max-w-40 items-center gap-2">
                     <IntegrationLogo slug={row.provider} className="size-4 shrink-0" />
-                    <span className="whitespace-nowrap">{label}</span>
+                    <span className="min-w-0 truncate whitespace-nowrap" title={label}>
+                        {label}
+                    </span>
                 </div>
             </td>
             <td className="w-full max-w-0 px-3 py-2">
@@ -581,7 +616,7 @@ function KeyRow({
                         column: that column is the first thing dropped on a narrow
                         screen, and "this key is dead" is not a detail to hide. */}
                     {standing ? (
-                        <Badge variant={standing.tone} className="shrink-0 md:hidden">
+                        <Badge variant={standing.tone} className={`shrink-0 ${columns.expires.fold}`}>
                             {standing.label}
                         </Badge>
                     ) : null}
@@ -589,18 +624,38 @@ function KeyRow({
                     {/* The standing rides with the name below sm, where its own
                         column is dropped; a ready key says nothing there. */}
                     {status && status.state !== "ready" ? (
-                        <span className="shrink-0 sm:hidden">
+                        <span className={`shrink-0 ${columns.status.fold}`}>
                             <KeyStanding status={status} compact />
                         </span>
                     ) : null}
                 </span>
+                {/* Under the name until its own column fits, so two keys of one
+                    provider can still be told apart on a phone. */}
+                {row.keyHint ? (
+                    <span
+                        className={`text-muted-foreground block truncate font-mono text-xs ${columns.key.fold}`}
+                    >
+                        {row.keyHint}
+                    </span>
+                ) : null}
+            </td>
+            <td
+                className={`text-muted-foreground ${columns.key.cell} whitespace-nowrap px-3 py-2 font-mono text-xs`}
+            >
+                {row.keyHint || null}
             </td>
             {status !== undefined ? (
-                <td className="hidden px-3 py-2 sm:table-cell">
-                    {status ? <KeyStanding status={status} /> : null}
+                <td className={`${columns.status.cell} px-3 py-2`}>
+                    {/* The cap is on a block inside the cell: a max-width on an auto
+                        table cell is ignored. */}
+                    {status ? (
+                        <div className="max-w-56">
+                            <KeyStanding status={status} />
+                        </div>
+                    ) : null}
                 </td>
             ) : null}
-            <td className="hidden whitespace-nowrap px-3 py-2 md:table-cell">
+            <td className={`${columns.expires.cell} whitespace-nowrap px-3 py-2`}>
                 {row.expiresAt ? (
                     <span className="flex items-center gap-2">
                         <span className="text-muted-foreground">
@@ -612,7 +667,7 @@ function KeyRow({
                     <span className="text-muted-foreground">{t("modelKeys.never")}</span>
                 )}
             </td>
-            <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 lg:table-cell">
+            <td className={`text-muted-foreground ${columns.lastUsed.cell} whitespace-nowrap px-3 py-2`}>
                 {row.lastUsedAt ? <RelativeTime iso={row.lastUsedAt} /> : t("modelKeys.never")}
             </td>
             <td className="px-3 py-2">
