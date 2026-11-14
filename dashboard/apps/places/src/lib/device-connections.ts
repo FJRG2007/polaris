@@ -176,6 +176,11 @@ export interface ConnectionPairing {
 export interface DeviceConnection {
     /** Stored on the account row. Never shown. */
     readonly id: string;
+    /** Set where a device's id is the make's own, the same through every
+     *  connection that declares the same value: the same device reached a second
+     *  way is then moved onto it rather than listed twice (`device-handover`).
+     *  Absent where an id only means something on one bridge or one network. */
+    readonly identity?: string;
     /** Who makes the devices, as their owner would say it. */
     readonly brand: string;
     /**
@@ -407,6 +412,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     {
         id: "tuya-app",
         brand: "Tuya",
+        identity: "tuya",
         logo: "tuya",
         apps: ["Smart Life", "Tuya Smart"],
         label: en("connections.tuya-app.label"),
@@ -455,6 +461,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     {
         id: "tuya-cloud",
         brand: "Tuya",
+        identity: "tuya",
         logo: "tuya",
         apps: ["Smart Life", "Tuya Smart"],
         label: en("connections.tuya-cloud.label"),
@@ -1051,6 +1058,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     {
         id: "petkit-cloud",
         brand: "PETKIT",
+        identity: "petkit",
         recommended: true,
         logo: "petkit",
         label: en("connections.petkit-cloud.label"),
@@ -1166,6 +1174,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     {
         id: "switchbot-cloud",
         brand: "SwitchBot",
+        identity: "switchbot",
         recommended: true,
         logo: "switchbot",
         label: en("connections.switchbot-cloud.label"),

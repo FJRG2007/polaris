@@ -12206,6 +12206,15 @@ model PlaceDevice {
     online         Boolean   @default(true)
     stateAt        DateTime?
 
+    // When the account it came through stopped listing it: sold, given away or
+    // left behind in a house somebody moved out of. The row is kept, off limits,
+    // rather than deleted, so its owner decides whether to remove it - and its
+    // history, automations and shares are still theirs if it comes back.
+    goneAt     DateTime?
+    // When a gone device was listed again by one of this install's connections.
+    // It stays off limits until somebody restores it or starts it afresh.
+    returnedAt DateTime?
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
@@ -12217,10 +12226,10 @@ model PlaceDevice {
     labels      PlaceDeviceLabel[]
 
     // One device per id per account. A sync runs on a schedule and on demand, and
-    // the two overlapping must not leave a house with the same door twice. Per
-    // account rather than per make: the same lock can be on two logins, and a
-    // house that connected both should see it under each rather than have the
-    // second one silently overwrite the first.
+    // the two overlapping must not leave a house with the same door twice. Where a
+    // connection's ids are the make's own (`identity` in `device-connections`),
+    // the same device reached through a second connection of the same install is
+    // moved onto it, row and id kept (`device-handover`), rather than listed twice.
     @@unique([accountId, externalId])
     @@index([installedAppId])
     @@index([placeId])

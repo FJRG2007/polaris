@@ -35,6 +35,7 @@ interface Row {
     air: null;
     appliance: null;
     stateAt: Date | null;
+    goneAt?: Date | null;
 }
 
 const rows = new Map<string, Row>();
@@ -43,6 +44,8 @@ let snapshots: { externalId: string; state: string }[] = [];
 vi.mock("@polaris/db", () => ({
     Prisma: { DbNull: null },
     prisma: {
+        // Only one connection here, so nothing to hand a device over from.
+        placeDeviceAccount: { findFirst: async () => null },
         placeDevice: {
             upsert: async (args: {
                 where: { accountId_externalId: { accountId: string; externalId: string } };
@@ -57,10 +60,26 @@ vi.mock("@polaris/db", () => ({
                 rows.set(row.id, row as Row);
                 return row;
             },
-            findMany: async (args: { where: { externalId?: { notIn: string[] } } }) =>
+            findMany: async (args: {
+                where: { externalId?: { notIn?: string[] }; goneAt?: unknown };
+            }) =>
                 [...rows.values()].filter(
-                    (row) => !args.where.externalId?.notIn.includes(row.externalId)
+                    (row) =>
+                        !args.where.externalId?.notIn?.includes(row.externalId) &&
+                        (args.where.goneAt === undefined || Boolean(row.goneAt))
                 ),
+            // Marking gone: what the account no longer lists, and was not already.
+            updateMany: async (args: {
+                where: { goneAt?: null; externalId: { notIn: string[] } };
+                data: Partial<Row>;
+            }) => {
+                if (args.where.goneAt !== null) return { count: 0 };
+                const marked = [...rows.values()].filter(
+                    (row) => !row.goneAt && !args.where.externalId.notIn.includes(row.externalId)
+                );
+                for (const row of marked) Object.assign(row, args.data);
+                return { count: marked.length };
+            },
             deleteMany: async (args: { where: { id: { in: string[] } } }) => {
                 for (const id of args.where.id.in) rows.delete(id);
                 return { count: args.where.id.in.length };
@@ -145,10 +164,15 @@ describe("a sync, as an open screen hears it", () => {
         await syncDevices("install-2");
         const frame = heard.find((change) => !change.accounts)!;
         expect(frame.installedAppId).toBe("install-2");
-        expect(frame.devices.map((device) => [device.id, device.state])).toEqual([["id-a", "on"]]);
-        expect(frame.removed).toEqual(["id-b"]);
-        // What was lent of it goes with it, as before.
-        expect(dropped).toContain("id-b");
+        expect(frame.devices[0]).toMatchObject({ id: "id-a", state: "on" });
+        // Gone, not deleted: published as gone, and what was lent of it stays
+        // for its owner to decide on.
+        expect(frame.devices.map((device) => [device.id, device.gone ?? null])).toEqual([
+            ["id-a", null],
+            ["id-b", "away"]
+        ]);
+        expect(frame.removed).toEqual([]);
+        expect(dropped).not.toContain("id-b");
     });
 
     it("reads only the accounts it was asked to, and names the ones that failed", async () => {

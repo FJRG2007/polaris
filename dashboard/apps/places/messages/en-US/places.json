@@ -1628,7 +1628,8 @@
             "reset-deodorizer": "Deodorizer reset",
             "bin-full": "Waste bin full",
             "litter-low": "Litter running low",
-            "fault": "Stopped on a fault"
+            "fault": "Stopped on a fault",
+            "moved": "Moved here from another connection"
         },
         "kindStates": {
             "lock": {
@@ -1898,7 +1899,20 @@
         "lapsed": "{name} stopped working because its plan with the maker ran out, so its devices do not respond.",
         "planEnded": "plan ran out",
         "openWhere": "Open {where}",
-        "connectInstead": "Connect {label} instead"
+        "connectInstead": "Connect {label} instead",
+        "movedIn": "{count, plural, one {# device moved} other {# devices moved}} from {from} to {to}, with their names, rooms, automations and history.",
+        "movedOut": "{from} has no devices left: they moved to {to}, with everything they had.",
+        "removeEmpty": "Remove {name}",
+        "disconnectMovedBody": "Its devices already moved to {to} and stay there, with their history.",
+        "goneTitle": "No longer here",
+        "goneAway": "Its account stopped listing it - sold, given away or left behind. Nothing acts on it.",
+        "goneBack": "It is back on one of your connections. Restore its settings and history, or start afresh.",
+        "goneRestore": "Restore",
+        "goneFresh": "Start afresh",
+        "goneRemove": "Remove",
+        "goneRemoveTitle": "Remove the device",
+        "goneRemoveQuestion": "Remove <em>{name}</em> for good?",
+        "goneRemoveBody": "Its history and anything shared of it go with it. If it comes back, it arrives as a new device."
     },
     "devicePanel": {
         "watchOnly": "Set to be watched rather than operated.",

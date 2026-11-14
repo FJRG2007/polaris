@@ -20,6 +20,7 @@ import { loadEnv } from "@polaris/config";
 import { HomeError } from "./home-error";
 import { ATTENTION_STATUSES, tellConnectionFailed } from "./account-alerts";
 import * as registry from "./device-connections";
+import * as handover from "./device-handover";
 import { withAddresses } from "./driver-addresses";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { NUKI_WEB, nukiWebDriver } from "./drivers/nuki-web";
@@ -122,6 +123,12 @@ export interface DeviceAccountView {
     /** Each of the connection's options (`ConnectionOption`), on or off. */
     readonly options: Readonly<Record<string, boolean>>;
     readonly deviceCount: number;
+    /** Devices moved onto this connection from another of this house's in the
+     *  last two weeks, kept whole (`device-handover`), by where they came from. */
+    readonly movedIn?: readonly { readonly from: string; readonly count: number }[];
+    /** Set when this connection has nothing left because its devices moved to
+     *  another: removing it then takes nothing with it. */
+    readonly movedOut?: { readonly to: string; readonly count: number } | null;
 }
 
 type AccountRow = {
@@ -238,7 +245,23 @@ export async function listAccounts(installedAppId: string): Promise<DeviceAccoun
         orderBy: [{ createdAt: "asc" }],
         select: { ...ACCOUNT_FIELDS, _count: { select: { devices: true } } }
     });
-    return rows.map(toView);
+    const views = rows.map(toView);
+    const moves = views.length > 1 ? await handover.recentHandovers(installedAppId) : [];
+    if (moves.length === 0) return views;
+    const named = new Map(views.map((view) => [view.id, view.connectionLabel]));
+    return views.map((view) => {
+        const movedIn = moves.flatMap((move) => {
+            const from = named.get(move.from);
+            return move.to === view.id && from ? [{ from, count: move.count }] : [];
+        });
+        const out = view.deviceCount === 0 ? moves.find((move) => move.from === view.id) : undefined;
+        const to = out ? named.get(out.to) : undefined;
+        return {
+            ...view,
+            ...(movedIn.length > 0 ? { movedIn } : {}),
+            ...(out && to ? { movedOut: { to, count: out.count } } : {})
+        };
+    });
 }
 
 /** One account with what it is opened with, for the service that is about to use
@@ -500,7 +523,9 @@ export async function linkLocal(
 /**
  * Take an account away.
  *
- * Its devices go with it, and their history with them. That is the honest
+ * Its devices go with it, and their history with them - the ones it still holds:
+ * a device moved to another connection (`device-handover`) is that one's row now
+ * and stays. That is the honest
  * behaviour rather than the convenient one: a row nothing can reach is a lock
  * somebody would still press, and keeping months of who-opened-what for an
  * account that has been disconnected is keeping a record of a building Polaris

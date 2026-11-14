@@ -1637,7 +1637,8 @@
             "reset-deodorizer": "Ambientador a cero",
             "bin-full": "Cubo lleno",
             "litter-low": "Queda poca arena",
-            "fault": "Parado por un fallo"
+            "fault": "Parado por un fallo",
+            "moved": "Llegó desde otra conexión"
         },
         "event": "{what}{hasActor, select, yes { por {actor}} other {}}{hasHow, select, yes { {how}} other {}}",
         "failedBecause": "{line} - {note}",
@@ -1898,7 +1899,20 @@
         "lapsed": "{name} ha dejado de funcionar porque su plan con el fabricante caducó, y sus dispositivos no responden.",
         "planEnded": "plan caducado",
         "openWhere": "Abrir {where}",
-        "connectInstead": "Conectar {label}"
+        "connectInstead": "Conectar {label}",
+        "movedIn": "{count, plural, one {# dispositivo pasó} other {# dispositivos pasaron}} de {from} a {to}, con sus nombres, salas, automatizaciones e historial.",
+        "movedOut": "{from} ya no tiene dispositivos: pasaron a {to}, con todo lo que tenían.",
+        "removeEmpty": "Quitar {name}",
+        "disconnectMovedBody": "Sus dispositivos ya pasaron a {to} y se quedan allí, con su historial.",
+        "goneTitle": "Ya no están aquí",
+        "goneAway": "Su cuenta dejó de mostrarlo: vendido, regalado o dejado atrás. Nada actúa sobre él.",
+        "goneBack": "Ha vuelto a una de tus conexiones. Recupera sus ajustes e historial, o empieza de cero.",
+        "goneRestore": "Recuperar",
+        "goneFresh": "Empezar de cero",
+        "goneRemove": "Quitar",
+        "goneRemoveTitle": "Quitar aparato",
+        "goneRemoveQuestion": "¿Quitar <em>{name}</em> para siempre?",
+        "goneRemoveBody": "Su historial y lo que se haya compartido de él se van con él. Si vuelve, llega como uno nuevo."
     },
     "devicePanel": {
         "watchOnly": "Configurado para vigilarse, no para manejarse.",

@@ -926,6 +926,10 @@ export interface DeviceView {
     /** The account it is read through, for reading that account again. Null on a
      *  device connected to nothing; absent where a view was built without it. */
     readonly accountId?: string | null;
+    /** `away` when its account stopped listing it (sold, given away, left
+     *  behind), `back` when one of this house's connections lists it again and it
+     *  waits to be restored. Either way it is off limits. Absent or null: here. */
+    readonly gone?: "away" | "back" | null;
 }
 
 /** How something came to happen. `polaris` is the one that carries weight: it is

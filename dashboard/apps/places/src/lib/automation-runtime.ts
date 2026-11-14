@@ -139,7 +139,8 @@ export function automationEngine(): AutomationEngine {
         devices: {
             async read(installedAppId, deviceId) {
                 const row = await prisma.placeDevice.findFirst({
-                    where: { id: deviceId, installedAppId },
+                    // A gone device is no longer this house's to act on or read.
+                    where: { id: deviceId, installedAppId, goneAt: null },
                     select: {
                         id: true,
                         kind: true,

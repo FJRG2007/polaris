@@ -1985,6 +1985,31 @@ export async function pollDevicePairingAction(input: unknown): Promise<{
 }
 
 /** Take one connection away, and the devices and their history with it. */
+/**
+ * A device that left and came back, made this house's again (`restore`), or one
+ * that left removed for good (`forget`) - after which, if it came back, the next
+ * read lists it as a new device with nothing of the old one's.
+ */
+export async function settleGoneDeviceAction(
+    deviceId: string,
+    choice: "restore" | "forget"
+): Promise<{ devices?: DeviceView[]; error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const result = await guard(async () => {
+        await devices.settleGoneDevice(install.id, String(deviceId), String(choice));
+        const { current } = await currentPlace(install.id);
+        return devices.listDevices(install.id, current.id);
+    });
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: choice === "restore" ? "places.device.restore" : "places.device.forget",
+        targetType: "installedApp",
+        targetId: install.id
+    });
+    return { devices: result.value };
+}
+
 export async function disconnectDeviceAccountAction(accountId: string): Promise<{
     devices?: DeviceView[];
     accounts?: deviceAccounts.DeviceAccountView[];

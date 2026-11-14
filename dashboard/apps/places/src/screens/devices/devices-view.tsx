@@ -31,6 +31,7 @@ import { ConnectDialog, type Connected } from "./connect-dialog";
 import { NukiLocalDialog } from "./nuki-local-dialog";
 import { RoomsDialog } from "./rooms-dialog";
 import { AccountOptionsDialog } from "./account-options-dialog";
+import { GoneDevices, HandoverNotes } from "./handover-notes";
 import * as kinds from "../../lib/device-kinds";
 import { batteryLine, batteryLow } from "../../lib/automation-kinds";
 import type { PlaceView } from "../../lib/place-kinds";
@@ -127,13 +128,18 @@ export function DevicesView({
     const [networks, setNetworks] = useState<AccountNetwork[]>([]);
     const [opened, setOpened] = useState<DeviceView | null>(null);
     const [disconnecting, setDisconnecting] = useState<DeviceAccountView | null>(null);
+    /** A device that left, about to be removed for good. */
+    const [forgetting, setForgetting] = useState<DeviceView | null>(null);
     /** The account whose switches are open, by id: read from the list so a
      *  switch flipped there is the switch drawn here. */
     const [adjusting, setAdjusting] = useState<string | null>(null);
     const [linking, setLinking] = useState<DeviceAccountView | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState("");
-    const groups = useMemo(() => groupDevices(devices ?? [], t), [devices, t]);
+    // A device that left the house is listed apart, off limits, not among these.
+    const here = useMemo(() => (devices ?? []).filter((device) => !device.gone), [devices]);
+    const gone = useMemo(() => (devices ?? []).filter((device) => device.gone), [devices]);
+    const groups = useMemo(() => groupDevices(here, t), [here, t]);
 
     /** When each device was last pushed, so a full read that began before a
      *  push cannot put the older state back. */
@@ -342,6 +348,23 @@ export function DevicesView({
         take({ devices: result.devices ?? [], accounts: result.accounts ?? [] });
     };
 
+    const settleGone = async (device: DeviceView, choice: "restore" | "forget") => {
+        const result = await runAction(
+            () => actions.settleGoneDeviceAction(device.id, choice),
+            setError
+        );
+        if (!result || result.error) {
+            if (result?.error) setError(result.error);
+            return;
+        }
+        take({ devices: result.devices ?? [] });
+    };
+    const forget = async () => {
+        if (!forgetting) return;
+        await settleGone(forgetting, "forget");
+        setForgetting(null);
+    };
+
     /** One dialog, two jobs, and the difference is which account it was opened
      *  on. Closing it has to forget that either way. */
     const settleConnection = (result: Connected) => {
@@ -538,8 +561,15 @@ export function DevicesView({
                 </section>
             ) : null}
 
+            <HandoverNotes
+                accounts={accounts}
+                canManage={canManage}
+                onRemove={setDisconnecting}
+            />
+
             {accounts
-                .filter((account) => account.status !== "ok")
+                // One left empty by a move says so above, with its own button.
+                .filter((account) => account.status !== "ok" && !account.movedOut)
                 .map((account) => {
                     // A plan that ran out at the maker is fixed in the maker's
                     // console, so the way there is offered - and, where the make
@@ -606,7 +636,16 @@ export function DevicesView({
                 <p className="text-xs text-muted-foreground">{t("devicesView.unplacedNote")}</p>
             )}
 
-            {devices.length === 0 ? (
+            <GoneDevices
+                devices={gone}
+                canManage={canManage}
+                onSettle={async (device, choice) => {
+                    if (choice === "forget") setForgetting(device);
+                    else await settleGone(device, choice);
+                }}
+            />
+
+            {here.length === 0 && gone.length > 0 ? null : here.length === 0 ? (
                 <EmptyState
                     title={t("devicesView.nothingTitle")}
                     description={t("devicesView.nothingBody")}
@@ -686,9 +725,28 @@ export function DevicesView({
                     em: (chunks) => <span className="font-medium text-foreground">{chunks}</span>
                 })}
                 requireTyping={false}
-                description={t("devicesView.disconnectBody")}
+                description={
+                    disconnecting?.movedOut
+                        ? t("devicesView.disconnectMovedBody", { to: disconnecting.movedOut.to })
+                        : t("devicesView.disconnectBody")
+                }
                 confirmLabel={t("devicesView.disconnect")}
                 onConfirm={disconnect}
+            />
+            <ConfirmDeleteDialog
+                open={forgetting !== null}
+                onOpenChange={(open) => (open ? undefined : setForgetting(null))}
+                name={forgetting?.name ?? ""}
+                kind="device"
+                title={t("devicesView.goneRemoveTitle")}
+                question={t.rich("devicesView.goneRemoveQuestion", {
+                    name: forgetting?.name ?? "",
+                    em: (chunks) => <span className="font-medium text-foreground">{chunks}</span>
+                })}
+                requireTyping={false}
+                description={t("devicesView.goneRemoveBody")}
+                confirmLabel={t("devicesView.goneRemove")}
+                onConfirm={forget}
             />
         </div>
     );

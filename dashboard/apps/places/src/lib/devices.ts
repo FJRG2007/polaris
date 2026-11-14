@@ -22,6 +22,7 @@ import { HomeError } from "./home-error";
 import * as rooms from "./rooms";
 import * as labels from "./labels";
 import * as accounts from "./device-accounts";
+import * as handover from "./device-handover";
 import * as litterAlerts from "./litter-alerts";
 import { DriverError, type DeviceHistoryEntry } from "./drivers/contract";
 import { host } from "@polaris/app-host";
@@ -80,6 +81,8 @@ const DEVICE_FIELDS = {
     switchSettings: true,
     reach: true,
     stateAt: true,
+    goneAt: true,
+    returnedAt: true,
     labels: { select: { labelId: true }, take: labels.LABEL_LIMITS.perDevice }
 } as const;
 
@@ -111,6 +114,8 @@ type DeviceRow = {
     switchSettings: Prisma.JsonValue | null;
     reach: string | null;
     stateAt: Date | null;
+    goneAt?: Date | null;
+    returnedAt?: Date | null;
     labels?: { labelId: string }[];
 };
 
@@ -226,7 +231,8 @@ function toView(row: DeviceRow): kinds.DeviceView {
         litter: litterOf(row),
         switchSettings: switchSettingsOf(row),
         reach: kinds.deviceReach(row.reach),
-        accountId: row.accountId
+        accountId: row.accountId,
+        gone: row.goneAt ? (row.returnedAt ? "back" : "away") : null
     };
 }
 
@@ -361,6 +367,8 @@ export async function actOnDevice(
         const what = kinds.DEVICE_KIND_LABELS[kinds.deviceKind(device.kind)].toLowerCase();
         throw new HomeError(`A ${what} cannot be told to ${kinds.DEVICE_ACTION_VERBS[action]}`);
     }
+    if (device.goneAt)
+        throw new HomeError(`${device.name} is no longer on any of this house's connections`);
     if (!device.controllable)
         throw new HomeError(`${device.name} is set to be watched, not operated`);
     if (!device.accountId) throw new HomeError(`${device.name} is not connected to anything`);
@@ -623,12 +631,19 @@ async function syncAccount(
         }
 
         const snapshots = await driver.list(credentials);
+        const listed = snapshots.map((snapshot) => snapshot.externalId);
+        // The same devices another of this house's connections holds: moved onto
+        // this one, or left with the other while it still works.
+        const held = await handover.claimTwins(installedAppId, accountId, listed);
+        await markReturned(installedAppId, accountId, view.connection, listed);
         const vendor = view.brand.toLowerCase();
         // What each litter box said last time, so what has just started needing
         // somebody (a full bin, a fault) is told once rather than every minute.
         const litterBefore = await litterAlerts.previousLitter(accountId, snapshots);
         const read: DeviceRow[] = [];
+        const shown: DeviceRow[] = [];
         for (const snapshot of snapshots) {
+            if (held.has(snapshot.externalId)) continue;
             const reading = {
                 kind: snapshot.kind,
                 model: snapshot.model,
@@ -666,6 +681,10 @@ async function syncAccount(
                 },
                 select: DEVICE_FIELDS
             });
+            shown.push(saved);
+            // A gone device waiting to be restored is shown, and nothing more:
+            // no alert, no automation, until somebody says it is theirs again.
+            if (saved.goneAt) continue;
             read.push(saved);
             await litterAlerts.tellLitter(
                 installedAppId,
@@ -675,29 +694,25 @@ async function syncAccount(
             );
         }
 
-        // Anything on our side the account no longer has. A device somebody sold
-        // is not a device this house has, and leaving the row would leave a button
-        // that answers with an error nobody can act on.
+        // Anything on our side the account no longer has: sold, given away, or
+        // left behind in a house somebody moved out of. Marked gone and kept, off
+        // limits, rather than deleted - removing it is its owner's call, and its
+        // history, automations and shares are still theirs if it comes back. A
+        // new owner who connects it gets a device of their own, on their install.
+        const now = new Date();
+        await prisma.placeDevice.updateMany({
+            where: { accountId, goneAt: null, externalId: { notIn: listed } },
+            data: { goneAt: now, returnedAt: null, online: false }
+        });
+        await prisma.placeDevice.updateMany({
+            where: { accountId, returnedAt: { not: null }, externalId: { notIn: listed } },
+            data: { returnedAt: null }
+        });
         const gone = await prisma.placeDevice.findMany({
-            where: {
-                accountId,
-                externalId: { notIn: snapshots.map((snapshot) => snapshot.externalId) }
-            },
-            select: { id: true }
+            where: { accountId, goneAt: { gte: now } },
+            select: DEVICE_FIELDS
         });
-        // Whatever was lent of a device that is no longer here. The rows are
-        // addressed by kind and id rather than by foreign key, so nothing drops
-        // them on the device's behalf - and a share of a door somebody sold
-        // should not be waiting if another arrives with the same id.
-        for (const device of gone) await dropGrantsFor("place.device", device.id);
-        await prisma.placeDevice.deleteMany({
-            where: { id: { in: gone.map((device) => device.id) } }
-        });
-        live.announceDevices(
-            installedAppId,
-            read.map(toView),
-            gone.map((device) => device.id)
-        );
+        live.announceDevices(installedAppId, [...shown, ...gone].map(toView), []);
 
         if (driver.history)
             await ingestHistory(accountId, await driver.history(credentials, HISTORY_PAGE));
@@ -711,6 +726,97 @@ async function syncAccount(
         }
         throw caught;
     }
+}
+
+/**
+ * A gone device listed again by one of this install's connections: it came back
+ * to the house it left. Not restored on its own - it could have spent the time
+ * with somebody else - but marked, so the screen offers to restore its settings
+ * and history or to start it afresh. One that came back through another
+ * connection with the same ids is moved onto that one as it is marked.
+ */
+async function markReturned(
+    installedAppId: string,
+    accountId: string,
+    connection: string,
+    listed: readonly string[]
+): Promise<void> {
+    if (listed.length === 0) return;
+    const sharing = handover.connectionsSharingIds(connection);
+    const back = await prisma.placeDevice.findMany({
+        where: {
+            installedAppId,
+            externalId: { in: [...listed] },
+            goneAt: { not: null },
+            returnedAt: null,
+            OR: [{ accountId }, ...(sharing.length > 0 ? [{ account: { connection: { in: sharing } } }] : [])]
+        },
+        orderBy: { goneAt: "desc" },
+        select: { id: true, accountId: true, externalId: true }
+    });
+    const taken = new Set(
+        (
+            await prisma.placeDevice.findMany({
+                where: { accountId, goneAt: null, externalId: { in: back.map((row) => row.externalId) } },
+                select: { externalId: true }
+            })
+        ).map((row) => row.externalId)
+    );
+    const now = new Date();
+    for (const row of back) {
+        // Already here as a device of its own (started afresh): nothing to offer.
+        if (taken.has(row.externalId)) continue;
+        const marked = await prisma.placeDevice
+            .updateMany({
+                where: { id: row.id, returnedAt: null },
+                data: { returnedAt: now, accountId }
+            })
+            .catch(() => ({ count: 0 }));
+        if (marked.count > 0) taken.add(row.externalId);
+    }
+}
+
+/** `restore` or `forget` a gone device, as a screen asked; anything else is
+ *  refused before either runs. */
+export async function settleGoneDevice(
+    installedAppId: string,
+    id: string,
+    choice: string
+): Promise<void> {
+    if (choice === "restore") await restoreDevice(installedAppId, id);
+    else if (choice === "forget") await forgetDevice(installedAppId, id);
+    else throw new HomeError("That device is not here");
+}
+
+/** A device that came back, made this house's again: everything it had - name,
+ *  room, automations, shares, history - is in force once more. */
+export async function restoreDevice(installedAppId: string, id: string): Promise<kinds.DeviceView> {
+    const { count } = await prisma.placeDevice.updateMany({
+        where: { id, installedAppId, goneAt: { not: null }, returnedAt: { not: null } },
+        data: { goneAt: null, returnedAt: null }
+    });
+    if (count === 0) throw new HomeError("That device is not here");
+    const device = await getDevice(installedAppId, id);
+    live.announceDevices(installedAppId, [device], []);
+    return device;
+}
+
+/**
+ * A gone device removed for good, with its history and whatever was lent of it.
+ * If it had come back, the next read lists it as a new device with nothing of
+ * the old one's. Only a gone device: one that is here goes with its connection.
+ */
+export async function forgetDevice(installedAppId: string, id: string): Promise<void> {
+    const row = await prisma.placeDevice.findFirst({
+        where: { id, installedAppId, goneAt: { not: null } },
+        select: { id: true }
+    });
+    if (!row) throw new HomeError("That device is not here");
+    // The shares are addressed by kind and id rather than by foreign key, so
+    // nothing drops them on the device's behalf.
+    await dropGrantsFor("place.device", row.id);
+    await prisma.placeDevice.deleteMany({ where: { id: row.id, goneAt: { not: null } } });
+    live.announceDevices(installedAppId, [], [row.id]);
 }
 
 /**
