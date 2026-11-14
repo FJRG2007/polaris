@@ -68,3 +68,15 @@ describe("the instructions a rewrite runs on", () => {
         expect(system.length).toBeLessThan(6_000);
     });
 });
+
+describe("a rewrite's language", () => {
+    const profile: WritingProfile = { writer: { name: "", email: "" }, org: null, context: "", skills: [] };
+
+    it("keeps the draft's regional variety in every purpose", () => {
+        for (const purpose of ["prompt", "email", "task", "text"] as const) {
+            const system = improveSystem(purpose, profile);
+            expect(system).toContain("Spanish from Spain stays Spanish from Spain");
+            expect(system).toContain("leave sentences that are already correct exactly as they are");
+        }
+    });
+});

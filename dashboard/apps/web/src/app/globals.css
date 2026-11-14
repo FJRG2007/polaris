@@ -1101,7 +1101,43 @@ dialog.pdfSlick-dialog .dialogButton {
     animation: polaris-ai-sweep 1.6s linear infinite;
 }
 
+/* Each line of an editor's text, marked like a selection that breathes. The
+ * colour is a registered property so the keyframes can move it; the highlight
+ * reads it from the element its text sits in. */
+@property --ai-rewriting-mark {
+    syntax: "<color>";
+    inherits: true;
+    initial-value: rgb(139 92 246 / 0.18);
+}
+
+@keyframes polaris-ai-mark {
+    0%,
+    100% {
+        --ai-rewriting-mark: rgb(139 92 246 / 0.16);
+    }
+    50% {
+        --ai-rewriting-mark: rgb(56 189 248 / 0.3);
+    }
+}
+
+/* Marked text is read through the mark, so it is not blurred under it. */
+.ai-rewriting-content[data-marked] {
+    filter: none;
+}
+
+.ai-rewriting .ai-rewriting-content {
+    animation: polaris-ai-mark 1.6s ease-in-out infinite;
+}
+
+::highlight(ai-rewriting) {
+    background-color: var(--ai-rewriting-mark);
+}
+
 @media (prefers-reduced-motion: reduce) {
+    .ai-rewriting .ai-rewriting-content {
+        animation: none;
+    }
+
     .ai-rewriting-veil {
         animation: none;
         background-image: none;
