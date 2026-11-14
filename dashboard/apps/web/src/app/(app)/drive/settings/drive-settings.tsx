@@ -6,6 +6,7 @@
  */
 
 import { useState, useTransition } from "react";
+import { useOptimisticToggle } from "@/lib/use-optimistic-toggle";
 import { setConfirmTrashAction, setTrashKeepDaysAction } from "./actions";
 import { MAIL_TRASH_KEEP_CHOICES } from "@polaris/core";
 import type { DrivePreferences } from "@/lib/drive-preferences";
@@ -14,24 +15,20 @@ import { Card, CardBody, Select, Switch } from "@polaris/ui";
 
 export function DriveSettings({ initial }: { initial: DrivePreferences }) {
     const t = useTranslations("drive");
-    const [confirmTrash, setConfirmTrash] = useState(initial.confirmTrash);
     const [keepDays, setKeepDays] = useState(initial.trashKeepDays);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
-
-    const change = (next: boolean) => {
-        if (next === confirmTrash) return;
-        const before = confirmTrash;
-        setConfirmTrash(next);
-        setError(null);
-        startTransition(async () => {
-            const result = await setConfirmTrashAction(next).catch(() => ({ error: "failed" }));
-            if ("error" in result) {
-                setConfirmTrash(before);
-                setError(t("settings.saveFailed"));
-            }
-        });
-    };
+    const [confirmTrash, change] = useOptimisticToggle(
+        initial.confirmTrash,
+        async (next) => {
+            setError(null);
+            // The action answers a code, not a sentence: any refusal reads as the
+            // card's own message.
+            const result = await setConfirmTrashAction(next);
+            return "error" in result ? { ok: false } : {};
+        },
+        { onRefused: setError, failure: t("settings.saveFailed") }
+    );
 
     const changeKeep = (next: number) => {
         if (next === keepDays) return;
@@ -65,7 +62,6 @@ export function DriveSettings({ initial }: { initial: DrivePreferences }) {
                     <Switch
                         checked={confirmTrash}
                         onChange={change}
-                        disabled={pending}
                         aria-label={t("settings.confirmTrash")}
                         aria-describedby="drive-confirm-trash-hint"
                     />

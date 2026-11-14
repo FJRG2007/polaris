@@ -11,7 +11,8 @@
  */
 
 import { runAction } from "@/lib/run-action";
-import { useState, useTransition } from "react";
+import { useOptimisticToggle } from "@/lib/use-optimistic-toggle";
+import { useState } from "react";
 import { setAutoPasskeyAction } from "./actions";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { Feedback, type SettingLock } from "./setting-card";
@@ -19,21 +20,16 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function AutoPasskeyCard({ enabled, lock }: { enabled: boolean; lock?: SettingLock }) {
     const t = useTranslations("accountSecurity");
-    const [on, setOn] = useState(enabled);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
 
-    function toggle(next: boolean) {
-        setOn(next);
-        setError(null);
-        startTransition(async () => {
-            const result = await runAction(() => setAutoPasskeyAction(next), setError);
-            if (!result || result.error) {
-                setOn(!next);
-                if (result?.error) setError(result.error);
-            }
-        });
-    }
+    const [on, toggle] = useOptimisticToggle(
+        enabled,
+        async (next) => {
+            setError(null);
+            return (await runAction(() => setAutoPasskeyAction(next), setError)) ?? { error: true };
+        },
+        { onRefused: setError }
+    );
 
     return (
         <Card>
@@ -45,7 +41,7 @@ export function AutoPasskeyCard({ enabled, lock }: { enabled: boolean; lock?: Se
                     </div>
                     <Switch
                         checked={on}
-                        disabled={Boolean(lock) || pending}
+                        disabled={Boolean(lock)}
                         onChange={toggle}
                         aria-label={t("autoPasskey.label")}
                     />

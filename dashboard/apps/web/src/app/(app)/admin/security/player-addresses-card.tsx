@@ -7,7 +7,8 @@
  * it; a save that fails puts the switch back where it was and says so.
  */
 
-import { useState, useTransition } from "react";
+import { useOptimisticToggle } from "@/lib/use-optimistic-toggle";
+import { useState } from "react";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { savePlayerAddressesSharedAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -15,27 +16,16 @@ import { Feedback } from "@/app/(app)/account/security/setting-card";
 
 export function PlayerAddressesCard({ shared }: { shared: boolean }) {
     const t = useTranslations("admin");
-    const [on, setOn] = useState(shared);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startSaving] = useTransition();
 
-    function change(next: boolean) {
-        const previous = on;
-        setOn(next);
-        setError(null);
-        startSaving(async () => {
-            try {
-                const result = await savePlayerAddressesSharedAction(next);
-                if (result.error) {
-                    setOn(previous);
-                    setError(result.error);
-                }
-            } catch {
-                setOn(previous);
-                setError(t("security.errors.saveFailed"));
-            }
-        });
-    }
+    const [on, toggle] = useOptimisticToggle(
+        shared,
+        async (next) => {
+            setError(null);
+            return savePlayerAddressesSharedAction(next);
+        },
+        { onRefused: setError, failure: t("security.errors.saveFailed") }
+    );
 
     return (
         <Card>
@@ -47,8 +37,7 @@ export function PlayerAddressesCard({ shared }: { shared: boolean }) {
                     </div>
                     <Switch
                         checked={on}
-                        disabled={pending}
-                        onChange={change}
+                        onChange={toggle}
                         aria-label={t("security.playerAddresses.title")}
                     />
                 </div>

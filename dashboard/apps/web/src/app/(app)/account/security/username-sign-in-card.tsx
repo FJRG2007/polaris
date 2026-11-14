@@ -19,7 +19,8 @@
  */
 
 import { runAction } from "@/lib/run-action";
-import { useState, useTransition } from "react";
+import { useOptimisticToggle } from "@/lib/use-optimistic-toggle";
+import { useState } from "react";
 import { setUsernameSignInAction } from "./actions";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -37,21 +38,16 @@ export function UsernameSignInCard({
     lock?: SettingLock;
 }) {
     const t = useTranslations("accountSecurity");
-    const [on, setOn] = useState(enabled);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
 
-    function toggle(next: boolean) {
-        setOn(next);
-        setError(null);
-        startTransition(async () => {
-            const result = await runAction(() => setUsernameSignInAction(next), setError);
-            if (!result || result.error) {
-                setOn(!next);
-                if (result?.error) setError(result.error);
-            }
-        });
-    }
+    const [on, toggle] = useOptimisticToggle(
+        enabled,
+        async (next) => {
+            setError(null);
+            return (await runAction(() => setUsernameSignInAction(next), setError)) ?? { error: true };
+        },
+        { onRefused: setError }
+    );
 
     return (
         <Card>
@@ -67,7 +63,7 @@ export function UsernameSignInCard({
                     </div>
                     <Switch
                         checked={on}
-                        disabled={Boolean(lock) || pending}
+                        disabled={Boolean(lock)}
                         onChange={toggle}
                         aria-label={t("usernameSignIn.label")}
                     />

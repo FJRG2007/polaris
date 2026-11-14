@@ -4,6 +4,9 @@
         "saving": "Guardando...",
         "cancel": "Cancelar"
     },
+    "optimistic": {
+        "failed": "Ese cambio no se ha guardado. Vuelve a estar como antes."
+    },
     "meta": {
         "description": "Panel de control para tu home lab: archivos, conexiones y más."
     },

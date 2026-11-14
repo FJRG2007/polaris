@@ -16,24 +16,21 @@
 import { useState } from "react";
 import { Switch } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
+import { useOptimisticToggle } from "@/lib/use-optimistic-toggle";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setOrgChatOfferedAction } from "./actions";
 
 export function OrgChatView({ offered }: { offered: boolean }) {
     const t = useTranslations("admin");
-    const [on, setOn] = useState(offered);
-    const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
-
-    const change = async (next: boolean) => {
-        if (saving) return;
-        setSaving(true);
-        setError("");
-        setOn(next);
-        const result = await runAction(() => setOrgChatOfferedAction(next), setError);
-        setSaving(false);
-        if (!result || result.error) setOn(!next);
-    };
+    const [on, change] = useOptimisticToggle(
+        offered,
+        async (next) => {
+            setError("");
+            return (await runAction(() => setOrgChatOfferedAction(next), setError)) ?? { error: true };
+        },
+        { onRefused: setError }
+    );
 
     return (
         <div className="flex flex-col gap-2">
@@ -45,7 +42,6 @@ export function OrgChatView({ offered }: { offered: boolean }) {
                 <Switch
                     checked={on}
                     onChange={change}
-                    disabled={saving}
                     aria-label={t("chat.orgChat.label")}
                 />
             </div>

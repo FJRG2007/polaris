@@ -18,7 +18,8 @@
 
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useState, useTransition } from "react";
+import { useOptimisticToggle } from "@/lib/use-optimistic-toggle";
+import { useState } from "react";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { setEmailLinkSignInAction } from "./actions";
 import { Feedback, type SettingLock } from "./setting-card";
@@ -35,22 +36,17 @@ export function EmailLinkCard({
     lock?: SettingLock;
 }) {
     const t = useTranslations("accountSecurity");
-    const [on, setOn] = useState(enabled);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
     const locked = Boolean(lock) || !canSend;
 
-    function toggle(next: boolean) {
-        setOn(next);
-        setError(null);
-        startTransition(async () => {
-            const result = await runAction(() => setEmailLinkSignInAction(next), setError);
-            if (!result || result.error) {
-                setOn(!next);
-                if (result?.error) setError(result.error);
-            }
-        });
-    }
+    const [on, toggle] = useOptimisticToggle(
+        enabled,
+        async (next) => {
+            setError(null);
+            return (await runAction(() => setEmailLinkSignInAction(next), setError)) ?? { error: true };
+        },
+        { onRefused: setError }
+    );
 
     return (
         <Card>
@@ -62,7 +58,7 @@ export function EmailLinkCard({
                     </div>
                     <Switch
                         checked={on}
-                        disabled={locked || pending}
+                        disabled={locked}
                         onChange={toggle}
                         aria-label={t("emailLink.label")}
                     />

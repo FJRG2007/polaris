@@ -4,6 +4,9 @@
         "saving": "Saving...",
         "cancel": "Cancel"
     },
+    "optimistic": {
+        "failed": "That change was not saved. It is back to how it was."
+    },
     "meta": {
         "description": "Home-lab control plane - drive, connections, and more."
     },
