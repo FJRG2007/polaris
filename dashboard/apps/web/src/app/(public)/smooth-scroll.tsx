@@ -28,6 +28,19 @@ import { useEffect } from "react";
  *  drifting once the reader has started reading. */
 const LERP = 0.1;
 
+/** How long the loop keeps running after the last input, for Lenis to pick it up. */
+const SETTLE_MS = 300;
+
+/** What can start a scroll Lenis has to animate. */
+const WAKE_EVENTS = [
+    "wheel",
+    "touchstart",
+    "touchmove",
+    "keydown",
+    "pointerdown",
+    "scroll"
+] as const;
+
 export function SmoothScroll() {
     useEffect(() => {
         // Someone who asked their system for less motion is asking for this too:
@@ -37,9 +50,32 @@ export function SmoothScroll() {
         const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
         if (reduced.matches) return;
 
-        let lenis: { raf: (time: number) => void; destroy: () => void } | null = null;
+        let lenis: {
+            raf: (time: number) => void;
+            destroy: () => void;
+            isScrolling: false | string;
+        } | null = null;
         let frame = 0;
+        let lastInput = 0;
         let cancelled = false;
+
+        // Frames only while something is moving. A loop on every frame for as
+        // long as the page is open keeps the compositor awake for a page nobody
+        // is scrolling; Lenis needs frames from the input until it settles.
+        const tick = (time: number): void => {
+            frame = 0;
+            lenis?.raf(time);
+            if (lenis?.isScrolling === "smooth" || performance.now() - lastInput < SETTLE_MS) {
+                frame = requestAnimationFrame(tick);
+            }
+        };
+        const wake = (): void => {
+            lastInput = performance.now();
+            if (lenis && !frame) frame = requestAnimationFrame(tick);
+        };
+        for (const type of WAKE_EVENTS) {
+            window.addEventListener(type, wake, { passive: true, capture: true });
+        }
 
         // Loaded on demand so it is fetched with the page it affects rather than
         // parsed by every route in the bundle - and so a failure to load costs the
@@ -47,15 +83,14 @@ export function SmoothScroll() {
         void import("lenis").then(({ default: Lenis }) => {
             if (cancelled) return;
             lenis = new Lenis({ lerp: LERP });
-            const tick = (time: number): void => {
-                lenis?.raf(time);
-                frame = requestAnimationFrame(tick);
-            };
-            frame = requestAnimationFrame(tick);
+            wake();
         });
 
         return () => {
             cancelled = true;
+            for (const type of WAKE_EVENTS) {
+                window.removeEventListener(type, wake, { capture: true });
+            }
             cancelAnimationFrame(frame);
             lenis?.destroy();
         };

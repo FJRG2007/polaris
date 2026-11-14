@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { isIdle, onIdleChange } from "@/lib/idle";
 
 export interface Rgb {
     r: number;
@@ -116,8 +117,9 @@ export function canvasRatio(): number {
 
 /**
  * Run `frame(seconds)` on every animation frame while `el` is on screen and
- * the tab is visible. One loop per element; the returned function stops it for
- * good. `frame` is called once straight away so a paused element still shows.
+ * the page is not idle (hidden, or its window not in front - see `lib/idle`).
+ * One loop per element; the returned function stops it for good. `frame` is
+ * called once straight away so a paused element still shows.
  */
 export function runWhileVisible(el: Element, frame: (seconds: number) => void): () => void {
     let raf = 0;
@@ -142,19 +144,18 @@ export function runWhileVisible(el: Element, frame: (seconds: number) => void): 
             ? null
             : new IntersectionObserver(([entry]) => {
                   visible = !!entry?.isIntersecting;
-                  if (visible && document.visibilityState !== "hidden") start();
+                  if (visible && !isIdle()) start();
                   else stop();
               });
     observer?.observe(el);
-    const onVisibility = () => {
-        if (document.visibilityState === "hidden") stop();
+    const unsubscribe = onIdleChange((idle) => {
+        if (idle) stop();
         else if (visible) start();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    if (!observer) start();
+    });
+    if (!observer && !isIdle()) start();
     return () => {
         stop();
         observer?.disconnect();
-        document.removeEventListener("visibilitychange", onVisibility);
+        unsubscribe();
     };
 }

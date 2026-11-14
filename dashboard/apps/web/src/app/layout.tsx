@@ -4,6 +4,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import type { CSSProperties, ReactNode } from "react";
 import localFont from "next/font/local";
+import { IdleWatch } from "@/components/idle-watch";
 import { DropGuard } from "@/components/drop-guard";
 import { themeClass } from "@polaris/core";
 import { resolveSession } from "@/lib/session";
@@ -229,6 +230,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 >
                     <LocaleSync locale={locale} signedIn={session !== null} />
                     <DropGuard />
+                    <IdleWatch />
                     <ConnectionBanner />
                     {children}
                 </I18nProvider>

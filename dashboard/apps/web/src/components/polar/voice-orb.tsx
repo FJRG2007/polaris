@@ -11,6 +11,7 @@
 
 import { cn } from "@polaris/ui";
 import { useEffect, useRef } from "react";
+import { animateWhileAwake, isIdle } from "@/lib/idle";
 
 export type OrbState =
     | "listening"
@@ -62,7 +63,7 @@ export function VoiceOrb({
             typeof window.matchMedia === "function" &&
             window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         let smooth = 0;
-        let frame = 0;
+        let stopLoop: (() => void) | null = null;
         let timer: ReturnType<typeof setInterval> | null = null;
 
         const target = (now: number): number => {
@@ -104,16 +105,14 @@ export function VoiceOrb({
         };
 
         if (reduced) {
-            timer = setInterval(() => draw(Date.now()), 200);
+            timer = setInterval(() => {
+                if (!isIdle()) draw(Date.now());
+            }, 200);
         } else {
-            const loop = (now: number) => {
-                draw(now);
-                frame = requestAnimationFrame(loop);
-            };
-            frame = requestAnimationFrame(loop);
+            stopLoop = animateWhileAwake(draw);
         }
         return () => {
-            cancelAnimationFrame(frame);
+            stopLoop?.();
             if (timer) clearInterval(timer);
         };
     }, []);

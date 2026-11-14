@@ -148,6 +148,8 @@ describe("the avatar", () => {
     it("stops its loop when it goes away", () => {
         motion(false);
         stubCanvas();
+        // jsdom never holds focus, which would read as an idle window - see lib/idle.
+        vi.spyOn(document, "hasFocus").mockReturnValue(true);
         const raf = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(9);
         const cancel = vi.spyOn(window, "cancelAnimationFrame");
         const view = render(withMessages(<PolarAvatar state="working" />));

@@ -15,6 +15,23 @@
 @tailwind utilities;
 
 /*
+ * Nobody looking, nothing moving.
+ *
+ * `data-idle` is on the root while the page is hidden or its window is not the
+ * one in front (`lib/idle`). The desktop app keeps drawing a minimized window,
+ * so every spinner, skeleton pulse and decorative loop otherwise costs the GPU
+ * for as long as the app is open. Paused, not removed: it resumes where it
+ * stopped. Elements with `data-state` are left running, because that is how
+ * dialogs and menus play their closing animation and a paused one never
+ * finishes leaving. The incoming-call ring keeps ringing.
+ */
+:root[data-idle] *:not([data-state]):not(.call-ring-pulse),
+:root[data-idle] *:not([data-state]):not(.call-ring-pulse)::before,
+:root[data-idle] *:not([data-state]):not(.call-ring-pulse)::after {
+    animation-play-state: paused !important;
+}
+
+/*
  * The size the interface is drawn at.
  *
  * Everything Polaris draws is sized in rem, so this one number moves the text
