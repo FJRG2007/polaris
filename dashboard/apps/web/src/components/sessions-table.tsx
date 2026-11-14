@@ -20,19 +20,20 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Badge, Button, cn } from "@polaris/ui";
-import type { CliSessionView } from "@/lib/cli/sessions";
+import type { DeviceSessionView } from "@/lib/device-sessions/sessions";
 import { RelativeTime } from "@/components/relative-time";
 import type { VaultClientRow } from "@/lib/vault/devices";
 import type { SessionView } from "@/lib/session-directory";
 import { readClientDevice } from "@/lib/vault/client-device";
-import { CliSessionRows } from "@/components/cli-session-rows";
+import { DeviceSessionRows } from "@/components/device-session-rows";
 import { clientKindText, signInText } from "@/lib/sign-in-words";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { isOnline, OnlineDot, useNow } from "@/components/presence";
 import type { ExtensionSessionView } from "@/lib/extension/sessions";
 import { addressLine, DeviceAddress } from "@/components/device-address";
 import { BrowserMark, ClientKindMark, SystemMark } from "@/components/client-marks";
-import { History, KeyRound, Lock, LockOpen, LogOut, PanelRightOpen } from "lucide-react";
+import { History, KeyRound, Lock, LockOpen, LogOut, Monitor, PanelRightOpen } from "lucide-react";
+import { machinesOf, type Machine } from "@/lib/device-sessions/machines";
 
 /**
  * When a row was last active: the reader's own phrase for it ("3 minutes ago",
@@ -201,9 +202,9 @@ export function SessionsTable({
     onPin,
     emptyLabel,
     compact = false,
-    cliSessions = [],
-    onSignOutCli,
-    onPinCli
+    deviceSessions = [],
+    onSignOutDevice,
+    onPinDevice
 }: {
     sessions: SessionView[];
     /**
@@ -238,7 +239,7 @@ export function SessionsTable({
     busyId: string | null;
     /** Where this session's history is read. Left out where the reader has no
      *  business reading the account's log. */
-    activityHref?: (session: SessionView) => string;
+    activityHref?: (session: { readonly id: string }) => string;
     onRevoke: (session: SessionView) => void;
     /**
      * Tie this one session to its address, untie it, or hand it back to the
@@ -254,11 +255,11 @@ export function SessionsTable({
      *  about. The columns fold into the device cell rather than being decided by
      *  a breakpoint that would put the table on a scrollbar at every size. */
     compact?: boolean;
-    /** The command-line sign-ins (`plr login`), rows of their own kind - see
-     *  `cli-session-rows`. */
-    cliSessions?: readonly CliSessionView[];
-    onSignOutCli?: (session: CliSessionView) => void;
-    onPinCli?: (session: CliSessionView, pinned: boolean | null) => void;
+    /** The apps signed in on a device of their own (command line, Stream Deck,
+     *  TV), rows of their own kind - see `device-session-rows`. */
+    deviceSessions?: readonly DeviceSessionView[];
+    onSignOutDevice?: (session: DeviceSessionView) => void;
+    onPinDevice?: (session: DeviceSessionView, pinned: boolean | null) => void;
 }) {
     const t = useTranslations("components");
     // A clock that ticks, so a row stops reading "Active now" once it is not
@@ -266,6 +267,25 @@ export function SessionsTable({
     const now = useNow();
     const sessionRows = inUseFirst(sessions, now);
     const extensionRows = inUseFirst(extensions, now);
+    const machines = machinesOf([
+        ...sessions.map((session) => ({
+            id: session.id,
+            ip: session.ip,
+            os: session.os,
+            current: session.current
+        })),
+        ...extensions.map((extension) => ({
+            id: extension.id,
+            ip: extension.ip,
+            os: extension.os
+        })),
+        ...deviceSessions.map((device) => ({
+            id: device.id,
+            ip: device.lastUsedIp ?? device.signedInIp,
+            os: device.os,
+            hostname: device.hostname
+        }))
+    ]);
     return (
         <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-sm">
@@ -311,7 +331,7 @@ export function SessionsTable({
                     {sessions.length === 0 &&
                     extensions.length === 0 &&
                     clients.length === 0 &&
-                    cliSessions.length === 0 ? (
+                    deviceSessions.length === 0 ? (
                         <tr>
                             <td
                                 colSpan={compact ? 2 : 7}
@@ -351,6 +371,10 @@ export function SessionsTable({
                                                         {t("sessionsTable.thisDevice")}
                                                     </Badge>
                                                 ) : null}
+                                                <MachineBadge
+                                                    machine={machines.get(session.id)}
+                                                    current={session.current}
+                                                />
                                                 {inUseNow(session, now) ? <ActiveNowBadge /> : null}
                                                 {session.locked ? (
                                                     <Badge>{t("sessionsTable.locked")}</Badge>
@@ -436,17 +460,10 @@ export function SessionsTable({
                                 <td className="px-3 py-2">
                                     <div className="flex justify-end gap-1">
                                         {activityHref ? (
-                                            <Button variant="ghost" size="icon" asChild>
-                                                <Link
-                                                    href={activityHref(session)}
-                                                    title={t("sessionsTable.activity")}
-                                                    aria-label={t("sessionsTable.activityFrom", {
-                                                        device: session.device
-                                                    })}
-                                                >
-                                                    <History className="size-4" />
-                                                </Link>
-                                            </Button>
+                                            <ActivityLink
+                                                href={activityHref(session)}
+                                                device={session.device}
+                                            />
                                         ) : null}
                                         {onPin ? (
                                             <PinButton
@@ -499,6 +516,7 @@ export function SessionsTable({
                                             <Badge variant="neutral">
                                                 {t("sessionsTable.extension")}
                                             </Badge>
+                                            <MachineBadge machine={machines.get(extension.id)} />
                                             {inUseNow(extension, now) ? <ActiveNowBadge /> : null}
                                             {(extension.pinToAddress ?? extension.pinnedByRule) ? (
                                                 <Badge
@@ -551,6 +569,14 @@ export function SessionsTable({
                             )}
                             <td className="px-3 py-2">
                                 <div className="flex justify-end gap-1">
+                                    {activityHref ? (
+                                        <ActivityLink
+                                            href={activityHref(extension)}
+                                            device={t("sessionsTable.extensionNamed", {
+                                                browser: extension.browser
+                                            })}
+                                        />
+                                    ) : null}
                                     {onPinExtension ? (
                                         <PinButton
                                             label={t("sessionsTable.extensionNamed", {
@@ -580,12 +606,14 @@ export function SessionsTable({
                             </td>
                         </tr>
                     ))}
-                    <CliSessionRows
-                        sessions={cliSessions}
+                    <DeviceSessionRows
+                        sessions={deviceSessions}
+                        machines={machines}
                         busyId={busyId}
                         compact={compact}
-                        onSignOut={onSignOutCli}
-                        onPin={onPinCli}
+                        activityHref={activityHref}
+                        onSignOut={onSignOutDevice}
+                        onPin={onPinDevice}
                     />
                     {/* The apps, under the browsers and in the same columns. What
                         a client reports is a name and a type, so the device column
@@ -706,6 +734,56 @@ export function SessionsTable({
                 </tbody>
             </table>
         </div>
+    );
+}
+
+/**
+ * The computer a row runs on (`lib/device-sessions/machines`): its name where a
+ * terminal or a Stream Deck on it reported one, "This computer" where it is the
+ * one the reader is using. Nothing for the reader's own session unless there is
+ * a name to add - it already says "This device".
+ */
+export function MachineBadge({
+    machine,
+    current = false,
+    named
+}: {
+    machine: Machine | undefined;
+    current?: boolean;
+    /** The row's own name, so a terminal called DRAGON is not labelled DRAGON again. */
+    named?: string;
+}) {
+    const t = useTranslations("components");
+    if (!machine || (current && !machine.name)) return null;
+    if (!machine.here && machine.name === named) return null;
+    return (
+        <Badge
+            variant={machine.here ? "primary" : "neutral"}
+            title={t("sessionsTable.machineHint")}
+            className="min-w-0 max-w-[12rem]"
+        >
+            <Monitor aria-hidden className="size-3 shrink-0" />
+            <span className="min-w-0 truncate">
+                {machine.name ?? t("sessionsTable.thisComputer")}
+            </span>
+        </Badge>
+    );
+}
+
+/** The way to a session's history in the activity log, the same on every kind
+ *  of row so none of them is missing it. */
+export function ActivityLink({ href, device }: { href: string; device: string }) {
+    const t = useTranslations("components");
+    return (
+        <Button variant="ghost" size="icon" asChild>
+            <Link
+                href={href}
+                title={t("sessionsTable.activity")}
+                aria-label={t("sessionsTable.activityFrom", { device })}
+            >
+                <History className="size-4" />
+            </Link>
+        </Button>
     );
 }
 

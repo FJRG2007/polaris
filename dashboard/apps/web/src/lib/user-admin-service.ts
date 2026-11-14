@@ -31,7 +31,7 @@ import { discardPersonalDrive } from "@/lib/personal-drive";
 import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
 import { parseStringList, type AccessRulesInput } from "@polaris/core";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
-import { revokeCliSession, revokeCliSessions } from "@/lib/cli/sessions";
+import { revokeDeviceSession, revokeAllDeviceSessions } from "@/lib/device-sessions/sessions";
 import { revokeExtensionSessions } from "@/lib/extension/sessions";
 import { endTerminalSessions } from "@/lib/terminal-sessions";
 import { markPrincipalsMoved, updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
@@ -281,7 +281,7 @@ async function wouldStrandInstance(userId: string): Promise<boolean> {
 async function dropSessions(userId: string): Promise<number> {
     const { count } = await prisma.session.deleteMany({ where: { userId } });
     const extensions = await revokeExtensionSessions(userId);
-    const terminals = await revokeCliSessions(userId);
+    const terminals = await revokeAllDeviceSessions(userId);
     // The shells it has open on servers and containers, which no sign-in check
     // reaches once they are attached (VULN-0038).
     await endTerminalSessions(userId);
@@ -581,12 +581,12 @@ export async function revokeSessionForUser(
 
 /** End one of somebody's command-line sign-ins - the same safety valve as
  *  ending one of their sessions, and told to them the same way. */
-export async function revokeCliSessionForUser(
+export async function revokeDeviceSessionForUser(
     actorId: string,
     userId: string,
     keyId: string
 ): Promise<{ error?: string }> {
-    if (!(await revokeCliSession(userId, keyId))) {
+    if (!(await revokeDeviceSession(userId, keyId))) {
         return { error: (await readerWords("api"))("refusals.users.sessionEnded") };
     }
     await recordAudit({

@@ -76,7 +76,7 @@ vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }
 vi.mock("@/lib/safety-queue", () => ({ openLockdownCase: caseOpened }));
 vi.mock("@/lib/step-up-grant", () => ({ revokeStepUpGrants: grantsRevoked }));
 vi.mock("@/lib/extension/sessions", () => ({ revokeExtensionSessions: extensionsEnded }));
-vi.mock("@/lib/cli/sessions", () => ({ revokeCliSessions: terminalsEnded }));
+vi.mock("@/lib/device-sessions/sessions", () => ({ revokeAllDeviceSessions: terminalsEnded }));
 
 const lifecycle = await import("@/lib/account-lifecycle");
 

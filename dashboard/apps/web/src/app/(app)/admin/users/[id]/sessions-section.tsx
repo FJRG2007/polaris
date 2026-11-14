@@ -10,7 +10,7 @@
 import { LogOut } from "lucide-react";
 import { useAccountAction } from "./use-account-action";
 import { useCallback, useEffect, useState } from "react";
-import type { CliSessionView } from "@/lib/cli/sessions";
+import type { DeviceSessionView } from "@/lib/device-sessions/sessions";
 import type { SessionView } from "@/lib/session-directory";
 import { SessionsTable } from "@/components/sessions-table";
 import type { DirectoryUser } from "@/lib/user-admin-service";
@@ -18,7 +18,7 @@ import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
-    revokeUserCliSessionAction,
+    revokeUserDeviceSessionAction,
     revokeUserSessionAction,
     revokeUserSessionsAction,
     userSessionsAction
@@ -31,12 +31,12 @@ export function SessionsSection({ user }: { user: DirectoryUser }) {
     // Null until the list arrives, so the section holds its shape rather than the
     // page waiting on a query nothing above it needs.
     const [sessions, setSessions] = useState<SessionView[] | null>(null);
-    const [cliSessions, setCliSessions] = useState<CliSessionView[]>([]);
+    const [deviceSessions, setDeviceSessions] = useState<DeviceSessionView[]>([]);
 
     const loadSessions = useCallback(async () => {
         const result = await userSessionsAction(user.id);
         setSessions(result.sessions ?? []);
-        setCliSessions(result.cliSessions ?? []);
+        setDeviceSessions(result.deviceSessions ?? []);
     }, [user.id]);
 
     useEffect(() => {
@@ -58,7 +58,7 @@ export function SessionsSection({ user }: { user: DirectoryUser }) {
                     <Button
                         size="sm"
                         variant="ghost"
-                        disabled={busy || (sessions?.length === 0 && cliSessions.length === 0)}
+                        disabled={busy || (sessions?.length === 0 && deviceSessions.length === 0)}
                         onClick={() =>
                             void run(() => revokeUserSessionsAction(user.id), loadSessions)
                         }
@@ -79,10 +79,10 @@ export function SessionsSection({ user }: { user: DirectoryUser }) {
                                 loadSessions
                             )
                         }
-                        cliSessions={cliSessions}
-                        onSignOutCli={(session) =>
+                        deviceSessions={deviceSessions}
+                        onSignOutDevice={(session) =>
                             void run(
-                                () => revokeUserCliSessionAction(user.id, session.id),
+                                () => revokeUserDeviceSessionAction(user.id, session.id),
                                 loadSessions
                             )
                         }

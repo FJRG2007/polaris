@@ -938,6 +938,8 @@
         "scannedBy": "Code scanned by",
         "allowedBy": "Allowed by",
         "thisDevice": "This device",
+        "thisComputer": "This computer",
+        "machineHint": "Same computer, judged by its address and system",
         "activeNow": "Active now",
         "activeNowHint": "Used in the last few minutes",
         "signedOutSince": "Signed out since",
@@ -976,14 +978,18 @@
             "title": "{says}. Press to {then}.",
             "label": "Address lock for {label}: {says}"
         },
-        "cli": {
-            "badge": "Command line",
+        "appSignIn": {
+            "kinds": {
+                "cli": "Command line",
+                "streamdeck": "Stream Deck",
+                "tv": "Polaris TV"
+            },
             "lockedHint": "This sign-in only works from the address it was last used at",
             "signedIn": "Signed in <time></time>",
             "signedInFrom": "Signed in <time></time> from {ip}",
             "notUsedYet": "Not used yet",
-            "named": "{name} command line",
-            "signOutNamed": "Sign {name} out of the command line"
+            "named": "{app} on {name}",
+            "signOutNamed": "Sign out {app} on {name}"
         }
     },
     "modelKeys": {

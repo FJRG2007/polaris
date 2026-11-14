@@ -1,42 +1,51 @@
 "use client";
 
 /**
- * The command-line sign-ins (`plr login`) on a sessions table, as rows of the
- * same columns a browser session has.
+ * The apps signed in on a device of their own - the command line, a Stream
+ * Deck, a TV - on a sessions table, as rows of the same columns and actions a
+ * browser session has. Which app a row is comes from `lib/device-sessions/kinds`.
  *
  * Its own component rather than another block inside `sessions-table`: that
  * table is shared and changed often, and a row kind kept here leaves it one
  * line to render these and nothing else to merge.
  *
- * A sign-in is an API key underneath (see `lib/cli/sessions`), so ending one
- * here revokes that key, and the CLI's next command says it was signed out.
+ * A sign-in is an API key underneath (see `lib/device-sessions/sessions`), so ending one
+ * here revokes that key, and the app's next request says it was signed out.
  */
 
 import { Badge, Button, cn } from "@polaris/ui";
-import { LogOut, Terminal } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { SystemMark } from "@/components/client-marks";
 import { DeviceAddress } from "@/components/device-address";
-import { PinButton } from "@/components/sessions-table";
-import type { CliSessionView } from "@/lib/cli/sessions";
+import { ActivityLink, MachineBadge, PinButton } from "@/components/sessions-table";
+import type { Machine } from "@/lib/device-sessions/machines";
+import { DEVICE_SESSION_KINDS } from "@/lib/device-sessions/kinds";
+import type { DeviceSessionView } from "@/lib/device-sessions/sessions";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 // The `<time>` tag is drawn by a function rather than handed an element: given
 // a bare element, the translator printed the message's own markup instead.
-export function CliSessionRows({
+export function DeviceSessionRows({
     sessions,
+    machines,
     busyId,
     compact,
+    activityHref,
     onSignOut,
     onPin
 }: {
-    sessions: readonly CliSessionView[];
+    sessions: readonly DeviceSessionView[];
+    /** The computer each row runs on, read across the whole table. */
+    machines?: ReadonlyMap<string, Machine>;
     busyId: string | null;
     compact: boolean;
+    /** Where its history is read. Left out where the reader has no such page. */
+    activityHref?: (session: { readonly id: string }) => string;
     /** Ends one. Left out where the reader may not. */
-    onSignOut?: (session: CliSessionView) => void;
+    onSignOut?: (session: DeviceSessionView) => void;
     /** The address lock for one, as for a session. Left out for an administrator. */
-    onPin?: (session: CliSessionView, pinned: boolean | null) => void;
+    onPin?: (session: DeviceSessionView, pinned: boolean | null) => void;
 }) {
     const t = useTranslations("components");
     return (
@@ -47,9 +56,12 @@ export function CliSessionRows({
                 const address = session.lastUsedIp ?? session.signedInIp;
                 const locked = session.pinToAddress ?? session.pinnedByRule;
                 const lastUsedAt = session.lastUsedAt;
+                const { icon: Mark, label } = DEVICE_SESSION_KINDS[session.kind];
+                const app = t(label);
+                const named = t("sessionsTable.appSignIn.named", { app, name: session.name });
                 return (
                     <tr
-                        key={`cli-${session.id}`}
+                        key={`device-${session.id}`}
                         className={cn(
                             "border-t border-border",
                             busyId === session.id && "opacity-60"
@@ -57,7 +69,7 @@ export function CliSessionRows({
                     >
                         <td className="w-full max-w-0 px-3 py-2">
                             <div className="flex items-center gap-3">
-                                <Terminal
+                                <Mark
                                     aria-hidden
                                     className="size-4 shrink-0 text-muted-foreground"
                                 />
@@ -72,18 +84,20 @@ export function CliSessionRows({
                                         <span className="min-w-0 truncate text-muted-foreground">
                                             {session.os}
                                         </span>
-                                        <Badge variant="neutral">
-                                            {t("sessionsTable.cli.badge")}
-                                        </Badge>
+                                        <Badge variant="neutral">{app}</Badge>
+                                        <MachineBadge
+                                            machine={machines?.get(session.id)}
+                                            named={session.name}
+                                        />
                                         {locked ? (
-                                            <Badge title={t("sessionsTable.cli.lockedHint")}>
+                                            <Badge title={t("sessionsTable.appSignIn.lockedHint")}>
                                                 {t("sessionsTable.addressLocked")}
                                             </Badge>
                                         ) : null}
                                     </p>
                                     <p className="truncate text-xs text-muted-foreground">
                                         {session.signedInIp
-                                            ? t.rich("sessionsTable.cli.signedInFrom", {
+                                            ? t.rich("sessionsTable.appSignIn.signedInFrom", {
                                                   ip: session.signedInIp,
                                                   time: () => (
                                                       <RelativeTime
@@ -92,7 +106,7 @@ export function CliSessionRows({
                                                       />
                                                   )
                                               })
-                                            : t.rich("sessionsTable.cli.signedIn", {
+                                            : t.rich("sessionsTable.appSignIn.signedIn", {
                                                   time: () => (
                                                       <RelativeTime
                                                           key="time"
@@ -116,7 +130,7 @@ export function CliSessionRows({
                                                       <RelativeTime key="time" iso={lastUsedAt} />
                                                   )
                                               })
-                                            : t("sessionsTable.cli.notUsedYet")}
+                                            : t("sessionsTable.appSignIn.notUsedYet")}
                                     </p>
                                 </div>
                             </div>
@@ -125,7 +139,7 @@ export function CliSessionRows({
                             <>
                                 <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
                                     <span className="flex items-center gap-2">
-                                        {t("sessionsTable.cli.badge")}
+                                        {app}
                                         {session.version ? (
                                             <span className="tabular-nums text-muted-foreground">
                                                 {session.version}
@@ -153,16 +167,19 @@ export function CliSessionRows({
                                     {session.lastUsedAt ? (
                                         <RelativeTime iso={session.lastUsedAt} />
                                     ) : (
-                                        t("sessionsTable.cli.notUsedYet")
+                                        t("sessionsTable.appSignIn.notUsedYet")
                                     )}
                                 </td>
                             </>
                         )}
                         <td className="px-3 py-2">
                             <div className="flex justify-end gap-1">
+                                {activityHref ? (
+                                    <ActivityLink href={activityHref(session)} device={named} />
+                                ) : null}
                                 {onPin ? (
                                     <PinButton
-                                        label={t("sessionsTable.cli.named", { name: session.name })}
+                                        label={named}
                                         pinToAddress={session.pinToAddress}
                                         pinnedByRule={session.pinnedByRule}
                                         busy={busyId !== null}
@@ -174,7 +191,8 @@ export function CliSessionRows({
                                         variant="ghost"
                                         size="icon"
                                         title={t("sessionsTable.signOut")}
-                                        aria-label={t("sessionsTable.cli.signOutNamed", {
+                                        aria-label={t("sessionsTable.appSignIn.signOutNamed", {
+                                            app,
                                             name: session.name
                                         })}
                                         disabled={busyId !== null}

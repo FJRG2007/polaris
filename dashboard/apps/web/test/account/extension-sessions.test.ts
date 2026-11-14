@@ -48,6 +48,11 @@ function match(row: Row, where: Row): boolean {
             const pair = value as { userId: string; deviceId: string };
             return row["userId"] === pair.userId && row["deviceId"] === pair.deviceId;
         }
+        if (typeof value === "object" && value !== null && !(value instanceof Date)) {
+            const rule = value as { not?: unknown; lt?: Date };
+            if ("not" in rule) return row[key] !== rule.not;
+            if (rule.lt) return (row[key] as Date) < rule.lt;
+        }
         return row[key] === value;
     });
 }
@@ -124,7 +129,11 @@ vi.mock("@polaris/db", () => ({
                 (row) => {
                     const user = users.find((one) => one["id"] === row["userId"]);
                     const security = securities.find((one) => one["userId"] === row["userId"]);
-                    return { ...row, user: user ? { ...user, security: security ?? null } : null };
+                    return {
+                        _count: { vaultDevices: 0 },
+                        ...row,
+                        user: user ? { ...user, security: security ?? null } : null
+                    };
                 }
             );
         },
@@ -207,10 +216,10 @@ beforeEach(() => {
     closed.length = 0;
 });
 
-async function connect(): Promise<{ token: string; sessionId: string }> {
+async function connect(deviceId = "install-1"): Promise<{ token: string; sessionId: string }> {
     const opened = await openExtensionConnection(
         {
-            deviceId: "install-1",
+            deviceId,
             deviceName: "Chrome on Windows",
             ...SEEN,
             requestIp: SEEN.ip,
@@ -227,7 +236,8 @@ async function connect(): Promise<{ token: string; sessionId: string }> {
     });
     const claim = await claimExtensionConnection(opened!.deviceCode, SEEN);
     if (claim.status !== "approved") throw new Error("not approved");
-    return { token: claim.token, sessionId: sessions[0]!["id"] as string };
+    const made = sessions.find((row) => row["deviceId"] === deviceId);
+    return { token: claim.token, sessionId: made!["id"] as string };
 }
 
 describe("opening a request", () => {
@@ -351,6 +361,59 @@ describe("collecting it", () => {
         expect(sessions).toHaveLength(1);
         expect(await readExtensionToken(first.token)).toBeNull();
         expect(await readExtensionToken(second.token)).toMatchObject({ userId: ALICE });
+    });
+});
+
+describe("a reinstall", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+
+    /** Move a connection back in time, as if it was made and last heard from then. */
+    function age(sessionId: string, days: number) {
+        const row = sessions.find((candidate) => candidate["id"] === sessionId)!;
+        row["createdAt"] = new Date(Date.now() - days * DAY);
+        row["lastSeenAt"] = new Date(Date.now() - days * DAY);
+    }
+
+    it("lists one browser once, keeping the connection made last", async () => {
+        const before = await connect("install-1");
+        age(before.sessionId, 2);
+        const after = await connect("install-2");
+
+        const listed = await listExtensionSessions(ALICE);
+        expect(listed.map((row) => row.id)).toEqual([after.sessionId]);
+        // Folded out of the list, not ended: a second profile looks the same.
+        expect(sessions.find((row) => row["id"] === before.sessionId)?.["revokedAt"]).toBeNull();
+    });
+
+    it("lists the earlier one again as soon as it is heard from", async () => {
+        const before = await connect("install-1");
+        age(before.sessionId, 2);
+        await connect("install-2");
+
+        await readExtensionToken(before.token);
+
+        expect(await listExtensionSessions(ALICE)).toHaveLength(2);
+    });
+
+    it("ends what a reinstall left behind once nothing has used it for a month", async () => {
+        const before = await connect("install-1");
+        age(before.sessionId, 40);
+        await connect("install-2");
+
+        expect(await readExtensionToken(before.token)).toBeNull();
+        expect(sessions.filter((row) => row["revokedAt"] === null)).toHaveLength(1);
+    });
+
+    it("keeps two browsers apart, however long one was quiet", async () => {
+        const chrome = await connect("install-1");
+        age(chrome.sessionId, 40);
+        const brave = sessions.find((row) => row["id"] === chrome.sessionId)!;
+        brave["browser"] = "Brave";
+        brave["name"] = "Brave on Windows";
+        await connect("install-2");
+
+        expect(await listExtensionSessions(ALICE)).toHaveLength(2);
+        expect(brave["revokedAt"]).toBeNull();
     });
 });
 

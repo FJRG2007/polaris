@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { DEVICE_KINDS } from "@/lib/device-sessions/kinds";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
 import { operationId } from "@/lib/api-docs/openapi";
@@ -27,7 +28,7 @@ export async function keyUsageAction(
     const parsed = inputSchema.safeParse(input);
     if (!parsed.success) return { error: "invalid" };
     const key = await prisma.apiKey.findFirst({
-        where: { id: parsed.data.keyId, userId: user.id },
+        where: { id: parsed.data.keyId, userId: user.id, kind: { notIn: DEVICE_KINDS } },
         select: { id: true }
     });
     if (!key) return { error: "notFound" };

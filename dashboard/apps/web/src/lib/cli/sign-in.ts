@@ -26,7 +26,7 @@ import { CLI_TOKEN_DAYS, isCliScope, type CliScope } from "./scopes";
 import { TV_TOKEN_DAYS } from "@/lib/tv/scopes";
 import { DECK_TOKEN_DAYS, isDeckScope, type DeckScope } from "@/lib/deck/scopes";
 import { createApiKey, scopesAvailableTo } from "@polaris/auth";
-import { revokeCliSession } from "./sessions";
+import { revokeDeviceSession } from "@/lib/device-sessions/sessions";
 import { AUTHORIZATION_POLL_MS, AUTHORIZATION_TTL_MS, newUserCode } from "@/lib/device-code";
 import { createApiKeySchema, describeClient, parseStringList, stringifyList } from "@polaris/core";
 
@@ -345,5 +345,5 @@ export async function endCliSignIn(principal: {
     readonly kind: string;
 }): Promise<boolean> {
     if (principal.kind !== "cli") return false;
-    return revokeCliSession(principal.userId, principal.keyId);
+    return revokeDeviceSession(principal.userId, principal.keyId);
 }

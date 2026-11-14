@@ -15,12 +15,12 @@ const cliEnded: string[] = [];
 const oneEnded: { userId: string; id: string }[] = [];
 const notices: { userId: string; count: number }[] = [];
 
-vi.mock("@/lib/cli/sessions", () => ({
-    revokeCliSessions: async (userId: string) => {
+vi.mock("@/lib/device-sessions/sessions", () => ({
+    revokeAllDeviceSessions: async (userId: string) => {
         cliEnded.push(userId);
         return 2;
     },
-    revokeCliSession: async (userId: string, id: string) => {
+    revokeDeviceSession: async (userId: string, id: string) => {
         oneEnded.push({ userId, id });
         return id === "live-key";
     }
@@ -54,7 +54,7 @@ vi.mock("@polaris/auth", async (original) => ({
 }));
 
 const { revokeOtherSessions } = await import("@/lib/session-directory");
-const { revokeCliSessionForUser, revokeUserSessions } = await import("@/lib/user-admin-service");
+const { revokeDeviceSessionForUser, revokeUserSessions } = await import("@/lib/user-admin-service");
 
 beforeEach(() => {
     cliEnded.length = 0;
@@ -79,13 +79,13 @@ describe("signing out everywhere", () => {
 
 describe("an administrator ending one CLI sign-in", () => {
     it("revokes it and tells the account", async () => {
-        expect(await revokeCliSessionForUser(ADMIN, ADA, "live-key")).toEqual({});
+        expect(await revokeDeviceSessionForUser(ADMIN, ADA, "live-key")).toEqual({});
         expect(oneEnded).toEqual([{ userId: ADA, id: "live-key" }]);
         expect(notices).toEqual([expect.objectContaining({ userId: ADA, count: 1 })]);
     });
 
     it("says so when it had already ended", async () => {
-        const result = await revokeCliSessionForUser(ADMIN, ADA, "gone-key");
+        const result = await revokeDeviceSessionForUser(ADMIN, ADA, "gone-key");
         expect(result.error).toBeTruthy();
         expect(notices).toEqual([]);
     });

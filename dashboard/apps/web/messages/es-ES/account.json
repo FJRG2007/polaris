@@ -264,20 +264,8 @@
             "menuFor": "Qué hacer con {name}",
             "more": "Más",
             "edit": "Editar",
-            "cli": {
-                "badge": "CLI",
-                "title": "Creada por plr login en un equipo. También aparece en Sesiones, donde se puede cerrar; plr logout también la revoca."
-            },
             "reference": "Referencia API",
-            "usage": "Uso",
-            "streamdeck": {
-                "badge": "Stream Deck",
-                "title": "Creada al conectar el plugin de Polaris en un Stream Deck. Descargas muestra los decks conectados y puede desconectarlos."
-            },
-            "tv": {
-                "badge": "TV",
-                "title": "Creada al conectar Polaris TV. Muestra tu nombre y el número de notificaciones en esa TV, nada más."
-            }
+            "usage": "Uso"
         },
         "form": {
             "neverExpires": "No caduca",

@@ -1,8 +1,9 @@
 /**
- * A CLI sign-in as a session.
+ * A device's sign-in - the command line, a Stream Deck, a TV - as a session.
  *
- * **One source of truth: the API key.** A `plr login` is an API key of kind
- * "cli", and that row is what a request is checked against, so it is also what
+ * **One source of truth: the API key.** Each of them signs in through the
+ * device-code flow and is handed an API key of its own kind (the registry in
+ * `./kinds`), and that row is what a request is checked against, so it is also what
  * the sessions screen lists. There is no second table that could say a sign-in
  * is live after its key was revoked, or the other way round: ending it from the
  * sessions screen, from the API keys screen or with `plr logout` is the same
@@ -22,13 +23,23 @@ import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import { addressPinned, isHandheld, type AddressPinScope } from "@polaris/core";
+import {
+    DEVICE_KINDS,
+    DEVICE_SESSION_KINDS,
+    type DeviceSessionKind
+} from "@/lib/device-sessions/kinds";
 
-/** A CLI sign-in, as a row on a sessions screen. */
-export interface CliSessionView {
+/** A device's sign-in, as a row on a sessions screen. */
+export interface DeviceSessionView {
     /** The API key's id: ending the session revokes this key. */
     readonly id: string;
-    /** The computer's name, as the CLI reported it at sign-in. */
+    /** Which app signed in. */
+    readonly kind: DeviceSessionKind;
+    /** The device's name, as the app reported it at sign-in. */
     readonly name: string;
+    /** The computer's hostname, for a kind whose reported name is one, so the
+     *  sessions screen can name the machine its other rows run on. */
+    readonly hostname: string | null;
     readonly os: string;
     readonly version: string | null;
     /** The address the sign-in was approved from. */
@@ -45,11 +56,11 @@ export interface CliSessionView {
     readonly pinnedByRule: boolean;
 }
 
-/** Live: kind "cli", not revoked, not expired. */
+/** Live: a device kind, not revoked, not expired. */
 function liveWhere(userId: string, now: Date) {
     return {
         userId,
-        kind: "cli",
+        kind: { in: DEVICE_KINDS },
         revokedAt: null,
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
     };
@@ -58,7 +69,7 @@ function liveWhere(userId: string, now: Date) {
 /** Whether a sign-in is tied to its address: its own answer where it gave one,
  *  the account's rule where it did not - the rule's own function, so "computers
  *  only" means the same thing for a terminal as for a browser. */
-export function cliPinned(
+export function devicePinned(
     row: { readonly os: string | null; readonly pinToAddress: boolean | null },
     scope: string | null | undefined
 ): boolean {
@@ -73,8 +84,11 @@ export function cliPinned(
     );
 }
 
-/** Every live CLI sign-in an account has, most recently used first. */
-export async function listCliSessions(userId: string, now = new Date()): Promise<CliSessionView[]> {
+/** Every live device sign-in an account has, most recently used first. */
+export async function listDeviceSessions(
+    userId: string,
+    now = new Date()
+): Promise<DeviceSessionView[]> {
     const [security, rows] = await Promise.all([
         prisma.userSecurity.findUnique({
             where: { userId },
@@ -86,6 +100,7 @@ export async function listCliSessions(userId: string, now = new Date()): Promise
             take: 200,
             select: {
                 id: true,
+                kind: true,
                 name: true,
                 clientName: true,
                 clientOs: true,
@@ -101,9 +116,13 @@ export async function listCliSessions(userId: string, now = new Date()): Promise
     ]);
     return rows.map((row) => ({
         id: row.id,
+        kind: row.kind as DeviceSessionKind,
         // A sign-in made before the computer was recorded still has the key's
         // own name, which carries it ("CLI - laptop").
         name: row.clientName ?? row.name,
+        hostname: DEVICE_SESSION_KINDS[row.kind as DeviceSessionKind].namesMachine
+            ? row.clientName
+            : null,
         os: row.clientOs ?? "Unknown OS", // i18n-ignore the parser's own word for it
         version: row.clientVersion,
         signedInIp: row.signedInIp,
@@ -112,22 +131,22 @@ export async function listCliSessions(userId: string, now = new Date()): Promise
         lastUsedIp: row.lastUsedIp,
         expiresAt: row.expiresAt?.toISOString() ?? null,
         pinToAddress: row.pinToAddress,
-        pinnedByRule: cliPinned(
+        pinnedByRule: devicePinned(
             { os: row.clientOs, pinToAddress: null },
             security?.pinSessionsToAddress
         )
     }));
 }
 
-/** Sign one out. Scoped to the owner and to CLI keys, so an id from another
+/** Sign one out. Scoped to the owner and to device keys, so an id from another
  *  account, or of a key made for something else, changes nothing. */
-export async function revokeCliSession(
+export async function revokeDeviceSession(
     userId: string,
     id: string,
     now = new Date()
 ): Promise<boolean> {
     const ended = await prisma.apiKey.updateMany({
-        where: { id, userId, kind: "cli", revokedAt: null },
+        where: { id, userId, kind: { in: DEVICE_KINDS }, revokedAt: null },
         data: { revokedAt: now }
     });
     return ended.count > 0;
@@ -135,7 +154,7 @@ export async function revokeCliSession(
 
 /** Sign every one out. What signing out everywhere, closing the account and an
  *  administrator ending its sessions call. Returns how many were live. */
-export async function revokeCliSessions(userId: string, now = new Date()): Promise<number> {
+export async function revokeAllDeviceSessions(userId: string, now = new Date()): Promise<number> {
     const ended = await prisma.apiKey.updateMany({
         where: liveWhere(userId, now),
         data: { revokedAt: now }
@@ -144,20 +163,20 @@ export async function revokeCliSessions(userId: string, now = new Date()): Promi
 }
 
 /** Tie one to its address, untie it, or hand it back to the account's rule. */
-export async function pinCliSession(
+export async function pinDeviceSession(
     userId: string,
     id: string,
     pinned: boolean | null
 ): Promise<boolean> {
     const written = await prisma.apiKey.updateMany({
-        where: { id, userId, kind: "cli", revokedAt: null },
+        where: { id, userId, kind: { in: DEVICE_KINDS }, revokedAt: null },
         data: { pinToAddress: pinned }
     });
     return written.count > 0;
 }
 
 /**
- * The address lock, checked when a CLI key authenticates: a sign-in tied to its
+ * The address lock, checked when a device's key authenticates: a sign-in tied to its
  * address that turns up from a different one is signed out on the spot, logged,
  * and its owner told - exactly what happens to a session. Returns whether the
  * request may go on.
@@ -165,7 +184,7 @@ export async function pinCliSession(
  * Only an address it was seen at counts as a move: a key never used yet, or a
  * request with no address, has nothing to compare.
  */
-export async function cliAddressAllows(
+export async function deviceAddressAllows(
     key: {
         readonly id: string;
         readonly userId: string;
@@ -181,16 +200,18 @@ export async function cliAddressAllows(
         select: { pinSessionsToAddress: true }
     });
     if (
-        !cliPinned(
+        !devicePinned(
             { os: key.clientOs, pinToAddress: key.pinToAddress },
             security?.pinSessionsToAddress
         )
     )
         return true;
 
-    await revokeCliSession(key.userId, key.id);
+    await revokeDeviceSession(key.userId, key.id);
     await recordAudit({
         actorId: key.userId,
+        // The action name predates the other devices; renaming it would split
+        // the history the log already holds.
         action: "account.cli.compromised",
         targetType: "apiKey",
         targetId: key.id,
@@ -199,7 +220,7 @@ export async function cliAddressAllows(
     await notifySessionsClosed({
         userId: key.userId,
         count: 1,
-        reason: "A command-line sign-in was used from a different network address than the one it is locked to, so it was signed out."
+        reason: "A signed-in device was used from a different network address than the one it is locked to, so it was signed out."
     });
     return false;
 }

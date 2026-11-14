@@ -938,6 +938,8 @@
         "scannedBy": "Escaneado por",
         "allowedBy": "Permitido por",
         "thisDevice": "Este equipo",
+        "thisComputer": "Este equipo",
+        "machineHint": "Mismo equipo, deducido por su dirección y sistema",
         "activeNow": "Activo ahora",
         "activeNowHint": "Usado en los últimos minutos",
         "signedOutSince": "Ya cerrada",
@@ -976,14 +978,18 @@
             "title": "{says}. Pulsa para {then}.",
             "label": "Fijación de dirección de {label}: {says}"
         },
-        "cli": {
-            "badge": "Terminal",
-            "lockedHint": "Este inicio de sesión solo funciona desde la dirección en la que se usó por última vez",
+        "appSignIn": {
+            "kinds": {
+                "cli": "Terminal",
+                "streamdeck": "Stream Deck",
+                "tv": "Polaris TV"
+            },
+            "lockedHint": "Esta sesión solo funciona desde la última dirección en que se usó",
             "signedIn": "Sesión iniciada <time></time>",
             "signedInFrom": "Sesión iniciada <time></time> desde {ip}",
             "notUsedYet": "Aún sin usar",
-            "named": "Terminal de {name}",
-            "signOutNamed": "Cerrar la sesión de terminal de {name}"
+            "named": "{app} en {name}",
+            "signOutNamed": "Cerrar {app} en {name}"
         }
     },
     "modelKeys": {

@@ -8,6 +8,7 @@
  */
 
 import { notFound } from "next/navigation";
+import { DEVICE_KINDS } from "@/lib/device-sessions/kinds";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
 import { KeyUsageView } from "./key-usage-view";
@@ -19,7 +20,7 @@ export default async function ApiKeyUsagePage({ params }: { params: Promise<{ ke
     const user = await requireUser();
     if (!/^[0-9a-f-]{36}$/i.test(keyId)) notFound();
     const key = await prisma.apiKey.findFirst({
-        where: { id: keyId, userId: user.id },
+        where: { id: keyId, userId: user.id, kind: { notIn: DEVICE_KINDS } },
         select: {
             id: true,
             name: true,

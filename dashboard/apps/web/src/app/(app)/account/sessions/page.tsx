@@ -16,7 +16,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { SessionsView } from "./sessions-view";
 import { DeviceAccountsCard } from "@/components/device-accounts";
 import { listVaultClients } from "@/lib/vault/devices";
-import { listCliSessions } from "@/lib/cli/sessions";
+import { listDeviceSessions } from "@/lib/device-sessions/sessions";
 import { listExtensionSessions } from "@/lib/extension/sessions";
 import { listTrustedDeviceRows, listUserSessions } from "@/lib/session-directory";
 
@@ -36,7 +36,7 @@ export default async function SessionsPage() {
         listExtensionSessions(user.id),
         listVaultClients(user.id).catch(() => []),
         // The command-line sign-ins, each an API key listed here as a session.
-        listCliSessions(user.id),
+        listDeviceSessions(user.id),
         // So approving a sign-in checks the PIN on its last digit.
         getUserSecurity(user.id).then((security) => security.pinLength)
     ]);
@@ -66,7 +66,7 @@ export default async function SessionsPage() {
                 trusted={trusted}
                 extensions={extensions}
                 clients={apps}
-                cliSessions={terminals}
+                deviceSessions={terminals}
                 pinLength={pinLength}
             />
         </div>

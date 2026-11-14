@@ -23,7 +23,7 @@ vi.mock("@polaris/core", async (original) => ({
     ...(await original<typeof import("@polaris/core")>()),
     userAgentAllowed: () => true
 }));
-vi.mock("@/lib/cli/sessions", () => ({ cliAddressAllows: async () => true }));
+vi.mock("@/lib/device-sessions/sessions", () => ({ deviceAddressAllows: async () => true }));
 vi.mock("@/lib/network-rules", () => ({
     evaluateAccountAccess: async () => ({ allowed: true })
 }));

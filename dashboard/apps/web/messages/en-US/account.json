@@ -264,20 +264,8 @@
             "menuFor": "What to do with {name}",
             "more": "More",
             "edit": "Edit",
-            "cli": {
-                "badge": "CLI",
-                "title": "Made by plr login on a computer. It is also listed under Sessions, where it can be signed out; plr logout revokes it too."
-            },
             "reference": "API reference",
-            "usage": "Usage",
-            "streamdeck": {
-                "badge": "Stream Deck",
-                "title": "Made by connecting the Polaris plugin on a Stream Deck. Downloads lists the connected decks and can disconnect them."
-            },
-            "tv": {
-                "badge": "TV",
-                "title": "Made by connecting Polaris TV. It shows your name and notification counts on that set, nothing more."
-            }
+            "usage": "Usage"
         },
         "form": {
             "neverExpires": "Never expires",

@@ -28,7 +28,7 @@ vi.mock("@/lib/account-recovery-service", () => ({}));
 vi.mock("@/lib/invite-service", () => ({}));
 vi.mock("@/lib/user-admin-service", () => ({}));
 vi.mock("@/lib/session-directory", () => ({}));
-vi.mock("@/lib/cli/sessions", () => ({}));
+vi.mock("@/lib/device-sessions/sessions", () => ({}));
 
 const { setDiscoveryPolicyAction } = await import("@/app/(app)/admin/users/actions");
 

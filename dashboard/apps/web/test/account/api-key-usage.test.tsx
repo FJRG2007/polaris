@@ -60,7 +60,10 @@ describe("a key's usage action", () => {
     it("refuses another account's key as not found, without reading its usage", async () => {
         const result = await keyUsageAction({ keyId: OTHER_KEY, range: "24h" });
         expect(result).toEqual({ error: "notFound" });
-        expect(state.lookups).toEqual([{ id: OTHER_KEY, userId: "user-1" }]);
+        // A device's sign-in is a session, not a key: its id reads as unknown here too.
+        expect(state.lookups).toEqual([
+            { id: OTHER_KEY, userId: "user-1", kind: { notIn: ["cli", "streamdeck", "tv"] } }
+        ]);
         expect(state.reports).toEqual([]);
     });
 

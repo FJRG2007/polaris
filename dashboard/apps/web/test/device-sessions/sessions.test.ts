@@ -24,11 +24,14 @@ let security: Row[] = [];
 const audits: Row[] = [];
 const notices: Row[] = [];
 
-/** The where clauses `lib/cli/sessions` writes, evaluated like the database. */
+/** The where clauses `lib/device-sessions/sessions` writes, evaluated like the database. */
 function match(row: Row, where: Row): boolean {
     return Object.entries(where).every(([key, value]) => {
         if (key === "OR") {
             return (value as Row[]).some((clause) => match(row, clause));
+        }
+        if (key === "kind" && value !== null && typeof value === "object") {
+            return (value as { in: unknown[] }).in.includes(row["kind"]);
         }
         if (key === "expiresAt" && value !== null && typeof value === "object") {
             const at = row["expiresAt"] as Date | null;
@@ -61,8 +64,14 @@ vi.mock("@/lib/notifications/session-events", () => ({
     notifySessionsClosed: async (entry: Row) => void notices.push(entry)
 }));
 
-const { cliAddressAllows, listCliSessions, pinCliSession, revokeCliSession, revokeCliSessions } =
-    await import("@/lib/cli/sessions");
+const { DEVICE_KINDS } = await import("@/lib/device-sessions/kinds");
+const {
+    deviceAddressAllows,
+    listDeviceSessions,
+    pinDeviceSession,
+    revokeDeviceSession,
+    revokeAllDeviceSessions
+} = await import("@/lib/device-sessions/sessions");
 
 /** A CLI key as `claimCliSignIn` leaves it. */
 function cliKey(overrides: Row = {}): Row {
@@ -96,10 +105,12 @@ beforeEach(() => {
 describe("listing", () => {
     it("shows each live CLI sign-in with its computer, system, version, addresses and times", async () => {
         keys.push(cliKey());
-        const [row] = await listCliSessions(ADA, NOW);
+        const [row] = await listDeviceSessions(ADA, NOW);
         expect(row).toEqual({
             id: "key-1",
+            kind: "cli",
             name: "ada-laptop",
+            hostname: "ada-laptop",
             os: "macOS",
             version: "0.4.6",
             signedInIp: "203.0.113.4",
@@ -120,37 +131,71 @@ describe("listing", () => {
             cliKey({ userId: BOB }),
             cliKey({ expiresAt: null })
         );
-        const rows = await listCliSessions(ADA, NOW);
+        const rows = await listDeviceSessions(ADA, NOW);
         expect(rows.map((row) => row.id)).toEqual(["key-5"]);
+    });
+
+    it("lists every device kind in the registry as a session, and no key somebody made", async () => {
+        keys.push(
+            cliKey({ kind: "streamdeck", name: "Stream Deck - DRAGON", clientName: "DRAGON" }),
+            cliKey({ kind: "tv", name: "TV - Living room", clientName: "Living room" }),
+            cliKey({ kind: "key", name: "test" }),
+            cliKey({ kind: "cli", clientName: "DRAGON" })
+        );
+        const rows = await listDeviceSessions(ADA, NOW);
+        expect(rows.map((row) => [row.kind, row.name, row.hostname])).toEqual([
+            ["streamdeck", "DRAGON", "DRAGON"],
+            // A TV's name is the set's own, never taken for a computer's.
+            ["tv", "Living room", null],
+            ["cli", "DRAGON", "DRAGON"]
+        ]);
+        expect(rows.map((row) => row.kind).sort()).toEqual([...DEVICE_KINDS].sort());
     });
 
     it("says when the account's rule locks it", async () => {
         security.push({ userId: ADA, pinSessionsToAddress: "all" });
         keys.push(cliKey());
-        expect((await listCliSessions(ADA, NOW))[0]?.pinnedByRule).toBe(true);
+        expect((await listDeviceSessions(ADA, NOW))[0]?.pinnedByRule).toBe(true);
     });
 });
 
 describe("signing out", () => {
+    it.each(DEVICE_KINDS)(
+        "revokes a %s sign-in, which is what its credential is checked against",
+        async (kind) => {
+            keys.push(cliKey({ kind }));
+            expect(await revokeDeviceSession(ADA, "key-1", NOW)).toBe(true);
+            expect(keys[0]?.["revokedAt"]).toEqual(NOW);
+            expect(await listDeviceSessions(ADA, NOW)).toEqual([]);
+        }
+    );
+
+    it("never revokes a key somebody made by hand", async () => {
+        keys.push(cliKey({ kind: "key" }));
+        expect(await revokeDeviceSession(ADA, "key-1", NOW)).toBe(false);
+        expect(await revokeAllDeviceSessions(ADA, NOW)).toBe(0);
+        expect(keys[0]?.["revokedAt"]).toBeNull();
+    });
+
     it("revokes that one key, and only for its owner", async () => {
         keys.push(cliKey(), cliKey());
-        expect(await revokeCliSession(BOB, "key-1", NOW)).toBe(false);
-        expect(await revokeCliSession(ADA, "key-1", NOW)).toBe(true);
+        expect(await revokeDeviceSession(BOB, "key-1", NOW)).toBe(false);
+        expect(await revokeDeviceSession(ADA, "key-1", NOW)).toBe(true);
         expect(keys[0]?.["revokedAt"]).toEqual(NOW);
         expect(keys[1]?.["revokedAt"]).toBeNull();
         // Already ended: nothing left to end.
-        expect(await revokeCliSession(ADA, "key-1", NOW)).toBe(false);
+        expect(await revokeDeviceSession(ADA, "key-1", NOW)).toBe(false);
     });
 
     it("never revokes a key that is not a CLI sign-in", async () => {
         keys.push(cliKey({ kind: "key" }));
-        expect(await revokeCliSession(ADA, "key-1", NOW)).toBe(false);
+        expect(await revokeDeviceSession(ADA, "key-1", NOW)).toBe(false);
         expect(keys[0]?.["revokedAt"]).toBeNull();
     });
 
     it("everywhere ends every live one the account has, and says how many", async () => {
         keys.push(cliKey(), cliKey(), cliKey({ kind: "key" }), cliKey({ userId: BOB }));
-        expect(await revokeCliSessions(ADA, NOW)).toBe(2);
+        expect(await revokeAllDeviceSessions(ADA, NOW)).toBe(2);
         expect(keys.map((row) => row["revokedAt"] === NOW)).toEqual([true, true, false, false]);
     });
 });
@@ -167,13 +212,13 @@ describe("the address lock", () => {
 
     it("lets an unlocked sign-in move", async () => {
         keys.push(cliKey());
-        expect(await cliAddressAllows(key(), "198.51.100.7")).toBe(true);
+        expect(await deviceAddressAllows(key(), "198.51.100.7")).toBe(true);
         expect(keys[0]?.["revokedAt"]).toBeNull();
     });
 
     it("signs a locked one out when it turns up somewhere else, logs it and tells the owner", async () => {
         keys.push(cliKey({ pinToAddress: true }));
-        expect(await cliAddressAllows(key({ pinToAddress: true }), "198.51.100.7")).toBe(false);
+        expect(await deviceAddressAllows(key({ pinToAddress: true }), "198.51.100.7")).toBe(false);
         expect(keys[0]?.["revokedAt"]).not.toBeNull();
         expect(audits).toEqual([
             expect.objectContaining({
@@ -187,23 +232,23 @@ describe("the address lock", () => {
     it("follows the account's rule when the sign-in has no answer of its own", async () => {
         security.push({ userId: ADA, pinSessionsToAddress: "all" });
         keys.push(cliKey());
-        expect(await cliAddressAllows(key(), "198.51.100.7")).toBe(false);
+        expect(await deviceAddressAllows(key(), "198.51.100.7")).toBe(false);
     });
 
     it("lets a locked one through from the same address, or on its first use", async () => {
-        expect(await cliAddressAllows(key({ pinToAddress: true }), "203.0.113.4")).toBe(true);
+        expect(await deviceAddressAllows(key({ pinToAddress: true }), "203.0.113.4")).toBe(true);
         expect(
-            await cliAddressAllows(key({ pinToAddress: true, lastUsedIp: null }), "198.51.100.7")
+            await deviceAddressAllows(key({ pinToAddress: true, lastUsedIp: null }), "198.51.100.7")
         ).toBe(true);
         expect(audits).toEqual([]);
     });
 
     it("can be locked, unlocked or handed back to the rule, by its owner only", async () => {
         keys.push(cliKey());
-        expect(await pinCliSession(BOB, "key-1", true)).toBe(false);
-        expect(await pinCliSession(ADA, "key-1", true)).toBe(true);
+        expect(await pinDeviceSession(BOB, "key-1", true)).toBe(false);
+        expect(await pinDeviceSession(ADA, "key-1", true)).toBe(true);
         expect(keys[0]?.["pinToAddress"]).toBe(true);
-        expect(await pinCliSession(ADA, "key-1", null)).toBe(true);
+        expect(await pinDeviceSession(ADA, "key-1", null)).toBe(true);
         expect(keys[0]?.["pinToAddress"]).toBeNull();
     });
 });

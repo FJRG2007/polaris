@@ -41,6 +41,10 @@ import { addressPinned, describeClient, isHandheld, type AddressPinScope } from 
 import { AUTHORIZATION_POLL_MS, AUTHORIZATION_TTL_MS, newUserCode } from "@/lib/device-code";
 import { readerWords } from "@/lib/i18n/reader-words";
 
+/** How long a connection of the same browser on the same system has to have
+ *  gone unused before a new one retires it as a reinstall's leftover. */
+const LEFTOVER_IDLE_MS = 30 * 24 * 60 * 60 * 1000;
+
 /** What the extension is handed when it asks. */
 export interface OpenedConnection {
     readonly userCode: string;
@@ -310,6 +314,30 @@ export async function claimExtensionConnection(
         data: { extensionSessionId: session.id }
     });
 
+    // What a reinstall left behind: earlier connections of this browser on this
+    // system that nothing has used for a month (see `withoutReinstalls`). Their
+    // install is gone with the token it held, so ending them takes nothing that
+    // works; a recent one is only folded out of the list, never ended, because a
+    // second profile of the same browser looks exactly like it.
+    const leftovers = await prisma.extensionSession.findMany({
+        where: {
+            userId: account.id,
+            id: { not: session.id },
+            revokedAt: null,
+            browser: client.browser,
+            os: client.os,
+            lastSeenAt: { lt: new Date(now.getTime() - LEFTOVER_IDLE_MS) }
+        },
+        select: { id: true }
+    });
+    if (leftovers.length > 0) {
+        await endConnections(
+            account.id,
+            leftovers.map((leftover) => leftover.id),
+            now
+        );
+    }
+
     // Spent: an approval is good for exactly one collection.
     await prisma.extensionAuthorization.deleteMany({ where: { id: row.id } });
 
@@ -429,7 +457,7 @@ export async function listExtensionSessions(userId: string): Promise<ExtensionSe
             _count: { select: { vaultDevices: true } }
         }
     });
-    return rows.map((row) => {
+    const views = rows.map((row) => {
         // Read again from the name rather than taken as stored, so a row written
         // with the user agent's guess (Brave reads as Chrome) shows what the
         // extension said.
@@ -455,6 +483,38 @@ export async function listExtensionSessions(userId: string): Promise<ExtensionSe
             )
         };
     });
+    return withoutReinstalls(views);
+}
+
+/**
+ * The connections left once an install's earlier lives are folded into its
+ * latest one.
+ *
+ * Why one browser showed as several rows: a connection is keyed by the id the
+ * extension keeps in its own storage, and that storage goes with the extension -
+ * removing and adding it again, loading a fresh build or clearing the browser's
+ * data mints a new id, so the next connection is a new row while the last one
+ * stays live with a token nobody holds any more. An earlier connection of the
+ * same browser on the same system that has not been heard from since a newer one
+ * was made is that leftover, and is not listed. One still in use - a second
+ * profile, say - is heard from again and comes back on its own, so nothing that
+ * works is hidden for long, and nothing is revoked here.
+ */
+export function withoutReinstalls<
+    T extends {
+        readonly browser: string;
+        readonly os: string;
+        readonly createdAt: string;
+        readonly lastSeenAt: string;
+    }
+>(rows: readonly T[]): T[] {
+    const newest = new Map<string, number>();
+    const twin = (row: T) => JSON.stringify([row.browser, row.os]);
+    for (const row of rows) {
+        const made = Date.parse(row.createdAt);
+        newest.set(twin(row), Math.max(newest.get(twin(row)) ?? 0, made));
+    }
+    return rows.filter((row) => (newest.get(twin(row)) ?? 0) <= Date.parse(row.lastSeenAt));
 }
 
 /**

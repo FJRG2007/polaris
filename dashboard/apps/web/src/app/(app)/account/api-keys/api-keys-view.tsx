@@ -400,33 +400,6 @@ function KeyRow({
                     >
                         {entry.name}
                     </Link>
-                    {/* Which keys a terminal is holding, so somebody cleaning up
-                        the list can tell a laptop's sign-in from a pipeline's key. */}
-                    {/* The key is the sign-in; Sessions lists the same row as a
-                        session, so the badge leads there. */}
-                    {entry.kind === "cli" ? (
-                        <Link
-                            href="/account/sessions"
-                            className="shrink-0 no-underline"
-                            title={t("apiKeys.list.cli.title")}
-                        >
-                            <Badge variant="neutral">{t("apiKeys.list.cli.badge")}</Badge>
-                        </Link>
-                    ) : entry.kind === "streamdeck" ? (
-                        // Connected decks are listed, and disconnected, under
-                        // Downloads too, where the plugin is installed from.
-                        <Link
-                            href="/account/downloads"
-                            className="shrink-0 no-underline"
-                            title={t("apiKeys.list.streamdeck.title")}
-                        >
-                            <Badge variant="neutral">{t("apiKeys.list.streamdeck.badge")}</Badge>
-                        </Link>
-                    ) : entry.kind === "tv" ? (
-                        <span className="shrink-0" title={t("apiKeys.list.tv.title")}>
-                            <Badge variant="neutral">{t("apiKeys.list.tv.badge")}</Badge>
-                        </span>
-                    ) : null}
                     {/* Only when it is not what a key normally is. A row that
                         says "Active" on every line says nothing on any of
                         them. */}

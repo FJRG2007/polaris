@@ -30,7 +30,7 @@ import { openLockdownCase } from "@/lib/safety-queue";
 import { notify } from "@/lib/notifications/dispatch";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { revokeStepUpGrants } from "@/lib/step-up-grant";
-import { revokeCliSessions } from "@/lib/cli/sessions";
+import { revokeAllDeviceSessions } from "@/lib/device-sessions/sessions";
 import { revokeExtensionSessions } from "@/lib/extension/sessions";
 import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
 
@@ -153,7 +153,7 @@ export async function closeAccount(userId: string, closure: core.AccountClosure)
     });
     await prisma.session.deleteMany({ where: { userId } });
     await revokeExtensionSessions(userId);
-    await revokeCliSessions(userId);
+    await revokeAllDeviceSessions(userId);
     await revokeStepUpGrants(userId);
     refreshVpnAccessLater();
     await recordAudit({

@@ -86,8 +86,8 @@ vi.mock("@polaris/auth", () => ({
     }
 }));
 
-vi.mock("@/lib/cli/sessions", () => ({
-    revokeCliSession: async (userId: string, id: string) => {
+vi.mock("@/lib/device-sessions/sessions", () => ({
+    revokeDeviceSession: async (userId: string, id: string) => {
         revoked.push({ userId, id });
         return true;
     }

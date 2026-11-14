@@ -12,6 +12,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { DEVICE_KINDS } from "@/lib/device-sessions/kinds";
 import { describeClient, type ClientReading } from "@polaris/core";
 
 /** A session as this module reads it: better-auth's own columns, and Polaris's
@@ -62,5 +63,23 @@ export async function sessionDeviceLabels(userId: string): Promise<Map<string, s
             state: { select: { userAgent: true, userAgentBrands: true, userAgentPlatform: true } }
         }
     });
-    return new Map(rows.map((row) => [row.id, sessionDevice(row)]));
+    // The apps that are sessions of their own - a device's sign-in and a browser
+    // extension's connection - are named by what they called themselves.
+    const [devices, extensions] = await Promise.all([
+        prisma.apiKey.findMany({
+            where: { userId, kind: { in: DEVICE_KINDS }, revokedAt: null },
+            select: { id: true, name: true },
+            take: 200
+        }),
+        prisma.extensionSession.findMany({
+            where: { userId, revokedAt: null },
+            select: { id: true, name: true },
+            take: 200
+        })
+    ]);
+    return new Map([
+        ...rows.map((row) => [row.id, sessionDevice(row)] as const),
+        ...devices.map((row) => [row.id, row.name] as const),
+        ...extensions.map((row) => [row.id, row.name] as const)
+    ]);
 }

@@ -23,7 +23,7 @@ import { newDeviceRefusal } from "@/lib/device-grace";
 import { getTranslations } from "@/lib/i18n/request";
 import { localized } from "../security/action-messages";
 import { revokeTrustedDevice, revokeTrustedDevices } from "@polaris/auth";
-import { pinCliSession, revokeCliSession } from "@/lib/cli/sessions";
+import { pinDeviceSession, revokeDeviceSession } from "@/lib/device-sessions/sessions";
 import { pinExtensionSession, revokeExtensionSession } from "@/lib/extension/sessions";
 import {
     decideLoginApproval,
@@ -53,7 +53,7 @@ type SessionError =
     | "errors.deviceForgotten"
     | "errors.unknownConnection"
     | "errors.connectionEnded"
-    | "errors.cliEnded";
+    | "errors.deviceEnded";
 
 /** One of this file's own refusals, in the reader's language. */
 async function refuse(key: SessionError): Promise<{ error: string }> {
@@ -313,14 +313,14 @@ export async function pinExtensionAction(
  * is refused and says it was signed out. The same gate as every other device
  * action here.
  */
-export async function signOutCliSessionAction(id: unknown): Promise<{ error?: string }> {
+export async function signOutDeviceSessionAction(id: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
     const parsed = sessionIdSchema.safeParse(id);
     if (!parsed.success) return refuse("errors.unknownSession");
 
-    if (!(await revokeCliSession(user.id, parsed.data))) return refuse("errors.cliEnded");
+    if (!(await revokeDeviceSession(user.id, parsed.data))) return refuse("errors.deviceEnded");
     await recordAudit({
         actorId: user.id,
         action: "account.cli.signedOut",
@@ -334,7 +334,7 @@ export async function signOutCliSessionAction(id: unknown): Promise<{ error?: st
 
 /** Tie one CLI sign-in to its address, untie it, or hand it back to the
  *  account's rule - the same three answers, and the same gate, as a session. */
-export async function pinCliSessionAction(
+export async function pinDeviceSessionAction(
     id: unknown,
     pinned: unknown
 ): Promise<{ error?: string }> {
@@ -345,7 +345,8 @@ export async function pinCliSessionAction(
     if (!parsed.success) return refuse("errors.unknownSession");
     if (pinned !== null && typeof pinned !== "boolean") return refuse("errors.unknownSetting");
 
-    if (!(await pinCliSession(user.id, parsed.data, pinned))) return refuse("errors.cliEnded");
+    if (!(await pinDeviceSession(user.id, parsed.data, pinned)))
+        return refuse("errors.deviceEnded");
     await recordAudit({
         actorId: user.id,
         action: "account.cli.pinned",

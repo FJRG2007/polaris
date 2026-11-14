@@ -33,16 +33,16 @@ vi.mock("@/lib/notifications/session-events", () => ({}));
 vi.mock("@/lib/audit-service", () => ({
     recordAudit: async (entry: { action: string }) => void audits.push(entry)
 }));
-vi.mock("@/lib/cli/sessions", () => ({
-    revokeCliSession: async (userId: string, id: string) => {
+vi.mock("@/lib/device-sessions/sessions", () => ({
+    revokeDeviceSession: async (userId: string, id: string) => {
         revoked.push({ userId, id });
         return id === KEY;
     },
-    pinCliSession: async (_userId: string, id: string, value: boolean | null) => {
+    pinDeviceSession: async (_userId: string, id: string, value: boolean | null) => {
         pinned.push({ id, pinned: value });
         return id === KEY;
     },
-    cliAddressAllows: async () => allowsAddress
+    deviceAddressAllows: async () => allowsAddress
 }));
 vi.mock("@/lib/request-context", () => ({
     clientIp: async () => "198.51.100.7",
@@ -66,9 +66,8 @@ vi.mock("@polaris/auth", async (original) => ({
     touchApiKey: async (id: string) => void touched.push(id)
 }));
 
-const { pinCliSessionAction, signOutCliSessionAction } = await import(
-    "@/app/(app)/account/sessions/actions"
-);
+const { pinDeviceSessionAction, signOutDeviceSessionAction } =
+    await import("@/app/(app)/account/sessions/actions");
 const { authenticateApiKey } = await import("@/lib/api-key-auth");
 
 beforeEach(() => {
@@ -82,36 +81,36 @@ beforeEach(() => {
 
 describe("signing a CLI sign-in out from the sessions screen", () => {
     it("revokes its key and records it", async () => {
-        expect(await signOutCliSessionAction(KEY)).toEqual({});
+        expect(await signOutDeviceSessionAction(KEY)).toEqual({});
         expect(revoked).toEqual([{ userId: ADA, id: KEY }]);
         expect(audits.map((entry) => entry.action)).toEqual(["account.cli.signedOut"]);
     });
 
     it("says so when it had already ended", async () => {
-        const result = await signOutCliSessionAction("0190a1b2-c3d4-7e5f-8a9b-000000000000");
-        expect(result.error).toBe("That command-line sign-in has already ended.");
+        const result = await signOutDeviceSessionAction("0190a1b2-c3d4-7e5f-8a9b-000000000000");
+        expect(result.error).toBe("That sign-in has already ended.");
         expect(audits).toEqual([]);
     });
 
     it("refuses anything that is not an id", async () => {
-        expect((await signOutCliSessionAction("../other")).error).toBeTruthy();
+        expect((await signOutDeviceSessionAction("../other")).error).toBeTruthy();
         expect(revoked).toEqual([]);
     });
 
     it("waits behind the new-device gate like every other device action", async () => {
         blocked = "This browser was only just signed in.";
-        expect((await signOutCliSessionAction(KEY)).error).toBeTruthy();
+        expect((await signOutDeviceSessionAction(KEY)).error).toBeTruthy();
         expect(revoked).toEqual([]);
     });
 
     it("locks it to its address, or hands it back to the account's rule", async () => {
-        expect(await pinCliSessionAction(KEY, true)).toEqual({});
-        expect(await pinCliSessionAction(KEY, null)).toEqual({});
+        expect(await pinDeviceSessionAction(KEY, true)).toEqual({});
+        expect(await pinDeviceSessionAction(KEY, null)).toEqual({});
         expect(pinned).toEqual([
             { id: KEY, pinned: true },
             { id: KEY, pinned: null }
         ]);
-        expect((await pinCliSessionAction(KEY, "yes")).error).toBeTruthy();
+        expect((await pinDeviceSessionAction(KEY, "yes")).error).toBeTruthy();
     });
 });
 

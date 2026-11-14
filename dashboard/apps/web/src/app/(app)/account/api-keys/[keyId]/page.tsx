@@ -13,6 +13,7 @@
 import { KeyForm } from "../key-form";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/session";
+import { isDeviceSessionKind } from "@/lib/device-sessions/kinds";
 import { listAccessGroups, listApiKeys, scopesAvailableTo } from "@polaris/auth";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,8 @@ export default async function EditApiKeyPage({ params }: { params: Promise<{ key
         scopesAvailableTo(user.id, user.isAdmin)
     ]);
 
-    const editing = keys.find((key) => key.id === keyId);
+    // A device's sign-in is a session, not a key to edit: Sessions is where it lives.
+    const editing = keys.find((key) => key.id === keyId && !isDeviceSessionKind(key.kind));
     if (!editing) notFound();
 
     return <KeyForm groups={groups} availableScopes={scopes} editing={editing} />;

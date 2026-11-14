@@ -21,7 +21,8 @@ import { Check, LogOut, ScanLine, X } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { VaultClientRow } from "@/lib/vault/devices";
-import type { CliSessionView } from "@/lib/cli/sessions";
+import type { DeviceSessionView } from "@/lib/device-sessions/sessions";
+import { DEVICE_SESSION_KINDS } from "@/lib/device-sessions/kinds";
 import type { ExtensionSessionView } from "@/lib/extension/sessions";
 import { TrustedDevicesCard } from "./trusted-devices-card";
 import { signInParts, signInText } from "@/lib/sign-in-words";
@@ -31,11 +32,11 @@ import {
     decideLoginApprovalAction,
     disconnectExtensionAction,
     revokeOtherSessionsAction,
-    pinCliSessionAction,
+    pinDeviceSessionAction,
     pinExtensionAction,
     pinSessionAction,
     revokeSessionAction,
-    signOutCliSessionAction
+    signOutDeviceSessionAction
 } from "./actions";
 import {
     Button,
@@ -80,7 +81,7 @@ export function SessionsView({
     trusted,
     extensions,
     clients,
-    cliSessions,
+    deviceSessions,
     pinLength
 }: {
     sessions: SessionView[];
@@ -96,12 +97,13 @@ export function SessionsView({
      *  beside it, and listing it separately said it was something external. */
     clients: VaultClientRow[];
     /** The command-line sign-ins, listed and ended like any other session. */
-    cliSessions: CliSessionView[];
+    deviceSessions: DeviceSessionView[];
     /** The PIN's length, null when unknown, so approving checks it on its last digit. */
     pinLength: number | null;
 }) {
     const router = useRouter();
     const t = useTranslations("accountSecurity");
+    const words = useTranslations("components");
     const [confirm, confirmElement] = useConfirm();
     const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -112,7 +114,7 @@ export function SessionsView({
     const others = active.filter((session) => !session.current);
     // What "everywhere else" reaches: the other browsers and every extension.
     // And every command-line sign-in: none of them is the browser this is.
-    const elsewhere = others.length + extensions.length + cliSessions.length;
+    const elsewhere = others.length + extensions.length + deviceSessions.length;
 
     /** Refusing is immediate; allowing goes through the PIN prompt first. */
     async function deny(sessionId: string) {
@@ -140,28 +142,29 @@ export function SessionsView({
         else router.refresh();
     }
 
-    /** Sign a command-line sign-in out. Its key is revoked, so the CLI's next
-     *  command says it was signed out and to run plr login. */
-    async function signOutCli(session: CliSessionView) {
+    /** Sign a device's app out. Its key is revoked, so the app's next request
+     *  says it was signed out and asks to be connected again. */
+    async function signOutDevice(session: DeviceSessionView) {
+        const named = { app: words(DEVICE_SESSION_KINDS[session.kind].label), name: session.name };
         const ok = await confirm({
-            title: t("sessions.cli.title"),
-            description: t("sessions.cli.description", { name: session.name }),
-            confirmLabel: t("sessions.cli.confirm"),
+            title: t("sessions.app.title", named),
+            description: t("sessions.app.description"),
+            confirmLabel: t("sessions.app.confirm"),
             danger: true
         });
         if (!ok) return;
         setBusyId(session.id);
         setError(null);
-        const result = await signOutCliSessionAction(session.id);
+        const result = await signOutDeviceSessionAction(session.id);
         setBusyId(null);
         if (result.error) setError(result.error);
         else router.refresh();
     }
 
-    async function pinCli(session: CliSessionView, pinned: boolean | null) {
+    async function pinDevice(session: DeviceSessionView, pinned: boolean | null) {
         setBusyId(session.id);
         setError(null);
-        const result = await pinCliSessionAction(session.id, pinned);
+        const result = await pinDeviceSessionAction(session.id, pinned);
         setBusyId(null);
         if (result.error) setError(result.error);
         else router.refresh();
@@ -336,9 +339,9 @@ export function SessionsView({
                             void (session.current ? signOutHere() : revoke(session))
                         }
                         onPin={(session, pinned) => void pin(session, pinned)}
-                        cliSessions={cliSessions}
-                        onSignOutCli={(session) => void signOutCli(session)}
-                        onPinCli={(session, pinned) => void pinCli(session, pinned)}
+                        deviceSessions={deviceSessions}
+                        onSignOutDevice={(session) => void signOutDevice(session)}
+                        onPinDevice={(session, pinned) => void pinDevice(session, pinned)}
                     />
 
                     {/* The table says nothing about apps until one is connected,
@@ -346,7 +349,9 @@ export function SessionsView({
                         with no rows this page answers neither "is anything
                         connected" nor "where do I go about it", which is the
                         question that brings people here. */}
-                    {extensions.length === 0 && clients.length === 0 && cliSessions.length === 0 ? (
+                    {extensions.length === 0 &&
+                    clients.length === 0 &&
+                    deviceSessions.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
                             {t.rich("sessions.active.nothingElse", {
                                 link: (chunks) => (

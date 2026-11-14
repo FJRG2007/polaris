@@ -12,6 +12,7 @@
 import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
+import { credentialSessionId } from "@/lib/device-sessions/credential-session";
 import { headers } from "next/headers";
 import { createHash } from "node:crypto";
 import { isUuid } from "@/lib/uuid";
@@ -65,18 +66,22 @@ async function clientIpHash(): Promise<string | undefined> {
 }
 
 /**
- * The session this request arrived on, or undefined for anything not driven by a
- * browser session (API keys, background work). Memoized per request so several
- * audit writes in one action do not each re-resolve the cookie.
+ * The session this request arrived on, or undefined for anything driven by no
+ * session (a key somebody made, background work). A device app or an extension
+ * presenting its own credential is a session too, and is named by it. Memoized
+ * per request so several audit writes in one action do not each re-resolve it.
  */
 const requestSessionId = cache(async (): Promise<string | undefined> => {
     try {
+        const requestHeaders = await headers();
         // Never renewing: see `getSession` in lib/session.ts.
         const session = await auth.api.getSession({
-            headers: await headers(),
+            headers: requestHeaders,
             query: { disableRefresh: true }
         });
-        return session?.session?.id;
+        return (
+            session?.session?.id ?? (await credentialSessionId(requestHeaders.get("authorization")))
+        );
     } catch {
         return undefined;
     }

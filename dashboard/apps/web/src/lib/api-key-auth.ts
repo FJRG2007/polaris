@@ -11,7 +11,8 @@
  */
 
 import { touchApiKey, verifyApiKey, type ApiKeyKind } from "@polaris/auth";
-import { cliAddressAllows } from "@/lib/cli/sessions";
+import { deviceAddressAllows } from "@/lib/device-sessions/sessions";
+import { isDeviceSessionKind } from "@/lib/device-sessions/kinds";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { userAgentAllowed, type Permission } from "@polaris/core";
 import { clientIp, clientUserAgent } from "@/lib/request-context";
@@ -25,7 +26,7 @@ export interface ApiKeyPrincipal {
     /** Set on a token minted from a Deploy project's settings. The Deploy API and
      *  its MCP tools confine such a key to that project. */
     projectId: string | null;
-    /** What issued it; "cli" for the credential `plr login` holds. */
+    /** What issued it; a device kind (`lib/device-sessions/kinds`) for an app's sign-in. */
     kind: ApiKeyKind;
 }
 
@@ -67,10 +68,11 @@ export async function authenticateApiKey(
     // credential that has already been proven; it never stands in for proving one.
     if (!userAgentAllowed(verified.clients, userAgent)) return null;
 
-    // A CLI sign-in is also a session, and answers to the address lock like
-    // one: used from somewhere other than where it was last seen while locked,
-    // it is signed out rather than let through.
-    if (verified.kind === "cli" && !(await cliAddressAllows(verified, ip))) return null;
+    // A device's sign-in is also a session, and answers to the address lock
+    // like one: used from somewhere other than where it was last seen while
+    // locked, it is signed out rather than let through.
+    if (isDeviceSessionKind(verified.kind) && !(await deviceAddressAllows(verified, ip)))
+        return null;
 
     // Not waited for: a usage stamp is two or three writes that decide nothing
     // about this request, and every API call was paying for them before its
