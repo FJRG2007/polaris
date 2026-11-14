@@ -324,6 +324,7 @@
         "removeLink": "Remove the link",
         "addLink": "Add a link",
         "copyCode": "Copy this code",
+        "downloadCode": "Download as {name}",
         "codeLanguage": "Language of this code",
         "plainText": "Plain text",
         "done": "Done",

@@ -128,3 +128,22 @@ export function languageForFile(name: string): CodeLanguage | undefined {
     if (lowercased === ".env" || lowercased.startsWith(".env.")) return BY_TOKEN.get("ini");
     return BY_TOKEN.get(extName(lowercased));
 }
+
+/** Fence tags that name a language rather than a file extension. */
+const NOT_EXTENSIONS = new Set(["python", "bash", "psql", "pgsql", "mysql", "javascript", "typescript", "golang", "shell", "console", "docker", "markdown", "powershell", "protobuf", "csharp", "fsharp", "objectivec", "latex", "elixir", "erlang", "haskell", "julia", "kotlin", "ocaml", "perl", "clojure"]);
+
+/**
+ * The name a fenced block is saved under: `code.py` for a `python` fence, the
+ * tag itself when it already is an extension (`tsx`, `html`), `Dockerfile` and
+ * `Makefile` for the two that have a name instead of an extension, and `.txt`
+ * for a fence we do not know or one with no language at all.
+ */
+export function fileNameForFence(language: string | null): string {
+    const tag = language?.trim().toLowerCase() ?? "";
+    const known = tag ? languageForToken(tag) : undefined;
+    if (!known) return "code.txt";
+    if (known.id === "dockerfile") return "Dockerfile";
+    if (known.id === "makefile") return "Makefile";
+    const extension = known.tokens.includes(tag) && !NOT_EXTENSIONS.has(tag) && /^[a-z0-9]+$/.test(tag) ? tag : known.tokens[0];
+    return `code.${extension}`;
+}

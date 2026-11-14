@@ -20,10 +20,12 @@
  * Unhighlighted code never goes near `innerHTML` at all: it is a text node.
  */
 
+import { Download } from "lucide-react";
 import { cn, CopyIcon, useCopied } from "@polaris/ui";
+import { downloadBytes } from "@/lib/download";
 import { useHighlighter } from "@/lib/code-highlight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { languageForToken } from "@/lib/code-language";
+import { fileNameForFence, languageForToken } from "@/lib/code-language";
 
 export function CodeBlock({ code, language }: { code: string; language: string | null }) {
     // Resolved before asking for a grammar, so an unknown fence tag ("output",
@@ -42,7 +44,10 @@ export function CodeBlock({ code, language }: { code: string; language: string |
                 <span className="truncate font-mono text-[0.625rem] uppercase tracking-[0.06em] text-foreground-subtle">
                     {known?.label ?? language ?? "code"}
                 </span>
-                <CopyButton code={code} />
+                <div className="flex shrink-0 items-center gap-0.5">
+                    <DownloadButton code={code} language={language} />
+                    <CopyButton code={code} />
+                </div>
             </div>
             <pre data-code="" className="overflow-x-auto p-3 font-mono text-xs leading-relaxed">
                 {marked ? (
@@ -75,6 +80,24 @@ function CopyButton({ code }: { code: string }) {
             )}
         >
             <CopyIcon copied={copied} />
+        </button>
+    );
+}
+
+/** Saves the block as a file, named after its language, without a round trip. */
+function DownloadButton({ code, language }: { code: string; language: string | null }) {
+    const t = useTranslations("components");
+    const name = fileNameForFence(language);
+
+    return (
+        <button
+            type="button"
+            title={t("editor.downloadCode", { name })}
+            aria-label={t("editor.downloadCode", { name })}
+            onClick={() => downloadBytes(new Blob([code], { type: "text/plain;charset=utf-8" }), name)}
+            className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
+        >
+            <Download className="size-3.5" />
         </button>
     );
 }

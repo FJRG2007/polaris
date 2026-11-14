@@ -87,3 +87,9 @@ describe("markdown the editor has no node for", () => {
         expect(markup).not.toContain("Copy this code");
     });
 });
+
+describe("downloading a fence", () => {
+    it("offers to save it as a file named after its language", () => {
+        expect(render("```py\nprint(1)\n```")).toContain("Download as code.py");
+    });
+});
