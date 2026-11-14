@@ -253,7 +253,7 @@ export function RunOutput({ run }: { run: CodeRun }) {
             </div>
             <div
                 role="log"
-                className="max-h-64 overflow-auto px-3 pb-3 font-mono text-xs leading-relaxed"
+                className="max-h-64 overflow-auto overscroll-contain px-3 pb-3 font-mono text-xs leading-relaxed"
             >
                 {state.lines.map((line, index) => (
                     <div
