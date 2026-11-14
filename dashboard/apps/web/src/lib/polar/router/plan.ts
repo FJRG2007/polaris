@@ -54,6 +54,7 @@ export function plannedStep(entry: PlanEntry, credential: ChatCredential): Plann
         reasoning: entry.option.reasoning,
         outputTokens: polarOutputTokens(entry.option),
         reads: entry.option,
+        contextTokens: entry.option.providerContextTokens ?? entry.option.contextTokens,
         keyId: credential.keyId,
         limits: credential.limits,
         coolingUntil: credential.coolingUntil,
@@ -112,7 +113,8 @@ export interface RoutedModel {
 
 export function routedModel(
     steps: readonly PlannedStep[],
-    onRefused?: (kind: FailureKind, step: PlannedStep) => void
+    onRefused?: (kind: FailureKind, step: PlannedStep) => void,
+    firstYields = false
 ): RoutedModel {
     let answeredAt: number | null = null;
     let refusal: FailureKind | null = null;
@@ -122,6 +124,7 @@ export function routedModel(
     const model = wrapLanguageModel({
         model: head.model(),
         middleware: routeMiddleware(steps, {
+            firstYields,
             onAnswered: (index, first) => {
                 answeredAt = index;
                 refusal = first;

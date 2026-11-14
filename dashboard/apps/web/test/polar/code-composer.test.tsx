@@ -162,7 +162,7 @@ function press(trigger: HTMLElement) {
 describe("Code's composer is Chat's", () => {
     it("draws the same controls, with what a session cannot take switched off and why", async () => {
         render(<PolarChat />, { wrapper: MessagesWrapper });
-        await screen.findByText("Model One", { exact: false });
+        await screen.findAllByText("Automatic", { exact: false });
         const chatButtons = composerButtons(screen.getByLabelText("Message Polar"));
         expect(chatButtons).toEqual([
             "Attach files",

@@ -80,7 +80,7 @@ const { PolarChat } = await import("@/components/polar/polar-panel");
 
 async function mount() {
     render(<PolarChat />, { wrapper: MessagesWrapper });
-    await screen.findByText("Model One", { exact: false });
+    await screen.findAllByText("Automatic", { exact: false });
 }
 
 const sent = () => prepare!({ messages: [] }).body;

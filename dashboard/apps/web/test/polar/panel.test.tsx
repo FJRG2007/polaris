@@ -10,7 +10,7 @@
 
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const chat = {
     status: "ready" as "ready" | "submitted" | "streaming" | "error",
@@ -129,7 +129,7 @@ async function type(text: string) {
 
 async function ready() {
     // The model list arrives before anything can be sent.
-    await waitFor(() => expect(screen.getByText("Model One", { exact: false })).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("Automatic", { exact: false })[0]).toBeTruthy());
 }
 
 describe("the side panel", () => {
@@ -454,7 +454,7 @@ describe("your own / commands", () => {
         fireEvent.mouseDown(entry);
         const shortcut = (await screen.findByLabelText("Shortcut *")) as HTMLInputElement;
         expect(shortcut.value).toBe("review");
-        expect(screen.getByText("Automatic")).toBeTruthy();
+        expect(within(screen.getByRole("dialog")).getByText("Automatic")).toBeTruthy();
         fireEvent.change(shortcut, { target: { value: "new" } });
         expect(screen.getByText("Polar already has a command with this name.")).toBeTruthy();
     });

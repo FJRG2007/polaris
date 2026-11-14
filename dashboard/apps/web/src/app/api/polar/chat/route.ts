@@ -104,11 +104,15 @@ import {
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import {
     answeredBy,
+    followedBy,
     polarModelOptions,
     reasoningFor,
     rememberRefusal,
-    resolvePolarModel
+    resolvePolarModel,
+    sameModelElsewhere,
+    type ResolvedModel
 } from "@/lib/polar/models";
+import { pinnedByHand, turnStandIns } from "@/lib/polar/turn-fallback";
 import { POLAR_RUNS_MAX, beginPolarRun } from "@/lib/polar/runs";
 import { GOAL_CONDITION_MAX, goalHasRoom, goalTurnOf } from "@/lib/polar/goals";
 import { goalCheckStream } from "@/lib/polar/goal-service";
@@ -125,6 +129,7 @@ import {
     type StoredFailure
 } from "@/lib/polar/provider-failure";
 import {
+    automaticChoice,
     modelChoiceSchema,
     pageContextSchema,
     storedScreen,
@@ -339,6 +344,26 @@ export async function POST(request: Request): Promise<Response> {
         }
     }
     if (typeof resolved === "string") return refuse(resolved, 409);
+    // A model Polar chose hands the turn on when it cannot answer: the same
+    // model through an aggregator, the rest of the list it came from, then
+    // Automatic. A model picked by hand shows its refusal (`turn-fallback.ts`).
+    if (!pinnedByHand(body.data.choice, choice)) {
+        const later = turnStandIns(
+            body.data.choice,
+            tries,
+            choice,
+            keepsToList,
+            automaticChoice(choice.intelligence)
+        );
+        const others: ResolvedModel[] = [];
+        const twin = resolved.automatic ? null : await sameModelElsewhere(user.id, resolved.option, access);
+        if (twin) others.push(twin);
+        for (const next of later) {
+            const attempt = await resolvePolarModel(user.id, next, signals, access);
+            if (typeof attempt !== "string") others.push(attempt);
+        }
+        resolved = followedBy(user.id, resolved, others);
+    }
 
     const owned = await ensurePolarThread(
         user.id,

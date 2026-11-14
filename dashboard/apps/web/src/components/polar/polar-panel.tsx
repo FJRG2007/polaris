@@ -181,6 +181,7 @@ import {
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
 import {
     cleanContextText,
+    automaticChoice,
     isAutomatic,
     MAX_QUEUE,
     polarAttachmentId,
@@ -1090,16 +1091,9 @@ export function PolarChat({
                             )
                         );
                         if (current && known) return current;
-                        const first = data.providers[0]?.models[0];
-                        return first
-                            ? {
-                                  kind: "language",
-                                  provider: first.provider,
-                                  model: first.model,
-                                  intelligence: "balanced",
-                                  payer: null
-                              }
-                            : null;
+                        // Nothing picked yet is Automatic, so a model that
+                        // cannot answer hands the turn on rather than failing it.
+                        return data.providers.length > 0 ? automaticChoice() : null;
                     });
                 }
             )

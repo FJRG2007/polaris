@@ -64,6 +64,10 @@ export interface RouteStep extends StandInTarget {
     routeReasoning: RouteReasoning;
     /** Set on a key that has spent its own allowance: it refuses at once. */
     spent?: boolean;
+    /** The model's context window in tokens; 0 or absent when unknown. A step
+     *  whose window cannot hold the call - its messages and its tool list - is
+     *  passed over rather than sent a turn it would truncate. */
+    contextTokens?: number;
 }
 
 /** The refusals the router moves past. A malformed request, a refusal of the
@@ -115,6 +119,40 @@ export interface RouteHooks {
     onRefused?: (kind: FailureKind, index: number) => void;
     /** Waits; replaced in tests. */
     sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+    /** Polar chose the first step, not the person: it too is passed over when
+     *  its window cannot hold the call. A model picked by hand is always asked. */
+    firstYields?: boolean;
+}
+
+/** Rough characters per token, to check a window holds a call. */
+const CHARS_PER_TOKEN = 4;
+
+/**
+ * The tokens a call needs before its answer, roughly: the text of every
+ * message, tool call and tool result, and the tool list as the provider is
+ * sent it. A file's bytes are left out - providers count those their own way.
+ * Pure.
+ */
+export function callTokens(params: Pick<CallParams, "prompt" | "tools">): number {
+    let chars = 0;
+    for (const message of params.prompt ?? []) {
+        if (typeof message.content === "string") {
+            chars += message.content.length;
+            continue;
+        }
+        for (const part of message.content) {
+            if (part.type === "text" || part.type === "reasoning") chars += part.text.length;
+            else if (part.type === "tool-call") chars += JSON.stringify(part.input ?? "").length;
+            else if (part.type === "tool-result") chars += JSON.stringify(part.output ?? "").length;
+        }
+    }
+    for (const entry of params.tools ?? []) chars += JSON.stringify(entry).length;
+    return Math.ceil(chars / CHARS_PER_TOKEN);
+}
+
+/** Whether a step's window holds a call of `tokens`; unknown holds anything. Pure. */
+export function holdsCall(step: Pick<RouteStep, "contextTokens">, tokens: number): boolean {
+    return !step.contextTokens || step.contextTokens > tokens;
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -269,6 +307,19 @@ export async function heldStream(
     return { ...result, stream };
 }
 
+/** The call's tools without the provider-executed ones, and a tool choice
+ *  that named one of them back to automatic. Pure. */
+export function withoutProviderTools(params: Pick<CallParams, "tools" | "toolChoice">): Pick<CallParams, "tools" | "toolChoice"> {
+    if (!sendsProviderTool(params)) return { tools: params.tools, toolChoice: params.toolChoice };
+    const tools = (params.tools ?? []).filter((entry) => entry.type !== "provider");
+    const choice = params.toolChoice;
+    const named = choice?.type === "tool" && !tools.some((entry) => entry.name === choice.toolName);
+    return {
+        tools: tools.length > 0 ? tools : undefined,
+        toolChoice: named || (choice?.type === "required" && tools.length === 0) ? undefined : choice
+    };
+}
+
 /** The call as one step receives it: its effort, and the answer length and
  *  reasoning another provider accepts. */
 function adjust(step: RouteStep, params: CallParams, origin: string): CallParams {
@@ -277,7 +328,11 @@ function adjust(step: RouteStep, params: CallParams, origin: string): CallParams
         ? reasoningForRoute(step.routeReasoning, current)
         : undefined;
     let next: CallParams = { ...params, reasoning };
-    if (step.provider !== origin) next = { ...next, maxOutputTokens: step.outputTokens };
+    if (step.provider !== origin) {
+        // A provider's own tool (its web search) runs only there: another
+        // provider is sent every other tool, unchanged, and answers without it.
+        next = { ...next, maxOutputTokens: step.outputTokens, ...withoutProviderTools(params) };
+    }
     return next;
 }
 
@@ -402,23 +457,36 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
         const crowded: Array<{ index: number; retryInMs: number }> = [];
 
         // What each refusal excludes is already in `ruled`; beyond that a step
-        // fits unless the call carries something only the first provider takes.
-        const fits = (index: number): boolean => {
+        // fits unless it cannot read a file the call sends, or its window
+        // cannot hold the call with its tools. The first step is the one asked
+        // for: only one Polar chose is passed over for its window.
+        let tokens: number | null = null;
+        const tooSmall: number[] = [];
+        const holds = (index: number): boolean =>
+            (index === 0 && !hooks.firstYields) || holdsCall(steps[index]!, (tokens ??= callTokens(params)));
+        const fits = (index: number, ignoreWindow = false): boolean => {
             const step = steps[index]!;
             if (ruledOut(ruled, step)) return false;
+            if (!ignoreWindow && !holds(index)) return false;
             if (index === 0) return true;
-            if (step.provider !== origin && sendsProviderTool(params)) return false;
             return !step.reads || readsSentFiles(params, step.reads);
         };
 
-        const settle = async (index: number, ignoreCooling: boolean): Promise<{ value: T } | null> => {
+        const settle = async (
+            index: number,
+            ignoreCooling: boolean,
+            ignoreWindow = false
+        ): Promise<{ value: T } | null> => {
             const step = steps[index]!;
-            if (!fits(index)) return null;
+            if (!fits(index, ignoreWindow)) {
+                if (!ignoreWindow && fits(index, true)) tooSmall.push(index);
+                return null;
+            }
             if (!ignoreCooling && coolingOf(subjectOf(step), step.free)) {
                 cooled.push(index);
                 return null;
             }
-            const later = steps.some((_, other) => other > index && fits(other));
+            const later = steps.some((_, other) => other > index && fits(other, ignoreWindow));
             let waited = 0;
             for (let retry = 0; ; retry++) {
                 try {
@@ -478,6 +546,15 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
         // in order, rather than refuse on what may already have passed.
         for (const index of cooled) {
             const done = await settle(index, true);
+            if (done) return done.value;
+        }
+        // Nothing asked held the call in its window: ask the largest anyway, so
+        // the reader sees the provider's own answer instead of a made-up one.
+        if (!lastError && tooSmall.length > 0) {
+            const largest = [...tooSmall].sort(
+                (a, b) => (steps[b]!.contextTokens ?? 0) - (steps[a]!.contextTokens ?? 0)
+            )[0]!;
+            const done = await settle(largest, true, true);
             if (done) return done.value;
         }
         if (lastError) throw lastError;

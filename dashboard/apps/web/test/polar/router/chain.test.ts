@@ -24,7 +24,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { routeMiddleware, backoffMs, heldStream, isRoutable, NoRouteError } =
+const { routeMiddleware, backoffMs, heldStream, isRoutable, NoRouteError, callTokens } =
     await import("@/lib/polar/router/chain");
 const { resetRouteHealth, coolingOf } = await import("@/lib/polar/router/health");
 const { resetKeyAdmission } = await import("@/lib/polar/router/limits");
@@ -85,6 +85,7 @@ const step = (
         coolingUntil: Date;
         coolingReason: string;
         spent: boolean;
+        contextTokens: number;
     }> = {}
 ) => ({
     model: () => model as never,
@@ -98,7 +99,8 @@ const step = (
     coolingUntil: extra.coolingUntil ?? null,
     coolingReason: extra.coolingReason ?? null,
     routeReasoning: extra.routeReasoning ?? ("inherit" as const),
-    spent: extra.spent
+    spent: extra.spent,
+    contextTokens: extra.contextTokens
 });
 
 const params = { prompt: [], maxOutputTokens: 16_384, reasoning: "medium" } as never;
@@ -260,18 +262,29 @@ describe("across providers", () => {
         );
     });
 
-    it("does not switch providers for a turn that sends a provider-only tool", async () => {
+    it("hands a turn with a provider-only tool to another provider, without that tool", async () => {
         const own = fakeModel("claude", () => Promise.reject(ANTHROPIC_OVERLOADED));
         const other = fakeModel("openai/gpt-mini", async () => "other");
-        const failure = await generate(
+        const polarisTool = { type: "function", name: "set_power", inputSchema: {} };
+        const answer = await generate(
             routeMiddleware(
                 [step(own, "anthropic", { keyId: "k1" }), step(other, "openrouter")],
                 noWait
             ),
-            webSearch
-        ).catch((error: unknown) => error);
-        expect(classifyProviderFailure(failure).kind).toBe("busy");
-        expect(other.doGenerate).not.toHaveBeenCalled();
+            {
+                prompt: [],
+                tools: [...(webSearch as { tools: unknown[] }).tools, polarisTool],
+                toolChoice: { type: "auto" }
+            } as never
+        );
+        expect(answer).toBe("other");
+        // Polaris's own tools survive the hop exactly; the provider's search does not.
+        expect(other.doGenerate).toHaveBeenCalledWith(
+            expect.objectContaining({ tools: [polarisTool], toolChoice: { type: "auto" } })
+        );
+        expect(own.doGenerate).toHaveBeenCalledWith(
+            expect.objectContaining({ tools: expect.arrayContaining([polarisTool]) })
+        );
     });
 
     it("walks on past a fallback that is refused too", async () => {
@@ -464,5 +477,71 @@ describe("streams", () => {
         const parts = (await partsOf(held as never)) as Array<{ type: string }>;
         expect(parts.map((part) => part.type)).toEqual(["response-metadata", "text-delta", "error"]);
         expect(release).toHaveBeenCalledOnce();
+    });
+});
+
+describe("a window that cannot hold the tool list", () => {
+    // About 5,000 tokens of tools: Polaris's own tool list is the bulk of a turn.
+    const bigTools = {
+        prompt: [{ role: "user", content: [{ type: "text", text: "Turn the lamp off" }] }],
+        tools: [{ type: "function", name: "set_power", description: "x".repeat(20_000), inputSchema: {} }]
+    } as never;
+
+    it("counts the messages and the tools a call sends", () => {
+        expect(callTokens(bigTools)).toBeGreaterThan(5_000);
+        expect(callTokens({ prompt: [], tools: [] } as never)).toBe(0);
+    });
+
+    it("passes over a model Polar chose whose window is too small, to one that holds the call", async () => {
+        const small = fakeModel("llama-8b", async () => "small");
+        const large = fakeModel("llama-70b", async () => "large");
+        const answer = await generate(
+            routeMiddleware(
+                [
+                    step(small, "groq", { contextTokens: 4_096 }),
+                    step(large, "openrouter", { contextTokens: 128_000 })
+                ],
+                { ...noWait, firstYields: true }
+            ),
+            bigTools
+        );
+        expect(answer).toBe("large");
+        expect(small.doGenerate).not.toHaveBeenCalled();
+        expect(large.doGenerate).toHaveBeenCalledWith(
+            expect.objectContaining({ tools: (bigTools as { tools: unknown[] }).tools })
+        );
+    });
+
+    it("always asks a model picked by hand, whatever its window", async () => {
+        const small = fakeModel("llama-8b", async () => "small");
+        const large = fakeModel("llama-70b", async () => "large");
+        const answer = await generate(
+            routeMiddleware(
+                [
+                    step(small, "groq", { contextTokens: 4_096 }),
+                    step(large, "openrouter", { contextTokens: 128_000 })
+                ],
+                noWait
+            ),
+            bigTools
+        );
+        expect(answer).toBe("small");
+    });
+
+    it("asks the largest model anyway when none holds the call, for the provider's own answer", async () => {
+        const tiny = fakeModel("tiny", async () => "tiny");
+        const small = fakeModel("small", async () => "small");
+        const answer = await generate(
+            routeMiddleware(
+                [
+                    step(tiny, "groq", { contextTokens: 1_024 }),
+                    step(small, "mistral", { contextTokens: 4_096 })
+                ],
+                { ...noWait, firstYields: true }
+            ),
+            bigTools
+        );
+        expect(answer).toBe("small");
+        expect(tiny.doGenerate).not.toHaveBeenCalled();
     });
 });

@@ -119,7 +119,7 @@ const { PolarChat, pastedFiles, refusalOf } = await import("@/components/polar/p
 
 async function mount() {
     render(<PolarChat />, { wrapper: MessagesWrapper });
-    await waitFor(() => expect(screen.getByText("Model One", { exact: false })).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("Automatic", { exact: false })[0]).toBeTruthy());
     return screen.getByLabelText("Message Polar");
 }
 

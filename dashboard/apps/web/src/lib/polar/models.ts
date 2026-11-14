@@ -23,6 +23,7 @@ import { createMistral } from "@ai-sdk/mistral";
 import { PROVIDER_ENDPOINTS } from "@/lib/polar/provider-endpoints";
 import { polarRouting } from "@/lib/polar/router/store";
 import {
+    STEPS_MOST,
     planSteps,
     plannedStep,
     routedModel,
@@ -290,15 +291,10 @@ export type StandInSource = Pick<ResolvedModel, "model" | "option" | "credential
  */
 export function withStandIn(resolved: ResolvedModel, ...sources: StandInSource[]): ResolvedModel {
     if (sources.length === 0 && resolved.routed) return resolved;
-    const fixed = (source: StandInSource): PlannedStep =>
-        plannedStep(
-            { option: source.option, credentials: [source.credential], build: () => source.model },
-            source.credential
-        );
-    const head = resolved.routed?.steps ?? [fixed({ ...resolved, model: resolved.base ?? resolved.model })];
+    const head = stepsOf(resolved);
     const origin = head[0]!.provider;
     return {
-        ...resolvedOf([...head, ...sources.map(fixed)], (kind, provider) => {
+        ...resolvedOf([...head, ...sources.map(fixedStep)], (kind, provider) => {
             if (provider === origin) resolved.onRefused?.(kind);
         }),
         automatic: resolved.automatic,
@@ -307,13 +303,56 @@ export function withStandIn(resolved: ResolvedModel, ...sources: StandInSource[]
     };
 }
 
+/** A model to add as a stand-in, as the one step it is. */
+function fixedStep(source: StandInSource): PlannedStep {
+    return plannedStep(
+        { option: source.option, credentials: [source.credential], build: () => source.model },
+        source.credential
+    );
+}
+
+/** The steps a resolved model walks: its plan, or the one model it is. */
+function stepsOf(resolved: ResolvedModel): readonly PlannedStep[] {
+    return resolved.routed?.steps ?? [fixedStep({ ...resolved, model: resolved.base ?? resolved.model })];
+}
+
+/**
+ * `resolved`, walking on to the plans of `others` once every step of its own
+ * is refused: a turn whose model Polar chose keeps going on the next model
+ * that can answer (`turn-fallback.ts`), the way OpenRouter walks a request's
+ * `models` list. A model on a key already planned is not asked twice, the
+ * whole plan stays within `STEPS_MOST`, and every refusal is remembered so the
+ * next turn starts past a provider that cannot answer.
+ */
+export function followedBy(
+    userId: string,
+    resolved: ResolvedModel,
+    others: readonly ResolvedModel[]
+): ResolvedModel {
+    if (others.length === 0) return resolved;
+    const steps: PlannedStep[] = [];
+    const seen = new Set<string>();
+    for (const step of [resolved, ...others].flatMap(stepsOf)) {
+        const id = `${step.keyId ?? step.provider}/${step.modelId}`;
+        if (seen.has(id) || steps.length >= STEPS_MOST) continue;
+        seen.add(id);
+        steps.push(step);
+    }
+    return {
+        ...resolvedOf(steps, (kind, provider) => rememberRefusal(userId, provider, kind), true),
+        automatic: resolved.automatic,
+        base: resolved.base ?? resolved.model
+    };
+}
+
 /** The resolved model for a plan: its first step is the one chosen, the rest
  *  stand in, in order. */
 function resolvedOf(
     steps: readonly PlannedStep[],
-    onRefused?: (kind: FailureKind, provider: string) => void
+    onRefused?: (kind: FailureKind, provider: string) => void,
+    chosenByPolar = false
 ): ResolvedModel {
-    const routed = routedModel(steps, (kind, step) => onRefused?.(kind, step.provider));
+    const routed = routedModel(steps, (kind, step) => onRefused?.(kind, step.provider), chosenByPolar);
     const head = steps[0]!;
     return {
         model: routed.model,
@@ -503,7 +542,80 @@ export function languageModel(
     }
 }
 
-/** Most other providers a turn keeps a stand-in from: each costs a key read. */
+/** Providers that serve other providers' models under their own ids, so a
+ *  model one provider refuses can still be asked through them. */
+export const AGGREGATOR_PROVIDERS: readonly string[] = ["openrouter"];
+
+/** Release tags a provider adds to a model's name that do not change the model. */
+const MODEL_TAGS = new Set(["versatile", "instant", "instruct", "latest", "preview", "chat", "it"]);
+
+/**
+ * What a model is called whoever serves it, to find the same model on an
+ * aggregator: the name after the vendor, without a `:variant`, the release
+ * tags above or a trailing date, and with dots and dashes read alike - Groq's
+ * `llama-3.3-70b-versatile` and OpenRouter's `meta-llama/llama-3.3-70b-instruct`
+ * are one model. Pure.
+ */
+export function modelIdentity(modelId: string): string {
+    const name = modelId.toLowerCase().split("/").pop()!.split(":")[0]!;
+    const parts = name.split(/[-_.]/).filter(Boolean);
+    while (parts.length > 1) {
+        const last = parts[parts.length - 1]!;
+        if (MODEL_TAGS.has(last) || /^\d{4,8}$/.test(last)) parts.pop();
+        else break;
+    }
+    return parts.join("-");
+}
+
+/**
+ * The same model on each aggregator this person holds a key for, as plan
+ * entries: a rate limit, a spent account or an outage at one provider is
+ * answered by the same model elsewhere before another model is asked. A free
+ * variant is never taken for the paid model.
+ */
+async function sameModelEntries(
+    userId: string,
+    option: PolarModelOption,
+    options: readonly PolarProviderOption[],
+    keysOf: (provider: string) => Promise<ChatCredential[]>
+): Promise<PlanEntry[]> {
+    const identity = modelIdentity(option.model);
+    const entries: PlanEntry[] = [];
+    for (const provider of AGGREGATOR_PROVIDERS) {
+        if (provider === option.provider) continue;
+        const twin = options
+            .find((entry) => entry.provider === provider)
+            ?.models.find(
+                (model) =>
+                    modelIdentity(model.model) === identity &&
+                    isFreeModel(model) === isFreeModel(option)
+            );
+        if (!twin) continue;
+        const keys = await keysOf(provider);
+        if (keys.length > 0) entries.push(entryOf(userId, twin, keys, options));
+    }
+    return entries;
+}
+
+/**
+ * The same model as `option` through an aggregator this person may spend on,
+ * planned as a model of its own, or null when none serves it.
+ */
+export async function sameModelElsewhere(
+    userId: string,
+    option: PolarModelOption,
+    access: PolarAccess
+): Promise<ResolvedModel | null> {
+    const options = await polarModelOptions(userId, access);
+    const entries = await sameModelEntries(userId, option, options, credentialCache(userId, access));
+    if (entries.length === 0) return null;
+    const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));
+    return steps.length > 0 ? resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind)) : null;
+}
+
+/** Most other providers a turn keeps a stand-in from: each costs a key read.
+ *  An aggregator is never counted against it - it serves every other
+ *  provider's models, so it is the stand-in most likely to answer. */
 const OTHER_PROVIDERS_MOST = 3;
 
 /**
@@ -543,6 +655,7 @@ async function resolveAutomatic(
         const routing = await polarRouting(userId);
         const entries: PlanEntry[] = [
             entryOf(userId, option, credentials, options, resolve.reasoning),
+            ...(await sameModelEntries(userId, option, options, keysOf)),
             ...[free, paid]
                 .filter((entry): entry is PolarModelOption => !!entry)
                 .map((entry) => entryOf(userId, entry, credentials, options)),
@@ -551,17 +664,18 @@ async function resolveAutomatic(
         const seen = new Set([option.provider]);
         let others = 0;
         for (const entry of later) {
-            if (others >= OTHER_PROVIDERS_MOST) break;
             if (seen.has(entry.provider)) continue;
+            const aggregator = AGGREGATOR_PROVIDERS.includes(entry.provider);
+            if (!aggregator && others >= OTHER_PROVIDERS_MOST) continue;
             seen.add(entry.provider);
             const keys = await keysOf(entry.provider);
             if (keys.length === 0) continue;
             entries.push(entryOf(userId, entry, keys, options));
-            others++;
+            if (!aggregator) others++;
         }
         const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));
         return {
-            ...resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind)),
+            ...resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind), true),
             automatic: route,
             onRefused: (kind) => rememberRefusal(userId, option.provider, kind)
         };
