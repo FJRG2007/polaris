@@ -59,6 +59,11 @@
             "c": "Celsius",
             "f": "Fahrenheit"
         },
+        "unsupportedChoice": "Esa opción no es una que Polaris ofrezca.",
+        "language": {
+            "label": "Idioma",
+            "hint": "Solo se usa si alguien no ha elegido uno y su dispositivo no lo indica."
+        },
         "currency": {
             "label": "Moneda",
             "names": {

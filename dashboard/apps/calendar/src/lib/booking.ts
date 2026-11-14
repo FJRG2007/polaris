@@ -30,9 +30,9 @@ import { calendarBusy } from "./freebusy";
 import { CalendarRefusal } from "./errors";
 import type { SessionUser } from "./access";
 import type { ObjectChange } from "./effects";
-import { DEFAULT_LOCALE, isLocale } from "@polaris/core";
+import { isLocale } from "@polaris/core";
 import { readInstanceSettings } from "./instance-settings";
-import { calendarT, calendarTFor, calendarTIn, localeOf } from "./i18n";
+import { calendarT, calendarTFor, calendarTIn, localeOf, visitorFallbackLocale } from "./i18n";
 import { callerAddress, newLinkToken, throttle } from "./scheduling-guard";
 import { itemOf, trashObject, writeItem, type StoredObject } from "./objects";
 import { requireCalendar, requireWritableCalendar, reachOf, reaches } from "./access";
@@ -1124,7 +1124,7 @@ export async function cancelBookingAsOwner(user: SessionUser, bookingId: string)
  *  language they booked in, with the page's link when it still takes bookings. */
 async function mailCancelled(booking: BookingRow): Promise<void> {
     const page = booking.page;
-    const locale = isLocale(booking.locale) ? booking.locale : DEFAULT_LOCALE;
+    const locale = isLocale(booking.locale) ? booking.locale : await visitorFallbackLocale();
     const t = calendarTIn(locale);
     const again = (await takesBookings(page))
         ? [`${await host.domainService.appBaseUrl()}/cal/book/${page.slug}`]

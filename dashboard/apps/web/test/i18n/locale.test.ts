@@ -21,6 +21,8 @@ let cookie: string | undefined;
 let acceptLanguage: string | null = null;
 let country: string | null | "never" = null;
 let session: { id: string } | null = null;
+/** The stored Display defaults blob, which carries the deployment's language. */
+let platform: string | null = null;
 
 const findUnique = vi.fn(async ({ where }: { where: { id: string } }) => rows[where.id] ?? null);
 const update = vi.fn(async ({ where, data }: { where: { id: string }; data: Row }) => {
@@ -36,7 +38,12 @@ const updateMany = vi.fn(
     }
 );
 
-vi.mock("@polaris/db", () => ({ prisma: { user: { findUnique, update, updateMany } }, onAccessWrite: () => undefined }));
+const settingFind = vi.fn(async () => (platform === null ? null : { value: platform }));
+
+vi.mock("@polaris/db", () => ({
+    prisma: { user: { findUnique, update, updateMany }, setting: { findUnique: settingFind } },
+    onAccessWrite: () => undefined
+}));
 vi.mock("next/headers", () => ({
     cookies: async () => ({
         get: (name: string) => (name === "polaris-locale" && cookie ? { value: cookie } : undefined)
@@ -70,10 +77,13 @@ beforeEach(() => {
     acceptLanguage = null;
     country = null;
     session = null;
+    platform = null;
+    settingFind.mockClear();
     findUnique.mockClear();
     update.mockClear();
     updateMany.mockClear();
     delete (globalThis as Record<symbol, unknown>)[Symbol.for("polaris.locale.cache")];
+    delete (globalThis as Record<symbol, unknown>)[Symbol.for("polaris.locale.deployment")];
 });
 
 afterEach(() => {
@@ -219,5 +229,92 @@ describe("the live stream", () => {
             .filter((frame) => frame.startsWith("data: "))
             .map((frame) => JSON.parse(frame.slice("data: ".length)) as { kind: string; locale: string });
         expect(frames).toEqual([expect.objectContaining({ kind: "locale", locale: "es-ES" })]);
+    });
+});
+
+describe("the deployment's default language", () => {
+    const spanishDefault = JSON.stringify({ language: "es-ES", currency: "EUR" });
+
+    it("answers a browser that names no language Polaris has", async () => {
+        platform = spanishDefault;
+        acceptLanguage = "de-DE,fr;q=0.8";
+        const { detectRequestLocale } = await modules();
+        expect(await detectRequestLocale({ withCountry: false })).toEqual({ locale: "es-ES", decided: true });
+    });
+
+    it("answers a request with no Accept-Language at all", async () => {
+        platform = spanishDefault;
+        const { getLocale } = await modules();
+        expect(await getLocale()).toBe("es-ES");
+    });
+
+    it("is ignored when the browser names a language Polaris has", async () => {
+        platform = spanishDefault;
+        acceptLanguage = "en-GB,en;q=0.9";
+        const { detectRequestLocale } = await modules();
+        expect(await detectRequestLocale({ withCountry: true })).toEqual({ locale: "en-US", decided: true });
+        expect(settingFind).not.toHaveBeenCalled();
+    });
+
+    it("is ignored when the browser was already shown Polaris in a language", async () => {
+        platform = spanishDefault;
+        cookie = "en-US";
+        const { detectRequestLocale } = await modules();
+        expect((await detectRequestLocale({ withCountry: false })).locale).toBe("en-US");
+    });
+
+    it("comes after the address's country for a new account", async () => {
+        platform = JSON.stringify({ language: "en-US" });
+        acceptLanguage = "fr-FR";
+        country = "MX";
+        const { detectRequestLocale, forgetDeploymentLocale } = await modules();
+        expect((await detectRequestLocale({ withCountry: true })).locale).toBe("es-ES");
+        platform = spanishDefault;
+        country = "FR";
+        forgetDeploymentLocale();
+        expect(await detectRequestLocale({ withCountry: true })).toEqual({ locale: "es-ES", decided: true });
+    });
+
+    it("never outranks what an account chose", async () => {
+        platform = JSON.stringify({ language: "en-US" });
+        acceptLanguage = "en-US";
+        session = { id: "bob" };
+        const { getLocale, getUserLocale } = await modules();
+        expect(await getLocale()).toBe("es-ES");
+        expect(await getUserLocale("bob")).toBe("es-ES");
+    });
+
+    it("is what an account with no language is addressed in", async () => {
+        platform = spanishDefault;
+        const { getUserLocale } = await modules();
+        expect(await getUserLocale("ada")).toBe("es-ES");
+        expect(await getUserLocale("nobody")).toBe("es-ES");
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("is US English when the operator never chose, or chose something gone", async () => {
+        const { getUserLocale } = await modules();
+        expect(await getUserLocale("ada")).toBe("en-US");
+        platform = JSON.stringify({ language: "fr-FR" });
+        delete (globalThis as Record<symbol, unknown>)[Symbol.for("polaris.locale.deployment")];
+        const fresh = await modules();
+        expect(await fresh.deploymentLocale()).toBe("en-US");
+    });
+
+    it("is US English when the setting cannot be read, without failing", async () => {
+        settingFind.mockRejectedValueOnce(new Error("database down"));
+        const { deploymentLocale } = await modules();
+        expect(await deploymentLocale()).toBe("en-US");
+    });
+
+    it("is read once, and again the moment the defaults are saved", async () => {
+        platform = spanishDefault;
+        const { deploymentLocale, forgetDeploymentLocale } = await modules();
+        expect(await deploymentLocale()).toBe("es-ES");
+        platform = JSON.stringify({ language: "en-US" });
+        expect(await deploymentLocale()).toBe("es-ES");
+        expect(settingFind).toHaveBeenCalledTimes(1);
+        forgetDeploymentLocale();
+        expect(await deploymentLocale()).toBe("en-US");
     });
 });

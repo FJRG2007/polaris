@@ -24,7 +24,7 @@ import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { randomBytes } from "node:crypto";
 import type { ObjectChange } from "./effects";
-import { calendarTIn, localeOf } from "./i18n";
+import { calendarTIn, localeOf, visitorFallbackLocale } from "./i18n";
 import { tryItemOf, writeItem, type StoredObject } from "./objects";
 import { resourceIdOf } from "./resource-address";
 import { loadPreferences } from "./preferences-store";
@@ -474,7 +474,7 @@ async function sendReply(
         ...(reply.recurrenceKey ? { recurrenceKey: reply.recurrenceKey } : {})
     });
     const event = eventsOf(item)[0];
-    const locale = change.context.actor ? await localeOf(change.context.actor.id) : "en-US";
+    const locale = change.context.actor ? await localeOf(change.context.actor.id) : await visitorFallbackLocale();
     const t = calendarTIn(locale as never);
     await host.calendarHost.sendCalendarEmail({
         to: organizer.email,

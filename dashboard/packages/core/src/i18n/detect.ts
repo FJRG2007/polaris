@@ -95,6 +95,9 @@ export interface LocaleSignals {
     readonly languages?: readonly string[] | null;
     /** The request address's country, when it has been looked up. */
     readonly country?: string | null;
+    /** What to answer when none of the above names a language Polaris has: the
+     *  deployment's default language, when an operator set one. */
+    readonly fallback?: Locale | null;
 }
 
 /**
@@ -103,7 +106,8 @@ export interface LocaleSignals {
  * The browser first, because it is the only one of these the person chose: the
  * header, then the list the page reported. Their address's country only when
  * neither names a language Polaris has - a French browser in Madrid reads
- * Spanish sooner than English. The default when nothing says anything.
+ * Spanish sooner than English. The deployment's default when nothing says
+ * anything, and the built-in one when the deployment has none.
  */
 export function detectLocale(signals: LocaleSignals): { locale: Locale; source: LocaleSource } {
     const fromHeader = negotiateLocale(parseAcceptLanguage(signals.acceptLanguage).map((range) => range.tag));
@@ -112,5 +116,5 @@ export function detectLocale(signals: LocaleSignals): { locale: Locale; source: 
     if (fromBrowser) return { locale: fromBrowser, source: "browser" };
     const fromCountry = localeForCountry(signals.country);
     if (fromCountry) return { locale: fromCountry, source: "country" };
-    return { locale: DEFAULT_LOCALE, source: "default" };
+    return { locale: signals.fallback ?? DEFAULT_LOCALE, source: "default" };
 }

@@ -29,6 +29,17 @@ export async function localeOf(userId: string): Promise<Locale> {
     }
 }
 
+/** The language for somebody with no account to ask - an outside organizer, a
+ *  booking older than the language it was made in: the deployment's default,
+ *  or the source language when even that cannot be read. */
+export async function visitorFallbackLocale(): Promise<Locale> {
+    try {
+        return await host.i18nLocaleService.deploymentLocale();
+    } catch {
+        return DEFAULT_LOCALE;
+    }
+}
+
 /** The translator for one account. */
 export async function calendarTFor(userId: string): Promise<CalendarTranslator> {
     return calendarCatalogs.translator(await localeOf(userId), "calendar");

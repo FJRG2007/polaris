@@ -184,7 +184,8 @@ export const host = {
     },
     i18nRequest: { getClient: async () => "browser", getLocale: async () => fake.requestLocale },
     i18nLocaleService: {
-        getUserLocale: async (userId: string) => fake.locales.get(userId) ?? "en-US"
+        getUserLocale: async (userId: string) => fake.locales.get(userId) ?? "en-US",
+        deploymentLocale: async () => "en-US"
     },
     notificationsDispatch: {
         notify: async (notice: Notice): Promise<void> => {

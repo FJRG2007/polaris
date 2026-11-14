@@ -18,7 +18,11 @@ export async function savePlatformDisplayAction(input: unknown): Promise<{ error
     const parsed = displayPreferencesSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("display.errors.unsupportedChoice") };
     await savePlatformDisplayPreferences(parsed.data);
-    await recordAudit({ actorId: admin.id, action: "admin.display.updated" });
+    await recordAudit({
+        actorId: admin.id,
+        action: "admin.display.updated",
+        metadata: { language: parsed.data.language }
+    });
     // Accounts that inherit these follow the change from their next render on.
     revalidatePath("/", "layout");
     return {};

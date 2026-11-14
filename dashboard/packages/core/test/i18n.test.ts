@@ -163,6 +163,24 @@ describe("detecting a language for somebody new", () => {
     it("reads US English when nothing says anything", () => {
         expect(detectLocale({})).toEqual({ locale: "en-US", source: "default" });
     });
+
+    it("answers the deployment's default only when nothing else says", () => {
+        expect(detectLocale({ acceptLanguage: "de", fallback: "es-ES" })).toEqual({
+            locale: "es-ES",
+            source: "default"
+        });
+        expect(detectLocale({ fallback: "es-ES" })).toEqual({ locale: "es-ES", source: "default" });
+        expect(detectLocale({ acceptLanguage: "de", fallback: null })).toEqual({ locale: "en-US", source: "default" });
+    });
+
+    it("never lets the deployment's default outrank what the browser or the country says", () => {
+        expect(detectLocale({ acceptLanguage: "en-GB", fallback: "es-ES" })).toEqual({
+            locale: "en-US",
+            source: "header"
+        });
+        expect(detectLocale({ acceptLanguage: "fr", languages: ["en"], fallback: "es-ES" }).locale).toBe("en-US");
+        expect(detectLocale({ acceptLanguage: "fr", country: "MX", fallback: "en-US" }).locale).toBe("es-ES");
+    });
 });
 
 describe("formatting a message", () => {

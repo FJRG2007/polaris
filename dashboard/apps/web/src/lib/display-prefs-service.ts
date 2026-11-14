@@ -29,10 +29,10 @@ import {
 import { getSetting, setSetting } from "./setting-store";
 import { resolveSession } from "./session";
 import { getLocale } from "./i18n/request";
-import { getUserLocale } from "./i18n/locale-service";
+import { forgetDeploymentLocale, getUserLocale, PLATFORM_DISPLAY_KEY } from "./i18n/locale-service";
 
 /** The Setting key holding the deployment-wide defaults. */
-const PLATFORM_KEY = "display.defaults";
+const PLATFORM_KEY = PLATFORM_DISPLAY_KEY;
 
 /** Whether an account may choose its own theme. Its own key rather than a field
  *  in the defaults blob: it is a policy about who decides, not a format. */
@@ -177,6 +177,8 @@ export async function savePlatformDisplayPreferences(
     preferences: DisplayPreferences
 ): Promise<void> {
     await setSetting(PLATFORM_KEY, stringifyDisplayPreferences(preferences));
+    // The default language is among them, and it is kept in memory elsewhere.
+    forgetDeploymentLocale();
 }
 
 /**

@@ -96,6 +96,7 @@ export function DisplayAdminPanel() {
                 initial={platform}
                 fallback={platform}
                 allowInherit={false}
+                allowLanguage
                 save={async (values: UserDisplayPreferences) => {
                     const result = await savePlatformDisplayAction(values);
                     if (!result.error) keep({ ...reading, platform: values });

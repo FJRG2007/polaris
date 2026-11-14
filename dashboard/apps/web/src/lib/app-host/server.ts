@@ -466,7 +466,10 @@ export const serverHost = {
     // player, the recipient of a notification). See docs/i18n.md.
     i18nLocaleService: {
         getUserLocale: later(load.i18nLocaleService, "getUserLocale"),
-        storedLocale: later(load.i18nLocaleService, "storedLocale")
+        storedLocale: later(load.i18nLocaleService, "storedLocale"),
+        // For somebody with no account to ask - a visitor's legacy booking, an
+        // outside organizer: the operator's default language, or the built-in one.
+        deploymentLocale: later(load.i18nLocaleService, "deploymentLocale")
     },
     i18nRequest: {
         getLocale: later(load.i18nRequest, "getLocale"),

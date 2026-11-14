@@ -11,11 +11,62 @@
  * change and the code that reads it can be different copies of this file (Next
  * bundles server components, route handlers and start-up code separately), and
  * a change made through one copy has to be seen by all of them.
+ *
+ * When nothing is known about somebody - no language on the account, and a
+ * browser that names none Polaris has - the deployment's default language
+ * answers (`deploymentLocale`), and the built-in one when the operator never set
+ * one.
  */
 
 import { prisma } from "@polaris/db";
+import { getSetting } from "@/lib/setting-store";
 import { publishLocaleChange } from "./locale-live";
-import { DEFAULT_LOCALE, isLocale, type Locale } from "@polaris/core";
+import { DEFAULT_LOCALE, isLocale, parseDisplayPreferences, type Locale } from "@polaris/core";
+
+/** The Setting key holding the deployment's display defaults, the default
+ *  language among them (see display-prefs-service). */
+export const PLATFORM_DISPLAY_KEY = "display.defaults";
+
+/** How long the deployment's default language is kept before it is read again.
+ *  A save through `forgetDeploymentLocale` lands at once regardless. */
+const DEPLOYMENT_TTL_MS = 60_000;
+
+const DEPLOYMENT = Symbol.for("polaris.locale.deployment");
+
+interface DeploymentHeld {
+    readonly locale: Locale;
+    readonly at: number;
+}
+
+function deploymentHolder(): { [DEPLOYMENT]?: DeploymentHeld } {
+    return globalThis as { [DEPLOYMENT]?: DeploymentHeld };
+}
+
+/**
+ * The language an operator chose for somebody Polaris knows nothing about, or
+ * the built-in default when none was chosen.
+ *
+ * A last resort only: an account's own language and what a browser asks for
+ * both come first. Never throws - a database that cannot be read answers with
+ * the built-in default rather than failing a page or a notice.
+ */
+export async function deploymentLocale(): Promise<Locale> {
+    const held = deploymentHolder()[DEPLOYMENT];
+    if (held && Date.now() - held.at < DEPLOYMENT_TTL_MS) return held.locale;
+    try {
+        const chosen = parseDisplayPreferences(await getSetting(PLATFORM_DISPLAY_KEY)).language;
+        const locale = isLocale(chosen) ? chosen : DEFAULT_LOCALE;
+        deploymentHolder()[DEPLOYMENT] = { locale, at: Date.now() };
+        return locale;
+    } catch {
+        return DEFAULT_LOCALE;
+    }
+}
+
+/** The deployment's defaults changed: the next question reads them again. */
+export function forgetDeploymentLocale(): void {
+    delete deploymentHolder()[DEPLOYMENT];
+}
 
 /** Long enough to spare the database a read per page, short enough that a
  *  change made outside `setUserLocale` (a database edit, a restore) lands. */
@@ -60,10 +111,10 @@ export async function storedLocale(userId: string): Promise<Locale | null> {
 
 /**
  * The language to address an account in. Never null: an account with nothing
- * stored reads the default until its next request detects one.
+ * stored reads the deployment's default until its next request detects one.
  */
 export async function getUserLocale(userId: string): Promise<Locale> {
-    return (await storedLocale(userId)) ?? DEFAULT_LOCALE;
+    return (await storedLocale(userId)) ?? (await deploymentLocale());
 }
 
 /**

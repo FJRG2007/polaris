@@ -15,13 +15,18 @@ import { DISPLAY_DEFAULTS, resolveDisplayPreferences } from "@polaris/core";
 import { DisplayPreferencesForm } from "@/components/display-preferences-form";
 import { withMessages } from "../setup/i18n";
 
-function render(options: { allowInherit: boolean; mine?: Record<string, string> }): string {
+function render(options: {
+    allowInherit: boolean;
+    allowLanguage?: boolean;
+    mine?: Record<string, string>;
+}): string {
     return renderToStaticMarkup(
         withMessages(
             <DisplayPreferencesForm
                 initial={options.mine ?? {}}
                 fallback={resolveDisplayPreferences({ weekStart: "sun" })}
                 allowInherit={options.allowInherit}
+                allowLanguage={options.allowLanguage}
                 save={async () => ({})}
             />
         )
@@ -45,5 +50,23 @@ describe("the preferences form", () => {
     it("previews the week the chosen day produces", () => {
         expect(render({ allowInherit: true, mine: { weekStart: "mon" } })).toContain("Mon to Sun");
         expect(render({ allowInherit: true, mine: { weekStart: "sat" } })).toContain("Sat to Fri");
+    });
+
+    it("offers the platform a default language, each named in itself, with what it is for", () => {
+        const html = render({ allowInherit: false, allowLanguage: true, mine: resolveDisplayPreferences({}) as never });
+        expect(html).toContain("Language");
+        expect(html).toContain("Used only when a person has not picked one and their device does not say.");
+        expect(html).toContain("English (US)");
+    });
+
+    it("leaves the language off an account's form, which has its own card for it", () => {
+        expect(render({ allowInherit: true })).not.toContain("their device does not say");
+    });
+
+    it("previews an amount in the chosen default language", () => {
+        const spanish = { ...resolveDisplayPreferences({}), language: "es-ES", currency: "EUR" } as never;
+        const english = { ...resolveDisplayPreferences({}), language: "en-US", currency: "EUR" } as never;
+        expect(render({ allowInherit: false, allowLanguage: true, mine: spanish })).toContain("1234,50");
+        expect(render({ allowInherit: false, allowLanguage: true, mine: english })).toContain("1,234.50");
     });
 });

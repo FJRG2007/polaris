@@ -6,7 +6,8 @@
  * account an administrator is viewing as, because it is the administrator who
  * is reading. Without an account (the sign-in screen, an invite) the cookie the
  * browser was last shown Polaris in decides, then the browser's own
- * `Accept-Language`, then the default.
+ * `Accept-Language`, then the deployment's default language (an operator's
+ * choice in Display defaults), then the built-in one.
  *
  * An account with no language yet gets one here, on its first request: the same
  * detection a new account gets, written once so every later request is a read.
@@ -19,7 +20,7 @@ import { cookies, headers } from "next/headers";
 import { clientIp } from "@/lib/request-context";
 import { LOCALE_COOKIE, localeFromCookie } from "./cookie";
 import type { Namespace, NamespaceTranslator } from "./types";
-import { recordDetectedLocale, storedLocale } from "./locale-service";
+import { deploymentLocale, recordDetectedLocale, storedLocale } from "./locale-service";
 import {
     clientFromUserAgent,
     DEFAULT_LOCALE,
@@ -73,7 +74,9 @@ async function countryOf(
  * The cookie first - it is either a language this browser was already reading
  * Polaris in, or the one its own language list named on the sign-in screen -
  * then `Accept-Language`, then, when `withCountry` is set and neither names a
- * language Polaris has, the country the address is in.
+ * language Polaris has, the country the address is in. When nothing says, the
+ * deployment's default language - read only then, since almost every browser
+ * names a language Polaris has.
  */
 export async function detectRequestLocale(options: {
     withCountry: boolean;
@@ -84,11 +87,15 @@ export async function detectRequestLocale(options: {
 
     const acceptLanguage = incoming.get("accept-language");
     const fromBrowser = detectLocale({ acceptLanguage });
-    if (fromBrowser.source !== "default" || !options.withCountry) {
-        return { locale: fromBrowser.locale, decided: true };
+    if (fromBrowser.source !== "default") return { locale: fromBrowser.locale, decided: true };
+    if (!options.withCountry) {
+        return { locale: detectLocale({ acceptLanguage, fallback: await deploymentLocale() }).locale, decided: true };
     }
-    const { country, answered } = await countryOf(await clientIp());
-    return { locale: detectLocale({ acceptLanguage, country }).locale, decided: answered };
+    const [{ country, answered }, fallback] = await Promise.all([
+        clientIp().then(countryOf),
+        deploymentLocale()
+    ]);
+    return { locale: detectLocale({ acceptLanguage, country, fallback }).locale, decided: answered };
 }
 
 /**

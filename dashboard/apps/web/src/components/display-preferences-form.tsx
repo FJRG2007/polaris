@@ -9,9 +9,12 @@
  * The sample line under the form is formatted with exactly what is selected, so
  * the effect of a choice is visible before it is saved.
  *
- * The language is not here: it has its own card and is saved on its own, since
- * changing it redraws the whole page (see `LanguageCard`). Its words come from
- * the `account` namespace, which both pages hand down with `<Messages>`.
+ * An account's language is not here: it has its own card and is saved on its
+ * own, since changing it redraws the whole page (see `LanguageCard`). The
+ * platform page does show one (`allowLanguage`) - the deployment's default
+ * language, a last resort for somebody who never chose one and whose device
+ * does not say, which redraws nothing. Its words come from the `account`
+ * namespace, which both pages hand down with `<Messages>`.
  */
 
 import { useMemo, useState, type FormEvent } from "react";
@@ -20,12 +23,16 @@ import { Button, Card, CardBody, Select, type SelectOption } from "@polaris/ui";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import {
     CURRENCIES,
+    LOCALES,
     THEMES,
+    LOCALE_INFO,
     weekdayOrder,
     weekdayNames,
     createDisplayFormat,
     AUTOMATIC_TIME_ZONE,
+    displayPreferencesSchema,
     resolveDisplayPreferences,
+    userDisplayPreferencesSchema,
     type Locale,
     type WeekStart,
     type DisplayPreferences,
@@ -95,6 +102,7 @@ const FIELD_KEYS = [
     "weekStart",
     "timeZone",
     "temperature",
+    "language",
     "currency"
 ] as const satisfies readonly (keyof UserDisplayPreferences)[];
 
@@ -178,6 +186,18 @@ function buildFields(t: Translate, locale: Locale): FieldSpec[] {
             ]
         },
         {
+            key: "language",
+            label: t("display.language.label"),
+            hint: t("display.language.hint"),
+            // Each in its own name, so it can be found by somebody who cannot
+            // read the language the page is in.
+            options: LOCALES.map((code) => ({
+                value: code,
+                label: LOCALE_INFO[code].name,
+                short: LOCALE_INFO[code].name
+            }))
+        },
+        {
             key: "currency",
             label: t("display.currency.label"),
             options: CURRENCIES.map((entry) => ({
@@ -206,6 +226,7 @@ export function DisplayPreferencesForm({
     fallback,
     allowInherit,
     allowTheme = true,
+    allowLanguage = false,
     save
 }: {
     /** What is stored today. Partial when a user may inherit. */
@@ -217,6 +238,9 @@ export function DisplayPreferencesForm({
      *  field is left out rather than shown disabled: a control that cannot be
      *  used is a question nobody answered. */
     allowTheme?: boolean;
+    /** True on the platform page only: the deployment's default language. An
+     *  account's own language has its own card. */
+    allowLanguage?: boolean;
     save: (values: UserDisplayPreferences) => Promise<{ error?: string }>;
 }) {
     const t = useTranslations("account");
@@ -229,12 +253,16 @@ export function DisplayPreferencesForm({
     const [done, setDone] = useState(false);
 
     const fields = useMemo(() => {
-        const all = buildFields(t, locale);
-        return allowTheme ? all : all.filter((field) => field.key !== "theme");
-    }, [t, locale, allowTheme]);
+        return buildFields(t, locale).filter(
+            (field) => (allowTheme || field.key !== "theme") && (allowLanguage || field.key !== "language")
+        );
+    }, [t, locale, allowTheme, allowLanguage]);
     const effective = useMemo(() => resolveDisplayPreferences(fallback, values), [fallback, values]);
     const format = useMemo(() => createDisplayFormat(effective), [effective]);
     const changed = !same(values, saved);
+    // The schema the server checks the save against, so a value it would refuse
+    // is never sent: the platform's set is complete, an account's may be partial.
+    const valid = (allowInherit ? userDisplayPreferencesSchema : displayPreferencesSchema).safeParse(values).success;
 
     function pick(key: keyof UserDisplayPreferences, value: string) {
         setDone(false);
@@ -250,6 +278,10 @@ export function DisplayPreferencesForm({
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if (!valid) {
+            setError(t("display.unsupportedChoice"));
+            return;
+        }
         setBusy(true);
         setError(null);
         setDone(false);
@@ -320,7 +352,7 @@ export function DisplayPreferencesForm({
                     <div className="flex items-center justify-between gap-2">
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         {done && !error ? <p className="text-sm text-success">{t("display.saved")}</p> : null}
-                        <Button type="submit" disabled={busy || !changed} className="ml-auto">
+                        <Button type="submit" disabled={busy || !changed || !valid} className="ml-auto">
                             {busy ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
