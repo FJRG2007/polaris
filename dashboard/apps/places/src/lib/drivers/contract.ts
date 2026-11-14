@@ -38,9 +38,14 @@ export type Credentials = Readonly<Record<string, string>>;
  * not answer has to leave everything exactly where it was and be tried again in
  * half a minute. Telling a house those are the same thing is how a network blip
  * disconnects somebody's front door.
+ *
+ * `lapsed` is the account's own standing at the maker rather than the key: a
+ * paid or trial plan the connection runs on has run out. Like a refused key it
+ * stops every device on the account until somebody acts, but the fix is in the
+ * maker's console, not a new credential typed here.
  */
 export class DriverError extends Error {
-    readonly kind: "unauthorized" | "unreachable" | "refused";
+    readonly kind: "unauthorized" | "lapsed" | "unreachable" | "refused";
 
     constructor(message: string, kind: DriverError["kind"]) {
         super(message);

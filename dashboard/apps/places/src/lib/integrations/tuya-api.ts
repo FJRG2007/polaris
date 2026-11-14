@@ -43,7 +43,7 @@ const EMPTY_BODY_SHA = createHash("sha256").update("").digest("hex");
  * to leave everything exactly where it was.
  */
 export class TuyaError extends Error {
-    readonly kind: "unauthorized" | "rate-limited" | "refused" | "unreachable";
+    readonly kind: "unauthorized" | "lapsed" | "rate-limited" | "refused" | "unreachable";
 
     constructor(message: string, kind: TuyaError["kind"]) {
         super(message);
@@ -56,6 +56,19 @@ export class TuyaError extends Error {
  *  ones that mean a device or a request was wrong. The first sort has to stop the
  *  connection and ask for new credentials; the second must not. */
 const UNAUTHORIZED_CODES = new Set([1001, 1002, 1003, 1004, 1005, 1010, 1011, 1013, 1106, 1114]);
+
+/** Their codes for "the project's plan has run out" - no plan, an expired or
+ *  unpaid one, a spent trial quota, and the same per API
+ *  (developer.tuya.com/en/docs/iot/error-code). Every device on the project
+ *  stops at once and new keys would not help, so it is its own sort: the
+ *  connection is marked and its owner is told where the fix is. */
+const LAPSED_CODES = new Set([
+    28841001, 28841002, 28841003, 28841004, 28841101, 28841102, 28841103, 28841104, 28841106
+]);
+
+/** What a lapsed plan is called on screen, whatever their own words were. */
+export const TUYA_LAPSED =
+    "Tuya stopped the cloud project's IoT Core subscription, so it refuses every command. Extend it in the Tuya developer platform under Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period - or connect the Smart Life app instead, which needs no subscription.";
 
 const envelopeSchema = z.object({
     success: z.boolean().optional(),
@@ -197,6 +210,7 @@ async function call(
         // permissions" are worth reading, and one Polaris invented in their place
         // would be a guess about somebody else's console.
         const detail = parsed.data.msg?.trim();
+        if (LAPSED_CODES.has(code)) throw new TuyaError(TUYA_LAPSED, "lapsed");
         if (UNAUTHORIZED_CODES.has(code)) {
             throw new TuyaError(
                 detail

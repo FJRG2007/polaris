@@ -18,6 +18,7 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { HomeError } from "./home-error";
+import { ATTENTION_STATUSES, tellConnectionFailed } from "./account-alerts";
 import * as registry from "./device-connections";
 import { withAddresses } from "./driver-addresses";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
@@ -110,7 +111,7 @@ export interface DeviceAccountView {
      *  turn a stored id into words of its own. */
     readonly connectionLabel: string;
     readonly label: string;
-    /** ok | unauthorized | unreachable. */
+    /** ok | unauthorized | lapsed | unreachable. */
     readonly status: string;
     readonly statusNote: string;
     readonly lastSyncedAt: string | null;
@@ -282,11 +283,7 @@ async function renewed(
         next = await driver.renew(credentials);
     } catch (caught) {
         if (caught instanceof DriverError) {
-            await markAccount(
-                id,
-                caught.kind === "unauthorized" ? "unauthorized" : "unreachable",
-                caught.message
-            );
+            await accountFailed(id, caught);
             throw new HomeError(caught.message);
         }
         throw caught;
@@ -545,11 +542,39 @@ export async function markAccount(
     id: string,
     status: string,
     note: string | null = null
-): Promise<void> {
-    await prisma.placeDeviceAccount.updateMany({
-        where: { id },
+): Promise<boolean> {
+    // The status only where it is new, so the answer says whether this call is
+    // the one that changed it - which is what rings the bell once rather than on
+    // every failed press. Two racing callers cannot both see a change.
+    const changed = await prisma.placeDeviceAccount.updateMany({
+        where: { id, status: { not: status } },
         data: { status, statusNote: note }
     });
+    if (changed.count > 0) return true;
+    await prisma.placeDeviceAccount.updateMany({ where: { id }, data: { statusNote: note } });
+    return false;
+}
+
+/** The status a driver's failure leaves its account in. */
+export function statusForFailure(kind: DriverError["kind"]): string {
+    return kind === "unauthorized" || kind === "lapsed" ? kind : "unreachable";
+}
+
+/**
+ * A driver failure, written on its account - and, where it is the account's to
+ * fix and this is the moment it started, said to the house's owner once.
+ *
+ * `onlyAccountLevel` is for a command: a plug that did not answer one press says
+ * nothing about the account, but a revoked key or a lapsed plan does.
+ */
+export async function accountFailed(
+    id: string,
+    caught: DriverError,
+    onlyAccountLevel = false
+): Promise<void> {
+    const status = statusForFailure(caught.kind);
+    if (onlyAccountLevel && !ATTENTION_STATUSES.has(status)) return;
+    if (await markAccount(id, status, caught.message)) await tellConnectionFailed(id, status);
 }
 
 export async function markSynced(id: string): Promise<void> {

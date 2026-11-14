@@ -721,8 +721,8 @@ export async function tuyaSpeaking<T>(run: () => Promise<T>): Promise<T> {
         if (caught instanceof TuyaError) {
             throw new DriverError(
                 caught.message,
-                caught.kind === "unauthorized"
-                    ? "unauthorized"
+                caught.kind === "unauthorized" || caught.kind === "lapsed"
+                    ? caught.kind
                     : caught.kind === "unreachable"
                       ? "unreachable"
                       : "refused"

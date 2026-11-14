@@ -784,7 +784,8 @@
         "labelGone": "Label not found",
         "labelTaken": "A label with that name is already here",
         "labelsFull": "This place has all the labels it can",
-        "labelElsewhere": "That label is at another place"
+        "labelElsewhere": "That label is at another place",
+        "tuyaLapsed": "Tuya stopped the cloud project's IoT Core subscription, so it refuses every command. Extend it in the Tuya developer platform under Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period - or connect the Smart Life app instead, which needs no subscription."
     },
     "connections": {
         "nuki-web": {
@@ -1893,7 +1894,11 @@
         "tankFullHint": "Empty the water tank to start it again",
         "connectLocally": "Connect {name} locally",
         "accountSettings": "Settings for {name}",
-        "batteryLowTitle": "Battery at or under {percent}%"
+        "batteryLowTitle": "Battery at or under {percent}%",
+        "lapsed": "{name} stopped working because its plan with the maker ran out, so its devices do not respond.",
+        "planEnded": "plan ran out",
+        "openWhere": "Open {where}",
+        "connectInstead": "Connect {label} instead"
     },
     "devicePanel": {
         "watchOnly": "Set to be watched rather than operated.",
@@ -2935,6 +2940,16 @@
         "fault": {
             "title": "{name} stopped on a fault",
             "body": "It reported: {fault}"
+        }
+    },
+    "connectionAlerts": {
+        "lapsed": {
+            "title": "{name} stopped working",
+            "body": "Its plan with the maker ran out, so its devices do not respond. Open Places to see how to renew it."
+        },
+        "refused": {
+            "title": "{name} needs to be connected again",
+            "body": "It refused what Polaris opens it with, so its devices do not respond. Open Places to reconnect it."
         }
     },
     "privacy": {

@@ -445,6 +445,10 @@
             "label": "Una cámara ha dejado de responder",
             "description": "Una cámara se ha quedado en silencio, o ha vuelto después de estarlo."
         },
+        "placesConnection": {
+            "label": "Una conexión de dispositivos necesita atención",
+            "description": "Se rechazó la clave de una conexión, o caducó su plan con el fabricante."
+        },
         "placesAutomation": {
             "label": "Aviso de una automatización",
             "description": "Un paso de una de tus automatizaciones pidió avisarte."

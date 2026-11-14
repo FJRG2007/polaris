@@ -784,7 +784,8 @@
         "labelGone": "Etiqueta eliminada",
         "labelTaken": "Ya hay una etiqueta con ese nombre",
         "labelsFull": "Este lugar ya tiene todas las etiquetas posibles",
-        "labelElsewhere": "Esa etiqueta es de otro lugar"
+        "labelElsewhere": "Esa etiqueta es de otro lugar",
+        "tuyaLapsed": "Tuya ha detenido la suscripción IoT Core del proyecto en la nube, así que rechaza cada orden. Amplíala en la plataforma de desarrolladores de Tuya en Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period, o conecta la app Smart Life, que no necesita suscripción."
     },
     "connections": {
         "nuki-web": {
@@ -1893,7 +1894,11 @@
         "tankFullHint": "Vacía el depósito de agua para que vuelva a funcionar",
         "connectLocally": "Conectar {name} en local",
         "accountSettings": "Ajustes de {name}",
-        "batteryLowTitle": "Batería al {percent}% o menos"
+        "batteryLowTitle": "Batería al {percent}% o menos",
+        "lapsed": "{name} ha dejado de funcionar porque su plan con el fabricante caducó, y sus dispositivos no responden.",
+        "planEnded": "plan caducado",
+        "openWhere": "Abrir {where}",
+        "connectInstead": "Conectar {label}"
     },
     "devicePanel": {
         "watchOnly": "Configurado para vigilarse, no para manejarse.",
@@ -2935,6 +2940,16 @@
         "fault": {
             "title": "{name} se ha parado por un fallo",
             "body": "Ha dicho: {fault}"
+        }
+    },
+    "connectionAlerts": {
+        "lapsed": {
+            "title": "{name} ha dejado de funcionar",
+            "body": "Su plan con el fabricante caducó y sus dispositivos no responden. Abre Places para ver cómo renovarlo."
+        },
+        "refused": {
+            "title": "Hay que volver a conectar {name}",
+            "body": "Rechazó lo que Polaris usa para abrirla y sus dispositivos no responden. Abre Places para reconectarla."
         }
     },
     "privacy": {

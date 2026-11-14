@@ -436,7 +436,9 @@ export function DevicesView({
                                     : t("devicesView.notChecked")
                                 : account.status === "unauthorized"
                                   ? t("devicesView.refusing")
-                                  : t("devicesView.notAnswering")}
+                                  : account.status === "lapsed"
+                                    ? t("devicesView.planEnded")
+                                    : t("devicesView.notAnswering")}
                         </span>
                         {canManage && account.connection === "nuki-web" && (
                             <Button
@@ -538,26 +540,58 @@ export function DevicesView({
 
             {accounts
                 .filter((account) => account.status !== "ok")
-                .map((account) => (
-                    <div
-                        key={account.id}
-                        className="flex flex-wrap items-center gap-3 rounded-lg border border-danger-edge bg-danger-soft px-3 py-2"
-                    >
-                        <p className="flex-1 text-sm text-danger">
-                            {account.status === "unauthorized"
-                                ? t("devicesView.refused", { name: account.label })
-                                : t("devicesView.unreachable", { name: account.label })}
-                            {account.statusNote
-                                ? ` ${placesRefusalText(t, account.statusNote)}`
-                                : ""}
-                        </p>
-                        {canManage && account.status === "unauthorized" && (
-                            <Button size="sm" onClick={() => setReconnecting(account)}>
-                                {t("devicesView.reconnect")}
-                            </Button>
-                        )}
-                    </div>
-                ))}
+                .map((account) => {
+                    // A plan that ran out at the maker is fixed in the maker's
+                    // console, so the way there is offered - and, where the make
+                    // has a way in that needs no such plan, that one beside it.
+                    const connection = registry.deviceConnection(account.connection);
+                    const said = connection ? registry.connectionWords(t, connection) : null;
+                    const instead = registry.recommendedConnection(account.brand);
+                    const offerInstead =
+                        account.status === "lapsed" && instead && instead.id !== account.connection;
+                    return (
+                        <div
+                            key={account.id}
+                            className="flex flex-wrap items-center gap-3 rounded-lg border border-danger-edge bg-danger-soft px-3 py-2"
+                        >
+                            <p className="min-w-0 flex-1 text-sm text-danger">
+                                {account.status === "unauthorized"
+                                    ? t("devicesView.refused", { name: account.label })
+                                    : account.status === "lapsed"
+                                      ? t("devicesView.lapsed", { name: account.label })
+                                      : t("devicesView.unreachable", { name: account.label })}
+                                {account.statusNote
+                                    ? ` ${placesRefusalText(t, account.statusNote)}`
+                                    : ""}
+                            </p>
+                            {canManage && account.status === "unauthorized" && (
+                                <Button size="sm" onClick={() => setReconnecting(account)}>
+                                    {t("devicesView.reconnect")}
+                                </Button>
+                            )}
+                            {account.status === "lapsed" && connection?.link && (
+                                <Button asChild size="sm">
+                                    <a href={connection.link.href} target="_blank" rel="noreferrer">
+                                        {t("devicesView.openWhere", {
+                                            where: said?.link?.label ?? connection.link.label
+                                        })}
+                                    </a>
+                                </Button>
+                            )}
+                            {canManage && offerInstead && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setConnecting(true)}
+                                >
+                                    {t("devicesView.connectInstead", {
+                                        label: registry.connectionWords(t, instead).label
+                                    })}
+                                </Button>
+                            )}
+                        </div>
+                    );
+                })}
 
             {error && (
                 <p

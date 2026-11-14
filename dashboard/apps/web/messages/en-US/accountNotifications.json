@@ -445,6 +445,10 @@
             "label": "A camera stopped answering",
             "description": "A camera went quiet, or came back after being quiet."
         },
+        "placesConnection": {
+            "label": "A device connection needs attention",
+            "description": "A connection's key was refused, or its plan with the maker ran out."
+        },
         "placesAutomation": {
             "label": "An automation told you something",
             "description": "A step in one of your automations asked to let you know."

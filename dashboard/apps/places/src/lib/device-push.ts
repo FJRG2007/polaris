@@ -150,7 +150,10 @@ async function open(channel: Channel): Promise<void> {
         channel.failures += 1;
         // A refused sign-in is the account's to show, at its next read; this
         // only waits the longest before asking again.
-        if (error instanceof DriverError && error.kind === "unauthorized")
+        if (
+            error instanceof DriverError &&
+            (error.kind === "unauthorized" || error.kind === "lapsed")
+        )
             channel.failures = Math.max(channel.failures, 10);
         if (!(error instanceof DriverError))
             console.error("places: a device channel could not be opened:", error);

@@ -671,6 +671,17 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "places.connection",
+        group: "places",
+        label: "A device connection needs attention",
+        description:
+            "A connection's key was refused, or its plan at the maker ran out, so its devices stopped responding.",
+        level: "warning",
+        // On: every device on the account stops at once, and from the house it
+        // only looks like a button that does nothing.
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "places.litter-bin",
         group: "places",
         label: "A litter box bin is full",

@@ -417,7 +417,11 @@ export async function actOnDevice(
                 at: new Date()
             }
         });
-        throw caught instanceof DriverError ? new HomeError(caught.message) : caught;
+        if (!(caught instanceof DriverError)) throw caught;
+        // A revoked key or a lapsed plan is the account's, not this press's: the
+        // banner and the bell have to say so now, not at the next read.
+        await accounts.accountFailed(device.accountId, caught, true);
+        throw new HomeError(caught.message);
     }
 
     // Where the make keeps a log of its own, the entry comes from there on the
@@ -702,11 +706,7 @@ async function syncAccount(
         return snapshots.length;
     } catch (caught) {
         if (caught instanceof DriverError) {
-            await accounts.markAccount(
-                accountId,
-                caught.kind === "unauthorized" ? "unauthorized" : "unreachable",
-                caught.message
-            );
+            await accounts.accountFailed(accountId, caught);
             throw new HomeError(caught.message);
         }
         throw caught;
