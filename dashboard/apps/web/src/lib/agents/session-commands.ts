@@ -813,6 +813,10 @@ export const LAUNCH_SCRIPT = [
     // The hooks and the Polaris tools, from beside the checkout rather than from
     // the repository's own .claude and .mcp.json. See PREPARE_WORKTREE.
     'if [ "$POLARIS_AGENT_CONFIG" = "claude" ]; then',
+    // A mode changed mid-session (see permissionModeCommand): the next start
+    // takes it. Last on the line, so it outranks the one the boot gave.
+    '  m="$(head -c 40 "$POLARIS_STATE_DIR/permission-mode" 2>/dev/null || true)"',
+    '  case "$m" in default|acceptEdits|plan|bypassPermissions) line="$line --permission-mode $m" ;; esac',
     '  line="$line --settings \\"$POLARIS_STATE_DIR/settings.json\\" --mcp-config \\"$POLARIS_STATE_DIR/mcp.json\\""',
     `  if [ -n "\${POLARIS_PREVIEW_BASE:-}" ]; then line="$line --append-system-prompt \\"${PREVIEW_PROMPT}\\""; fi`,
     "fi",
@@ -960,6 +964,47 @@ export function queuePromptCommand(stateDir: string, text: string): string {
         'n="$n-$$"',
         `printf %s ${encoded} | base64 -d > "$q/.$n"`,
         'mv "$q/.$n" "$q/$n"'
+    ].join("\n");
+}
+
+/**
+ * Claude Code's Shift+Tab cycle over the modes Polaris offers: `default`, then
+ * `acceptEdits`, then `plan`, then `bypassPermissions`, which is in the cycle
+ * because Polaris starts Claude Code with `--allow-dangerously-skip-permissions`
+ * (https://code.claude.com/docs/en/permission-modes). A mode the person
+ * enabled beyond these (`auto`) slots in after them, so a press count read off
+ * this can land there; the next hook reports the mode in force either way.
+ */
+export const CLAUDE_MODE_CYCLE = ["ask", "edits", "plan", "full"] as const;
+
+/** How many Shift+Tab presses move the agent from one mode to another. */
+export function modePresses(from: string | null, to: string): number {
+    const cycle: readonly string[] = CLAUDE_MODE_CYCLE;
+    const start = cycle.indexOf(from ?? "");
+    const end = cycle.indexOf(to);
+    if (start < 0 || end < 0) return 0;
+    return (end - start + cycle.length) % cycle.length;
+}
+
+/**
+ * Change a running Claude session's permission mode.
+ *
+ * The mode is written beside the checkout, where the launch script reads it,
+ * so a session that runs each prompt as its own turn takes it from the next
+ * one. One with the agent's interface open is switched where it stands, with
+ * the same Shift+Tab presses a person would make - only when it is idle at its
+ * prompt, which the caller checks, because at a plan approval Shift+Tab
+ * approves.
+ */
+export function permissionModeCommand(stateDir: string, claudeMode: string, presses: number): string {
+    if (!/^[A-Za-z]+$/.test(claudeMode)) throw new Error("not a permission mode");
+    const keys = Array.from({ length: Math.max(0, Math.min(presses, 6)) }, () => "BTab").join(" ");
+    return [
+        `printf %s ${claudeMode} > "${stateDir}/permission-mode"`,
+        `if ${runnerIn(stateDir)} && ! ${interfaceOpen()}; then exit 0; fi`,
+        keys
+            ? `t=${shellQuote(TMUX_SESSION)}; if ${interfaceOpen()}; then t=${shellQuote(`${TMUX_SESSION}:${INTERFACE_WINDOW}`)}; fi; tmux send-keys -t "$t" ${keys}`
+            : ":"
     ].join("\n");
 }
 

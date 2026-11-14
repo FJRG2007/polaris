@@ -68,7 +68,7 @@ describe("hookDecision", () => {
 });
 
 describe("the permission hook", () => {
-    it("asks Polaris only for a permission prompt, with a longer timeout", () => {
+    it("asks Polaris for a permission prompt, a question or a plan, with a longer timeout", () => {
         const script = hookScript("https://p.example/events", "tok", "https://p.example/permission");
         expect(script).toContain("PermissionRequest");
         expect(script).toContain("'https://p.example/permission'");
@@ -78,7 +78,9 @@ describe("the permission hook", () => {
             hooks: Record<string, { hooks: { timeout: number }[] }[]>;
         };
         expect(settings.hooks.PermissionRequest![0]!.hooks[0]!.timeout).toBe(PERMISSION_HOOK_TIMEOUT_SECONDS);
-        expect(settings.hooks.PreToolUse![0]!.hooks[0]!.timeout).toBe(5);
+        // PreToolUse waits on an AskUserQuestion or ExitPlanMode answer.
+        expect(settings.hooks.PreToolUse![0]!.hooks[0]!.timeout).toBe(PERMISSION_HOOK_TIMEOUT_SECONDS);
+        expect(settings.hooks.PostToolUse![0]!.hooks[0]!.timeout).toBe(5);
     });
 
     it("settles on turn-level events only", () => {

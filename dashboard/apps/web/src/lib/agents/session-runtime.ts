@@ -220,7 +220,10 @@ function agentCommandFor(
     // overruling settings somebody keeps so they do not have to say it twice.
     // A mode somebody picked for this session wins over both: it is the one
     // thing here that was chosen for this work rather than for every session.
-    const chosen = core.permissionModeArgs(cli.id, session.permissionMode);
+    // With bypass allowed but not on, so a mode changed mid-session can reach
+    // every one Polaris offers (see `permissionModeCommand`).
+    const picked = core.permissionModeArgs(cli.id, session.permissionMode);
+    const chosen = picked ? [...picked, "--allow-dangerously-skip-permissions"] : null;
     const args =
         chosen ??
         (core.polarisAppliesAutonomy(session.place, session.unattended, enigmaActive)
@@ -1006,6 +1009,26 @@ export async function deliverFirstPrompt(
             `Polaris could not send the first prompt: ${error instanceof Error ? error.message : "unknown"}. Send it again from the box below.`
         ).catch(() => undefined);
     }
+}
+
+/**
+ * Change a running session's permission mode, as its picker does mid-session.
+ * Only for a tool that takes one; `from` is the mode it last reported.
+ */
+export async function changeSessionMode(
+    sessionId: string,
+    cliId: string,
+    from: core.SessionPermissionMode | null,
+    to: core.SessionPermissionMode
+): Promise<void> {
+    const args = core.permissionModeArgs(cliId, to);
+    const placement = await sessionPlacement(sessionId);
+    if (!args || !placement) throw new Error("That session no longer exists.");
+    await steer(
+        sessionId,
+        commands.permissionModeCommand(stateDirFor(placement), args[1]!, commands.modePresses(from, to)),
+        "The agent's terminal did not take the mode"
+    );
 }
 
 /** Stop what the agent is doing without ending the session. */

@@ -94,6 +94,7 @@ import {
     useRepoName
 } from "@/components/polar/polar-code-context";
 import type { PendingPermission } from "@/lib/agents/session-permissions";
+import { CodeAskCard, CodeTodos } from "@/components/polar/polar-code-asks";
 import type { PolarCodeTask } from "@/lib/polar/code-task";
 import type {
     PolarCodeAccess,
@@ -1281,6 +1282,24 @@ function CodeThread({
         if (text) sendText(text);
     };
 
+    // The mode the agent is in, changeable while it runs: only for a tool that
+    // takes one, on a session that picked one (otherwise the place and Enigma
+    // decided, and Polaris does not know the mode in force).
+    const liveMode =
+        cli && core.takesPermissionMode(cli) && thread?.session.live ? (thread.view.permissionMode ?? null) : null;
+    const changeMode = (mode: core.SessionPermissionMode) => {
+        setError(null);
+        startTransition(() => {
+            void runAction(
+                () => postCode<{ error?: string }>("/api/polar/code/mode", { sessionId, mode }),
+                setError
+            ).then((result) => {
+                if (result?.error) setError(result.error);
+                read();
+            });
+        });
+    };
+
     const session = thread?.session;
     const blocks = useMemo(() => codeBlocks(thread?.entries ?? []), [thread]);
     // The agent mid-turn draws its steps moving; a message on its way to it
@@ -1349,7 +1368,16 @@ function CodeThread({
                     </Button>
                 </div>
             ) : null}
-            {thread.permission ? (
+            {/* A thread cached before todos existed has none. */}
+            <CodeTodos todos={thread.todos ?? []} />
+            {thread.permission?.ask ? (
+                <CodeAskCard
+                    key={thread.permission.id}
+                    requestId={thread.permission.id}
+                    ask={thread.permission.ask}
+                    onAnswered={read}
+                />
+            ) : thread.permission ? (
                 <CodePermission
                     key={thread.permission.id}
                     asked={thread.permission}
@@ -1382,7 +1410,11 @@ function CodeThread({
                 disabled={busy}
                 maxLength={PROMPT_MAX}
                 onSubmit={send}
-                picker={null}
+                picker={
+                    liveMode ? (
+                        <PermissionModePicker value={liveMode} onChange={changeMode} disabled={busy} />
+                    ) : null
+                }
                 attach={parts.attach}
                 voiceMode={parts.voiceMode}
                 submit={{

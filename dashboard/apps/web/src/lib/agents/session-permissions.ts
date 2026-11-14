@@ -18,6 +18,7 @@ import { z } from "zod";
 import { prisma, type Prisma } from "@polaris/db";
 import { normalizeHookEvent } from "./session-hooks";
 import { touchSession, subscribeSession } from "./session-live";
+import { askAnswerSchema, storedAsk, type SessionAsk } from "./session-asks";
 
 /** How long the hook waits for an answer. The hook's own curl and Claude's
  *  timeout for it are a little longer (see session-hooks), so the server is
@@ -31,7 +32,9 @@ export type PermissionStatus = PermissionChoice | "pending" | "expired";
 
 export const permissionAnswerSchema = z.object({
     requestId: z.string().trim().uuid(),
-    choice: z.enum(PERMISSION_CHOICES)
+    choice: z.enum(PERMISSION_CHOICES),
+    /** For a question or a plan: what was chosen or typed (session-asks). */
+    answer: askAnswerSchema.optional()
 });
 
 /** The kinds of event after which a prompt is no longer the one on screen. */
@@ -125,7 +128,13 @@ export function hookDecision(
  *  shows one prompt at a time. */
 export async function openPermissionRequest(
     sessionId: string,
-    request: { tool: string; detail: string; suggestions: Prisma.InputJsonValue | null }
+    request: {
+        tool: string;
+        detail: string;
+        suggestions: Prisma.InputJsonValue | null;
+        /** A question's or a plan's input, echoed back with the answer. */
+        input?: Prisma.InputJsonValue | null;
+    }
 ): Promise<string> {
     await prisma.agentPermissionRequest.updateMany({
         where: { sessionId, status: "pending" },
@@ -136,7 +145,8 @@ export async function openPermissionRequest(
             sessionId,
             tool: request.tool || "tool",
             detail: request.detail,
-            ...(request.suggestions !== null ? { suggestions: request.suggestions } : {})
+            ...(request.suggestions !== null ? { suggestions: request.suggestions } : {}),
+            ...(request.input ? { input: request.input } : {})
         },
         select: { id: true }
     });
@@ -166,7 +176,13 @@ export async function awaitPermission(
     sessionId: string,
     waitMs: number = PERMISSION_WAIT_MS,
     signal?: AbortSignal
-): Promise<{ status: PermissionStatus; tool: string; suggestions: unknown }> {
+): Promise<{
+    status: PermissionStatus;
+    tool: string;
+    suggestions: unknown;
+    input?: unknown;
+    answer?: unknown;
+}> {
     const deadline = Date.now() + waitMs;
     let wake: (() => void) | null = null;
     const unsubscribe = subscribeSession(sessionId, () => wake?.());
@@ -174,14 +190,16 @@ export async function awaitPermission(
         for (;;) {
             const row = await prisma.agentPermissionRequest.findUnique({
                 where: { id: requestId },
-                select: { status: true, tool: true, suggestions: true }
+                select: { status: true, tool: true, suggestions: true, input: true, answer: true }
             });
             if (!row) return { status: "expired", tool: "", suggestions: null };
             if (row.status !== "pending")
                 return {
                     status: row.status as PermissionStatus,
                     tool: row.tool,
-                    suggestions: row.suggestions
+                    suggestions: row.suggestions,
+                    input: row.input,
+                    answer: row.answer
                 };
             const left = deadline - Date.now();
             if (left <= 0 || signal?.aborted) {
@@ -213,16 +231,24 @@ export interface PendingPermission {
     readonly tool: string;
     readonly detail: string;
     readonly at: string;
+    /** A question with options or a plan to approve, instead of a tool call. */
+    readonly ask: SessionAsk | null;
 }
 
 export async function pendingPermission(sessionId: string): Promise<PendingPermission | null> {
     const row = await prisma.agentPermissionRequest.findFirst({
         where: { sessionId, status: "pending" },
         orderBy: { createdAt: "desc" },
-        select: { id: true, tool: true, detail: true, createdAt: true }
+        select: { id: true, tool: true, detail: true, createdAt: true, input: true }
     });
     return row
-        ? { id: row.id, tool: row.tool, detail: row.detail, at: row.createdAt.toISOString() }
+        ? {
+              id: row.id,
+              tool: row.tool,
+              detail: row.detail,
+              at: row.createdAt.toISOString(),
+              ask: row.input ? storedAsk(row.tool, row.input) : null
+          }
         : null;
 }
 
@@ -242,7 +268,8 @@ export async function answerPermission(
     requestId: string,
     choice: PermissionChoice,
     userId: string,
-    canControl: (sessionId: string) => Promise<boolean>
+    canControl: (sessionId: string) => Promise<boolean>,
+    answer: Prisma.InputJsonValue | null = null
 ): Promise<AnswerOutcome> {
     const row = await prisma.agentPermissionRequest.findUnique({
         where: { id: requestId },
@@ -251,7 +278,12 @@ export async function answerPermission(
     if (!row || !(await canControl(row.sessionId))) return { ok: false, reason: "gone" };
     const moved = await prisma.agentPermissionRequest.updateMany({
         where: { id: requestId, status: "pending" },
-        data: { status: choice, answeredById: userId, answeredAt: new Date() }
+        data: {
+            status: choice,
+            answeredById: userId,
+            answeredAt: new Date(),
+            ...(answer ? { answer } : {})
+        }
     });
     if (moved.count > 0) {
         touchSession(row.sessionId);

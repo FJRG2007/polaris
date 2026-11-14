@@ -57,12 +57,14 @@ import { keepSpare } from "@/lib/agents/session-spares";
 import { queuePosition } from "@/lib/agents/session-queue";
 import { capacityRefusal, sessionCapacity } from "@/lib/agents/session-capacity";
 import { pendingPermission, type PendingPermission } from "@/lib/agents/session-permissions";
+import { storedTodos, type SessionTodo } from "@/lib/agents/session-asks";
 import { lastTurnRefused, refusedAccountName } from "@/lib/agents/signin-refusal";
 import {
     forkSessionAction,
     interruptSessionAction,
     listSessionsAction,
     promptSessionAction,
+    setSessionModeAction,
     sessionChoicesAction,
     sessionDetailAction,
     startSessionAction,
@@ -126,6 +128,15 @@ export interface PolarCodeThread {
      *  the screen says so, with a Cancel, instead of a bare "Queued". Only for
      *  somebody who may steer it; null for a session that is not queued. */
     readonly queued: { readonly reason: string | null; readonly position: number | null } | null;
+    /** The agent's todo list as it last wrote it; empty when it keeps none. */
+    readonly todos: readonly SessionTodo[];
+}
+
+async function todosOf(sessionId: string): Promise<SessionTodo[]> {
+    const row = await prisma.agentSession
+        .findUnique({ where: { id: sessionId }, select: { todos: true } })
+        .catch(() => null);
+    return storedTodos(row?.todos);
 }
 
 /** The session's last reported size against its model's window, or null. */
@@ -235,10 +246,11 @@ export async function polarCodeThread(
 ): Promise<PolarCodeThread | null> {
     const access = await accessOf(user);
     if (access === "none") return null;
-    const [detail, t, context] = await Promise.all([
+    const [detail, t, context, todos] = await Promise.all([
         sessionDetailAction(sessionId),
         getTranslations("agents"),
-        contextOf(sessionId)
+        contextOf(sessionId),
+        todosOf(sessionId)
     ]);
     if (!detail) return null;
     // Only for whoever the answer route takes it from: the person who started
@@ -288,7 +300,8 @@ export async function polarCodeThread(
         queued:
             access === "manage" && core.isSessionQueued(detail.session.state)
                 ? await queuedReason(t, user.id, sessionId)
-                : null
+                : null,
+        todos
     };
 }
 
@@ -551,6 +564,13 @@ export async function polarCodeInterrupt(
     const parsed = polarCodeInterruptSchema.safeParse(input);
     // An id that is not one reads as a session that is not there.
     return interruptSessionAction(parsed.success ? parsed.data.sessionId : "");
+}
+
+/** Change a running session's permission mode from its thread. */
+export async function polarCodeMode(user: SessionUser, input: unknown): Promise<{ error?: string }> {
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    return setSessionModeAction(input);
 }
 
 /** Take a session that has not started out of the queue, from its thread. One

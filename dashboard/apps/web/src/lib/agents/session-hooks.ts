@@ -86,8 +86,11 @@ export function claudeHookSettings(
         const hook = {
             type: "command",
             command: scriptPath,
+            // PreToolUse too: an AskUserQuestion or ExitPlanMode call waits there
+            // for the person's answer (session-asks). Every other call returns
+            // as fast as ever, since the script's own curl is what bounds it.
             timeout:
-                event === "PermissionRequest"
+                event === "PermissionRequest" || event === "PreToolUse"
                     ? PERMISSION_HOOK_TIMEOUT_SECONDS
                     : HOOK_TIMEOUT_SECONDS
         };
@@ -176,7 +179,11 @@ export function hookScript(ingestUrl: string, token: string, askUrl?: string): s
         'answer=""',
         ...(askUrl
             ? [
-                  `if printf %s "$payload" | grep -q '"hook_event_name" *: *"PermissionRequest"'; then`,
+                  // And a question or a plan, answered before the tool runs.
+                  `ask=""`,
+                  `if printf %s "$payload" | grep -q '"hook_event_name" *: *"PermissionRequest"'; then ask=1; fi`,
+                  `if printf %s "$payload" | grep -q '"hook_event_name" *: *"PreToolUse"' && printf %s "$payload" | grep -Eq '"tool_name" *: *"(AskUserQuestion|ExitPlanMode)"'; then ask=1; fi`,
+                  `if [ -n "$ask" ]; then`,
                   `    answer=$(printf %s "$payload" | curl -sf -m ${PERMISSION_CURL_SECONDS} -X POST ${shellQuote(askUrl)} \\`,
                   `      -H ${shellQuote(`Authorization: Bearer ${token}`)} \\`,
                   '      -H "Content-Type: application/json" \\',

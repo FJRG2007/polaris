@@ -17,10 +17,13 @@
  * somebody's agent to change what it was doing.
  */
 
+import { readTodos, reportedPermissionMode } from "@/lib/agents/session-asks";
 import { hookConversation, hookEventFailed, normalizeHookEvent } from "@/lib/agents/session-hooks";
 import {
     recordSessionConversation,
     recordSessionEvents,
+    recordSessionTodos,
+    recordReportedMode,
     sessionForToken
 } from "@/lib/agents/session-service";
 import { readerWords } from "@/lib/i18n/reader-words";
@@ -82,6 +85,12 @@ export async function POST(
     await recordSessionConversation(id, hookConversation(payload)).catch((error) =>
         console.error(`[agent-session] ${id}: could not keep the conversation id`, error)
     );
+
+    // The todo list and the mode ride on the payload too; both best effort.
+    const todos = readTodos(payload);
+    if (todos) await recordSessionTodos(id, todos).catch(() => undefined);
+    const mode = reportedPermissionMode(payload);
+    if (mode) await recordReportedMode(id, mode).catch(() => undefined);
 
     const event = normalizeHookEvent(payload);
     // An event this build cannot place says nothing, and moving the session for a

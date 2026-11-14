@@ -9053,6 +9053,9 @@ model AgentSession {
     // ahead), "plan" (reads and plans, changes nothing) or "full". Null leaves
     // it to the place and to Enigma, as every session before this did.
     permissionMode String?
+    // The agent's own todo list, as its last todo tool call wrote it: up to
+    // 50 `{ text, status }`. Null until the agent keeps one.
+    todos          Json?
     // The provider, model and payer a multi-provider tool (OpenCode) works
     // with, from the list Polar's chat picks from. Null for every tool that
     // signs in its own way, and for every session started before this existed.
@@ -17192,6 +17195,10 @@ model AgentPermissionRequest {
     // The permission updates the agent offered for "always allow", as it sent
     // them; replayed (in-session only) when that is the answer.
     suggestions Json?
+    // What a question or a plan put to the person carries (the agent's
+    // AskUserQuestion input, or the plan), and what they answered with.
+    input       Json?
+    answer      Json?
     // pending | allow | deny | always | expired
     status      String    @default("pending")
     answeredById String?  @db.Uuid

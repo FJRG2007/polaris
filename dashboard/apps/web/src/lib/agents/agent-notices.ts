@@ -152,7 +152,9 @@ const CHOICE_WORDS = {
 export async function pushPermissionRequest(
     sessionId: string,
     requestId: string,
-    detail: string
+    detail: string,
+    /** A question or a plan is answered on the session, not with a button. */
+    buttons = true
 ): Promise<void> {
     try {
         const subject = await sessionSubject(sessionId);
@@ -167,7 +169,7 @@ export async function pushPermissionRequest(
             push: {
                 tag: sessionPushTag(subject.id),
                 requireInteraction: true,
-                actions: (["allow", "deny", "always"] as const).map((choice) => ({
+                actions: (buttons ? (["allow", "deny", "always"] as const) : []).map((choice) => ({
                     action: choice,
                     title: t(CHOICE_WORDS[choice]),
                     request: { url: PERMISSION_ANSWER_URL, body: { requestId, choice } }

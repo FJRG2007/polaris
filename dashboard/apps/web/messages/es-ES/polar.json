@@ -1419,7 +1419,40 @@
             "search": "Buscar un agente",
             "noMatch": "Sin agentes",
             "clear": "Dejar este agente"
-        }
+        },
+        "todos": {
+            "title": "Plan",
+            "done": "{done} de {total} hechas",
+            "show": "Ver el plan",
+            "hide": "Ocultar el plan",
+            "status": {
+                "pending": "Falta",
+                "in_progress": "En curso",
+                "completed": "Hecha"
+            }
+        },
+        "ask": {
+            "title": "El agente pregunta",
+            "pager": "{index} de {total}",
+            "previous": "Pregunta anterior",
+            "next": "Siguiente",
+            "selected": "{count} elegidas",
+            "other": "Otra cosa",
+            "otherPlaceholder": "Escribe tu respuesta",
+            "skip": "Omitir",
+            "submit": "Enviar",
+            "continue": "Seguir"
+        },
+        "plan": {
+            "title": "¿Construir este plan?",
+            "approve": "Aprobar",
+            "keepPlanning": "Seguir planeando",
+            "feedbackLabel": "Qué cambiar",
+            "feedbackPlaceholder": "Dile al agente qué planear distinto",
+            "send": "Devolver"
+        },
+        "modeFailed": "No se pudo cambiar el modo. Inténtalo de nuevo.",
+        "modeBusy": "Responde al agente primero y luego cambia el modo."
     },
     "compare": {
         "open": "Preguntar a varios",

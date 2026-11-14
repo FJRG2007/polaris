@@ -492,6 +492,39 @@ export async function interruptSessionAction(sessionId: string): Promise<{ error
     return {};
 }
 
+const sessionModeSchema = z
+    .object({ sessionId: z.string().trim().uuid(), mode: z.enum(core.SESSION_PERMISSION_MODES) })
+    .strict();
+
+/**
+ * Change a running session's permission mode mid-session. Not while the agent
+ * waits on an answer: in its terminal the keys that switch modes would answer
+ * that prompt instead (Shift+Tab approves a plan).
+ */
+export async function setSessionModeAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const [t, tp] = await Promise.all([getTranslations("agents"), getTranslations("polar")]);
+    const parsed = sessionModeSchema.safeParse(input);
+    if (!parsed.success) return { error: t("sessions.errors.gone") };
+    const session = await sessions.getSession(parsed.data.sessionId, user.id);
+    if (!session || core.isSessionOver(session.state)) return { error: t("sessions.errors.gone") };
+    if (!core.takesPermissionMode(session.cli)) return { error: tp("code.modeFailed") };
+    if (session.permissionMode === parsed.data.mode) return {};
+    if (await permissions.pendingPermission(session.id)) return { error: tp("code.modeBusy") };
+    try {
+        await runtime.changeSessionMode(session.id, session.cli, session.permissionMode, parsed.data.mode);
+        await prisma.agentSession.update({
+            where: { id: session.id },
+            data: { permissionMode: parsed.data.mode },
+            select: { id: true }
+        });
+    } catch (error) {
+        console.error(`[agent-session] ${session.id}: mode change failed:`, error);
+        return { error: tp("code.modeFailed") };
+    }
+    return {};
+}
+
 export async function stopSessionAction(sessionId: string): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
     const session = await sessions.getSession(sessionId, user.id);
@@ -850,7 +883,8 @@ export async function answerPermissionAction(
         async (sessionId) => {
             const session = await sessions.getSession(sessionId, user.id);
             return session !== null && !core.isSessionOver(session.state);
-        }
+        },
+        parsed.data.answer ?? null
     );
     if (outcome.ok) return { status: outcome.status };
     return {

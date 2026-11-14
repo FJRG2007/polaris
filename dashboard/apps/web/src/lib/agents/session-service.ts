@@ -649,6 +649,36 @@ export async function recordSessionEvents(
     return null;
 }
 
+/** Keep the agent's todo list as its last todo call wrote it. */
+export async function recordSessionTodos(
+    sessionId: string,
+    todos: readonly { text: string; status: string }[]
+): Promise<void> {
+    await prisma.agentSession.update({
+        where: { id: sessionId },
+        data: { todos: todos.map((todo) => ({ text: todo.text, status: todo.status })) },
+        select: { id: true }
+    });
+    touchSession(sessionId);
+}
+
+/**
+ * Keep the mode the agent reports it is in (Shift+Tab in its terminal, a plan
+ * approved, a change from Polaris), so the session shows the one in force.
+ * Only on a session that picked a mode: one that left it to the place and to
+ * Enigma keeps leaving it, rather than gaining a flag on its next boot.
+ */
+export async function recordReportedMode(
+    sessionId: string,
+    mode: core.SessionPermissionMode
+): Promise<void> {
+    const moved = await prisma.agentSession.updateMany({
+        where: { id: sessionId, permissionMode: { not: null }, NOT: { permissionMode: mode } },
+        data: { permissionMode: mode }
+    });
+    if (moved.count > 0) touchSession(sessionId);
+}
+
 /**
  * Keep the agent's own conversation id and transcript path, as a hook reported
  * them (already checked by `hookConversation`).

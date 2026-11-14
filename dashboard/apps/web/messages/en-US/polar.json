@@ -1419,7 +1419,40 @@
             "search": "Find an agent",
             "noMatch": "No agents match",
             "clear": "Stop using this agent"
-        }
+        },
+        "todos": {
+            "title": "Plan",
+            "done": "{done} of {total} done",
+            "show": "Show the plan",
+            "hide": "Hide the plan",
+            "status": {
+                "pending": "To do",
+                "in_progress": "In progress",
+                "completed": "Done"
+            }
+        },
+        "ask": {
+            "title": "The agent asks",
+            "pager": "{index} of {total}",
+            "previous": "Previous question",
+            "next": "Next question",
+            "selected": "{count} selected",
+            "other": "Something else",
+            "otherPlaceholder": "Type your answer",
+            "skip": "Skip",
+            "submit": "Send answers",
+            "continue": "Next"
+        },
+        "plan": {
+            "title": "Ready to build this plan?",
+            "approve": "Approve",
+            "keepPlanning": "Keep planning",
+            "feedbackLabel": "What to change",
+            "feedbackPlaceholder": "Tell the agent what to plan differently",
+            "send": "Send back"
+        },
+        "modeFailed": "The mode could not be changed. Try again.",
+        "modeBusy": "Answer the agent first, then change the mode."
     },
     "compare": {
         "open": "Ask several models",
