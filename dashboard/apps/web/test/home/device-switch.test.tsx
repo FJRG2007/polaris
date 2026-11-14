@@ -134,8 +134,8 @@ describe("a switch on a device row", () => {
         fireEvent.click(toggle);
         expect(pressed).toEqual([["device-1", "turn-off"]]);
         await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("false"));
-        // Not pressed twice while the first is in flight.
-        expect(toggle.hasAttribute("disabled")).toBe(true);
+        // Not a lock: a later press wins, so it stays pressable while in flight.
+        expect(toggle.hasAttribute("disabled")).toBe(false);
 
         await act(async () => answer({ error: "Tuya refused the request." }));
         await waitFor(() =>

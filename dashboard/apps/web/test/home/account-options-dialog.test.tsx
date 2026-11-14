@@ -72,7 +72,11 @@ describe("account options", () => {
         render(<AccountOptionsDialog account={account} onClose={() => {}} onChanged={changed} />);
         fireEvent.click(screen.getByRole("switch", { name: "Take the session back" }));
         await settle();
-        expect(changed.mock.calls.at(-1)![0]).toBe(account);
+        // The switch holds the press itself and goes back on its own; the account
+        // above is only told what the server confirmed, so it is never told at all.
+        const toggle = screen.getByRole("switch", { name: "Take the session back" });
+        expect(toggle.getAttribute("aria-checked")).toBe("true");
+        expect(changed).not.toHaveBeenCalled();
         expect(screen.getByRole("alert").textContent).toBeTruthy();
     });
 });
