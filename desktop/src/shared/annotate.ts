@@ -8,18 +8,19 @@
  * shared picture, which on a screen share is the whole display.
  */
 
-import { z } from "zod";
+// The tree-shaken build of zod: the drawing overlay's page reads this, and the
+// full one would be nearly all of what that window loads.
+import * as z from "zod/mini";
 
-const unit = z.number().finite().min(0).max(1);
+// A number in zod 4 is always finite.
+const unit = z.number().check(z.gte(0), z.lte(1));
 
-export const strokeSchema = z
-    .object({
-        key: z.string().regex(/^[^\s\p{Cc}]{1,160}$/u),
-        color: z.string().regex(/^#[0-9a-f]{6}$/i),
-        points: z.array(z.tuple([unit, unit])).min(0).max(64),
-        end: z.boolean()
-    })
-    .strict();
+export const strokeSchema = z.strictObject({
+    key: z.string().check(z.regex(/^[^\s\p{Cc}]{1,160}$/u)),
+    color: z.string().check(z.regex(/^#[0-9a-f]{6}$/i)),
+    points: z.array(z.tuple([unit, unit])).check(z.maxLength(64)),
+    end: z.boolean()
+});
 
 export type StrokeInput = z.infer<typeof strokeSchema>;
 

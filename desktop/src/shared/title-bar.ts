@@ -9,13 +9,14 @@
  * again whenever the theme changes.
  */
 
-import { z } from "zod";
+// The tree-shaken build of zod, as in `update-ready`: the page's preload reads this.
+import * as z from "zod/mini";
 
 const HEX = /^#[0-9a-f]{6}$/;
 
 export const titleBarColorsSchema = z.object({
-    background: z.string().regex(HEX),
-    symbol: z.string().regex(HEX)
+    background: z.string().check(z.regex(HEX)),
+    symbol: z.string().check(z.regex(HEX))
 });
 
 export type TitleBarColors = z.infer<typeof titleBarColorsSchema>;

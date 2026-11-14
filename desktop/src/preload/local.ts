@@ -11,7 +11,8 @@ import { readUpdateCheck } from "@/shared/update-check";
 import type { StrokeInput } from "@/shared/annotate";
 import type { WidgetView } from "@/shared/voice-widget";
 import { applyTextSize } from "./text-size";
-import { CHANNELS, type PolarisLocal, type PushEvent, type TvInstallState } from "@/shared/bridge";
+import { readTextSize } from "@/shared/text-size";
+import { CHANNELS, TEXT_SIZE_ARGUMENT, type PolarisLocal, type PushEvent, type TvInstallState } from "@/shared/bridge";
 
 const bridge: PolarisLocal = {
     connect: {
@@ -86,11 +87,15 @@ const bridge: PolarisLocal = {
 
 contextBridge.exposeInMainWorld("polarisLocal", bridge);
 
-// Every window of the app's own reads at the account's text size, asked for
-// before the page draws: an answer that came back after the first paint would
-// lay the window out at the default size and then redraw it at this one.
-const size: unknown = ipcRenderer.sendSync(CHANNELS.textSize);
-if (typeof size === "number") applyTextSize(size);
+// Every window of the app's own reads at the account's text size from before the
+// page draws: it arrives as an argument of the window, never as a synchronous
+// call, which would hold this page until the main process is free. A window
+// reloaded after the size changed asks once more, and redraws only then.
+const given = readTextSize(process.argv.find((arg) => arg.startsWith(TEXT_SIZE_ARGUMENT))?.slice(TEXT_SIZE_ARGUMENT.length));
+if (given !== null) applyTextSize(given);
+void ipcRenderer.invoke(CHANNELS.textSize).then((size: unknown) => {
+    if (typeof size === "number" && size !== given) applyTextSize(size);
+});
 ipcRenderer.on(CHANNELS.textSizeChanged, (_event: unknown, size: unknown) => {
     if (typeof size === "number") applyTextSize(size);
 });

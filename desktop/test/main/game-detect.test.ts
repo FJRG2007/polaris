@@ -9,16 +9,21 @@
  * the heartbeat, once when it stops - and nothing at all when it could not look.
  */
 
-import { describe, expect, it } from "vitest";
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
+import { describe, expect, it, vi } from "vitest";
+import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { KNOWN_GAMES } from "@/main/known-games";
 import {
     GameWatcher,
     matchGame,
     parseCmdline,
+    parseProcessNames,
     parsePs,
     parseTasklist,
     REPEAT_MS,
-    type RunningGame
+    type RunningGame,
+    WindowsLister
 } from "@/main/game-detect";
 
 describe("reading the list of programs", () => {
@@ -108,5 +113,100 @@ describe("watching for a game", () => {
         await watch.check(15_000);
         await watch.check(30_000);
         expect(said.map((game) => game?.name ?? null)).toEqual(["Celeste"]);
+    });
+});
+
+/** A stand-in PowerShell: answers each list command with `names`, or stays
+ *  silent, or exits, as the test says. */
+function fakeShell(behavior: { names?: string[]; silent?: boolean; exitOnAsk?: boolean; }) {
+    const child = new EventEmitter() as EventEmitter & {
+        stdin: PassThrough;
+        stdout: PassThrough;
+        stderr: PassThrough;
+        exitCode: number | null;
+        killed: boolean;
+        kill: () => boolean;
+    };
+    child.stdin = new PassThrough();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.exitCode = null;
+    child.killed = false;
+    child.kill = () => {
+        child.killed = true;
+        child.exitCode = 1;
+        child.emit("exit", 1);
+        return true;
+    };
+    const asked: string[] = [];
+    child.stdin.setEncoding("utf8");
+    child.stdin.on("data", (line: string) => {
+        asked.push(line);
+        const end = /'(<<[^']+>>)'/.exec(line)?.[1];
+        if (!end) return;
+        if (behavior.exitOnAsk) {
+            child.exitCode = 1;
+            child.emit("exit", 1);
+            return;
+        }
+        if (behavior.silent) return;
+        // Split across chunks, the way a pipe can hand it over.
+        const text = `${(behavior.names ?? []).join("\r\n")}\r\n${end}\r\n`;
+        const half = Math.floor(text.length / 2);
+        child.stdout.write(text.slice(0, half));
+        setTimeout(() => child.stdout.write(text.slice(half)), 0);
+    });
+    return { child: child as unknown as ChildProcessWithoutNullStreams, asked };
+}
+
+describe("listing programs on Windows", () => {
+    it("reads PowerShell's names back as program keys", () => {
+        expect(parseProcessNames("Hollow_Knight\r\nexplorer\r\n\r\n  steam  \r\n")).toEqual(["hollow_knight.exe", "explorer.exe", "steam.exe"]);
+    });
+
+    it("keeps one shell open and asks it again", async () => {
+        const shells: ReturnType<typeof fakeShell>[] = [];
+        const lister = new WindowsLister(() => {
+            const shell = fakeShell({ names: ["Celeste", "explorer"] });
+            shells.push(shell);
+            return shell.child;
+        }, async () => ["tasklist.exe"]);
+        expect(await lister.list()).toEqual(["celeste.exe", "explorer.exe"]);
+        expect(await lister.list()).toEqual(["celeste.exe", "explorer.exe"]);
+        expect(shells).toHaveLength(1);
+        expect(matchGame(await lister.list())?.name).toBe("Celeste");
+    });
+
+    it("answers two looks asked at once with one list", async () => {
+        const shell = fakeShell({ names: ["explorer"] });
+        const lister = new WindowsLister(() => shell.child, async () => []);
+        const [a, b] = await Promise.all([lister.list(), lister.list()]);
+        expect(a).toEqual(b);
+        expect(shell.asked.filter((line) => line.includes("Get-Process"))).toHaveLength(1);
+    });
+
+    it("falls back to tasklist when the shell goes away, and starts a new one next time", async () => {
+        let started = 0;
+        const lister = new WindowsLister(() => {
+            started += 1;
+            return fakeShell(started === 1 ? { exitOnAsk: true } : { names: ["explorer"] }).child;
+        }, async () => ["from-tasklist.exe"]);
+        expect(await lister.list()).toEqual(["from-tasklist.exe"]);
+        expect(await lister.list()).toEqual(["explorer.exe"]);
+        expect(started).toBe(2);
+    });
+
+    it("gives up on a shell that does not answer", async () => {
+        vi.useFakeTimers();
+        try {
+            const shell = fakeShell({ silent: true });
+            const lister = new WindowsLister(() => shell.child, async () => ["from-tasklist.exe"]);
+            const look = lister.list();
+            await vi.advanceTimersByTimeAsync(10_000);
+            expect(await look).toEqual(["from-tasklist.exe"]);
+            expect(shell.child.killed).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

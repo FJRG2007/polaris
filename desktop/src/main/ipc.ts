@@ -353,11 +353,9 @@ export function registerIpc(host: IpcHost): void {
         followWidgetTextSize();
         return true;
     });
-    // Asked by every page of the app's own as it loads, synchronously so the
-    // first paint is already at it; the size is no secret.
-    ipcMain.on(CHANNELS.textSize, (event) => {
-        event.returnValue = textSize();
-    });
+    // Asked by every page of the app's own as it loads, after the size it was
+    // opened with (`TEXT_SIZE_ARGUMENT`) is already drawn; the size is no secret.
+    ipcMain.handle(CHANNELS.textSize, (): number => textSize());
 
     // The window that asked is the one whose taskbar button carries it.
     ipcMain.handle(CHANNELS.appBadge, (event, raw: unknown): boolean => {

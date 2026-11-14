@@ -4,19 +4,20 @@
  * without Electron.
  */
 
-import { z } from "zod";
+// The tree-shaken build of zod, as in `update-ready`: the preloads read this.
+import * as z from "zod/mini";
 
 export const updateCheckSchema = z.discriminatedUnion("kind", [
     /** Nothing newer is out; `version` is the one running. */
-    z.object({ kind: z.literal("current"), version: z.string().max(40) }),
+    z.object({ kind: z.literal("current"), version: z.string().check(z.maxLength(40)) }),
     /** A newer version is being downloaded and installed. */
-    z.object({ kind: z.literal("downloading"), version: z.string().max(40) }),
+    z.object({ kind: z.literal("downloading"), version: z.string().check(z.maxLength(40)) }),
     /** Installed; it opens on the next start, or now with a restart. */
-    z.object({ kind: z.literal("ready"), version: z.string().max(40) }),
+    z.object({ kind: z.literal("ready"), version: z.string().check(z.maxLength(40)) }),
     /** Out, but this copy cannot install it itself: its page has the download. */
-    z.object({ kind: z.literal("available"), version: z.string().max(40) }),
+    z.object({ kind: z.literal("available"), version: z.string().check(z.maxLength(40)) }),
     /** The question could not be asked; `reason` says why, in words. */
-    z.object({ kind: z.literal("failed"), reason: z.string().max(300) }),
+    z.object({ kind: z.literal("failed"), reason: z.string().check(z.maxLength(300)) }),
     /** A build that does not update itself, such as one run from the source. */
     z.object({ kind: z.literal("unsupported") })
 ]);

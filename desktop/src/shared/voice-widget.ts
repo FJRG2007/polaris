@@ -8,7 +8,8 @@
  * the rule for each is one schema the main process and the tests share.
  */
 
-import { z } from "zod";
+// The tree-shaken build of zod: the widget's page reads this module.
+import * as z from "zod/mini";
 
 /** The most people the page may list; the widget draws fewer and counts the rest. */
 export const MAX_PEOPLE = 50;
@@ -28,25 +29,22 @@ export function lockKeys(platform: NodeJS.Platform, inGame: boolean): readonly (
     return inGame ? [["Shift+`", "Shift+`"], withCtrl] : [withCtrl];
 }
 
-const personSchema = z
-    .object({
-        id: z.string().min(1).max(128),
-        name: z.string().trim().max(120),
-        speaking: z.boolean(),
-        muted: z.boolean(),
-        deafened: z.boolean()
-    })
-    .strict();
+const personSchema = z.strictObject({
+    id: z.string().check(z.minLength(1), z.maxLength(128)),
+    name: z.string().check(z.trim(), z.maxLength(120)),
+    speaking: z.boolean(),
+    muted: z.boolean(),
+    deafened: z.boolean()
+});
 
 /** What the page in a call publishes, or null once it has ended. */
-export const voiceStateSchema = z
-    .object({
-        participants: z.array(personSchema).max(MAX_PEOPLE),
+export const voiceStateSchema = z.nullable(
+    z.strictObject({
+        participants: z.array(personSchema).check(z.maxLength(MAX_PEOPLE)),
         selfMuted: z.boolean(),
         selfDeafened: z.boolean()
     })
-    .strict()
-    .nullable();
+);
 
 export type VoiceState = z.infer<typeof voiceStateSchema>;
 export type VoicePerson = z.infer<typeof personSchema>;

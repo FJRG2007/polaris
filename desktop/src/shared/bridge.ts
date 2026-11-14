@@ -602,3 +602,7 @@ export const CHANNELS = {
 
 /** The argument that carries this app's version into the dashboard's preload. */
 export const VERSION_ARGUMENT = "--polaris-desktop-version=";
+
+/** The argument that carries the account's text size into the app's own
+ *  windows' preload, so the first paint is at it without a synchronous call. */
+export const TEXT_SIZE_ARGUMENT = "--polaris-text-size=";

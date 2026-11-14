@@ -7,12 +7,13 @@
  * sends it, and again in the page's preload before the page hears it.
  */
 
-import { z } from "zod";
+// The tree-shaken build of zod: this is read in the page's preload, which runs
+// before every load of the dashboard, and the full one is most of a megabyte.
+import * as z from "zod/mini";
 
-export const updateReadySchema = z
-    .object({ version: z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/).max(64) })
-    .strict()
-    .nullable();
+export const updateReadySchema = z.nullable(
+    z.strictObject({ version: z.string().check(z.regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/), z.maxLength(64)) })
+);
 
 export type UpdateReady = z.infer<typeof updateReadySchema>;
 

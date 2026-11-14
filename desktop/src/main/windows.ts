@@ -18,7 +18,8 @@
 
 import { join } from "node:path";
 import { release } from "node:os";
-import { VERSION_ARGUMENT } from "@/shared/bridge";
+import { textSize } from "./settings";
+import { TEXT_SIZE_ARGUMENT, VERSION_ARGUMENT } from "@/shared/bridge";
 import { defaultTitleBarColors, foreignPageCss, overlayHeight } from "@/shared/title-bar";
 import { classifyNavigation, isServerUrl, mainFrameStep } from "./navigation";
 import {
@@ -93,6 +94,11 @@ function splashChrome(): BrowserWindowConstructorOptions {
             height: 32
         }
     };
+}
+
+/** The app's own pages, opened at the account's text size (`preload/local.ts`). */
+function localPreferences(): WebPreferences {
+    return preferences("local.js", { additionalArguments: [`${TEXT_SIZE_ARGUMENT}${textSize()}`] });
 }
 
 function polarisPreferences(): WebPreferences {
@@ -261,7 +267,7 @@ export function openOverlayWindow(bounds: { readonly x: number; readonly y: numb
         focusable: false,
         skipTaskbar: true,
         alwaysOnTop: true,
-        webPreferences: preferences("local.js")
+        webPreferences: localPreferences()
     });
     register(window.webContents, "overlay");
     window.setIgnoreMouseEvents(true);
@@ -299,7 +305,7 @@ export function openVoiceWidgetWindow(bounds: { readonly x: number; readonly y: 
         focusable: false,
         skipTaskbar: true,
         alwaysOnTop: true,
-        webPreferences: preferences("local.js")
+        webPreferences: localPreferences()
     });
     register(window.webContents, "voice-widget");
     window.setIgnoreMouseEvents(true, { forward: true });
@@ -327,7 +333,7 @@ export interface LocalSheet {
  * with its window, and says so through `onClosed`.
  */
 export function openLocalSheet(parent: BrowserWindow, kind: "connect", onClosed: () => void): LocalSheet {
-    const view = new WebContentsView({ webPreferences: preferences("local.js") });
+    const view = new WebContentsView({ webPreferences: localPreferences() });
     view.setBackgroundColor("#00000000");
     const contents = view.webContents;
     register(contents, kind);
@@ -376,7 +382,7 @@ export function openLocalWindow(
             minHeight: 320,
             parent: options.parent,
             modal: false,
-            webPreferences: preferences("local.js"),
+            webPreferences: localPreferences(),
             ...(kind === "updating" ? splashChrome() : {})
         })
     );

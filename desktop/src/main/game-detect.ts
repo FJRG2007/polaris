@@ -8,8 +8,9 @@
  * is running so somebody can pick one to add as a game, and that list goes to
  * the page on screen and nowhere else.
  *
- * Reading the list is one system command every `CHECK_MS`, cheap enough to
- * leave running: `tasklist` on Windows, `ps` on macOS, and `/proc` on Linux,
+ * Reading the list is one look every `CHECK_MS`, cheap enough to leave
+ * running: a PowerShell kept open and asked again on Windows (`WindowsLister`),
+ * `ps` on macOS, and `/proc` on Linux,
  * where a program's name in `ps` is cut to fifteen characters and a game run
  * through a compatibility layer is known by its Windows program name, which is
  * the first word of its command line.
@@ -18,7 +19,7 @@
  * operating system it is reading.
  */
 
-import { execFile } from "node:child_process";
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { KNOWN_GAMES, type KnownGame } from "./known-games";
 
@@ -57,6 +58,16 @@ export function parseTasklist(text: string): string[] {
         if (match?.[1]) names.push(programKey(match[1]));
     }
     return names;
+}
+
+/** Every program in the lines `WindowsLister` reads back: PowerShell's process
+ *  names, which are the image names without their `.exe`. */
+export function parseProcessNames(text: string): string[] {
+    return text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((name) => programKey(`${name}.exe`));
 }
 
 /** Every program in `ps -A -o comm=` output, which on macOS is a full path. */
@@ -135,6 +146,99 @@ export async function runningPrograms(platform: NodeJS.Platform = process.platfo
     return parsePs(await run("ps", ["-A", "-o", "comm="]));
 }
 
+/** What a `WindowsLister` starts: PowerShell reading commands from its input. */
+export type SpawnLister = () => ChildProcessWithoutNullStreams;
+
+/** The line PowerShell writes after each list, so a reply is known to be whole. */
+const LIST_END = "<<polaris-list-end>>";
+
+/** How long one list may take before the shell is taken for stuck. */
+const LIST_TIMEOUT_MS = 10_000;
+
+/**
+ * The running programs on Windows, read every `CHECK_MS` by one PowerShell that
+ * stays open. `tasklist` was measured at 1.2-1.5 s of processor per run on a
+ * machine with ~500 processes, every 15 s for as long as the app ran; the open
+ * shell answers the same question in ~15 ms. It exits by itself when this app
+ * does, since its input closes. A shell that cannot start, or stops answering,
+ * gives way to `tasklist` for that look and is started again on the next.
+ */
+export class WindowsLister {
+    private child: ChildProcessWithoutNullStreams | null = null;
+    private pending: Promise<string[]> | null = null;
+
+    constructor(
+        private readonly start: SpawnLister = () =>
+            spawn("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "-"], { windowsHide: true }),
+        private readonly fallback: () => Promise<string[]> = async () => parseTasklist(await run("tasklist", ["/fo", "csv", "/nh"]))
+    ) {}
+
+    /** One list; a second asked while one is on its way gets the same answer. */
+    list(): Promise<string[]> {
+        this.pending ??= this.ask()
+            .catch(() => {
+                this.stop();
+                return this.fallback();
+            })
+            .finally(() => {
+                this.pending = null;
+            });
+        return this.pending;
+    }
+
+    stop(): void {
+        this.child?.kill();
+        this.child = null;
+    }
+
+    private shell(): ChildProcessWithoutNullStreams {
+        if (this.child && this.child.exitCode === null && !this.child.killed) return this.child;
+        const child = this.start();
+        child.stdout.setEncoding("utf8");
+        child.stderr.resume();
+        child.on("error", () => undefined);
+        child.on("exit", () => {
+            if (this.child === child) this.child = null;
+        });
+        // Names outside the console's code page arrive as themselves.
+        child.stdin.write("[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)\n");
+        this.child = child;
+        return child;
+    }
+
+    private ask(): Promise<string[]> {
+        const child = this.shell();
+        return new Promise((resolve, reject) => {
+            let text = "";
+            const done = (error: Error | null) => {
+                clearTimeout(timer);
+                child.stdout.off("data", heard);
+                child.off("exit", gone);
+                if (error) reject(error);
+                else resolve(parseProcessNames(text.slice(0, text.indexOf(LIST_END))));
+            };
+            const heard = (chunk: string) => {
+                text += chunk;
+                if (text.includes(LIST_END)) done(null);
+            };
+            const gone = () => done(new Error("The process list stopped."));
+            const timer = setTimeout(() => done(new Error("The process list did not answer.")), LIST_TIMEOUT_MS);
+            child.stdout.on("data", heard);
+            child.once("exit", gone);
+            child.stdin.write(`(Get-Process).ProcessName; '${LIST_END}'\n`, (error) => {
+                if (error) done(error);
+            });
+        });
+    }
+}
+
+/** The watcher's look: the open shell on Windows, `runningPrograms` elsewhere. */
+function watchedPrograms(): () => Promise<string[]> {
+    if (process.platform !== "win32") return () => runningPrograms();
+    const lister = new WindowsLister();
+    return () => lister.list();
+}
+
 /**
  * Watches for a game and says when it starts, stops, and - while it runs - that
  * it is still running.
@@ -154,7 +258,7 @@ export class GameWatcher {
 
     constructor(
         private readonly onChange: (game: RunningGame | null) => void,
-        private readonly list: () => Promise<string[]> = () => runningPrograms()
+        private readonly list: () => Promise<string[]> = watchedPrograms()
     ) {}
 
     /** The programs somebody added as games, from the dashboard. */
