@@ -126,7 +126,15 @@ async function WritingSection({ userId, readOnly }: { userId: string; readOnly: 
 }
 
 /** The agents, with the skills, connectors and models they can be given. */
-async function AgentsSection({ userId, readOnly }: { userId: string; readOnly: boolean }) {
+async function AgentsSection({
+    userId,
+    readOnly,
+    part
+}: {
+    userId: string;
+    readOnly: boolean;
+    part: "agents" | "tools";
+}) {
     const access = await polarAccessFor(userId);
     const [agents, skills, connectors, providers, engines, defaults] = await Promise.all([
         listAgents(userId),
@@ -149,6 +157,7 @@ async function AgentsSection({ userId, readOnly }: { userId: string; readOnly: b
         .slice(0, 1000);
     return (
         <PolarAgents
+            part={part}
             initial={agents}
             defaults={[...defaults.values()]}
             readOnly={readOnly}
@@ -257,7 +266,7 @@ export async function SettingsSectionPage({
         case "agents":
             return (
                 <Suspense fallback={<ListSkeleton />}>
-                    <AgentsSection userId={user.id} readOnly={Boolean(user.viewingAs)} />
+                    <AgentsSection userId={user.id} readOnly={Boolean(user.viewingAs)} part="agents" />
                 </Suspense>
             );
         case "display":
@@ -273,7 +282,14 @@ export async function SettingsSectionPage({
         case "routing":
             return <PolarRoutingSettings part="fallbacks" />;
         case "coding-tools":
-            return <PolarRoutingSettings part="tools" />;
+            return (
+                <div className="flex flex-col gap-8">
+                    <Suspense fallback={<ListSkeleton />}>
+                        <AgentsSection userId={user.id} readOnly={Boolean(user.viewingAs)} part="tools" />
+                    </Suspense>
+                    <PolarRoutingSettings part="tools" />
+                </div>
+            );
         case "usage":
             return <PolarUsageSettings />;
         case "data":

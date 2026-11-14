@@ -39,6 +39,7 @@ describe("the Agents settings", () => {
     it("saves a new agent only once it has a name and instructions", async () => {
         render(
             <PolarAgents
+                part="agents"
                 initial={[]}
                 defaults={[]}
                 readOnly={false}
@@ -72,6 +73,7 @@ describe("the Agents settings", () => {
     it("sets the account and the models of an agent that comes with Polaris", async () => {
         render(
             <PolarAgents
+                part="tools"
                 initial={[]}
                 defaults={[]}
                 readOnly={false}
@@ -109,6 +111,7 @@ describe("the Agents settings", () => {
         saved.length = 0;
         render(
             <PolarAgents
+                part="agents"
                 initial={[]}
                 defaults={[]}
                 readOnly={false}
@@ -147,6 +150,24 @@ describe("the Agents settings", () => {
     });
 });
 
+describe("where each half lives", () => {
+    it("shows only the person's agents on Agents, and the tools only under Coding tools", () => {
+        const picks = { skills: [], connectors: [], models: [], engines: [CLAUDE] };
+        const agents = render(
+            <PolarAgents part="agents" initial={[]} defaults={[]} readOnly={false} picks={picks} />,
+            { wrapper: MessagesWrapper }
+        );
+        expect(screen.queryByText("Polar and coding tools")).toBeNull();
+        expect(screen.getByRole("button", { name: "Create agent" })).toBeTruthy();
+        agents.unmount();
+        render(<PolarAgents part="tools" initial={[]} defaults={[]} readOnly={false} picks={picks} />, {
+            wrapper: MessagesWrapper
+        });
+        expect(screen.getByText("Polar and coding tools")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Create agent" })).toBeNull();
+    });
+});
+
 describe("the included tools", () => {
     it("draws every tool with its logo and folds the long list", () => {
         const tools = ["amp", "droid", "aider", "crush", "goose", "cline"].map((engine) => ({
@@ -156,6 +177,7 @@ describe("the included tools", () => {
         }));
         const { container } = render(
             <PolarAgents
+                part="tools"
                 initial={[]}
                 defaults={[]}
                 readOnly={false}
@@ -176,6 +198,7 @@ describe("the included tools", () => {
     it("leaves a stored coding tool where it is and shows it", () => {
         render(
             <PolarAgents
+                part="agents"
                 initial={[
                     {
                         id: "0190c6a0-0000-7000-8000-0000000000c1",

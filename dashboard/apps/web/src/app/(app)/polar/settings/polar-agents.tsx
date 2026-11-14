@@ -141,8 +141,16 @@ export function PolarAgents({
     initial,
     defaults,
     picks,
-    readOnly
+    readOnly,
+    part
 }: {
+    /**
+     * Which half to show. An agent is instructions, a model and tools that
+     * someone set up for a job ("Your agents"); Polar and the coding tools are
+     * what an agent runs on, so their accounts and models live under Coding
+     * tools, not beside the agents.
+     */
+    part: "agents" | "tools";
     initial: AgentView[];
     /** The saved settings of the agents that come with Polaris, by engine. */
     defaults: AgentWork[];
@@ -194,6 +202,7 @@ export function PolarAgents({
 
     return (
         <section className="flex flex-col gap-6">
+            {part === "tools" ? (
             <div className="flex flex-col gap-3">
                 <div className="min-w-0">
                     <h2 className="text-sm font-semibold">{t("settings.agents.builtInTitle")}</h2>
@@ -241,6 +250,8 @@ export function PolarAgents({
                     </CardBody>
                 </Card>
             </div>
+            ) : null}
+            {part === "agents" ? (
             <div className="flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -361,6 +372,7 @@ export function PolarAgents({
                     </Card>
                 )}
             </div>
+            ) : null}
             <WorkEditor
                 tuning={tuning}
                 initial={tuning ? workOf(tuning.engine) : null}
