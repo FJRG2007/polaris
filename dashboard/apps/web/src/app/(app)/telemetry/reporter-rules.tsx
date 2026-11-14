@@ -26,6 +26,7 @@ import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { CopyButton } from "@/components/copy-button";
 import { Button, Select, Switch, cn } from "@polaris/ui";
+import { useOptimisticToggle } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { RuleListInput } from "@/components/rule-list-input";
 import { ClientRulesEditor } from "@/components/client-rules-editor";
@@ -261,10 +262,11 @@ export function ReporterRules({
                                 setDraft({ ...draft, requireSecret: true });
                                 await onDone();
                             }
+                            return Boolean(result?.secret);
                         }}
                         onClear={async () => {
                             setBusy(true);
-                            await runAction(
+                            const result = await runAction(
                                 () => actions.clearTelemetrySecretAction(project.id),
                                 setError
                             );
@@ -272,6 +274,7 @@ export function ReporterRules({
                             setIssued(null);
                             setDraft({ ...draft, requireSecret: false });
                             await onDone();
+                            return Boolean(result && !result.error);
                         }}
                     />
 
@@ -313,27 +316,33 @@ export function ReporterRules({
 function ProjectKey({
     project,
     issued,
-    busy,
     onMint,
     onClear
 }: {
     project: ProjectSummary;
     issued: string | null;
     busy: boolean;
-    onMint: () => Promise<void>;
-    onClear: () => Promise<void>;
+    /** Each answers whether the server took it. */
+    onMint: () => Promise<boolean>;
+    onClear: () => Promise<boolean>;
 }) {
     const t = useTranslations("telemetry");
+    // Moves at once; back if the key could not be issued or withdrawn, which the
+    // panel already explains.
+    const [required, setRequired] = useOptimisticToggle(
+        project.rules.requireSecret,
+        async (next) => ((await (next ? onMint() : onClear())) ? null : { ok: false }),
+        { onRefused: () => undefined }
+    );
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/40 p-2.5">
             <div className="flex items-center gap-2">
                 <KeyRound className="size-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 text-xs font-medium">{t("rules.requireKey")}</span>
                 <Switch
-                    checked={project.rules.requireSecret}
-                    disabled={busy}
+                    checked={required}
                     aria-label={t("rules.requireKey")}
-                    onChange={(checked) => void (checked ? onMint() : onClear())}
+                    onChange={setRequired}
                 />
             </div>
             <p className="text-xs text-muted-foreground">

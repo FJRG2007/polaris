@@ -7,7 +7,7 @@
 
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { IconAction } from "@/components/icon-action";
 import { RelativeTime } from "@/components/relative-time";
 import { DeliveryLogDialog } from "./delivery-log-dialog";
@@ -44,6 +44,7 @@ import {
     Input,
     Switch
 } from "@polaris/ui";
+import { useOptimisticToggle } from "@polaris/ui";
 
 export interface EventOption {
     id: string;
@@ -78,17 +79,9 @@ export function WebhooksView({
     const [enabled, setEnabled] = useState<Record<string, boolean>>({});
     const atLimit = hooks.length >= MAX_OUTBOUND_WEBHOOKS;
 
-    function toggle(hook: OutboundHookView, next: boolean) {
-        setEnabled((current) => ({ ...current, [hook.id]: next }));
-        startTransition(async () => {
-            const result = await actions.setOutboundHookEnabledAction(hook.id, next);
-            if (result.error) {
-                setEnabled((current) => ({ ...current, [hook.id]: !next }));
-                setNotice({ id: hook.id, ok: false, text: result.error });
-                return;
-            }
-            router.refresh();
-        });
+    /** What one hook's switch shows, so its badge and Test follow it. */
+    function shown(id: string, on: boolean) {
+        setEnabled((current) => (current[id] === on ? current : { ...current, [id]: on }));
     }
 
     function test(hook: OutboundHookView) {
@@ -176,14 +169,11 @@ export function WebhooksView({
                                                     {t("webhooks.list.off")}
                                                 </Badge>
                                             ) : null}
-                                            <Switch
-                                                checked={on}
-                                                disabled={pending}
-                                                onChange={(next) => toggle(hook, next)}
-                                                aria-label={
-                                                    on
-                                                        ? t("webhooks.list.switchOff")
-                                                        : t("webhooks.list.switchOn")
+                                            <OutboundHookSwitch
+                                                hook={hook}
+                                                onShown={shown}
+                                                onRefused={(text) =>
+                                                    setNotice({ id: hook.id, ok: false, text })
                                                 }
                                             />
                                             <IconAction
@@ -558,5 +548,32 @@ function SecretDialog({ secret, onClose }: { secret: string; onClose: () => void
                 </div>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** On or off for one webhook: moves at once, back if the save is refused. */
+function OutboundHookSwitch({
+    hook,
+    onShown,
+    onRefused
+}: {
+    hook: OutboundHookView;
+    onShown: (id: string, on: boolean) => void;
+    onRefused: (message: string) => void;
+}) {
+    const t = useTranslations("accountNotifications");
+    const router = useRouter();
+    const [on, toggle] = useOptimisticToggle(
+        hook.enabled,
+        (next) => actions.setOutboundHookEnabledAction(hook.id, next),
+        { onSaved: () => router.refresh(), onRefused }
+    );
+    useEffect(() => onShown(hook.id, on), [hook.id, on, onShown]);
+    return (
+        <Switch
+            checked={on}
+            onChange={toggle}
+            aria-label={on ? t("webhooks.list.switchOff") : t("webhooks.list.switchOn")}
+        />
     );
 }

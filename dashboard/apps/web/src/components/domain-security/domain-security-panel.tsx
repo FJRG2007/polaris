@@ -27,6 +27,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import type { DomainSecurityView } from "@/lib/domain-security/service";
 import { Button, DnsRecordTable, SegmentedControl, Skeleton, Switch } from "@polaris/ui";
+import { useOptimisticToggle } from "@polaris/ui";
 import {
     SECURITY_SECTIONS,
     severityRank,
@@ -160,8 +161,22 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
     const [section, setSection] = useState<SecuritySection>("email");
     const [showPassed, setShowPassed] = useState(false);
     const [fixing, setFixing] = useState(false);
-    const [savingDedicated, setSavingDedicated] = useState(false);
     const firstCheck = useRef(false);
+    const [dedicated, toggleDedicated] = useOptimisticToggle(
+        view?.dedicated ?? false,
+        async (next) => {
+            setError("");
+            const result = await runAction(
+                () => setDomainDedicatedAction(scope, domain, next),
+                setError
+            );
+            if (!result || result.error) return result ?? { error: true };
+            if (!result.view) return { ok: false };
+            accept(result.view);
+            return null;
+        },
+        { onRefused: setError }
+    );
 
     const accept = (next: DomainSecurityView) => {
         setView(next);
@@ -211,17 +226,6 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
         (finding) => open(finding) && finding.where === "dns" && finding.records.length > 0
     );
 
-    async function toggleDedicated(next: boolean) {
-        setSavingDedicated(true);
-        setError("");
-        const result = await runAction(
-            () => setDomainDedicatedAction(scope, domain, next),
-            setError
-        );
-        setSavingDedicated(false);
-        if (result?.view) accept(result.view);
-        else if (result?.error) setError(result.error);
-    }
 
     return (
         <div className="flex min-w-0 flex-col gap-3">
@@ -370,11 +374,10 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
                     {view.canFix && (
                         <div className="flex items-start gap-3 border-t border-border pt-3">
                             <Switch
-                                checked={view.dedicated}
-                                disabled={savingDedicated}
+                                checked={dedicated}
                                 aria-label={t("dedicated.label")}
                                 aria-describedby={`dedicated-${domain}`}
-                                onChange={(next) => void toggleDedicated(next)}
+                                onChange={toggleDedicated}
                             />
                             <div className="min-w-0">
                                 <p className="text-sm">{t("dedicated.label")}</p>

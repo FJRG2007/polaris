@@ -39,6 +39,7 @@ import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { refusalCause } from "@/lib/mailbox/refusals";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
 import { Button, ConfirmDeleteDialog, Select, Switch, cn, useToast } from "@polaris/ui";
+import { useOptimisticToggle } from "@polaris/ui";
 import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
 import {
     AlertTriangle,
@@ -302,9 +303,23 @@ function AccountRow({
     const [busy, startBusy] = useBusy();
     const [removing, setRemoving] = useState(false);
     const [sharing, setSharing] = useState(false);
-    const [unified, setUnified] = useState(account.unified);
-    const [notify, setNotify] = useState(account.notify);
-    const [sendAs, setSendAs] = useState(account.delegateSendAs);
+    // Each switch is its own patch, so the rest of the mailbox's settings are left
+    // alone. They move at once and go back, with a toast, if the edit is refused.
+    const patch = async (change: Parameters<typeof editAccountAction>[1]) => {
+        const said = refusalOf(await editAccountAction(account.id, change));
+        if (said) return { error: said };
+        router.refresh();
+        return null;
+    };
+    const [unified, setUnified] = useOptimisticToggle(account.unified, (next) =>
+        patch({ unified: next })
+    );
+    const [notify, setNotify] = useOptimisticToggle(account.notify, (next) =>
+        patch({ notify: next })
+    );
+    const [sendAs, setSendAs] = useOptimisticToggle(account.delegateSendAs, (next) =>
+        patch({ delegateSendAs: next })
+    );
     const [trashDays, setTrashDays] = useState(account.trashKeepDays);
 
     const refused = account.state === "auth";
@@ -372,23 +387,7 @@ function AccountRow({
                 <label className="flex shrink-0 items-center gap-2 text-[12px] text-muted-foreground">
                     <Switch
                         checked={unified}
-                        onChange={(next) => {
-                            setUnified(next);
-                            startBusy(async () => {
-                                // Only this switch. The edit is a patch, so the
-                                // rest of the mailbox's settings are left alone.
-                                const answer = await editAccountAction(account.id, {
-                                    unified: next
-                                });
-                                const said = refusalOf(answer);
-                                if (said) {
-                                    setUnified(!next);
-                                    toast.show({ title: said });
-                                    return;
-                                }
-                                router.refresh();
-                            });
-                        }}
+                        onChange={setUnified}
                         aria-label={t("accounts.unifiedLabel")}
                     />
                     {t("accounts.unified")}
@@ -400,21 +399,7 @@ function AccountRow({
                 >
                     <Switch
                         checked={notify}
-                        onChange={(next) => {
-                            setNotify(next);
-                            startBusy(async () => {
-                                const answer = await editAccountAction(account.id, {
-                                    notify: next
-                                });
-                                const said = refusalOf(answer);
-                                if (said) {
-                                    setNotify(!next);
-                                    toast.show({ title: said });
-                                    return;
-                                }
-                                router.refresh();
-                            });
-                        }}
+                        onChange={setNotify}
                         aria-label={t("accounts.notifyLabel")}
                     />
                     {t("accounts.notify")}
@@ -428,21 +413,7 @@ function AccountRow({
                 >
                     <Switch
                         checked={sendAs}
-                        onChange={(next) => {
-                            setSendAs(next);
-                            startBusy(async () => {
-                                const answer = await editAccountAction(account.id, {
-                                    delegateSendAs: next
-                                });
-                                const said = refusalOf(answer);
-                                if (said) {
-                                    setSendAs(!next);
-                                    toast.show({ title: said });
-                                    return;
-                                }
-                                router.refresh();
-                            });
-                        }}
+                        onChange={setSendAs}
                         aria-label={t("accounts.delegateSendAs")}
                     />
                     {t("accounts.delegateSendAs")}

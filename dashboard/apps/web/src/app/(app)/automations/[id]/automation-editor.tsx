@@ -47,6 +47,7 @@ import {
     useToast,
     type SelectOption
 } from "@polaris/ui";
+import { useOptimisticToggle } from "@polaris/ui";
 import * as core from "@polaris/core";
 import type { SecretSummary } from "@/lib/automations/secrets";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -217,7 +218,16 @@ function Loaded({
     const [pending, start] = useTransition();
     const [deleting, setDeleting] = useState(false);
     const [versionsOpen, setVersionsOpen] = useState(false);
-    const [lan, setLan] = useState(detail.allowLocalNetwork);
+    const [lan, setLan] = useOptimisticToggle(
+        detail.allowLocalNetwork,
+        (next) => setLocalNetworkAction(detail.id, next),
+        {
+            onSaved: (next) =>
+                toast.show({
+                    title: next ? t("editor.localNetworkOn") : t("editor.localNetworkOff")
+                })
+        }
+    );
     const [chosen, setChosen] = useState<View | null>(null);
     const [testRunId, setTestRunId] = useState<string | null>(detail.lastTestRunId);
     const testRun = useTestRun(testRunId);
@@ -698,19 +708,7 @@ function Loaded({
                             checked={lan}
                             disabled={readOnly || detail.localNetworkRefusal !== null}
                             aria-label={t("editor.localNetwork")}
-                            onChange={async (next: boolean) => {
-                                setLan(next);
-                                const answer = await setLocalNetworkAction(detail.id, next);
-                                if (!answer.ok) {
-                                    setLan(!next);
-                                    toast.show({ title: answer.error });
-                                } else
-                                    toast.show({
-                                        title: next
-                                            ? t("editor.localNetworkOn")
-                                            : t("editor.localNetworkOff")
-                                    });
-                            }}
+                            onChange={setLan}
                         />
                     </section>
                 </div>

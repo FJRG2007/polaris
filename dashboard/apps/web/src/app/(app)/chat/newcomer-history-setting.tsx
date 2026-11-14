@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Select, Switch } from "@polaris/ui";
+import { Select, Switch, useOptimisticToggle } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { setNewcomerHistoryAction } from "./actions";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
@@ -21,16 +21,28 @@ type Choice = "inherit" | "on" | "off";
 export function NewcomerHistorySetting({ channel }: { channel: ChatChannelView }) {
     const t = useTranslations("chat");
     const [choice, setChoice] = useState<Choice>(channel.newcomerHistory as Choice);
-    const [spaceDefault, setSpaceDefault] = useState(channel.spaceNewcomerHistory ?? true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     useEffect(() => setChoice(channel.newcomerHistory as Choice), [channel.newcomerHistory]);
-    useEffect(
-        () => setSpaceDefault(channel.spaceNewcomerHistory ?? true),
-        [channel.spaceNewcomerHistory]
+    const [spaceDefault, flipDefault] = useOptimisticToggle(
+        channel.spaceNewcomerHistory ?? true,
+        async (next) => {
+            setError("");
+            return (
+                (await runAction(
+                    () =>
+                        setNewcomerHistoryAction({
+                            scope: "space",
+                            spaceId: channel.spaceId ?? "",
+                            value: next
+                        }),
+                    setError
+                )) ?? { error: true }
+            );
+        },
+        { onRefused: setError }
     );
     if (!channel.spaceId) return null;
-    const spaceId = channel.spaceId;
 
     const save = async (
         input: Parameters<typeof setNewcomerHistoryAction>[0],
@@ -51,12 +63,6 @@ export function NewcomerHistorySetting({ channel }: { channel: ChatChannelView }
         const was = choice;
         setChoice(next);
         void save({ scope: "channel", channelId: channel.id, value: next }, () => setChoice(was));
-    };
-
-    const flipDefault = (next: boolean) => {
-        const was = spaceDefault;
-        setSpaceDefault(next);
-        void save({ scope: "space", spaceId, value: next }, () => setSpaceDefault(was));
     };
 
     const state = spaceDefault
@@ -97,8 +103,8 @@ export function NewcomerHistorySetting({ channel }: { channel: ChatChannelView }
                 </span>
                 <Switch
                     checked={spaceDefault}
-                    disabled={busy || !channel.mayManageSpaceDefault}
-                    onChange={(next: boolean) => flipDefault(next)}
+                    disabled={!channel.mayManageSpaceDefault}
+                    onChange={flipDefault}
                     aria-label={t("channelSettings.newcomerHistoryDefault")}
                 />
             </label>

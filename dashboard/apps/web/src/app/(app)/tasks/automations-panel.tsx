@@ -25,6 +25,7 @@ import { CopyButton } from "@/components/copy-button";
 import type { FormView } from "@/lib/tasks/form-service";
 import type { AutomationView } from "@/lib/tasks/automation-service";
 import { Button, Card, CardBody, Input, isDirty, Select, Switch, cn } from "@polaris/ui";
+import { useOptimisticToggle } from "@polaris/ui";
 import type { CustomFieldView, StatusView, TagView } from "@/lib/tasks/space-service";
 
 interface RuleContext {
@@ -404,20 +405,11 @@ export function AutomationsPanel({
                                             : ""}
                                     </p>
                                 </div>
-                                <Switch
-                                    checked={rule.enabled}
-                                    aria-label={t("automations.enable", { name: rule.name })}
-                                    onChange={async (enabled) => {
-                                        await runAction(
-                                            () =>
-                                                actions.setAutomationEnabledAction(
-                                                    context.spaceId,
-                                                    rule.id,
-                                                    enabled
-                                                ),
-                                            setError
-                                        );
-                                    }}
+                                <RuleSwitch
+                                    spaceId={context.spaceId}
+                                    rule={rule}
+                                    label={t("automations.enable", { name: rule.name })}
+                                    onRefused={setError}
                                 />
                                 <button
                                     type="button"
@@ -631,4 +623,28 @@ export function FormsPanel({
             </ul>
         </section>
     );
+}
+
+/** On or off for one automation: moves at once, back if the save is refused. */
+function RuleSwitch({
+    spaceId,
+    rule,
+    label,
+    onRefused
+}: {
+    spaceId: string;
+    rule: { id: string; enabled: boolean };
+    label: string;
+    onRefused: (message: string) => void;
+}) {
+    const [on, toggle] = useOptimisticToggle(
+        rule.enabled,
+        async (next) =>
+            (await runAction(
+                () => actions.setAutomationEnabledAction(spaceId, rule.id, next),
+                onRefused
+            )) ?? { error: true },
+        { onRefused }
+    );
+    return <Switch checked={on} aria-label={label} onChange={toggle} />;
 }
