@@ -37,11 +37,13 @@ function ProvidersSkeleton() {
 export default async function AdminSsoPage() {
     const [, t] = await Promise.all([requireAdmin(), getTranslations("admin")]);
     return (
-        <>
+        // Narrow page, as Uploads: the column is centred in the content area,
+        // header included, rather than left against the rail.
+        <div className="mx-auto flex w-full max-w-3xl flex-col">
             <PageHeader title={t("sso.title")} description={t("sso.description")} />
             <Suspense fallback={<ProvidersSkeleton />}>
                 <Providers />
             </Suspense>
-        </>
+        </div>
     );
 }

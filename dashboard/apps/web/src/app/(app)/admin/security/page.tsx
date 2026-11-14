@@ -24,11 +24,13 @@ export default async function AdminSecurityPage() {
     const t = await getTranslations("admin");
 
     return (
-        <>
+        // Narrow page, as Uploads: the column is centred in the content area,
+        // header included, rather than left against the rail.
+        <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader title={t("security.title")} description={t("security.description")} />
             <div className="flex flex-col gap-4">
                 <SecurityAdminLoader revision={Date.now()} />
             </div>
-        </>
+        </div>
     );
 }
