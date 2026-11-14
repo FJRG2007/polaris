@@ -8,6 +8,11 @@
  * `_adb-tls-connect._tcp`, and its Cast record names the model (`md`). What is
  * found here feeds the path engine (`tv-path.ts`) as a `TvSighting`.
  *
+ * Searching never listens for the network: the query goes out from a port the
+ * system picks on each interface's own address and asks for unicast answers, so
+ * nothing binds 5353 or joins the multicast group and Windows Defender Firewall
+ * has no reason to ask the operator to let Polaris in.
+ *
  * The packet reading and the record collecting are pure, so they are tested on
  * packets without a network.
  */
@@ -26,6 +31,8 @@ const TYPE_SRV = 33;
 const CLASS_IN = 1;
 /** The question's top class bit: answer by unicast, so a socket off port 5353 hears it (RFC 6762 5.4). */
 const UNICAST_RESPONSE = 0x8000;
+/** How often the query goes out while a search listens: under the firewall's 3-second window for unicast answers. */
+export const RESEND_MS = 1_000;
 /** Compression pointers followed per name before it counts as a loop. */
 const MAX_JUMPS = 32;
 
@@ -229,57 +236,93 @@ function localAddresses(): string[] {
         .map((entry) => entry.address);
 }
 
-function openSocket(port: number): Promise<Socket> {
-    return new Promise((resolve, reject) => {
-        const socket = createSocket({ type: "udp4", reuseAddr: true });
-        socket.once("error", reject);
-        socket.bind(port, () => {
-            socket.removeListener("error", reject);
+/**
+ * When the query goes out, in ms from the start: every `RESEND_MS` for as long as
+ * the search listens. Windows Defender Firewall lets unicast answers to a multicast
+ * through for 3 seconds after it was sent, so a gap under that keeps every moment
+ * of the listen covered without any inbound rule.
+ */
+export function askTimes(listenMs: number): number[] {
+    const times = [0];
+    while (times[times.length - 1]! + RESEND_MS < listenMs) times.push(times[times.length - 1]! + RESEND_MS);
+    return times;
+}
+
+/** What `browseWith` needs from the system, so the binding and the cadence are tested without a network. */
+export interface BrowseDeps {
+    readonly locals: () => readonly string[];
+    readonly createSocket: (type: "udp4") => Socket;
+}
+
+const SYSTEM: BrowseDeps = { locals: localAddresses, createSocket: (type) => createSocket(type) };
+
+/**
+ * A socket on one interface's own address and a port the system picks. Never port
+ * 5353 and never the wildcard address, and no multicast group joined: that is what
+ * a program listening for the network looks like, and what makes Windows ask to
+ * let it through the firewall.
+ */
+function openSocket(local: string, create: BrowseDeps["createSocket"]): Promise<Socket | null> {
+    return new Promise((resolve) => {
+        const socket = create("udp4");
+        socket.once("error", () => {
+            socket.close();
+            resolve(null);
+        });
+        socket.bind({ address: local, port: 0 }, () => {
+            socket.removeAllListeners("error");
+            socket.on("error", () => undefined);
             resolve(socket);
         });
     });
 }
 
 /**
- * Asks the network for TVs for `listenMs` and returns what answered. Port 5353 is
- * shared when the system allows it, so multicast answers are heard too; when it
- * does not, any port works, since the query asks for unicast answers. Never throws:
- * a network that cannot be asked finds nothing.
+ * Asks the network for TVs for `listenMs` and returns what answered. The query
+ * goes out on each interface from that interface's own address and a port other
+ * than 5353, with the unicast-response bit set: a responder answers such a query
+ * by unicast straight back to that port (RFC 6762 5.1, 5.4 and 6.7), which the
+ * firewall lets in as the answer to what was sent. Never throws: a network that
+ * cannot be asked finds nothing.
  */
-export async function browseTvs(listenMs: number, cancelled: () => boolean = () => false): Promise<Map<string, TvAnnouncement>> {
-    const locals = localAddresses();
-    if (locals.length === 0) return new Map();
-    const socket = await openSocket(MDNS_PORT).catch(() => openSocket(0).catch(() => null));
-    if (!socket) return new Map();
+export async function browseWith(
+    deps: BrowseDeps,
+    listenMs: number,
+    cancelled: () => boolean = () => false
+): Promise<Map<string, TvAnnouncement>> {
+    const sockets = (await Promise.all(deps.locals().map(async (local) => ({ local, socket: await openSocket(local, deps.createSocket) }))))
+        .flatMap(({ local, socket }) => (socket ? [{ local, socket }] : []));
+    if (sockets.length === 0) return new Map();
     const packets: MdnsPacket[] = [];
-    socket.on("error", () => undefined);
-    socket.on("message", (data, remote) => packets.push({ data, from: remote.address }));
-    for (const local of locals) {
+    const query = tvQuery();
+    for (const { local, socket } of sockets) {
+        socket.on("message", (data, remote) => packets.push({ data, from: remote.address }));
         try {
-            socket.addMembership(MDNS_GROUP, local);
+            socket.setMulticastInterface(local);
         } catch {
-            // Already joined on this interface, or a port that is not 5353: unicast answers still arrive.
+            // The address is bound, so the system's default route for the group still works.
         }
     }
-    const query = tvQuery();
     const ask = () => {
-        for (const local of locals) {
+        for (const { socket } of sockets) {
             try {
-                socket.setMulticastInterface(local);
                 socket.send(query, MDNS_PORT, MDNS_GROUP);
             } catch {
                 // An interface that went away meanwhile.
             }
         }
     };
-    ask();
-    // Asked twice: one lost UDP packet should not hide a TV.
-    const again = setTimeout(ask, Math.floor(listenMs / 2));
+    const timers = askTimes(listenMs).map((at) => setTimeout(ask, at));
     const step = 100;
     for (let waited = 0; waited < listenMs && !cancelled(); waited += step) {
         await new Promise((resolve) => setTimeout(resolve, step));
     }
-    clearTimeout(again);
-    socket.close();
+    for (const timer of timers) clearTimeout(timer);
+    for (const { socket } of sockets) socket.close();
     return collectTvs(packets);
+}
+
+/** `browseWith` on this computer's own interfaces. */
+export function browseTvs(listenMs: number, cancelled: () => boolean = () => false): Promise<Map<string, TvAnnouncement>> {
+    return browseWith(SYSTEM, listenMs, cancelled);
 }

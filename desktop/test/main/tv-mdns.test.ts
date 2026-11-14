@@ -5,9 +5,23 @@
  * anything waits on a port it never opens.
  */
 
+import { EventEmitter } from "node:events";
 import { choosePath } from "@/main/tv-path";
-import { describe, expect, it } from "vitest";
-import { collectTvs, mergeFound, namesOf, parseMdns, sightingOf, tvQuery, TV_SERVICE_TYPES } from "@/main/tv-mdns";
+import { createSocket, type Socket } from "node:dgram";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+    askTimes,
+    browseWith,
+    collectTvs,
+    mergeFound,
+    namesOf,
+    parseMdns,
+    RESEND_MS,
+    sightingOf,
+    tvQuery,
+    TV_SERVICE_TYPES,
+    type BrowseDeps
+} from "@/main/tv-mdns";
 import { ANDROID_TV_ADB, CHROMECAST_GOOGLE_TV, PRINTER, response } from "../fixtures/mdns";
 
 describe("tvQuery", () => {
@@ -112,5 +126,136 @@ describe("merging what was found", () => {
         expect(choosePath(sightingOf(heard.get("192.168.1.40"), false)).route).toBe("pairing");
         expect(choosePath(sightingOf(heard.get("192.168.1.40"), true)).route).toBe("network");
         expect(choosePath(sightingOf(undefined, false)).route).toBe("network");
+    });
+});
+
+describe("asking without listening for the network", () => {
+    class FakeSocket extends EventEmitter {
+        readonly bound: { address?: string; port?: number; }[] = [];
+        readonly sent: { at: number; port: number; address: string; }[] = [];
+        readonly interfaces: string[] = [];
+        readonly addMembership = vi.fn();
+        closed = false;
+
+        bind(options: { address?: string; port?: number; }, done: () => void): this {
+            this.bound.push(options);
+            queueMicrotask(done);
+            return this;
+        }
+
+        setMulticastInterface(address: string): void {
+            this.interfaces.push(address);
+        }
+
+        send(_data: Buffer, port: number, address: string): void {
+            this.sent.push({ at: Date.now(), port, address });
+        }
+
+        close(): void {
+            this.closed = true;
+        }
+    }
+
+    function deps(locals: string[]) {
+        const sockets: FakeSocket[] = [];
+        const created: BrowseDeps = {
+            locals: () => locals,
+            createSocket: () => {
+                const socket = new FakeSocket();
+                sockets.push(socket);
+                return socket as unknown as Socket;
+            }
+        };
+        return { created, sockets };
+    }
+
+    beforeEach(() => {
+        vi.useFakeTimers({ now: 0 });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("binds each interface's own address on a port the system picks, never 5353 or the wildcard, and joins no group", async () => {
+        const { created, sockets } = deps(["192.168.1.10", "10.0.0.5"]);
+        const browsing = browseWith(created, 3_000);
+        await vi.runAllTimersAsync();
+        await browsing;
+        expect(sockets.map((socket) => socket.bound)).toEqual([[{ address: "192.168.1.10", port: 0 }], [{ address: "10.0.0.5", port: 0 }]]);
+        for (const socket of sockets) {
+            expect(socket.bound[0]!.port).not.toBe(5353);
+            expect(socket.bound[0]!.address).not.toBe("0.0.0.0");
+            expect(socket.addMembership).not.toHaveBeenCalled();
+            expect(socket.closed).toBe(true);
+        }
+        expect(sockets.map((socket) => socket.interfaces)).toEqual([["192.168.1.10"], ["10.0.0.5"]]);
+    });
+
+    it("sends the query to the group again before each 3-second window ends, for the whole listen", async () => {
+        const { created, sockets } = deps(["192.168.1.10"]);
+        const browsing = browseWith(created, 3_000);
+        await vi.runAllTimersAsync();
+        await browsing;
+        const times = sockets[0]!.sent.map((send) => send.at);
+        expect(times[0]).toBe(0);
+        expect(sockets[0]!.sent.every((send) => send.port === 5353 && send.address === "224.0.0.251")).toBe(true);
+        expect(times).toEqual([0, 1_000, 2_000]);
+    });
+
+    it("keeps the window open to the end of any listen time", () => {
+        expect(RESEND_MS).toBeLessThan(3_000);
+        for (const listen of [500, 1_500, 3_000, 10_000, 60_000]) {
+            const times = askTimes(listen);
+            expect(times[0]).toBe(0);
+            for (let index = 1; index < times.length; index += 1) expect(times[index]! - times[index - 1]!).toBeLessThan(3_000);
+            expect(times[times.length - 1]! + 3_000).toBeGreaterThanOrEqual(listen);
+            expect(times[times.length - 1]!).toBeLessThan(listen);
+        }
+    });
+
+    it("collects the unicast answers each socket hears", async () => {
+        const { created, sockets } = deps(["192.168.1.10"]);
+        const browsing = browseWith(created, 1_500);
+        await vi.advanceTimersByTimeAsync(10);
+        sockets[0]!.emit("message", CHROMECAST_GOOGLE_TV, { address: "192.168.1.40", port: 5353 });
+        await vi.runAllTimersAsync();
+        expect([...(await browsing).keys()]).toEqual(["192.168.1.40"]);
+    });
+
+    it("finds nothing, without throwing, when no interface can be bound", async () => {
+        const failing: BrowseDeps = {
+            locals: () => ["192.168.1.10"],
+            createSocket: () => {
+                const socket = new FakeSocket();
+                socket.bind = function (this: FakeSocket) {
+                    queueMicrotask(() => this.emit("error", new Error("EADDRNOTAVAIL")));
+                    return this;
+                };
+                return socket as unknown as Socket;
+            }
+        };
+        expect((await browseWith(failing, 1_000)).size).toBe(0);
+        expect((await browseWith(deps([]).created, 1_000)).size).toBe(0);
+    });
+
+    it("binds a real socket off 5353 on the address it is given", async () => {
+        vi.useRealTimers();
+        const sockets: Socket[] = [];
+        const real: BrowseDeps = {
+            locals: () => ["127.0.0.1"],
+            createSocket: (type) => {
+                const socket = createSocket(type);
+                sockets.push(socket);
+                return socket;
+            }
+        };
+        const browsing = browseWith(real, 200);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const address = sockets[0]!.address();
+        expect(address.address).toBe("127.0.0.1");
+        expect(address.port).not.toBe(5353);
+        expect(address.port).toBeGreaterThan(0);
+        await browsing;
     });
 });

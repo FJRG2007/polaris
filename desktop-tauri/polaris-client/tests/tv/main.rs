@@ -7,6 +7,7 @@ use polaris_client::adb_client::new_adb_key;
 
 mod install;
 mod mdns;
+mod mdns_packets;
 mod path;
 mod usb;
 mod wait;
