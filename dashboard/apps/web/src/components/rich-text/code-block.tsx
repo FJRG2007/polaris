@@ -25,6 +25,8 @@ import { cn, CopyIcon, useCopied } from "@polaris/ui";
 import { downloadBytes } from "@/lib/download";
 import { useHighlighter } from "@/lib/code-highlight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { runKindFor } from "@/lib/code-run";
+import { RunButton, RunOutput, useCodeRun } from "@/components/rich-text/code-run";
 import { fileNameForFence, languageForToken } from "@/lib/code-language";
 
 export function CodeBlock({ code, language }: { code: string; language: string | null }) {
@@ -34,6 +36,9 @@ export function CodeBlock({ code, language }: { code: string; language: string |
     const known = language ? languageForToken(language) : null;
     const highlighter = useHighlighter(known ? language : null);
     const marked = highlighter && language ? highlighter(code, language) : null;
+    // Only languages a browser can run on its own get a Run button; see lib/code-run.
+    const runKind = runKindFor(language);
+    const run = useCodeRun(code, runKind);
 
     return (
         <div
@@ -45,6 +50,7 @@ export function CodeBlock({ code, language }: { code: string; language: string |
                     {known?.label ?? language ?? "code"}
                 </span>
                 <div className="flex shrink-0 items-center gap-0.5">
+                    {runKind ? <RunButton run={run} kind={runKind} /> : null}
                     <DownloadButton code={code} language={language} />
                     <CopyButton code={code} />
                 </div>
@@ -58,6 +64,7 @@ export function CodeBlock({ code, language }: { code: string; language: string |
                     <code>{code}</code>
                 )}
             </pre>
+            <RunOutput run={run} />
         </div>
     );
 }
