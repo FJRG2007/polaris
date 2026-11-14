@@ -41,7 +41,7 @@ import {
 } from "../../lib/minecraft/announcement";
 import { COMMAND_BYTES_MAX, commandBytes } from "../../lib/minecraft/command-size";
 import {
-    VARIABLES,
+    textVariables,
     previewText,
     visibleLength,
     type KnownValues
@@ -100,10 +100,7 @@ export function insertsFor(
     edition: MinecraftEdition,
     scope: "all" | "server" = "all"
 ) {
-    return VARIABLES.filter(
-        (spec) =>
-            (edition !== "bedrock" || spec.bedrock) && (scope === "all" || spec.kind === "server")
-    ).map((spec) => ({
+    return textVariables(edition, scope).map((spec) => ({
         label: spec.label,
         text: `{${spec.name}}`,
         title:

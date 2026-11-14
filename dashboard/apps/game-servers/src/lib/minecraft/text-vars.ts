@@ -4,8 +4,8 @@
  *
  * Three kinds, told apart because each is filled in somewhere else:
  *
- * - **The game's**, per player: the name, level and health of whoever reads the
- *   line. Minecraft does these itself - a `selector` or `score` text component
+ * - **The game's**, per player: the name, level, health and position of
+ *   whoever reads the line. Minecraft does these itself - a `selector` or `score` text component
  *   resolved for `@s` when the command runs as that player - so they need no
  *   list of who is online and are never stale.
  * - **The account's**, per player: the Polaris account a player is tied to.
@@ -33,6 +33,24 @@ export const LEVELS_VARIABLE = "server.levels";
 /** The variables that read the last death. */
 export const DEATH_VARIABLES: readonly string[] = ["death.player", "death.message"];
 
+/** The entity field behind each per-player value a command can use. */
+export const PLAYER_READS: Readonly<Record<string, string>> = {
+    "player.x": "Pos",
+    "player.y": "Pos",
+    "player.z": "Pos",
+    "player.dimension": "Dimension",
+    "player.level": "XpLevel",
+    "player.health": "Health"
+};
+
+/** Where the last death was: read off that player while they are online. */
+export const DEATH_PLACE_VARIABLES: readonly string[] = [
+    "death.x",
+    "death.y",
+    "death.z",
+    "death.dimension"
+];
+
 /** The leaderboards: level from who is on, the rest from the game's figures. */
 export const RANK_VARIABLES: readonly string[] = [LEVEL_RANKING, ...STATS_RANKINGS];
 
@@ -40,6 +58,7 @@ export const RANK_VARIABLES: readonly string[] = [LEVEL_RANKING, ...STATS_RANKIN
 export const SERVER_READ_VARIABLES: readonly string[] = [
     LEVELS_VARIABLE,
     ...DEATH_VARIABLES,
+    ...DEATH_PLACE_VARIABLES,
     ...RANK_VARIABLES
 ];
 
@@ -69,6 +88,12 @@ export interface VariableSpec {
     /** Whether Bedrock can draw it: its scoreboard has no criteria but `dummy`. */
     readonly bedrock: boolean;
     /**
+     * False for a value only a console command can use: a text on screen is
+     * drawn by the game from a score, and a score holds a number, never a
+     * dimension's name.
+     */
+    readonly inText?: false;
+    /**
      * How long a value is taken to be, for the counter under a field. A list of
      * names has no longest, so it counts as a few of them: the counter is a guide
      * to what fits, and the game cuts a line that runs past the screen.
@@ -81,6 +106,22 @@ const LEVEL = {
     criterion: "level",
     seed: "execute as @a store result score @s polaris_level run xp query @s levels"
 } as const;
+/**
+ * Where a player stands, one score an axis. Nothing keeps these current by
+ * itself, so the seed writes them each time a text goes out: an announcement
+ * shows where everybody is as it is sent, and a held one again each time it is
+ * sent again. `data get` rounds down, so a score is the block the player is in.
+ */
+function axis(letter: "x" | "y" | "z", index: number) {
+    const name = `polaris_${letter}`;
+    return {
+        name,
+        criterion: "dummy",
+        seed: `execute as @a store result score @s ${name} run data get entity @s Pos[${index}]`
+    } as const;
+}
+const AXES = { x: axis("x", 0), y: axis("y", 1), z: axis("z", 2) } as const;
+
 const HEALTH = {
     name: "polaris_health",
     criterion: "health",
@@ -116,6 +157,27 @@ export const VARIABLES: readonly VariableSpec[] = [
         objective: HEALTH,
         bedrock: false,
         width: 2
+    },
+    ...(["x", "y", "z"] as const).map(
+        (letter): VariableSpec => ({
+            name: `player.${letter}`,
+            label: gameMessage("games", `lib.vars.player_${letter}`),
+            kind: "game",
+            sample: { x: "128", y: "64", z: "-256" }[letter],
+            component: { score: { name: "@s", objective: AXES[letter].name } },
+            objective: AXES[letter],
+            bedrock: false,
+            width: 8
+        })
+    ),
+    {
+        name: "player.dimension",
+        label: gameMessage("games", "lib.vars.player_dimension"),
+        kind: "game",
+        sample: "minecraft:overworld",
+        bedrock: false,
+        inText: false,
+        width: 24
     },
     {
         name: "polaris.name",
@@ -218,6 +280,24 @@ export const VARIABLES: readonly VariableSpec[] = [
         bedrock: false,
         width: 40
     },
+    ...(["x", "y", "z"] as const).map(
+        (letter): VariableSpec => ({
+            name: `death.${letter}`,
+            label: gameMessage("games", `lib.vars.death_${letter}`),
+            kind: "server",
+            sample: { x: "131", y: "12", z: "-240" }[letter],
+            bedrock: false,
+            width: 8
+        })
+    ),
+    {
+        name: "death.dimension",
+        label: gameMessage("games", "lib.vars.death_dimension"),
+        kind: "server",
+        sample: "minecraft:overworld",
+        bedrock: false,
+        width: 24
+    },
     {
         name: "call.count",
         label: gameMessage("games", "lib.vars.call_count"),
@@ -245,6 +325,23 @@ export const VARIABLES: readonly VariableSpec[] = [
         width: 24
     }
 ];
+
+/**
+ * The variables a text on screen can use: the ones this edition draws, and
+ * for `server` (the side panel, the same for everybody) nothing of one player's.
+ * One list for the field's menu, its help and its check.
+ */
+export function textVariables(
+    edition: MinecraftEdition,
+    scope: "all" | "server" = "all"
+): VariableSpec[] {
+    return VARIABLES.filter(
+        (spec) =>
+            (edition !== "bedrock" || spec.bedrock) &&
+            spec.inText !== false &&
+            (scope === "all" || spec.kind === "server")
+    );
+}
 
 const BY_NAME = new Map(VARIABLES.map((spec) => [spec.name, spec]));
 
@@ -312,6 +409,9 @@ export function variableProblem(text: string, edition: MinecraftEdition): string
         }
         if (edition === "bedrock" && !use.spec.bedrock) {
             return gameMessage("games", "lib.vars.notOnBedrock", { name: use.spec.name });
+        }
+        if (use.spec.inText === false) {
+            return gameMessage("games", "lib.vars.onlyInCommands", { name: use.spec.name });
         }
     }
     const rest = text.replace(TOKEN, "");
@@ -425,8 +525,14 @@ export function visibleLength(plain: string, known: KnownValues = {}): number {
     return length + plain.length - last;
 }
 
-/** Splits text into plain runs and the game variables left in it by `fillValues`. */
-const GAME_SPLIT = /(\{(?:player|player\.level|player\.health)\})/i;
+/** Splits text into plain runs and the game variables left in it by `fillValues`:
+ *  every one the game draws, read off the list so a new one is never missed. */
+const GAME_SPLIT = new RegExp(
+    `(\\{(?:${VARIABLES.filter((spec) => spec.component)
+        .map((spec) => spec.name.replace(/\./g, "\\."))
+        .join("|")})\\})`,
+    "i"
+);
 
 /** A run of text, or a game variable to draw in its place. */
 export type Piece = { readonly text: string } | { readonly component: Record<string, unknown> };

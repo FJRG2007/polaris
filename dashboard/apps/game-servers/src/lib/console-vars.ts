@@ -27,6 +27,7 @@ import { playerSelector } from "./minecraft/announcement";
 import type { MinecraftEdition } from "./minecraft/service";
 import {
     LEVELS_VARIABLE,
+    PLAYER_READS,
     RANK_VARIABLES,
     VARIABLES,
     replaceVariables,
@@ -71,16 +72,26 @@ const CUSTOM_NAME = /^[a-z][a-z0-9_]{0,23}$/;
 const READ_FROM_GAME = new Set<string>([LEVELS_VARIABLE, ...RANK_VARIABLES]);
 
 /** The catalogue variables a kept command can use on this server: Minecraft
- *  only, the ones its edition draws, and of the per-player ones only the name -
- *  a level or a health is drawn by the game in a text, not typed into a command. */
+ *  only, the ones its edition draws, and of the per-player ones the name and
+ *  whatever Polaris can ask the game for before the line goes (`player-read`):
+ *  where they stand, their dimension, level and health. */
 export function consoleVariables(edition: MinecraftEdition | null): VariableSpec[] {
     if (!edition) return [];
     return VARIABLES.filter(
         (spec) =>
             (edition === "java" || spec.bedrock) &&
-            (spec.kind !== "game" || spec.name === "player") &&
+            (spec.kind !== "game" || spec.name === "player" || spec.name in PLAYER_READS) &&
             !READ_FROM_GAME.has(spec.name)
     );
+}
+
+/** The per-player values a command asks the game for, by variable. */
+export function playerReadsIn(command: string, edition: MinecraftEdition | null): string[] {
+    const names = variablesIn(command).flatMap((use) => {
+        const spec = consoleSpec(use.name, edition);
+        return spec && spec.name in PLAYER_READS ? [spec.name] : [];
+    });
+    return [...new Set(names)];
 }
 
 function consoleSpec(name: string, edition: MinecraftEdition | null): VariableSpec | null {
@@ -404,7 +415,7 @@ export function fillCommand(
         const spec = consoleSpec(use.name, fill.edition);
         if (!spec) return null;
         if (spec.name === "player") return player ? playerSelector(player.name) : null;
-        const known = spec.kind === "account" ? player?.values[spec.name] : fill.server[spec.name];
+        const known = spec.kind === "server" ? fill.server[spec.name] : player?.values[spec.name];
         return commandSafe(known ?? use.fallback ?? "");
     });
 }

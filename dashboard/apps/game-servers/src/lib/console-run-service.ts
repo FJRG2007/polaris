@@ -19,12 +19,22 @@ import { gameMessage } from "./game-message";
 import { isSequence } from "./console-commands";
 import { liveContext } from "./minecraft/live-values";
 import { runConsoleCommand } from "./games-operations";
-import { editionOf, shownPlayers } from "./minecraft/service";
+import { readPlayerValues } from "./minecraft/player-read";
+import { playerSelector } from "./minecraft/announcement";
+import { DEATH_PLACE_VARIABLES, variablesIn } from "./minecraft/text-vars";
+import {
+    editionOf,
+    shownPlayers,
+    withServerContainer,
+    type ServerContainer
+} from "./minecraft/service";
 import { MAX_CONSOLE_LINE, parseQueue, type QueueStep } from "./console-queue";
 import {
     commandLines,
     commandUses,
     commandVariables,
+    MAX_PLAYER_LINES,
+    playerReadsIn,
     type CustomVariable,
     type RunTarget
 } from "./console-vars";
@@ -104,20 +114,51 @@ export async function keptCommandSteps(server: RunServer, run: KeptRun): Promise
     const problem = keptRunProblem(server, run);
     if (problem) throw new Error(problem);
     const players = await shownPlayers(server.ownerId, server.install.id).catch(() => null);
-    const context = await liveContext(server.install.id, [run.command], players, null);
-    const filled = { ...fill, server: context.values };
-    if (!uses.perPlayer) return each(filled, []);
+    // Where somebody stands, or where the last death was, is the game's to say:
+    // asked right before the lines are written, so they are where it is now.
+    const reads = playerReadsIn(read.command, edition);
+    const deathPlace = variablesIn(read.command).some((use) =>
+        DEATH_PLACE_VARIABLES.includes(use.spec?.name ?? "")
+    );
+    const withGame = <T>(work: (game: ServerContainer | null) => Promise<T>): Promise<T> =>
+        reads.length > 0 || deathPlace
+            ? withServerContainer(server.ownerId, server.install.id, work)
+            : work(null);
+    return withGame(async (game) => {
+        const context = await liveContext(server.install.id, [run.command], players, game);
+        const filled = { ...fill, server: context.values };
+        if (!uses.perPlayer) return each(filled, []);
 
-    const accounts = new Map(
-        (context.recipients ?? []).map((recipient) => [recipient.name.toLowerCase(), recipient])
-    );
-    const names =
-        run.target && "player" in run.target ? [run.target.player] : [...(players?.players ?? [])];
-    if (names.length === 0) throw new Error(gameMessage("games", "consoleVars.errors.nobodyOn"));
-    return each(
-        filled,
-        names.map((name) => ({ name, values: accounts.get(name.toLowerCase())?.values ?? {} }))
-    );
+        const accounts = new Map(
+            (context.recipients ?? []).map((recipient) => [
+                recipient.name.toLowerCase(),
+                recipient
+            ])
+        );
+        const names =
+            run.target && "player" in run.target
+                ? [run.target.player]
+                : [...(players?.players ?? [])];
+        if (names.length === 0) {
+            throw new Error(gameMessage("games", "consoleVars.errors.nobodyOn"));
+        }
+        // Only for the players a line is written for (`commandLines`).
+        const asked = names
+            .filter((name) => playerSelector(name) !== null)
+            .slice(0, MAX_PLAYER_LINES);
+        const answers =
+            game && reads.length > 0 ? await readPlayerValues(game, asked, reads) : null;
+        return each(
+            filled,
+            names.map((name) => ({
+                name,
+                values: {
+                    ...accounts.get(name.toLowerCase())?.values,
+                    ...answers?.get(name.toLowerCase())
+                }
+            }))
+        );
+    });
 }
 
 /** The lines one run sends, with every variable filled in. Throws a carried

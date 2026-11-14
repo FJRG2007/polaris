@@ -106,7 +106,11 @@ describe("what is replaced", () => {
         const java = consoleVariables("java").map((spec) => spec.name);
         expect(java).toContain("player");
         expect(java).toContain("server.online");
-        expect(java).not.toContain("player.level");
+        // Asked of the game right before the line goes (`player-read`).
+        for (const name of ["player.level", "player.health", "player.x", "player.dimension"]) {
+            expect(java).toContain(name);
+        }
+        expect(java).toContain("death.x");
         expect(java).not.toContain("server.levels");
         expect(java).not.toContain("rank.level");
         expect(consoleVariables("bedrock").map((spec) => spec.name)).not.toContain("death.player");

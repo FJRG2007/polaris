@@ -64,8 +64,9 @@ describe("keeping a command", () => {
         fireEvent.click(screen.getByRole("button", { name: "{player}" }));
         expect(field.value).toBe("say {player} joined");
         expect(screen.getByText(/Braces that are not a variable/)).toBeTruthy();
-        // A per-player value the game draws itself is not offered in a command.
-        expect(screen.queryByRole("button", { name: "{player.level}" })).toBeNull();
+        // Asked of the game before the line goes, so a command can use them too.
+        expect(screen.getByRole("button", { name: "{player.level}" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "{player.x}" })).toBeTruthy();
     });
 
     it("keeps a declared variable only once the command uses it", () => {

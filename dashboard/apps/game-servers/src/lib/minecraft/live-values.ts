@@ -27,7 +27,9 @@ import {
     statsRanking,
     type PlayerFigures
 } from "./rankings";
+import { readDeathValues } from "./player-read";
 import {
+    DEATH_PLACE_VARIABLES,
     DEATH_VARIABLES,
     LEVELS_VARIABLE,
     usesAccount,
@@ -91,7 +93,7 @@ export async function liveContext(
     installedAppId: string,
     texts: readonly string[],
     players: PlayerList | null,
-    server?: Pick<ServerContainer, "say" | "run"> | null,
+    server?: Pick<ServerContainer, "say" | "run" | "sayEach"> | null,
     /** Every player's figures, for the rankings that read them. */
     readFigures?: () => Promise<readonly PlayerFigures[]>
 ): Promise<SendContext> {
@@ -153,10 +155,18 @@ export async function liveContext(
         const ranked = rankLines(eventWins(readEventState(config)));
         list(EVENTS_RANKING, ranked, ranked.slice(0, INLINE_TOP));
     }
-    if (DEATH_VARIABLES.some((name) => used.has(name))) {
+    const place = DEATH_PLACE_VARIABLES.some((name) => used.has(name));
+    if (place || DEATH_VARIABLES.some((name) => used.has(name))) {
         const death = await lastDeath(installedAppId, config, server ?? null);
         values["death.player"] = death?.player ?? null;
         values["death.message"] = death?.message ?? null;
+        // Where it was is the game's to say, and only while that player is on.
+        if (place) {
+            const where = server
+                ? await readDeathValues(server, death?.player ?? null).catch(() => null)
+                : null;
+            for (const name of DEATH_PLACE_VARIABLES) values[name] = where?.[name] ?? null;
+        }
     }
 
     const recipients =

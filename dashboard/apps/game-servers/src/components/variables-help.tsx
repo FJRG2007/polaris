@@ -17,7 +17,7 @@ import { colorName, styleName, useGameText, useSchemaText } from "../screens/gam
 import { Card, CardBody, cn } from "@polaris/ui";
 import type { ReactNode } from "react";
 import type { MinecraftEdition } from "../lib/minecraft/service";
-import { VARIABLES, type VariableSpec } from "../lib/minecraft/text-vars";
+import { textVariables, type VariableSpec } from "../lib/minecraft/text-vars";
 import { consoleVariables, type CustomVariable } from "../lib/console-vars";
 
 /** The headings the values are read under, in the order they are shown. */
@@ -62,11 +62,7 @@ export function VariablesHelp({
     const offered =
         scope === "console"
             ? consoleVariables(edition)
-            : VARIABLES.filter(
-                  (spec) =>
-                      (edition !== "bedrock" || spec.bedrock) &&
-                      (scope === "all" || spec.kind === "server")
-              );
+            : textVariables(edition ?? "java", scope);
     const groups = GROUP_ORDER.map((label) => ({
         label,
         specs: offered.filter((spec) => groupOf(spec) === label)
