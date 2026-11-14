@@ -815,8 +815,8 @@ const ADMIN_AREAS: AppSubapp[] = [
         icon: Users,
         base: "/admin/users",
         match: [
+            "/admin/privacy",
             "/admin/groups",
-            "/admin/announcements",
             "/admin/organizations",
             "/admin/badges",
             "/admin/roles",
@@ -835,17 +835,18 @@ const ADMIN_AREAS: AppSubapp[] = [
                 keywords: ["accounts", "invites"]
             },
             {
-                label: "Announcements", // i18n-ignore
-                href: "/admin/announcements",
+                label: "Privacy", // i18n-ignore
+                href: "/admin/privacy",
                 adminOnly: true,
-                icon: Megaphone,
+                icon: EyeOff,
                 keywords: [
-                    "maintenance",
-                    "banner",
-                    "broadcast",
-                    "notify everyone",
-                    "outage",
-                    "notice"
+                    "finding people",
+                    "discovery",
+                    "search people",
+                    "public profiles",
+                    "profile visibility",
+                    "followers",
+                    "directory"
                 ]
             },
             {
@@ -936,7 +937,7 @@ const ADMIN_AREAS: AppSubapp[] = [
         label: "Communication", // i18n-ignore
         icon: MessageSquare,
         base: "/admin/email",
-        match: ["/admin/safety"],
+        match: ["/admin/announcements", "/admin/safety"],
         parent: { label: "Management", href: "/admin" }, // i18n-ignore
         parentAppId: "admin",
         sections: [
@@ -968,6 +969,20 @@ const ADMIN_AREAS: AppSubapp[] = [
                 needs: "inbox.read",
                 icon: Radio,
                 keywords: ["whatsapp", "telegram", "slack", "discord", "bot", "messaging"]
+            },
+            {
+                label: "Announcements", // i18n-ignore
+                href: "/admin/announcements",
+                adminOnly: true,
+                icon: Megaphone,
+                keywords: [
+                    "maintenance",
+                    "banner",
+                    "broadcast",
+                    "notify everyone",
+                    "outage",
+                    "notice"
+                ]
             },
             {
                 label: "Safety", // i18n-ignore

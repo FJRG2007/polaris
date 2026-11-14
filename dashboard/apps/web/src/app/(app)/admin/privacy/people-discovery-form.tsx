@@ -3,8 +3,7 @@
 /**
  * How people who are not friends or colleagues find each other.
  *
- * Beside the other rules about people, because it is the instance's half of
- * "who can find me": each account still decides that for itself, and this
+ * Under Privacy, because it is the instance's half of "who can find me": each account still decides that for itself, and this
  * decides which identifiers a stranger may type to get there. The defaults are
  * the closed ones - the whole username and nothing else - because every partial
  * match on strangers is a directory two letters at a time.
@@ -51,31 +50,24 @@ export function PeopleDiscoveryForm({ policy }: { policy: DiscoveryPolicy }) {
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                    <h2 className="text-sm font-medium">{t("users.discovery.title")}</h2>
-                    <p className="max-w-xl text-sm text-muted-foreground">
-                        {t("users.discovery.hint")}
-                    </p>
-                </div>
-
-                <ul className="flex flex-col divide-y divide-border border-t border-border">
+                <ul className="flex flex-col divide-y divide-border">
                     {DISCOVERY_RULES.map((rule) => (
                         <li key={rule} className="flex items-start justify-between gap-3 py-2">
                             <div className="flex min-w-0 flex-col gap-0.5">
                                 <span className="text-sm">
-                                    {t(`users.discovery.rules.${rule}.label`)}
+                                    {t(`privacy.discovery.rules.${rule}.label`)}
                                 </span>
                                 <span
                                     id={`discovery-${rule}`}
                                     className="text-xs text-muted-foreground"
                                 >
-                                    {t(`users.discovery.rules.${rule}.hint`)}
+                                    {t(`privacy.discovery.rules.${rule}.hint`)}
                                 </span>
                             </div>
                             <Switch
                                 checked={draft[rule]}
                                 disabled={pending}
-                                aria-label={t(`users.discovery.rules.${rule}.label`)}
+                                aria-label={t(`privacy.discovery.rules.${rule}.label`)}
                                 aria-describedby={`discovery-${rule}`}
                                 onChange={(value: boolean) => {
                                     setDraft((current) => ({ ...current, [rule]: value }));
@@ -88,7 +80,7 @@ export function PeopleDiscoveryForm({ policy }: { policy: DiscoveryPolicy }) {
 
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                 {done && !dirty ? (
-                    <p className="text-sm text-muted-foreground">{t("users.discovery.saved")}</p>
+                    <p className="text-sm text-muted-foreground">{t("privacy.discovery.saved")}</p>
                 ) : null}
 
                 <Button

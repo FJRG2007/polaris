@@ -2612,7 +2612,48 @@
             "seasonalThemes": {
                 "title": "Temas de temporada",
                 "description": "Halloween, Navidad y otras fechas en que se viste la interfaz."
+            },
+            "privacy": {
+                "title": "Privacidad",
+                "description": "Perfiles públicos y cómo se encuentran las personas."
+            },
+            "storage": {
+                "title": "Ubicaciones de datos",
+                "description": "Dónde guarda Polaris sus datos y cómo moverlos a otro disco o recurso."
+            },
+            "retention": {
+                "title": "Retención de datos",
+                "description": "Cuánto se conservan avisos, actividad, auditoría y cuerpos de correo."
+            },
+            "announcements": {
+                "title": "Avisos",
+                "description": "Banners y avisos que ve todo el mundo."
+            },
+            "safety": {
+                "title": "Moderación",
+                "description": "Cuentas y mensajes denunciados, y cuentas bloqueadas."
+            },
+            "diagnostics": {
+                "title": "Diagnóstico",
+                "description": "Comprobaciones de estado, test de velocidad y paquete de soporte."
+            },
+            "apps": {
+                "title": "Apps de Polaris",
+                "description": "Instala y configura las apps de Polaris."
+            },
+            "channels": {
+                "title": "Canales",
+                "description": "WhatsApp, Telegram, Slack y otros canales por los que salen los avisos."
             }
+        },
+        "groups": {
+            "audit": "Supervisión",
+            "people": "Personas y acceso",
+            "communication": "Comunicación",
+            "platform": "Plataforma",
+            "integrations": "Integraciones e IA",
+            "storage": "Almacenamiento",
+            "usage": "Uso y estado"
         }
     },
     "policies": {
@@ -3337,42 +3378,6 @@
             "days": "Días.",
             "saved": "Guardado."
         },
-        "profiles": {
-            "title": "Perfiles sin iniciar sesión",
-            "hint": "La página de cada persona está en <code>/u/su-usuario</code> y se puede compartir. Desactivado, solo la ve quien ha iniciado sesión aquí, que es lo que suele querer una empresa. Activado, un desconocido solo ve lo que la cuenta ha dejado para “todo el mundo”, y una cuenta con algo más restringido le resulta invisible.",
-            "switchLabel": "Mostrar perfiles a quien no ha iniciado sesión",
-            "followersLabel": "A quién se muestran los seguidores de una cuenta nueva",
-            "followersSelectLabel": "A quién se muestran los seguidores de una cuenta nueva",
-            "followersHint": "Quién sigue a alguien y a quién sigue es un mismo dato y un solo ajuste en su pantalla de privacidad. Esto es lo que indica antes de que nadie lo toque: el directorio de una empresa y un sitio donde la gente se sigue quieren respuestas opuestas, y solo tú sabes cuál es este. Cambiarlo no afecta a las cuentas que ya han elegido.",
-            "audiences": {
-                "everyone": "Todos",
-                "friends": "Amigos",
-                "nobody": "Nadie"
-            }
-        },
-        "discovery": {
-            "title": "Encontrar personas",
-            "hint": "Qué permite encontrar una cuenta a quien no es amigo ni compañero. A amigos y compañeros siempre se les encuentra por parte de su nombre o usuario. El ajuste de privacidad de cada persona y los bloqueos siguen valiendo.",
-            "saved": "Guardado.",
-            "rules": {
-                "usernameExact": {
-                    "label": "Usuario completo",
-                    "hint": "Escribir @ada encuentra a Ada."
-                },
-                "usernamePartial": {
-                    "label": "Parte del usuario",
-                    "hint": "Unas letras listan cada coincidencia de la instancia."
-                },
-                "namePartial": {
-                    "label": "Parte del nombre",
-                    "hint": "Unas letras listan cada coincidencia de la instancia."
-                },
-                "emailExact": {
-                    "label": "Correo completo",
-                    "hint": "Encuentra la cuenta. El correo solo se muestra si su dueño lo permite."
-                }
-            }
-        },
         "errors": {
             "invalidInput": "Datos no válidos",
             "unknownAccount": "Cuenta desconocida.",
@@ -3382,7 +3387,6 @@
             "zeroForNoWait": "Usa 0 para no esperar.",
             "tooLong": "Es más de {max} días.",
             "checkDays": "Revisa el número de días.",
-            "audience": "Ese público no puede ser el predeterminado.",
             "checkSettings": "Revisa los ajustes y vuelve a intentarlo",
             "alreadyDecided": "Esa solicitud ya se ha decidido."
         }
@@ -4153,6 +4157,52 @@
         "page": {
             "title": "Temas de temporada",
             "description": "Lo que luce la interfaz en Halloween, Navidad y otras fechas."
+        }
+    },
+    "privacy": {
+        "page": {
+            "title": "Privacidad",
+            "description": "Qué pueden ver y encontrar quienes no están en el círculo de una cuenta."
+        },
+        "profiles": {
+            "title": "Perfiles",
+            "description": "Quién puede leer la página de una persona.",
+            "publicLabel": "Perfiles públicos",
+            "publicHint": "Las páginas en <code>/u/usuario</code> se abren sin iniciar sesión. Los visitantes solo ven lo que la cuenta muestra a todos.",
+            "followersLabel": "Seguidores visibles a",
+            "followersHint": "El valor inicial de las cuentas nuevas. Las que ya eligieron conservan su elección.",
+            "audiences": {
+                "everyone": "Todos",
+                "friends": "Amigos",
+                "nobody": "Nadie"
+            }
+        },
+        "discovery": {
+            "title": "Encontrar personas",
+            "description": "Qué permite encontrar una cuenta a quien no es amigo ni compañero. El ajuste de cada persona y sus bloqueos siguen valiendo.",
+            "saved": "Guardado.",
+            "rules": {
+                "usernameExact": {
+                    "label": "Usuario completo",
+                    "hint": "Escribir @ada encuentra a Ada."
+                },
+                "usernamePartial": {
+                    "label": "Parte del usuario",
+                    "hint": "Unas letras listan cada coincidencia de la instancia."
+                },
+                "namePartial": {
+                    "label": "Parte del nombre",
+                    "hint": "Unas letras listan cada coincidencia de la instancia."
+                },
+                "emailExact": {
+                    "label": "Correo completo",
+                    "hint": "Encuentra la cuenta. El correo solo se muestra si su dueño lo permite."
+                }
+            }
+        },
+        "errors": {
+            "audience": "Ese público no puede ser el predeterminado.",
+            "checkSettings": "Revisa los ajustes y vuelve a intentarlo"
         }
     }
 }

@@ -3,9 +3,8 @@
 /**
  * Whether somebody's page can be read without signing in.
  *
- * It sits with the other rules about people rather than under Security, because
- * what it decides is not who gets in - it is how far out an account's own page
- * reaches. Each account already decides what its page says; this decides whether
+ * It sits under Privacy rather than Security, because what it decides is not
+ * who gets in - it is how far out an account's own page reaches. Each account already decides what its page says; this decides whether
  * a stranger with no session is a reader at all.
  *
  * Off unless an operator turns it on, and the reason is that the two kinds of
@@ -47,18 +46,21 @@ export function PublicProfilesForm({
 
     return (
         <Card>
-            <CardBody className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex flex-col gap-1">
-                        <h2 className="text-sm font-medium">{t("users.profiles.title")}</h2>
-                        <p className="max-w-xl text-sm text-muted-foreground">
-                            {t.rich("users.profiles.hint", { code: (chunks) => <code key="code">{chunks}</code> })}
-                        </p>
+            <CardBody className="flex flex-col divide-y divide-border py-1">
+                <div className="flex items-start justify-between gap-3 py-3">
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-sm">{t("privacy.profiles.publicLabel")}</span>
+                        <span id="privacy-public-profiles" className="text-xs text-muted-foreground">
+                            {t.rich("privacy.profiles.publicHint", {
+                                code: (chunks) => <code key="code">{chunks}</code>
+                            })}
+                        </span>
                     </div>
                     <Switch
                         checked={on}
                         disabled={pending}
-                        aria-label={t("users.profiles.switchLabel")}
+                        aria-label={t("privacy.profiles.publicLabel")}
+                        aria-describedby="privacy-public-profiles"
                         onChange={(next: boolean) => {
                             // Applied on the press and put back if the server
                             // refuses it, so the switch never reads as saved when
@@ -75,16 +77,21 @@ export function PublicProfilesForm({
                         }}
                     />
                 </div>
-                <div className="flex flex-col gap-1 border-t border-border pt-3">
-                    <label className="flex flex-col gap-1 text-sm">
-                        {t("users.profiles.followersLabel")}
+                <div className="flex flex-wrap items-start justify-between gap-3 py-3">
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="text-sm">{t("privacy.profiles.followersLabel")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("privacy.profiles.followersHint")}
+                        </span>
+                    </div>
+                    <div className="w-full sm:w-44">
                         <Select
                             value={audience}
                             disabled={pending}
-                            aria-label={t("users.profiles.followersSelectLabel")}
+                            aria-label={t("privacy.profiles.followersLabel")}
                             options={DEFAULT_AUDIENCES.map((value) => ({
                                 value,
-                                label: t(`users.profiles.audiences.${value}`)
+                                label: t(`privacy.profiles.audiences.${value}`)
                             }))}
                             onValueChange={(value) => {
                                 const next = value as PrivacyAudience;
@@ -100,11 +107,10 @@ export function PublicProfilesForm({
                                 });
                             }}
                         />
-                    </label>
-                    <p className="max-w-xl text-xs text-muted-foreground">{t("users.profiles.followersHint")}</p>
+                    </div>
                 </div>
 
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className="py-3 text-sm text-danger">{error}</p> : null}
             </CardBody>
         </Card>
     );

@@ -17,11 +17,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { publishAccessChange } from "@/lib/access-live";
 import { setSetting } from "@/lib/setting-store";
 import { getTranslations } from "@/lib/i18n/request";
-import { setProfilesPublic } from "@/lib/profile-service";
-import { FOLLOWERS_DEFAULT_KEY, setDefaultFollowerAudience } from "@/lib/privacy-service";
 import { setSharingPolicy } from "@/lib/sharing-policy";
-import { setDiscoveryPolicy } from "@/lib/people-search";
-import { DISCOVERY_POLICY_KEY, discoveryPolicySchema } from "@/lib/discovery-policy";
 import {
     accessRulesSchema,
     createInviteSchema,
@@ -299,74 +295,6 @@ export async function setUsernameCooldownAction(days: unknown): Promise<{ error?
         targetType: "setting",
         targetId: USERNAME_COOLDOWN_KEY,
         metadata: { days: parsed.data }
-    });
-    revalidatePath("/admin/users");
-    return {};
-}
-
-/**
- * Whether somebody's page may be read without signing in.
- *
- * Audited, because it is the one setting on this screen that changes what leaves
- * the deployment: turning it on makes an address readable by anybody who has it,
- * and whoever asks later deserves to be able to see when that was decided and by
- * whom.
- */
-export async function setPublicProfilesAction(allowed: unknown): Promise<{ error?: string }> {
-    const admin = await requireAdmin();
-    const on = allowed === true;
-    await setProfilesPublic(on);
-    await recordAudit({
-        actorId: admin.id,
-        action: "settings.public-profiles",
-        targetType: "setting",
-        targetId: "profiles.public",
-        metadata: { enabled: on }
-    });
-    revalidatePath("/admin/users");
-    return {};
-}
-
-/**
- * What a new account's follower lists are shown to.
- *
- * Only the three that name nobody in particular. "Everybody except" and "only"
- * each carry a list of people, and a list belongs to an account - there is no
- * account yet for a default to have one of.
- */
-export async function setFollowerDefaultAction(audience: unknown): Promise<{ error?: string }> {
-    const admin = await requireAdmin();
-    const parsed = z.enum(["everyone", "friends", "nobody"]).safeParse(audience);
-    if (!parsed.success)
-        return { error: (await getTranslations("admin"))("users.errors.audience") };
-    await setDefaultFollowerAudience(parsed.data);
-    await recordAudit({
-        actorId: admin.id,
-        action: "settings.follower-default",
-        targetType: "setting",
-        targetId: FOLLOWERS_DEFAULT_KEY,
-        metadata: { audience: parsed.data }
-    });
-    revalidatePath("/admin/users");
-    return {};
-}
-
-/**
- * Which identifiers find somebody who is not a friend or a colleague. Each
- * account's own "who can find me" still applies on top of whatever this says.
- */
-export async function setDiscoveryPolicyAction(input: unknown): Promise<{ error?: string }> {
-    const admin = await requireAdmin();
-    const parsed = discoveryPolicySchema.safeParse(input);
-    if (!parsed.success)
-        return { error: (await getTranslations("admin"))("users.errors.checkSettings") };
-    await setDiscoveryPolicy(parsed.data);
-    await recordAudit({
-        actorId: admin.id,
-        action: "settings.people-discovery",
-        targetType: "setting",
-        targetId: DISCOVERY_POLICY_KEY,
-        metadata: parsed.data
     });
     revalidatePath("/admin/users");
     return {};

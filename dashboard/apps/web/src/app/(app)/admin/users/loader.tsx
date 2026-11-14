@@ -4,8 +4,6 @@ import { UsersAdmin } from "./users-admin";
 import { loadUsersAdminAction } from "./data";
 import { AfterPaint } from "@/components/after-paint";
 import { SharingPolicyForm } from "./sharing-policy-form";
-import { PublicProfilesForm } from "./public-profiles-form";
-import { PeopleDiscoveryForm } from "./people-discovery-form";
 import { UsernameCooldownForm } from "./username-cooldown-form";
 import { CardSkeleton, TableSkeleton } from "../region-skeletons";
 
@@ -50,11 +48,6 @@ export function UsersAdminLoader({
                         roles={data.roles.map((role) => ({ value: role.name, label: role.name }))}
                     />
                     <UsernameCooldownForm days={data.cooldownDays} />
-                    <PublicProfilesForm
-                        enabled={data.publicProfiles}
-                        followerDefault={data.followerDefault}
-                    />
-                    <PeopleDiscoveryForm policy={data.discovery} />
                 </>
             )}
         </AfterPaint>

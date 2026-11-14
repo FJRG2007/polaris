@@ -11,9 +11,6 @@ import { getAuthMailStatus } from "@/lib/auth-mail";
 import { sharingPolicy } from "@/lib/sharing-policy";
 import { listRoleOptions } from "@/lib/role-service";
 import { getSetting } from "@/lib/setting-store";
-import { discoveryPolicy } from "@/lib/people-search";
-import { profilesArePublic } from "@/lib/profile-service";
-import { defaultFollowerAudience } from "@/lib/privacy-service";
 import { usernameCooldownDays, USERNAME_COOLDOWN_KEY } from "@polaris/core";
 import { listRecoveryRequests } from "@/lib/account-recovery-service";
 import { listImposableGroups, listUserDirectoryPage } from "@/lib/user-admin-service";
@@ -28,10 +25,7 @@ export async function loadUsersAdminAction() {
         mail,
         roles,
         sharing,
-        cooldown,
-        publicProfiles,
-        followerDefault,
-        discovery
+        cooldown
     ] = await Promise.all([
         listUserDirectoryPage(),
         listInvites(),
@@ -42,10 +36,7 @@ export async function loadUsersAdminAction() {
         // pickers offer whatever this instance actually defines.
         listRoleOptions(),
         sharingPolicy(),
-        getSetting(USERNAME_COOLDOWN_KEY),
-        profilesArePublic(),
-        defaultFollowerAudience(),
-        discoveryPolicy()
+        getSetting(USERNAME_COOLDOWN_KEY)
     ]);
     return {
         users,
@@ -56,9 +47,6 @@ export async function loadUsersAdminAction() {
         canSendMail: mail.ready,
         viewerId: admin.id,
         sharing,
-        cooldownDays: usernameCooldownDays(cooldown),
-        publicProfiles,
-        followerDefault,
-        discovery
+        cooldownDays: usernameCooldownDays(cooldown)
     };
 }

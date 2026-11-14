@@ -2612,7 +2612,48 @@
             "seasonalThemes": {
                 "title": "Seasonal themes",
                 "description": "Halloween, Christmas and other dates the interface dresses up for."
+            },
+            "privacy": {
+                "title": "Privacy",
+                "description": "Public profiles and how people find each other."
+            },
+            "storage": {
+                "title": "Storage locations",
+                "description": "Where Polaris keeps its data, and moving it to another disk or share."
+            },
+            "retention": {
+                "title": "Keeping records",
+                "description": "How long notifications, activity, audit entries and mail bodies are kept."
+            },
+            "announcements": {
+                "title": "Announcements",
+                "description": "Banners and notices shown to everybody."
+            },
+            "safety": {
+                "title": "Safety queue",
+                "description": "Reported accounts and messages, and locked-down accounts."
+            },
+            "diagnostics": {
+                "title": "Diagnostics",
+                "description": "Health checks, a speed test and a support bundle."
+            },
+            "apps": {
+                "title": "Polaris apps",
+                "description": "Install and configure Polaris apps."
+            },
+            "channels": {
+                "title": "Channels",
+                "description": "WhatsApp, Telegram, Slack and other channels alerts go out through."
             }
+        },
+        "groups": {
+            "audit": "Oversight",
+            "people": "People & access",
+            "communication": "Communication",
+            "platform": "Platform",
+            "integrations": "Integrations & AI",
+            "storage": "Storage & data",
+            "usage": "Usage & health"
         }
     },
     "policies": {
@@ -3337,42 +3378,6 @@
             "days": "Days.",
             "saved": "Saved."
         },
-        "profiles": {
-            "title": "Profiles without signing in",
-            "hint": "A person’s page lives at <code>/u/their-username</code> and can be handed out. With this off it is only readable by people signed in here, which is what a deployment for one company usually wants. With it on, a stranger still sees only what an account has set to “everybody” - and an account set to anything narrower stays invisible to them.",
-            "switchLabel": "Show profiles to people who are not signed in",
-            "followersLabel": "Who a new account's followers are shown to",
-            "followersSelectLabel": "Who a new account's followers are shown to",
-            "followersHint": "Who follows somebody and who they follow are one disclosure and one setting on their own privacy screen. This is what it says before anybody touches it - a directory for one company and a place where people follow each other want opposite answers, and only you can say which this is. Changing it never reaches back into an account that has already chosen.",
-            "audiences": {
-                "everyone": "Everybody",
-                "friends": "Friends",
-                "nobody": "Nobody"
-            }
-        },
-        "discovery": {
-            "title": "Finding people",
-            "hint": "What lets someone who is not a friend or colleague find an account. Friends and colleagues are always found by part of their name or username. Each person's own privacy setting and blocks still apply.",
-            "saved": "Saved.",
-            "rules": {
-                "usernameExact": {
-                    "label": "Whole username",
-                    "hint": "Typing @ada finds Ada."
-                },
-                "usernamePartial": {
-                    "label": "Part of a username",
-                    "hint": "A few letters list every match on this instance."
-                },
-                "namePartial": {
-                    "label": "Part of a name",
-                    "hint": "A few letters list every match on this instance."
-                },
-                "emailExact": {
-                    "label": "Whole email address",
-                    "hint": "Finds the account. The address is shown only if its owner allows it."
-                }
-            }
-        },
         "errors": {
             "invalidInput": "Invalid input",
             "unknownAccount": "Unknown account.",
@@ -3382,7 +3387,6 @@
             "zeroForNoWait": "Use 0 for no wait at all.",
             "tooLong": "That is longer than {max} days.",
             "checkDays": "Check the number of days.",
-            "audience": "That is not an audience a default can be.",
             "checkSettings": "Check the settings and try again",
             "alreadyDecided": "That request has already been decided."
         }
@@ -4153,6 +4157,52 @@
         "page": {
             "title": "Seasonal themes",
             "description": "What the interface wears on Halloween, Christmas and other dates."
+        }
+    },
+    "privacy": {
+        "page": {
+            "title": "Privacy",
+            "description": "What people outside an account's circle can see and find."
+        },
+        "profiles": {
+            "title": "Profiles",
+            "description": "Who can read a person's page.",
+            "publicLabel": "Public profiles",
+            "publicHint": "Pages at <code>/u/username</code> open without signing in. Visitors see only what an account shows to everybody.",
+            "followersLabel": "Followers shown to",
+            "followersHint": "The default for new accounts. Accounts that already chose keep their choice.",
+            "audiences": {
+                "everyone": "Everybody",
+                "friends": "Friends",
+                "nobody": "Nobody"
+            }
+        },
+        "discovery": {
+            "title": "Finding people",
+            "description": "What lets someone who is not a friend or colleague find an account. Each person's own setting and blocks still apply.",
+            "saved": "Saved.",
+            "rules": {
+                "usernameExact": {
+                    "label": "Whole username",
+                    "hint": "Typing @ada finds Ada."
+                },
+                "usernamePartial": {
+                    "label": "Part of a username",
+                    "hint": "A few letters list every match on this instance."
+                },
+                "namePartial": {
+                    "label": "Part of a name",
+                    "hint": "A few letters list every match on this instance."
+                },
+                "emailExact": {
+                    "label": "Whole email address",
+                    "hint": "Finds the account. The address is shown only if its owner allows it."
+                }
+            }
+        },
+        "errors": {
+            "audience": "That is not an audience a default can be.",
+            "checkSettings": "Check the settings and try again"
         }
     }
 }

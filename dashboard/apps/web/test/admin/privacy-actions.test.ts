@@ -1,6 +1,7 @@
 /**
- * The discovery policy is the operator's: only an administrator sets it, only
- * the four switches are accepted, and every change lands in the audit log.
+ * The privacy settings under Management > Privacy are the operator's: only an
+ * administrator sets them, only the four discovery switches are accepted, and
+ * every change lands in the audit log.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,18 +20,10 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit }));
 vi.mock("@/lib/people-search", () => ({ setDiscoveryPolicy }));
-vi.mock("@/lib/access-live", () => ({}));
-vi.mock("@/lib/setting-store", () => ({}));
 vi.mock("@/lib/profile-service", () => ({}));
 vi.mock("@/lib/privacy-service", () => ({}));
-vi.mock("@/lib/sharing-policy", () => ({}));
-vi.mock("@/lib/account-recovery-service", () => ({}));
-vi.mock("@/lib/invite-service", () => ({}));
-vi.mock("@/lib/user-admin-service", () => ({}));
-vi.mock("@/lib/session-directory", () => ({}));
-vi.mock("@/lib/device-sessions/sessions", () => ({}));
 
-const { setDiscoveryPolicyAction } = await import("@/app/(app)/admin/users/actions");
+const { setDiscoveryPolicyAction } = await import("@/app/(app)/admin/privacy/actions");
 
 const policy = {
     usernameExact: true,
@@ -68,7 +61,7 @@ describe("setting how people can be found", () => {
             null
         ]) {
             expect(await setDiscoveryPolicyAction(input)).toEqual({
-                error: "users.errors.checkSettings"
+                error: "privacy.errors.checkSettings"
             });
         }
         expect(setDiscoveryPolicy).not.toHaveBeenCalled();
