@@ -70,9 +70,30 @@ export function activeToolNames(
     return [...always, ...names];
 }
 
-/** Lowercase words of three letters or more. */
+/** Lowercase words of three letters or more, in any script. */
 function words(text: string): string[] {
-    return text.toLowerCase().match(/[a-z0-9]{3,}/g) ?? [];
+    return text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
+}
+
+/** Most tool names `find_tools` lists per area when nothing matched. */
+const AREA_SAMPLE = 6;
+
+/**
+ * Every area the person has tools in, with a few tool names each, for a search
+ * that matched nothing - a query in another language, or words no description
+ * uses - so the next search, or the next call, lands instead of the model
+ * concluding that Polaris cannot do it.
+ */
+export function toolAreas(
+    catalog: readonly CatalogEntry[]
+): { area: McpCategory; tools: string[] }[] {
+    const areas = new Map<McpCategory, string[]>();
+    for (const entry of catalog) {
+        const names = areas.get(entry.category) ?? [];
+        if (names.length < AREA_SAMPLE) names.push(entry.name);
+        areas.set(entry.category, names);
+    }
+    return [...areas].map(([area, tools]) => ({ area, tools }));
 }
 
 /** The catalog ranked against a query: name hits count most, then the
@@ -170,12 +191,19 @@ export function findToolsTool(catalog: readonly CatalogEntry[]): ToolSet {
     return {
         [FIND_TOOLS]: tool({
             description:
-                "Find more Polaris tools by what you need to do (e.g. 'restart a deploy', 'minecraft players'). Returns names and one-line descriptions; the tools found can be called in the next step. Use it when no tool you have fits.",
+                "Find more Polaris tools by what you need to do, in English (e.g. 'restart a deploy', 'minecraft players', 'turn off a device'). Returns names and one-line descriptions; the tools found can be called in the next step. Use it when no tool you have fits, and before ever saying Polaris cannot do something. When nothing matches it lists the areas the person has tools in: search again with words from them.",
             inputSchema: findToolsInput as unknown as FlexibleSchema<
                 z.infer<typeof findToolsInput>
             >,
             async execute({ query }) {
                 const found = rankTools(catalog, query);
+                if (found.length === 0) {
+                    return {
+                        tools: [],
+                        note: "No tool matched. Search again in English with the words of an area below, or with one of the tool names listed.",
+                        areas: toolAreas(catalog)
+                    };
+                }
                 return {
                     tools: found.map((entry) => ({
                         name: entry.name,

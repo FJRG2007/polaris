@@ -91,6 +91,48 @@ describe("find_tools", () => {
     });
 });
 
+describe("find_tools with nothing matched", () => {
+    const withPlaces: relevance.CatalogEntry[] = [
+        ...catalog,
+        { name: "places_devices", description: "The devices in this account's places.", category: "home" },
+        { name: "places_device_control", description: "Switch something on or off.", category: "home" }
+    ];
+
+    it("lists the areas the person has tools in, so a query in another language is not a dead end", async () => {
+        const output = (await run(relevance.findToolsTool(withPlaces), relevance.FIND_TOOLS, {
+            query: "apaga los ventiladores del rack"
+        })) as { tools: unknown[]; areas: { area: string; tools: string[] }[] };
+        expect(output.tools).toEqual([]);
+        expect(output.areas).toContainEqual({
+            area: "home",
+            tools: ["places_devices", "places_device_control"]
+        });
+        expect(output.areas.map((entry) => entry.area)).toEqual([
+            "polaris",
+            "files",
+            "development",
+            "games",
+            "mail",
+            "home"
+        ]);
+    });
+
+    it("still finds the device tools from the English words its description invites", () => {
+        expect(
+            relevance.rankTools(withPlaces, "turn off a device").map((entry) => entry.name)[0]
+        ).toBe("places_devices");
+    });
+
+    it("reads words in any script", () => {
+        expect(
+            relevance.rankTools(
+                [{ name: "x", description: "Récupère les fichiers.", category: "files" }],
+                "récupère"
+            )
+        ).toHaveLength(1);
+    });
+});
+
 describe("read_current_view", () => {
     const context = (record: { kind: string; id: string; name?: string }) =>
         pageContextSchema.parse({ route: "/x", app: "tasks", record });

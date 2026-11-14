@@ -324,7 +324,9 @@ export async function POST(request: Request): Promise<Response> {
     const listed = agent ?? polarWork;
     const keepsToList = listed?.modelPolicy === "required" && listed.models.length > 0;
     let choice: ModelChoice = tries[0] ?? body.data.choice;
-    const signals = turnSignals(messages);
+    // Every chat turn is offered Polaris's tools, so it never goes to a model
+    // too small to call them (`automaticCandidates`).
+    const signals = { ...turnSignals(messages), agentic: true };
     let resolved = await resolvePolarModel(user.id, choice, signals, access);
     for (const next of tries.slice(1)) {
         if (typeof resolved !== "string") break;

@@ -401,7 +401,9 @@ describe("what a request has to look like", () => {
             files: 0,
             tools: false,
             contextChars: "Tidy my tasks".length,
-            lastChars: "Tidy my tasks".length
+            lastChars: "Tidy my tasks".length,
+            // Every chat turn offers tools, so it keeps off models too small to call them.
+            agentic: true
         });
     });
 

@@ -24,6 +24,10 @@ export interface TurnSignals {
     contextChars: number;
     /** Characters of the newest message's text. */
     lastChars: number;
+    /** Whether the model is offered tools it may have to call to answer - every
+     *  Polar chat turn is: its devices, files and apps are tools. Such a turn
+     *  never goes to a model too small to drive them while a larger one fits. */
+    agentic?: boolean;
 }
 
 export const PLAIN_TURN: TurnSignals = { files: 0, tools: false, contextChars: 0, lastChars: 0 };
@@ -39,6 +43,10 @@ export const FAILURE_MS = 5 * 60_000;
 export const UNPAID_MS = 30 * 60_000;
 /** Rough characters per token, to check a model's window can hold the turn. */
 const CHARS_PER_TOKEN = 4;
+/** A model whose name states fewer parameters than this (billions) is too small
+ *  to drive tools reliably: it calls none, or the wrong one, and then answers
+ *  that it cannot help. */
+export const AGENTIC_MIN_BILLIONS = 10;
 
 /** Which kind of model a turn goes to. */
 export type AutoRoute = "fast" | "reasoning";
@@ -77,6 +85,23 @@ export function autoRoute(signals: TurnSignals): AutoRoute {
     return "fast";
 }
 
+/**
+ * The parameter count a model's id or name states, in billions ("8b", "1.5b",
+ * "8x7b"), the largest when it states several ("235b-a22b" is 235); null when
+ * it states none, which is most commercial models.
+ */
+export function statedBillions(model: Pick<PolarModelOption, "model" | "name">): number | null {
+    let most: number | null = null;
+    for (const text of [model.model, model.name]) {
+        const name = text.toLowerCase().split("/").pop() ?? "";
+        for (const match of name.matchAll(/(?<![a-z0-9.])(?:(\d+)x)?(\d+(?:\.\d+)?)b(?![a-z0-9])/g)) {
+            const billions = Number(match[2]) * (match[1] ? Number(match[1]) : 1);
+            if (most === null || billions > most) most = billions;
+        }
+    }
+    return most;
+}
+
 /** Cheapest first; an unknown price after every known one. */
 function byCostAsc(a: PolarModelOption, b: PolarModelOption): number {
     const left = a.costInput ?? Number.POSITIVE_INFINITY;
@@ -96,11 +121,14 @@ const byName = (a: PolarModelOption, b: PolarModelOption) =>
 
 /**
  * Every model this person can use, in the order Automatic tries them for a
- * turn. Fast: models that do not reason first, then the cheapest. Reasoning:
+ * turn. Fast: models that do not reason first, then the cheapest, then the
+ * newest. Reasoning:
  * models that reason first, then the newest, then the most capable by price.
  * A turn with files only goes to models that read files, and a long one only
  * to models whose window holds it, unless no model qualifies - then the
- * filter is dropped rather than leaving the turn with nothing. A provider in
+ * filter is dropped rather than leaving the turn with nothing; so is the one
+ * that keeps a turn offering tools off models too small to call them
+ * (`statedBillions`). A provider in
  * `unpaid` refused a call for want of credit a moment ago, so only its free
  * models are offered while it has any. Providers in `failing` go last, in the
  * same order among themselves.
@@ -122,6 +150,12 @@ export function automaticCandidates(
         if (kept.length > 0) models = kept;
     };
     if (signals.files > 0) keep((model) => model.attachment);
+    if (signals.agentic) {
+        keep((model) => {
+            const billions = statedBillions(model);
+            return billions === null || billions >= AGENTIC_MIN_BILLIONS;
+        });
+    }
     const tokens = Math.ceil(signals.contextChars / CHARS_PER_TOKEN);
     keep((model) => {
         // The provider's own window when it reports one, as the context bar reads it.
@@ -131,7 +165,7 @@ export function automaticCandidates(
     const sorted = [...models].sort((a, b) => {
         if (route === "fast") {
             if (a.reasoning !== b.reasoning) return a.reasoning ? 1 : -1;
-            return byCostAsc(a, b) || byName(a, b);
+            return byCostAsc(a, b) || byReleaseDesc(a, b) || byName(a, b);
         }
         if (a.reasoning !== b.reasoning) return a.reasoning ? -1 : 1;
         return byReleaseDesc(a, b) || byCostAsc(b, a) || byName(a, b);

@@ -105,7 +105,7 @@ export function signalsOf(messages: readonly ModelMessage[], tools: boolean): Tu
             files = attached;
         }
     }
-    return { files, tools: calls, contextChars, lastChars };
+    return { files, tools: calls, contextChars, lastChars, agentic: tools };
 }
 
 export interface PreparedCall {
