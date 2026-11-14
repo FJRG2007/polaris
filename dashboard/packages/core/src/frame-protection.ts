@@ -38,12 +38,17 @@ const HOST = /^(\*\.)?[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,
  * Strict on purpose: the value ends up inside a response header on every request and
  * inside a Traefik file, so anything that could close a directive (`;`), start another
  * source (a space), or quote a keyword is refused rather than escaped. Accepted:
- * `https://example.com`, `https://*.example.com`, `http://intranet.local:8080`. A path
- * is dropped - CSP matches origins here, and keeping `/page` would read as a narrower
- * permission than the browser grants.
+ * `https://example.com`, `https://*.example.com`, `http://intranet.local:8080`, and the
+ * same without a scheme (`example.com`, `*.example.com`), which is read as https since
+ * that is what an operator typing a bare domain means. A path is dropped - CSP matches
+ * origins here, and keeping `/page` would read as a narrower permission than the
+ * browser grants.
  */
 export function normalizeFrameOrigin(value: string): string | null {
-    const trimmed = value.trim().toLowerCase();
+    const lowered = value.trim().toLowerCase();
+    // Anything that names a scheme keeps it, so `ftp://` is refused below rather than
+    // turned into `https://ftp://...`.
+    const trimmed = /^[a-z][a-z0-9+.-]*:\/\//.test(lowered) ? lowered : `https://${lowered}`;
     const match = /^(https?):\/\/([^/?#\s]+)(?:[/?#].*)?$/.exec(trimmed);
     if (!match) return null;
     const [, scheme, authority] = match;
@@ -65,7 +70,7 @@ export const frameOriginSchema = z.string().transform((value, ctx) => {
     if (!origin) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "Use a site address like https://example.com or https://*.example.com"
+            message: "Use a site address like example.com, https://example.com or *.example.com"
         });
         return z.NEVER;
     }

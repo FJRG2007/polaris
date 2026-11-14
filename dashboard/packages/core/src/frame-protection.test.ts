@@ -26,10 +26,23 @@ describe("normalizeFrameOrigin", () => {
         expect(normalizeFrameOrigin("https://*.example.com")).toBe("https://*.example.com");
     });
 
+    it("reads a bare domain as https", () => {
+        expect(normalizeFrameOrigin("test.com")).toBe("https://test.com");
+        expect(normalizeFrameOrigin(" Test.COM/embed/ ")).toBe("https://test.com");
+        expect(normalizeFrameOrigin("*.Example.com")).toBe("https://*.example.com");
+        expect(normalizeFrameOrigin("localhost:3000")).toBe("https://localhost:3000");
+        expect(normalizeFrameOrigin("http://localhost:3000/")).toBe("http://localhost:3000");
+        expect(frameAncestorsSchema.parse(["test.com", "https://test.com/"])).toEqual([
+            "https://test.com"
+        ]);
+    });
+
     it("refuses what could break or widen the header", () => {
         for (const bad of [
-            "example.com",
+            "",
             "ftp://example.com",
+            "javascript:alert(1)",
+            "not a site",
             "https://exa mple.com",
             "https://example.com;script-src *",
             "https://'self'",
@@ -46,8 +59,8 @@ describe("normalizeFrameOrigin", () => {
         expect(frameAncestorsSchema.parse(["https://a.example", "https://A.example/"])).toEqual([
             "https://a.example"
         ]);
-        expect(frameAncestorsSchema.safeParse(["nope"]).success).toBe(false);
-        expect(cleanFrameAncestors(["https://a.example", 3, "bad", "https://b.example"])).toEqual([
+        expect(frameAncestorsSchema.safeParse(["not a site"]).success).toBe(false);
+        expect(cleanFrameAncestors(["https://a.example", 3, "b@d", "https://b.example"])).toEqual([
             "https://a.example",
             "https://b.example"
         ]);

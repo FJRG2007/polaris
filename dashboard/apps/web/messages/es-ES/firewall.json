@@ -353,8 +353,8 @@
         "allowed": "Sitios que pueden incrustar",
         "allowedHint": "Cada uno puede mostrar estas páginas en un marco. Vacío: solo este sitio.",
         "allowedAbove": "También permitidos por un ámbito superior: {sites}",
-        "placeholder": "https://example.com",
-        "invalid": "Usa una dirección como https://example.com o https://*.example.com",
+        "placeholder": "example.com o https://*.example.com",
+        "invalid": "Usa una dirección como example.com, https://example.com o *.example.com",
         "polaris": "Siempre activo en Polaris. Los calendarios publicados se incrustan en cualquier sitio."
     },
     "missing": {

@@ -353,8 +353,8 @@
         "allowed": "Sites allowed to embed",
         "allowedHint": "Each one may show these pages in a frame. Empty means only this site.",
         "allowedAbove": "Also allowed by a scope above: {sites}",
-        "placeholder": "https://example.com",
-        "invalid": "Use a site address like https://example.com or https://*.example.com",
+        "placeholder": "example.com or https://*.example.com",
+        "invalid": "Use a site address like example.com, https://example.com or *.example.com",
         "polaris": "Always on for Polaris. Published calendars stay embeddable on any site."
     },
     "missing": {
