@@ -249,3 +249,47 @@ describe("changing a record", () => {
         expect(within(reopened).getByText("Refused by Cloudflare")).toBeTruthy();
     });
 });
+
+describe("a record Polaris manages", () => {
+    const owned: ZoneRecords = {
+        ...zone,
+        records: [
+            { ...view("r1", "A", "www", "203.0.113.10"), owner: { kind: "game-server", label: "Survival", href: "/apps/installed/s1" } },
+            zone.records[1]
+        ]
+    };
+    beforeEach(() => actions.zoneRecordsAction.mockResolvedValue({ zone: owned }));
+
+    it("carries the Polaris mark, linking to what it serves", async () => {
+        await mount();
+        const badge = screen.getByRole("link", { name: "Managed by Polaris: Game server address: Survival" });
+        expect(badge.getAttribute("href")).toBe("/apps/installed/s1");
+        expect(screen.queryByRole("link", { name: /Managed by Polaris: .*_dmarc/ })).toBeNull();
+    });
+
+    it("warns before its edit, and opens the form only once that is confirmed", async () => {
+        await mount();
+        fireEvent.click(screen.getByRole("button", { name: "Edit the A record www" }));
+        const dialog = await screen.findByRole("dialog");
+        expect(within(dialog).getByText("Record managed by Polaris")).toBeTruthy();
+        expect(dialog.textContent).toContain("Players stop finding this server by its address.");
+        fireEvent.click(within(dialog).getByRole("button", { name: "Edit it anyway" }));
+        expect(await screen.findByRole("dialog")).not.toBe(dialog);
+        expect(screen.queryByText("Record managed by Polaris")).toBeNull();
+    });
+
+    it("an unmanaged record opens its form without the warning", async () => {
+        await mount();
+        fireEvent.click(screen.getByRole("button", { name: "Edit the TXT record _dmarc" }));
+        await screen.findByRole("dialog");
+        expect(screen.queryByText("Record managed by Polaris")).toBeNull();
+    });
+
+    it("says what breaks in the delete confirmation", async () => {
+        await mount();
+        fireEvent.click(screen.getByRole("button", { name: "Delete the A record www" }));
+        const dialog = await screen.findByRole("dialog");
+        expect(dialog.textContent).toContain("Polaris manages this record (Game server address: Survival).");
+        expect(dialog.textContent).toContain("Players stop finding this server by its address.");
+    });
+});

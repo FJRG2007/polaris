@@ -627,7 +627,10 @@
             "readFailed": "Could not read the zones",
             "emptyTitle": "No zone to edit",
             "emptyDescription": "Connect a Cloudflare token that can edit DNS, and its zones appear here.",
-            "openIntegrations": "Open Integrations"
+            "openIntegrations": "Open Integrations",
+            "zonePlaceholder": "Pick a zone",
+            "zoneSearch": "Search zones",
+            "zoneNone": "No zone matches"
         },
         "follow": {
             "title": "Public address",

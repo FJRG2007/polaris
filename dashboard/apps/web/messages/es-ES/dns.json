@@ -139,5 +139,39 @@
         "deleteQuestionContent": "¿Eliminar el registro <strong>{type}</strong> <strong>{name}</strong> con contenido <code>{content}</code>?",
         "deleteDescription": "Los resolvers seguirán respondiendo con él hasta que caduque su copia en caché.",
         "deleteConfirm": "Eliminar registro"
+    },
+    "owner": {
+        "badge": "Polaris",
+        "badgeAria": "Gestionado por Polaris: {what}",
+        "filterAria": "Filtrar por quién lo gestiona",
+        "all": "Todos",
+        "managed": "De Polaris",
+        "unmanaged": "Ajenos a Polaris",
+        "serves": "{kind}: {label}",
+        "kinds": {
+            "dashboard": "Web de Polaris",
+            "deployZone": "Zona de Deploy",
+            "deployService": "Servicio desplegado",
+            "tunnel": "Túnel de Deploy",
+            "gameZone": "Direcciones de juegos",
+            "gameServer": "Servidor de juego",
+            "verification": "Prueba de dominio",
+            "ownerDomain": "Dominio propio"
+        },
+        "breaks": {
+            "dashboard": "Polaris deja de abrir en esta dirección, y los enlaces hechos con ella fallan.",
+            "deployZone": "Los servicios de esta zona dejan de responder en sus direcciones.",
+            "deployService": "Este servicio deja de responder en esta dirección.",
+            "tunnel": "Las visitas dejan de llegar a este servicio por su túnel.",
+            "gameZone": "Los jugadores dejan de encontrar los servidores de este juego.",
+            "gameServer": "Los jugadores dejan de encontrar este servidor por su dirección.",
+            "verification": "El dominio pierde su prueba y no sirve para direcciones nuevas.",
+            "ownerDomain": "Los servicios de este dominio dejan de responder en sus direcciones."
+        },
+        "editTitle": "Registro gestionado por Polaris",
+        "editQuestion": "Polaris escribió {type} {name} para {what}. Cambiarlo puede romperlo.",
+        "editConfirm": "Editar igual",
+        "deleteWarning": "Polaris gestiona este registro ({what}). {breaks}",
+        "cancel": "Cancelar"
     }
 }

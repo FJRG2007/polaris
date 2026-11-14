@@ -16,9 +16,11 @@
  * again until it does.
  */
 
+import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
-import { ttlLabel } from "@/lib/dns/records-view";
-import { Button, Skeleton, cn } from "@polaris/ui";
+import { OWNER_KEYS, ttlLabel } from "@/lib/dns/records-view";
+import { Button, PolarisMark, Skeleton, cn } from "@polaris/ui";
+import type { RecordOwner } from "@/lib/dns/record-owners";
 import { Pencil, Radar, Trash2 } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import type { DnsRecordView } from "@/lib/dns/zone-records";
@@ -168,6 +170,7 @@ function RecordRow({
                         {record.relative}
                     </span>
                     <CopyButton value={record.name} label={t("table.copyName", { name: record.name })} className="shrink-0" />
+                    {record.owner ? <OwnerBadge owner={record.owner} /> : null}
                 </span>
             </td>
             <td className="max-w-0 px-3 py-2">
@@ -229,5 +232,38 @@ function RecordRow({
                 </span>
             </td>
         </tr>
+    );
+}
+
+/** What a record Polaris manages serves, in one line: "Game server: Survival". */
+export function useOwnerText() {
+    const t = useTranslations("dns");
+    return (owner: RecordOwner) => t("owner.serves", { kind: t(`owner.kinds.${OWNER_KEYS[owner.kind]}`), label: owner.label });
+}
+
+/** The Polaris mark on a record Polaris manages, naming what it serves and
+ *  opening that thing when Polaris has a page for it. */
+function OwnerBadge({ owner }: { owner: RecordOwner }) {
+    const t = useTranslations("dns");
+    const what = useOwnerText()(owner);
+    const chip = cn(
+        "inline-flex max-w-[12rem] shrink-0 items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary [&_svg]:size-3",
+        owner.href && "hover:bg-primary/20"
+    );
+    const body = (
+        <>
+            <PolarisMark nameClassName="hidden" className="gap-0" />
+            <span className="min-w-0 truncate">{owner.label}</span>
+        </>
+    );
+    const label = t("owner.badgeAria", { what });
+    return owner.href ? (
+        <Link href={owner.href} prefetch={false} className={chip} title={what} aria-label={label} data-owner={owner.kind}>
+            {body}
+        </Link>
+    ) : (
+        <span className={chip} title={what} aria-label={label} role="img" data-owner={owner.kind}>
+            {body}
+        </span>
     );
 }

@@ -59,10 +59,10 @@ describe("the order and the filters", () => {
     });
 
     it("narrows by type and by a search over the name and the content", () => {
-        expect(view.listedRecords(records, { type: "A", search: "" }).map((entry) => entry.id)).toEqual(["a1", "a2"]);
-        expect(view.listedRecords(records, { type: view.ALL_TYPES, search: "DOMAINKEY" }).map((entry) => entry.id)).toEqual(["t"]);
-        expect(view.listedRecords(records, { type: view.ALL_TYPES, search: "mx.example" }).map((entry) => entry.id)).toEqual(["m"]);
-        expect(view.listedRecords(records, { type: "TXT", search: "www" })).toEqual([]);
+        expect(view.listedRecords(records, { type: "A", search: "", owned: "all" }).map((entry) => entry.id)).toEqual(["a1", "a2"]);
+        expect(view.listedRecords(records, { type: view.ALL_TYPES, search: "DOMAINKEY", owned: "all" }).map((entry) => entry.id)).toEqual(["t"]);
+        expect(view.listedRecords(records, { type: view.ALL_TYPES, search: "mx.example", owned: "all" }).map((entry) => entry.id)).toEqual(["m"]);
+        expect(view.listedRecords(records, { type: "TXT", search: "www", owned: "all" })).toEqual([]);
     });
 
     it("offers only the types the zone holds", () => {

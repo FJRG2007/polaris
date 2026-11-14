@@ -27,8 +27,13 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/tls/managed-certificates", () => ({ openText: (value: string | null) => value }));
 vi.mock("@/lib/integrations/cloudflare-account-service", () => ({ loadCloudflareToken: async () => "instance-token" }));
+vi.mock("@/lib/dns/record-owners", async (original) => ({
+    ...(await original<typeof import("@/lib/dns/record-owners")>()),
+    loadOwnershipFacts: async () => ({ byRecordId: new Map(), byHostname: new Map(), verification: new Map() })
+}));
 vi.mock("@/lib/integrations/cloudflare-api", () => ({
     listZones: async () => [{ id: ZONE_ID, name: "example.test" }],
+    getZone: async (_token: string, id: string) => (id === ZONE_ID ? { id: ZONE_ID, name: "example.test" } : null),
     resolveZoneForHostname: async () => ({ id: ZONE_ID, name: "example.test" }),
     listDnsRecords: async () => listed,
     saveDnsRecord: async (_token: string, _zone: string, _id: string | null, record: { type: string; name: string }) => {

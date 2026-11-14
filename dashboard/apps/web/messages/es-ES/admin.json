@@ -627,7 +627,10 @@
             "readFailed": "No se leyeron las zonas",
             "emptyTitle": "Nada que editar",
             "emptyDescription": "Conecta un token de Cloudflare que pueda editar DNS y sus zonas aparecerán aquí.",
-            "openIntegrations": "Abrir Integraciones"
+            "openIntegrations": "Abrir Integraciones",
+            "zonePlaceholder": "Elige una zona",
+            "zoneSearch": "Buscar zonas",
+            "zoneNone": "Ninguna coincide"
         },
         "follow": {
             "title": "Dirección pública",

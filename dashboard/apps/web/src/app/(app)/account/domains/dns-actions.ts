@@ -26,6 +26,7 @@ import {
     DnsEditError,
     deleteZoneRecord,
     editableZones,
+    zoneOptions,
     recordPropagation,
     saveZoneRecord,
     zoneRecords,
@@ -92,6 +93,31 @@ export async function listDnsZonesAction(): Promise<{
         return { zones: await editableZones() };
     } catch (caught) {
         return failure(caught, "dns.errors.readZones");
+    }
+}
+
+/** A page of zones the picker asks for: a search, Cloudflare's page as a cursor, or ids. */
+const zoneOptionsSchema = z
+    .object({
+        query: z.string().trim().max(120).default(""),
+        cursor: z.string().regex(/^[1-9]\d{0,5}$/).nullable().default(null),
+        limit: z.number().int().min(1).max(50).default(25),
+        ids: z.array(z.string().regex(/^[a-f0-9]{32}$/)).min(1).max(50).optional()
+    })
+    .strict();
+
+/** A page of the zones an administrator can pick from, searched by name. */
+export async function dnsZoneOptionsAction(
+    input: unknown
+): Promise<{ items: { id: string; name: string }[]; next: string | null } | { error: string }> {
+    try {
+        const user = await requireUser();
+        if (!user.isAdmin) return { error: (await getTranslations("account"))("dns.errors.adminOnly") };
+        const parsed = zoneOptionsSchema.safeParse(input);
+        if (!parsed.success) return { error: (await getTranslations("account"))("dns.errors.unreadable") };
+        return await zoneOptions(parsed.data);
+    } catch (caught) {
+        return { error: (await failure(caught, "dns.errors.readZones")).error };
     }
 }
 

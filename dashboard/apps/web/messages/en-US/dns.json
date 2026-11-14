@@ -139,5 +139,39 @@
         "deleteQuestionContent": "Delete the <strong>{type}</strong> record <strong>{name}</strong> with content <code>{content}</code>?",
         "deleteDescription": "Resolvers keep answering with it until their cached copy expires.",
         "deleteConfirm": "Delete record"
+    },
+    "owner": {
+        "badge": "Polaris",
+        "badgeAria": "Managed by Polaris: {what}",
+        "filterAria": "Filter by who manages it",
+        "all": "All records",
+        "managed": "Managed by Polaris",
+        "unmanaged": "Not by Polaris",
+        "serves": "{kind}: {label}",
+        "kinds": {
+            "dashboard": "Polaris address",
+            "deployZone": "Deploy address zone",
+            "deployService": "Deployed service",
+            "tunnel": "Deploy tunnel",
+            "gameZone": "Game server addresses",
+            "gameServer": "Game server address",
+            "verification": "Domain ownership proof",
+            "ownerDomain": "Owner domain"
+        },
+        "breaks": {
+            "dashboard": "Polaris stops opening on this address, and links built from it stop working.",
+            "deployZone": "Deployed services under this zone stop answering on their addresses.",
+            "deployService": "This service stops answering on this address.",
+            "tunnel": "Visitors stop reaching this service through its tunnel.",
+            "gameZone": "Players stop finding this game's servers by name.",
+            "gameServer": "Players stop finding this server by its address.",
+            "verification": "The domain loses its proof and can no longer be used for new addresses.",
+            "ownerDomain": "Services on this domain stop answering on their addresses."
+        },
+        "editTitle": "Record managed by Polaris",
+        "editQuestion": "Polaris wrote {type} {name} for {what}. Changing it can break it.",
+        "editConfirm": "Edit it anyway",
+        "deleteWarning": "Polaris manages this record ({what}). {breaks}",
+        "cancel": "Cancel"
     }
 }

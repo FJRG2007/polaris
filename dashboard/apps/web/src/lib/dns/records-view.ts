@@ -7,6 +7,7 @@
 
 import type { MessageParams } from "@polaris/core";
 import type { DnsRecordView } from "./zone-records";
+import type { RecordOwnerKind } from "./record-owners";
 import {
     PROXIABLE_TYPES,
     TTL_AUTO,
@@ -19,13 +20,34 @@ import {
 /** The type filter's "every type" value. */
 export const ALL_TYPES = "all";
 
+/** Whose records are listed: every one, the ones Polaris manages, or the rest. */
+export type OwnedFilter = "all" | "polaris" | "other";
+
 export interface RecordFilters {
     /** A record type, or `ALL_TYPES`. */
     readonly type: string;
     readonly search: string;
+    readonly owned: OwnedFilter;
 }
 
-export const NO_RECORD_FILTERS: RecordFilters = { type: ALL_TYPES, search: "" };
+export const NO_RECORD_FILTERS: RecordFilters = { type: ALL_TYPES, search: "", owned: "all" };
+
+/** Whether the filters list fewer records than the zone holds. */
+export function isNarrowed(filters: RecordFilters): boolean {
+    return filters.type !== ALL_TYPES || filters.search.trim() !== "" || filters.owned !== "all";
+}
+
+/** An owner kind as the `dns` messages name it (`owner.kinds.*`, `owner.breaks.*`). */
+export const OWNER_KEYS = {
+    dashboard: "dashboard",
+    "deploy-zone": "deployZone",
+    "deploy-service": "deployService",
+    tunnel: "tunnel",
+    "game-zone": "gameZone",
+    "game-server": "gameServer",
+    verification: "verification",
+    "owner-domain": "ownerDomain"
+} as const satisfies Record<RecordOwnerKind, string>;
 
 /** Plain code-point order: the same on every machine, whatever its language. */
 function compare(a: string, b: string): number {
@@ -37,12 +59,14 @@ export function listedRecords(records: readonly DnsRecordView[], filters: Record
     const needle = filters.search.trim().toLowerCase();
     return records
         .filter((record) => filters.type === ALL_TYPES || record.type === filters.type)
+        .filter((record) => filters.owned === "all" || (filters.owned === "polaris") === (record.owner !== undefined))
         .filter(
             (record) =>
                 needle === "" ||
                 record.name.toLowerCase().includes(needle) ||
                 record.relative.toLowerCase().includes(needle) ||
-                record.content.toLowerCase().includes(needle)
+                record.content.toLowerCase().includes(needle) ||
+                (record.owner?.label.toLowerCase().includes(needle) ?? false)
         )
         .sort(
             (a, b) =>

@@ -23,13 +23,24 @@
  */
 
 import * as view from "@/lib/dns/records-view";
-import { DnsRecordsTable } from "./dns-records-table";
+import { DnsRecordsTable, useOwnerText } from "./dns-records-table";
 import { Plus, RefreshCw, Search, X } from "lucide-react";
 import { PropagationPanel } from "./dns-propagation-panel";
 import { useLiveRead } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DnsRecordView, ZoneRecords } from "@/lib/dns/zone-records";
-import { Button, ConfirmDeleteDialog, Input, Select } from "@polaris/ui";
+import {
+    Button,
+    ConfirmDeleteDialog,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select
+} from "@polaris/ui";
 import { DnsRecordDialog, type RecordEditing } from "./dns-record-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { emptyDraft, normalizeDraft, type DnsRecordDraft, type DnsRecordFields } from "@/lib/dns/record-schema";
@@ -84,6 +95,9 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
     const [editing, setEditing] = useState<EditorSession | null>(null);
     const [refused, setRefused] = useState<{ editing: RecordEditing; message: string } | null>(null);
     const [deleting, setDeleting] = useState<DnsRecordView | null>(null);
+    // A record Polaris manages, held here until its edit is confirmed.
+    const [guarded, setGuarded] = useState<DnsRecordView | null>(null);
+    const ownerText = useOwnerText();
     const [checking, setChecking] = useState<string | null>(null);
     const [error, setError] = useState("");
     const editingRef = useRef(editing);
@@ -111,13 +125,20 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
     const all = zone?.records ?? null;
     const shown = useMemo(() => (all ? view.listedRecords(all, filters) : null), [all, filters]);
     const types = useMemo(() => view.recordTypesIn(all ?? []), [all]);
-    const narrowed = filters.type !== view.ALL_TYPES || filters.search.trim() !== "";
+    const narrowed = view.isNarrowed(filters);
+    const breaks = (record: DnsRecordView) =>
+        record.owner ? t(`owner.breaks.${view.OWNER_KEYS[record.owner.kind]}`) : "";
 
     function openForm(next: RecordEditing) {
         setEditing({ ...next, session: (sessionSequence += 1) });
     }
 
-    function openEditor(record: DnsRecordView | null) {
+    /** Open the form - for a record Polaris manages, only once the warning is confirmed. */
+    function openEditor(record: DnsRecordView | null, confirmed = false) {
+        if (record?.owner && !confirmed) {
+            setGuarded(record);
+            return;
+        }
         const draft = record?.draft ?? emptyDraft("A");
         openForm({ id: record?.id ?? null, draft, original: JSON.stringify(normalizeDraft(draft)) });
     }
@@ -134,7 +155,7 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
         if (!current || !scope) return;
         const original = current.records.find((record) => record.id === opened.id) ?? null;
         const id = opened.id ?? `pending-${(pendingSequence += 1)}`;
-        const optimistic = view.pendingView(id, fields, draft, current.zone.name);
+        const optimistic = { ...view.pendingView(id, fields, draft, current.zone.name), owner: original?.owner };
         setEditing(null);
         setError("");
         update((zone) => ({
@@ -150,7 +171,8 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
                 mark(id, false);
                 const saved = result.record;
                 if (saved) {
-                    update((zone) => ({ ...zone, records: zone.records.map((record) => (record.id === id ? saved : record)) }));
+                    const kept = { ...saved, owner: saved.owner ?? original?.owner };
+                    update((zone) => ({ ...zone, records: zone.records.map((record) => (record.id === id ? kept : record)) }));
                     live.refresh();
                     return;
                 }
@@ -225,6 +247,17 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
                     options={[
                         { value: view.ALL_TYPES, label: t("editor.allTypes") },
                         ...types.map((type) => ({ value: type, label: type }))
+                    ]}
+                />
+                <Select
+                    className="sm:w-48"
+                    aria-label={t("owner.filterAria")}
+                    value={filters.owned}
+                    onValueChange={(owned) => setFilters((current) => ({ ...current, owned: owned as view.OwnedFilter }))}
+                    options={[
+                        { value: "all", label: t("owner.all") },
+                        { value: "polaris", label: t("owner.managed") },
+                        { value: "other", label: t("owner.unmanaged") }
                     ]}
                 />
                 <div className="flex items-center gap-2">
@@ -313,7 +346,7 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
                     )
                 }
                 onCheck={(record) => setChecking((current) => (current === record.id ? null : record.id))}
-                onEdit={openEditor}
+                onEdit={(record) => openEditor(record)}
                 onDelete={setDeleting}
             />
 
@@ -326,6 +359,39 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
                     onSubmit={(draft, fields) => submit(editing, draft, fields)}
                 />
             )}
+
+            <Dialog open={guarded !== null} onOpenChange={(open) => !open && setGuarded(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t("owner.editTitle")}</DialogTitle>
+                        <DialogDescription>
+                            {guarded?.owner
+                                ? t("owner.editQuestion", {
+                                      type: guarded.type,
+                                      name: guarded.relative,
+                                      what: ownerText(guarded.owner)
+                                  })
+                                : null}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <p className="mt-3 text-sm text-danger-ink">{guarded ? breaks(guarded) : null}</p>
+                    <DialogFooter className="mt-4">
+                        <Button variant="ghost" onClick={() => setGuarded(null)}>
+                            {t("owner.cancel")}
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={() => {
+                                const record = guarded;
+                                setGuarded(null);
+                                if (record) openEditor(record, true);
+                            }}
+                        >
+                            {t("owner.editConfirm")}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <ConfirmDeleteDialog
                 open={deleting !== null}
@@ -355,7 +421,18 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
                         </>
                     ) : null
                 }
-                description={t("editor.deleteDescription")}
+                description={
+                    deleting?.owner ? (
+                        <span className="flex flex-col gap-1.5">
+                            <span role="alert" className="font-medium text-danger-ink">
+                                {t("owner.deleteWarning", { what: ownerText(deleting.owner), breaks: breaks(deleting) })}
+                            </span>
+                            <span>{t("editor.deleteDescription")}</span>
+                        </span>
+                    ) : (
+                        t("editor.deleteDescription")
+                    )
+                }
                 confirmLabel={t("editor.deleteConfirm")}
                 onConfirm={() => deleting && remove(deleting)}
             />

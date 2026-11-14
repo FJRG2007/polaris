@@ -19,6 +19,7 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 import type { DomainOwner } from "@/lib/owner-domains";
 import { openText } from "@/lib/tls/managed-certificates";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
+import { loadOwnershipFacts, withOwners, type RecordOwner } from "./record-owners";
 import { checkPropagation, type PropagationReport, type QueryType } from "./propagation";
 import {
     DNS_RECORD_TYPES,
@@ -34,8 +35,10 @@ import {
 import {
     deleteDnsRecord,
     getDnsRecord,
+    getZone,
     listDnsRecords,
     listZones,
+    listZonesPage,
     resolveZoneForHostname,
     saveDnsRecord,
     type CfEditableRecord
@@ -82,7 +85,9 @@ async function zoneFor(scope: DnsScope): Promise<Zone> {
         if (!CF_ID.test(scope.zoneId)) throw await refusal("errors.zoneNotEditable");
         const token = await loadCloudflareToken();
         if (!token) throw await refusal("errors.connectCloudflare");
-        const zone = (await listZones(token)).find((entry) => entry.id === scope.zoneId);
+        // Asked for by id, so a zone past the first page of a large account is as
+        // reachable as the first.
+        const zone = await getZone(token, scope.zoneId);
         if (!zone) throw await refusal("errors.zoneNotReached");
         return { token, id: zone.id, name: zone.name, within: null };
     }
@@ -165,6 +170,8 @@ export interface DnsRecordView {
     readonly priority: number | null;
     /** The record as the editor's form holds it, or null for a type it does not edit. */
     readonly draft: DnsRecordDraft | null;
+    /** What in Polaris the record serves, when Polaris wrote it. */
+    readonly owner?: RecordOwner;
 }
 
 function numberOf(value: unknown): string {
@@ -243,13 +250,39 @@ async function scopedRecords(zone: Zone): Promise<DnsRecordView[]> {
         .map((record) => viewOf(record, zone.name));
 }
 
-/** A zone's records, narrowed to what this scope may see. */
+/** A page of the zones whoever runs this Polaris can edit, searched by Cloudflare. */
+export async function zoneOptions(request: {
+    readonly query: string;
+    readonly cursor: string | null;
+    readonly limit: number;
+    readonly ids?: readonly string[];
+}): Promise<{ items: { id: string; name: string }[]; next: string | null }> {
+    const token = await loadCloudflareToken();
+    if (!token) return { items: [], next: null };
+    if (request.ids) {
+        const found = await Promise.all(
+            request.ids.filter((id) => CF_ID.test(id)).map((id) => getZone(token, id))
+        );
+        return { items: found.filter((zone): zone is { id: string; name: string } => zone !== null), next: null };
+    }
+    const page = request.cursor && /^[1-9]\d{0,5}$/.test(request.cursor) ? Number(request.cursor) : 1;
+    const { zones, more } = await listZonesPage(token, { query: request.query, page, perPage: request.limit });
+    return { items: zones, next: more ? String(page + 1) : null };
+}
+
+/**
+ * A zone's records, narrowed to what this scope may see. For the instance's own
+ * zones each record Polaris wrote carries what it serves; a domain's owner is not
+ * shown what other parts of this Polaris put there.
+ */
 export async function zoneRecords(scope: DnsScope): Promise<ZoneRecords> {
     const zone = await zoneFor(scope);
+    const records = await scopedRecords(zone);
     return {
         zone: { id: zone.id, name: zone.name },
         within: zone.within,
-        records: await scopedRecords(zone)
+        records:
+            scope.kind === "instance" ? withOwners(records, await loadOwnershipFacts(zone.id, records)) : records
     };
 }
 

@@ -114,6 +114,55 @@ export async function listZones(token: string): Promise<CfZone[]> {
         .map((entry) => ({ id: entry.id, name: entry.name }));
 }
 
+/** Zone names are matched as they are typed, and this many are read per page at most. */
+const ZONE_PAGE_MAX = 50;
+
+/** A zone as the API answers it, or null for a row missing its identity. */
+function zoneOf(entry: unknown): CfZone | null {
+    if (!entry || typeof entry !== "object") return null;
+    const row = entry as { id?: unknown; name?: unknown };
+    return typeof row.id === "string" && typeof row.name === "string"
+        ? { id: row.id, name: row.name }
+        : null;
+}
+
+/**
+ * One page of the zones this token reaches, by name, narrowed by Cloudflare to
+ * names containing `query` - so an account with any number of zones is read a
+ * page at a time and searched where they live. `page` counts from 1; `more` says
+ * whether a page follows.
+ */
+export async function listZonesPage(
+    token: string,
+    options: { query: string; page: number; perPage: number }
+): Promise<{ zones: CfZone[]; more: boolean }> {
+    const perPage = Math.min(Math.max(1, Math.floor(options.perPage)), ZONE_PAGE_MAX);
+    const page = Math.max(1, Math.floor(options.page));
+    const params = new URLSearchParams({
+        page: String(page),
+        per_page: String(perPage),
+        order: "name",
+        direction: "asc"
+    });
+    const query = options.query.trim().toLowerCase();
+    if (query) params.set("name", `contains:${query}`);
+    const result = await cf<unknown[]>(token, "GET", `/zones?${params.toString()}`);
+    if (!Array.isArray(result)) throw new Error("Unexpected zones response from Cloudflare");
+    const zones = result.map(zoneOf).filter((zone): zone is CfZone => zone !== null);
+    return { zones, more: result.length === perPage };
+}
+
+/** One zone by its id, or null when this token does not reach it. */
+export async function getZone(token: string, zoneId: string): Promise<CfZone | null> {
+    try {
+        return zoneOf(await cf<unknown>(token, "GET", `/zones/${zoneId}`));
+    } catch (caught) {
+        if (caught instanceof CloudflareApiError && caught.status !== null && caught.status < 500)
+            return null;
+        throw caught;
+    }
+}
+
 /** The zone whose name is the longest suffix of a hostname (app.example.com -> example.com), or null. */
 export function zoneForHostname(zones: readonly CfZone[], hostname: string): CfZone | null {
     return (
