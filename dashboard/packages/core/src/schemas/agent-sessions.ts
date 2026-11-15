@@ -135,6 +135,8 @@ export const startAgentSessionSchema = z
         place: agentSessionPlaceSchema.default("local"),
         /** The enrolled server, for `host`. Checked against the place below. */
         hostId: z.string().uuid().nullable().default(null),
+        /** The paired computer, for `computer`. Checked against the place below. */
+        runnerId: z.string().uuid().nullable().default(null),
         /** What the worktree branches from. Empty takes the repository's default. */
         baseRef: z
             .string()
@@ -203,6 +205,10 @@ export const startAgentSessionSchema = z
     .refine((value) => value.place !== "host" || Boolean(value.hostId), {
         message: "Pick the server it runs on",
         path: ["hostId"]
+    })
+    .refine((value) => value.place !== "computer" || Boolean(value.runnerId), {
+        message: "Pick the computer it runs on",
+        path: ["runnerId"]
     })
     // A branch is a thing a checkout has. Asking for one without a repository is
     // a form filled in wrong rather than a value to quietly drop, and dropping it

@@ -108,6 +108,8 @@
         "description": "Pon un agente de código en tus repositorios. Revisa pull requests, responde issues, arregla checks que fallan y abre pull requests cuando se lo pides."
     },
     "text": {
+        "computerOffline": "{name} no está conectado. Abre Polaris en ese equipo o inicia la sesión en otro sitio.",
+        "computerGone": "Ese equipo ya no está vinculado a tu cuenta.",
         "runGateGone": "Esa tarea ya no espera una decisión.",
         "runAnswered": "Esa pregunta ya tiene respuesta.",
         "runNotVariant": "Esa tarea no es una de varias variantes.",

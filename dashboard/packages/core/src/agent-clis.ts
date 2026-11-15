@@ -1564,7 +1564,7 @@ export function parseAgentCliVersion(output: string): string | null {
  * Null is "nobody said", which is the only value a session created before this
  * existed can have.
  */
-export function agentRunsUnattended(place: "local" | "host", chosen: boolean | null): boolean {
+export function agentRunsUnattended(place: "local" | "host" | "computer", chosen: boolean | null): boolean {
     return chosen ?? place === "local";
 }
 
@@ -1636,7 +1636,7 @@ export function permissionModeArgs(
  * Polaris only writes it where nobody else did.
  */
 export function polarisAppliesAutonomy(
-    place: "local" | "host",
+    place: "local" | "host" | "computer",
     chosen: boolean | null,
     enigmaActive: boolean
 ): boolean {

@@ -56,6 +56,7 @@ import { startContainer } from "./session-container";
 import { claimSpare } from "./session-spares";
 import { previewBase } from "./session-preview-link";
 import * as placement from "./session-placement";
+import * as computer from "@/lib/computers/computer-sessions";
 import {
     addSessionMessage,
     finishSession,
@@ -713,6 +714,11 @@ function guardEnv(env: Record<string, string>): Record<string, string> {
  */
 export async function startSession(session: SessionView, token: string): Promise<void> {
     try {
+        if (session.place === "computer") {
+            await computer.startOnComputer(session, token);
+            await markSessionStarted(session.id, "", "");
+            return;
+        }
         const boot = await bootstrapFor(session, token);
         if (session.place === "host") {
             await startOnHost(session, boot);
@@ -880,6 +886,9 @@ export async function runInSession(
     if (!placement) throw new Error("That session no longer exists.");
     if (!evenIfFinished && core.isSessionOver(placement.state))
         throw new Error("That session has ended.");
+    // A computer's runner takes protocol frames, not shell commands. Callers
+    // that reach here for one treat it like any machine that did not answer.
+    if (placement.place === "computer") throw new Error("That session runs on a computer, which takes no commands.");
 
     if (placement.place === "host") {
         if (!placement.hostId) throw new Error("That session names no server to run on.");
@@ -998,6 +1007,7 @@ export async function promptSession(sessionId: string, text: string): Promise<vo
     // A session whose runner takes its prompts gets this one as a file in the
     // queue: nothing typed, nothing that has to look ready first.
     if (!placement) throw new Error("That session no longer exists.");
+    if (placement.place === "computer") return computer.promptOnComputer(sessionId, text);
     const queued = await runInSession(
         sessionId,
         commands.queuePromptCommand(stateDirFor(placement), text)
@@ -1080,6 +1090,7 @@ export async function changeSessionMode(
 ): Promise<void> {
     const args = core.permissionModeArgs(cliId, to);
     const placement = await sessionPlacement(sessionId);
+    if (placement?.place === "computer") return computer.settingsOnComputer(sessionId, { permissionMode: to });
     if (!args || !placement) throw new Error("That session no longer exists.");
     await steer(
         sessionId,
@@ -1095,6 +1106,7 @@ export async function changeSessionMode(
 export async function changeSessionModel(sessionId: string, model: string): Promise<void> {
     const placement = await sessionPlacement(sessionId);
     if (!placement) throw new Error("That session no longer exists.");
+    if (placement.place === "computer") return computer.settingsOnComputer(sessionId, { model });
     await steer(
         sessionId,
         commands.modelCommand(stateDirFor(placement), model),
@@ -1115,6 +1127,7 @@ export async function changeSessionEffort(
     if (!support || !support.levels.includes(level)) throw new Error("That tool takes no effort level.");
     const placement = await sessionPlacement(sessionId);
     if (!placement) throw new Error("That session no longer exists.");
+    if (placement.place === "computer") return computer.settingsOnComputer(sessionId, { effort: level });
     await steer(
         sessionId,
         commands.effortCommand(stateDirFor(placement), support.command, level),
@@ -1125,6 +1138,7 @@ export async function changeSessionEffort(
 /** Stop what the agent is doing without ending the session. */
 export async function interruptSession(sessionId: string): Promise<void> {
     const placement = await sessionPlacement(sessionId);
+    if (placement?.place === "computer") return computer.interruptOnComputer(sessionId);
     if (placement) {
         const stopped = await runInSession(
             sessionId,
@@ -1220,6 +1234,10 @@ export async function stopSession(sessionId: string): Promise<SaveOutcome | null
     // Whoever pressed Stop has answered whatever it was waiting on.
     await clearSessionWaiting(sessionId);
     await syncFinalSessionHistory(sessionId);
+    if (placement.place === "computer") {
+        await computer.stopOnComputer(sessionId);
+        return null;
+    }
     if (placement.place === "host") {
         await runInSession(
             sessionId,

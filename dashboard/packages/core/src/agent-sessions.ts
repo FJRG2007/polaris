@@ -334,15 +334,17 @@ export function promptSubmitDelayMs(byteLength: number): number {
  * picks when the work needs the machine that already has the toolchain, the caches
  * and the agent's own login on it.
  *
- * There is no third option that runs on the operator's laptop. Polaris is a
- * control plane and cannot reach into a machine that has not enrolled with it.
+ * `computer` is the starter's own PC, through the runner they paired with it
+ * (`runner-protocol.ts`): it dials out to Polaris, so Polaris never reaches into
+ * it, and the agent runs on that machine's own sign-ins.
  */
-export const AGENT_SESSION_PLACES = ["local", "host"] as const;
+export const AGENT_SESSION_PLACES = ["local", "host", "computer"] as const;
 export type AgentSessionPlace = (typeof AGENT_SESSION_PLACES)[number];
 
 export const AGENT_SESSION_PLACE_LABELS: Record<AgentSessionPlace, string> = {
     local: "This Polaris box",
-    host: "An enrolled server"
+    host: "An enrolled server",
+    computer: "This computer"
 };
 
 /**

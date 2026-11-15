@@ -312,6 +312,7 @@ model User {
     sessionStates       SessionState[]
     extensionSessions    ExtensionSession[]
     trustedDevices      TrustedDevice[]
+    agentRunners        AgentRunner[]
     accountDevices      AccountDevice[]
     deviceCodes         DeviceCode[]
     emails              UserEmail[]
@@ -941,6 +942,50 @@ model UserProfileStyle {
 // remembered, so the owner can recognise one in the list and end that one. It is
 // a label, never the pass - deleting a row here forgets a device, and the
 // Verification row is what actually decides whether the challenge is skipped.
+// A runner on somebody's own computer: the daemon that lets Polar Code drive the
+// agent CLIs installed there from any device. It dials out to Polaris over one
+// WebSocket (docs/runner-protocol.md); nothing reaches into the computer.
+model AgentRunner {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    // What the person calls it. Starts as the machine's own name.
+    name      String
+    // SHA-256 of the runner credential. The credential itself is shown to the
+    // runner once, when it pairs, and never stored.
+    tokenHash String   @unique
+    // The last characters, so the screen can tell two credentials apart.
+    tokenHint String
+    // As the runner last reported them. Shown, never an input to a decision.
+    platform      String?
+    osRelease     String?
+    arch          String?
+    runnerVersion String?
+    // The capabilities frame as received (shells, CLIs and their sign-in).
+    capabilities  Json?
+    // Which dashboard node holds its live connection, and since when. Null
+    // while it is not connected anywhere.
+    relayNode     String?
+    connectedAt   DateTime?
+    lastSeenAt    DateTime?
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+}
+
+// A command for a runner whose connection is on another dashboard node, too
+// large for a NOTIFY payload. Read and deleted by the node that holds it.
+model AgentRunnerCommand {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    runnerId  String   @db.Uuid
+    body      String
+    createdAt DateTime @default(now())
+
+    @@index([createdAt])
+}
+
 model TrustedDevice {
     id String @id @default(uuid(7)) @db.Uuid
     // The Verification row this describes. Follows better-auth's rotation, so
@@ -9019,8 +9064,12 @@ model AgentSession {
     // What starts a `custom` agent, exactly as the operator typed it. Null for a
     // catalogued one, whose command is the catalogue's business.
     command     String?
-    // local | host - a container on the Polaris box, or an enrolled server.
+    // local | host | computer - a container on the Polaris box, an enrolled
+    // server, or the starter's own computer through its runner.
     place       String    @default("local")
+    // The runner, for `computer`. No relation: a revoked runner leaves its
+    // finished sessions readable.
+    runnerId    String?   @db.Uuid
     // Whether it runs on the machine everybody shares rather than on this
     // account's own.
     //
@@ -9223,6 +9272,7 @@ model AgentSession {
     @@index([hostId])
     // The sweep that carries on a session once an account frees up.
     @@index([limitWaitUntil])
+    @@index([runnerId])
 }
 
 // What a person's agent remembers about one repository, carried between the

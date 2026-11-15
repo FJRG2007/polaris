@@ -13,10 +13,7 @@
 import { sessionForToken } from "@/lib/agents/session-service";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { isSessionOver } from "@polaris/core";
-import type { Prisma } from "@polaris/db";
-import { pushPermissionRequest } from "@/lib/agents/agent-notices";
-import * as permissions from "@/lib/agents/session-permissions";
-import * as asks from "@/lib/agents/session-asks";
+import { decidePermissionHook } from "@/lib/agents/session-hook-ingest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,47 +53,5 @@ export async function POST(
     } catch {
         return noDecision();
     }
-    // A question or a plan, put to the person before the tool runs.
-    const question = asks.readAsk(payload);
-    if (question) {
-        try {
-            const tool = question.ask.kind === "plan" ? "ExitPlanMode" : "AskUserQuestion";
-            const requestId = await permissions.openPermissionRequest(id, {
-                tool,
-                detail: question.ask.kind === "plan" ? "" : question.ask.questions[0]!.question,
-                suggestions: null,
-                input: question.raw as Prisma.InputJsonValue
-            });
-            void pushPermissionRequest(id, requestId, question.ask.kind === "plan" ? tool : question.ask.questions[0]!.question, false);
-            const answer = await permissions.awaitPermission(
-                requestId,
-                id,
-                permissions.PERMISSION_WAIT_MS,
-                request.signal
-            );
-            return Response.json(asks.askDecision(tool, answer.status, answer.input, answer.answer));
-        } catch (error) {
-            console.error(`[agent-session] ${id}: question could not be relayed:`, error);
-            return noDecision();
-        }
-    }
-    const asked = permissions.readPermissionRequest(payload);
-    // The PreToolUse hook already put a question or a plan to the person; one
-    // that went unanswered there is the agent's own terminal's to ask.
-    if (!asked || asks.isAskTool(asked.tool)) return noDecision();
-
-    try {
-        const requestId = await permissions.openPermissionRequest(id, asked);
-        void pushPermissionRequest(id, requestId, asked.detail);
-        const answer = await permissions.awaitPermission(
-            requestId,
-            id,
-            permissions.PERMISSION_WAIT_MS,
-            request.signal
-        );
-        return Response.json(permissions.hookDecision(answer.status, answer.tool, answer.suggestions));
-    } catch (error) {
-        console.error(`[agent-session] ${id}: permission prompt could not be relayed:`, error);
-        return noDecision();
-    }
+    return Response.json(await decidePermissionHook(id, payload, request.signal));
 }

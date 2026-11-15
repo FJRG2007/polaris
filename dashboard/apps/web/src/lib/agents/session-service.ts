@@ -39,6 +39,11 @@ import * as subagents from "./session-subagents";
  * says what is wrong in terms the reader can see, and where there is something to
  * press, it says what.
  */
+/** A stored place, read back. Anything unknown is the box, as before. */
+function readPlace(raw: string): core.AgentSessionPlace {
+    return (core.AGENT_SESSION_PLACES as readonly string[]).includes(raw) ? (raw as core.AgentSessionPlace) : "local";
+}
+
 export class SessionRefusal extends Error {
     constructor(message: string) {
         super(message);
@@ -292,7 +297,7 @@ function toView(record: SessionRecord): SessionView {
         repoFullName: record.repo?.repoFullName ?? "",
         cli: record.cli,
         command: record.command,
-        place: record.place === "host" ? "host" : "local",
+        place: readPlace(record.place),
         sharedHome: record.sharedHome,
         unattended: record.unattended,
         permissionMode: core.sessionPermissionMode(record.permissionMode),
@@ -458,6 +463,8 @@ export interface SessionCreateInput {
     /** The provider and model, for a tool that takes them from Polaris. */
     readonly modelChoice?: core.SessionModelChoice | null;
     readonly hostId: string | null;
+    /** The paired computer, for `computer`. */
+    readonly runnerId?: string | null;
     readonly baseRef: string;
     readonly taskId: string | null;
     readonly enigma: core.EnigmaSettings | null;
@@ -505,6 +512,7 @@ export async function createSession(
             model: input.modelChoice?.model ?? null,
             modelPayer: input.modelChoice?.payer ?? null,
             hostId: input.hostId,
+            runnerId: input.place === "computer" ? (input.runnerId ?? null) : null,
             baseRef: input.baseRef,
             branch: createdSessionBranch(id, input.repoId, input.title),
             taskId: input.taskId,
@@ -995,7 +1003,7 @@ export async function sessionPlacement(sessionId: string): Promise<{
     if (!record) return null;
     return {
         id: record.id,
-        place: record.place === "host" ? "host" : "local",
+        place: readPlace(record.place),
         hostId: record.hostId,
         containerId: record.containerId,
         workdir: record.workdir,
