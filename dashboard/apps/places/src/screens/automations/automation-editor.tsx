@@ -48,6 +48,7 @@ import { savePlaceLocationAction } from "../actions";
 import { AutomationCanvas } from "./automation-canvas";
 import { AddBlockButton, RoomsProvider, blockIcon } from "./add-block";
 import type { LabelView, RoomView } from "../../lib/room-kinds";
+import { prefilledDefinition } from "../../lib/automation-prefill";
 import { swap, within } from "@polaris/ui/automation-graph";
 import type { CanvasSelection, NodeState } from "@polaris/ui/automation-canvas";
 
@@ -235,7 +236,9 @@ export function startingDraft(
     device: DeviceView | undefined,
     placeId: string,
     timeZone: string,
-    t: ReturnType<typeof usePlacesT>
+    t: ReturnType<typeof usePlacesT>,
+    /** A camera it was started from, where it was. */
+    cameraId: string | null = null
 ): Draft {
     const base = { enabled: true, placeId };
     if (template === "autoOff") {
@@ -278,7 +281,12 @@ export function startingDraft(
             definition: auto.followDefinition(timeZone)
         };
     }
-    return { ...base, name: "", definition: auto.blankDefinition(timeZone) };
+    // Started from one device or camera: that thing is already in it.
+    return {
+        ...base,
+        name: device?.name ?? "",
+        definition: prefilledDefinition({ deviceId: device?.id, cameraId }, timeZone)
+    };
 }
 
 export function AutomationEditor({

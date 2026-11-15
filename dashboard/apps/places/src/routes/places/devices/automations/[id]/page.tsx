@@ -60,6 +60,7 @@ export default async function AutomationPage({
                             : null
                     }
                     deviceId={one(query.device)}
+                    cameraId={one(query.camera)}
                     placeId={one(query.place)}
                 />
             )}

@@ -25,10 +25,13 @@ const { useDisplayFormat } = hostUi.displayFormat;
 export function AutomationStarter({
     template,
     deviceId,
+    cameraId = null,
     placeId
 }: {
     template: string | null;
     deviceId: string | null;
+    /** A camera it is started from, by "Create automation" on the camera. */
+    cameraId?: string | null;
     placeId: string | null;
 }) {
     const t = usePlacesT();
@@ -57,7 +60,13 @@ export function AutomationStarter({
                 context.devices.find((device) => device.id === deviceId),
                 context.placeId,
                 auto.readerZone(format.preferences.timeZone),
-                t
+                t,
+                cameraId &&
+                    (context.privacyTargets ?? []).some(
+                        (option) => option.target === `camera:${cameraId}`
+                    )
+                    ? cameraId
+                    : null
             );
             setDraft(next);
             setName(next.name);
