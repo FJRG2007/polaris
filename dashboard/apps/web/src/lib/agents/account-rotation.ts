@@ -20,8 +20,9 @@
  *
  * A session can also be moved by hand (`switchSessionAccount`), the way AO's
  * `ao account switch` pins a session to another account: the same claim on
- * the row, the launch reads the new account before the next turn, and an
- * agent that left its terminal is brought back on its conversation.
+ * the row, the launch reads the new account before the next turn, an agent
+ * that left its terminal is brought back on its conversation, and one running
+ * in its own interface ends its turn and starts again on the conversation.
  * Ported from Agent Orchestrator (Apache-2.0),
  * backend/internal/service/agentaccounts/service.go (session handoff).
  *
@@ -30,7 +31,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { queueTurnAgain } from "@/lib/agents/session-runtime";
+import { moveAgentToAccount, promptMovedAgent, queueTurnAgain, type AgentMove } from "@/lib/agents/session-runtime";
 import { instanceKeysAreShared } from "@/lib/agents/model-keys";
 import { refusedAccountName } from "@/lib/agents/signin-refusal";
 import { addSessionMessage } from "@/lib/agents/session-service";
@@ -363,8 +364,8 @@ export function movedNotice(to: string, from: string | null): string {
     return from ? `Moved to ${to} from ${from}.` : `Moved to ${to}.`;
 }
 
-/** The turn could not be queued again (no runner, or the agent's interface is
- *  open): the person sends it. */
+/** The turn could not be sent again (no conversation to restart the agent on,
+ *  or the restarted agent never came back in time): the person sends it. */
 export const RESEND_YOURSELF = "Send your last message again to carry on.";
 
 /** An overloaded provider, sent again after a wait. Pure. */
@@ -449,13 +450,32 @@ async function interruptedPrompt(sessionId: string): Promise<string | null> {
     return row?.body.trim() ? row.body : null;
 }
 
-/** Send the failed turn again, once. Never throws: a resend that did not land
+/** Send the failed turn again, once: through the runner's queue, else on the
+ *  agent restarted on the new account. Never throws: a resend that did not land
  *  leaves the turn where the person can send it themselves. */
 async function resend(sessionId: string): Promise<boolean> {
+    return resendAfter(sessionId, null);
+}
+
+/**
+ * The turn again on the new account. The runner's queue first: a turn there
+ * starts afresh. Otherwise the agent in the terminal still holds the account it
+ * started on, and typing the turn into it would meet the same limit and move
+ * the session through every account, so it is restarted on its conversation
+ * first (`moveAgentToAccount`, unless the caller already did) and the turn
+ * typed once it is back.
+ */
+async function resendAfter(sessionId: string, moved: AgentMove | null): Promise<boolean> {
     try {
         const prompt = await interruptedPrompt(sessionId);
         if (!prompt) return false;
-        return await queueTurnAgain(sessionId, prompt);
+        if (moved !== "relaunched" && moved !== "resumed") {
+            if (await queueTurnAgain(sessionId, prompt)) return true;
+            if (moved !== null) return false;
+            moved = await moveAgentToAccount(sessionId);
+        }
+        if (moved !== "relaunched" && moved !== "resumed") return false;
+        return await promptMovedAgent(sessionId, prompt);
     } catch (error) {
         console.error(
             `[agent-session] ${sessionId}: could not send the turn again:`,
@@ -670,19 +690,21 @@ export type SwitchOutcome = "moved" | "same" | "unknown" | "machine" | "over" | 
 /** Ports a switch reaches out through, so a test can watch them. */
 export interface SwitchPorts {
     readonly notice: (sessionId: string, body: string) => Promise<void>;
-    /** Puts the new account where the next launch reads it, and brings back an
-     *  agent that left its terminal on its conversation. */
-    readonly restart: (sessionId: string) => Promise<void>;
-    /** Sends the turn a limit left waiting. */
-    readonly resend: (sessionId: string) => Promise<boolean>;
+    /** Puts the new account where the next launch reads it, brings back an
+     *  agent that left its terminal, and restarts one running in its own
+     *  interface, each on its conversation (`moveAgentToAccount`). */
+    readonly restart: (sessionId: string) => Promise<AgentMove>;
+    /** Sends the turn a limit held, or the one the restart ended, again. */
+    readonly resend: (sessionId: string, moved: AgentMove) => Promise<boolean>;
 }
 
 /**
  * Move a session to another of its owner's accounts for its tool, by hand.
  * Only accounts the rotation could pick are taken, so a switch can never land
  * on somebody else's sign-in or another tool's. A wait on a usage limit ends,
- * and the turn it held is sent again on the new account. Never throws on a
- * lost race: two switches at once move the session once.
+ * and the turn it held is sent again on the new account; so is a turn the
+ * agent was in the middle of in its own interface, which the restart ended.
+ * Never throws on a lost race: two switches at once move the session once.
  */
 export async function switchSessionAccount(
     sessionId: string,
@@ -708,8 +730,9 @@ export async function switchSessionAccount(
         ? (accounts.find((account) => account.id === row.accountId)?.name ?? (await refusedAccountName(row.accountId)))
         : null;
     await ports.notice(sessionId, movedNotice(target.name, from)).catch(() => undefined);
-    await ports.restart(sessionId);
-    if (row.limitWaitUntil) await ports.resend(sessionId).catch(() => false);
+    const moved = await ports.restart(sessionId);
+    const cut = moved === "relaunched" && row.state === "working";
+    if (row.limitWaitUntil || cut) await ports.resend(sessionId, moved).catch(() => false);
     return "moved";
 }
 
@@ -726,7 +749,8 @@ export async function sessionAccountChoices(
     return { current: row.accountId, accounts };
 }
 
-/** The real ports: the turn's resend as rotation does it. */
-export function switchPorts(restart: (sessionId: string) => Promise<void>): SwitchPorts {
-    return { notice: PORTS.notice, restart, resend };
+/** The real ports: the agent moved as the rotation moves it, and the turn
+ *  sent again on it. */
+export function switchPorts(): SwitchPorts {
+    return { notice: PORTS.notice, restart: moveAgentToAccount, resend: resendAfter };
 }

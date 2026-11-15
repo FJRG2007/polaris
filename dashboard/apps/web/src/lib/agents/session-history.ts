@@ -17,6 +17,8 @@ import { runInSession } from "./session-runtime";
 import { touchSession } from "./session-live";
 import {
     decodeClaudeLine,
+    decodeCodexLine,
+    newestCodexBoundary,
     promptKey,
     transcriptDecoder,
     type HistoryRow,
@@ -24,6 +26,7 @@ import {
 } from "./transcript-decoders";
 import { readableTranscriptPath, readTranscript } from "./session-transcript";
 import { claudeLineUsage, recordSessionUsage, type TurnUsage } from "./session-usage";
+import { noteCodexTurnEnd } from "./codex-turn-failures";
 
 /** The shortest gap between two reads of one transcript. One second: the end of
  *  a turn usually lands within a few seconds of its last tool, and at three the
@@ -154,6 +157,11 @@ async function readOnce(
         },
         data: { transcriptFile: path, transcriptOffset: BigInt(next) }
     });
+    // A Codex turn that failed or was stopped fires no hook; its end is here.
+    if (moved.count > 0 && decode === decodeCodexLine) {
+        const written = read.lines.filter((line) => line.end <= next).map((line) => line.text);
+        await noteCodexTurnEnd(sessionId, newestCodexBoundary(written));
+    }
     if (moved.count > 0)
         await recordSessionUsage(sessionId, spent).catch((error) =>
             console.error(`[agent-session] ${sessionId}: could not count usage`, error)

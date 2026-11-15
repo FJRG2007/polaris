@@ -443,6 +443,97 @@ export function decodeCodexLine(line: string): HistoryRow[] {
     }
 }
 
+/**
+ * The newest turn boundary in a stretch of a Codex rollout.
+ *
+ * Codex runs its Stop hook only on a turn whose model request succeeded: a
+ * turn that ends on a usage limit, an unsupported model or an expired sign-in
+ * fires no hook at all, and neither does an Esc. Codex still writes every turn
+ * end to the rollout, as an `event_msg` `task_complete` carrying `error` when
+ * the turn failed, or a `turn_aborted` with reason `interrupted` for an Esc.
+ * Only the newest boundary counts: a turn started after a failed one means a
+ * later turn is running, and the failure is history.
+ *
+ * Ported from Agent Orchestrator (Apache-2.0),
+ * backend/internal/adapters/agent/codex/turn_failures.go
+ * (`lastCodexTurnFailure`, `codexTurnBoundary`).
+ */
+export type CodexTurnBoundary =
+    | { readonly kind: "started" }
+    | {
+          readonly kind: "ended";
+          /** When the turn ended, in epoch ms, or null when the record says no
+           *  readable time: such an end is never acted on, since dating it now
+           *  could make an old failure look newer than the current prompt. */
+          readonly at: number | null;
+          /** What the failure said, or null for a turn that did not fail. */
+          readonly error: string | null;
+          readonly interrupted: boolean;
+      };
+
+/** The payload types that start or end a turn, matched as quoted text before
+ *  any decode: most of a rollout is messages, reasoning and token counts. */
+const CODEX_BOUNDARY_TYPES = ["task_started", "turn_started", "turn_aborted", "task_complete", "turn_complete"] as const;
+const CODEX_BOUNDARY_QUOTED = CODEX_BOUNDARY_TYPES.map((type) => `"${type}"`);
+
+const codexBoundarySchema = z.object({
+    timestamp: z.string().max(64).optional(),
+    type: z.literal("event_msg"),
+    payload: z.object({
+        type: z.enum(CODEX_BOUNDARY_TYPES),
+        reason: z.string().max(200).nullish(),
+        error: z.unknown().optional()
+    })
+});
+
+/** The longest failure text kept from a rollout record. */
+const MAX_CODEX_ERROR_CHARS = 4_096;
+
+function codexBoundary(line: string): CodexTurnBoundary | null {
+    if (!line.includes('"event_msg"') || !CODEX_BOUNDARY_QUOTED.some((type) => line.includes(type))) return null;
+    let raw: unknown;
+    try {
+        raw = JSON.parse(line);
+    } catch {
+        return null;
+    }
+    const parsed = codexBoundarySchema.safeParse(raw);
+    if (!parsed.success) return null;
+    const { timestamp, payload } = parsed.data;
+    const time = timestamp ? Date.parse(timestamp) : Number.NaN;
+    const at = Number.isFinite(time) ? time : null;
+    switch (payload.type) {
+        case "task_started":
+        case "turn_started":
+            return { kind: "started" };
+        case "turn_aborted":
+            // Esc. Other reasons (a turn replaced by a newer one, a review
+            // ending) are not a turn the person stopped.
+            return { kind: "ended", at, error: null, interrupted: payload.reason === "interrupted" };
+        default: {
+            const error = payload.error;
+            if (error === undefined || error === null) return { kind: "ended", at, error: null, interrupted: false };
+            const message =
+                typeof error === "string"
+                    ? error
+                    : typeof error === "object" && typeof (error as { message?: unknown }).message === "string"
+                      ? (error as { message: string }).message
+                      : "";
+            return { kind: "ended", at, error: message.slice(0, MAX_CODEX_ERROR_CHARS), interrupted: false };
+        }
+    }
+}
+
+/** The newest boundary among these lines, oldest first, or null when they
+ *  hold none. Pure. */
+export function newestCodexBoundary(lines: readonly string[]): CodexTurnBoundary | null {
+    for (let index = lines.length - 1; index >= 0; index--) {
+        const boundary = codexBoundary(lines[index]!);
+        if (boundary) return boundary;
+    }
+    return null;
+}
+
 // ---------------------------------------------------------------------------
 // Gemini CLI: `~/.gemini/tmp/<project>/chats/session-*.jsonl`
 // ---------------------------------------------------------------------------

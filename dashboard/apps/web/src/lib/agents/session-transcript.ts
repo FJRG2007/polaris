@@ -36,7 +36,8 @@ export const MAX_LINE_BYTES = 256 * 1024;
  *
  * The path came from a hook payload - the agent's own machine said it - so it is
  * held to the shape the agents that report one actually write: an absolute
- * `.jsonl` under a projects directory inside a `.claude` config home (or `.codex/sessions`). Never a
+ * `.jsonl` under a projects directory inside a `.claude` config home (or `.codex/sessions`,
+ * directly or through a Codex account home). Never a
  * path from a request.
  */
 export function readableTranscriptPath(path: string | null | undefined): path is string {
@@ -47,6 +48,10 @@ export function readableTranscriptPath(path: string | null | undefined): path is
     return (
         /\/\.claude[^/]*\/(?:[^/]+\/)*projects\/[^/]+\/[^/]+\.jsonl$/.test(path) ||
         /\/\.codex\/sessions\/(?:[^/]+\/)*[^/]+\.jsonl$/.test(path) ||
+        // A Codex account's own home (`account-homes.ts`): its `sessions` is a
+        // link back to the session's `.codex/sessions`, and Codex names the
+        // rollout through the home it was started in.
+        /\/\.polaris-accounts\/codex\/[A-Za-z0-9_-]{1,64}\/sessions\/(?:[^/]+\/)*[^/]+\.jsonl$/.test(path) ||
         /\/\.gemini\/tmp\/[^/]+\/chats\/[^/]+\.jsonl$/.test(path)
     );
 }
@@ -60,6 +65,22 @@ export function transcriptChunkScript(path: string, offset: number): string {
         "size=$(wc -c < \"$f\" | tr -d ' ')",
         `echo "${MARK} chunk $size"`,
         `tail -c +${from + 1} "$f" | head -c ${TRANSCRIPT_CHUNK_BYTES} | base64 | tr -d '\\n'`,
+        "echo"
+    ].join("\n");
+}
+
+/** The script that prints the file's size and its last chunk, for a reader
+ *  that only wants the newest lines. Answers in the chunk shape. */
+export function transcriptTailScript(path: string): string {
+    return [
+        `f=${shellQuote(path)}`,
+        `[ -f "$f" ] || { echo "${MARK} missing"; exit 0; }`,
+        "size=$(wc -c < \"$f\" | tr -d ' ')",
+        `echo "${MARK} chunk $size"`,
+        // Measured once: the window ends at the size printed even while the
+        // agent appends, so a walk further back lines up with it.
+        `from=$((size > ${TRANSCRIPT_CHUNK_BYTES} ? size - ${TRANSCRIPT_CHUNK_BYTES} : 0))`,
+        `tail -c +$((from + 1)) "$f" | head -c $((size - from)) | base64 | tr -d '\\n'`,
         "echo"
     ].join("\n");
 }
@@ -198,4 +219,56 @@ export async function readTranscript(
     function done(): TranscriptRead {
         return { kind: "ok", lines, next: heldAt, restarted, skipped, more: heldAt < size };
     }
+}
+
+/** Chunks a tail read walks back at most: 44 KB, the end of a turn and the
+ *  records written around it. */
+export const MAX_TAIL_CHUNKS = 4;
+
+/**
+ * Read the file's complete lines backwards from its end, a chunk at a time,
+ * until `enough` says the lines read so far answer the question or the chunks
+ * run out. The line still being written and the first line cut by the window
+ * are left out. Lines come oldest first.
+ */
+export async function readTranscriptTail(
+    path: string,
+    run: (script: string) => Promise<string>,
+    enough: (lines: readonly string[]) => boolean,
+    { maxChunks = MAX_TAIL_CHUNKS }: { maxChunks?: number } = {}
+): Promise<{ kind: "ok"; lines: string[] } | { kind: "missing" } | { kind: "failed" }> {
+    const first = parseTranscriptAnswer(await run(transcriptTailScript(path)));
+    if (!first || first.kind === "line") return { kind: "failed" };
+    if (first.kind === "missing") return { kind: "missing" };
+    let held = first.bytes;
+    // Cut on the way: nothing here can be vouched for.
+    if (held.length !== Math.min(TRANSCRIPT_CHUNK_BYTES, first.size)) return { kind: "failed" };
+    let start = first.size - held.length;
+    let lines = completeLines(held, start > 0);
+    for (let chunk = 1; chunk < maxChunks && start > 0 && !enough(lines); chunk++) {
+        const from = Math.max(0, start - TRANSCRIPT_CHUNK_BYTES);
+        const answer = parseTranscriptAnswer(await run(transcriptChunkScript(path, from)));
+        if (!answer || answer.kind !== "chunk" || answer.size < start) break;
+        const piece = answer.bytes.subarray(0, start - from);
+        if (piece.length < start - from) break;
+        held = Buffer.concat([piece, held]);
+        start = from;
+        lines = completeLines(held, start > 0);
+    }
+    return { kind: "ok", lines };
+}
+
+/** The whole lines in a window of the file: the last one only once it ends,
+ *  the first only when the window starts at the top. */
+function completeLines(bytes: Buffer, cutAtStart: boolean): string[] {
+    const end = bytes.lastIndexOf(0x0a);
+    if (end < 0) return [];
+    const begin = cutAtStart ? bytes.indexOf(0x0a) + 1 : 0;
+    if (begin > end) return [];
+    return bytes
+        .subarray(begin, end)
+        .toString("utf8")
+        .split("\n")
+        .map((line) => line.replace(/\r$/, ""))
+        .filter((line) => line !== "");
 }

@@ -1298,6 +1298,66 @@ export async function resumeAgent(sessionId: string, vendorSessionId: string): P
     await steer(sessionId, commands.submitCommand(), "The resume was typed but not submitted");
 }
 
+/** What became of the agent when its session moved to another account. */
+export type AgentMove = "next-turn" | "resumed" | "relaunched" | "stays";
+
+/**
+ * Put a running session's agent on the account its session now names.
+ *
+ * The credentials file is written first, which is all a runner session needs:
+ * every turn starts afresh and reads it ("next-turn"). An agent that left its
+ * terminal is brought back on its conversation ("resumed"). One running in its
+ * own interface keeps the variables it started with, so its turn is ended
+ * with Esc and it is restarted on the same conversation ("relaunched"), the way
+ * the rotation resumes a Claude session. "stays" when there is no conversation
+ * to come back to, which leaves the agent as it is rather than starting a new
+ * one over it.
+ */
+export async function moveAgentToAccount(sessionId: string): Promise<AgentMove> {
+    const [, placement, row] = await Promise.all([
+        refreshCredentials(sessionId),
+        sessionPlacement(sessionId),
+        prisma.agentSession.findUnique({ where: { id: sessionId }, select: { cli: true, vendorSessionId: true } })
+    ]);
+    if (!placement || !row) return "stays";
+    const conversation =
+        core.agentResumeStyle(row.cli) !== "" && row.vendorSessionId && core.isVendorSessionId(row.vendorSessionId)
+            ? row.vendorSessionId
+            : null;
+    if (!conversation) return "stays";
+    if (await agentHasExited(sessionId)) {
+        await steer(sessionId, commands.clearReadyCommand(), "The session's terminal did not take the resume");
+        await steer(sessionId, commands.resumeCommand(conversation), "The session's terminal did not take the resume");
+        await steer(sessionId, commands.submitCommand(), "The resume was typed but not submitted");
+        return "resumed";
+    }
+    const result = await runInSession(sessionId, commands.relaunchAgentCommand(stateDirFor(placement), conversation));
+    if (result.code === commands.NOT_RELAUNCHED.nextTurn) return "next-turn";
+    if (result.code !== 0) throw new Error("The session's terminal did not restart the agent");
+    return "relaunched";
+}
+
+/** How long a restarted agent is given to hold its terminal again before a
+ *  turn is typed into it: a resume reads the whole conversation back. */
+const RELAUNCH_READY_TIMEOUT_MS = 2 * 60 * 1000;
+
+/**
+ * Type a turn into an agent `moveAgentToAccount` restarted or resumed, once it
+ * holds its terminal again. False when it never did in time; the turn is then
+ * the person's to send.
+ */
+export async function promptMovedAgent(sessionId: string, text: string): Promise<boolean> {
+    const deadline = Date.now() + RELAUNCH_READY_TIMEOUT_MS;
+    for (;;) {
+        const ready = await runInSession(sessionId, commands.relaunchedReadyCommand()).catch(() => null);
+        if (ready?.code === 0) break;
+        if (Date.now() + AGENT_READY_POLL_MS >= deadline) return false;
+        await new Promise((resolve) => setTimeout(resolve, AGENT_READY_POLL_MS));
+    }
+    await promptSession(sessionId, text);
+    return true;
+}
+
 /** What the agent's terminal currently shows. */
 export async function captureSession(sessionId: string, lines = 200): Promise<string> {
     const result = await runInSession(sessionId, commands.captureCommand(lines));

@@ -1032,6 +1032,13 @@ export const RUNNER_SCRIPT = [
 
 const RUNNER_SCRIPT_BASE64 = Buffer.from(RUNNER_SCRIPT, "utf8").toString("base64");
 
+/** What the setup cleared before the agent started, cleared again by anything
+ *  that starts it later from tmux's own environment, which is the boot's. */
+const CLEAR_BOOT_ENV: readonly string[] = [
+    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_AGENT_HOOK_FILE",
+    'for pair in $POLARIS_CREDENTIAL_FILES; do unset "$(printf %s "$pair" | cut -d= -f1)"; done'
+];
+
 /**
  * What the interface window runs: the agent on the conversation the runner was
  * on. A window opened later starts from tmux's own environment, which is the
@@ -1040,8 +1047,7 @@ const RUNNER_SCRIPT_BASE64 = Buffer.from(RUNNER_SCRIPT, "utf8").toString("base64
 export const INTERFACE_SCRIPT = [
     "#!/bin/sh",
     "# Written by Polaris. Opens the agent's own interface on this session's conversation.",
-    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_AGENT_HOOK_FILE",
-    'for pair in $POLARIS_CREDENTIAL_FILES; do unset "$(printf %s "$pair" | cut -d= -f1)"; done',
+    ...CLEAR_BOOT_ENV,
     'id="$(head -c 128 "$POLARIS_STATE_DIR/agent-session-id" 2>/dev/null || true)"',
     'case "$id" in *[!A-Za-z0-9_-]*) id="" ;; esac',
     'exec sh "$POLARIS_STATE_DIR/launch.sh" "$id"',
@@ -1202,6 +1208,78 @@ export function openInterfaceCommand(stateDir: string, session = TMUX_SESSION): 
         `[ -f "${stateDir}/turn.txt" ] && exit ${NOT_OPENED.turnRunning}`,
         `tmux new-window -t ${shellQuote(session)} -n ${INTERFACE_WINDOW} "sh \\"${stateDir}/interface.sh\\""`
     ].join("\n");
+}
+
+/**
+ * What a restarted agent's pane runs: the agent on its conversation, with the
+ * boot's environment cleared as the setup cleared it, and as the agent's own
+ * account where the setup would have dropped to it. `window` for the
+ * interface window, which closes when the agent exits so the runner carries
+ * on; otherwise the terminal is left at a shell, as the boot leaves it.
+ */
+export const RELAUNCH_SCRIPT = [
+    "#!/bin/sh",
+    "# Written by Polaris. Starts the agent again on its conversation, on the account its session moved to.",
+    ...CLEAR_BOOT_ENV,
+    ...AGENT_ACCOUNT.slice(0, 4),
+    "export POLARIS_AS_ROOT",
+    'id="${1:-}"',
+    'case "$id" in *[!A-Za-z0-9_-]*) id="" ;; esac',
+    'if [ "${2:-}" = "window" ]; then exec sh "$POLARIS_STATE_DIR/launch.sh" "$id"; fi',
+    'sh "$POLARIS_STATE_DIR/launch.sh" "$id" || true',
+    'echo "polaris: the agent exited. This terminal is still yours."',
+    "exec sh",
+    ""
+].join("\n");
+
+const RELAUNCH_SCRIPT_BASE64 = Buffer.from(RELAUNCH_SCRIPT, "utf8").toString("base64");
+
+/** What `relaunchAgentCommand` exits with when it restarts nothing. */
+export const NOT_RELAUNCHED = { nextTurn: 3 } as const;
+
+/** How long the agent is given to stop its turn after Esc, before its pane is
+ *  restarted. */
+export const RELAUNCH_SETTLE_SECONDS = 2;
+
+/**
+ * Restart the agent running in the session's terminal on its conversation, so
+ * it starts again from the credentials file and reads the account the session
+ * moved to: a running process keeps the variables it started with.
+ *
+ * The turn it is on ends first the way a person ends one, with Esc, which
+ * Codex, Claude Code and Gemini CLI each take as "stop this turn" and record
+ * in the conversation; only then is the pane restarted, on the same
+ * conversation, so nothing it said is lost. The ready flag goes first, so
+ * nothing types into the pane before the restarted agent holds it.
+ *
+ * Exits `NOT_RELAUNCHED.nextTurn` for a session whose runner starts every turn
+ * afresh and whose interface is closed: its next turn reads the account. The
+ * id is checked here because it is about to be part of a command.
+ */
+export function relaunchAgentCommand(stateDir: string, vendorSessionId: string, session = TMUX_SESSION): string {
+    if (!isVendorSessionId(vendorSessionId)) throw new Error("That is not a conversation Polaris can reopen.");
+    return [
+        `if ${interfaceOpen(session)}; then t=${shellQuote(`${session}:${INTERFACE_WINDOW}`)}; m=window`,
+        `elif ${runnerIn(stateDir)}; then exit ${NOT_RELAUNCHED.nextTurn}`,
+        `else t=${shellQuote(session)}; m=terminal; fi`,
+        `printf %s ${RELAUNCH_SCRIPT_BASE64} | base64 -d > "${stateDir}/relaunch.sh" || exit 1`,
+        'tmux send-keys -t "$t" Escape',
+        `sleep ${RELAUNCH_SETTLE_SECONDS}`,
+        `rm -f ${AGENT_READY_FLAG}`,
+        `tmux respawn-pane -k -t "$t" "sh \\"${stateDir}/relaunch.sh\\" ${vendorSessionId} $m"`
+    ].join("\n");
+}
+
+/** Clear the ready flag before typing a resume into the shell the agent left,
+ *  so a turn typed after it waits for the agent rather than the shell. */
+export function clearReadyCommand(): string {
+    return `rm -f ${AGENT_READY_FLAG}`;
+}
+
+/** Whether a restarted or resumed agent holds its pane again: the interface
+ *  window when it is open, else the terminal. */
+export function relaunchedReadyCommand(session = TMUX_SESSION): string {
+    return `if ${interfaceOpen(session)}; then ${agentReadyCommand(`${session}:${INTERFACE_WINDOW}`)}; else ${agentReadyCommand(session)}; fi`;
 }
 
 /** Left in the state directory of a container kept for its unsaved work, whose

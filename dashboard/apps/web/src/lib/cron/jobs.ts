@@ -66,6 +66,7 @@ import { sweepBadgeUnlocks } from "@/lib/badges/badge-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
 import { sweepSessionQueue } from "@/lib/agents/session-queue";
 import { resumeLimitedSessions } from "@/lib/agents/account-rotation";
+import { sweepCodexTurnEnds } from "@/lib/agents/codex-turn-failures";
 import { advanceActiveRuns } from "@/lib/agents/orchestration-service";
 import { reapLeftoverContainers, reapPoolLeftovers } from "@/lib/agents/leftover-containers";
 import { sweepSpares } from "@/lib/agents/session-spares";
@@ -1149,6 +1150,9 @@ export async function runJobBody(job: ScheduledJob): Promise<unknown> {
 async function sweepAgentQueue(): Promise<void> {
     await sweepSessionQueue().catch(() => 0);
     await advanceActiveRuns().catch(() => 0);
+    // Codex turns that failed on a limit or were stopped, which fire no hook:
+    // read from the rollout.
+    await sweepCodexTurnEnds().catch(() => 0);
     // Sessions that waited for an account to come back from its limit.
     await resumeLimitedSessions().catch(() => 0);
 }

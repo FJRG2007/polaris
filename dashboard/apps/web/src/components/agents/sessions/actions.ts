@@ -939,8 +939,9 @@ export async function sessionAccountsAction(
 /**
  * Move a running session to another of its owner's accounts for its tool. The
  * next turn launches on it and resumes the same conversation; an agent that
- * left its terminal is brought back on it now. Not while the agent waits on an
- * answer, which a restart would drop.
+ * left its terminal is brought back on it now, and one in its own interface
+ * ends its turn and starts again on it, the turn sent again. Not while the
+ * agent waits on an answer, which a restart would drop.
  */
 export async function switchSessionAccountAction(input: unknown): Promise<{ error?: string }> {
     const t = await getTranslations("agents");
@@ -949,17 +950,8 @@ export async function switchSessionAccountAction(input: unknown): Promise<{ erro
     const session = await controlledSession(parsed.data.sessionId);
     if (!session || core.isSessionOver(session.state)) return { error: t("sessions.errors.gone") };
     if (await permissions.pendingPermission(session.id)) return { error: t("session.account.errors.busy") };
-    const restart = async (id: string) => {
-        await runtime.refreshCredentials(id);
-        const conversation = await resumableConversation(session);
-        if (conversation && (await runtime.agentHasExited(id))) await runtime.resumeAgent(id, conversation);
-    };
     try {
-        const outcome = await rotation.switchSessionAccount(
-            session.id,
-            parsed.data.accountId,
-            rotation.switchPorts(restart)
-        );
+        const outcome = await rotation.switchSessionAccount(session.id, parsed.data.accountId, rotation.switchPorts());
         if (outcome === "moved" || outcome === "same") return {};
         if (outcome === "over") return { error: t("sessions.errors.gone") };
         if (outcome === "machine") return { error: t("session.account.errors.machine") };
