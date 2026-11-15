@@ -490,7 +490,7 @@ async function shippedContainer(): Promise<CallServerContainer> {
     let driver: ReturnType<typeof localDockerDriver> | null = null;
     try {
         driver = localDockerDriver();
-        const own = (await driver.listContainers(true)).filter(isPolarisPart);
+        const own = (await driver.listContainers(true)).filter((container) => isPolarisPart(container));
         const mine = own.find((container) => container.composeService === CALL_SERVICE);
         if (!mine) return "missing";
         return mine.state === "running" ? "running" : "stopped";

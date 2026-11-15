@@ -30,3 +30,17 @@ const PART_CATALOG_KEYS: Readonly<Record<string, string>> = {
 export function partCatalogKey(label: string): string | null {
     return PART_CATALOG_KEYS[label] ?? null;
 }
+
+/** The compose projects Polaris starts beside its own stack, by name; plain
+ *  strings so a browser module can read them without the classification. */
+export const TUNNEL_PROJECT = "polaris-tunnel";
+export const PUBLIC_TUNNEL_PROJECT = "polaris-ptunnel";
+/** Remote access through Tailscale, started only while it is turned on. */
+export const TAILSCALE_PROJECT = "polaris-tailscale";
+/** A server's way into the VPN's private networks, started with the first one. */
+export const GATEWAY_PROJECT = "polaris-network-gateway";
+/** The backup way in, started while backup access is on. */
+export const BACKUP_TUNNEL_PROJECT = "polaris-backup-tunnel";
+/** What an agent session's container and compose project are named after: the
+ *  session id follows. */
+export const SESSION_CONTAINER_PREFIX = "polaris-session-";

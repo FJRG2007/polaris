@@ -11,7 +11,7 @@
 
 import { z } from "zod";
 import type { ComposeSpec } from "@polaris/deploy";
-import { GATEWAY_PROJECT } from "@/lib/polaris-parts";
+import { GATEWAY_PROJECT } from "@/lib/polaris-part-keys";
 
 /** The most networks one VPN keeps, which also bounds a screen's probes. */
 export const MAX_NETWORKS = 16;

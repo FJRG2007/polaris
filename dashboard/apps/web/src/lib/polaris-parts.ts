@@ -15,6 +15,14 @@
 import { relayProject } from "@/lib/backup-access/relay";
 import { findApp } from "@/lib/apps/catalog";
 import { baseProject } from "@/lib/deploy/host-volumes";
+import {
+    TUNNEL_PROJECT,
+    PUBLIC_TUNNEL_PROJECT,
+    TAILSCALE_PROJECT,
+    GATEWAY_PROJECT,
+    BACKUP_TUNNEL_PROJECT,
+    SESSION_CONTAINER_PREFIX,
+} from "@/lib/polaris-part-keys";
 
 /**
  * The compose projects of the two tunnels the control plane opens for its own
@@ -25,17 +33,14 @@ import { baseProject } from "@/lib/deploy/host-volumes";
  * simply stop counting as Polaris here, and the figures would still look
  * plausible.
  */
-export const TUNNEL_PROJECT = "polaris-tunnel";
-export const PUBLIC_TUNNEL_PROJECT = "polaris-ptunnel";
-/** Remote access through Tailscale, started only while it is turned on. */
-export const TAILSCALE_PROJECT = "polaris-tailscale";
-/** A server's way into the VPN's private networks, started with the first one. */
-export const GATEWAY_PROJECT = "polaris-network-gateway";
-/** The backup way in, started while backup access is on. */
-export const BACKUP_TUNNEL_PROJECT = "polaris-backup-tunnel";
-/** What an agent session's container and compose project are named after: the
- *  session id follows. */
-export const SESSION_CONTAINER_PREFIX = "polaris-session-";
+export {
+    TUNNEL_PROJECT,
+    PUBLIC_TUNNEL_PROJECT,
+    TAILSCALE_PROJECT,
+    GATEWAY_PROJECT,
+    BACKUP_TUNNEL_PROJECT,
+    SESSION_CONTAINER_PREFIX,
+} from "@/lib/polaris-part-keys";
 
 /**
  * The compose projects that are Polaris rather than something it runs.
