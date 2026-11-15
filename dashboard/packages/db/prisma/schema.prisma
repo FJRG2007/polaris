@@ -8491,6 +8491,13 @@ model AnalyticsSession {
     referrerSource String?
     campaign       String?
     medium         String?
+    /// `utm_term` and `utm_content` of the landing address.
+    term           String?
+    content        String?
+    /// Browser and system with their major version, as a breakdown shows them:
+    /// "Chrome 131", "Android 14". Null when the user agent names no version.
+    browserVersion String?
+    osVersion      String?
     /// The site's own id for the visitor, from `polaris.identify()`. Only what
     /// the page chose to send; the one thing that spans days, so retention is
     /// measured over it and over nothing else.

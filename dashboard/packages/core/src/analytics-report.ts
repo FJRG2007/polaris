@@ -35,6 +35,10 @@ export interface VisitSessionRow {
     readonly referrerSource: string | null;
     readonly campaign: string | null;
     readonly medium: string | null;
+    readonly term?: string | null;
+    readonly content?: string | null;
+    readonly browserVersion?: string | null;
+    readonly osVersion?: string | null;
 }
 
 export interface VisitEventRow {
@@ -82,8 +86,12 @@ export const VISIT_DIMENSIONS = [
     "referrer",
     "channel",
     "campaign",
+    "term",
+    "content",
     "browser",
+    "browserVersion",
     "os",
+    "osVersion",
     "device",
     "country",
     "language",
@@ -235,6 +243,10 @@ function breakdownsOf(
     const referrer = new Tally();
     const channel = new Tally();
     const campaign = new Tally();
+    const term = new Tally();
+    const content = new Tally();
+    const browserVersion = new Tally();
+    const osVersion = new Tally();
     const browser = new Tally();
     const os = new Tally();
     const device = new Tally();
@@ -251,6 +263,10 @@ function breakdownsOf(
         referrer.add(session.referrerSource ?? "Direct", session.id, views);
         channel.add(session.referrerKind, session.id, views);
         if (session.campaign) campaign.add(session.campaign, session.id, views);
+        if (session.term) term.add(session.term, session.id, views);
+        if (session.content) content.add(session.content, session.id, views);
+        if (session.browserVersion) browserVersion.add(session.browserVersion, session.id, views);
+        if (session.osVersion) osVersion.add(session.osVersion, session.id, views);
         browser.add(session.browser, session.id, views);
         os.add(session.os, session.id, views);
         device.add(session.device, session.id, views);
@@ -267,6 +283,10 @@ function breakdownsOf(
         referrer: referrer.top(limit),
         channel: channel.top(limit),
         campaign: campaign.top(limit),
+        term: term.top(limit),
+        content: content.top(limit),
+        browserVersion: browserVersion.top(limit),
+        osVersion: osVersion.top(limit),
         browser: browser.top(limit),
         os: os.top(limit),
         device: device.top(limit),

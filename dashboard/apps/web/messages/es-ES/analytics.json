@@ -60,7 +60,11 @@
         "addresses": "Direcciones",
         "events": "Eventos",
         "noEvents": "No hay eventos propios. Llama a polaris.event(''name'') desde tu página.",
-        "firewall": "Bloquear o inspeccionar {ip} en el cortafuegos"
+        "firewall": "Bloquear o inspeccionar {ip} en el cortafuegos",
+        "terms": "Términos",
+        "contents": "Contenido",
+        "browserVersions": "Versiones",
+        "systemVersions": "Versión sistema"
     },
     "recent": {
         "title": "Visitas recientes",
@@ -157,7 +161,11 @@
             "language": "Idioma",
             "screen": "Pantalla",
             "ip": "Dirección",
-            "distinctId": "ID visitante"
+            "distinctId": "ID visitante",
+            "term": "Término",
+            "content": "Contenido",
+            "browserVersion": "Versión navegador",
+            "osVersion": "Versión sistema"
         }
     },
     "reports": {

@@ -14,8 +14,8 @@ const ANDROID_TABLET = "Mozilla/5.0 (Linux; Android 14; SM-X200) AppleWebKit/537
 
 describe("parseVisitAgent", () => {
     it("reads the common desktop browsers", () => {
-        expect(parseVisitAgent(CHROME)).toEqual({ browser: "Chrome", os: "Windows", device: "desktop" });
-        expect(parseVisitAgent(FIREFOX_LINUX)).toEqual({ browser: "Firefox", os: "Linux", device: "desktop" });
+        expect(parseVisitAgent(CHROME)).toMatchObject({ browser: "Chrome", os: "Windows", device: "desktop" });
+        expect(parseVisitAgent(FIREFOX_LINUX)).toMatchObject({ browser: "Firefox", os: "Linux", device: "desktop" });
     });
 
     it("does not let Edge be counted as Chrome", () => {
@@ -27,7 +27,7 @@ describe("parseVisitAgent", () => {
     });
 
     it("reads phones and tablets apart", () => {
-        expect(parseVisitAgent(SAFARI_IOS)).toEqual({ browser: "Safari", os: "iOS", device: "mobile" });
+        expect(parseVisitAgent(SAFARI_IOS)).toMatchObject({ browser: "Safari", os: "iOS", device: "mobile" });
         expect(parseVisitAgent(IPAD).device).toBe("tablet");
         expect(parseVisitAgent(ANDROID_TABLET).device).toBe("tablet");
     });
@@ -101,7 +101,7 @@ describe("parseVisitSource", () => {
 
     it("lets a campaign win over the referrer, which is the point of tagging one", () => {
         const source = parseVisitSource("https://mail.google.com/", "utm_source=newsletter&utm_medium=email&utm_campaign=launch");
-        expect(source).toEqual({ kind: "campaign", source: "newsletter", medium: "email", campaign: "launch" });
+        expect(source).toMatchObject({ kind: "campaign", source: "newsletter", medium: "email", campaign: "launch" });
     });
 
     it("accepts a bare ref parameter", () => {
@@ -132,5 +132,21 @@ describe("groupVisitPath", () => {
     it("normalises the root", () => {
         expect(groupVisitPath("/")).toBe("/");
         expect(groupVisitPath("")).toBe("/");
+    });
+});
+
+describe("versions and UTM detail", () => {
+    it("reads the browser and system major version", () => {
+        expect(parseVisitAgent(CHROME)).toMatchObject({ browserVersion: "Chrome 140", osVersion: "Windows 10" });
+        expect(parseVisitAgent(EDGE)).toMatchObject({ browserVersion: "Edge 140" });
+        expect(parseVisitAgent(SAFARI_IOS)).toMatchObject({ browserVersion: "Safari 18.0", osVersion: "iOS 18" });
+        expect(parseVisitAgent(FIREFOX_LINUX)).toMatchObject({ browserVersion: "Firefox 130", osVersion: null });
+        expect(parseVisitAgent(IPAD)).toMatchObject({ osVersion: "iPadOS 18" });
+    });
+
+    it("keeps utm_term and utm_content", () => {
+        const source = parseVisitSource(null, "?utm_source=news&utm_term=shoes&utm_content=hero");
+        expect(source).toMatchObject({ kind: "campaign", term: "shoes", content: "hero" });
+        expect(parseVisitSource(null, "?utm_source=news")).toMatchObject({ term: null, content: null });
     });
 });

@@ -60,7 +60,11 @@
         "addresses": "Addresses",
         "events": "Events",
         "noEvents": "No custom events. Call polaris.event(''name'') from your page.",
-        "firewall": "Block or inspect {ip} in the firewall"
+        "firewall": "Block or inspect {ip} in the firewall",
+        "terms": "Terms",
+        "contents": "Content",
+        "browserVersions": "Versions",
+        "systemVersions": "System versions"
     },
     "recent": {
         "title": "Recent visits",
@@ -157,7 +161,11 @@
             "language": "Language",
             "screen": "Screen",
             "ip": "Address",
-            "distinctId": "Visitor ID"
+            "distinctId": "Visitor ID",
+            "term": "Term",
+            "content": "Content",
+            "browserVersion": "Browser version",
+            "osVersion": "System version"
         }
     },
     "reports": {

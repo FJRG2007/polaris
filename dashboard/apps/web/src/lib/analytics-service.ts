@@ -429,6 +429,10 @@ export async function recordVisit(input: VisitInput): Promise<void> {
             referrerSource: source.source,
             campaign: source.campaign,
             medium: source.medium,
+            term: source.term ?? null,
+            content: source.content ?? null,
+            browserVersion: agent.browserVersion ?? null,
+            osVersion: agent.osVersion ?? null,
             distinctId: input.distinctId ?? null,
             data: input.data ? JSON.stringify(input.data) : null
         },
@@ -560,7 +564,18 @@ const RAW_MAX_MS = 31 * 86_400_000;
 const RAW_EVENT_CAP = 200_000;
 
 /** What only the per-visit rows can answer. */
-const RAW_ONLY: readonly VisitDimension[] = ["entry", "exit", "campaign", "language", "screen", "ip"];
+const RAW_ONLY: readonly VisitDimension[] = [
+    "entry",
+    "exit",
+    "campaign",
+    "term",
+    "content",
+    "browserVersion",
+    "osVersion",
+    "language",
+    "screen",
+    "ip"
+];
 
 export async function readAnalytics(
     site: AnalyticsSiteView,
@@ -701,8 +716,12 @@ async function reportFromDays(siteId: string, from: number, to: number, buckets:
             referrer: rank("referrer"),
             channel: rank("channel"),
             campaign: empty,
+            term: empty,
+            content: empty,
             browser: rank("browser"),
+            browserVersion: empty,
             os: rank("os"),
+            osVersion: empty,
             device: rank("device"),
             country: rank("country"),
             language: empty,
@@ -775,6 +794,10 @@ function toSessionRow(session: {
     referrerSource: string | null;
     campaign: string | null;
     medium: string | null;
+    term: string | null;
+    content: string | null;
+    browserVersion: string | null;
+    osVersion: string | null;
 }): VisitSessionRow {
     return {
         id: session.id,
@@ -791,7 +814,11 @@ function toSessionRow(session: {
         referrerKind: session.referrerKind,
         referrerSource: session.referrerSource,
         campaign: session.campaign,
-        medium: session.medium
+        medium: session.medium,
+        term: session.term,
+        content: session.content,
+        browserVersion: session.browserVersion,
+        osVersion: session.osVersion
     };
 }
 

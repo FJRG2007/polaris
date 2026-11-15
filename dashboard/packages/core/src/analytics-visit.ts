@@ -21,6 +21,10 @@ export interface VisitAgent {
     readonly browser: string;
     readonly os: string;
     readonly device: DeviceKind;
+    /** "Chrome 131"; null when the agent names no version. */
+    readonly browserVersion?: string | null;
+    /** "Android 14", "Windows 10"; null when the agent names no version. */
+    readonly osVersion?: string | null;
 }
 
 export interface VisitSource {
@@ -30,6 +34,9 @@ export interface VisitSource {
     readonly source: string | null;
     readonly medium: string | null;
     readonly campaign: string | null;
+    /** `utm_term` and `utm_content`, only on a tagged visit. */
+    readonly term?: string | null;
+    readonly content?: string | null;
 }
 
 /**
@@ -129,7 +136,40 @@ export function parseVisitAgent(userAgent: string | null | undefined): VisitAgen
     } else if (os === "Unknown" && browser === "Unknown") {
         device = "unknown";
     }
-    return { browser, os, device };
+    return {
+        browser,
+        os,
+        device,
+        browserVersion: versioned(browser, browserVersion(lower, browser)),
+        osVersion: versioned(os, systemVersion(lower, os))
+    };
+}
+
+function versioned(name: string, version: string | null): string | null {
+    return version && name !== "Unknown" ? `${name} ${version}` : null;
+}
+
+/** The browser's major version, read after the token that named it. Safari keeps
+ *  its own in `Version/`; its `Safari/` number is the WebKit build. */
+function browserVersion(lower: string, browser: string): string | null {
+    if (browser === "Safari") return /version\/(\d+(?:\.\d)?)/.exec(lower)?.[1] ?? null;
+    const token = BROWSERS.find(([marker, name]) => name === browser && lower.includes(marker))?.[0];
+    if (!token || !token.endsWith("/")) return null;
+    const at = lower.indexOf(token) + token.length;
+    return /^(\d+)/.exec(lower.slice(at))?.[1] ?? null;
+}
+
+/** Windows NT kernel numbers as the releases people know. NT 10.0 is both 10
+ *  and 11: the user agent stopped telling them apart. */
+const WINDOWS_NT: Readonly<Record<string, string>> = { "10.0": "10", "6.3": "8.1", "6.2": "8", "6.1": "7" };
+
+function systemVersion(lower: string, os: string): string | null {
+    if (os === "Windows") return WINDOWS_NT[/windows nt (\d+\.\d+)/.exec(lower)?.[1] ?? ""] ?? null;
+    if (os === "Android") return /android (\d+)/.exec(lower)?.[1] ?? null;
+    if (os === "iOS" || os === "iPadOS") return /os (\d+)[_.]\d+/.exec(lower)?.[1] ?? null;
+    if (os === "macOS") return /mac os x (\d+)[_.](\d+)/.exec(lower)?.slice(1, 3).join(".") ?? null;
+    if (os === "ChromeOS") return /cros \S+ (\d+)/.exec(lower)?.[1] ?? null;
+    return null;
 }
 
 /** The bot's own name where it gives one, so the breakdown says "Googlebot" rather
@@ -229,7 +269,14 @@ function parseUtm(query: string | null | undefined): VisitSource | null {
     const medium = params.get("utm_medium");
     const campaign = params.get("utm_campaign");
     if (!source && !medium && !campaign) return null;
-    return { kind: "campaign", source: source?.slice(0, 120) ?? null, medium: medium?.slice(0, 120) ?? null, campaign: campaign?.slice(0, 120) ?? null };
+    return {
+        kind: "campaign",
+        source: source?.slice(0, 120) ?? null,
+        medium: medium?.slice(0, 120) ?? null,
+        campaign: campaign?.slice(0, 120) ?? null,
+        term: params.get("utm_term")?.slice(0, 120) || null,
+        content: params.get("utm_content")?.slice(0, 120) || null
+    };
 }
 
 /**

@@ -337,7 +337,9 @@ export function PagesSection(props: PanelProps) {
                 title={t("lists.environment")}
                 choices={[
                     { value: "browser", label: t("breakdowns.browsers"), empty: t("breakdowns.nothing") },
+                    { value: "browserVersion", label: t("breakdowns.browserVersions"), empty: t("breakdowns.nothing") },
                     { value: "os", label: t("breakdowns.systems"), empty: t("breakdowns.nothing") },
+                    { value: "osVersion", label: t("breakdowns.systemVersions"), empty: t("breakdowns.nothing") },
                     { value: "device", label: t("breakdowns.devices"), empty: t("breakdowns.nothing") },
                     { value: "screen", label: t("breakdowns.screens"), empty: t("breakdowns.noScreens") }
                 ]}
@@ -363,7 +365,9 @@ export function SourcesSection(props: PanelProps) {
                 title={t("breakdowns.channels")}
                 choices={[
                     { value: "channel", label: t("breakdowns.channels"), empty: t("breakdowns.nothing") },
-                    { value: "campaign", label: t("breakdowns.campaigns"), empty: t("breakdowns.noCampaigns") }
+                    { value: "campaign", label: t("breakdowns.campaigns"), empty: t("breakdowns.noCampaigns") },
+                    { value: "term", label: t("breakdowns.terms"), empty: t("breakdowns.noCampaigns") },
+                    { value: "content", label: t("breakdowns.contents"), empty: t("breakdowns.noCampaigns") }
                 ]}
             />
         </div>

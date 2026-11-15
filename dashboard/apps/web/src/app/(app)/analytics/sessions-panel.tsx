@@ -701,6 +701,12 @@ function ProfileInfo({
             title: session.referrerSource ?? undefined
         },
         ...(session.campaign ? [{ label: t("filters.dims.campaign"), icon: null, value: session.campaign }] : []),
+        ...(session.term ? [{ label: t("filters.dims.term"), icon: null, value: session.term }] : []),
+        ...(session.content ? [{ label: t("filters.dims.content"), icon: null, value: session.content }] : []),
+        ...(session.browserVersion
+            ? [{ label: t("filters.dims.browserVersion"), icon: null, value: session.browserVersion }]
+            : []),
+        ...(session.osVersion ? [{ label: t("filters.dims.osVersion"), icon: null, value: session.osVersion }] : []),
         ...(session.linkedSessions > 1
             ? [{ label: t("sessions.linked"), icon: null, value: grouped(session.linkedSessions) }]
             : [])
