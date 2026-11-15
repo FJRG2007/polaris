@@ -219,3 +219,46 @@ export interface ReadingHistory {
     readonly points: readonly ReadingBucket[];
     readonly stats: { min: number; avg: number; max: number } | null;
 }
+
+/** The sections of a device's page, top to bottom. */
+export type DeviceSection = "controls" | "auto-off" | "used" | "readings" | "history";
+
+/** Kinds whose worth is what the air or the room is doing: often left running,
+ *  so how many times they were switched says little. */
+const ENVIRONMENT_KINDS = new Set(["climate", "air", "dehumidifier", "sensor"]);
+/** Kinds whose worth is being switched or opened: the count of uses is the
+ *  point, whatever else they happen to measure. */
+const SWITCHED_KINDS = new Set(["lock", "opener", "light", "switch", "outlet"]);
+/** Measures of the room rather than of the device's own draw. */
+const ENVIRONMENT_MEASURES: ReadonlySet<ReadingMeasure> = new Set([
+    "temperature",
+    "humidity",
+    "target",
+    "pm25",
+    "allergen",
+    "gas",
+    "co2",
+    "filter"
+]);
+
+/**
+ * The order a device's page lists its sections in. The state and the controls
+ * always lead and the history always closes. Between them, a device that reads
+ * the room (a dehumidifier, a purifier, an air conditioner, a sensor) puts its
+ * readings above the month of use, and a device that is switched (a light, a
+ * socket, a door) keeps the use first. Any other kind reads the room first only
+ * when it reports a measure of the room; a socket's watts never count.
+ */
+export function deviceSectionOrder(
+    kind: string,
+    measures: readonly ReadingMeasure[]
+): readonly DeviceSection[] {
+    const readingsFirst =
+        !SWITCHED_KINDS.has(kind) &&
+        measures.length > 0 &&
+        (ENVIRONMENT_KINDS.has(kind) ||
+            measures.some((measure) => ENVIRONMENT_MEASURES.has(measure)));
+    return readingsFirst
+        ? ["controls", "auto-off", "readings", "used", "history"]
+        : ["controls", "auto-off", "used", "readings", "history"];
+}

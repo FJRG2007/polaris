@@ -9,6 +9,10 @@
  * about anything in a building is always "is this normal". The history is last
  * and is the longest, since it is the one people read rather than glance at.
  *
+ * A device that reads the room - a dehumidifier, a purifier, an air conditioner,
+ * a sensor - is usually left on, so its readings move above the month of use.
+ * That order is `deviceSectionOrder`, never this file.
+ *
  * The chart counts uses rather than openings on the sensor: an unlock followed by
  * the door swinging is one person arriving, and counting both would double every
  * quiet week.
@@ -39,7 +43,8 @@ import { LightControls } from "./light-controls";
 import { ApplianceControls } from "./appliance-controls";
 import { LitterControls } from "./litter-controls";
 import { SwitchSettings } from "./switch-settings";
-import { DeviceReadings } from "./device-readings";
+import { DeviceReadings, deviceMeasures } from "./device-readings";
+import { deviceSectionOrder } from "../../lib/reading-kinds";
 import Link from "next/link";
 import { automationHref, networksFor } from "../../lib/device-list";
 import type { AccountNetwork } from "../../lib/network-details";
@@ -404,6 +409,14 @@ export function DevicePanel({
         void load();
     }, [deviceId, load]);
 
+    /** Readings above the month of use for a device that reads the room. */
+    const order = useMemo(() => {
+        if (!device) return [];
+        const off = device.readingsOff ?? [];
+        const shown = deviceMeasures(device).filter((measure) => !off.includes(measure));
+        return deviceSectionOrder(device.kind, shown);
+    }, [device]);
+
     const days = useMemo(
         () => kinds.bucketUsage(used ?? [], format.preferences.timeZone, kinds.USAGE_DAYS),
         [used, format.preferences.timeZone]
@@ -496,142 +509,190 @@ export function DevicePanel({
                         />
 
                         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain p-5">
-                            <section className="flex flex-col gap-3">
-                                <DeviceControls
-                                    device={device}
-                                    canControl={canControl}
-                                    busy={busy}
-                                    onAct={(action, command) => void act(action, command)}
-                                    detailed
-                                />
-                                <p className="text-xs text-foreground-subtle">
-                                    {[
-                                        device.zone,
-                                        device.model,
-                                        device.firmware &&
-                                            t("devicePanel.firmware", { version: device.firmware }),
-                                        device.batteryPercent !== null &&
-                                            `${t("devicePanel.battery", {
-                                                percent: device.batteryPercent
-                                            })} (${t("devicePanel.batteryLine", {
-                                                percent: batteryLine(device)
-                                            })})`,
-                                        device.stateAt &&
-                                            t("devicePanel.readAt", {
-                                                time: format.time(device.stateAt)
-                                            })
-                                    ]
-                                        .filter(Boolean)
-                                        .join(" - ")}
-                                </p>
-                                {/* Whether it answers here or only through its
-                                    maker, for a make reached both ways. */}
-                                {device.reach && (
-                                    <p className="text-xs text-foreground-subtle">
-                                        {kinds.reachText(device.reach, t)}
-                                    </p>
-                                )}
-                                {lan && lan.networks.length > 0 && (
-                                    <div className="flex min-w-0 flex-col gap-1">
-                                        {lan.networks.map((network) => (
-                                            <LanDetails
-                                                key={network.id}
-                                                details={network.details}
-                                                labels={{
-                                                    address: t("network.address"),
-                                                    mac: t("network.mac")
-                                                }}
+                            {order.map((section) => {
+                                switch (section) {
+                                    case "controls":
+                                        return (
+                                            <section key={section} className="flex flex-col gap-3">
+                                                <DeviceControls
+                                                    device={device}
+                                                    canControl={canControl}
+                                                    busy={busy}
+                                                    onAct={(action, command) =>
+                                                        void act(action, command)
+                                                    }
+                                                    detailed
+                                                />
+                                                <p className="text-xs text-foreground-subtle">
+                                                    {[
+                                                        device.zone,
+                                                        device.model,
+                                                        device.firmware &&
+                                                            t("devicePanel.firmware", {
+                                                                version: device.firmware
+                                                            }),
+                                                        device.batteryPercent !== null &&
+                                                            `${t("devicePanel.battery", {
+                                                                percent: device.batteryPercent
+                                                            })} (${t("devicePanel.batteryLine", {
+                                                                percent: batteryLine(device)
+                                                            })})`,
+                                                        device.stateAt &&
+                                                            t("devicePanel.readAt", {
+                                                                time: format.time(device.stateAt)
+                                                            })
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(" - ")}
+                                                </p>
+                                                {/* Whether it answers here or only through its
+                                                    maker, for a make reached both ways. */}
+                                                {device.reach && (
+                                                    <p className="text-xs text-foreground-subtle">
+                                                        {kinds.reachText(device.reach, t)}
+                                                    </p>
+                                                )}
+                                                {lan && lan.networks.length > 0 && (
+                                                    <div className="flex min-w-0 flex-col gap-1">
+                                                        {lan.networks.map((network) => (
+                                                            <LanDetails
+                                                                key={network.id}
+                                                                details={network.details}
+                                                                labels={{
+                                                                    address: t("network.address"),
+                                                                    mac: t("network.mac")
+                                                                }}
+                                                            />
+                                                        ))}
+                                                        {lan.shared && (
+                                                            <p className="text-xs text-foreground-subtle">
+                                                                {t("devicesView.sharedAddress", {
+                                                                    account:
+                                                                        lan.networks[0]?.label ?? ""
+                                                                })}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {batteryLow(device) && (
+                                                    <p className="flex items-center gap-1.5 text-xs text-danger">
+                                                        <BatteryLow className="size-3.5 shrink-0" />
+                                                        {t("devicePanel.batteryLow")}
+                                                    </p>
+                                                )}
+                                                {error && (
+                                                    <p
+                                                        role="alert"
+                                                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                                                    >
+                                                        {error}
+                                                    </p>
+                                                )}
+                                            </section>
+                                        );
+                                    case "auto-off":
+                                        return (
+                                            <AutoOffShortcut
+                                                key={`${section}:${device.id}`}
+                                                device={device}
+                                                canManage={canManage}
+                                                canControl={canControl}
                                             />
-                                        ))}
-                                        {lan.shared && (
-                                            <p className="text-xs text-foreground-subtle">
-                                                {t("devicesView.sharedAddress", {
-                                                    account: lan.networks[0]?.label ?? ""
-                                                })}
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-                                {batteryLow(device) && (
-                                    <p className="flex items-center gap-1.5 text-xs text-danger">
-                                        <BatteryLow className="size-3.5 shrink-0" />
-                                        {t("devicePanel.batteryLow")}
-                                    </p>
-                                )}
-                                {error && (
-                                    <p
-                                        role="alert"
-                                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                                    >
-                                        {error}
-                                    </p>
-                                )}
-                            </section>
-
-                            <AutoOffShortcut
-                                key={device.id}
-                                device={device}
-                                canManage={canManage}
-                                canControl={canControl}
-                            />
-
-                            <section className="flex flex-col gap-2 border-t border-border pt-4">
-                                <h3 className="text-sm font-medium">{t("devicePanel.used")}</h3>
-                                {used === null ? (
-                                    <Skeleton className="h-32 w-full" />
-                                ) : (
-                                    <TimeSeriesChart
-                                        label={t("devicePanel.usage", { days: kinds.USAGE_DAYS })}
-                                        points={days.map((day) => ({ t: day.t, v: day.count }))}
-                                        from={days[0]?.t ?? Date.now()}
-                                        to={days[days.length - 1]?.t ?? Date.now()}
-                                        summary="sum"
-                                        formatTime={(at) => format.date(at)}
-                                        format={(value) => String(Math.round(value))}
-                                    />
-                                )}
-                            </section>
-
-                            <DeviceReadings key={device.id} device={device} />
-
-                            <section className="flex flex-col gap-2 border-t border-border pt-4">
-                                <h3 className="text-sm font-medium">{t("devicePanel.history")}</h3>
-                                {events === null ? (
-                                    <div className="flex flex-col gap-2">
-                                        <Skeleton className="h-6 w-full" />
-                                        <Skeleton className="h-6 w-4/5" />
-                                        <Skeleton className="h-6 w-3/5" />
-                                    </div>
-                                ) : events.length === 0 ? (
-                                    <EmptyState
-                                        title={t("devicePanel.emptyTitle")}
-                                        description={t("devicePanel.emptyBody")}
-                                    />
-                                ) : (
-                                    <ul className="divide-y divide-border rounded-lg border border-border">
-                                        {events.map((event) => (
-                                            <li
-                                                key={event.id}
-                                                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-3 py-2"
+                                        );
+                                    case "used":
+                                        return (
+                                            <section
+                                                key={section}
+                                                className="flex flex-col gap-2 border-t border-border pt-4"
                                             >
-                                                <span
-                                                    className={cn(
-                                                        "text-sm",
-                                                        event.outcome === "ok" ? "" : "text-danger"
-                                                    )}
-                                                >
-                                                    {kinds.describeEvent(event, t, (note) =>
-                                                        placesRefusalText(t, note)
-                                                    )}
-                                                </span>
-                                                <span className="text-xs tabular-nums text-foreground-subtle">
-                                                    {format.dateTime(event.at)}
-                                                </span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </section>
+                                                <h3 className="text-sm font-medium">
+                                                    {t("devicePanel.used")}
+                                                </h3>
+                                                {used === null ? (
+                                                    <Skeleton className="h-32 w-full" />
+                                                ) : (
+                                                    <TimeSeriesChart
+                                                        label={t("devicePanel.usage", {
+                                                            days: kinds.USAGE_DAYS
+                                                        })}
+                                                        points={days.map((day) => ({
+                                                            t: day.t,
+                                                            v: day.count
+                                                        }))}
+                                                        from={days[0]?.t ?? Date.now()}
+                                                        to={days[days.length - 1]?.t ?? Date.now()}
+                                                        summary="sum"
+                                                        formatTime={(at) => format.date(at)}
+                                                        format={(value) =>
+                                                            String(Math.round(value))
+                                                        }
+                                                    />
+                                                )}
+                                            </section>
+                                        );
+                                    case "readings":
+                                        return (
+                                            <DeviceReadings
+                                                key={`${section}:${device.id}`}
+                                                device={device}
+                                            />
+                                        );
+                                    case "history":
+                                        return (
+                                            <section
+                                                key={section}
+                                                className="flex flex-col gap-2 border-t border-border pt-4"
+                                            >
+                                                <h3 className="text-sm font-medium">
+                                                    {t("devicePanel.history")}
+                                                </h3>
+                                                {events === null ? (
+                                                    <div className="flex flex-col gap-2">
+                                                        <Skeleton className="h-6 w-full" />
+                                                        <Skeleton className="h-6 w-4/5" />
+                                                        <Skeleton className="h-6 w-3/5" />
+                                                    </div>
+                                                ) : events.length === 0 ? (
+                                                    <EmptyState
+                                                        title={t("devicePanel.emptyTitle")}
+                                                        description={t("devicePanel.emptyBody")}
+                                                    />
+                                                ) : (
+                                                    <ul className="divide-y divide-border rounded-lg border border-border">
+                                                        {events.map((event) => (
+                                                            <li
+                                                                key={event.id}
+                                                                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-3 py-2"
+                                                            >
+                                                                <span
+                                                                    className={cn(
+                                                                        "text-sm",
+                                                                        event.outcome === "ok"
+                                                                            ? ""
+                                                                            : "text-danger"
+                                                                    )}
+                                                                >
+                                                                    {kinds.describeEvent(
+                                                                        event,
+                                                                        t,
+                                                                        (note) =>
+                                                                            placesRefusalText(
+                                                                                t,
+                                                                                note
+                                                                            )
+                                                                    )}
+                                                                </span>
+                                                                <span className="text-xs tabular-nums text-foreground-subtle">
+                                                                    {format.dateTime(event.at)}
+                                                                </span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </section>
+                                        );
+                                }
+                            })}
                         </div>
                     </>
                 )}
