@@ -121,6 +121,7 @@ import {
     type ResolvedModel
 } from "@/lib/polar/models";
 import { pinnedByHand, turnStandIns } from "@/lib/polar/turn-fallback";
+import { isToolFailure, toolFailureText, withTaggedToolErrors } from "@/lib/polar/tool-failure";
 import { POLAR_RUNS_MAX, beginPolarRun } from "@/lib/polar/runs";
 import { GOAL_CONDITION_MAX, goalHasRoom, goalTurnOf } from "@/lib/polar/goals";
 import { goalCheckStream } from "@/lib/polar/goal-service";
@@ -576,7 +577,8 @@ export async function POST(request: Request): Promise<Response> {
             always,
             new Set([...used, ...found])
         ) as (keyof typeof tools & string)[];
-    const turnTools = { ...tools, ...taskTools, ...askTools };
+    // A tool that throws is told apart from the provider failing (`tool-failure.ts`).
+    const turnTools = withTaggedToolErrors({ ...tools, ...taskTools, ...askTools });
 
     const parentFor = (index: number, list: readonly UIMessage[]): string | null =>
         index === list.length - 1 && list[index]?.role === "user"
@@ -743,6 +745,12 @@ export async function POST(request: Request): Promise<Response> {
         // The provider's refusal is classified and named, never forwarded: its
         // body is the provider's own words about the account it belongs to.
         onError: (error) => {
+            // The SDK sends a tool call's own failure through here too: it is
+            // the tool's, said as such, and never held against the provider.
+            if (isToolFailure(error)) {
+                console.warn("polar: a tool call failed", error);
+                return toolFailureText(error);
+            }
             // The model that last answered refused: a stand-in's own refusal
             // names the stand-in. Automatic tries that provider last for a few
             // minutes, and one out of credit only for its free models.
