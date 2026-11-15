@@ -19,6 +19,7 @@ import { expirePermissions, settlesPermissions } from "./session-permissions";
 import * as core from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { readSessionCursor } from "./session-cursor";
+import { NATIVE_ENGINE } from "@/lib/polar/native/engine-choice";
 import { GENERAL_SCOPE, getPlatformAgentDefaults, scopeOf, withTierGate } from "./agent-defaults-service";
 import { clearSessionWaiting, noticeSessionEnded, noticeSessionWaiting } from "./agent-notices";
 import * as subagents from "./session-subagents";
@@ -576,6 +577,24 @@ export async function sessionForToken(
     const state = readState(record.state);
     if (core.isSessionOver(state)) return null;
     return { id: record.id, state, taskId: record.taskId, cli: record.cli };
+}
+
+/**
+ * The native-engine session a model token belongs to, with the person who
+ * started it (whose Polar models it spends), or null. Only a session running
+ * Polaris's own engine may call models with its token: a CLI session's token
+ * reports events and nothing more, so a token leaked from one of those
+ * containers cannot spend anybody's models.
+ */
+export async function nativeSessionForToken(token: string): Promise<{ id: string; userId: string } | null> {
+    if (!token) return null;
+    const record = await prisma.agentSession.findUnique({
+        where: { tokenHash: hashToken(token) },
+        select: { id: true, state: true, cli: true, startedById: true }
+    });
+    if (!record || record.cli !== NATIVE_ENGINE || !record.startedById) return null;
+    if (core.isSessionOver(readState(record.state))) return null;
+    return { id: record.id, userId: record.startedById };
 }
 
 /** The repository a session works in, as `owner/name`, or null for a workspace

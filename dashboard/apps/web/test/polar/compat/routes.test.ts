@@ -18,7 +18,8 @@ const state = {
     recorded: [] as Record<string, unknown>[],
     resolvedWith: [] as unknown[],
     resolveOptions: [] as unknown[],
-    limit: false
+    limit: false,
+    native: null as null | { id: string; userId: string }
 };
 
 vi.mock("@/lib/api-key-auth", () => ({
@@ -26,6 +27,9 @@ vi.mock("@/lib/api-key-auth", () => ({
         state.presented.push(request.headers.get("authorization"));
         return request.headers.get("authorization") === "Bearer plk_good" ? state.principal : null;
     }
+}));
+vi.mock("@/lib/agents/session-service", () => ({
+    nativeSessionForToken: async (token: string) => (token === "pst_native" ? state.native : null)
 }));
 vi.mock("@/lib/polar/access", () => ({
     polarAccessFor: async () => ({ use: state.use, spend: true, web: false, connectors: false })
@@ -149,6 +153,7 @@ beforeEach(() => {
     state.resolvedWith = [];
     state.resolveOptions = [];
     state.limit = false;
+    state.native = null;
 });
 
 describe("who may call", () => {
@@ -180,6 +185,26 @@ describe("who may call", () => {
         expect(await closed.json()).toEqual({
             error: { message: expect.any(String), type: "permission_error", param: null, code: null }
         });
+    });
+});
+
+describe("a native session's token", () => {
+    const chat = { model: "gpt-5", messages: [{ role: "user", content: "hi" }] };
+
+    it("calls models as the person who started the session", async () => {
+        state.native = { id: "s1", userId: "u9" };
+        const response = await createChatCompletion(post("chat/completions", chat, { authorization: "Bearer pst_native" }));
+        expect(response.status).toBe(200);
+        expect(state.recorded.at(-1)).toMatchObject({ userId: "u9" });
+    });
+
+    it("is refused when the token is no native session's, or its starter lost Polar", async () => {
+        const unknown = await createChatCompletion(post("chat/completions", chat, { authorization: "Bearer pst_native" }));
+        expect(unknown.status).toBe(401);
+        state.native = { id: "s1", userId: "u9" };
+        state.use = false;
+        const closed = await createChatCompletion(post("chat/completions", chat, { authorization: "Bearer pst_native" }));
+        expect(closed.status).toBe(403);
     });
 });
 

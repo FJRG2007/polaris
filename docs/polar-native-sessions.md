@@ -282,7 +282,7 @@ an install that never ran the migration's reader still behaves as before.
 - [x] Native engine: loop, tools, prompt, hooks, transcript, compaction,
       interrupt, model change, plan mode, subagents (`lib/polar/native/`)
 - [x] Tests per tool and end to end with a scripted model (`test/polar/native/`)
-- [ ] Session-scoped model token accepted by the compatible API
+- [x] Session-scoped model token accepted by the compatible API (native sessions only)
 - [ ] `polaris-agent` bundle served by the instance; catalogue row; boot
       script and runner launch
 - [ ] MCP client over the session's `mcpConfig` (Polaris first, then the session's own servers)
