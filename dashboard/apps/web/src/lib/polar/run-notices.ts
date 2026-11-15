@@ -140,3 +140,37 @@ export async function noticePolarRunEnd(
         console.error("polar: could not send the finished-chat notice", error);
     }
 }
+
+/**
+ * A background subagent ended: the person hears of it in the bell, with the
+ * chat to open. A stopped one was stopped by them and needs no telling.
+ */
+export async function noticeSubagentEnd(
+    userId: string,
+    threadId: string,
+    name: string,
+    status: string
+): Promise<void> {
+    if (status === "stopped") return;
+    try {
+        const thread = await prisma.polarThread.findFirst({
+            where: { id: threadId, userId },
+            select: { title: true, temporary: true }
+        });
+        if (!thread || thread.temporary) return;
+        const t = await wordsFor(userId);
+        const done = status === "done";
+        await notify({
+            userId,
+            event: "polar.chatReady",
+            title: t(done ? "notices.subagentDoneTitle" : "notices.subagentFailedTitle", { name }),
+            body: t("notices.subagentBody", { title: thread.title }),
+            level: done ? "info" : "warning",
+            actionRequired: false,
+            href: `/polar?thread=${threadId}`,
+            metadata: { threadId, subagent: name, state: status }
+        });
+    } catch (error) {
+        console.error("polar: could not send the finished-subagent notice", error);
+    }
+}

@@ -46,7 +46,11 @@ import {
 } from "@/lib/polar/tool-relevance";
 import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
 import { agentSkills, enabledSkills } from "@/lib/polar/skills/store";
-import { polarThreadAgent } from "@/lib/polar/agents/store";
+import { listAgents, polarThreadAgent } from "@/lib/polar/agents/store";
+import * as subagentTasks from "@/lib/polar/subagents/task-tool";
+import { subagentTypes } from "@/lib/polar/subagents/types";
+import { takeFinishedBackground } from "@/lib/polar/subagents/store";
+import { TASK_TOOL } from "@/lib/polar/subagents/shared";
 import { agentPrompt, agentTurnChoices, polarTurnChoices } from "@/lib/polar/agents/shared";
 import { polarAgentDefault } from "@/lib/polar/agents/defaults";
 import { trialSkillSchema } from "@/lib/polar/skills/shared";
@@ -295,7 +299,8 @@ export async function POST(request: Request): Promise<Response> {
             ...polarWebTools("", ""),
             ...connectorSet.tools,
             ...connectorStandIns(body.data.messages, connectorSet.tools),
-            ...polarSkillTools([])
+            ...polarSkillTools([]),
+            ...subagentTasks.taskToolStandIn()
         } as never
     });
     if (!checked.success) return refuse("invalid", 400);
@@ -461,6 +466,60 @@ export async function POST(request: Request): Promise<Response> {
             : {}),
         ...skillTools
     };
+    // Subagents (`lib/polar/subagents`): a child run of this loop with a subset
+    // of `tools` above. Foreground ones stop with this turn; `parentStop` is
+    // tied to the run's own stop switch once the run exists.
+    const parentStop = new AbortController();
+    const approvalRules = {
+        ...toolset.approval,
+        ...(body.data.connectors ? connectorSet.approval : {}),
+        ...(remembers ? MEMORY_APPROVAL : {}),
+        ...(web ? WEB_APPROVAL : {}),
+        ...(web ? browserApprovalFor(user.id) : {})
+    };
+    const ownAgents = await listAgents(user.id).catch((error: unknown) => {
+        console.error("polar: could not read the agents for subagents", error);
+        return [];
+    });
+    const taskTools = subagentTasks.polarTaskTools({
+        userId: user.id,
+        threadId: body.data.threadId,
+        tools,
+        approval: approvalRules as never,
+        webNames: new Set([
+            ...Object.keys(webTools),
+            ...Object.keys(weatherTools),
+            ...Object.keys(repoTools),
+            ...Object.keys(browserTools)
+        ]),
+        active: (found) => activeFor(found),
+        resolve: async (type) => {
+            if (!type.agent) return resolved;
+            for (const next of agentTurnChoices(type.agent, choice)) {
+                const attempt = await resolvePolarModel(user.id, next, signals, access);
+                if (typeof attempt !== "string") return attempt;
+            }
+            const keeps = type.agent.modelPolicy === "required" && type.agent.models.length > 0;
+            return keeps ? null : resolved;
+        },
+        signal: parentStop.signal,
+        depth: 0,
+        types: subagentTypes(ownAgents),
+        spent: async (child, usage) => {
+            const answered = answeredBy(child);
+            await recordPolarUsage({
+                userId: user.id,
+                threadId: body.data.threadId,
+                messageId: null,
+                provider: answered.option.provider,
+                model: answered.option.model,
+                payer: answered.credential.source === "instance" ? "instance" : "own",
+                usage: answerUsage(usage, answered.option),
+                ...routeRecord(child)
+            });
+        },
+        started: { count: 0 }
+    });
     // What the model is sent: the core and the current app's tools, and any
     // this conversation already reached for. Every one stays registered, so an
     // approval or an older turn naming one still resolves.
@@ -478,7 +537,8 @@ export async function POST(request: Request): Promise<Response> {
             ? Object.keys(connectorSet.tools).filter((name) => !off.has(name))
             : []),
         // Skills are listed in the system prompt, so the tool that reads them goes with it.
-        ...(USE_SKILL in skillTools ? [USE_SKILL] : [])
+        ...(USE_SKILL in skillTools ? [USE_SKILL] : []),
+        ...(TASK_TOOL in taskTools ? [TASK_TOOL] : [])
     ];
     // The six browser_* tools `browser` replaced stay registered for old turns
     // but are never sent again.
@@ -494,6 +554,7 @@ export async function POST(request: Request): Promise<Response> {
             always,
             new Set([...used, ...found])
         ) as (keyof typeof tools & string)[];
+    const turnTools = { ...tools, ...taskTools };
 
     const parentFor = (index: number, list: readonly UIMessage[]): string | null =>
         index === list.length - 1 && list[index]?.role === "user"
@@ -534,7 +595,9 @@ export async function POST(request: Request): Promise<Response> {
 
     // The answer runs on its own, not on this request: leaving the chat leaves
     // it answering, and only its stop (`chat/[id]/stream`) ends it.
-    const modelMessages = await convertToModelMessages(withScreenNotes(withoutFailures(sendable)));
+    const modelMessages = await convertToModelMessages(withScreenNotes(withoutFailures(sendable)), {
+        tools: subagentTasks.taskToolStandIn()
+    });
     const run = beginPolarRun(
         user.id,
         body.data.threadId,
@@ -545,6 +608,15 @@ export async function POST(request: Request): Promise<Response> {
         return refusedTurn(messages, { code: "too_many_runs", max: POLAR_RUNS_MAX }, save);
     }
     run.watch(request.signal);
+    if (run.signal.aborted) parentStop.abort();
+    else run.signal.addEventListener("abort", () => parentStop.abort(), { once: true });
+    // Background subagents that ended since the last turn: their reports.
+    const finishedBackground = await takeFinishedBackground(user.id, body.data.threadId).catch(
+        (error: unknown) => {
+            console.error("polar: could not read the finished subagents", error);
+            return [];
+        }
+    );
     if (condition) {
         goal = await setPolarGoal(user.id, body.data.threadId, condition).catch((error) => {
             console.error("polar: could not set the goal", error);
@@ -577,6 +649,7 @@ export async function POST(request: Request): Promise<Response> {
                 skillsPrompt(skills),
                 enigma ? enigmaPrompt(enigmaSkills) : "",
                 fenceSummary(compacted.summary),
+                subagentTasks.finishedBackgroundPrompt(finishedBackground),
                 // Only on a turn asked again from an answer's row: that turn's
                 // prefix is not cached, every other one is.
                 refineLine(body.data.refine)
@@ -586,19 +659,13 @@ export async function POST(request: Request): Promise<Response> {
             providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } }
         },
         messages: modelMessages,
-        tools,
+        tools: turnTools,
         activeTools: activeFor(new Set()),
         // A tool find_tools turned up is sent from the next step on, and the
         // last step has to answer.
         prepareStep: ({ stepNumber, steps }) =>
             nextStep(stepNumber, STEP_MAX, steps as never, activeFor),
-        toolApproval: {
-            ...toolset.approval,
-            ...(body.data.connectors ? connectorSet.approval : {}),
-            ...(remembers ? MEMORY_APPROVAL : {}),
-            ...(web ? WEB_APPROVAL : {}),
-            ...(web ? browserApprovalFor(user.id) : {})
-        },
+        toolApproval: approvalRules,
         // Without a length the provider reserves the model's whole output
         // window, which an account with little credit cannot cover (`credit.ts`).
         maxOutputTokens: polarOutputTokens(resolved.option),

@@ -15,7 +15,10 @@
             "down": "El modelo no respondió ({where}): el proveedor tiene problemas. Pregunta luego o elige otro modelo.",
             "model": "El modelo no respondió ({where}). Pregunta otra vez o elige otro modelo.",
             "other": "El modelo no respondió ({where}). Pregunta otra vez o elige otro modelo."
-        }
+        },
+        "subagentDoneTitle": "El subagente {name} terminó",
+        "subagentFailedTitle": "El subagente {name} no terminó",
+        "subagentBody": "En el chat \"{title}\"."
     },
     "toggle": {
         "title": "Pide a Polar ({keys})",
@@ -1721,5 +1724,53 @@
         "banner": "Chateando con {name}",
         "edit": "Editar agentes",
         "end": "Volver a Polar"
+    },
+    "subagents": {
+        "title": "Subagentes",
+        "label": "Subagente",
+        "background": "En segundo plano",
+        "status": {
+            "running": "Trabajando",
+            "done": "Hecho",
+            "failed": "Fallido",
+            "stopped": "Detenido",
+            "budget": "Sin margen",
+            "interrupted": "Interrumpido"
+        },
+        "steps": "{count} pasos",
+        "tokens": "{count} tokens",
+        "duration": "{min} min {sec} s",
+        "seconds": "{sec} s",
+        "open": "Ver transcripción",
+        "stop": "Detener",
+        "stopping": "Deteniendo...",
+        "send": "Enviar",
+        "continue": "Continuar",
+        "steerPlaceholder": "Escríbele mientras trabaja",
+        "continuePlaceholder": "Pídele que siga",
+        "continuePrompt": "Continúa el subagente {id} con resume: {text}",
+        "panelOpen": "Subagentes de este chat",
+        "panelRunning": "{count} activos",
+        "panelEmpty": "Aún no hay subagentes en este chat.",
+        "transcriptTitle": "{name}: {description}",
+        "task": "Tarea",
+        "you": "Tú",
+        "report": "Informe",
+        "noReport": "Aún sin informe.",
+        "usedTool": "Usó {tool}",
+        "loadFailed": "No se pudo cargar la transcripción.",
+        "retry": "Reintentar",
+        "stopFailed": "Ya había terminado.",
+        "steerFailed": "Terminó antes de tu mensaje. Continúalo en su lugar.",
+        "steerSent": "Enviado. Lo leerá antes del siguiente paso.",
+        "failure": "El modelo que usaba lo rechazó y se detuvo.",
+        "refusals": {
+            "invalid": "No se pudo leer la tarea.",
+            "per_turn": "Esta respuesta ya inició todos los subagentes que puede.",
+            "too_many": "Tienes todos los subagentes activos que puedes. Espera a que acabe uno.",
+            "unknown_type": "No hay ningún subagente de ese tipo.",
+            "no_model": "Ninguno de los modelos de ese agente se puede usar ahora.",
+            "not_resumable": "Ese subagente no se puede continuar."
+        }
     }
 }

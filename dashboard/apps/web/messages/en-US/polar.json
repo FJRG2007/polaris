@@ -15,7 +15,10 @@
             "down": "The model did not answer ({where}): the provider is having trouble. Ask again later or pick another model.",
             "model": "The model did not answer ({where}). Ask again or pick another model.",
             "other": "The model did not answer ({where}). Ask again or pick another model."
-        }
+        },
+        "subagentDoneTitle": "Subagent {name} finished",
+        "subagentFailedTitle": "Subagent {name} did not finish",
+        "subagentBody": "In the chat \"{title}\"."
     },
     "toggle": {
         "title": "Ask Polar ({keys})",
@@ -1721,5 +1724,53 @@
         "banner": "Chatting with {name}",
         "edit": "Edit agents",
         "end": "Back to Polar"
+    },
+    "subagents": {
+        "title": "Subagents",
+        "label": "Subagent",
+        "background": "Background",
+        "status": {
+            "running": "Working",
+            "done": "Done",
+            "failed": "Failed",
+            "stopped": "Stopped",
+            "budget": "Out of allowance",
+            "interrupted": "Interrupted"
+        },
+        "steps": "{count} steps",
+        "tokens": "{count} tokens",
+        "duration": "{min}m {sec}s",
+        "seconds": "{sec}s",
+        "open": "Open transcript",
+        "stop": "Stop",
+        "stopping": "Stopping...",
+        "send": "Send",
+        "continue": "Continue",
+        "steerPlaceholder": "Message it while it works",
+        "continuePlaceholder": "Ask it to keep going",
+        "continuePrompt": "Continue subagent {id} with resume: {text}",
+        "panelOpen": "Subagents in this chat",
+        "panelRunning": "{count} running",
+        "panelEmpty": "No subagents in this chat yet.",
+        "transcriptTitle": "{name}: {description}",
+        "task": "Task",
+        "you": "You",
+        "report": "Report",
+        "noReport": "No report yet.",
+        "usedTool": "Used {tool}",
+        "loadFailed": "The transcript could not load.",
+        "retry": "Try again",
+        "stopFailed": "It had already finished.",
+        "steerFailed": "It finished before your message arrived. Continue it instead.",
+        "steerSent": "Sent. It reads it before its next step.",
+        "failure": "The model it ran on refused, so it stopped.",
+        "refusals": {
+            "invalid": "The task could not be read.",
+            "per_turn": "This answer started as many subagents as one answer may.",
+            "too_many": "You have as many subagents running as you may. Wait for one to end.",
+            "unknown_type": "There is no subagent of that kind.",
+            "no_model": "None of that agent's models can be used now.",
+            "not_resumable": "That subagent cannot be continued."
+        }
     }
 }
