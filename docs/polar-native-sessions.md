@@ -223,6 +223,18 @@ The engine itself is environment-free: tools run against a `Workspace`
 `LanguageModel`, and hooks go through a `HookSink`. Tests drive it with a
 scripted model and a temporary directory.
 
+### Polaris's own capabilities come through MCP
+
+The native engine's built-in tools are only the coding tools above, the same
+set a coding CLI has. Everything Polaris itself can do (Drive, Tasks, Deploy,
+Mail, sessions, orchestration...) reaches the agent through the Polaris MCP
+server (`/api/mcp`), which the session's `mcpConfig` already names, as a
+connector like any other. That server has its own discovery - tool search,
+categories, listing tools by category - so the agent loads what a task needs
+instead of carrying a flat list. No Polaris capability is added as a native
+built-in. Polar chat moves the same way: its flat set of built-in Polaris
+tools (115 today) is replaced by the same MCP connector, in a separate change.
+
 ### Choosing the engine
 
 A per-person setting, **Session engine**, on Polar's settings:
@@ -265,12 +277,13 @@ an install that never ran the migration's reader still behaves as before.
 
 - [x] Design and parity inventory (this page)
 - [ ] Engine choice: setting, composer override, disabled reasons, switch off
-- [ ] Native engine: loop, tools, prompt, hooks, transcript, compaction,
-      interrupt, model change, plan mode, subagents
-- [ ] Tests per tool and end to end with a scripted model
+- [x] Native engine: loop, tools, prompt, hooks, transcript, compaction,
+      interrupt, model change, plan mode, subagents (`lib/polar/native/`)
+- [x] Tests per tool and end to end with a scripted model (`test/polar/native/`)
 - [ ] Session-scoped model token accepted by the compatible API
 - [ ] `polaris-agent` bundle served by the instance; catalogue row; boot
       script and runner launch
-- [ ] WebFetch, WebSearch, Skill, MCP client, images/PDF in Read
+- [ ] MCP client over the session's `mcpConfig` (Polaris first, then the session's own servers)
+- [ ] WebFetch, WebSearch, Skill, images/PDF in Read
 - [ ] Background subagents, resume, fork
 - [ ] Side-by-side runs against OpenCode on the same tasks, then flip the switch
