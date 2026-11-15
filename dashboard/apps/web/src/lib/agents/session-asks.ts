@@ -24,6 +24,9 @@ export type TodoStatus = (typeof TODO_STATUSES)[number];
 export interface SessionTodo {
     readonly text: string;
     readonly status: TodoStatus;
+    /** The task's id, for a list kept one task at a time (TaskCreate and
+     *  TaskUpdate); absent for one written whole. */
+    readonly id?: string;
 }
 
 const MAX_TODOS = 50;
@@ -98,9 +101,68 @@ export function readTodos(payload: unknown): SessionTodo[] | null {
 export function storedTodos(raw: unknown): SessionTodo[] {
     if (!Array.isArray(raw)) return [];
     return raw.flatMap((item) => {
-        const parsed = z.object({ text: z.string().max(MAX_TODO_CHARS), status: z.enum(TODO_STATUSES) }).safeParse(item);
-        return parsed.success ? [parsed.data] : [];
+        const parsed = z
+            .object({
+                text: z.string().max(MAX_TODO_CHARS),
+                status: z.enum(TODO_STATUSES),
+                id: z.string().max(MAX_TASK_ID_CHARS).optional()
+            })
+            .safeParse(item);
+        if (!parsed.success) return [];
+        const { id, ...todo } = parsed.data;
+        return [id ? { ...todo, id } : todo];
     });
+}
+
+const MAX_TASK_ID_CHARS = 64;
+
+/** Whether a payload is Claude Code's TaskCreate or TaskUpdate having run. */
+export function isTaskTool(payload: unknown): boolean {
+    const { tool, event } = inputOf(payload);
+    return event === "PostToolUse" && (tool === "TaskCreate" || tool === "TaskUpdate");
+}
+
+/** The id Claude Code gave a task it created: off its response when it says,
+ *  else the next number, which is how it numbers them. */
+function createdTaskId(response: unknown, current: readonly SessionTodo[]): string {
+    const record = response && typeof response === "object" ? (response as Record<string, unknown>) : {};
+    const task = record.task && typeof record.task === "object" ? (record.task as Record<string, unknown>) : record;
+    const said = task.id ?? task.taskId;
+    if ((typeof said === "string" && said.trim()) || typeof said === "number") return clip(String(said), MAX_TASK_ID_CHARS);
+    const text = typeof response === "string" ? response : "";
+    const numbered = /Task #(\d+)/.exec(text);
+    if (numbered) return numbered[1]!;
+    const highest = current.reduce((max, todo) => Math.max(max, Number(todo.id) || 0), 0);
+    return String(highest + 1);
+}
+
+/**
+ * The list after Claude Code's TaskCreate or TaskUpdate (its newer task tools,
+ * which add or change one task per call rather than writing the whole list as
+ * TodoWrite does), or null when the payload is neither or changes nothing.
+ * Read once the call has run, because only the response carries a new task's
+ * id; a task marked `deleted` leaves the list.
+ */
+export function applyTaskTool(payload: unknown, current: readonly SessionTodo[]): SessionTodo[] | null {
+    if (!isTaskTool(payload)) return null;
+    const { tool, input } = inputOf(payload);
+    const record = payload as Record<string, unknown>;
+    if (tool === "TaskCreate") {
+        if (current.length >= MAX_TODOS) return null;
+        const text = [input.subject, input.activeForm].find((value) => typeof value === "string" && value.trim());
+        if (typeof text !== "string") return null;
+        const id = createdTaskId(record.tool_response, current);
+        return [...current, { id, text: clip(text, MAX_TODO_CHARS), status: "pending" }];
+    }
+    const raw = input.taskId ?? input.id;
+    const id = typeof raw === "number" ? String(raw) : typeof raw === "string" ? raw.trim() : "";
+    const at = current.findIndex((todo) => todo.id === id);
+    if (!id || at < 0) return null;
+    if (input.status === "deleted") return current.filter((_, index) => index !== at);
+    const status = input.status === undefined ? current[at]!.status : todoStatus(input.status);
+    const text = typeof input.subject === "string" && input.subject.trim() ? clip(input.subject, MAX_TODO_CHARS) : current[at]!.text;
+    if (!status) return null;
+    return current.map((todo, index) => (index === at ? { ...todo, text, status } : todo));
 }
 
 const questionSchema = z.object({

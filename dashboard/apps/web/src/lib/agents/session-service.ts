@@ -12,6 +12,7 @@
  */
 
 import { prisma, type Prisma } from "@polaris/db";
+import { applyTaskTool, storedTodos } from "@/lib/agents/session-asks";
 import { touchSession } from "./session-live";
 import { createdSessionBranch } from "./session-branch";
 import { expirePermissions, settlesPermissions } from "./session-permissions";
@@ -660,6 +661,28 @@ export async function recordSessionTodos(
         select: { id: true }
     });
     touchSession(sessionId);
+}
+
+/**
+ * Apply one TaskCreate or TaskUpdate to the kept list. Under a row lock,
+ * because Claude Code runs several task calls of one message in parallel, and
+ * each hook reading the list before the others wrote would drop their tasks.
+ */
+export async function recordTaskTool(sessionId: string, payload: unknown): Promise<void> {
+    const changed = await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "AgentSession" WHERE "id" = ${sessionId}::uuid FOR UPDATE`;
+        const row = await tx.agentSession.findUnique({ where: { id: sessionId }, select: { todos: true } });
+        if (!row) return false;
+        const next = applyTaskTool(payload, storedTodos(row.todos));
+        if (!next) return false;
+        await tx.agentSession.update({
+            where: { id: sessionId },
+            data: { todos: next.map((todo) => ({ ...todo })) },
+            select: { id: true }
+        });
+        return true;
+    });
+    if (changed) touchSession(sessionId);
 }
 
 /**

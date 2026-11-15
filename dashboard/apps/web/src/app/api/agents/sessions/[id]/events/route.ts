@@ -17,12 +17,13 @@
  * somebody's agent to change what it was doing.
  */
 
-import { readTodos, reportedPermissionMode } from "@/lib/agents/session-asks";
+import { isTaskTool, readTodos, reportedPermissionMode } from "@/lib/agents/session-asks";
 import { hookConversation, hookEventFailed, normalizeHookEvent } from "@/lib/agents/session-hooks";
 import {
     recordSessionConversation,
     recordSessionEvents,
     recordSessionTodos,
+    recordTaskTool,
     recordReportedMode,
     sessionForToken
 } from "@/lib/agents/session-service";
@@ -89,6 +90,7 @@ export async function POST(
     // The todo list and the mode ride on the payload too; both best effort.
     const todos = readTodos(payload);
     if (todos) await recordSessionTodos(id, todos).catch(() => undefined);
+    else if (isTaskTool(payload)) await recordTaskTool(id, payload).catch(() => undefined);
     const mode = reportedPermissionMode(payload);
     if (mode) await recordReportedMode(id, mode).catch(() => undefined);
 
