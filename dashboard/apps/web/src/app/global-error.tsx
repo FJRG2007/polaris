@@ -74,7 +74,7 @@ export default function GlobalError({
     }, [staleBuild]);
 
     return (
-        <html lang="en" suppressHydrationWarning>
+        <html lang="en" dir="ltr" suppressHydrationWarning>
             <body>
                 <div className="flex min-h-dvh items-center justify-center p-6">
                     <div className="flex max-w-md flex-col gap-4 rounded-lg border border-border bg-surface p-6">

@@ -6,6 +6,9 @@
  */
 
 export { cn } from "./lib/cn";
+// Menus, selects and tabs read the reading direction from this, not from
+// `<html dir>`: the dashboard wraps every page in it (see I18nProvider).
+export { DirectionProvider, useDirection } from "@radix-ui/react-direction";
 export { PUBLIC_DOCS, publicDocHref } from "./lib/public-docs";
 export { OverlayPortal, useOverlayRoot } from "./lib/overlay-root";
 export { applePlatform, formatShortcut } from "./lib/shortcut";

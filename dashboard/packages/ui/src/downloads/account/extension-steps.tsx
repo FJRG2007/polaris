@@ -158,7 +158,7 @@ function Toggle({ on }: { on: boolean }) {
             <span
                 className={cn(
                     "absolute top-0.5 size-2.5 rounded-full bg-background shadow-sm transition-transform duration-300",
-                    on ? "translate-x-3" : "translate-x-0.5"
+                    on ? "translate-x-3 rtl:-translate-x-3" : "translate-x-0.5 rtl:-translate-x-0.5"
                 )}
             />
         </span>

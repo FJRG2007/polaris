@@ -58,6 +58,55 @@ export interface LocaleInfo {
      * Set it once the coverage report shows the locale at 100%.
      */
     readonly complete: boolean;
+    /** Which way its script runs. Derived from the tag (see `scriptDirection`),
+     *  never written by hand, so an Arabic or Hebrew entry cannot forget it. */
+    readonly direction: TextDirection;
+}
+
+/** The direction a script is written in, as `<html dir>` takes it. */
+export type TextDirection = "ltr" | "rtl";
+
+/**
+ * The languages written right to left by default, for a runtime whose `Intl`
+ * cannot say (Firefox and older engines have no `Intl.Locale` text info).
+ * `iw` and `ji` are the deprecated tags for Hebrew and Yiddish that some
+ * browsers still send.
+ */
+const RTL_LANGUAGES: ReadonlySet<string> = new Set([
+    "ar", "arc", "ckb", "dv", "fa", "he", "iw", "ji", "ks", "nqo", "pnb", "prs",
+    "ps", "sd", "syr", "ug", "ur", "yi"
+]);
+
+/** Scripts written right to left: a script subtag decides over the language,
+ *  so `az-Arab` is right to left and `ku-Latn` is not. */
+const RTL_SCRIPTS: ReadonlySet<string> = new Set([
+    "adlm", "arab", "hebr", "mand", "nkoo", "rohg", "samr", "syrc", "thaa"
+]);
+
+/** What `Intl.Locale` reports where it can: `getTextInfo()` in current engines,
+ *  the `textInfo` accessor in the V8 releases that shipped it first. */
+interface LocaleTextInfo {
+    getTextInfo?: () => { direction?: string };
+    textInfo?: { direction?: string };
+}
+
+/**
+ * The direction of a BCP 47 tag's script. `Intl.Locale` answers when the
+ * runtime has text info; otherwise the script subtag, then the language, are
+ * looked up in the lists above. Anything unparseable is left to right.
+ */
+export function scriptDirection(tag: string): TextDirection {
+    try {
+        const intl = new Intl.Locale(tag) as Intl.Locale & LocaleTextInfo;
+        const direction = intl.getTextInfo?.().direction ?? intl.textInfo?.direction;
+        if (direction === "rtl" || direction === "ltr") return direction;
+    } catch {
+        // An invalid tag or no `Intl.Locale`: the static lists decide.
+    }
+    const [language = "", ...rest] = tag.toLowerCase().split(/[-_]/);
+    const script = rest.find((part) => part.length === 4 && /^[a-z]{4}$/.test(part));
+    if (script) return RTL_SCRIPTS.has(script) ? "rtl" : "ltr";
+    return RTL_LANGUAGES.has(language) ? "rtl" : "ltr";
 }
 
 const INFO = {
@@ -80,9 +129,11 @@ const INFO = {
         ],
         formats: { dateOrder: "dmy", weekStart: "mon", clock: "24h" }
     }
-} as const satisfies Record<Locale, LocaleInfo>;
+} as const satisfies Record<Locale, Omit<LocaleInfo, "direction">>;
 
-export const LOCALE_INFO: Readonly<Record<Locale, LocaleInfo>> = INFO;
+export const LOCALE_INFO: Readonly<Record<Locale, LocaleInfo>> = Object.fromEntries(
+    LOCALES.map((locale) => [locale, { ...INFO[locale], direction: scriptDirection(locale) }])
+) as Record<Locale, LocaleInfo>;
 
 /** The locales marked complete, as a type: their catalogs must match the
  *  source's shape exactly. */
@@ -107,6 +158,11 @@ export type LocaleWords = { readonly [S in typeof SOURCE_LOCALE]: string } & {
 /** The reader's words, or the source's when their locale has none yet. */
 export function wordsFor(words: LocaleWords, locale: Locale): string {
     return words[locale] ?? words[SOURCE_LOCALE];
+}
+
+/** Which way a locale's interface runs - the value of `<html dir>`. */
+export function localeDirection(locale: Locale): TextDirection {
+    return LOCALE_INFO[locale].direction;
 }
 
 /** Whether a value names a locale Polaris has catalogs for. Exact and

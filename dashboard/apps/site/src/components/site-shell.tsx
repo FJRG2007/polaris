@@ -6,6 +6,7 @@
 import "../app/globals.css";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { scriptDirection } from "@polaris/core";
 import type { SiteLocale } from "@/data/builders";
 import { sans } from "@/lib/fonts";
 import { href, siteData, words } from "@/lib/site";
@@ -27,7 +28,7 @@ export function SiteShell({ locale, children }: { locale: SiteLocale; children: 
     const { repo } = siteData();
     return (
         // "system": the dashboard's theme class that follows the reader's machine.
-        <html lang={locale} className={`system ${sans.variable}`}>
+        <html lang={locale} dir={scriptDirection(locale)} className={`system ${sans.variable}`}>
             <body className="min-h-screen bg-background text-foreground antialiased">
                 <a
                     href="#main"

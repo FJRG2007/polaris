@@ -6,7 +6,7 @@ import type { CSSProperties, ReactNode } from "react";
 import localFont from "next/font/local";
 import { IdleWatch } from "@/components/idle-watch";
 import { DropGuard } from "@/components/drop-guard";
-import { themeClass } from "@polaris/core";
+import { localeDirection, themeClass } from "@polaris/core";
 import { resolveSession } from "@/lib/session";
 import { CHUNK_RECOVERY_SCRIPT } from "@/lib/stale-build";
 import { getClient, getLocale, getTranslations } from "@/lib/i18n/request";
@@ -207,6 +207,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     return (
         <html
             lang={locale}
+            dir={localeDirection(locale)}
             className={`${sans.variable} ${mono.variable} ${NAME_FACES} ${themeClass(theme)}`.trim()}
             // Everything Polaris draws is sized in rem, so this is what the whole
             // interface is laid out against - see globals.css.

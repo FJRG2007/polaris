@@ -14,7 +14,9 @@ import {
     LOCALE_INFO,
     LOCALES,
     isLocale,
-    localeOrDefault
+    localeDirection,
+    localeOrDefault,
+    scriptDirection
 } from "../src/i18n/locales.js";
 import {
     detectLocale,
@@ -59,6 +61,43 @@ describe("the locale registry", () => {
 
     it("names each language in itself", () => {
         expect(LOCALE_INFO["es-ES"].name).toBe("Español (España)");
+    });
+});
+
+describe("the direction a language is written in", () => {
+    it("is left to right for every locale Polaris has today", () => {
+        for (const locale of LOCALES) expect(localeDirection(locale)).toBe("ltr");
+    });
+
+    it("is right to left for Arabic, Hebrew, Persian and Urdu", () => {
+        for (const tag of ["ar", "ar-EG", "he-IL", "fa-IR", "ur-PK", "iw", "yi"])
+            expect(scriptDirection(tag)).toBe("rtl");
+        for (const tag of ["en-US", "es-ES", "fr", "ja-JP", "zh-Hant-TW"])
+            expect(scriptDirection(tag)).toBe("ltr");
+    });
+
+    it("lets a script subtag decide over the language", () => {
+        expect(scriptDirection("az-Arab")).toBe("rtl");
+        expect(scriptDirection("pa-Arab-PK")).toBe("rtl");
+        expect(scriptDirection("ku-Latn")).toBe("ltr");
+    });
+
+    it("reaches the same answer from the static lists when Intl cannot say", () => {
+        const Real = Intl.Locale;
+        // An engine with `Intl.Locale` but no text info, like Firefox.
+        const Bare = class extends Real {} as typeof Intl.Locale;
+        Object.defineProperty(Bare.prototype, "getTextInfo", { value: undefined });
+        Object.defineProperty(Bare.prototype, "textInfo", { value: undefined });
+        vi.stubGlobal("Intl", Object.assign(Object.create(Intl) as typeof Intl, { Locale: Bare }));
+        try {
+            expect(scriptDirection("ar-SA")).toBe("rtl");
+            expect(scriptDirection("he")).toBe("rtl");
+            expect(scriptDirection("az-Arab")).toBe("rtl");
+            expect(scriptDirection("en-US")).toBe("ltr");
+            expect(scriptDirection("not a tag")).toBe("ltr");
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 });
 

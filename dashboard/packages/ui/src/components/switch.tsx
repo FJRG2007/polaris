@@ -39,7 +39,7 @@ export function Switch({
             <span
                 className={cn(
                     "inline-block size-4 rounded-full bg-white shadow transition-transform",
-                    checked ? "translate-x-[1.125rem]" : "translate-x-0.5"
+                    checked ? "translate-x-[1.125rem] rtl:-translate-x-[1.125rem]" : "translate-x-0.5 rtl:-translate-x-0.5"
                 )}
             />
         </button>

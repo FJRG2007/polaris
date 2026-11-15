@@ -599,3 +599,25 @@ html:has(.page-bleed) {
     height: env(titlebar-area-height, 0px);
     app-region: drag;
 }
+
+/* Icons that point along the line - back, next, a disclosure chevron - point the
+   other way when the line runs right to left. `scale` composes with whatever
+   `transform` the icon already has, so a chevron rotated to point down still
+   points down. Icons that do not point (and media controls, which never mirror)
+   are left alone. Every lucide icon carries its own `lucide-<name>` class. */
+[dir="rtl"] :is(
+        .lucide-arrow-left,
+        .lucide-arrow-right,
+        .lucide-arrow-big-left,
+        .lucide-arrow-big-right,
+        .lucide-chevron-left,
+        .lucide-chevron-right,
+        .lucide-chevrons-left,
+        .lucide-chevrons-right,
+        .lucide-chevron-first,
+        .lucide-chevron-last,
+        .lucide-move-left,
+        .lucide-move-right
+    ) {
+    scale: -1 1;
+}

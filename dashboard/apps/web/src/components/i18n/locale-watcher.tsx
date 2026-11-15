@@ -5,13 +5,13 @@
  *
  * The change arrives on the account's live stream (the one `AccessWatcher`
  * listens on, shared between tabs - see `shared-stream`) as a frame naming the
- * new locale. The document's language and the cookie follow at once, and the
+ * new locale. The document's language, its direction and the cookie follow at once, and the
  * page is drawn again on the server, which is where the words come from: the
  * new locale and its messages arrive through the providers like any other
  * redraw. No reload, and whatever is typed into a field stays there.
  */
 
-import { isLocale } from "@polaris/core";
+import { isLocale, localeDirection } from "@polaris/core";
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "./i18n-provider";
@@ -41,6 +41,7 @@ export function LocaleWatcher(): null {
             }
             if (frame.kind !== "locale" || !isLocale(frame.locale) || frame.locale === current.current) return;
             document.documentElement.lang = frame.locale;
+            document.documentElement.dir = localeDirection(frame.locale);
             writeLocaleCookie(frame.locale);
             router.refresh();
         });

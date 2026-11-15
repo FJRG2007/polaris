@@ -18,7 +18,7 @@
 import { useRouter } from "next/navigation";
 import type { Namespace, NamespaceTranslator } from "@/lib/i18n/types";
 import { readLocaleCookie, writeLocaleCookie } from "@/lib/i18n/cookie";
-import { UiStringsProvider, type UiStrings } from "@polaris/ui";
+import { DirectionProvider, UiStringsProvider, type UiStrings } from "@polaris/ui";
 import { I18nContext } from "@polaris/ui/i18n";
 import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { setActionFailureText } from "@/lib/run-action";
@@ -27,6 +27,7 @@ import {
     clientFacts,
     createTranslator,
     DEFAULT_LOCALE,
+    localeDirection,
     negotiateLocale,
     type Client,
     type ClientFacts,
@@ -53,7 +54,9 @@ export function I18nProvider({
     const value = useMemo(() => ({ locale, messages, client }), [locale, messages, client]);
     return (
         <I18nContext.Provider value={value}>
-            <UiWords>{children}</UiWords>
+            <DirectionProvider dir={localeDirection(locale)}>
+                <UiWords>{children}</UiWords>
+            </DirectionProvider>
         </I18nContext.Provider>
     );
 }
@@ -117,9 +120,9 @@ function UiWords({ children }: { children: ReactNode }) {
 /**
  * Keeps the document and the cookie agreeing with the locale a page was drawn in.
  *
- * `<html lang>` is set by the server on every full load; a redraw in another
- * language (`router.refresh()`) keeps the element it already had, so it is set
- * here too. With an account, the cookie is made to agree with it, so the
+ * `<html lang>` and `<html dir>` are set by the server on every full load; a
+ * redraw in another language (`router.refresh()`) keeps the element it already
+ * had, so they are set here too. With an account, the cookie is made to agree with it, so the
  * sign-in screen after signing out is in the same language. Without one, the
  * browser's own language list gets a say: the server only saw `Accept-Language`,
  * and `navigator.languages` is what the person actually set.
@@ -131,6 +134,7 @@ export function LocaleSync({ locale, signedIn }: { locale: Locale; signedIn: boo
     const settled = useRouterSettled();
     useEffect(() => {
         document.documentElement.lang = locale;
+        document.documentElement.dir = localeDirection(locale);
         const remembered = readLocaleCookie(document.cookie);
         if (signedIn) {
             if (remembered !== locale) writeLocaleCookie(locale);
