@@ -152,3 +152,46 @@ describe("error pages and hash routing", () => {
         expect(beats.find((beat) => beat.type === "view")?.url).toBe("/app");
     });
 });
+
+describe("web vitals", () => {
+    type Take = (entry: Record<string, unknown>) => void;
+    let observers: Map<string, Take>;
+
+    beforeEach(() => {
+        observers = new Map();
+        vi.stubGlobal(
+            "PerformanceObserver",
+            class {
+                constructor(private readonly callback: (list: { getEntries: () => unknown[] }) => void) {}
+                observe(options: { type: string }) {
+                    observers.set(options.type, (entry) => this.callback({ getEntries: () => [entry] }));
+                }
+            }
+        );
+    });
+
+    const vitalsBeats = () => beats.filter((beat) => beat.type === "vitals") as (Beat & { vitals: Record<string, number> })[];
+
+    it("sends the measured metrics once, for the page they were measured on", () => {
+        window.history.replaceState(null, "", "/landing");
+        load({ "data-vitals": "true" });
+        observers.get("largest-contentful-paint")?.({ startTime: 2300.4 });
+        observers.get("paint")?.({ name: "first-contentful-paint", startTime: 900 });
+        observers.get("layout-shift")?.({ hadRecentInput: false, value: 0.05, startTime: 100 });
+        observers.get("layout-shift")?.({ hadRecentInput: false, value: 0.04, startTime: 400 });
+        observers.get("layout-shift")?.({ hadRecentInput: true, value: 0.5, startTime: 500 });
+        observers.get("event")?.({ interactionId: 7, duration: 180 });
+        observers.get("event")?.({ interactionId: 0, duration: 900 });
+        window.history.pushState(null, "", "/next");
+        window.dispatchEvent(new Event("pagehide"));
+        expect(vitalsBeats()).toHaveLength(1);
+        expect(vitalsBeats()[0]).toMatchObject({ url: "/landing", vitals: { lcp: 2300, fcp: 900, cls: 0.09, inp: 180 } });
+    });
+
+    it("sends nothing unless asked for", () => {
+        load({});
+        window.dispatchEvent(new Event("pagehide"));
+        expect(observers.size).toBe(0);
+        expect(vitalsBeats()).toEqual([]);
+    });
+});

@@ -73,6 +73,7 @@ All options are attributes on the `<script>` tag.
 | `data-forms="true"` | Record form submissions as `form-submit`, with the form's target `path` and its `id` when it has one. Forms that carry `data-polaris-event` report only that event. |
 | `data-hash="true"` | Count the `#hash` as part of the page, for hash-based routers (`/app#/inbox`). Hash changes are counted as route changes. |
 | `data-404="true"` | Put this on the tag of your error page: every view of it also records a `404` event with the requested `path`, so broken links show up under **Events**. |
+| `data-vitals="true"` | Measure Core Web Vitals in the visitor's browser (LCP, INP, CLS, FCP, TTFB) and send them once per page load, when the first page is left. Shown under **Pages > Core Web Vitals** at the 75th percentile, overall and per page, for ranges up to 30 days; kept with the per-visit detail. |
 | `data-before-send="beforeSend"` | Name of a global function that sees each beat first. |
 
 ### `data-before-send`
@@ -92,7 +93,7 @@ value to drop it. If it throws, the beat is dropped.
 <script defer fetchpriority="low" src="https://polaris.example.com/analytics.js" data-key="YOUR_KEY" data-before-send="beforeSend"></script>
 ```
 
-A beat has `key`, `type` (`view`, `event`, `leave` or `identify`), `url` (path
+A beat has `key`, `type` (`view`, `event`, `leave`, `identify` or `vitals`), `url` (path
 and query), `screen`, `language`, `timezone`, and depending on the type
 `referrer`, `title`, `name`, `props`, `distinctId`, `data` and `durationMs`. A
 beat that no longer matches the [limits](#limits-and-validation) is discarded by
@@ -313,6 +314,7 @@ and checks it against a fixed schema:
 | `language` | up to 35 characters |
 | `timezone` | up to 64 characters |
 | `durationMs` | integer, 0 to 86,400,000 (one day) |
+| `vitals` | object with at least one of `lcp`, `inp`, `fcp`, `ttfb` (milliseconds, 0 to 60,000) and `cls` (0 to 100); no other keys |
 
 - 120 beats per minute per client address. Beats past it are dropped.
 - The page's origin is read from the request's `Origin` or `Referer` header,

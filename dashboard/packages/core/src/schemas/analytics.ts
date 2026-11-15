@@ -12,12 +12,13 @@
  */
 
 import { z } from "zod";
+import { webVitalsSchema } from "../analytics-vitals.js";
 
 /** Long enough for a real URL with a query, short enough to bound a row. */
 const URL_MAX = 2048;
 const NAME_MAX = 120;
 
-export const VISIT_BEATS = ["view", "event", "leave", "identify"] as const;
+export const VISIT_BEATS = ["view", "event", "leave", "identify", "vitals"] as const;
 export type VisitBeat = (typeof VISIT_BEATS)[number];
 
 /**
@@ -61,7 +62,9 @@ export const visitBeatSchema = z.object({
     /** Milliseconds on the page, sent with the beat that ends a view. Capped at a
      *  day: a tab left open over a weekend is not a two-day visit, and letting it
      *  count as one would wreck every average on the screen. */
-    durationMs: z.number().int().min(0).max(86_400_000).optional()
+    durationMs: z.number().int().min(0).max(86_400_000).optional(),
+    /** Core Web Vitals for the page being left, on a `vitals` beat. */
+    vitals: webVitalsSchema.optional()
 });
 
 export type VisitBeatInput = z.infer<typeof visitBeatSchema>;

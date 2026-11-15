@@ -8454,6 +8454,7 @@ model AnalyticsSite {
     events   AnalyticsEvent[]
     days     AnalyticsDay[]
     reports  AnalyticsReport[]
+    vitals   AnalyticsVital[]
 
     @@unique([scopeType, scopeId])
 }
@@ -8499,6 +8500,7 @@ model AnalyticsSession {
 
     site   AnalyticsSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
     events AnalyticsEvent[]
+    vitals AnalyticsVital[]
 
     @@index([siteId, startedAt])
     @@index([siteId, lastSeenAt])
@@ -8530,6 +8532,30 @@ model AnalyticsEvent {
     @@index([siteId, at])
     @@index([sessionId])
     @@index([siteId, kind, at])
+}
+
+/// Core Web Vitals one visitor's browser measured on one page, sent by the
+/// tracker (`data-vitals`) when the page is left. Milliseconds, except `cls`.
+/// Owned by the visit, so it is pruned with the raw rows; the daily rollup does
+/// not carry it and long ranges report it as unavailable.
+model AnalyticsVital {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    siteId    String   @db.Uuid
+    sessionId String
+    at        DateTime
+    /// The grouped route, as on AnalyticsEvent.
+    path      String
+    lcp       Float?
+    inp       Float?
+    cls       Float?
+    fcp       Float?
+    ttfb      Float?
+
+    site    AnalyticsSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+    session AnalyticsSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    @@index([siteId, at])
+    @@index([sessionId])
 }
 
 /// A day of traffic, folded down.

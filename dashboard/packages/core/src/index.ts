@@ -136,6 +136,7 @@ export * from "./waf-anomalies.js";
 export * from "./analytics-visit.js";
 export * from "./analytics-geo.js";
 export * from "./analytics-report.js";
+export * from "./analytics-vitals.js";
 export * from "./waf-intel.js";
 export * from "./certificates.js";
 export * from "./waf-presets.js";

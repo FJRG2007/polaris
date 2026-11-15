@@ -249,6 +249,63 @@ export async function revenue(window: ReportWindow): Promise<RevenueReport> {
     return { totals, byEvent };
 }
 
+// --- web vitals ----------------------------------------------------------------
+
+/** The 75th percentile of each metric, and how many pages measured it. */
+export interface VitalsRow {
+    readonly samples: number;
+    readonly lcp: number | null;
+    readonly inp: number | null;
+    readonly cls: number | null;
+    readonly fcp: number | null;
+    readonly ttfb: number | null;
+}
+
+export interface VitalsReport {
+    readonly overall: VitalsRow;
+    /** The most-measured pages, each with its own percentiles. */
+    readonly pages: readonly (VitalsRow & { readonly path: string })[];
+    /** The window is longer than the per-visit rows answer for; nothing was read. */
+    readonly unavailable: boolean;
+}
+
+/** Pages listed in the vitals report. */
+const VITALS_PAGES = 25;
+
+const p75 = (column: string) =>
+    Prisma.raw(`percentile_cont(0.75) WITHIN GROUP (ORDER BY v."${column}") FILTER (WHERE v."${column}" IS NOT NULL)`);
+
+/**
+ * Core Web Vitals at the 75th percentile - the percentile Google's thresholds
+ * are defined on - over the window, then per page. Read from the per-visit rows
+ * only: the daily rollup does not carry them, so a window past `RAW_MAX_MS`
+ * reports `unavailable` instead of a figure from part of it.
+ */
+export async function vitals(window: ReportWindow): Promise<VitalsReport> {
+    const empty: VitalsRow = { samples: 0, lcp: null, inp: null, cls: null, fcp: null, ttfb: null };
+    if (window.to - window.from > RAW_MAX_MS) return { overall: empty, pages: [], unavailable: true };
+    const join = window.filters.length ? Prisma.sql`JOIN "AnalyticsSession" s ON s.id = v."sessionId"` : Prisma.empty;
+    const where = Prisma.sql`v."siteId" = ${window.siteId}::uuid
+        AND v.at >= ${new Date(window.from)} AND v.at < ${new Date(window.to)}${sessionSql(window.filters)}`;
+    const columns = Prisma.sql`count(*)::int AS samples, ${p75("lcp")} AS lcp, ${p75("inp")} AS inp,
+        ${p75("cls")} AS cls, ${p75("fcp")} AS fcp, ${p75("ttfb")} AS ttfb`;
+    const [overall, pages] = await Promise.all([
+        prisma.$queryRaw<VitalsRow[]>(Prisma.sql`SELECT ${columns} FROM "AnalyticsVital" v ${join} WHERE ${where}`),
+        prisma.$queryRaw<(VitalsRow & { path: string })[]>(Prisma.sql`
+            SELECT v.path AS path, ${columns} FROM "AnalyticsVital" v ${join} WHERE ${where}
+            GROUP BY v.path ORDER BY samples DESC, v.path ASC LIMIT ${VITALS_PAGES}
+        `)
+    ]);
+    return { overall: toVitalsRow(overall[0]) ?? empty, pages: pages.map((row) => ({ path: row.path, ...toVitalsRow(row)! })), unavailable: false };
+}
+
+/** Postgres hands percentiles back as doubles and counts as ints; keep both as numbers. */
+function toVitalsRow(row: VitalsRow | undefined): VitalsRow | null {
+    if (!row) return null;
+    const num = (value: unknown) => (value === null || value === undefined ? null : Number(value));
+    return { samples: Number(row.samples) || 0, lcp: num(row.lcp), inp: num(row.inp), cls: num(row.cls), fcp: num(row.fcp), ttfb: num(row.ttfb) };
+}
+
 // --- funnels -------------------------------------------------------------------
 
 export interface FunnelStep {

@@ -475,5 +475,33 @@
         "trend": "Visitantes",
         "none": "Nada en el periodo.",
         "generated": "Creado {at}"
+    },
+    "vitals": {
+        "title": "Core Web Vitals",
+        "none": "Aún no hay medidas. Añade data-vitals=\"true\" a la etiqueta para medir la velocidad.",
+        "unavailable": "La velocidad solo se guarda por visita. Elige 30 días o menos.",
+        "samples": "Percentil 75 de {count} cargas de página",
+        "page": "Página",
+        "pageSamples": "Cargas",
+        "metric": {
+            "lcp": "Mayor pintura",
+            "inp": "Interacción",
+            "cls": "Saltos",
+            "fcp": "Primer render",
+            "ttfb": "Respuesta"
+        },
+        "hint": {
+            "lcp": "Largest Contentful Paint: cuándo apareció el contenido principal",
+            "inp": "Interaction to Next Paint: lo rápido que respondió a un clic o tecla",
+            "cls": "Cumulative Layout Shift: cuánto saltó la página al cargar",
+            "fcp": "First Contentful Paint: cuándo apareció algo por primera vez",
+            "ttfb": "Time to First Byte: cuánto tardó el servidor en responder"
+        },
+        "band": {
+            "good": "Bien",
+            "improve": "Mejorable",
+            "poor": "Mal",
+            "unknown": "Sin medir"
+        }
     }
 }

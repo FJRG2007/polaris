@@ -456,7 +456,8 @@ const reportRequestSchema = z.discriminatedUnion("kind", [
         cursor: z.string().max(2048).nullish(),
         limit: z.number().int().min(1).max(200).optional()
     }),
-    z.object({ kind: z.literal("realtime") })
+    z.object({ kind: z.literal("realtime") }),
+    z.object({ kind: z.literal("vitals") })
 ]);
 export type AnalyticsReportRequest = z.infer<typeof reportRequestSchema>;
 
@@ -474,7 +475,8 @@ export type AnalyticsReportAnswer =
     | { kind: "sessionStats"; stats: reports.SessionStats }
     | { kind: "sessionProperties"; key: string | null; rows: reports.SessionPropertyRow[] }
     | ({ kind: "breakdown"; dimension: core.VisitDimension } & lists.RankedList)
-    | ({ kind: "realtime" } & lists.RealtimeSnapshot);
+    | ({ kind: "realtime" } & lists.RealtimeSnapshot)
+    | { kind: "vitals"; report: reports.VitalsReport };
 
 const SESSIONS_PAGE = 50;
 
@@ -515,6 +517,8 @@ export async function runAnalyticsReportAction(input: {
             return { kind: "properties", name: ask.name, rows: await reports.eventProperties(window, ask.name) };
         case "revenue":
             return { kind: "revenue", report: await reports.revenue(window) };
+        case "vitals":
+            return { kind: "vitals", report: await reports.vitals(window) };
         case "funnel":
             return { kind: "funnel", steps: await reports.funnel(window, ask.definition) };
         case "journey":

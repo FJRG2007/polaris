@@ -34,6 +34,8 @@
  *   data-forms="true"          - record form submissions
  *   data-hash="true"           - count the #hash as part of the page, for hash routers
  *   data-404="true"            - this is an error page: record a 404 event for it
+ *   data-vitals="true"         - measure Core Web Vitals (LCP, INP, CLS, FCP, TTFB) and send
+ *                                them once per page load, when the first page is left
  *   data-before-send="fnName"  - a global function that sees every beat first and
  *                                returns it (changed or not), or a falsy value to drop it
  *
@@ -175,8 +177,67 @@
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
     });
 
+    // Core Web Vitals, read from the browser's own performance entries. One set per
+    // document: the metrics describe the page that was loaded, so they are sent the
+    // first time it is left (a route change, the tab hidden, the page closed).
+    const vitalsOn = flag("data-vitals");
+    const vitals = {};
+    let vitalsSent = false;
+    function observe(type, take, extra) {
+        try {
+            new PerformanceObserver((list) => list.getEntries().forEach(take)).observe({ type, buffered: true, ...extra });
+        } catch {
+            /* not supported here: that metric is simply not sent */
+        }
+    }
+    if (vitalsOn) {
+        observe("largest-contentful-paint", (entry) => (vitals.lcp = entry.startTime));
+        observe("paint", (entry) => entry.name === "first-contentful-paint" && (vitals.fcp = entry.startTime));
+        // CLS is the worst burst of shifts: a window closes after a second of calm
+        // or five seconds in all. Shifts right after input are expected, not counted.
+        let burst = 0;
+        let first = 0;
+        let last = 0;
+        observe("layout-shift", (entry) => {
+            if (entry.hadRecentInput) return;
+            if (burst && entry.startTime - last < 1000 && entry.startTime - first < 5000) burst += entry.value;
+            else {
+                burst = entry.value;
+                first = entry.startTime;
+            }
+            last = entry.startTime;
+            vitals.cls = Math.max(vitals.cls || 0, burst);
+        });
+        // The slowest interaction stands in for INP: on a single page load it is the
+        // same figure for all but the rare page with fifty or more interactions.
+        observe("event", (entry) => entry.interactionId && (vitals.inp = Math.max(vitals.inp || 0, entry.duration)), {
+            durationThreshold: 40
+        });
+        try {
+            const navigation = performance.getEntriesByType("navigation")[0];
+            if (navigation && navigation.responseStart > 0) vitals.ttfb = navigation.responseStart;
+        } catch {
+            /* ignore */
+        }
+    }
+
+    function sendVitals(url) {
+        if (!vitalsOn || vitalsSent) return;
+        const measured = {};
+        for (const metric of ["lcp", "inp", "cls", "fcp", "ttfb"]) {
+            const value = vitals[metric];
+            if (typeof value !== "number" || !isFinite(value) || value < 0) continue;
+            measured[metric] = metric === "cls" ? Math.min(100, Math.round(value * 10000) / 10000) : Math.min(60000, Math.round(value));
+        }
+        if (!Object.keys(measured).length) return;
+        vitalsSent = true;
+        send({ ...base("vitals"), url: url || currentUrl(), vitals: measured }, true);
+    }
+
     /** Close the page being left, so the visit has a measured length. */
     function leave() {
+        // Not before the first page is even recorded: the opening view also calls this.
+        if (lastUrl) sendVitals(lastUrl);
         if (!enteredAt) return;
         const elapsed = Date.now() - enteredAt;
         enteredAt = 0;
@@ -289,6 +350,11 @@
     // An error page says so on its own tag, and every view of it is a 404 for the
     // address that was asked for.
     if (flag("data-404")) whenIdle(() => event("404", { path: currentUrl().slice(0, 240) }));
+
+    if (vitalsOn) {
+        addEventListener("pagehide", () => sendVitals(lastUrl));
+        addEventListener("visibilitychange", () => document.visibilityState === "hidden" && sendVitals(lastUrl));
+    }
 
     if (!auto) return;
 

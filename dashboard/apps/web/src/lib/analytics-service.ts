@@ -13,6 +13,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import type { WebVitalsInput } from "@polaris/core";
 import { forgetSubject } from "@/lib/access/forget";
 import { sessionWhere } from "@/lib/analytics-reports";
 import { randomBytes } from "node:crypto";
@@ -466,6 +467,43 @@ export async function recordVisitLeave(input: VisitInput): Promise<void> {
     await prisma.analyticsSession.updateMany({
         where: { id: sessionId, siteId: input.siteId },
         data: { lastSeenAt: new Date(input.at) }
+    });
+}
+
+/**
+ * Keep the Core Web Vitals the tracker measured on the page being left.
+ *
+ * Starts no visit: vitals without a recorded view are a page nobody counted
+ * (an excluded page, an ignored address, a bot), and keeping them would rate a
+ * page the totals say was never seen.
+ */
+export async function recordVisitVitals(input: VisitInput, vitals: WebVitalsInput): Promise<void> {
+    const [path] = splitUrl(input.url);
+    if (await ignored(input, path)) return;
+    const salt = await dailySalt(input.at);
+    const sessionId = await visitSessionId({
+        salt,
+        siteId: input.siteId,
+        ip: input.ip,
+        userAgent: input.userAgent ?? ""
+    });
+    const session = await prisma.analyticsSession.findFirst({
+        where: { id: sessionId, siteId: input.siteId },
+        select: { id: true }
+    });
+    if (!session) return;
+    await prisma.analyticsVital.create({
+        data: {
+            siteId: input.siteId,
+            sessionId,
+            at: new Date(input.at),
+            path: groupVisitPath(path),
+            lcp: vitals.lcp ?? null,
+            inp: vitals.inp ?? null,
+            cls: vitals.cls ?? null,
+            fcp: vitals.fcp ?? null,
+            ttfb: vitals.ttfb ?? null
+        }
     });
 }
 

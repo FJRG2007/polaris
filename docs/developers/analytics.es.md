@@ -74,6 +74,7 @@ Todas son atributos de la etiqueta `<script>`.
 | `data-forms="true"` | Registra los envíos de formularios como `form-submit`, con la ruta de destino en `path` y su `id` si lo tiene. Los formularios con `data-polaris-event` solo envían ese evento. |
 | `data-hash="true"` | Cuenta el `#hash` como parte de la página, para routers basados en hash (`/app#/inbox`). Los cambios de hash cuentan como cambios de ruta. |
 | `data-404="true"` | Ponlo en la etiqueta de tu página de error: cada visita a ella registra también un evento `404` con la ruta pedida en `path`, y los enlaces rotos aparecen en **Eventos**. |
+| `data-vitals="true"` | Mide las Core Web Vitals en el navegador del visitante (LCP, INP, CLS, FCP, TTFB) y las envía una vez por carga, al salir de la primera página. Se ven en **Páginas > Core Web Vitals** en el percentil 75, en total y por página, para rangos de hasta 30 días; se guardan con el detalle por visita. |
 | `data-before-send="beforeSend"` | Nombre de una función global que ve cada latido antes de enviarse. |
 
 ### `data-before-send`
@@ -93,7 +94,7 @@ para descartarlo. Si lanza un error, el latido se descarta.
 <script defer fetchpriority="low" src="https://polaris.example.com/analytics.js" data-key="YOUR_KEY" data-before-send="beforeSend"></script>
 ```
 
-Un latido tiene `key`, `type` (`view`, `event`, `leave` o `identify`), `url`
+Un latido tiene `key`, `type` (`view`, `event`, `leave`, `identify` o `vitals`), `url`
 (ruta y query), `screen`, `language`, `timezone` y, según el tipo, `referrer`,
 `title`, `name`, `props`, `distinctId`, `data` y `durationMs`. Si deja de cumplir
 los [límites](#limites-y-validacion), el servidor lo descarta.
@@ -318,6 +319,7 @@ lo comprueba contra un esquema fijo:
 | `language` | hasta 35 caracteres |
 | `timezone` | hasta 64 caracteres |
 | `durationMs` | entero, de 0 a 86.400.000 (un día) |
+| `vitals` | objeto con al menos uno de `lcp`, `inp`, `fcp`, `ttfb` (milisegundos, de 0 a 60.000) y `cls` (de 0 a 100); ninguna otra clave |
 
 - 120 latidos por minuto y dirección de cliente. Los que pasan se descartan.
 - El origen de la página se lee de la cabecera `Origin` o `Referer` de la

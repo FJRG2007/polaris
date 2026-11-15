@@ -475,5 +475,33 @@
         "trend": "Visitors over time",
         "none": "Nothing in this window.",
         "generated": "Generated {at}"
+    },
+    "vitals": {
+        "title": "Core Web Vitals",
+        "none": "No measurements yet. Add data-vitals=\"true\" to the tracker tag to measure page speed.",
+        "unavailable": "Page speed is kept per visit only. Pick a range of 30 days or less.",
+        "samples": "75th percentile of {count} page loads",
+        "page": "Page",
+        "pageSamples": "Loads",
+        "metric": {
+            "lcp": "Largest paint",
+            "inp": "Interaction",
+            "cls": "Layout shift",
+            "fcp": "First paint",
+            "ttfb": "Server response"
+        },
+        "hint": {
+            "lcp": "Largest Contentful Paint: when the main content appeared",
+            "inp": "Interaction to Next Paint: how fast the page answered a click or key",
+            "cls": "Cumulative Layout Shift: how much the page jumped while loading",
+            "fcp": "First Contentful Paint: when anything first appeared",
+            "ttfb": "Time to First Byte: how long the server took to answer"
+        },
+        "band": {
+            "good": "Good",
+            "improve": "Needs work",
+            "poor": "Poor",
+            "unknown": "Not measured"
+        }
     }
 }
