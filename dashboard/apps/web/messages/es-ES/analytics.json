@@ -549,7 +549,7 @@
         "deep": "Leído al 75%",
         "time": "Tiempo medio",
         "views": "Vistas medidas",
-        "unavailable": "El desplazamiento y el tiempo no se guardan en los totales diarios. Elige 30 días o menos.",
+        "unavailable": "Pasados 30 días, el desplazamiento y el tiempo no se filtran. Quita los filtros o elige 30 días o menos.",
         "empty": "Aún no hay vistas medidas. Llegan del script de seguimiento al salir de una página."
     },
     "share": {

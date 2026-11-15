@@ -209,6 +209,35 @@ const ROLLUP_DIMENSIONS: readonly VisitDimension[] = [
 ];
 
 /**
+ * Bumped whenever the rollup starts carrying something new. A day whose total row
+ * is older and whose raw rows are still all there is folded again, so the new
+ * columns are filled for the whole raw window, not only from the next day on.
+ * 1: scroll depth and time on page per path.
+ */
+export const ROLLUP_VERSION = 1;
+
+/** Scroll depth at or past this counts as read to the end, as in the raw report. */
+const DEEP_SCROLL = 75;
+
+/** Add one view's leave-beat measures to its path row. */
+export function foldEngagement(
+    into: { engagedViews: number; scrollSum: number; scrollViews: number; deepViews: number; engagedMsSum: number; timedViews: number },
+    view: { scrollPct: number | null; engagedMs: number | null }
+): void {
+    if (view.scrollPct === null && view.engagedMs === null) return;
+    into.engagedViews += 1;
+    if (view.scrollPct !== null) {
+        into.scrollSum += view.scrollPct;
+        into.scrollViews += 1;
+        if (view.scrollPct >= DEEP_SCROLL) into.deepViews += 1;
+    }
+    if (view.engagedMs !== null) {
+        into.engagedMsSum += view.engagedMs;
+        into.timedViews += 1;
+    }
+}
+
+/**
  * Fold a completed day into totals.
  *
  * Runs for whole UTC days only, and rewrites rather than adds, so running it twice
@@ -229,7 +258,7 @@ export async function rollupAnalyticsDay(day: number): Promise<{ sites: number }
             }),
             prisma.analyticsEvent.findMany({
                 where: { siteId: site.id, at: { gte: new Date(from), lt: new Date(to) } },
-                select: { sessionId: true, kind: true, name: true, path: true }
+                select: { sessionId: true, kind: true, name: true, path: true, scrollPct: true, engagedMs: true }
             })
         ]);
         if (sessions.length === 0) continue;
@@ -249,6 +278,12 @@ export async function rollupAnalyticsDay(day: number): Promise<{ sites: number }
             bounces: number;
             durationSec: number;
             measured: number;
+            engagedViews: number;
+            scrollSum: number;
+            scrollViews: number;
+            deepViews: number;
+            engagedMsSum: number;
+            timedViews: number;
         }
         const cells = new Map<string, Cell>();
         // The pair is kept on the cell rather than parsed back out of the key. A value
@@ -266,7 +301,13 @@ export async function rollupAnalyticsDay(day: number): Promise<{ sites: number }
                     views: 0,
                     bounces: 0,
                     durationSec: 0,
-                    measured: 0
+                    measured: 0,
+                    engagedViews: 0,
+                    scrollSum: 0,
+                    scrollViews: 0,
+                    deepViews: 0,
+                    engagedMsSum: 0,
+                    timedViews: 0
                 };
                 cells.set(key, found);
             }
@@ -311,6 +352,7 @@ export async function rollupAnalyticsDay(day: number): Promise<{ sites: number }
                 const found = cell("path", event.path);
                 found.visitors.add(event.sessionId);
                 found.views += 1;
+                foldEngagement(found, event);
             } else if (event.name) {
                 const found = cell("event", event.name);
                 found.visitors.add(event.sessionId);
@@ -336,7 +378,14 @@ export async function rollupAnalyticsDay(day: number): Promise<{ sites: number }
                 views: entry.views,
                 bounces: entry.bounces,
                 durationSec: entry.durationSec,
-                measured: entry.measured
+                measured: entry.measured,
+                engagedViews: entry.engagedViews,
+                scrollSum: entry.scrollSum,
+                scrollViews: entry.scrollViews,
+                deepViews: entry.deepViews,
+                engagedMsSum: entry.engagedMsSum,
+                timedViews: entry.timedViews,
+                rollupVersion: entry.dimension === "total" ? ROLLUP_VERSION : 0
             }));
         if (rows.length > 0) await prisma.analyticsDay.createMany({ data: rows });
         touched += 1;
@@ -374,9 +423,13 @@ export async function pruneAnalytics(
         ) {
             const already = await prisma.analyticsDay.findFirst({
                 where: { day: new Date(day), dimension: "total" },
-                select: { id: true }
+                orderBy: { rollupVersion: "asc" },
+                select: { rollupVersion: true }
             });
-            if (already) continue;
+            // Folded again only while every raw row of the day is still kept: sessions
+            // ending before `cutoff` are about to go, so a day before it may be partial
+            // and re-folding it would overwrite good totals with smaller ones.
+            if (already && (already.rollupVersion >= ROLLUP_VERSION || day < cutoff)) continue;
             await rollupAnalyticsDay(day);
             days += 1;
         }

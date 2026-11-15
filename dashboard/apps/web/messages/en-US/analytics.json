@@ -549,7 +549,7 @@
         "deep": "Read to 75%",
         "time": "Avg. time",
         "views": "Measured views",
-        "unavailable": "Scroll and time are not kept in the daily totals. Choose 30 days or less.",
+        "unavailable": "Past 30 days, scroll and time cannot be filtered. Clear the filters or choose 30 days or less.",
         "empty": "No measured views yet. They come from the tracker script when a page is left."
     },
     "share": {

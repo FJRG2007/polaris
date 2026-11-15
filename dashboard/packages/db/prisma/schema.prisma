@@ -8630,6 +8630,20 @@ model AnalyticsDay {
     durationSec Int @default(0)
     measured    Int @default(0)
 
+    /// Scroll depth and time on page, on "path" rows only, kept as sums and
+    /// counts for the same reason: views that measured either, the scroll sum and
+    /// how many views it covers, views scrolled 75% or more, and the time open in
+    /// milliseconds with how many views it covers.
+    engagedViews Int   @default(0)
+    scrollSum    Int   @default(0)
+    scrollViews  Int   @default(0)
+    deepViews    Int   @default(0)
+    engagedMsSum Float @default(0)
+    timedViews   Int   @default(0)
+    /// Which rollup wrote the row (on the "total" row): a day still inside the
+    /// raw window and written by an older rollup is folded again.
+    rollupVersion Int  @default(0)
+
     site AnalyticsSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
     @@unique([siteId, day, dimension, value])

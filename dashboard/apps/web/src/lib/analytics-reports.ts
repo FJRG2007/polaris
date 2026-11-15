@@ -377,13 +377,20 @@ export interface EngagementReport {
     readonly unavailable: boolean;
 }
 
+/** Pages listed in the engagement report. */
+const ENGAGEMENT_PAGES = 20;
+
 /**
  * Scroll depth and time on page, per page (Pulse's scroll depth and page time
- * columns). From the per-view rows only, at most 20 pages by measured views;
- * a window past `RAW_MAX_MS` reports `unavailable`.
+ * columns), at most 20 pages by measured views. Up to `RAW_MAX_MS` from the
+ * per-view rows; past it from the daily rollup's path rows, which carry the sums
+ * but not the visit's dimensions, so a filtered long window reports `unavailable`.
  */
 export async function engagement(window: ReportWindow): Promise<EngagementReport> {
-    if (window.to - window.from > RAW_MAX_MS) return { pages: [], unavailable: true };
+    if (window.to - window.from > RAW_MAX_MS) {
+        if (window.filters.length) return { pages: [], unavailable: true };
+        return { pages: await engagementFromDays(window), unavailable: false };
+    }
     const join = window.filters.length ? Prisma.sql`JOIN "AnalyticsSession" s ON s.id = e."sessionId"` : Prisma.empty;
     const rows = await prisma.$queryRaw<
         { path: string; measured: number; avgScroll: number | null; deep: number; avgEngagedMs: number | null }[]
@@ -399,7 +406,7 @@ export async function engagement(window: ReportWindow): Promise<EngagementReport
           AND (e."scrollPct" IS NOT NULL OR e."engagedMs" IS NOT NULL)${sessionSql(window.filters)}
         GROUP BY e.path
         ORDER BY measured DESC, e.path ASC
-        LIMIT 20
+        LIMIT ${ENGAGEMENT_PAGES}
     `);
     return {
         unavailable: false,
@@ -411,6 +418,35 @@ export async function engagement(window: ReportWindow): Promise<EngagementReport
             avgEngagedMs: row.avgEngagedMs === null ? null : Math.round(Number(row.avgEngagedMs))
         }))
     };
+}
+
+/** The long-window engagement report, summed from the rollup's path rows. */
+async function engagementFromDays(window: ReportWindow): Promise<EngagementRow[]> {
+    const rows = await prisma.analyticsDay.groupBy({
+        by: ["value"],
+        where: {
+            siteId: window.siteId,
+            dimension: "path",
+            day: { gte: new Date(window.from - (window.from % 86_400_000)), lt: new Date(window.to) },
+            engagedViews: { gt: 0 }
+        },
+        _sum: { engagedViews: true, scrollSum: true, scrollViews: true, deepViews: true, engagedMsSum: true, timedViews: true },
+        orderBy: [{ _sum: { engagedViews: "desc" } }, { value: "asc" }],
+        take: ENGAGEMENT_PAGES
+    });
+    return rows.map((row) => {
+        const sum = row._sum;
+        const measured = sum.engagedViews ?? 0;
+        const scrollViews = sum.scrollViews ?? 0;
+        const timedViews = sum.timedViews ?? 0;
+        return {
+            path: row.value,
+            measured,
+            avgScroll: scrollViews > 0 ? Math.round((sum.scrollSum ?? 0) / scrollViews) : null,
+            deepShare: measured > 0 ? (sum.deepViews ?? 0) / measured : null,
+            avgEngagedMs: timedViews > 0 ? Math.round((sum.engagedMsSum ?? 0) / timedViews) : null
+        };
+    });
 }
 
 /** Postgres hands percentiles back as doubles and counts as ints; keep both as numbers. */
