@@ -58,6 +58,10 @@ vi.mock("@/lib/polar/skills/enigma-catalogue", () => ({
     enigmaCatalogue: async () => ({
         version: "1.0.0",
         available: true,
+        commands: [
+            { name: "recap", description: "Sum up.", argumentHint: null, instructions: "Sum up: $ARGUMENTS", chat: true },
+            { name: "gate", description: "Gate.", argumentHint: null, instructions: "Run it.", chat: false }
+        ],
         skills: [
             { name: "git-policy", description: "Commits and branches.", instructions: "Commit small." },
             { name: "ci-policy", description: "Pipelines.", instructions: "Cache by hash." }
@@ -664,6 +668,14 @@ describe("Polar on the web", () => {
         expect(prompt).toContain("git-policy: Commits and branches.");
         expect(prompt).not.toContain("ci-policy");
         expect(prompt).not.toContain("Commit small.");
+    });
+
+    it("loads Enigma's chat-runnable commands like skills, never one that needs a checkout", async () => {
+        state.enigma = true;
+        await offered(body());
+        const prompt = JSON.stringify(state.prompts.at(-1));
+        expect(prompt).toContain("recap: /recap: Sum up.");
+        expect(prompt).not.toContain("gate");
     });
 
     it("offers the provider's own search and the page reader when the web is allowed", async () => {

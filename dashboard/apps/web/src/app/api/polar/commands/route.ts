@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { polarCaller } from "@/lib/polar/access";
 import { polarCommandInputSchema } from "@/lib/polar/shared";
 import { createPolarCommand, listPolarCommands } from "@/lib/polar/commands";
+import { userHasManage } from "@/lib/session";
 import { NO_ENIGMA_COMMANDS } from "@/lib/polar/enigma-slash";
 import { enigmaSlashLists } from "@/lib/polar/skills/enigma-commands";
 
@@ -21,10 +22,12 @@ export async function GET(): Promise<Response> {
     // Enigma's commands ride along: unreadable settings or package is simply none.
     const [commands, enigma] = await Promise.all([
         listPolarCommands(user.id),
-        enigmaSlashLists(user).catch((error: unknown) => {
-            console.error("polar: could not list Enigma's commands", error);
-            return NO_ENIGMA_COMMANDS;
-        })
+        userHasManage(user, "agents.manage")
+            .then((canCode) => enigmaSlashLists(user.id, canCode))
+            .catch((error: unknown) => {
+                console.error("polar: could not list Enigma's commands", error);
+                return NO_ENIGMA_COMMANDS;
+            })
     ]);
     return NextResponse.json({ commands, enigma });
 }

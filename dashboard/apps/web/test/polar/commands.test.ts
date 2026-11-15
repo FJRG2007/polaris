@@ -34,6 +34,13 @@ vi.mock("@/lib/api-session", () => ({
 vi.mock("@/lib/polar/access", async () =>
     (await import("./fixtures/open-polar-access")).openPolarAccess()
 );
+vi.mock("@/lib/session", () => ({ userHasManage: async () => true }));
+vi.mock("@/lib/polar/skills/enigma-commands", () => ({
+    enigmaSlashLists: async (_userId: string, canCode: boolean) => ({
+        code: canCode ? [{ name: "gate", description: "Validate changes.", argumentHint: null }] : [],
+        chat: []
+    })
+}));
 vi.mock("@/lib/polar/models", () => ({
     polarModelOptions: async () => [
         { provider: "openai", payers: ["own"], models: [{ provider: "openai", model: "mini" }] }
@@ -139,6 +146,14 @@ describe("the command routes", () => {
         const body = (await response.json()) as { commands: Array<{ choice: unknown }> };
         expect(state.where[0]).toEqual({ userId: "u1" });
         expect(body.commands[0]?.choice).toEqual(automaticChoice());
+    });
+
+    it("lists Enigma's commands beside them, Code's only for who can start a session", async () => {
+        const body = (await (await listRoute.GET()).json()) as { enigma: unknown };
+        expect(body.enigma).toEqual({
+            code: [{ name: "gate", description: "Validate changes.", argumentHint: null }],
+            chat: []
+        });
     });
 
     it("stores a new command normalized", async () => {

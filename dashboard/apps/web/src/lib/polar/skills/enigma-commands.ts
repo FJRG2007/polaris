@@ -5,16 +5,16 @@
  * skills, so nothing here fetches more than once per version.
  */
 
-import { userHasManage, type SessionUser } from "@/lib/session";
 import { ownEnigma } from "@/lib/agents/agent-defaults-service";
 import { enigmaCatalogue, type EnigmaSkill } from "@/lib/polar/skills/enigma-catalogue";
 import { enigmaSlashFor, NO_ENIGMA_COMMANDS, type EnigmaSlashLists } from "@/lib/polar/enigma-slash";
 
-export async function enigmaSlashLists(user: SessionUser): Promise<EnigmaSlashLists> {
-    const [{ resolved }, code] = await Promise.all([ownEnigma(user.id), userHasManage(user, "agents.manage")]);
+/** `canCode` is whether the person can start a Code session (`agents.manage`). */
+export async function enigmaSlashLists(userId: string, canCode: boolean): Promise<EnigmaSlashLists> {
+    const { resolved } = await ownEnigma(userId);
     if (!resolved.enabled) return NO_ENIGMA_COMMANDS;
     const { commands } = await enigmaCatalogue();
-    return { code: code ? enigmaSlashFor(commands, "code") : [], chat: enigmaSlashFor(commands, "chat") };
+    return { code: canCode ? enigmaSlashFor(commands, "code") : [], chat: enigmaSlashFor(commands, "chat") };
 }
 
 /**
