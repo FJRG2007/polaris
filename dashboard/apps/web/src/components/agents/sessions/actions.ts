@@ -1063,6 +1063,8 @@ export interface SessionChecksView {
     mergeableState: string;
     pullState: "open" | "closed" | "merged" | null;
     canMerge: boolean;
+    /** Whether failing checks, review comments and conflicts go to the agent unasked. */
+    autoFeedback: boolean;
 }
 
 /** The token a merge or a checks read is made with: the person's own linked
@@ -1088,10 +1090,11 @@ export async function sessionChecksAction(
     if (!session.pullRequest || !session.repoFullName) return { view: null };
     const [owner, repo] = session.repoFullName.split("/") as [string, string];
     const token = await pullToken(user.id, owner);
-    const [found, pull, push] = await Promise.all([
+    const [found, pull, push, auto] = await Promise.all([
         pullRequestChecks(owner, repo, session.pullRequest.number, token),
         review.linkedPullRequest(session).catch(() => null),
-        review.sessionPushSetting(session.id)
+        review.sessionPushSetting(session.id),
+        prisma.agentSession.findUnique({ where: { id: session.id }, select: { autoFeedback: true } })
     ]);
     if (!found) return { error: t("session.checks.unreachable") };
     return {
@@ -1109,9 +1112,24 @@ export async function sessionChecksAction(
             tally: loop.checksTally(found.checks),
             mergeableState: found.mergeableState,
             pullState: pull?.state ?? null,
-            canMerge: pull?.state === "open" && push !== "disabled"
+            canMerge: pull?.state === "open" && push !== "disabled",
+            autoFeedback: auto?.autoFeedback ?? true
         }
     };
+}
+
+const autoFeedbackSchema = z.object({ sessionId: sessionIdSchema, on: z.boolean() }).strict();
+
+/** Turn the session's automatic feedback (session-feedback.ts) on or off. */
+export async function setSessionAutoFeedbackAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = autoFeedbackSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await sessions.getSession(parsed.data.sessionId, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    await prisma.agentSession.update({ where: { id: session.id }, data: { autoFeedback: parsed.data.on } });
+    return {};
 }
 
 /** The failing checks, with what each said about itself, sent to the agent. */

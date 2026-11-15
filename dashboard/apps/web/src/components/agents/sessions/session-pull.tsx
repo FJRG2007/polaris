@@ -27,12 +27,14 @@ import {
     Popover,
     PopoverContent,
     PopoverTrigger,
-    Select
+    Select,
+    Switch
 } from "@polaris/ui";
 import {
     mergeSessionPullAction,
     sendFailingChecksAction,
     sessionChecksAction,
+    setSessionAutoFeedbackAction,
     type SessionChecksView
 } from "./actions";
 
@@ -92,6 +94,16 @@ export function SessionPull({ session }: { session: SessionView }) {
             if (result?.error) setError(result.error);
             else if (result) setNote(t("session.checks.sent"));
         });
+
+    // Optimistic: the switch moves now and goes back if the save is refused.
+    const setAutoFeedback = async (on: boolean) => {
+        setView((current) => (current ? { ...current, autoFeedback: on } : current));
+        const result = await runAction(() => setSessionAutoFeedbackAction({ sessionId: session.id, on }), setError);
+        if (!result || result.error) {
+            if (result?.error) setError(result.error);
+            setView((current) => (current ? { ...current, autoFeedback: !on } : current));
+        }
+    };
 
     const merge = () =>
         startTransition(async () => {
@@ -158,6 +170,22 @@ export function SessionPull({ session }: { session: SessionView }) {
                             ))}
                         </ul>
                     )}
+                    {!core.isSessionOver(session.state) ? (
+                        <div className="mt-2 flex min-w-0 items-start gap-3 border-t border-border px-2 pt-2">
+                            <div className="min-w-0 flex-1">
+                                <p id={`auto-feedback-${session.id}`} className="text-sm">
+                                    {t("session.feedback.toggle")}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{t("session.feedback.hint")}</p>
+                            </div>
+                            <Switch
+                                checked={view.autoFeedback}
+                                onChange={(on) => void setAutoFeedback(on)}
+                                aria-describedby={`auto-feedback-${session.id}`}
+                                aria-label={t("session.feedback.toggle")}
+                            />
+                        </div>
+                    ) : null}
                 </PopoverContent>
             </Popover>
             {failed > 0 && !core.isSessionOver(session.state) ? (

@@ -9137,6 +9137,9 @@ model AgentSession {
     // The /goal the agent keeps working toward, judged after each turn: the
     // shape `PolarGoal` in apps/web/src/lib/polar/goals.ts. Null is none.
     goal           Json?
+    // Whether failing checks, review comments and merge conflicts on its pull
+    // request are sent to the agent without anybody asking (session-feedback.ts).
+    autoFeedback   Boolean @default(true)
     // The agent's own todo list, as its last todo tool call wrote it: up to
     // 50 `{ text, status }`. Null until the agent keeps one.
     todos          Json?
@@ -9339,6 +9342,9 @@ model SessionPullFacts {
     targetBranch String   @default("")
     // When GitHub last answered for it. The poll refreshes the oldest first.
     fetchedAt    DateTime @default(now())
+    // What was already sent to the session about it, so a fact is reported
+    // once: the shape `FeedbackState` in lib/agents/session-feedback.ts.
+    feedback     Json     @default("{}")
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
 
@@ -9469,10 +9475,15 @@ model AgentQueuedPrompt {
     // Upload ids the message carries, resolved again when it is sent.
     attachments String[] @default([])
     authorId    String   @db.Uuid
+    // Set on a message Polaris queued itself from the session's pull request
+    // (lib/agents/session-feedback.ts): which fact it reports, so a newer word
+    // on the same fact replaces the one still waiting. Null for a typed one.
+    feedbackKey String?
     createdAt   DateTime @default(now())
 
     session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
+    @@unique([sessionId, feedbackKey])
     @@index([sessionId, createdAt])
 }
 

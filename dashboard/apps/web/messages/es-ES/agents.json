@@ -477,6 +477,12 @@
             "promptIntro": "Estos checks fallaron en la pull request #{number}. Corrige lo que indican:",
             "promptNoSummary": "El check no dio resumen. Abre su enlace para ver los detalles."
         },
+        "feedback": {
+            "toggle": "Enviar al agente lo que falla",
+            "hint": "Checks fallidos, comentarios de revisión y conflictos llegan al agente solos, hasta 3 veces por push.",
+            "conflict": "La pull request #{number} tiene conflictos. Haz rebase sobre la rama base, resuélvelos y haz push.",
+            "changesRequested": "@{author} pidió cambios:"
+        },
         "merge": {
             "open": "Fusionar",
             "title": "Fusionar la pull request #{number}",

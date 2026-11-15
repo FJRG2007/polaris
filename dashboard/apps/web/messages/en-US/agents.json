@@ -477,6 +477,12 @@
             "promptIntro": "These checks failed on pull request #{number}. Fix what they report:",
             "promptNoSummary": "The check gave no summary. Open its link for the details."
         },
+        "feedback": {
+            "toggle": "Send fixes needed to the agent",
+            "hint": "Failing checks, review comments and merge conflicts go to the agent on their own, up to 3 times per push.",
+            "conflict": "Pull request #{number} has merge conflicts. Rebase onto the base branch, resolve them and push.",
+            "changesRequested": "@{author} requested changes:"
+        },
         "merge": {
             "open": "Merge",
             "title": "Merge pull request #{number}",

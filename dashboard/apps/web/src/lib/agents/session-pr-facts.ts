@@ -34,6 +34,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import type * as status from "@/lib/agents/session-status";
 import { githubAppInstallationToken } from "@/lib/github-service";
+import type { PreviousFacts } from "@/lib/agents/session-feedback";
 
 const GRAPHQL_URL = "https://api.github.com/graphql";
 
@@ -566,13 +567,28 @@ export async function fetchPullObservation(
     return { kind: "ok", observation: observationFrom(pull) };
 }
 
-/** Stores one observation for a session. */
+/** What a row said before a write, for what reacts to the change. */
+export const PREVIOUS_FACTS_SELECT = {
+    state: true,
+    draft: true,
+    checks: true,
+    headSha: true,
+    fetchedAt: true,
+    feedback: true
+} as const;
+
+/** Stores one observation for a session. Returns the row as it was before,
+ *  or null when there was none. */
 export async function writePullFacts(
     sessionId: string,
     repoFullName: string,
     observation: PullObservation,
     now: Date = new Date()
-): Promise<void> {
+): Promise<PreviousFacts | null> {
+    const previous = await prisma.sessionPullFacts.findUnique({
+        where: { sessionId_number: { sessionId, number: observation.number } },
+        select: PREVIOUS_FACTS_SELECT
+    });
     const data = {
         repoFullName,
         url: observation.url,
@@ -595,6 +611,7 @@ export async function writePullFacts(
         create: { sessionId, number: observation.number, ...data },
         update: data
     });
+    return previous;
 }
 
 /**
@@ -631,7 +648,14 @@ export interface RefreshDeps {
 const defaultRefreshDeps: RefreshDeps = {
     token: (owner) => githubAppInstallationToken(owner).catch(() => null),
     fetch: (owner, repo, number, token) => fetchPullObservation(owner, repo, number, token),
-    write: (target, observation) => writePullFacts(target.sessionId, target.repoFullName, observation)
+    write: async (target, observation) => {
+        const previous = await writePullFacts(target.sessionId, target.repoFullName, observation);
+        // The one place a row changes, webhook or poll: notices and the feedback
+        // routed to the session react here. Loaded on use, so reading facts
+        // never pulls in the session runtime.
+        const { reactToPullFacts } = await import("@/lib/agents/session-feedback");
+        await reactToPullFacts({ ...target, observation, previous });
+    }
 };
 
 /** Refreshes targets one at a time, one token per owner, stopping at the first
