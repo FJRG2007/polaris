@@ -187,6 +187,8 @@ describe("Code's composer is Chat's", () => {
             "Effort: Default",
             // A Claude source runs on Claude Code, whose questions are answered here.
             "Permissions: Full access",
+            // Where the session runs: Polaris, or one of the person's paired computers.
+            "Runs on: Polaris",
             "Voice talks to Polar's chat, not to an agent"
         ]);
         const form = box.closest("form") as HTMLFormElement;

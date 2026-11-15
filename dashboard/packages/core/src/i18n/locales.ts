@@ -160,9 +160,10 @@ export function wordsFor(words: LocaleWords, locale: Locale): string {
     return words[locale] ?? words[SOURCE_LOCALE];
 }
 
-/** Which way a locale's interface runs - the value of `<html dir>`. */
+/** Which way a locale's interface runs - the value of `<html dir>`. A locale
+ *  not in the registry (one a test registers in memory) is read from its tag. */
 export function localeDirection(locale: Locale): TextDirection {
-    return LOCALE_INFO[locale].direction;
+    return (LOCALE_INFO as Readonly<Record<string, LocaleInfo | undefined>>)[locale]?.direction ?? scriptDirection(locale);
 }
 
 /** Whether a value names a locale Polaris has catalogs for. Exact and
