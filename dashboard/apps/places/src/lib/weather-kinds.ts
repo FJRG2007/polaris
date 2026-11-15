@@ -24,13 +24,27 @@ export const WEATHER_GROUPS = [
 ] as const;
 export type WeatherGroup = (typeof WEATHER_GROUPS)[number];
 
-/** The conditions now and today's range, in Celsius. */
+/** One day of the forecast, in Celsius. `date` is the place's own day,
+ *  YYYY-MM-DD. */
+export interface WeatherDay {
+    readonly date: string;
+    readonly code: number;
+    readonly high: number;
+    readonly low: number;
+}
+
+/** The conditions now and today's range, in Celsius, and the next days when
+ *  the answer held them. */
 export interface PanelWeather {
     readonly temperature: number;
     readonly code: number;
     readonly high: number | null;
     readonly low: number | null;
+    readonly days?: readonly WeatherDay[];
 }
+
+/** How many days a forecast row shows, today first. */
+export const FORECAST_DAYS = 5;
 
 /** What the wall's weather route answers. */
 export interface WeatherAnswer {
@@ -38,6 +52,9 @@ export interface WeatherAnswer {
     readonly weather: PanelWeather | null;
     /** Whether the panel's place has a location to ask about. */
     readonly located: boolean;
+    /** The weather of each card set to a location of its own, by card id;
+     *  null where the service did not answer. */
+    readonly cards?: Readonly<Record<string, PanelWeather | null>>;
 }
 
 /** The forecast address for a coordinate: the conditions now and today. */
@@ -47,9 +64,9 @@ export function forecastUrl(latitude: number, longitude: number): URL {
         latitude: latitude.toFixed(2),
         longitude: longitude.toFixed(2),
         current: "temperature_2m,weather_code",
-        daily: "temperature_2m_max,temperature_2m_min",
+        daily: "weather_code,temperature_2m_max,temperature_2m_min",
         timezone: "auto",
-        forecast_days: "1"
+        forecast_days: String(FORECAST_DAYS)
     }).toString();
     return url;
 }
@@ -59,6 +76,8 @@ const forecastSchema = z.object({
     current: z.object({ temperature_2m: reading, weather_code: reading }).optional(),
     daily: z
         .object({
+            time: z.array(z.string().max(32)).max(16).optional(),
+            weather_code: z.array(z.number().finite().nullable()).optional(),
             temperature_2m_max: z.array(z.number().finite().nullable()).optional(),
             temperature_2m_min: z.array(z.number().finite().nullable()).optional()
         })
@@ -72,11 +91,22 @@ export function parseForecast(body: unknown): PanelWeather | null {
     const now = parsed.data.current;
     if (typeof now?.temperature_2m !== "number" || typeof now.weather_code !== "number")
         return null;
+    const daily = parsed.data.daily;
+    const days: WeatherDay[] = [];
+    for (const [i, date] of (daily?.time ?? []).slice(0, FORECAST_DAYS).entries()) {
+        const code = daily?.weather_code?.[i];
+        const high = daily?.temperature_2m_max?.[i];
+        const low = daily?.temperature_2m_min?.[i];
+        if (typeof code !== "number" || typeof high !== "number" || typeof low !== "number")
+            continue;
+        days.push({ date, code: Math.round(code), high, low });
+    }
     return {
         temperature: now.temperature_2m,
         code: Math.round(now.weather_code),
-        high: parsed.data.daily?.temperature_2m_max?.[0] ?? null,
-        low: parsed.data.daily?.temperature_2m_min?.[0] ?? null
+        high: daily?.temperature_2m_max?.[0] ?? null,
+        low: daily?.temperature_2m_min?.[0] ?? null,
+        ...(days.length > 0 ? { days } : {})
     };
 }
 
@@ -94,16 +124,28 @@ export function weatherGroup(code: number): WeatherGroup | null {
     return null;
 }
 
+const weatherSchema = z.object({
+    temperature: z.number().finite(),
+    code: z.number().int(),
+    high: z.number().finite().nullable(),
+    low: z.number().finite().nullable(),
+    days: z
+        .array(
+            z.object({
+                date: z.string().max(32),
+                code: z.number().int(),
+                high: z.number().finite(),
+                low: z.number().finite()
+            })
+        )
+        .max(16)
+        .optional()
+});
+
 const answerSchema = z.object({
     located: z.boolean(),
-    weather: z
-        .object({
-            temperature: z.number().finite(),
-            code: z.number().int(),
-            high: z.number().finite().nullable(),
-            low: z.number().finite().nullable()
-        })
-        .nullable()
+    weather: weatherSchema.nullable(),
+    cards: z.record(z.string().max(40), weatherSchema.nullable()).optional()
 });
 
 /** The route's answer as the browser reads it, or null when it is not one. */

@@ -279,7 +279,9 @@
             "latitude": "Use a latitude from -90 to 90.",
             "longitude": "Use a longitude from -180 to 180.",
             "both": "Fill in both, or leave both empty."
-        }
+        },
+        "advanced": "Coordinates",
+        "located": "Set to {latitude}, {longitude}"
     },
     "placeKinds": {
         "house": "Home",
@@ -3292,5 +3294,25 @@
         "offTitle": "Stop keeping {measure}?",
         "offBody": "Its stored history is deleted now, to save storage or for privacy, and nothing new is recorded until you turn it back on.",
         "offConfirm": "Stop and delete"
+    },
+    "locationSearch": {
+        "placeholder": "Search a city or address",
+        "failed": "Search is not available right now. Try again.",
+        "none": "No places by that name.",
+        "results": "Places found"
+    },
+    "weatherCard": {
+        "title": "Weather card",
+        "description": "Whose weather it shows, and whether the next days show too.",
+        "where": "Location",
+        "placeOwn": "This place",
+        "other": "Another location",
+        "pickBelow": "Search a city below",
+        "showing": "Showing {name}",
+        "thisDevice": "This device",
+        "forecast": "Show the next days",
+        "nextDays": "Next days",
+        "pick": "Choose a location",
+        "settings": "Weather settings"
     }
 }

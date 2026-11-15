@@ -279,7 +279,9 @@
             "latitude": "Usa una latitud entre -90 y 90.",
             "longitude": "Usa una longitud entre -180 y 180.",
             "both": "Rellena las dos o deja ambas vacías."
-        }
+        },
+        "advanced": "Coordenadas",
+        "located": "Fijado en {latitude}, {longitude}"
     },
     "placeKinds": {
         "house": "Casa",
@@ -3292,5 +3294,25 @@
         "offTitle": "¿Dejar de guardar {measure}?",
         "offBody": "Su historial se borra ahora, para ahorrar espacio o por privacidad, y no se registra nada nuevo hasta que lo vuelvas a activar.",
         "offConfirm": "Parar y borrar"
+    },
+    "locationSearch": {
+        "placeholder": "Busca una ciudad o dirección",
+        "failed": "La búsqueda no está disponible. Inténtalo de nuevo.",
+        "none": "Ningún lugar con ese nombre.",
+        "results": "Resultados"
+    },
+    "weatherCard": {
+        "title": "El tiempo",
+        "description": "De dónde es el tiempo que muestra y si enseña los próximos días.",
+        "where": "Ubicación",
+        "placeOwn": "Este lugar",
+        "other": "Otra ubicación",
+        "pickBelow": "Busca una ciudad abajo",
+        "showing": "Mostrando {name}",
+        "thisDevice": "Este equipo",
+        "forecast": "Ver los próximos días",
+        "nextDays": "Próximos",
+        "pick": "Elegir ubicación",
+        "settings": "Ajustes del tiempo"
     }
 }

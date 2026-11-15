@@ -56,6 +56,15 @@ const box = {
     h: cell.min(1).max(PANEL_ROWS)
 };
 
+/** A place picked for a weather card instead of the panel's own: a name to
+ *  show and a coordinate, kept to about a kilometre as a place's is. */
+export const weatherLocationSchema = z.object({
+    name: z.string().trim().min(1).max(120),
+    latitude: z.number().finite().min(-90).max(90),
+    longitude: z.number().finite().min(-180).max(180)
+});
+export type WeatherLocation = z.infer<typeof weatherLocationSchema>;
+
 export const panelCardSchema = z
     .discriminatedUnion("type", [
         z.object({ ...box, type: z.literal("device"), deviceId: z.string().uuid() }),
@@ -73,8 +82,14 @@ export const panelCardSchema = z
         // One device's reading, large. A device card shows it too, smaller and
         // among its controls.
         z.object({ ...box, type: z.literal("sensor"), deviceId: z.string().uuid() }),
-        // The weather at the panel's place, from the place's location.
-        z.object({ ...box, type: z.literal("weather") })
+        // The weather at the panel's place, from the place's location, or at
+        // the location picked for the card. `forecast` adds the next days.
+        z.object({
+            ...box,
+            type: z.literal("weather"),
+            location: weatherLocationSchema.nullable().default(null),
+            forecast: z.boolean().default(false)
+        })
     ])
     .refine((card) => card.x + card.w <= PANEL_COLUMNS, "A card runs past the panel's edge")
     .refine((card) => card.y + card.h <= PANEL_ROWS, "A card runs past the panel's edge")

@@ -6,7 +6,7 @@
  * the browser while the next one is on its way.
  */
 
-import { cn, Skeleton } from "@polaris/ui";
+import { Button, cn, Skeleton } from "@polaris/ui";
 import { useEffect, useState } from "react";
 import { usePlacesT } from "../use-places-t";
 import { hostUi } from "@polaris/app-host/client";
@@ -18,6 +18,7 @@ import {
     CloudRain,
     CloudSnow,
     CloudSun,
+    MapPin,
     Sun,
     Thermometer
 } from "lucide-react";
@@ -30,6 +31,7 @@ import {
 } from "../../lib/weather-kinds";
 
 const { useDisplayFormat } = hostUi.displayFormat;
+const { useLocale } = hostUi.i18nProvider;
 
 const REFRESH_MS = 15 * 60_000;
 const KEPT_PREFIX = "polaris.wall.weather:";
@@ -91,6 +93,19 @@ export function usePanelWeather(url: string | null, enabled: boolean): WeatherSt
     return weather;
 }
 
+/** What one weather card shows: the place's weather, or the weather at the
+ *  location set on the card, which the route answers by card id. A card set
+ *  to a location the last answer does not know yet is still loading. */
+export function cardWeather(
+    weather: WeatherState,
+    card: { readonly id: string; readonly location?: unknown }
+): WeatherState {
+    if (!card.location || weather.state !== "ready") return weather;
+    const cards = weather.answer.cards;
+    if (!cards || !(card.id in cards)) return { state: "loading" };
+    return { state: "ready", answer: { located: true, weather: cards[card.id] ?? null } };
+}
+
 const ICONS: Record<WeatherGroup, typeof Sun> = {
     clear: Sun,
     partly: CloudSun,
@@ -111,15 +126,20 @@ export function WeatherIcon({ code, className }: { code: number; className?: str
 /** The temperature, the sky in words, and today's range. */
 export function WeatherReading({
     weather,
-    large = false
+    large = false,
+    forecast = false
 }: {
     weather: PanelWeather;
     large?: boolean;
+    /** The next days under it, when the answer holds them. */
+    forecast?: boolean;
 }) {
     const t = usePlacesT();
     const format = useDisplayFormat();
+    const locale = useLocale();
     const group = weatherGroup(weather.code);
-    return (
+    const days = forecast ? (weather.days ?? []).slice(1) : [];
+    const now = (
         <div className="flex min-w-0 items-center gap-3">
             <WeatherIcon code={weather.code} className={large ? "size-14" : "size-10"} />
             <div className="flex min-w-0 flex-col">
@@ -145,10 +165,40 @@ export function WeatherReading({
             </div>
         </div>
     );
+    if (days.length === 0) return now;
+    const weekday = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
+    return (
+        <div className="flex min-w-0 flex-col gap-3">
+            {now}
+            <ul className="flex min-w-0 gap-3 overflow-hidden" aria-label={t("weatherCard.nextDays")}>
+                {days.map((day) => (
+                    <li key={day.date} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                        <span className="truncate text-base text-muted-foreground">
+                            {weekday.format(new Date(`${day.date}T12:00:00Z`))}
+                        </span>
+                        <WeatherIcon code={day.code} className="size-6" />
+                        <span className="truncate text-base tabular-nums">
+                            {format.temperature(day.high)}
+                            <span className="text-muted-foreground"> {format.temperature(day.low)}</span>
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
 }
 
-/** A weather card's face. */
-export function WeatherFace({ weather }: { weather: WeatherState }) {
+/** A weather card's face. `onPick` offers choosing a location where there is
+ *  none, to somebody who may set one. */
+export function WeatherFace({
+    weather,
+    forecast = false,
+    onPick
+}: {
+    weather: WeatherState;
+    forecast?: boolean;
+    onPick?: () => void;
+}) {
     const t = usePlacesT();
     if (weather.state === "loading")
         return (
@@ -163,8 +213,15 @@ export function WeatherFace({ weather }: { weather: WeatherState }) {
     if (weather.state === "failed")
         return <p className="text-lg text-muted-foreground">{t("panelWeather.failed")}</p>;
     if (!weather.answer.located)
-        return <p className="text-lg text-muted-foreground">{t("panelWeather.noLocation")}</p>;
+        return onPick ? (
+            <Button type="button" variant="outline" onClick={onPick}>
+                <MapPin className="size-4 shrink-0" />
+                {t("weatherCard.pick")}
+            </Button>
+        ) : (
+            <p className="text-lg text-muted-foreground">{t("panelWeather.noLocation")}</p>
+        );
     if (!weather.answer.weather)
         return <p className="text-lg text-muted-foreground">{t("panelWeather.failed")}</p>;
-    return <WeatherReading weather={weather.answer.weather} />;
+    return <WeatherReading weather={weather.answer.weather} forecast={forecast} />;
 }

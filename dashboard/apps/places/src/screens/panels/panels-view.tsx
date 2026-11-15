@@ -48,6 +48,7 @@ import { PanelBoard, type BoardRoom } from "./panel-board";
 import { usePanelWeather } from "./panel-weather";
 import { PanelStyleDialog } from "./panel-style-dialog";
 import { NameDialog } from "./panel-name-dialog";
+import { WeatherCardDialog } from "./weather-card-dialog";
 import {
     addCard,
     type NewCard,
@@ -278,10 +279,21 @@ export function PanelDetail({
     const [removing, setRemoving] = useState(false);
     const [styling, setStyling] = useState(false);
     const [error, setError] = useState("");
+    const [weatherFor, setWeatherFor] = useState<string | null>(null);
+    const weatherCards = selected.cards.flatMap((card) => (card.type === "weather" ? [card] : []));
+    // Where each weather card looks, in the address: a card moved to another
+    // city asks again at once instead of drawing the old answer.
+    const spots = weatherCards
+        .map((card) => (card.location ? `${card.location.latitude},${card.location.longitude}` : "-"))
+        .join(";");
     const weather = usePanelWeather(
-        `/api/home/panels/${encodeURIComponent(selected.id)}/weather`,
-        selected.cards.some((card) => card.type === "weather")
+        `/api/home/panels/${encodeURIComponent(selected.id)}/weather?at=${encodeURIComponent(spots)}`,
+        weatherCards.length > 0
     );
+    const editedWeather = weatherCards.find((card) => card.id === weatherFor) ?? null;
+    const onWeatherSettings = canManage
+        ? (card: { readonly id: string }) => setWeatherFor(card.id)
+        : undefined;
 
     /** Save cards at once on the screen, and put the old ones back if refused. */
     const saveCards = async (cards: PanelCard[]) => {
@@ -462,6 +474,7 @@ export function PanelDetail({
                             onError={setError}
                             density={selected.style.density}
                             weather={weather}
+                            onWeatherSettings={onWeatherSettings}
                         />
                     </div>
                 ) : (
@@ -493,6 +506,7 @@ export function PanelDetail({
                                 onError={setError}
                                 density={selected.style.density}
                                 weather={weather}
+                                onWeatherSettings={onWeatherSettings}
                                 fitStyle={selected.style}
                             />
                         </div>
@@ -524,6 +538,25 @@ export function PanelDetail({
                     else void saveCards(next);
                 }}
             />
+            {editedWeather ? (
+                <WeatherCardDialog
+                    initial={{
+                        location: editedWeather.location ?? null,
+                        forecast: editedWeather.forecast ?? false
+                    }}
+                    onClose={() => setWeatherFor(null)}
+                    onSave={(settings) => {
+                        setWeatherFor(null);
+                        void saveCards(
+                            selected.cards.map((card) =>
+                                card.id === editedWeather.id && card.type === "weather"
+                                    ? { ...card, ...settings }
+                                    : card
+                            )
+                        );
+                    }}
+                />
+            ) : null}
             <PanelStyleDialog
                 open={styling}
                 style={selected.style}

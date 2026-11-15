@@ -31,13 +31,13 @@ describe("weather card", () => {
         expect(panelCardsSchema.safeParse(cards).success).toBe(true);
     });
 
-    it("asks Open-Meteo for the conditions now and today, at two decimals", () => {
+    it("asks Open-Meteo for the conditions now and the next days, at two decimals", () => {
         const url = forecastUrl(40.4168, -3.7038);
         expect(url.origin + url.pathname).toBe("https://api.open-meteo.com/v1/forecast");
         expect(url.searchParams.get("latitude")).toBe("40.42");
         expect(url.searchParams.get("longitude")).toBe("-3.70");
         expect(url.searchParams.get("current")).toBe("temperature_2m,weather_code");
-        expect(url.searchParams.get("forecast_days")).toBe("1");
+        expect(url.searchParams.get("forecast_days")).toBe("5");
     });
 
     it("reads a forecast, and refuses one without a reading now", () => {

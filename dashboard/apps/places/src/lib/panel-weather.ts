@@ -12,6 +12,7 @@
 
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
+import { storedCards } from "./panel-layout";
 import { forecastUrl, parseForecast, type PanelWeather, type WeatherAnswer } from "./weather-kinds";
 
 const KEEP_MS = 10 * 60_000;
@@ -67,19 +68,28 @@ export async function weatherAt(
     }
 }
 
-/** The weather a panel shows, or null when the panel is not this install's. */
+/** The weather a panel shows - its place's, and each card's set to a location
+ *  of its own - or null when the panel is not this install's. */
 export async function panelWeather(
     installedAppId: string,
     panelId: string
 ): Promise<WeatherAnswer | null> {
     const row = await prisma.placePanel.findFirst({
         where: { id: panelId, installedAppId },
-        select: { place: { select: { latitude: true, longitude: true } } }
+        select: { cards: true, place: { select: { latitude: true, longitude: true } } }
     });
     if (!row) return null;
     const { latitude, longitude } = row.place;
-    if (latitude === null || longitude === null) return { located: false, weather: null };
-    return { located: true, weather: await weatherAt(latitude, longitude) };
+    const own = storedCards(row.cards).flatMap((card) =>
+        card.type === "weather" && card.location ? [{ id: card.id, at: card.location }] : []
+    );
+    // At most one request per coordinate: the cache folds cards at one spot.
+    const answers = await Promise.all(
+        own.map(async ({ id, at }) => [id, await weatherAt(at.latitude, at.longitude)] as const)
+    );
+    const cards = answers.length > 0 ? { cards: Object.fromEntries(answers) } : {};
+    if (latitude === null || longitude === null) return { located: false, weather: null, ...cards };
+    return { located: true, weather: await weatherAt(latitude, longitude), ...cards };
 }
 
 /** Forget every kept answer. For tests. */

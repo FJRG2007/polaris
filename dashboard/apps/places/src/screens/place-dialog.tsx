@@ -23,6 +23,7 @@ import {
     type PlaceView
 } from "../lib/place-kinds";
 import { UseLocationButton } from "./location-button";
+import { LocationSearch } from "./location-search";
 import { usePlacesT } from "./use-places-t";
 import {
     Button,
@@ -156,7 +157,33 @@ export function PlaceDialog({
                         <p className="text-[0.75rem] text-muted-foreground">
                             {t("placeDialog.locationHint")}
                         </p>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <LocationSearch
+                            disabled={busy}
+                            onPick={(found) => {
+                                setLatitude(String(found.latitude));
+                                setLongitude(String(found.longitude));
+                                if (!address.trim())
+                                    setAddress(
+                                        found.detail ? `${found.name}, ${found.detail}` : found.name
+                                    );
+                            }}
+                        />
+                        {latitude.trim() && longitude.trim() && !location.half ? (
+                            <p className="text-[0.75rem] text-muted-foreground">
+                                {t("placeDialog.located", {
+                                    latitude: latitude.trim(),
+                                    longitude: longitude.trim()
+                                })}
+                            </p>
+                        ) : null}
+                        <details
+                            className="group"
+                            open={Boolean(location.latitude || location.longitude || location.half)}
+                        >
+                            <summary className="cursor-pointer text-[0.75rem] text-muted-foreground hover:text-foreground">
+                                {t("placeDialog.advanced")}
+                            </summary>
+                        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                             <CoordinateField
                                 label={t("placeDialog.latitude")}
                                 value={latitude}
@@ -181,6 +208,7 @@ export function PlaceDialog({
                                 {t("placeDialog.errors.both")}
                             </p>
                         ) : null}
+                        </details>
                         <UseLocationButton
                             disabled={busy}
                             onLocated={(found) => {

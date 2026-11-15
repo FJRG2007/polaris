@@ -271,11 +271,19 @@ export function ClockCard() {
     );
 }
 
-/** The weather at the panel's place now. */
-export function WeatherCard({ weather }: { weather: WeatherState }) {
+/** The weather at the panel's place, or the card's own location, now. */
+export function WeatherCard({
+    weather,
+    forecast,
+    onPick
+}: {
+    weather: WeatherState;
+    forecast?: boolean;
+    onPick?: () => void;
+}) {
     return (
         <CardFrame className="justify-center">
-            <WeatherFace weather={weather} />
+            <WeatherFace weather={weather} forecast={forecast} onPick={onPick} />
         </CardFrame>
     );
 }

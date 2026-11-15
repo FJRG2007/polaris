@@ -27,7 +27,7 @@ import { stackOrder, type PanelCard, type PanelDensity, type PanelStyle } from "
 import { PanelFitGrid } from "./panel-fit-grid";
 import type { ListRoom } from "../../lib/panel-list";
 import { PanelDeviceList } from "./panel-list";
-import type { WeatherState } from "./panel-weather";
+import { cardWeather, type WeatherState } from "./panel-weather";
 import { useDeviceAct } from "../devices/use-device-act";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LentActionsProvider } from "../devices/lent-actions";
@@ -35,7 +35,7 @@ import { applyPanelChange, optimisticDevice, rolledBack } from "./panel-state";
 import { parseDeviceFrame, useDeviceStream } from "../devices/use-device-stream";
 import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
 import { Button } from "@polaris/ui";
-import { ShieldQuestion } from "lucide-react";
+import { Settings2, ShieldQuestion } from "lucide-react";
 import { CameraViewer } from "../camera-viewer";
 import type { CameraView } from "../../lib/cameras";
 import type { PanelAutomation } from "../../lib/panels";
@@ -193,7 +193,8 @@ export function PanelBoard({
     weather = { state: "loading" },
     roomLabels,
     fitStyle,
-    fitClassName
+    fitClassName,
+    onWeatherSettings
 }: {
     placeId: string;
     cards: readonly PanelCard[];
@@ -218,6 +219,8 @@ export function PanelBoard({
      *  arranged 12-column grid. Ignored while arranging. */
     fitStyle?: Pick<PanelStyle, "density" | "cardSize" | "textScale">;
     fitClassName?: string;
+    /** Opens a weather card's settings; given only to somebody who may arrange. */
+    onWeatherSettings?: (card: Extract<PanelCard, { type: "weather" }>) => void;
 }) {
     const t = usePlacesT();
     const router = useRouter();
@@ -327,7 +330,14 @@ export function PanelBoard({
     );
     const render = (card: PanelCard) => {
         if (card.type === "clock") return <ClockCard />;
-        if (card.type === "weather") return <WeatherCard weather={weather} />;
+        if (card.type === "weather")
+            return (
+                <WeatherCard
+                    weather={cardWeather(weather, card)}
+                    forecast={card.forecast}
+                    onPick={onWeatherSettings ? () => onWeatherSettings(card) : undefined}
+                />
+            );
         if (card.type === "device") {
             const device = byId.get(card.deviceId);
             return device ? <DeviceTile device={device} acts={acts} /> : <GoneCard />;
@@ -421,7 +431,19 @@ export function PanelBoard({
                 render={render}
                 labelOf={labelOf}
                 extra={(card) =>
-                    card.type === "action" && onCardsChange ? (
+                    card.type === "weather" && onWeatherSettings ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            aria-label={t("weatherCard.settings")}
+                            title={t("weatherCard.settings")}
+                            onClick={() => onWeatherSettings(card)}
+                            className="size-9 p-0"
+                        >
+                            <Settings2 className="size-4" />
+                        </Button>
+                    ) : card.type === "action" && onCardsChange ? (
                         <Button
                             type="button"
                             size="sm"
