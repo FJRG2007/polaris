@@ -98,8 +98,8 @@ Size: S under a day, M one to three days, L more.
 | Embed dashboard | [embed-dashboard](https://plausible.io/docs/embed-dashboard) | none | gap | plan: depends on public links | M |
 | Email reports | [email-reports](https://plausible.io/docs/email-reports) | none | - | n/a: Polaris has no outbound email channel; see weekly digest | - |
 | Slack reports | [slack-reports](https://plausible.io/docs/slack-reports) | none | - | n/a: outbound channels are not part of Polaris; notifications are the channel | - |
-| Traffic spike and drop alerts | [traffic-spikes](https://plausible.io/docs/traffic-spikes) | none | gap | plan: a per-site threshold checked by the collector loop, delivered as a Polaris notification | M |
-| Weekly digest | email reports | none | gap | plan: delivered as a Polaris notification | M |
+| Traffic spike and drop alerts | [traffic-spikes](https://plausible.io/docs/traffic-spikes) | Per-reader spike / drop thresholds on the site panel (`lib/analytics-alerts.ts`, `analytics-alerts` job) | none | built: Polaris notifications | M |
+| Weekly digest | email reports | Weekly / monthly summary per reader (`lib/analytics-alerts.ts`) | none | built: Polaris notification | M |
 | Stats API | [stats-api](https://plausible.io/docs/stats-api) | Session-bound actions only | gap | build: `GET /api/v1/analytics/stats` with a Polaris API key, same filters and ranges as the screen | M |
 | Events API | [events-api](https://plausible.io/docs/events-api) | `POST /api/analytics/collect` (public, keyed by the site key) | server-side callers must fake an origin | have: the collect endpoint is the events API; server-side use documented | - |
 | Sites API | [sites-api](https://plausible.io/docs/sites-api) | Actions only | gap | plan | M |
@@ -139,8 +139,8 @@ unless Pulse goes further.
 | Screen resolution | `ScreenResolutionStat` | `screen` dimension | none | have | - |
 | Browser and OS versions | `TechSpecs.tsx`, `BrowserStat`, `OSStat` | Browser, OS, device names | versions | build: browser and OS version, raw-only breakdowns | M |
 | Peak hours | `components/dashboard/PeakHours.tsx` (day x hour grid) | none | gap | build: 7 x 24 grid from raw sessions | S |
-| Scroll depth | `ScrollDepthBars.tsx`, `ScrollDepthDistribution` | none | gap | build: per-pageview scroll depth from the leave beat | M |
-| Time on page | `PageTableRow` time columns (`getPagesTable`) | Visit duration per session | per page | build: per-pageview engaged time from the leave beat | M |
+| Scroll depth | `ScrollDepthBars.tsx`, `ScrollDepthDistribution` | Average scroll and share read to 75% per page (`engagement-card.tsx`) | none | built: from the leave beat, raw-only | M |
+| Time on page | `PageTableRow` time columns (`getPagesTable`) | Average time per page (`engagement-card.tsx`) | none | built: from the leave beat, raw-only | M |
 | Content signals | `ContentSignals.tsx`, `ContentStats.tsx` | Top pages with entries / exits | partial | have (pages, entries, exits; scroll and time with the rows above) | - |
 | Goals | `GoalStats.tsx`, settings `goals` | Goal reports | none | have | - |
 | Event property breakdowns | `getEventPropertyKeys`, `getEventPropertyValues` | `eventProperties` report | none | have | - |
@@ -151,8 +151,8 @@ unless Pulse goes further.
 | Public dashboard with password | `PublicDashboardSection.tsx`, `app/share/[id]`, `authenticatePublicDashboard` | Grants to people only | gap | build: public / password link on the shared link primitives | L |
 | Growth reports (link, slides, print) | `app/r/[token]`, `components/reports/PublicReport.tsx`, `ReportSlides.tsx`, expiry 7 / 30 / 90 days | Printable report (`(print)/analytics/report`) | public link | build together with the public dashboard | M |
 | Scheduled email reports | `ScheduledEmailsSection.tsx`, `ReportEvery` month / quarter | none | - | n/a for email (no outbound channel); periodic digest as a Polaris notification: build | M |
-| Weekly / monthly summary notifications | `lib/notifications/categories.ts` `summary`, `summary_monthly` | none | gap | build: digest notification per site | M |
-| Traffic alerts | `site` notification category | none | gap | build: spike / drop notification | M |
+| Weekly / monthly summary notifications | `lib/notifications/categories.ts` `summary`, `summary_monthly` | `analytics.digest` notification | none | built | M |
+| Traffic alerts | `site` notification category | `analytics.traffic` notification | none | built | M |
 | Export xlsx / csv / json with grain | `lib/api/export.ts` | CSV of raw pages and events | xlsx, grain | have (CSV); xlsx: n/a, CSV opens in every spreadsheet | - |
 | Import from Plausible, Fathom, Umami, Simple Analytics | `lib/import/sources/*`, run in a worker | none | gap | plan: daily totals into `AnalyticsDay` | L |
 | Data window / retention | `getDataWindow` | Raw retention setting, daily rollup kept | none | have | - |
