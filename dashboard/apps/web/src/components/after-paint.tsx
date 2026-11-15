@@ -23,6 +23,12 @@
  * An answer of `null` is the record being gone, shown as such instead of as a
  * failure.
  *
+ * `streamed` is the same read already started by the server page and handed
+ * down unresolved: the answer then arrives in the page's own response, and the
+ * first read awaits it instead of sending a second request after hydration.
+ * Every read after that (a retry, a new `revision`) calls `load`, unless the
+ * page handed down a new promise with the new revision.
+ *
  * The kept copy is written in the wire format (`lib/app-bundles/wire`), so a
  * `Date` or a `Map` in an answer is still one when a revisit paints it.
  */
@@ -37,6 +43,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 export function AfterPaint<T>({
     cacheKey,
     load,
+    streamed,
     skeleton,
     persist = true,
     revision,
@@ -47,6 +54,8 @@ export function AfterPaint<T>({
     /** Names everything the read depends on (an id, a page), so two never share one. */
     cacheKey: string;
     load: () => Promise<T | null>;
+    /** The read the server page started and streamed in, used once. */
+    streamed?: Promise<T | null>;
     skeleton: ReactNode;
     persist?: boolean;
     /** A value the server page renders anew each time (`Date.now()`). */
@@ -62,7 +71,18 @@ export function AfterPaint<T>({
     // every render: what is read is named by `cacheKey`.
     const latestLoad = useRef(load);
     latestLoad.current = load;
-    const stableLoad = useCallback(async () => ({ value: toWire(await latestLoad.current()) }), []);
+    // A promise the page streamed is awaited once; a new one comes with a new page render.
+    const pending = useRef(streamed);
+    const handed = useRef(streamed);
+    if (streamed !== handed.current) {
+        handed.current = streamed;
+        pending.current = streamed;
+    }
+    const stableLoad = useCallback(async () => {
+        const ahead = pending.current;
+        pending.current = undefined;
+        return { value: toWire(await (ahead ?? latestLoad.current())) };
+    }, []);
     const { data, error, kept, firstFailed, updatedAt, refresh } = useLiveRead<{
         value: unknown;
     }>({

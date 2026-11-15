@@ -1,21 +1,14 @@
 "use server";
 
 /**
- * What the privacy screen shows, asked for by the browser after the page has
- * painted (see `PrivacyLoader`).
+ * The privacy settings again, for a retry or a refresh after a change. The
+ * first visit's answer arrives with the page (`read.ts`).
  */
 
 import { requireAdmin } from "@/lib/session";
-import { discoveryPolicy } from "@/lib/people-search";
-import { profilesArePublic } from "@/lib/profile-service";
-import { defaultFollowerAudience } from "@/lib/privacy-service";
+import { readPrivacy, type PrivacyData } from "./read";
 
-export async function loadPrivacyAction() {
+export async function loadPrivacyAction(): Promise<PrivacyData> {
     await requireAdmin();
-    const [publicProfiles, followerDefault, discovery] = await Promise.all([
-        profilesArePublic(),
-        defaultFollowerAudience(),
-        discoveryPolicy()
-    ]);
-    return { publicProfiles, followerDefault, discovery };
+    return readPrivacy();
 }

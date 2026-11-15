@@ -5,6 +5,7 @@
  */
 
 import { PageHeader } from "@polaris/ui";
+import { readPrivacy } from "./read";
 import { PrivacyLoader } from "./loader";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
@@ -18,7 +19,8 @@ export default async function PrivacyPage() {
     return (
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader title={t("privacy.page.title")} description={t("privacy.page.description")} />
-            <PrivacyLoader revision={Date.now()} />
+            {/* Started, not awaited: streamed in the same response as the shell. */}
+            <PrivacyLoader revision={Date.now()} streamed={readPrivacy()} />
         </div>
     );
 }

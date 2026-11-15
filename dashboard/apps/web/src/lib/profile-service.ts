@@ -46,7 +46,7 @@ import {
 } from "@/lib/privacy-service";
 
 /** Whether a profile may be read by somebody with no session. */
-const PUBLIC_KEY = "profiles.public";
+export const PUBLIC_KEY = "profiles.public";
 
 /**
  * Whether this Polaris shows profiles to people who are not signed in.

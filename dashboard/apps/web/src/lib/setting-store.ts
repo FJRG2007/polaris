@@ -13,6 +13,16 @@ export async function getSetting(key: string): Promise<string | null> {
     return row?.value ?? null;
 }
 
+/** Several keys in one query; an unset key is absent from the map. */
+export async function getSettings(keys: readonly string[]): Promise<Map<string, string>> {
+    if (keys.length === 0) return new Map();
+    const rows = await prisma.setting.findMany({
+        where: { key: { in: [...keys] } },
+        select: { key: true, value: true }
+    });
+    return new Map(rows.map((row) => [row.key, row.value]));
+}
+
 /** Store a value, or forget the key when null. */
 export async function setSetting(key: string, value: string | null): Promise<void> {
     if (value === null) {

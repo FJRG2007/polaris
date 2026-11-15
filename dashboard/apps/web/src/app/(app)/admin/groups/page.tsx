@@ -11,6 +11,7 @@
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { readGroupsAdmin } from "./read";
 import { GroupsAdminLoader } from "./loader";
 import { getTranslations } from "@/lib/i18n/request";
 
@@ -23,7 +24,9 @@ export default async function GroupsAdminPage() {
     return (
         <>
             <PageHeader title={t("groups.page.title")} description={t("groups.page.description")} />
-            <GroupsAdminLoader revision={Date.now()} />
+            {/* Started, not awaited: the shell paints now and the rows stream in the
+                same response, instead of a second request after hydration. */}
+            <GroupsAdminLoader revision={Date.now()} streamed={readGroupsAdmin()} />
         </>
     );
 }
