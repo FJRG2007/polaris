@@ -131,11 +131,11 @@ export function WeatherReading({
                 >
                     {format.temperature(weather.temperature)}
                 </span>
-                <span className="min-w-0 truncate text-sm text-muted-foreground">
+                <span className="min-w-0 truncate text-lg text-muted-foreground">
                     {group ? t(`panelWeather.${group}`) : t("panelWeather.unknown")}
                 </span>
                 {weather.high !== null && weather.low !== null ? (
-                    <span className="min-w-0 truncate text-xs text-muted-foreground tabular-nums">
+                    <span className="min-w-0 truncate text-base text-muted-foreground tabular-nums">
                         {t("panelWeather.range", {
                             high: format.temperature(weather.high),
                             low: format.temperature(weather.low)
@@ -161,10 +161,10 @@ export function WeatherFace({ weather }: { weather: WeatherState }) {
             </div>
         );
     if (weather.state === "failed")
-        return <p className="text-sm text-muted-foreground">{t("panelWeather.failed")}</p>;
+        return <p className="text-lg text-muted-foreground">{t("panelWeather.failed")}</p>;
     if (!weather.answer.located)
-        return <p className="text-sm text-muted-foreground">{t("panelWeather.noLocation")}</p>;
+        return <p className="text-lg text-muted-foreground">{t("panelWeather.noLocation")}</p>;
     if (!weather.answer.weather)
-        return <p className="text-sm text-muted-foreground">{t("panelWeather.failed")}</p>;
+        return <p className="text-lg text-muted-foreground">{t("panelWeather.failed")}</p>;
     return <WeatherReading weather={weather.answer.weather} />;
 }

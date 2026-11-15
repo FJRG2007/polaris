@@ -3103,7 +3103,23 @@
         "sensorOffline": "No responde",
         "weather": "Tiempo",
         "addWeather": "Tiempo",
-        "style": "Estilo: {name}"
+        "style": "Estilo: {name}",
+        "preview": "Vista",
+        "previewHint": "Como lo ve una tableta, con su aspecto.",
+        "tableName": "Nombre",
+        "tablePlace": "Lugar",
+        "tableCards": "Tarjetas",
+        "tableLayout": "Diseño",
+        "tableOpened": "Abierto",
+        "neverOpened": "Nunca",
+        "search": "Buscar paneles",
+        "noMatch": "Ningún panel",
+        "openFull": "Pantalla completa",
+        "duplicate": "Duplicar",
+        "duplicateName": "{name} (copia)",
+        "actionsFor": "Acciones de {name}",
+        "back": "Paneles",
+        "layoutValue": "{size}, {orientation}"
     },
     "panelWall": {
         "nightDark": "Oscuro de noche",
@@ -3116,7 +3132,13 @@
         "view": "Vista",
         "viewGrid": "Tarjetas",
         "viewList": "Lista",
-        "wake": "Activar pantalla"
+        "wake": "Activar pantalla",
+        "close": "Cerrar",
+        "more": "Abrir {name}",
+        "notAllowed": "Sin permiso",
+        "roomOn": "{on} de {count} activos",
+        "pages": "Páginas",
+        "page": "Página {page} de {count}"
     },
     "battery": {
         "level": "Batería {percent}%",
@@ -3218,6 +3240,20 @@
             "plain": "Liso",
             "tinted": "Teñido",
             "gradient": "Degradado"
+        },
+        "textScale": "Texto",
+        "textScaleValue": "{percent}%",
+        "cardSize": "Tarjetas",
+        "cardSizes": {
+            "small": "Pequeñas",
+            "medium": "Medianas",
+            "large": "Grandes"
+        },
+        "orientation": "Orientación",
+        "orientations": {
+            "auto": "Girar con tableta",
+            "landscape": "Horizontal",
+            "portrait": "Vertical"
         }
     },
     "readings": {

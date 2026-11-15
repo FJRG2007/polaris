@@ -168,7 +168,7 @@ describe("the colour wheel", () => {
                     />
                 )
             );
-            const wheel = screen.getByRole("slider", { name: "Color" });
+        const wheel = screen.getByRole("slider", { name: "Color" });
             fireEvent.keyDown(wheel, { key: "ArrowRight" });
             fireEvent.keyDown(wheel, { key: "ArrowRight" });
             expect(onCommit).not.toHaveBeenCalled();
@@ -194,7 +194,11 @@ describe("the colour wheel", () => {
         render(
             withMessages(<DeviceTile device={lamp({ hue: 200, saturation: 60 })} acts={acts} />)
         );
-        const wheel = screen.getByRole("slider", { name: "Color" });
+        // The wheel is in the sheet a tap on the card opens.
+        fireEvent.click(screen.getAllByRole("button", { name: /^Open /, hidden: true }).at(-1)!);
+        // The wheel is in the sheet a tap on the card opens.
+        fireEvent.click(screen.getAllByRole("button", { name: /^Open /, hidden: true }).at(-1)!);
+        const wheel = screen.getAllByRole("slider", { name: "Color", hidden: true }).at(-1)!;
         expect(wheel.getAttribute("aria-valuetext")).toBe("Hue 200 degrees, saturation 60%");
     });
 });

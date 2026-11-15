@@ -3103,7 +3103,23 @@
         "sensorOffline": "Not answering",
         "weather": "Weather",
         "addWeather": "Weather",
-        "style": "Style {name}"
+        "style": "Style {name}",
+        "preview": "Preview",
+        "previewHint": "As a tablet shows it, with this panel's look.",
+        "tableName": "Name",
+        "tablePlace": "Place",
+        "tableCards": "Cards",
+        "tableLayout": "Layout",
+        "tableOpened": "Last opened",
+        "neverOpened": "Never",
+        "search": "Search panels",
+        "noMatch": "No panels match",
+        "openFull": "Open full screen",
+        "duplicate": "Duplicate",
+        "duplicateName": "{name} (copy)",
+        "actionsFor": "Actions for {name}",
+        "back": "All panels",
+        "layoutValue": "{size}, {orientation}"
     },
     "panelWall": {
         "nightDark": "Dark at night",
@@ -3116,7 +3132,13 @@
         "view": "View",
         "viewGrid": "Cards",
         "viewList": "List",
-        "wake": "Wake the screen"
+        "wake": "Wake the screen",
+        "close": "Close",
+        "more": "Open {name}",
+        "notAllowed": "Not allowed",
+        "roomOn": "{on} of {count} on",
+        "pages": "Pages",
+        "page": "Page {page} of {count}"
     },
     "battery": {
         "level": "Battery {percent}%",
@@ -3218,6 +3240,20 @@
             "plain": "Plain",
             "tinted": "Tinted",
             "gradient": "Gradient"
+        },
+        "textScale": "Text size",
+        "textScaleValue": "{percent}%",
+        "cardSize": "Card size",
+        "cardSizes": {
+            "small": "Small",
+            "medium": "Medium",
+            "large": "Large"
+        },
+        "orientation": "Orientation",
+        "orientations": {
+            "auto": "Turn with tablet",
+            "landscape": "Landscape",
+            "portrait": "Portrait"
         }
     },
     "readings": {

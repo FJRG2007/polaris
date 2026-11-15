@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 /**
- * A device on a wall panel offers the controls it really has and no others:
+ * A device on a wall panel is its state and one big press; a tap on the card
+ * opens a full-screen sheet with the controls it really has and no others:
  * a dimmer only on a light that dims, a colour only on a coloured one, a
  * switch on a plug, and its battery with a warning once it is low.
  */
@@ -9,7 +10,7 @@
 import "@/components/app-host/client";
 import { withMessages } from "../../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { DeviceView } from "@polaris-app/places/src/lib/device-kinds";
 
 vi.mock("next/navigation", () => ({
@@ -21,6 +22,10 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({}));
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 
 const { DeviceTile } = await import("@polaris-app/places/src/screens/panels/panel-cards");
+
+function openSheet(): void {
+    fireEvent.click(screen.getByRole("button", { name: /^Open / }));
+}
 
 function device(overrides: Partial<DeviceView> = {}): DeviceView {
     return {
@@ -61,6 +66,8 @@ describe("a device tile", () => {
                 />
             )
         );
+        expect(screen.queryAllByRole("slider")).toHaveLength(0);
+        openSheet();
         expect(screen.getAllByRole("slider")).toHaveLength(1);
         expect(screen.getByRole("switch")).toBeTruthy();
     });
@@ -80,11 +87,14 @@ describe("a device tile", () => {
                 />
             )
         );
+        openSheet();
         expect(screen.getAllByRole("slider")).toHaveLength(3);
     });
 
     it("draws only a switch for a plug", () => {
         render(withMessages(<DeviceTile device={device({ kind: "outlet" })} acts={acts} />));
+        expect(screen.getByRole("button", { name: /^(On|Off)$/ })).toBeTruthy();
+        openSheet();
         expect(screen.getByRole("switch")).toBeTruthy();
         expect(screen.queryAllByRole("slider")).toHaveLength(0);
     });
