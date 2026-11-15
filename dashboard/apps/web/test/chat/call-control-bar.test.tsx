@@ -222,7 +222,7 @@ describe("the call's control bar", () => {
             expect(cluster.className).toContain("[&_button.bg-muted:hover]:bg-card-hover");
         }
         for (const chevron of screen.getAllByRole("button", { name: /deviceSettings/ })) {
-            expect(chevron.className).not.toMatch(/border-l/);
+            expect(chevron.className).not.toMatch(/(^|\s)border-[ls](\s|$)/);
         }
     });
 

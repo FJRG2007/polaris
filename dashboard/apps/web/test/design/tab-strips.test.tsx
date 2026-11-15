@@ -99,7 +99,7 @@ const CHOICE_STATE = ["aria-pressed", "aria-selected", "aria-current", "aria-che
 function isCrushingPill(node: Opening, own: string): boolean {
     if (!has(own, "flex-1") || !has(own, "truncate") || tabKeepsWidth(own)) return false;
     // A row of a vertical list - a thread, a file - truncating its name is not a strip.
-    if (has(own, "text-left") || !mappedSiblings(node)) return false;
+    if (has(own, "text-start") || has(own, "text-left") || !mappedSiblings(node)) return false;
     const role = attribute(node, "role");
     return role === '"radio"' || CHOICE_STATE.some((name) => attribute(node, name) !== null);
 }

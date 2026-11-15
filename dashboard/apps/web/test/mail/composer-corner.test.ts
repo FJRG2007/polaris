@@ -53,7 +53,7 @@ describe("the corner the composer and the transfer card share", () => {
     it("sits above whatever is docked rather than on top of it", () => {
         expect(transfers).toContain(`var(${HEIGHT},0px)`);
         expect(transfers).toContain("z-50");
-        expect(transfers).not.toContain("bottom-4 right-4 z-40");
+        expect(transfers).not.toContain("bottom-4 end-4 z-40");
     });
 
     it("writes the calc with the spaces CSS needs", () => {
