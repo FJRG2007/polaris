@@ -694,6 +694,8 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 from === AUTO && detected
                     ? t("lang.detected", { language: languageName(detected, locale) })
                     : t("lang.auto"),
+            // In the flags' column, so every language name below starts level with it.
+            icon: <Languages className="size-4 text-muted-foreground" />,
             keywords: "auto"
         },
         ...languages

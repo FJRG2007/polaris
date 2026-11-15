@@ -19,7 +19,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { Button, Card, CardBody, Select, type SelectOption } from "@polaris/ui";
+import { Button, Card, CardBody, LanguageSelect, Select, type SelectOption } from "@polaris/ui";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import {
     CURRENCIES,
@@ -212,6 +212,9 @@ function buildFields(t: Translate, locale: Locale): FieldSpec[] {
     ];
 }
 
+/** The deployment's languages for the shared picker, each named in itself. */
+const LANGUAGES = LOCALES.map((code) => ({ value: code, tag: code, label: LOCALE_INFO[code].name }));
+
 function toSelectOptions(options: FieldOption[]): SelectOption[] {
     return options.map((option) => ({ value: option.value, label: option.label }));
 }
@@ -302,6 +305,27 @@ export function DisplayPreferencesForm({
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         {fields.map((field) => {
                             const inherited = values[field.key] === undefined;
+                            // The platform's language is the only one on this form,
+                            // and it has no layer under it to inherit from.
+                            if (field.key === "language" && !allowInherit) {
+                                return (
+                                    <label key={field.key} className="flex flex-col gap-1 text-sm">
+                                        {field.label}
+                                        <LanguageSelect
+                                            value={String(values[field.key])}
+                                            onValueChange={(value) => pick(field.key, value)}
+                                            languages={LANGUAGES}
+                                            readerLocale={locale}
+                                            searchPlaceholder={tc("languagePicker.search")}
+                                            emptyText={tc("languagePicker.empty")}
+                                            aria-label={field.label}
+                                        />
+                                        {field.hint ? (
+                                            <span className="text-xs text-muted-foreground">{field.hint}</span>
+                                        ) : null}
+                                    </label>
+                                );
+                            }
                             const options = allowInherit
                                 ? [
                                       {

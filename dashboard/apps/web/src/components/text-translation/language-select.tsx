@@ -1,9 +1,12 @@
 "use client";
 
-/** A target language, named in the reader's own language and found by any of its names. */
+/**
+ * A target language: each row names it in itself, with the reader's name for
+ * it beside, and it is found by any of its names.
+ */
 
 import { useMemo } from "react";
-import { LanguageSelect as Picker, languageName } from "@polaris/ui";
+import { LanguageSelect as Picker, languageListName, languageName } from "@polaris/ui";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { TARGET_LANGUAGES } from "@/lib/text-translation/logic";
 
@@ -29,7 +32,7 @@ export function LanguageSelect({
             TARGET_LANGUAGES.map((code) => ({
                 value: code,
                 tag: code,
-                label: languageLabel(code, locale)
+                label: languageListName(code, code)
             })).sort((one, other) => one.label.localeCompare(other.label, locale)),
         [locale]
     );

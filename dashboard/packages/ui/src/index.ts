@@ -138,10 +138,12 @@ export {
 export {
     LanguageSelect,
     languageName,
+    languageListName,
     languageOptions,
     type LanguageChoice,
     type LanguageSelectProps
 } from "./components/language-select";
+export { LanguageFlag, languageFlagCode } from "./components/language-flag";
 export {
     AsyncSelect,
     AsyncMultiSelect,

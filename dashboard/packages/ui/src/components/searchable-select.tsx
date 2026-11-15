@@ -16,7 +16,7 @@
  */
 
 import { cn } from "../lib/cn";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { SelectOption } from "./select";
 import { Check, ChevronDown } from "lucide-react";
 import { MenuSearch, menuSearchMatches } from "./menu-search";
@@ -31,6 +31,9 @@ export interface SearchableSelectOption extends SelectOption {
     /** What typing matches besides the label, or instead of a label that is not
      *  plain text. */
     keywords?: string;
+    /** A second, muted line of text at the row's right end - a language's name
+     *  in the reader's language, say. Searched too when it is plain text. */
+    hint?: ReactNode;
 }
 
 export interface SearchableSelectProps {
@@ -68,7 +71,8 @@ export interface SearchableSelectProps {
 /** The text an option is found by. */
 function searchTextOf(option: SearchableSelectOption): string {
     const label = typeof option.label === "string" ? option.label : "";
-    return [label, option.keywords ?? "", option.value].join(" ");
+    const hint = typeof option.hint === "string" ? option.hint : "";
+    return [label, hint, option.keywords ?? "", option.value].join(" ");
 }
 
 /** The options left after typing, in the order they were given. */
@@ -114,7 +118,9 @@ export function SearchableSelect({
                 disabled={disabled}
                 aria-label={ariaLabel}
                 className={cn(
-                    "group flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-field px-2.5 text-left text-[0.8125rem] transition-colors duration-fast hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:border-border-strong",
+                    // An icon that only keeps the menu's rows aligned
+                    // (`data-icon-placeholder`) has nothing to say on the trigger.
+                    "group flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-field px-2.5 text-left text-[0.8125rem] transition-colors duration-fast hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:border-border-strong [&_[data-icon-placeholder]]:hidden",
                     className
                 )}
             >
@@ -177,6 +183,16 @@ export function SearchableSelect({
                             >
                                 {option.label}
                             </span>
+                            {option.hint != null && (
+                                <span
+                                    className="min-w-0 max-w-[50%] shrink truncate text-right text-[0.75rem] text-muted-foreground"
+                                    title={
+                                        typeof option.hint === "string" ? option.hint : undefined
+                                    }
+                                >
+                                    {option.hint}
+                                </span>
+                            )}
                             {option.value === value && (
                                 <Check className="absolute right-2 text-primary" />
                             )}
