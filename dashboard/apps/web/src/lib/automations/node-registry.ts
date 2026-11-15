@@ -14,6 +14,7 @@ import { alertNode, alertNotifyNode } from "./nodes/alert-node";
 import { agentWorkNode } from "./nodes/agent-node";
 import { askAgentNode } from "./nodes/ask-agent-node";
 import { CORE_SERVER_NODES } from "./nodes/core-nodes";
+import { POLAR_SERVER_NODES } from "./nodes/polar-nodes";
 import { appAutomationNodes } from "@/lib/app-extensions/registry";
 
 const CORE = new Map<string, ServerNode>(
@@ -25,7 +26,8 @@ const CORE = new Map<string, ServerNode>(
         alertNotifyNode as ServerNode,
         agentWorkNode as ServerNode,
         askAgentNode as ServerNode,
-        codeNode as ServerNode
+        codeNode as ServerNode,
+        ...(POLAR_SERVER_NODES as ServerNode[])
     ].map((node) => [node.type, node])
 );
 
@@ -49,7 +51,25 @@ export async function graphProblems(
     graph: core.AutomationGraph,
     options: { forPublish?: boolean } = {}
 ): Promise<core.GraphProblem[]> {
-    const problems = core.graphProblems(graph, options);
+    return [...core.graphProblems(graph, options), ...(await appConfigProblems(graph))];
+}
+
+/**
+ * `core.automationIssues` with app nodes' configs checked as `graphProblems`
+ * checks them: what the editor shows, graded, for one automation.
+ */
+export async function automationIssues(
+    graph: core.AutomationGraph,
+    options: { automationId?: string; forPublish?: boolean } = {}
+): Promise<core.AutomationIssue[]> {
+    return core.automationIssues(graph, {
+        ...options,
+        extraProblems: await appConfigProblems(graph)
+    });
+}
+
+async function appConfigProblems(graph: core.AutomationGraph): Promise<core.GraphProblem[]> {
+    const problems: core.GraphProblem[] = [];
     const apps = graph.nodes.filter((node) => !core.isCoreNodeType(node.type));
     if (apps.length === 0) return problems;
     const contributed = await appAutomationNodes().catch(() => []);

@@ -164,7 +164,11 @@
         "askAgent": "Usar un agente",
         "alert": "Enviar alerta a una automatización",
         "alertIn": "Al llegar una alerta",
-        "alertNotify": "Avisar de la alerta"
+        "alertNotify": "Avisar de la alerta",
+        "aiWrite": "Escribir con IA",
+        "aiAgent": "Usar un agente",
+        "aiDecide": "Decisión IA",
+        "aiExtract": "Extraer campos"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -287,6 +291,48 @@
             "3": "Normal",
             "4": "Alta",
             "5": "Urgente"
+        },
+        "aiPrompt": "Prompt",
+        "aiPromptHint": "Inserta valores de pasos anteriores. Los siguientes leen el texto.",
+        "aiModel": "Modelo",
+        "aiModelAuto": "Automático",
+        "aiModelSearch": "Buscar modelos",
+        "aiModelNone": "Aún no hay modelos. Añade una clave de proveedor en Polar.",
+        "aiModelReset": "Usar Automático",
+        "aiAgentOptional": "Agente (opcional)",
+        "aiAgentNone": "Sin agente",
+        "aiAgentClear": "Quitar agente",
+        "aiTask": "Tarea",
+        "aiTaskHint": "Qué debe averiguar el agente. Sus herramientas solo leen.",
+        "aiMaxSteps": "Pasos máx.",
+        "aiMaxTokens": "Tokens máx.",
+        "aiTimeout": "Segundos máx.",
+        "aiDecideInput": "Sobre qué decidir",
+        "aiDecideInstructions": "Cómo decidir (opcional)",
+        "aiOutcomes": "Resultados",
+        "aiOutcomeLabel": "Resultado {number}",
+        "aiOutcomeDescription": "Cuándo elegirlo (opcional)",
+        "aiOutcomeAdd": "Añadir opción",
+        "aiOutcomeRemove": "Quitar resultado",
+        "aiOnFailure": "Si la IA no decide",
+        "aiOnFailureError": "Ir por Si hay error",
+        "aiOnFailureFail": "Hacerla fallar",
+        "aiOnFailureCase": "Ir por \"{label}\"",
+        "aiExtractText": "Texto que leer",
+        "aiExtractHint": "Los pasos siguientes leen cada campo de los campos de este paso.",
+        "aiFields": "Campos",
+        "aiFieldName": "Nombre",
+        "aiFieldKind": "Tipo",
+        "aiFieldDescription": "Qué es (opcional)",
+        "aiFieldRequired": "Obligatorio",
+        "aiFieldAdd": "Añadir campo",
+        "aiFieldRemove": "Quitar campo",
+        "aiFieldKinds": {
+            "text": "Texto",
+            "number": "Número",
+            "boolean": "Sí/no",
+            "date": "Fecha",
+            "list": "Lista"
         }
     },
     "operators": {
@@ -421,7 +467,21 @@
         "alertTopicOff": "La automatización de esa dirección está apagada o sin publicar",
         "crmRunner": "La cuenta con la que se ejecuta ya no puede usar el CRM",
         "crmForbidden": "La cuenta con la que se ejecuta no puede cambiar esos registros",
-        "crmActionFailed": "El CRM no lo hizo"
+        "crmActionFailed": "El CRM no lo hizo",
+        "callLoop": "Detenida: esa automatización ya se ejecuta antes en esta cadena",
+        "polarModelGone": "Ese modelo ya no está disponible para la cuenta con la que se ejecuta",
+        "polarTimeout": "El paso de IA se quedó sin tiempo",
+        "polarEmpty": "La IA respondió sin nada",
+        "polarNoOutcome": "La IA no eligió ninguno de los resultados",
+        "polarNoFields": "La IA no devolvió los campos pedidos",
+        "extractMissing": "No se encontró un campo obligatorio en el texto",
+        "inputRequired": "Escribe lo que lee el paso",
+        "taskRequired": "Escribe la tarea del agente",
+        "outcomeRequired": "Nombra cada opción",
+        "outcomesTooFew": "Añade al menos dos resultados",
+        "outcomesRepeat": "Hay resultados repetidos",
+        "fieldsRequired": "Añade al menos un campo",
+        "fieldsRepeat": "Hay campos repetidos"
     },
     "secrets": {
         "title": "Secretos",
@@ -481,7 +541,11 @@
         },
         "tooLarge": "Demasiado grande para fijarlo (64 KB como mucho).",
         "tryBodyLeaks": "Solo el Intentar lleva a los pasos de dentro. Quita la otra conexión.",
-        "scopeTooDeep": "Los Intentar y bucles anidan {max} niveles como mucho. Saca un paso."
+        "scopeTooDeep": "Los Intentar y bucles anidan {max} niveles como mucho. Saca un paso.",
+        "selfCall": "Un paso Ejecutar otra automatización ejecuta esta misma. Elige otra.",
+        "selfTrigger": "Un paso volvería a iniciar esta automatización. Añade una condición antes.",
+        "missingReference": "Un paso lee de un paso que no existe. Corrige el valor.",
+        "laterReference": "Un paso lee de un paso que va después. Corrige el valor."
     },
     "canvas": {
         "board": "Lienzo de la automatización",
@@ -755,7 +819,11 @@
         "askAgent": "Pregunta a uno de tus agentes de Polar y usa su respuesta después.",
         "alert": "Envía una alerta a la dirección de otra automatización.",
         "alertIn": "Una dirección a la que monitores, scripts y ntfy o Gotify envían alertas.",
-        "alertNotify": "Avisa a personas de una alerta, según su gravedad."
+        "alertNotify": "Avisa a personas de una alerta, según su gravedad.",
+        "aiWrite": "Redacta un texto con un prompt y valores de pasos anteriores.",
+        "aiAgent": "Un agente de Polar trabaja en una tarea con herramientas de lectura.",
+        "aiDecide": "El modelo elige un resultado; cada uno es su propio camino.",
+        "aiExtract": "Lee un texto y saca los campos que definas."
     },
     "flow": {
         "conditionGroup": "Condiciones",
@@ -1083,7 +1151,8 @@
             "drive": "Drive",
             "calendar": "Calendario",
             "code": "Code",
-            "crm": "CRM"
+            "crm": "CRM",
+            "polar": "Polar"
         },
         "presets": {
             "publicIpChanged": "Cambió la IP pública",
@@ -1412,5 +1481,35 @@
         "people": "Personas",
         "teams": "Equipos",
         "noTeams": "Esta organización no tiene equipos."
+    },
+    "issues": {
+        "title": "Revisión",
+        "error": "Error",
+        "warning": "Aviso",
+        "summaryErrors": "Errores: {errors}, avisos: {warnings}. Los errores impiden guardar y publicar.",
+        "summaryWarnings": "Avisos: {warnings}. Puedes guardar y publicar igualmente.",
+        "publishBlocked": "Corrige primero los errores de Revisión",
+        "duplicateNode": "Dos pasos comparten un id",
+        "unknownEdgeNode": "Una conexión lleva a un paso que ya no está",
+        "unknownPort": "Una conexión sale por un camino que este paso ya no tiene",
+        "intoTrigger": "Nada puede llevar a un disparador",
+        "cycle": "Sus conexiones dan vueltas en bucle. Usa Para cada o Repetir",
+        "finallyEntry": "El carril Finalmente empieza en un paso no válido",
+        "finallyShared": "Un paso está en el flujo principal y en Finalmente",
+        "badConfig": "Configuración incompleta",
+        "pinTooLarge": "Datos fijados demasiado grandes",
+        "pinNotAllowed": "Este tipo de paso no admite datos fijados",
+        "loopBodyLeaks": "Se llega a un paso de un bucle desde fuera",
+        "tryBodyLeaks": "Se llega a un paso de un Try desde fuera",
+        "scopeTooDeep": "Bucles y Try anidados a más de {max} niveles",
+        "callCycle": "Llama a una automatización que vuelve a llamar a esta",
+        "noTrigger": "Añade un disparador antes de publicar",
+        "unreachable": "Ningún disparador llega aquí, así que nunca se ejecuta",
+        "missingReference": "Lee {reference} y ningún paso tiene ese id",
+        "laterReference": "Lee {reference} de un paso que no va antes",
+        "unknownOutput": "Lee {reference}, que ese paso quizá no da",
+        "selfTrigger": "Volvería a iniciar \"{trigger}\" sin condición entre medias",
+        "selfCall": "Se ejecuta a sí misma",
+        "contradiction": "Sus condiciones nunca pueden cumplirse a la vez"
     }
 }

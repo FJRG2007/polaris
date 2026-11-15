@@ -5,11 +5,15 @@
  * once, refetched behind it), the status chip, and run errors in words.
  */
 
+import * as core from "@polaris/core";
 import { Badge, Button, Skeleton } from "@polaris/ui";
 import {
     Activity,
     Bell,
     Bot,
+    BrainCircuit,
+    ScanText,
+    Sparkles,
     CircleStop,
     Clock,
     Code,
@@ -313,7 +317,11 @@ const NODE_KEYS = {
     "core.alertNotify": "alertNotify",
     "core.agentWork": "agentWork",
     "core.askAgent": "askAgent",
-    "core.code": "code"
+    "core.code": "code",
+    "core.aiWrite": "aiWrite",
+    "core.aiAgent": "aiAgent",
+    "core.aiDecide": "aiDecide",
+    "core.aiExtract": "aiExtract"
 } as const;
 
 /**
@@ -382,6 +390,10 @@ const NODE_ICONS: Record<string, LucideIcon> = {
     "core.alertNotify": BellRing,
     "core.agentWork": Bot,
     "core.askAgent": Bot,
+    "core.aiWrite": Sparkles,
+    "core.aiAgent": BrainCircuit,
+    "core.aiDecide": Split,
+    "core.aiExtract": ScanText,
     "core.code": Code,
     "core.manual": Hand,
     "core.schedule": Clock,
@@ -430,6 +442,32 @@ export function nodeHint(
 }
 
 /** An output port in the reader's words: Then, Else, a Choose case (by its label), a lane, Each, Done, Error, Timed out. */
+/** A validator finding on one node, in words, for the canvas and the issues panel. */
+export interface NodeIssue {
+    readonly severity: core.IssueSeverity;
+    readonly text: string;
+}
+
+/** One finding of `core.automationIssues` in words; `title` names a node by its id. */
+export function issueText(
+    t: ReturnType<typeof useTranslations<"automations">>,
+    issue: core.AutomationIssue,
+    title: (id: string) => string
+): string {
+    switch (issue.code) {
+        case "missingReference":
+        case "laterReference":
+        case "unknownOutput":
+            return t(`issues.${issue.code}`, { reference: issue.reference });
+        case "selfTrigger":
+            return t("issues.selfTrigger", { trigger: title(issue.trigger) });
+        case "scopeTooDeep":
+            return t("issues.scopeTooDeep", { max: core.AUTOMATION_LIMITS.scopeDepth });
+        default:
+            return t(`issues.${issue.code}`);
+    }
+}
+
 export function portLabel(
     t: ReturnType<typeof useTranslations<"automations">>,
     node: { readonly type: string; readonly config?: unknown },

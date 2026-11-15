@@ -19,7 +19,7 @@
 
 import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { NodeIcon, portLabel } from "../shared";
+import { NodeIcon, portLabel, type NodeIssue } from "../shared";
 import {
     LayoutGrid,
     Map as MapIcon,
@@ -154,6 +154,8 @@ export interface CanvasBoardProps {
     readonly incomplete: (node: core.GraphNode) => boolean;
     /** Each node's step status in the run being shown. */
     readonly states?: Readonly<Record<string, string>>;
+    /** The validator's finding on each node, worded: errors block saving, warnings do not. */
+    readonly issues?: Readonly<Record<string, NodeIssue>>;
     /** The items of a node's right-click menu; the node is selected first when it was not already. */
     readonly menu?: (node: core.GraphNode) => ReactNode;
     /** The items of the right-click menu on the empty canvas, a connection or a
@@ -858,6 +860,18 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                     {props.incomplete(node) ? (
                                         <span className="truncate text-[11px] text-warning-ink">
                                             {t("runErrors.badConfig")}
+                                        </span>
+                                    ) : props.issues?.[node.id] ? (
+                                        <span
+                                            className={cn(
+                                                "truncate text-[11px]",
+                                                props.issues[node.id]!.severity === "error"
+                                                    ? "text-destructive"
+                                                    : "text-warning-ink"
+                                            )}
+                                            title={props.issues[node.id]!.text}
+                                        >
+                                            {props.issues[node.id]!.text}
                                         </span>
                                     ) : null}
                                     {node.pinned !== undefined ? (

@@ -715,7 +715,11 @@ export const CORE_NODE_OUTPUT_PATHS: Readonly<Record<graphs.CoreNodeType, readon
     "core.alertNotify": ["recipients", "priority"],
     "core.agentWork": ["runId", "sessionId", "repo"],
     "core.askAgent": ["text", "agent"],
-    "core.code": ["items", "count", "logs"]
+    "core.code": ["items", "count", "logs"],
+    "core.aiWrite": ["text", "model"],
+    "core.aiAgent": ["text", "steps", "model"],
+    "core.aiDecide": ["outcome", "label", "reason", "failed"],
+    "core.aiExtract": ["fields", "missing"]
 };
 
 export interface ReferenceOption {

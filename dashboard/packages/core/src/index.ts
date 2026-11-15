@@ -83,6 +83,7 @@ export * from "./automation-graph.js";
 export * from "./automation-webhook.js";
 export * from "./payload-shape.js";
 export * from "./automation-canvas.js";
+export * from "./automation-validate.js";
 export * from "./automation-app-events.js";
 export * from "./sign-in-methods.js";
 export * from "./request-origin.js";

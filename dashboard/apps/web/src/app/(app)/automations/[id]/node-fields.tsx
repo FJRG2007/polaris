@@ -49,6 +49,13 @@ import {
     triggerChoices
 } from "./flow-fields";
 import * as polls from "../automations-polls";
+import {
+    AiAgentFields,
+    AiDecideFields,
+    AiExtractFields,
+    AiWriteFields,
+    POLAR_NODE_DEFAULTS
+} from "./polar-fields";
 
 export type T = ReturnType<typeof useTranslations<"automations">>;
 
@@ -163,6 +170,7 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     "core.alert": () => ({ topicId: "", title: "", body: "", priority: 3, tags: "", click: "", dedupKey: "" }),
     "core.agentWork": () => ({ repoId: "", mode: null, instructions: "", target: "run" }),
     "core.askAgent": () => ({ agentId: "", prompt: "" }),
+    ...POLAR_NODE_DEFAULTS,
     "core.code": () => ({ code: CODE_TEMPLATES.filter, items: "" }),
     "core.chat": () => ({
         preset: "slack",
@@ -446,6 +454,14 @@ export function NodeFields({
             return <AgentWorkFields config={config} set={set} />;
         case "core.askAgent":
             return <AskAgentFields config={config} set={set} />;
+        case "core.aiWrite":
+            return <AiWriteFields config={config} set={set} />;
+        case "core.aiAgent":
+            return <AiAgentFields config={config} set={set} />;
+        case "core.aiDecide":
+            return <AiDecideFields config={config} set={set} />;
+        case "core.aiExtract":
+            return <AiExtractFields config={config} set={set} />;
         case "core.code":
             return <CodeFields config={config} set={set} />;
         case "core.connectivity":

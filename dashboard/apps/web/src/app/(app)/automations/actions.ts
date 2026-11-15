@@ -35,7 +35,7 @@ import { listAdministeredOrgs } from "@/lib/orgs/org-service";
 import { mayEditShelf, type Shelf } from "@/lib/automations/runner";
 
 type Result<T = object> =
-    ({ ok: true } & T) | { ok: false; error: string; problems?: core.GraphProblem[] };
+    ({ ok: true } & T) | { ok: false; error: string; problems?: readonly (core.GraphProblem | core.AutomationIssue)[] };
 
 async function actor(): Promise<RunActor> {
     const user = await requirePermission("automations.use");
@@ -204,17 +204,26 @@ export async function setEnabledAction(automationId: unknown, enabled: unknown):
 
 /** The sentence for a draft that cannot be saved or published: the problem's own when it has one. */
 async function problemError(
-    problems: readonly core.GraphProblem[],
+    problems: readonly (core.GraphProblem | core.AutomationIssue)[],
     fallback: "invalid" | "notReady"
 ): Promise<string> {
     const t = await getTranslations("automations");
     const named = problems.find((problem) =>
-        ["loopBodyLeaks", "tryBodyLeaks", "scopeTooDeep", "callCycle"].includes(problem.code)
+        [
+            "loopBodyLeaks",
+            "tryBodyLeaks",
+            "scopeTooDeep",
+            "callCycle",
+            "selfCall",
+            "selfTrigger",
+            "missingReference",
+            "laterReference"
+        ].includes(problem.code)
     );
     if (named?.code === "scopeTooDeep")
         return t("errors.scopeTooDeep", { max: core.AUTOMATION_LIMITS.scopeDepth });
     return t(
-        `errors.${(named?.code ?? fallback) as "loopBodyLeaks" | "tryBodyLeaks" | "callCycle" | typeof fallback}`
+        `errors.${(named?.code ?? fallback) as "loopBodyLeaks" | "tryBodyLeaks" | "callCycle" | "selfCall" | "selfTrigger" | "missingReference" | "laterReference" | typeof fallback}`
     );
 }
 
@@ -882,6 +891,42 @@ export async function thresholdSubjectsAction(
 }
 
 const agentReposRequestSchema = z.object(pageFields).strict();
+
+/**
+ * The models the caller's own Polar can use now, a page at a time: what a
+ * Polar step may pick besides Automatic. Ids are `<provider>::<model>`.
+ */
+export async function polarModelOptionsAction(
+    input: unknown
+): Promise<OptionsPage<{ id: string; name: string }> | { error: string }> {
+    try {
+        const who = await actor();
+        const parsed = agentReposRequestSchema.safeParse(input);
+        if (!parsed.success) return { items: [], next: null };
+        const { query, cursor, limit, ids } = parsed.data;
+        const { polarModelOptions } = await import("@/lib/polar/models");
+        const all = (await polarModelOptions(who.id)).flatMap((provider) =>
+            provider.models.map((model) => ({
+                id: `${provider.provider}::${model.model}`,
+                name: `${model.name} (${provider.name})`
+            }))
+        );
+        const needle = query?.trim().toLowerCase() ?? "";
+        const matching = all.filter(
+            (entry) =>
+                (!ids || ids.includes(entry.id)) &&
+                (!needle || entry.name.toLowerCase().includes(needle))
+        );
+        const start = Math.max(0, Number.parseInt(cursor ?? "0", 10) || 0);
+        const page = matching.slice(start, start + limit);
+        return {
+            items: page,
+            next: start + limit < matching.length ? String(start + limit) : null
+        };
+    } catch (caught) {
+        return { error: (await failure(caught)).error };
+    }
+}
 
 /**
  * The caller's custom Polar agents, a page at a time, by name: what an "Ask an

@@ -164,7 +164,11 @@
         "askAgent": "Ask an agent",
         "alert": "Send an alert to an automation",
         "alertIn": "When an alert arrives",
-        "alertNotify": "Notify about the alert"
+        "alertNotify": "Notify about the alert",
+        "aiWrite": "Write with AI",
+        "aiAgent": "Run an agent",
+        "aiDecide": "AI decision",
+        "aiExtract": "Extract fields"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -287,6 +291,48 @@
             "3": "Normal",
             "4": "High",
             "5": "Urgent"
+        },
+        "aiPrompt": "Prompt",
+        "aiPromptHint": "Insert values from earlier steps. Later steps read the text.",
+        "aiModel": "Model",
+        "aiModelAuto": "Automatic",
+        "aiModelSearch": "Search models",
+        "aiModelNone": "No models yet. Add an AI provider key in Polar.",
+        "aiModelReset": "Use Automatic",
+        "aiAgentOptional": "Agent (optional)",
+        "aiAgentNone": "No agent",
+        "aiAgentClear": "Remove agent",
+        "aiTask": "Task",
+        "aiTaskHint": "What the agent should find out. Its tools only read.",
+        "aiMaxSteps": "Max steps",
+        "aiMaxTokens": "Max tokens",
+        "aiTimeout": "Max seconds",
+        "aiDecideInput": "What to decide on",
+        "aiDecideInstructions": "How to decide (optional)",
+        "aiOutcomes": "Outcomes",
+        "aiOutcomeLabel": "Outcome {number}",
+        "aiOutcomeDescription": "When to pick it (optional)",
+        "aiOutcomeAdd": "Add outcome",
+        "aiOutcomeRemove": "Remove outcome",
+        "aiOnFailure": "If the AI can't decide",
+        "aiOnFailureError": "Take the On error path",
+        "aiOnFailureFail": "Fail the run",
+        "aiOnFailureCase": "Take \"{label}\"",
+        "aiExtractText": "Text to read",
+        "aiExtractHint": "Later steps read each field from this step's fields.",
+        "aiFields": "Fields",
+        "aiFieldName": "Name",
+        "aiFieldKind": "Type",
+        "aiFieldDescription": "What it is (optional)",
+        "aiFieldRequired": "Required",
+        "aiFieldAdd": "Add field",
+        "aiFieldRemove": "Remove field",
+        "aiFieldKinds": {
+            "text": "Text",
+            "number": "Number",
+            "boolean": "Yes/no",
+            "date": "Date",
+            "list": "List"
         }
     },
     "operators": {
@@ -421,7 +467,21 @@
         "alertTopicOff": "The automation behind that address is off or unpublished",
         "crmRunner": "The account it runs as can no longer use the CRM",
         "crmForbidden": "The account it runs as cannot change those records",
-        "crmActionFailed": "The CRM did not do it"
+        "crmActionFailed": "The CRM did not do it",
+        "callLoop": "Stopped: that automation is already running earlier in this chain",
+        "polarModelGone": "That model is no longer available to the account this runs as",
+        "polarTimeout": "The AI step ran out of time",
+        "polarEmpty": "The AI answered with nothing",
+        "polarNoOutcome": "The AI didn't pick one of the outcomes",
+        "polarNoFields": "The AI didn't return the fields asked for",
+        "extractMissing": "A required field wasn't found in the text",
+        "inputRequired": "Write what the step reads",
+        "taskRequired": "Write the agent's task",
+        "outcomeRequired": "Name every outcome",
+        "outcomesTooFew": "Add at least two outcomes",
+        "outcomesRepeat": "Two outcomes share a name",
+        "fieldsRequired": "Add at least one field",
+        "fieldsRepeat": "Two fields share a name"
     },
     "secrets": {
         "title": "Secrets",
@@ -481,7 +541,11 @@
         },
         "tooLarge": "Too large to pin (64 KB at most).",
         "tryBodyLeaks": "Only the Try leads into the steps inside it. Remove the other connection.",
-        "scopeTooDeep": "Try blocks and loops go {max} deep at most. Move a step out."
+        "scopeTooDeep": "Try blocks and loops go {max} deep at most. Move a step out.",
+        "selfCall": "A Run another automation step runs this same automation. Pick another one.",
+        "selfTrigger": "A step would start this automation again. Add a condition before it.",
+        "missingReference": "A step reads from a step that is not there. Fix the value.",
+        "laterReference": "A step reads from a step that runs after it. Fix the value."
     },
     "canvas": {
         "board": "Automation canvas",
@@ -755,7 +819,11 @@
         "askAgent": "Ask one of your Polar agents and use its answer in later steps.",
         "alert": "Post an alert to another automation's alert address.",
         "alertIn": "An address monitors, scripts and ntfy or Gotify clients post alerts to.",
-        "alertNotify": "Notify people of an alert, graded by its severity."
+        "alertNotify": "Notify people of an alert, graded by its severity.",
+        "aiWrite": "Draft a text from a prompt and values from earlier steps.",
+        "aiAgent": "A Polar agent works on a task with read-only tools.",
+        "aiDecide": "The model picks one outcome; each one is its own path.",
+        "aiExtract": "Read a text and pull out the fields you define."
     },
     "flow": {
         "conditionGroup": "Conditions",
@@ -1083,7 +1151,8 @@
             "drive": "Drive",
             "calendar": "Calendar",
             "code": "Code",
-            "crm": "CRM"
+            "crm": "CRM",
+            "polar": "Polar"
         },
         "presets": {
             "publicIpChanged": "Public IP changed",
@@ -1412,5 +1481,35 @@
         "people": "People",
         "teams": "Teams",
         "noTeams": "This organization has no teams."
+    },
+    "issues": {
+        "title": "Checks",
+        "error": "Error",
+        "warning": "Warning",
+        "summaryErrors": "Errors: {errors}, warnings: {warnings}. Errors stop saving and publishing.",
+        "summaryWarnings": "Warnings: {warnings}. You can still save and publish.",
+        "publishBlocked": "Fix the errors under Checks first",
+        "duplicateNode": "Two steps share one id",
+        "unknownEdgeNode": "A connection leads to a step that is gone",
+        "unknownPort": "A connection leaves by a path this step no longer has",
+        "intoTrigger": "Nothing may lead into a trigger",
+        "cycle": "Its connections go round in a loop. Use For each or Repeat",
+        "finallyEntry": "The Finally lane starts on a step it can't start on",
+        "finallyShared": "A step is in both the main flow and the Finally lane",
+        "badConfig": "Not set up completely",
+        "pinTooLarge": "The pinned data is too large",
+        "pinNotAllowed": "This kind of step can't hold pinned data",
+        "loopBodyLeaks": "A step inside a loop is reached from outside it",
+        "tryBodyLeaks": "A step inside a Try is reached from outside it",
+        "scopeTooDeep": "Loops and Try blocks nest more than {max} deep",
+        "callCycle": "Calls an automation that calls this one back",
+        "noTrigger": "Add a trigger before publishing",
+        "unreachable": "No trigger leads here, so it never runs",
+        "missingReference": "Reads {reference}, and no step has that id",
+        "laterReference": "Reads {reference} from a step that doesn't run before it",
+        "unknownOutput": "Reads {reference}, which that step may not give",
+        "selfTrigger": "Would start \"{trigger}\" again, with no condition in between",
+        "selfCall": "Runs the automation it is in",
+        "contradiction": "Its conditions can never all hold"
     }
 }

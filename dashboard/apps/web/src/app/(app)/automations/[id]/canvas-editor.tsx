@@ -41,6 +41,7 @@ import {
     Trash2,
     Undo2,
     X,
+    Sparkles,
     Zap,
     ZoomIn,
     ZoomOut,
@@ -68,7 +69,7 @@ import * as catalog from "./node-catalog";
 import { AddBlockDialog, type AddGroup } from "@polaris/ui/automation-add";
 import { PolarAssist, assistEdgeOf } from "../polar-assist";
 import { FailureFields, WhenFields } from "./flow-fields";
-import { NodeIcon, nodeHint, nodeTitle } from "../shared";
+import { NodeIcon, nodeHint, nodeTitle, type NodeIssue } from "../shared";
 import { scheduleSummary } from "./schedule-words";
 import {
     AppLogo,
@@ -131,6 +132,7 @@ export function CanvasEditor({
     secrets,
     samples,
     states,
+    issues,
     onChanged,
     onAdded,
     onRunFrom
@@ -144,6 +146,8 @@ export function CanvasEditor({
     secrets: SecretSummary[];
     samples: Readonly<Record<string, unknown>>;
     states?: Readonly<Record<string, string>>;
+    /** What the validator found on each node, worded. */
+    issues?: Readonly<Record<string, NodeIssue>>;
     onChanged: () => void;
     /** A node of this type was just added: the first trigger names an unnamed automation. */
     onAdded?: (type: string) => void;
@@ -659,6 +663,7 @@ export function CanvasEditor({
                     subtitle={(node) => nodeSubtitle(t, node)}
                     incomplete={(node) => !configValid(node)}
                     states={states}
+                    issues={issues}
                     menu={nodeMenu}
                     boardMenu={boardMenu}
                 />
@@ -816,6 +821,7 @@ const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
     automations: Workflow,
     places: House,
     crm: Contact,
+    polar: Sparkles,
     "game-servers": Gamepad2,
     deploy: Rocket,
     chat: MessagesSquare,
@@ -838,6 +844,7 @@ const GROUP_APP_LOGOS: Partial<Record<catalog.CatalogGroupId, string>> = {
     automations: "automations",
     places: catalog.PLACES_APP,
     crm: "crm",
+    polar: "polar",
     "game-servers": "games",
     // The deploy group is the Apps app, as the sidebar names and draws it.
     deploy: "apps",

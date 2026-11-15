@@ -818,6 +818,107 @@ export const connectivityTriggerConfigSchema = z.object({
 });
 
 /** Every node type core contributes, with the config each one takes. */
+/**
+ * The model a Polar step asks: null is Automatic (Polar picks per ask, as in a
+ * chat); otherwise a provider and model from the person's own model picker.
+ */
+export const aiModelSchema = z
+    .object({
+        provider: z.string().trim().min(1).max(64),
+        model: z.string().trim().min(1).max(200)
+    })
+    .nullable()
+    .default(null);
+export type AiModel = z.infer<typeof aiModelSchema>;
+
+/** An optional custom Polar agent whose instructions (and model, under Automatic) the step uses. */
+const aiAgentRef = z.union([z.literal(""), z.string().uuid()]).default("");
+const required = (max: number, code: string) =>
+    text(max).refine((value) => value.trim().length > 0, code);
+
+export const AI_FIELD_KINDS = ["text", "number", "boolean", "date", "list"] as const;
+export type AiFieldKind = (typeof AI_FIELD_KINDS)[number];
+
+/**
+ * Where a decision goes when the model fails or answers with no outcome it
+ * was given: its own "error" port, the run's failure, or one of its outcomes.
+ */
+export const aiDecisionFailure = z
+    .union([z.literal("error"), z.literal("fail"), z.string().regex(/^case\d+$/)])
+    .default("error");
+
+/**
+ * Polar steps, shaped after n8n's AI nodes (docs.n8n.io/integrations/builtin/
+ * cluster-nodes/root-nodes: Basic LLM Chain, AI Agent, Text Classifier,
+ * Information Extractor): a prompt in, text out; a bounded tool loop; one
+ * port per category plus a fallback; a typed schema the answer must fill.
+ */
+export const aiWriteConfigSchema = z.object({
+    prompt: required(AUTOMATION_LIMITS.textLength * 4, "promptRequired"),
+    model: aiModelSchema,
+    agentId: aiAgentRef,
+    maxTokens: z.number().int().min(64).max(8192).default(1024)
+});
+export const aiAgentConfigSchema = z.object({
+    task: required(AUTOMATION_LIMITS.textLength * 4, "taskRequired"),
+    model: aiModelSchema,
+    agentId: aiAgentRef,
+    /** Model calls at most, tool rounds included. */
+    maxSteps: z.number().int().min(1).max(20).default(8),
+    /** Tokens across every step together. */
+    maxTokens: z.number().int().min(256).max(64_000).default(16_000),
+    timeoutSeconds: z.number().int().min(10).max(600).default(120)
+});
+export const aiDecideConfigSchema = z.object({
+    input: required(AUTOMATION_LIMITS.textLength * 4, "inputRequired"),
+    instructions: text(AUTOMATION_LIMITS.textLength).default(""),
+    cases: z
+        .array(
+            z.object({
+                label: text(60).refine((value) => value.trim().length > 0, "outcomeRequired"),
+                description: text(300).default("")
+            })
+        )
+        .min(2, "outcomesTooFew")
+        .max(AUTOMATION_LIMITS.switchCases)
+        .refine(
+            (cases) =>
+                new Set(cases.map((entry) => entry.label.trim().toLowerCase())).size ===
+                cases.length,
+            "outcomesRepeat"
+        ),
+    onFailure: aiDecisionFailure,
+    model: aiModelSchema,
+    agentId: aiAgentRef
+});
+export const aiExtractConfigSchema = z.object({
+    text: required(AUTOMATION_LIMITS.textLength * 4, "inputRequired"),
+    fields: z
+        .array(
+            z.object({
+                name: z
+                    .string()
+                    .trim()
+                    .min(1)
+                    .max(64)
+                    .regex(/^[A-Za-z_][\w-]*$/, "valueNameInvalid"),
+                kind: z.enum(AI_FIELD_KINDS).default("text"),
+                description: text(300).default(""),
+                required: z.boolean().default(false)
+            })
+        )
+        .min(1, "fieldsRequired")
+        .max(30)
+        .refine(
+            (fields) => new Set(fields.map((entry) => entry.name)).size === fields.length,
+            "fieldsRepeat"
+        ),
+    model: aiModelSchema,
+    agentId: aiAgentRef
+});
+export type AiDecideConfig = z.infer<typeof aiDecideConfigSchema>;
+export type AiExtractConfig = z.infer<typeof aiExtractConfigSchema>;
+
 export const CORE_NODE_CONFIGS = {
     "core.manual": z.object({}).strict(),
     "core.schedule": scheduleConfigSchema,
@@ -961,7 +1062,11 @@ export const CORE_NODE_CONFIGS = {
             "codeRequired"
         ),
         items: text(500).default("")
-    })
+    }),
+    "core.aiWrite": aiWriteConfigSchema,
+    "core.aiAgent": aiAgentConfigSchema,
+    "core.aiDecide": aiDecideConfigSchema,
+    "core.aiExtract": aiExtractConfigSchema
 } as const;
 export type CoreNodeType = keyof typeof CORE_NODE_CONFIGS;
 export const CORE_NODE_TYPES = Object.keys(CORE_NODE_CONFIGS) as CoreNodeType[];
@@ -1015,6 +1120,12 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     "core.askAgent": { role: "action", ports: [], idempotent: false },
     // Reads its input and nothing else: the same items give the same answer.
     "core.code": { role: "action", ports: [], idempotent: true },
+    // A model's answer differs every time, and every ask is spent.
+    "core.aiWrite": { role: "action", ports: [], idempotent: false },
+    "core.aiAgent": { role: "action", ports: [], idempotent: false },
+    // Its ports are its outcomes: see nodePorts.
+    "core.aiDecide": { role: "action", ports: [], own: true, idempotent: false },
+    "core.aiExtract": { role: "action", ports: [], idempotent: false },
     "core.try": {
         role: "flow",
         ports: ["body", "then", "catch", "always"],
@@ -1082,6 +1193,18 @@ export function portMoves(
     return moves;
 }
 
+/** The ports of an AI decision: one per outcome, then "error" when failures go there. */
+export function decidePorts(config: unknown): string[] {
+    const parsed = aiDecideConfigSchema.safeParse(config);
+    if (!parsed.success) {
+        const cases = (config as { cases?: unknown[] } | undefined)?.cases;
+        const count = Array.isArray(cases) ? Math.min(cases.length, AUTOMATION_LIMITS.switchCases) : 0;
+        return [...Array.from({ length: count }, (_, index) => `case${index + 1}`), "error"];
+    }
+    const cases = parsed.data.cases.map((_, index) => `case${index + 1}`);
+    return parsed.data.onFailure === "error" ? [...cases, "error"] : cases;
+}
+
 export function parallelPorts(config: unknown): string[] {
     const parsed = CORE_NODE_CONFIGS["core.parallel"].safeParse(config);
     const lanes = parsed.success ? parsed.data.lanes : 2;
@@ -1131,6 +1254,10 @@ export function nodePorts(
     const meta = CORE_NODE_META[type];
     if (type === "core.switch") return switchPorts(node?.config);
     if (type === "core.parallel") return parallelPorts(node?.config);
+    if (type === "core.aiDecide") {
+        const ports = decidePorts(node?.config);
+        return ports.includes("error") ? ports : [...ports, ...errorPort];
+    }
     const own = meta.role === "condition" || meta.own ? meta.ports : ["next", ...meta.ports];
     return [...own, ...errorPort];
 }

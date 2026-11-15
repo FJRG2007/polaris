@@ -20,6 +20,7 @@ export type CatalogGroupId =
     | "automations"
     | "places"
     | "crm"
+    | "polar"
     | core.AppEventApp
     | "logic"
     | "timing"
@@ -240,6 +241,11 @@ export function catalogGroups(options: {
         {
             id: "send",
             items: ["core.notify", "core.alertNotify", "core.alert", "core.message", "core.chat", "core.http"].map(plain)
+        },
+        // Polar's own steps: write, run an agent, decide, extract.
+        {
+            id: "polar",
+            items: ["core.aiWrite", "core.aiAgent", "core.aiDecide", "core.aiExtract"].map(plain)
         },
         // Steps that reach other automations; merged into the triggers' group of that name.
         { id: "automations", items: ["core.run", "core.announce"].map(plain) }
