@@ -234,15 +234,6 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         flow: "paste",
         home: true
     },
-    // codewhale.net/en/docs/auth: browser sign-in with a one-time code, and
-    // `codewhale account logout` to remove the profile's session.
-    CODEWHALE_HOME_LOGIN: {
-        cli: "codewhale",
-        command: "codewhale login",
-        logout: "codewhale account logout",
-        flow: "device",
-        home: true
-    },
     // fx.sh/docs/getting-started/authentication: without a provider name,
     // `fx login` signs in to Vercel and `fx logout` signs out of it.
     FX_HOME_LOGIN: { cli: "fx", command: "fx login", logout: "fx logout", flow: "paste", home: true },

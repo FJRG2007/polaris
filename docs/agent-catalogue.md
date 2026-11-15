@@ -119,7 +119,6 @@ is offered the same sign-out.
 | Devin | `devin auth login --force-manual-token-flow` | `devin auth logout` | docs.devin.ai/cli/reference/commands (file: `~/.local/share/devin/credentials.toml`, docs.devin.ai/cli/enterprise/devin-auth) |
 | Amp | `amp login` | `amp logout` | ampcode.com/docs/cli |
 | Autohand | `autohand login` | `autohand logout` | docs.autohand.ai/working-with-autohand-code/cli-reference |
-| Codewhale | `codewhale login` (one-time code) | `codewhale account logout` | codewhale.net/en/docs/auth |
 | fx | `fx login` (Vercel) | `fx logout` | fx.sh/docs/getting-started/authentication |
 | MiMo Code | `mimo auth login` | - (none documented) | mimo.mi.com/docs/en-US/tokenplan/integration/mimo-code |
 | MiniMax Code | `mcode login --region global` | `mcode logout` | code.minimax.io/docs/cli/quick-start |
@@ -158,6 +157,9 @@ Not listed, and why (checked 2026-11-15):
   use an API key instead (qwenlm.github.io/qwen-code-docs/en/users/configuration/auth).
 - **Muse, Prime Agent**: no vendor page documenting a login was found (AO links
   ai.meta.com/llama and a quickstart that returns 404).
+- **Codewhale**: `codewhale login` (one-time code) and `codewhale account
+  logout` are documented (codewhale.net/en/docs/auth), but the catalogue has no
+  sourced install line, so a sign-in machine would have nothing to run.
 - **MiniMax Code (Mainland China)**: only the Global region is offered; the bare
   `mcode login` is the China one.
 - **Setup wizards** (Goose, Vibe, Hermes, OpenHands, DeepSeek Harness, OMP):

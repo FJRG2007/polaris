@@ -14,6 +14,7 @@ import {
     LOGIN_COMMANDS,
     assistedSignins,
     canAssistSignin,
+    isHomeSignin,
     credentialFileScript,
     parseCredentialFile,
     signinCredentialFile,
@@ -218,7 +219,10 @@ describe("the sign-in command table", () => {
         for (const [env, login] of Object.entries(LOGIN_COMMANDS)) {
             const cli = core.AGENT_CLIS.find((one) => one.id === login.cli);
             expect(cli, env).toBeDefined();
-            expect(cli?.credentials.some((credential) => credential.env === env), env).toBe(true);
+            // A login kept in the home stores nothing, so it declares no credential.
+            if (!isHomeSignin(env)) {
+                expect(cli?.credentials.some((credential) => credential.env === env), env).toBe(true);
+            }
             expect(signinInstall(env), env).not.toBe("");
             expect(login.command, env).not.toMatch(/[\n\r]/);
         }
