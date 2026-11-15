@@ -246,6 +246,34 @@
         send({ ...base("vitals"), url: url || currentUrl(), vitals: measured }, true);
     }
 
+    // The deepest point of the page seen so far, in percent of its height. Only a
+    // number leaves the page: never what was on it.
+    let scrolled = 0;
+    function measureScroll() {
+        try {
+            const doc = document.documentElement;
+            const height = Math.max(doc.scrollHeight, document.body ? document.body.scrollHeight : 0);
+            if (!height) return;
+            const seen = ((window.scrollY || doc.scrollTop || 0) + window.innerHeight) / height;
+            scrolled = Math.max(scrolled, Math.min(100, seen * 100));
+        } catch {
+            /* ignore */
+        }
+    }
+    let scrollQueued = false;
+    addEventListener(
+        "scroll",
+        () => {
+            if (scrollQueued) return;
+            scrollQueued = true;
+            requestAnimationFrame(() => {
+                scrollQueued = false;
+                measureScroll();
+            });
+        },
+        { passive: true }
+    );
+
     /** Close the page being left, so the visit has a measured length. */
     function leave() {
         // Not before the first page is even recorded: the opening view also calls this.
@@ -254,7 +282,8 @@
         const elapsed = Date.now() - enteredAt;
         enteredAt = 0;
         if (elapsed < 1000) return;
-        send({ ...base("leave"), durationMs: elapsed }, true);
+        // The page being left, not the one a client-side navigation already shows.
+        send({ ...base("leave"), url: lastUrl || currentUrl(), durationMs: elapsed, scroll: Math.round(scrolled) }, true);
     }
 
     function view(url) {
@@ -265,6 +294,8 @@
         leave();
         lastUrl = next;
         enteredAt = Date.now();
+        scrolled = 0;
+        measureScroll();
         const body = { ...base("view"), url: next };
         // Only the first view of a visit has a referrer worth reading - after that it
         // is this site linking to itself, which the server files as a self referral

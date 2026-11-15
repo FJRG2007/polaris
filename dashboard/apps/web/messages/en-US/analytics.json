@@ -541,5 +541,15 @@
         "save": "Save",
         "saved": "Saved",
         "invalid": "Use a whole number from 1 to 1,000,000, or leave it empty."
+    },
+    "engagement": {
+        "title": "Scroll depth and time on page",
+        "page": "Page",
+        "scroll": "Avg. scroll",
+        "deep": "Read to 75%",
+        "time": "Avg. time",
+        "views": "Measured views",
+        "unavailable": "Scroll and time are not kept in the daily totals. Choose 30 days or less.",
+        "empty": "No measured views yet. They come from the tracker script when a page is left."
     }
 }

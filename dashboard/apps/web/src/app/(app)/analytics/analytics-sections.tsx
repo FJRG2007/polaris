@@ -14,6 +14,7 @@
 
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { PeakHoursCard } from "./peak-hours-card";
+import { EngagementCard } from "./engagement-card";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, Filter, FilterX, Globe, Radio } from "lucide-react";
 import {
@@ -347,6 +348,9 @@ export function PagesSection(props: PanelProps) {
             />
             <div className="min-w-0 xl:col-span-2">
                 <VitalsCard {...props} />
+            </div>
+            <div className="min-w-0 xl:col-span-2">
+                <EngagementCard {...props} />
             </div>
         </div>
     );

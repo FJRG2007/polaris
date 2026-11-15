@@ -362,6 +362,57 @@ export async function peakHours(window: ReportWindow, timeZone: string): Promise
     }
 }
 
+export interface EngagementRow {
+    readonly path: string;
+    /** Views of the page that sent a leave beat. */
+    readonly measured: number;
+    readonly avgScroll: number | null;
+    /** Share of measured views that scrolled at least 75%. */
+    readonly deepShare: number | null;
+    readonly avgEngagedMs: number | null;
+}
+
+export interface EngagementReport {
+    readonly pages: readonly EngagementRow[];
+    readonly unavailable: boolean;
+}
+
+/**
+ * Scroll depth and time on page, per page (Pulse's scroll depth and page time
+ * columns). From the per-view rows only, at most 20 pages by measured views;
+ * a window past `RAW_MAX_MS` reports `unavailable`.
+ */
+export async function engagement(window: ReportWindow): Promise<EngagementReport> {
+    if (window.to - window.from > RAW_MAX_MS) return { pages: [], unavailable: true };
+    const join = window.filters.length ? Prisma.sql`JOIN "AnalyticsSession" s ON s.id = e."sessionId"` : Prisma.empty;
+    const rows = await prisma.$queryRaw<
+        { path: string; measured: number; avgScroll: number | null; deep: number; avgEngagedMs: number | null }[]
+    >(Prisma.sql`
+        SELECT e.path AS path,
+               count(*)::int AS measured,
+               avg(e."scrollPct")::float AS "avgScroll",
+               (count(*) FILTER (WHERE e."scrollPct" >= 75))::int AS deep,
+               avg(e."engagedMs")::float AS "avgEngagedMs"
+        FROM "AnalyticsEvent" e ${join}
+        WHERE e."siteId" = ${window.siteId}::uuid AND e.kind = 'pageview'
+          AND e.at >= ${new Date(window.from)} AND e.at < ${new Date(window.to)}
+          AND (e."scrollPct" IS NOT NULL OR e."engagedMs" IS NOT NULL)${sessionSql(window.filters)}
+        GROUP BY e.path
+        ORDER BY measured DESC, e.path ASC
+        LIMIT 20
+    `);
+    return {
+        unavailable: false,
+        pages: rows.map((row) => ({
+            path: row.path,
+            measured: Number(row.measured) || 0,
+            avgScroll: row.avgScroll === null ? null : Math.round(Number(row.avgScroll)),
+            deepShare: Number(row.measured) > 0 ? Number(row.deep) / Number(row.measured) : null,
+            avgEngagedMs: row.avgEngagedMs === null ? null : Math.round(Number(row.avgEngagedMs))
+        }))
+    };
+}
+
 /** Postgres hands percentiles back as doubles and counts as ints; keep both as numbers. */
 function toVitalsRow(row: VitalsRow | undefined): VitalsRow | null {
     if (!row) return null;

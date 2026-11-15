@@ -461,7 +461,8 @@ const reportRequestSchema = z.discriminatedUnion("kind", [
     }),
     z.object({ kind: z.literal("realtime") }),
     z.object({ kind: z.literal("vitals") }),
-    z.object({ kind: z.literal("peakHours"), timeZone: z.string().trim().min(1).max(64) })
+    z.object({ kind: z.literal("peakHours"), timeZone: z.string().trim().min(1).max(64) }),
+    z.object({ kind: z.literal("engagement") })
 ]);
 export type AnalyticsReportRequest = z.infer<typeof reportRequestSchema>;
 
@@ -481,7 +482,8 @@ export type AnalyticsReportAnswer =
     | ({ kind: "breakdown"; dimension: core.VisitDimension } & lists.RankedList)
     | ({ kind: "realtime" } & lists.RealtimeSnapshot)
     | { kind: "vitals"; report: reports.VitalsReport }
-    | { kind: "peakHours"; report: reports.PeakHoursReport };
+    | { kind: "peakHours"; report: reports.PeakHoursReport }
+    | { kind: "engagement"; report: reports.EngagementReport };
 
 const SESSIONS_PAGE = 50;
 
@@ -526,6 +528,8 @@ export async function runAnalyticsReportAction(input: {
             return { kind: "vitals", report: await reports.vitals(window) };
         case "peakHours":
             return { kind: "peakHours", report: await reports.peakHours(window, ask.timeZone) };
+        case "engagement":
+            return { kind: "engagement", report: await reports.engagement(window) };
         case "funnel":
             return { kind: "funnel", steps: await reports.funnel(window, ask.definition) };
         case "journey":

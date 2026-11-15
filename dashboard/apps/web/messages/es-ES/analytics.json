@@ -541,5 +541,15 @@
         "save": "Guardar",
         "saved": "Guardado",
         "invalid": "Usa un número entero de 1 a 1.000.000, o déjalo vacío."
+    },
+    "engagement": {
+        "title": "Desplazamiento y tiempo en página",
+        "page": "Página",
+        "scroll": "Despl. medio",
+        "deep": "Leído al 75%",
+        "time": "Tiempo medio",
+        "views": "Vistas medidas",
+        "unavailable": "El desplazamiento y el tiempo no se guardan en los totales diarios. Elige 30 días o menos.",
+        "empty": "Aún no hay vistas medidas. Llegan del script de seguimiento al salir de una página."
     }
 }

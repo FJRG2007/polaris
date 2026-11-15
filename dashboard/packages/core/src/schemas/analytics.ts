@@ -63,6 +63,8 @@ export const visitBeatSchema = z.object({
      *  day: a tab left open over a weekend is not a two-day visit, and letting it
      *  count as one would wreck every average on the screen. */
     durationMs: z.number().int().min(0).max(86_400_000).optional(),
+    /** How far down the page being left was scrolled, in percent, on a `leave` beat. */
+    scroll: z.number().int().min(0).max(100).optional(),
     /** Core Web Vitals for the page being left, on a `vitals` beat. */
     vitals: webVitalsSchema.optional()
 });

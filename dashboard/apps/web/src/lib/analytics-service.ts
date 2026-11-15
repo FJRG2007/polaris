@@ -355,6 +355,8 @@ export interface VisitInput {
     readonly distinctId?: string | null;
     /** What `polaris.identify()` said about the visitor. */
     readonly data?: Record<string, unknown> | null;
+    /** How far down the page being left was scrolled, 0-100, on a leave beat. */
+    readonly scroll?: number | null;
 }
 
 /** Whether this site ignores this visit: an excluded page or an ignored address. */
@@ -472,6 +474,19 @@ export async function recordVisitLeave(input: VisitInput): Promise<void> {
         where: { id: sessionId, siteId: input.siteId },
         data: { lastSeenAt: new Date(input.at) }
     });
+
+    // The scroll depth and time of the view being left: the latest view of that
+    // page in this visit that has none yet, so a repeated beat fills nothing twice.
+    const engagedMs = input.durationMs && input.durationMs > 0 ? Math.min(input.durationMs, 86_400_000) : null;
+    const scrollPct = typeof input.scroll === "number" ? Math.max(0, Math.min(100, Math.round(input.scroll))) : null;
+    if (engagedMs === null && scrollPct === null) return;
+    const [path] = splitUrl(input.url);
+    const view = await prisma.analyticsEvent.findFirst({
+        where: { sessionId, siteId: input.siteId, kind: "pageview", path: groupVisitPath(path), engagedMs: null, scrollPct: null },
+        orderBy: { at: "desc" },
+        select: { id: true }
+    });
+    if (view) await prisma.analyticsEvent.updateMany({ where: { id: view.id }, data: { engagedMs, scrollPct } });
 }
 
 /**

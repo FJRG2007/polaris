@@ -94,7 +94,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         } else if (beat.type === "vitals") {
             if (beat.vitals) await recordVisitVitals(common, beat.vitals);
         } else if (beat.type === "leave") {
-            await recordVisitLeave({ ...common, durationMs: beat.durationMs ?? null });
+            await recordVisitLeave({ ...common, durationMs: beat.durationMs ?? null, scroll: beat.scroll ?? null });
         } else {
             await recordVisit({
                 ...common,

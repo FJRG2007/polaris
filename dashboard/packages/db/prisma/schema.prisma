@@ -8531,6 +8531,10 @@ model AnalyticsEvent {
     /// As requested, when it differs from the grouped route - so a single visit can
     /// still be traced to the exact URL.
     rawPath   String?
+    /// How far down the view scrolled, 0-100, from the leave beat; null when not measured.
+    scrollPct Int?
+    /// How long the view was open, from the leave beat; null when not measured.
+    engagedMs Int?
     /// Custom event properties, as a JSON string object.
     props     String?
 
