@@ -9,7 +9,7 @@
 
 import * as core from "@polaris/core";
 import { Printer } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { rowLabel } from "@/app/(app)/analytics/analytics-sections";
@@ -47,12 +47,18 @@ export interface ReportViewProps {
     breakdowns: core.VisitReport["breakdowns"];
     unavailable: readonly core.VisitDimension[];
     filtersIgnored: boolean;
+    /** `print` opens the print dialog on its own; `public` is a shared link's page,
+     *  which keeps the button; `embed` is the same page framed by another site. */
+    mode?: "print" | "public" | "embed";
+    /** Shown under the heading: a shared link's range picker. */
+    toolbar?: ReactNode;
 }
 
 export function ReportView(props: ReportViewProps) {
     const t = useTranslations("analytics");
     const format = useDisplayFormat();
-    const [asked, setAsked] = useState(false);
+    const mode = props.mode ?? "print";
+    const [asked, setAsked] = useState(mode !== "print");
 
     useEffect(() => {
         if (asked) return;
@@ -107,15 +113,18 @@ export function ReportView(props: ReportViewProps) {
                             <p className="mt-1 text-[12px] text-[#555555]">{t("filters.ignoredLong")}</p>
                         ) : null}
                     </div>
-                    <button
-                        type="button"
-                        className="flex shrink-0 items-center gap-1.5 rounded-md border border-[#cccccc] px-3 py-1.5 text-[13px] print:hidden"
-                        onClick={() => window.print()}
-                    >
-                        <Printer className="size-4 shrink-0" aria-hidden />
-                        {t("report.print")}
-                    </button>
+                    {mode !== "embed" ? (
+                        <button
+                            type="button"
+                            className="flex shrink-0 items-center gap-1.5 rounded-md border border-[#cccccc] px-3 py-1.5 text-[13px] print:hidden"
+                            onClick={() => window.print()}
+                        >
+                            <Printer className="size-4 shrink-0" aria-hidden />
+                            {t("report.print")}
+                        </button>
+                    ) : null}
                 </header>
+                {props.toolbar}
 
                 <dl className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 print:grid-cols-3">
                     {figures.map(([label, value]) => (

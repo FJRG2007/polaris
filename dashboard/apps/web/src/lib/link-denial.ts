@@ -22,7 +22,8 @@ const DENIALS: Readonly<Record<string, NamespaceKey<"publicPages">>> = {
     ip_flagged: "denied.network",
     sign_in_required: "denied.signIn",
     not_invited: "denied.notInvited",
-    password_required: "denied.protected"
+    password_required: "denied.protected",
+    rate_limited: "denied.rateLimited"
 };
 
 /** The message for a gate's refusal, falling back to the generic one rather

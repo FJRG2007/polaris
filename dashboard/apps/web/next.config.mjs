@@ -12,9 +12,9 @@ import { PortableImportMetaUrl } from "./scripts/portable-import-meta.mjs";
 
 const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-/** Every path except a published calendar's embed and Polar's embed, in the
- *  matcher syntax Next uses for `headers()`. */
-const FRAMEABLE_EXCEPT_EMBEDS = "/:path((?!cal/embed/|polar/embed$).*)";
+/** Every path except a published calendar's embed, a shared analytics link's
+ *  embed and Polar's embed, in the matcher syntax Next uses for `headers()`. */
+const FRAMEABLE_EXCEPT_EMBEDS = "/:path((?!cal/embed/|sa/embed/|polar/embed$).*)";
 
 /**
  * The browser extension's own origin, as `lib/polar/embed-bridge.ts` spells it
@@ -68,6 +68,7 @@ export const TOKEN_PATH_PREFIXES = [
     "p",
     "r",
     "s",
+    "sa",
     "t",
     "tr",
     "vs"
@@ -344,8 +345,9 @@ const nextConfig = {
      * itself working - and the ones it draws today are `srcdoc` documents (mail
      * bodies, print previews), which carry no headers of their own anyway.
      *
-     * The one exception is a published calendar's embed, `/cal/embed/<token>`, whose
-     * whole purpose is to be framed by the operator's own website.
+     * The exceptions are a published calendar's embed, `/cal/embed/<token>`, and a
+     * shared analytics link's embed, `/sa/embed/<token>`, whose whole purpose is to
+     * be framed by the operator's own website.
      *
      * The same policy says what Polaris itself may frame (`frame-src`): its own
      * pages and the chat's players, and nothing else - so a frame injected into a

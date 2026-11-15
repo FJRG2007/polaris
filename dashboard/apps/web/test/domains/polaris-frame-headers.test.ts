@@ -51,6 +51,12 @@ describe("Polaris's framing headers", () => {
         expect(await headersFor("/cal/embed/abc123")).toEqual({});
     });
 
+    it("leave only a shared analytics link's embed frameable, not its page", async () => {
+        expect(await headersFor("/sa/embed/abc123")).toEqual({});
+        expect((await headersFor("/sa/abc123"))["X-Frame-Options"]).toBe("SAMEORIGIN");
+        expect((await headersFor("/analytics"))["X-Frame-Options"]).toBe("SAMEORIGIN");
+    });
+
     it("let a page frame itself and the chat's players, and nothing broader", async () => {
         const policy = (await headersFor("/chat"))["Content-Security-Policy"] ?? "";
         const frameSrc = policy

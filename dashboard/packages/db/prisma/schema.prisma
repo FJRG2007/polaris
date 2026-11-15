@@ -8456,6 +8456,7 @@ model AnalyticsSite {
     reports  AnalyticsReport[]
     vitals   AnalyticsVital[]
     alerts   AnalyticsAlert[]
+    shareLinks AnalyticsShareLink[]
 
     @@unique([scopeType, scopeId])
 }
@@ -8632,6 +8633,36 @@ model AnalyticsAlert {
 
     @@unique([siteId, userId])
     @@index([userId])
+}
+
+/// A site's numbers on a public address (/sa/<token>), for anybody holding it.
+///
+/// The token is only in the URL: the row holds its hash, and the token sealed under
+/// the master key so the owner can be shown the link again. Removing a link deletes
+/// the row, so a link taken down and made again is a new address.
+model AnalyticsShareLink {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    siteId         String    @db.Uuid
+    createdById    String
+    label          String    @default("")
+    tokenHash      String    @unique
+    encryptedToken Bytes
+    tokenNonce     Bytes
+    tokenKeyId     String    @default("")
+    /// scrypt hash from `@polaris/core/link-password`; null is no password.
+    passwordHash   String?
+    /// The window a visitor lands on: 24h | 7d | 30d | 90d | 12m
+    range          String    @default("30d")
+    /// Whether /sa/embed/<token> may be framed by another site. Never with a password.
+    allowEmbed     Boolean   @default(false)
+    expiresAt      DateTime?
+    viewCount      Int       @default(0)
+    lastViewedAt   DateTime?
+    createdAt      DateTime  @default(now())
+
+    site AnalyticsSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+    @@index([siteId])
 }
 
 model AnalyticsReport {

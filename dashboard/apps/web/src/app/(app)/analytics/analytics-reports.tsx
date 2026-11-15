@@ -19,6 +19,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
 import { IgnoredTraffic } from "./ignored-traffic";
 import { AlertSettingsCard } from "./alert-settings";
+import { ShareLinksCard } from "./share-links";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Download, Filter, Plus, Trash2, X } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useTransition } from "react";
@@ -1128,6 +1129,8 @@ function SitePanel(props: PanelProps) {
             />
 
             <AlertSettingsCard scope={props.scope} siteId={props.siteId} />
+
+            {may(props.data.level, "own") && <ShareLinksCard scope={props.scope} siteId={props.siteId} />}
 
             <Card>
                 <CardHeader>

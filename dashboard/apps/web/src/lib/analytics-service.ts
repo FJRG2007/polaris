@@ -275,6 +275,12 @@ export async function holdsPolarisSite(held: ReadonlySet<string>): Promise<boole
     return id !== null && held.has(id);
 }
 
+/** A site by its record id, for a public link that names it. */
+export async function findSiteById(id: string): Promise<AnalyticsSiteView | null> {
+    const row = await prisma.analyticsSite.findUnique({ where: { id } });
+    return row ? toSiteView(row) : null;
+}
+
 export async function findExternalSite(scopeId: string): Promise<AnalyticsSiteView | null> {
     const row = await prisma.analyticsSite.findUnique({
         where: { scopeType_scopeId: { scopeType: "external", scopeId } }

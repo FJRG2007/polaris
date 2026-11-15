@@ -91,7 +91,8 @@
         "protected": "This link is protected.",
         "unavailable": "This link is not available.",
         "downloadLimit": "This link has reached its download limit.",
-        "closed": "This link is outside its hours. Try again during the times it opens."
+        "closed": "This link is outside its hours. Try again during the times it opens.",
+        "rateLimited": "This link is being opened too often. Try again in a minute."
     },
     "share": {
         "missing": "\"{name}\" is not here any more. It was renamed, moved or deleted, so this is the nearest folder.",
@@ -373,5 +374,9 @@
         "lasted": "Lasted {span}",
         "ongoing": "Still down",
         "seeOnly": "This link only shows the connection's record."
+    },
+    "analytics": {
+        "wrongPassword": "That password is not right.",
+        "tooManyAttempts": "Too many attempts. Try again in a few minutes."
     }
 }

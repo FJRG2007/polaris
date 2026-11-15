@@ -33,6 +33,7 @@ import {
 import * as reports from "@/lib/analytics-reports";
 import * as lists from "@/lib/analytics-lists";
 import * as alerts from "@/lib/analytics-alerts";
+import * as shareLinks from "@/lib/analytics-share";
 import { externalSiteSchema } from "./site-input";
 import {
     createExternalSite,
@@ -738,5 +739,58 @@ export async function setAlertSettingsAction(input: {
     const parsed = alertSettingsSchema.safeParse(input.settings);
     if (!parsed.success) return { error: await say("alerts.invalid") };
     await alerts.writeAlertSettings(reached.access.site.id, reached.userId, parsed.data);
+    return {};
+}
+
+// --- public links ------------------------------------------------------------------
+
+/** A site's public links. Putting a site on the internet is its owner's call, so
+ *  only an owner sees them. */
+export async function listShareLinksAction(input: {
+    scopeType: string;
+    scopeId: string;
+}): Promise<{ error?: string; links?: shareLinks.ShareLinkView[] }> {
+    const reached = await reach(input, "own");
+    if ("error" in reached) return reached;
+    return { links: await shareLinks.listShareLinks(reached.access.site.id) };
+}
+
+export async function createShareLinkAction(input: {
+    scopeType: string;
+    scopeId: string;
+    link: unknown;
+}): Promise<{ error?: string; link?: shareLinks.ShareLinkView }> {
+    const reached = await reach(input, "own");
+    if ("error" in reached) return reached;
+    const parsed = shareLinks.shareLinkInputSchema.safeParse(input.link);
+    if (!parsed.success) return { error: await say("share.invalid") };
+    const link = await shareLinks.createShareLink(reached.access.site.id, reached.userId, parsed.data);
+    if (!link) return { error: await say("share.tooMany") };
+    await recordAudit({
+        actorId: reached.userId,
+        action: "analytics.share.create",
+        targetType: "analytics",
+        targetId: reached.access.site.id
+    });
+    return { link };
+}
+
+export async function deleteShareLinkAction(input: {
+    scopeType: string;
+    scopeId: string;
+    id: unknown;
+}): Promise<{ error?: string }> {
+    const reached = await reach(input, "own");
+    if ("error" in reached) return reached;
+    const id = z.string().uuid().safeParse(input.id);
+    if (!id.success || !(await shareLinks.deleteShareLink(reached.access.site.id, id.data))) {
+        return { error: await say("share.gone") };
+    }
+    await recordAudit({
+        actorId: reached.userId,
+        action: "analytics.share.delete",
+        targetType: "analytics",
+        targetId: reached.access.site.id
+    });
     return {};
 }

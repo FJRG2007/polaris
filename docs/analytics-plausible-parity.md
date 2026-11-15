@@ -93,9 +93,9 @@ Size: S under a day, M one to three days, L more.
 | Feature | Plausible | Polaris today | Gap | Decision | Size |
 | --- | --- | --- | --- | --- | --- |
 | Team roles | [users-roles](https://plausible.io/docs/users-roles) | Site sharing with view / edit grants (`site-access.ts`, `analytics.site` grant) | none | have | - |
-| Public dashboard | [visibility](https://plausible.io/docs/visibility) | none | gap | plan: public page on the shared link primitives (`lib/link-guards.ts`) | L |
-| Shared links with password | [shared-links](https://plausible.io/docs/shared-links) | Grants to people only | gap | plan: same as public dashboard, with `link-password-form` | L |
-| Embed dashboard | [embed-dashboard](https://plausible.io/docs/embed-dashboard) | none | gap | plan: depends on public links | M |
+| Public dashboard | [visibility](https://plausible.io/docs/visibility) | none | gap | built: `/sa/<token>` public link per site (`lib/analytics-share.ts`), owner-only card on the site panel | L |
+| Shared links with password | [shared-links](https://plausible.io/docs/shared-links) | Grants to people only | gap | built: optional password (scrypt, constant-time compare, 8 tries / 10 min per link and address), 7 / 30 / 90 day expiry | L |
+| Embed dashboard | [embed-dashboard](https://plausible.io/docs/embed-dashboard) | none | gap | built: `/sa/embed/<token>`, the only analytics path without frame headers; never with a password | M |
 | Email reports | [email-reports](https://plausible.io/docs/email-reports) | none | - | n/a: Polaris has no outbound email channel; see weekly digest | - |
 | Slack reports | [slack-reports](https://plausible.io/docs/slack-reports) | none | - | n/a: outbound channels are not part of Polaris; notifications are the channel | - |
 | Traffic spike and drop alerts | [traffic-spikes](https://plausible.io/docs/traffic-spikes) | Per-reader spike / drop thresholds on the site panel (`lib/analytics-alerts.ts`, `analytics-alerts` job) | none | built: Polaris notifications | M |
@@ -148,7 +148,7 @@ unless Pulse goes further.
 | Journeys (Sankey) | `components/journeys/SankeyJourney.tsx` | Journey reports | none | have | - |
 | Visitor profiles and visits | `app/sites/[id]/visitors/[key]`, `lib/api/visitors.ts` | Sessions panel with the journey of each session | none | have | - |
 | Comparison: previous and year | `ReportCompare` `previous` / `year` / `none` (`lib/api/reports.ts`) | Previous period | year | build: year-over-year mode | S |
-| Public dashboard with password | `PublicDashboardSection.tsx`, `app/share/[id]`, `authenticatePublicDashboard` | Grants to people only | gap | build: public / password link on the shared link primitives | L |
+| Public dashboard with password | `PublicDashboardSection.tsx`, `app/share/[id]`, `authenticatePublicDashboard` | Grants to people only | gap | built: `/sa/<token>` with optional password and expiry, embed at `/sa/embed/<token>` | L |
 | Growth reports (link, slides, print) | `app/r/[token]`, `components/reports/PublicReport.tsx`, `ReportSlides.tsx`, expiry 7 / 30 / 90 days | Printable report (`(print)/analytics/report`) | public link | build together with the public dashboard | M |
 | Scheduled email reports | `ScheduledEmailsSection.tsx`, `ReportEvery` month / quarter | none | - | n/a for email (no outbound channel); periodic digest as a Polaris notification: build | M |
 | Weekly / monthly summary notifications | `lib/notifications/categories.ts` `summary`, `summary_monthly` | `analytics.digest` notification | none | built | M |
