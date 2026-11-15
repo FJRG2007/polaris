@@ -10,19 +10,25 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState, useTransition } from "react";
 import { Button, Input, Select } from "@polaris/ui";
 import {
+    CLOUD_CREATE_FIELDS,
     CLOUD_FIELDS,
     KAFKA_SASL_MECHANISMS,
     cloudAmqpCreateSchema,
     cloudConnectSchema,
+    cloudCreateSchema,
     cloudProvidersFor,
+    isCloudCreateProvider,
     type CloudConnectInput,
-    type CloudField,
-    type DataEngine
+    type CloudCreateProvider,
+    type CloudEngine,
+    type CloudField
 } from "@polaris/core";
 import * as deployActions from "./actions";
 import { Field } from "./form-field";
 
 const SECRET_FIELDS: readonly CloudField[] = ["password", "token"];
+/** Engines connected to with one connection string that carries the account. */
+const CONNECTION_STRING: readonly CloudEngine[] = ["postgres", "mongo", "redis"];
 
 export function CloudDatabaseForm({
     environmentId,
@@ -32,7 +38,7 @@ export function CloudDatabaseForm({
     onDone
 }: {
     environmentId: string;
-    engine: DataEngine;
+    engine: CloudEngine;
     name: string;
     provider: string;
     onDone: () => void;
@@ -46,6 +52,12 @@ export function CloudDatabaseForm({
         apiKey: "",
         plan: "lemur",
         region: "amazon-web-services::us-east-1"
+    });
+    const managed = isCloudCreateProvider(provider) ? CLOUD_CREATE_FIELDS[provider] : null;
+    const [hosted, setHosted] = useState({
+        apiKey: "",
+        account: "",
+        region: managed?.region ?? ""
     });
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -61,18 +73,21 @@ export function CloudDatabaseForm({
         ...values
     } as CloudConnectInput;
     const createDraft = { environmentId, name: name.trim(), ...create };
+    const hostedDraft = { environmentId, name: name.trim(), provider, ...hosted };
     const parsed =
-        mode === "create"
-            ? cloudAmqpCreateSchema.safeParse(createDraft)
-            : cloudConnectSchema.safeParse(connectDraft);
+        mode === "connect"
+            ? cloudConnectSchema.safeParse(connectDraft)
+            : managed
+              ? cloudCreateSchema.safeParse(hostedDraft)
+              : cloudAmqpCreateSchema.safeParse(createDraft);
     const issues = parsed.success ? [] : parsed.error.issues;
     const issueFor = (field: string) => {
         const found = issues.find((one) => one.path[0] === field);
         // An empty field is incomplete, not wrong: it is marked required instead.
         const typed =
-            field in values
+            mode === "connect"
                 ? values[field as CloudField]
-                : (create as Record<string, string>)[field];
+                : ((managed ? hosted : create) as Record<string, string>)[field];
         if (!found || !typed) return undefined;
         return t.has(found.message) ? t(found.message) : found.message;
     };
@@ -81,9 +96,15 @@ export function CloudDatabaseForm({
         setError(null);
         startTransition(async () => {
             const result =
-                mode === "create"
-                    ? await deployActions.createCloudAmqpDatabaseAction(createDraft)
-                    : await deployActions.connectCloudDatabaseAction(connectDraft);
+                mode === "connect"
+                    ? await deployActions.connectCloudDatabaseAction(connectDraft)
+                    : managed
+                      ? await deployActions.createCloudDatabaseAction(
+                            hostedDraft as Parameters<
+                                typeof deployActions.createCloudDatabaseAction
+                            >[0]
+                        )
+                      : await deployActions.createCloudAmqpDatabaseAction(createDraft);
             if (result.error) setError(result.error);
             else onDone();
         });
@@ -121,7 +142,7 @@ export function CloudDatabaseForm({
                 CLOUD_FIELDS[engine].map(({ field, required }) => (
                     <Field
                         key={field}
-                        label={`${t(field === "url" && engine === "kafka" ? "view.database.cloud.field_url_kafka" : `view.database.cloud.field_${field}`)}${required ? " *" : ""}`}
+                        label={`${t(field === "url" && engine === "kafka" ? "view.database.cloud.field_url_kafka" : field === "url" && CONNECTION_STRING.includes(engine) ? "view.database.cloud.field_url_connection" : `view.database.cloud.field_${field}`)}${required ? " *" : ""}`}
                         error={issueFor(field)}
                     >
                         {field === "saslMechanism" ? (
@@ -159,7 +180,49 @@ export function CloudDatabaseForm({
                     />
                 </Field>
             )}
-            {mode === "create" && (
+            {mode === "create" && managed && (
+                <>
+                    <Field
+                        label={`${t(`view.database.cloud.hosted.${provider as CloudCreateProvider}.apiKey`)} *`}
+                        error={issueFor("apiKey")}
+                    >
+                        <Input
+                            type="password"
+                            value={hosted.apiKey}
+                            onChange={(event) =>
+                                setHosted({ ...hosted, apiKey: event.target.value })
+                            }
+                            autoComplete="off"
+                        />
+                    </Field>
+                    <Field
+                        label={`${t(`view.database.cloud.hosted.${provider as CloudCreateProvider}.account`)}${managed.account === "required" ? " *" : ""}`}
+                        error={issueFor("account")}
+                    >
+                        <Input
+                            type={provider === "upstash" ? "email" : "text"}
+                            value={hosted.account}
+                            onChange={(event) =>
+                                setHosted({ ...hosted, account: event.target.value })
+                            }
+                            autoComplete="off"
+                        />
+                    </Field>
+                    <Field
+                        label={`${t("view.database.cloud.region")} *`}
+                        hint={t(`view.database.cloud.hosted.${provider as CloudCreateProvider}.regionHint`)}
+                        error={issueFor("region")}
+                    >
+                        <Input
+                            value={hosted.region}
+                            onChange={(event) =>
+                                setHosted({ ...hosted, region: event.target.value })
+                            }
+                        />
+                    </Field>
+                </>
+            )}
+            {mode === "create" && !managed && (
                 <>
                     <Field
                         label={`${t("view.database.cloud.apiKey")} *`}
@@ -199,9 +262,11 @@ export function CloudDatabaseForm({
                 disabled={pending || !parsed.success}
                 aria-disabled={!parsed.success}
             >
-                {mode === "create"
-                    ? t("view.database.cloud.createSubmit")
-                    : t("view.database.cloud.connectSubmit")}
+                <span className="min-w-0 truncate" title={chosen.label}>
+                    {mode === "create"
+                        ? t("view.database.cloud.createSubmitIn", { provider: chosen.label })
+                        : t("view.database.cloud.connectSubmit")}
+                </span>
             </Button>
         </div>
     );

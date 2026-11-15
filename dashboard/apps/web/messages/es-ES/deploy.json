@@ -396,7 +396,31 @@
                     "amqpName": "Usa letras, números, guiones y guiones bajos",
                     "apiKey": "Pega la clave de API de CloudAMQP",
                     "plan": "Usa un id de plan de CloudAMQP, como lemur",
-                    "region": "Usa proveedor::región, como amazon-web-services::us-east-1"
+                    "region": "Usa proveedor::región, como amazon-web-services::us-east-1",
+                    "urlPostgres": "Usa una cadena que empiece por postgresql:// o postgres://",
+                    "urlMongo": "Usa una cadena que empiece por mongodb+srv:// o mongodb://",
+                    "urlRedis": "Usa una cadena que empiece por rediss:// o redis://",
+                    "regionId": "Usa el ID de región del proveedor, como us-east-1",
+                    "email": "Usa el email con el que entras en Upstash"
+                },
+                "createSubmitIn": "Crear en {provider}",
+                "field_url_connection": "Cadena de conexión",
+                "hosted": {
+                    "neon": {
+                        "apiKey": "Clave de Neon",
+                        "account": "ID de organización",
+                        "regionHint": "Un ID de región de Neon, como aws-us-east-2"
+                    },
+                    "supabase": {
+                        "apiKey": "Token de Supabase",
+                        "account": "Slug de organización",
+                        "regionHint": "Una región de Supabase, como us-east-1"
+                    },
+                    "upstash": {
+                        "apiKey": "Clave de Upstash",
+                        "account": "Email de la cuenta",
+                        "regionHint": "Una región de AWS o GCP, como us-east-1"
+                    }
                 }
             }
         },

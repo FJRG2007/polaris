@@ -119,6 +119,8 @@ import {
     subjectCommentSchema,
     databaseCreateSchema,
     cloudConnectSchema,
+    cloudCreateSchema,
+    type CloudCreateInput,
     cloudAmqpCreateSchema,
     type CloudConnectInput,
     type CloudAmqpCreateInput,
@@ -1995,6 +1997,35 @@ export async function createCloudAmqpDatabaseAction(
         const target = await getOrCreateLocalTarget(access.ownerId);
         const { createCloudAmqpDatabase } = await import("@/lib/data-cloud/service");
         const database = await createCloudAmqpDatabase(access.ownerId, input, target.id);
+        await recordDeployAudit({
+            actorId: user.id,
+            action: "deploy.db.create",
+            targetType: "database",
+            targetId: database.id
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: await failure(caught, "databases.createFailed") };
+    }
+}
+
+/** Create PostgreSQL at Neon or Supabase, or Redis at Upstash, with the user's key. */
+export async function createCloudDatabaseAction(
+    input: CloudCreateInput
+): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const parsed = cloudCreateSchema.safeParse(input);
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "databases.invalid") };
+    try {
+        const access = await requireEnvironmentAccess(
+            parsed.data.environmentId,
+            user.id,
+            "databases.manage"
+        );
+        const target = await getOrCreateLocalTarget(access.ownerId);
+        const { createCloudDatabase } = await import("@/lib/data-cloud/service");
+        const database = await createCloudDatabase(access.ownerId, input, target.id);
         await recordDeployAudit({
             actorId: user.id,
             action: "deploy.db.create",

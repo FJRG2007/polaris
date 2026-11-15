@@ -171,10 +171,14 @@
             "amqpDeleteFailed": "CloudAMQP could not delete the instance (HTTP {status})",
             "failed": {
                 "lost": "Polaris lost what it needed to create this instance. Create it again.",
-                "timeout": "CloudAMQP did not finish creating this instance within 30 minutes.",
-                "keyRefused": "CloudAMQP refused the API key. Check it and send the form again.",
-                "createRefused": "CloudAMQP refused to create it with that plan and region. Check them and send the form again."
-            }
+                "timeout": "{provider} did not finish creating this instance within 30 minutes.",
+                "keyRefused": "{provider} refused the key. Check it and send the form again.",
+                "createRefused": "{provider} refused to create it as asked. Check the form and send it again."
+            },
+            "providerKeyRefused": "{provider} refused the key. Check it and send the form again.",
+            "providerRefused": "{provider} said: {message}",
+            "providerStatus": "{provider} answered HTTP {status}",
+            "providerUnreadable": "{provider} answered in a way Polaris could not read"
         }
     },
     "registry": {

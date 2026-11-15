@@ -171,10 +171,14 @@
             "amqpDeleteFailed": "CloudAMQP no pudo borrar la instancia (HTTP {status})",
             "failed": {
                 "lost": "Polaris perdió lo que necesitaba para crear esta instancia. Créala de nuevo.",
-                "timeout": "CloudAMQP no terminó de crear esta instancia en 30 minutos.",
-                "keyRefused": "CloudAMQP rechazó la clave de API. Revísala y envía el formulario otra vez.",
-                "createRefused": "CloudAMQP no quiso crearla con ese plan y región. Revísalos y envía el formulario otra vez."
-            }
+                "timeout": "{provider} no terminó de crear esta instancia en 30 minutos.",
+                "keyRefused": "{provider} rechazó la clave. Revísala y envía de nuevo.",
+                "createRefused": "{provider} rechazó crearla así. Revisa el formulario y envíalo de nuevo."
+            },
+            "providerKeyRefused": "{provider} rechazó la clave. Revísala y envía de nuevo.",
+            "providerRefused": "{provider} dijo: {message}",
+            "providerStatus": "{provider} respondió HTTP {status}",
+            "providerUnreadable": "{provider} respondió algo que Polaris no pudo leer"
         }
     },
     "registry": {

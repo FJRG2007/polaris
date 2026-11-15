@@ -317,9 +317,9 @@
             "creating": "Being created in the cloud. This page updates when it is ready.",
             "failed": {
                 "lost": "Polaris lost what it needed to create this instance. Delete it and create it again.",
-                "timeout": "CloudAMQP did not finish creating this instance within 30 minutes. Delete it here to remove it there too.",
-                "keyRefused": "CloudAMQP refused the API key. Delete this instance and create it with a valid key.",
-                "createRefused": "CloudAMQP refused the plan or region. Delete this instance and create it again."
+                "timeout": "{provider} did not finish creating this instance within 30 minutes. Delete it here to remove it there too.",
+                "keyRefused": "{provider} refused the key. Delete this instance and create it with a valid key.",
+                "createRefused": "{provider} refused the request. Delete this instance and create it again."
             }
         }
     },

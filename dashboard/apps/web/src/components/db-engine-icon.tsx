@@ -58,7 +58,11 @@ const PROVIDER_BRANDS: Readonly<Record<string, EngineBrand>> = {
     "backblaze-b2": { Mark: marks.BackblazeMark, color: "#E21E29" },
     "meilisearch-cloud": BRANDS.meilisearch!,
     "clickhouse-cloud": BRANDS.clickhouse!,
-    "influxdb-cloud": BRANDS.influxdb!
+    "influxdb-cloud": BRANDS.influxdb!,
+    "mongodb-atlas": BRANDS.mongo!,
+    neon: { Mark: marks.NeonMark, color: "#37C38F" },
+    supabase: { Mark: marks.SupabaseMark, color: "#3FCF8E" },
+    upstash: { Mark: marks.UpstashMark, color: "#00E9A3" }
 };
 
 /** The engine's mark on its tinted chip. An object store is shown as what it is

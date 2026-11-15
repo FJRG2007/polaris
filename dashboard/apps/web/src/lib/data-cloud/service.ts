@@ -16,10 +16,15 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import * as cloudamqp from "./cloudamqp";
+import { neon } from "./neon";
+import { upstash } from "./upstash";
+import { supabase } from "./supabase";
+import { refusedForGood, type CloudCreator, type CloudSecrets } from "./managed";
 import { CloudError, provisionFailure, type CloudErrorKey, type ProvisionFailure } from "./errors";
 import { loadEnv } from "@polaris/config";
 import { slugify } from "@polaris/deploy";
 import { connect as tcpConnect } from "node:net";
+import { resolveSrv } from "node:dns/promises";
 import { connect as tlsConnect } from "node:tls";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import { randomBytes } from "node:crypto";
@@ -32,6 +37,20 @@ import { wordsFor } from "@/lib/notifications/notice-words";
 import { configuredRequest, resolveName, RefusedAddressError } from "@/lib/safe-fetch";
 
 const TEST_TIMEOUT_MS = 10_000;
+
+/** The managed hosts created through `managed.ts`; CloudAMQP keeps its own path. */
+const CREATORS: Readonly<Record<core.CloudCreateProvider, CloudCreator>> = {
+    neon,
+    supabase,
+    upstash
+};
+
+function creatorFor(provider: string | null): CloudCreator | null {
+    return provider && core.isCloudCreateProvider(provider) ? CREATORS[provider] : null;
+}
+
+/** Every provider a row can be provisioning with. */
+const PROVISIONING_PROVIDERS = ["cloudamqp", ...core.CLOUD_CREATE_PROVIDERS] as const;
 
 /** A request to a public address only. */
 export const publicRequest: cloudamqp.CloudFetch = (url, init) =>
@@ -187,6 +206,26 @@ export async function testCloudConnection(
         case "kafka":
             await openSocket(e.host, e.port, e.securityProtocol.endsWith("SSL"));
             return;
+        // Their own protocols would need a client library; listening is the proof.
+        // PostgreSQL negotiates TLS inside its protocol, so the socket is plain.
+        case "postgres":
+            await openSocket(e.host, e.port, false);
+            return;
+        case "redis":
+            await openSocket(e.host, e.port, new URL(e.url).protocol === "rediss:");
+            return;
+        case "mongo": {
+            if (new URL(e.url).protocol !== "mongodb+srv:") {
+                await openSocket(e.host, e.port, false);
+                return;
+            }
+            // An SRV string names no host to open; its first member is asked.
+            const members = await resolveSrv(`_mongodb._tcp.${e.host}`).catch(() => []);
+            const first = members[0];
+            if (!first) throw new CloudError("noResolve");
+            await openSocket(first.name, first.port, true);
+            return;
+        }
     }
 }
 
@@ -343,7 +382,71 @@ export async function createCloudAmqpDatabase(
     });
     if (after?.status === "failed") {
         await prisma.managedDatabase.deleteMany({ where: { id: row.id, status: "failed" } });
-        throw new CloudError(`failed.${provisionFailure(after.providerError)}`);
+        throw new CloudError(`failed.${provisionFailure(after.providerError)}`, {
+            provider: "CloudAMQP"
+        });
+    }
+    return row;
+}
+
+/** Why the last step on a row failed it, said the provider's way, for the form. */
+const lastFailure = new Map<string, CloudError>();
+
+/**
+ * Create PostgreSQL at Neon or Supabase, or Redis at Upstash, with the user's
+ * key. The same shape as the CloudAMQP create: the row first, holding all the
+ * create needs, then the first step at once so a refusal is on the form.
+ */
+export async function createCloudDatabase(
+    ownerId: string,
+    raw: core.CloudCreateInput,
+    targetId: string,
+    request: cloudamqp.CloudFetch = publicRequest
+) {
+    const input = core.cloudCreateSchema.parse(raw);
+    const environment = await prisma.environment.findFirst({
+        where: { id: input.environmentId, project: { ownerId } },
+        select: { id: true }
+    });
+    if (!environment) throw new CloudError("environmentNotFound");
+    const slug = await claimSlug(input.environmentId, input.name);
+    const engine = core.cloudCreateEngine(input.provider);
+    const row = await prisma.managedDatabase.create({
+        data: {
+            ...cloudRow(input.environmentId, targetId, input.name, slug, engine, input.provider),
+            status: "provisioning",
+            ...sealed({
+                username: "",
+                password: "",
+                database: "",
+                cloud: {
+                    endpoint: core.cloudEndpointPlaceholder(),
+                    apiKey: input.apiKey,
+                    region: input.region,
+                    account: input.account,
+                    remoteName: `${slug}-${randomBytes(4).toString("hex")}`.slice(0, 60),
+                    ...(input.provider === "supabase"
+                        ? { dbPassword: randomBytes(24).toString("base64url") }
+                        : {})
+                }
+            })
+        }
+    });
+    await advanceCloudProvision(row.id, request).catch(() => undefined);
+    const after = await prisma.managedDatabase.findFirst({
+        where: { id: row.id },
+        select: { status: true, providerError: true }
+    });
+    const said = lastFailure.get(row.id);
+    lastFailure.delete(row.id);
+    if (after?.status === "failed") {
+        await prisma.managedDatabase.deleteMany({ where: { id: row.id, status: "failed" } });
+        throw (
+            said ??
+            new CloudError(`failed.${provisionFailure(after.providerError)}`, {
+                provider: CREATORS[input.provider].label
+            })
+        );
     }
     return row;
 }
@@ -391,9 +494,15 @@ export async function advanceCloudProvision(
     inFlight.add(databaseId);
     try {
         const row = await prisma.managedDatabase.findFirst({
-            where: { id: databaseId, provider: "cloudamqp", status: "provisioning" }
+            where: { id: databaseId, status: "provisioning" }
         });
         if (!row) return;
+        const creator = creatorFor(row.provider);
+        if (creator) {
+            await advanceManaged(row, creator, request, now);
+            return;
+        }
+        if (row.provider !== "cloudamqp") return;
         const cloud = openSealed(row)?.cloud;
         if (!cloud?.apiKey || !cloud.remoteName || !cloud.plan || !cloud.region) {
             await failProvision(row.id, "lost");
@@ -458,19 +567,77 @@ export async function advanceCloudProvision(
     }
 }
 
+/** One step on a row a managed host is creating; see `advanceCloudProvision`. */
+async function advanceManaged(
+    row: NonNullable<Awaited<ReturnType<typeof prisma.managedDatabase.findFirst>>>,
+    creator: CloudCreator,
+    request: cloudamqp.CloudFetch,
+    now: Date
+): Promise<void> {
+    const sealedCloud = openSealed(row)?.cloud;
+    if (!sealedCloud?.apiKey || !sealedCloud.remoteName) {
+        await failProvision(row.id, "lost");
+        return;
+    }
+    const cloud: CloudSecrets = sealedCloud;
+    const late = now.getTime() - row.createdAt.getTime() > CREATE_WAIT_MS;
+    let instance;
+    try {
+        if (row.providerResourceId) {
+            instance = await creator.get(request, cloud, row.providerResourceId);
+        } else {
+            instance = await creator.create(request, cloud);
+            await prisma.managedDatabase.updateMany({
+                where: { id: row.id, providerResourceId: null },
+                data: { providerResourceId: instance.id }
+            });
+        }
+    } catch (error) {
+        const key = error instanceof CloudError ? error.key : null;
+        if (key === "providerKeyRefused" || (!row.providerResourceId && refusedForGood(error))) {
+            lastFailure.set(row.id, error as CloudError);
+            await failProvision(
+                row.id,
+                key === "providerKeyRefused" ? "keyRefused" : "createRefused"
+            );
+        } else if (late) await failProvision(row.id, "timeout");
+        return;
+    }
+    if (!instance.ready || !instance.endpoint) {
+        if (late) await failProvision(row.id, "timeout");
+        return;
+    }
+    const endpoint = instance.endpoint;
+    await prisma.managedDatabase.updateMany({
+        where: { id: row.id, status: "provisioning" },
+        data: {
+            status: "running",
+            providerError: null,
+            ...sealed({
+                username: endpoint.username,
+                password: endpoint.password,
+                database: endpoint.database,
+                cloud: { ...sealedCloud, endpoint }
+            })
+        }
+    });
+}
+
 /** One pass over every row still being created in a cloud. */
 export async function resumeCloudProvisions(
     request: cloudamqp.CloudFetch = publicRequest,
     now: Date = new Date()
 ): Promise<void> {
-    const rows = await prisma.managedDatabase.findMany({
-        where: { provider: "cloudamqp", status: "provisioning", binnedAt: null },
-        select: { id: true },
-        orderBy: { createdAt: "asc" },
-        take: 50
-    });
-    for (const row of rows)
-        await advanceCloudProvision(row.id, request, now).catch(() => undefined);
+    for (const provider of PROVISIONING_PROVIDERS) {
+        const rows = await prisma.managedDatabase.findMany({
+            where: { provider, status: "provisioning", binnedAt: null },
+            select: { id: true },
+            orderBy: { createdAt: "asc" },
+            take: 50
+        });
+        for (const row of rows)
+            await advanceCloudProvision(row.id, request, now).catch(() => undefined);
+    }
 }
 
 let watching = false;
@@ -509,19 +676,30 @@ export async function removeCloudInstance(
         data: { status: "deleting" }
     });
     const row = await prisma.managedDatabase.findFirst({ where: { id: databaseId } });
-    if (row?.provider !== "cloudamqp") return;
+    const creator = creatorFor(row?.provider ?? null);
+    if (!row || (row.provider !== "cloudamqp" && !creator)) return;
     const cloud = openSealed(row)?.cloud;
     if (!cloud?.apiKey) return;
+    const apiKey = cloud.apiKey;
     try {
-        const id =
-            row.providerResourceId ??
-            (cloud.remoteName
-                ? (await cloudamqp.findCloudAmqpInstance(request, cloud.apiKey, cloud.remoteName))
-                      ?.id
-                : null);
-        if (id) await cloudamqp.deleteCloudAmqpInstance(request, cloud.apiKey, id);
+        if (creator) {
+            const id =
+                row.providerResourceId ??
+                (cloud.remoteName ? await creator.find(request, cloud) : null);
+            if (id) await creator.remove(request, cloud, id);
+        } else {
+            const id =
+                row.providerResourceId ??
+                (cloud.remoteName
+                    ? (await cloudamqp.findCloudAmqpInstance(request, apiKey, cloud.remoteName))?.id
+                    : null);
+            if (id) await cloudamqp.deleteCloudAmqpInstance(request, apiKey, id);
+        }
     } catch (error) {
-        if (!(error instanceof CloudError && error.key === "amqpKeyRefused")) {
+        const refusedKey =
+            error instanceof CloudError &&
+            (error.key === "amqpKeyRefused" || error.key === "providerKeyRefused");
+        if (!refusedKey) {
             if (stopped.count > 0) {
                 await prisma.managedDatabase.updateMany({
                     where: { id: databaseId, status: "deleting" },

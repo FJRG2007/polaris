@@ -32,6 +32,10 @@ export type CloudErrorKey =
     | "amqpCreateFailed"
     | "amqpReadFailed"
     | "amqpDeleteFailed"
+    | "providerKeyRefused"
+    | "providerRefused"
+    | "providerStatus"
+    | "providerUnreadable"
     | `failed.${ProvisionFailure}`;
 
 export class CloudError extends Error {

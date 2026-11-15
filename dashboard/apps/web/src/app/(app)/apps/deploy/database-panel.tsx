@@ -261,7 +261,12 @@ export function DatabaseManageDialog({
                     <div className="flex flex-col gap-4">
                         {overview.cloud?.failure ? (
                             <p className="text-sm text-danger">
-                                {t(`database.cloud.failed.${overview.cloud.failure}`)}
+                                {t(`database.cloud.failed.${overview.cloud.failure}`, {
+                                    provider:
+                                        core.DATA_CLOUD_PROVIDERS.find(
+                                            (one) => one.id === overview.cloud?.provider
+                                        )?.label ?? overview.cloud.provider
+                                })}
                             </p>
                         ) : overview.cloud && overview.status === "provisioning" ? (
                             <p className="text-sm text-muted-foreground">

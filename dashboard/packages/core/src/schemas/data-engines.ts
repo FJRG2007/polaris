@@ -37,6 +37,19 @@ export function isDataEngine(engine: unknown): engine is DataEngine {
     return typeof engine === "string" && (DATA_ENGINES as readonly string[]).includes(engine);
 }
 
+/**
+ * Every engine that can live in a cloud: the data engines above, and the SQL,
+ * document and key-value engines a managed host offers (PostgreSQL at Neon or
+ * Supabase, MongoDB at Atlas, Redis at Upstash).
+ */
+export const CLOUD_ENGINES = [...DATA_ENGINES, "postgres", "mongo", "redis"] as const;
+export type CloudEngine = (typeof CLOUD_ENGINES)[number];
+
+/** True for an engine the "where it runs" choice offers a cloud for. */
+export function isCloudEngine(engine: unknown): engine is CloudEngine {
+    return typeof engine === "string" && (CLOUD_ENGINES as readonly string[]).includes(engine);
+}
+
 /** How the new-database picker groups every engine it offers. */
 export const ENGINE_GROUPS = [
     "relational",
@@ -533,7 +546,7 @@ export function dataEngineReferenceKeys(
 export interface DataCloudProvider {
     readonly id: string;
     readonly label: string;
-    readonly engines: readonly DataEngine[];
+    readonly engines: readonly CloudEngine[];
     /** Where to create one by hand. */
     readonly consoleUrl: string;
     readonly create: boolean;
@@ -619,10 +632,47 @@ export const DATA_CLOUD_PROVIDERS: readonly DataCloudProvider[] = [
         consoleUrl: "https://customer.cloudamqp.com",
         create: true
     },
+    // https://neon.com/docs/reference/api/projects/create-project - a project
+    // answers with its connection URI; see `lib/data-cloud/neon.ts`.
+    {
+        id: "neon",
+        label: "Neon",
+        engines: ["postgres"],
+        consoleUrl: "https://console.neon.tech",
+        create: true
+    },
+    // https://supabase.com/docs/reference/api/v1-create-a-project - see
+    // `lib/data-cloud/supabase.ts`.
+    {
+        id: "supabase",
+        label: "Supabase",
+        engines: ["postgres"],
+        consoleUrl: "https://supabase.com/dashboard",
+        create: true
+    },
+    // https://www.mongodb.com/docs/api/doc/atlas-admin-api-v2/ - connect only:
+    // the flex cluster pages we could read do not spell out the provider
+    // settings or connection string fields a create would rely on.
+    {
+        id: "mongodb-atlas",
+        label: "MongoDB Atlas",
+        engines: ["mongo"],
+        consoleUrl: "https://cloud.mongodb.com",
+        create: false
+    },
+    // https://upstash.com/docs/devops/developer-api/redis/create_database_global
+    // - see `lib/data-cloud/upstash.ts`.
+    {
+        id: "upstash",
+        label: "Upstash",
+        engines: ["redis"],
+        consoleUrl: "https://console.upstash.com",
+        create: true
+    },
     {
         id: "other",
         label: "Another provider",
-        engines: [...DATA_ENGINES],
+        engines: [...CLOUD_ENGINES],
         consoleUrl: "",
         create: false
     }
@@ -649,7 +699,7 @@ export type CloudField =
 
 /** What connecting to each engine takes, and which of it is required. */
 export const CLOUD_FIELDS: Readonly<
-    Record<DataEngine, readonly { readonly field: CloudField; readonly required: boolean }[]>
+    Record<CloudEngine, readonly { readonly field: CloudField; readonly required: boolean }[]>
 > = {
     minio: [
         { field: "url", required: true },
@@ -692,8 +742,20 @@ export const CLOUD_FIELDS: Readonly<
     rabbitmq: [
         { field: "url", required: true },
         { field: "managementUrl", required: false }
-    ]
+    ],
+    // A managed host hands over one connection string with the account in it.
+    postgres: [{ field: "url", required: true }],
+    mongo: [{ field: "url", required: true }],
+    redis: [{ field: "url", required: true }]
 };
+
+/** The engines whose address is a connection string that carries its account. */
+const CONNECTION_STRING_ENGINES: readonly CloudEngine[] = [
+    "rabbitmq",
+    "postgres",
+    "mongo",
+    "redis"
+];
 
 export const KAFKA_SASL_MECHANISMS = ["PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"] as const;
 
@@ -704,14 +766,25 @@ export const KAFKA_SASL_MECHANISMS = ["PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"]
 const ISSUE = "view.database.cloud.issues";
 
 /** The schemes each engine's address may use. Kafka's is a broker list instead. */
-const URL_SCHEMES: Readonly<Record<Exclude<DataEngine, "kafka">, readonly string[]>> = {
+const URL_SCHEMES: Readonly<Record<Exclude<CloudEngine, "kafka">, readonly string[]>> = {
     minio: ["https:", "http:"],
     meilisearch: ["https:", "http:"],
     typesense: ["https:", "http:"],
     clickhouse: ["https:", "http:"],
     influxdb: ["https:", "http:"],
     couchdb: ["https:", "http:"],
-    rabbitmq: ["amqps:", "amqp:"]
+    rabbitmq: ["amqps:", "amqp:"],
+    postgres: ["postgresql:", "postgres:"],
+    mongo: ["mongodb+srv:", "mongodb:"],
+    redis: ["rediss:", "redis:"]
+};
+
+/** The issue said for an address with the wrong scheme. */
+const URL_ISSUE: Readonly<Partial<Record<CloudEngine, string>>> = {
+    rabbitmq: "urlAmqp",
+    postgres: "urlPostgres",
+    mongo: "urlMongo",
+    redis: "urlRedis"
 };
 
 const text = (max: number) => z.string().trim().max(max, `${ISSUE}.tooLong`).default("");
@@ -756,7 +829,7 @@ export const cloudConnectSchema = z
     .object({
         environmentId: z.string().uuid(),
         name: z.string().trim().min(1, `${ISSUE}.nameRequired`).max(64, `${ISSUE}.tooLong`),
-        engine: z.enum(DATA_ENGINES),
+        engine: z.enum(CLOUD_ENGINES),
         provider: z
             .string()
             .trim()
@@ -797,8 +870,11 @@ export const cloudConnectSchema = z
             const url = normalizeEndpointUrl(value.url);
             const schemes = URL_SCHEMES[value.engine];
             if (!url || !schemes.includes(url.protocol)) {
-                issue("url", `${ISSUE}.${value.engine === "rabbitmq" ? "urlAmqp" : "urlHttp"}`);
-            } else if ((url.username || url.password) && value.engine !== "rabbitmq") {
+                issue("url", `${ISSUE}.${URL_ISSUE[value.engine] ?? "urlHttp"}`);
+            } else if (
+                (url.username || url.password) &&
+                !CONNECTION_STRING_ENGINES.includes(value.engine)
+            ) {
                 issue("url", `${ISSUE}.urlCredentials`);
             }
         }
@@ -844,7 +920,13 @@ export function cloudEndpoint(input: CloudConnect): DataEndpoint {
         "https:": 443,
         "http:": 80,
         "amqps:": 5671,
-        "amqp:": 5672
+        "amqp:": 5672,
+        "postgresql:": 5432,
+        "postgres:": 5432,
+        "mongodb:": 27017,
+        "mongodb+srv:": 27017,
+        "rediss:": 6379,
+        "redis:": 6379
     };
     const endpoint: DataEndpoint = {
         ...EMPTY_ENDPOINT,
@@ -867,6 +949,11 @@ export function cloudEndpoint(input: CloudConnect): DataEndpoint {
             database,
             nativeUrl: `clickhouse://${encodeURIComponent(endpoint.username)}:${encodeURIComponent(endpoint.password)}@${url.hostname}:9440/${database}?secure=true`
         };
+    }
+    if (input.engine === "postgres" || input.engine === "mongo") {
+        // The database is the path; a string with none names the default one.
+        const database = decodeURIComponent(url.pathname.replace(/^\//, ""));
+        return { ...endpoint, database };
     }
     if (input.engine === "rabbitmq") {
         const vhost = decodeURIComponent(url.pathname.replace(/^\//, "")) || "/";
@@ -899,3 +986,69 @@ export const cloudAmqpCreateSchema = z.object({
         .regex(/^[a-z0-9-]+::[a-z0-9-]+$/, `${ISSUE}.region`)
 });
 export type CloudAmqpCreateInput = z.input<typeof cloudAmqpCreateSchema>;
+
+/** The managed hosts Polaris creates an instance at with the user's own key. */
+export const CLOUD_CREATE_PROVIDERS = ["neon", "supabase", "upstash"] as const;
+export type CloudCreateProvider = (typeof CLOUD_CREATE_PROVIDERS)[number];
+
+/** True for a provider `cloudCreateSchema` creates at. */
+export function isCloudCreateProvider(provider: string): provider is CloudCreateProvider {
+    return (CLOUD_CREATE_PROVIDERS as readonly string[]).includes(provider);
+}
+
+/**
+ * What a create asks for beyond the key, per provider: `account` is the Neon
+ * organization id (optional with an organization key), the Supabase
+ * organization slug, or the Upstash account email; `region` is that provider's
+ * own region id, defaulting to one its documentation gives as an example.
+ */
+export const CLOUD_CREATE_FIELDS: Readonly<
+    Record<
+        CloudCreateProvider,
+        { readonly account: "optional" | "required"; readonly region: string }
+    >
+> = {
+    neon: { account: "optional", region: "aws-us-east-2" },
+    supabase: { account: "required", region: "us-east-1" },
+    upstash: { account: "required", region: "us-east-1" }
+};
+
+/** Creating PostgreSQL at Neon or Supabase, or Redis at Upstash. */
+export const cloudCreateSchema = z
+    .object({
+        environmentId: z.string().uuid(),
+        name: z.string().trim().min(1, `${ISSUE}.nameRequired`).max(64, `${ISSUE}.tooLong`),
+        provider: z.enum(CLOUD_CREATE_PROVIDERS),
+        apiKey: z.string().trim().min(8, `${ISSUE}.apiKey`).max(512, `${ISSUE}.tooLong`),
+        account: z.string().trim().max(256, `${ISSUE}.tooLong`).default(""),
+        region: z
+            .string()
+            .trim()
+            .toLowerCase()
+            .regex(/^[a-z0-9][a-z0-9-]{1,40}$/, `${ISSUE}.regionId`)
+    })
+    .superRefine((value, ctx) => {
+        const issue = (path: string, message: string) =>
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+        if (CLOUD_CREATE_FIELDS[value.provider].account === "required" && !value.account) {
+            issue("account", `${ISSUE}.required`);
+        }
+        if (
+            value.provider === "upstash" &&
+            value.account &&
+            !/^[^\s@]+@[^\s@]+$/.test(value.account)
+        ) {
+            issue("account", `${ISSUE}.email`);
+        }
+    })
+    .transform((value) => ({
+        ...value,
+        account: value.provider === "upstash" ? value.account.toLowerCase() : value.account
+    }));
+export type CloudCreateInput = z.input<typeof cloudCreateSchema>;
+export type CloudCreate = z.output<typeof cloudCreateSchema>;
+
+/** The engine each create provider makes. */
+export function cloudCreateEngine(provider: CloudCreateProvider): CloudEngine {
+    return provider === "upstash" ? "redis" : "postgres";
+}

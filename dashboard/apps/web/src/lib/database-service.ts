@@ -76,6 +76,11 @@ export interface DbCredentials {
         plan?: string;
         region?: string;
         remoteName?: string;
+        /** The Neon organization, the Supabase organization slug, or the
+         *  Upstash account email a create is made under. */
+        account?: string;
+        /** The database password Polaris chose for a Supabase create. */
+        dbPassword?: string;
     };
 }
 

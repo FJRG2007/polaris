@@ -68,7 +68,7 @@ import {
     cloudProvidersFor,
     engineGroup,
     ENGINE_GROUPS,
-    isDataEngine,
+    isCloudEngine,
     dbVersionCaveat,
     MANAGED_ENGINES,
     MANAGED_ENGINE_INFO,
@@ -1546,7 +1546,7 @@ function NewDatabaseFields({
                     options={ENGINE_OPTIONS}
                 />
             </Field>
-            {isDataEngine(engine) && (
+            {isCloudEngine(engine) && (
                 <Field label={t("view.database.cloud.where")}>
                     <Select
                         value={where}
@@ -1565,7 +1565,7 @@ function NewDatabaseFields({
         </>
     );
 
-    if (isDataEngine(engine) && where !== "server") {
+    if (isCloudEngine(engine) && where !== "server") {
         return (
             <div className="flex flex-col gap-3">
                 {header}

@@ -317,9 +317,9 @@
             "creating": "Se está creando en la nube. Esta página se actualiza cuando esté lista.",
             "failed": {
                 "lost": "Polaris perdió lo que necesitaba para crear esta instancia. Bórrala y créala de nuevo.",
-                "timeout": "CloudAMQP no terminó de crear esta instancia en 30 minutos. Bórrala aquí para quitarla también allí.",
-                "keyRefused": "CloudAMQP rechazó la clave de API. Borra esta instancia y créala con una clave válida.",
-                "createRefused": "CloudAMQP rechazó el plan o la región. Borra esta instancia y créala de nuevo."
+                "timeout": "{provider} no terminó de crear esta instancia en 30 minutos. Bórrala aquí para quitarla también allí.",
+                "keyRefused": "{provider} rechazó la clave. Borra esta instancia y créala con una clave válida.",
+                "createRefused": "{provider} rechazó la petición. Borra esta instancia y créala de nuevo."
             }
         }
     },
