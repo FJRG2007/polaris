@@ -5,13 +5,9 @@ The 38 terminal agents Agent Orchestrator (AO) runs are all in
 What is left, each item needing a value verified against AO source or the tool's
 own docs before it is written:
 
-1. Hooks for the new agents. AO writes hooks for kimi, devin, kiro, kilocode,
-   vibe, muse, agy, autohand, kimchi, prime-agent, omp, codewhale, mimo-code,
-   command-code, memcode, pi, auggie, cline, crush, cursor, droid, goose, qwen,
-   amp, opencode, openhands (`backend/internal/adapters/agent/<name>/hooks.go`).
-   Port each format into a `firstRun` assert like `codexHooks()` and teach
-   `normalizeHookEvent` (`apps/web/src/lib/agents/session-hooks.ts`) its event
-   names, then flip `observe` to `hooks`.
+1. Hooks for the new agents: ten are written from `AGENT_HOOK_FILES`
+   (`dashboard/packages/core/src/agent-hook-files.ts`); the rest, and why each
+   needs more than a table row, are in `U3-PLAN.md`.
 2. Model choice: most new agents take `--model`. Add `model: { provider, flag }`
    once the models.dev provider for each is confirmed (AO
    `docs/harnesses/model-catalogs.md`, `adapters/agent/modelcatalog`).

@@ -566,16 +566,16 @@ export async function reissueSessionToken(
  */
 export async function sessionForToken(
     token: string
-): Promise<{ id: string; state: core.AgentSessionState; taskId: string | null } | null> {
+): Promise<{ id: string; state: core.AgentSessionState; taskId: string | null; cli: string } | null> {
     if (!token) return null;
     const record = await prisma.agentSession.findUnique({
         where: { tokenHash: hashToken(token) },
-        select: { id: true, state: true, taskId: true }
+        select: { id: true, state: true, taskId: true, cli: true }
     });
     if (!record) return null;
     const state = readState(record.state);
     if (core.isSessionOver(state)) return null;
-    return { id: record.id, state, taskId: record.taskId };
+    return { id: record.id, state, taskId: record.taskId, cli: record.cli };
 }
 
 /** The repository a session works in, as `owner/name`, or null for a workspace

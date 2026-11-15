@@ -48,7 +48,7 @@ export async function handleRunnerMessage(
 
     const session = await prisma.agentSession.findFirst({
         where: { id: message.sessionId, runnerId: identity.runnerId, place: "computer" },
-        select: { id: true, state: true }
+        select: { id: true, cli: true, state: true }
     });
     if (!session) return { type: "error", code: "unknown_session", message: "No such session on this computer" };
     const over = core.isSessionOver(session.state as core.AgentSessionState);
@@ -70,7 +70,7 @@ export async function handleRunnerMessage(
                 );
             return null;
         case "hook":
-            if (!over) await ingestHookPayload(session.id, message.payload, core.parseHookSequence(message.seq));
+            if (!over) await ingestHookPayload(session, message.payload, core.parseHookSequence(message.seq));
             return null;
         case "event":
             if (!over)

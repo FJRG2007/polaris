@@ -445,7 +445,14 @@ describe("the tool's own first-run wizard", () => {
         // the wizard with nothing anywhere saying why.
         // Claude Code, Codex, Gemini CLI and Copilot CLI have sourced answers
         // (the wizard, and the hooks that report their turns to Polaris).
-        const sourced = new Set(["claude", "codex", "gemini", "copilot"]);
+        // So do the tools whose hook files are written from AGENT_HOOK_FILES.
+        const sourced = new Set([
+            "claude",
+            "codex",
+            "gemini",
+            "copilot",
+            ...Object.keys(core.AGENT_HOOK_FILES)
+        ]);
         for (const cli of core.AGENT_CLIS) {
             if (sourced.has(cli.id)) continue;
             expect(cli.firstRun, cli.id).toEqual([]);

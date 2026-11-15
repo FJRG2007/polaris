@@ -11,6 +11,7 @@
  * Called inside a request: the follow-up work is scheduled with `after()`.
  */
 
+import { sessionEndIsSwap } from "@/lib/agents/hook-activity";
 import { isTaskTool, readTodos, reportedPermissionMode } from "@/lib/agents/session-asks";
 import { hookConversation, hookEventFailed, normalizeHookEvent } from "@/lib/agents/session-hooks";
 import { hookSubagentRef } from "@/lib/agents/session-subagents";
@@ -36,9 +37,17 @@ import * as asks from "@/lib/agents/session-asks";
 /** The events after which the transcript is read. */
 const HISTORY_KINDS = new Set(["turn.end", "turn.failed", "tool.end", "tool.failed"]);
 
+/** A session as the caller that authenticated it found it. */
+export interface HookSession {
+    readonly id: string;
+    readonly cli: string;
+}
+
 /** Take in one lifecycle hook payload. Never throws for a payload it does not
- *  understand: a hook's outcome must not change what the agent does. */
-export async function ingestHookPayload(id: string, payload: unknown, seq: bigint | null): Promise<void> {
+ *  understand: a hook's outcome must not change what the agent does. `seq` is
+ *  when the hook ran, in nanoseconds (`parseHookSequence`), or null. */
+export async function ingestHookPayload(session: HookSession, payload: unknown, seq: bigint | null): Promise<void> {
+    const { id } = session;
     await recordSessionConversation(id, hookConversation(payload)).catch((error) =>
         console.error(`[agent-session] ${id}: could not keep the conversation id`, error)
     );
@@ -52,7 +61,14 @@ export async function ingestHookPayload(id: string, payload: unknown, seq: bigin
     const event = normalizeHookEvent(payload);
     if (!event) return;
 
-    const kind = event.kind === "tool.end" && hookEventFailed(payload) ? "tool.failed" : event.kind;
+    // A session end that only swapped the conversation (Droid's /clear,
+    // Kimchi's reload or fork) leaves the agent running, like Claude's /clear.
+    const kind =
+        event.kind === "tool.end" && hookEventFailed(payload)
+            ? "tool.failed"
+            : event.kind === "session.end" && sessionEndIsSwap(session.cli, payload)
+              ? "session.clear"
+              : event.kind;
     const subject =
         kind === "prompt" ? ((await turnAccountName(id).catch(() => null)) ?? event.subject) : event.subject;
 

@@ -66,6 +66,6 @@ export async function POST(
         return acknowledged();
     }
 
-    await ingestHookPayload(id, payload, parseHookSequence(request.headers.get("x-polaris-seq")));
+    await ingestHookPayload(session, payload, parseHookSequence(request.headers.get("x-polaris-seq")));
     return acknowledged();
 }

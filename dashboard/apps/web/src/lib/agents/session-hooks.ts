@@ -19,7 +19,12 @@
  * slow one is felt as the agent being slow.
  */
 
-import { isTranscriptPath, isVendorSessionId, type AgentSessionEventKind } from "@polaris/core";
+import {
+    hookGroup,
+    isTranscriptPath,
+    isVendorSessionId,
+    type AgentSessionEventKind
+} from "@polaris/core";
 
 /**
  * The events Polaris asks Claude Code to report.
@@ -86,18 +91,14 @@ export function claudeHookSettings(
         // A session that runs each prompt as a process of its own ends one of
         // those with every answer, and that is not the session ending.
         if (headless && event === "SessionEnd") continue;
-        const hook = {
-            type: "command",
-            command: scriptPath,
-            // PreToolUse too: an AskUserQuestion or ExitPlanMode call waits there
-            // for the person's answer (session-asks). Every other call returns
-            // as fast as ever, since the script's own curl is what bounds it.
-            timeout:
-                event === "PermissionRequest" || event === "PreToolUse"
-                    ? PERMISSION_HOOK_TIMEOUT_SECONDS
-                    : HOOK_TIMEOUT_SECONDS
-        };
-        hooks[event] = [matcher ? { matcher, hooks: [hook] } : { hooks: [hook] }];
+        // PreToolUse too: an AskUserQuestion or ExitPlanMode call waits there
+        // for the person's answer (session-asks). Every other call returns
+        // as fast as ever, since the script's own curl is what bounds it.
+        const timeout =
+            event === "PermissionRequest" || event === "PreToolUse"
+                ? PERMISSION_HOOK_TIMEOUT_SECONDS
+                : HOOK_TIMEOUT_SECONDS;
+        hooks[event] = [hookGroup(scriptPath, timeout, { matcher })];
     }
     // The bypass-permissions warning opens on "No, exit", and the first prompt's
     // Enter chose it: the agent quit before reading the message. Claude Code now
@@ -164,14 +165,18 @@ export function hookScript(
         // way, and this is what puts them back in order. See applySessionEvents.
         "seq=$(date +%s%N 2>/dev/null || true)",
         'payload="$(cat)"',
-        // Copilot CLI does not name the event in its payload, so its hook
-        // configuration names it in the environment and it is added here.
+        // A tool whose payload does not name the event (Copilot CLI), or names
+        // it in its own words (every tool written from AGENT_HOOK_FILES), has
+        // its configuration name it in the environment. Stamped last, so the
+        // name Polaris reads wins over a native key of the same name.
         'event="${POLARIS_HOOK_EVENT:-}"',
         'case "$event" in *[!A-Za-z]*) event="" ;; esac',
         'if [ -n "$event" ]; then',
+        '  payload="${payload%"${payload##*[![:space:]]}"}"',
         "  inner=\"${payload#\\{}\"",
+        "  inner=\"${inner%\\}}\"",
         "  case \"$inner\" in",
-        "    *[!}[:space:]]*) payload=\"{\\\"hook_event_name\\\":\\\"$event\\\",$inner\" ;;",
+        "    *[![:space:]]*) payload=\"{$inner,\\\"hook_event_name\\\":\\\"$event\\\"}\" ;;",
         "    *) payload=\"{\\\"hook_event_name\\\":\\\"$event\\\"}\" ;;",
         "  esac",
         "fi",
@@ -299,6 +304,9 @@ const CLAUDE_EVENT_KINDS: Record<string, AgentSessionEventKind> = {
     UserPromptSubmit: "prompt",
     PreToolUse: "tool.start",
     PostToolUse: "tool.end",
+    // Stamped by the hook script for tools registered from AGENT_HOOK_FILES
+    // whose native event reports a failed tool call on its own.
+    PostToolUseFailure: "tool.failed",
     // Blocked on a person: a permission prompt, or a question it asked and is
     // waiting on. The one event that should reach somebody.
     Notification: "question",
@@ -455,7 +463,7 @@ export function normalizeHookEvent(payload: unknown): NormalizedHookEvent | null
         return { kind, detail: clip(said || "The turn stopped on an error"), subject: "" };
     }
 
-    if (kind === "tool.start" || kind === "tool.end" || kind === "permission") {
+    if (kind === "tool.start" || kind === "tool.end" || kind === "tool.failed" || kind === "permission") {
         const detail = toolDetail(tool, input);
         return { kind, detail: detail ? `${tool}: ${detail}` : tool, subject: tool };
     }

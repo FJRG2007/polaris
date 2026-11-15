@@ -30,6 +30,7 @@ import { shellQuote } from "./session-hooks";
 import { INSTALL_GH } from "./session-gh";
 import {
     FIRST_RUN_WORKDIR,
+    HOOK_FILE_WORKDIR,
     hasControlCharacter,
     isAgentEffortLevel,
     SAFE_MODEL_ID,
@@ -536,6 +537,7 @@ export function firstRunProgram(): string {
     return [
         'const fs = require("node:fs");',
         'const path = require("node:path");',
+        'const { execFileSync } = require("node:child_process");',
         "const home = process.env.HOME;",
         "if (!home) process.exit(0);",
         // The directory this session works in, for the answers that are about
@@ -550,13 +552,41 @@ export function firstRunProgram(): string {
         // and writing what is Polaris's to say - the wizard itself, which only
         // an agent on a screen nobody could reach can have answered already. See
         // `CLAUDE_WIZARD_ANSWER`.
+        // What marks a hook entry as one Polaris wrote: the relay names the
+        // session's state directory, and nothing a person writes does.
+        'const ours = (value) => JSON.stringify(value).includes("POLARIS_STATE_DIR");',
+        // A hook file the tool reads from the checkout rather than the home:
+        // kept out of every commit the agent makes. Untracked, it goes into
+        // the clone's own exclude list; tracked (a repository that ships its
+        // own copy), git is told to leave our edit out of what it stages.
+        "function keepOutOfCommits(rel) {",
+        "    const git = (args) => execFileSync(\"git\", [\"-C\", workdir, ...args], { stdio: [\"ignore\", \"pipe\", \"ignore\"], windowsHide: true }).toString().trim();",
+        "    try {",
+        "        try { git([\"ls-files\", \"--error-unmatch\", \"--\", rel]); git([\"update-index\", \"--skip-worktree\", \"--\", rel]); return; } catch {}",
+        "        const exclude = path.resolve(workdir, git([\"rev-parse\", \"--git-path\", \"info/exclude\"]));",
+        '        let text = "";',
+        '        try { text = fs.readFileSync(exclude, "utf8"); } catch {}',
+        '        const line = "/" + rel;',
+        '        if (text.split("\\n").includes(line)) return;',
+        "        fs.mkdirSync(path.dirname(exclude), { recursive: true });",
+        '        fs.appendFileSync(exclude, (text && !text.endsWith("\\n") ? "\\n" : "") + line + "\\n");',
+        "    } catch {}",
+        "}",
         "function fill(target, source, assert) {",
         "    let wrote = false;",
         "    for (const [name, value] of Object.entries(source)) {",
         `        const key = name === ${JSON.stringify(FIRST_RUN_WORKDIR)} ? workdir : name;`,
         "        if (!key) continue;",
         // A list is a value like any other: a hook registration is replaced
-        // whole, never merged index by index into whatever list was there.
+        // whole, never merged index by index into whatever list was there -
+        // except that an asserted list of Polaris's hooks keeps the entries
+        // Polaris did not write, so a repository's or a person's own hook for
+        // the same event still runs beside ours.
+        "        if (assert && Array.isArray(value) && ours(value) && Array.isArray(target[key])) {",
+        "            const merged = target[key].filter((entry) => !ours(entry)).concat(value);",
+        "            if (JSON.stringify(merged) !== JSON.stringify(target[key])) { target[key] = merged; wrote = true; }",
+        "            continue;",
+        "        }",
         '        if (value && typeof value === "object" && !Array.isArray(value)) {',
         "            const branch = target[key];",
         '            if (branch && typeof branch === "object" && !Array.isArray(branch)) {',
@@ -584,7 +614,11 @@ export function firstRunProgram(): string {
         "    return wrote;",
         "}",
         'for (const answer of JSON.parse(fs.readFileSync(process.argv[1], "utf8"))) {',
-        "    const file = path.join(home, answer.file);",
+        `    const inWorkdir = answer.file.startsWith(${JSON.stringify(HOOK_FILE_WORKDIR)});`,
+        // No worktree (a sign-in container): nothing to hook there.
+        "    if (inWorkdir && !workdir) continue;",
+        `    const rel = inWorkdir ? answer.file.slice(${HOOK_FILE_WORKDIR.length}) : answer.file;`,
+        "    const file = path.join(inWorkdir ? workdir : home, rel);",
         "    let current = {};",
         // A file that is not there, or is half-written, is answered the same way
         // as an empty one. The alternative is a session that will not start
@@ -611,6 +645,7 @@ export function firstRunProgram(): string {
         "    try {",
         "        fs.mkdirSync(path.dirname(file), { recursive: true });",
         '        fs.writeFileSync(file, JSON.stringify(current, null, 2) + "\\n");',
+        "        if (inWorkdir) keepOutOfCommits(rel);",
         '        console.log("polaris: answered its first run in " + file);',
         "    } catch (error) {",
         '        console.log("polaris: could not write " + file + " (" + error.message + ")");',
