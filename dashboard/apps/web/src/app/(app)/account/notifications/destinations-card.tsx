@@ -189,7 +189,7 @@ export function DestinationsCard({
                                             link: (chunks) => (
                                                 <Link
                                                     key="link"
-                                                    href="/admin/email"
+                                                    href="/admin/integrations/email"
                                                     className="underline"
                                                 >
                                                     {chunks}

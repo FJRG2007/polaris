@@ -25,7 +25,6 @@ const actions = vi.hoisted(() => {
         "dnsTailAction",
         "tunnelStatusesAction",
         "readAppWidgetsAction",
-        "channelStateAction",
         "serverDetailAction",
         "getRunAction",
         "checkUpdatesAction",
@@ -233,9 +232,6 @@ vi.mock("@/app/(app)/apps/tunnels/actions", () => ({
 vi.mock("@/app/(app)/home/app-widget-actions", () => ({
     readAppWidgetsAction: actions.readAppWidgetsAction,
     appWidgetTargetsAction: actions.appWidgetTargetsAction
-}));
-vi.mock("@/app/(app)/admin/email/channels/actions", () => ({
-    channelStateAction: actions.channelStateAction
 }));
 vi.mock("@/app/(app)/mail-server/actions", () => ({
     serverDetailAction: actions.serverDetailAction,
@@ -494,7 +490,6 @@ const ROUTES: Record<string, () => Promise<{ GET?: Handler; POST?: Handler }>> =
     "/api/dns-blocker/tail": () => import("@/app/api/dns-blocker/tail/route"),
     "/api/tunnels/statuses": () => import("@/app/api/tunnels/statuses/route"),
     "/api/home/app-widgets": () => import("@/app/api/home/app-widgets/route"),
-    "/api/admin/channels/state": () => import("@/app/api/admin/channels/state/route"),
     "/api/mail-server/detail": () => import("@/app/api/mail-server/detail/route"),
     "/api/automations/run": () => import("@/app/api/automations/run/route"),
     "/api/admin/settings/update-status": () =>
@@ -663,10 +658,6 @@ const dns = () =>
     actual<typeof import("@/app/(app)/network-filter/dns-blocker-polls")>(
         "@/app/(app)/network-filter/dns-blocker-polls"
     );
-const channels = () =>
-    actual<typeof import("@/app/(app)/admin/email/channels/channel-polls")>(
-        "@/app/(app)/admin/email/channels/channel-polls"
-    );
 const domains = () =>
     actual<typeof import("@/app/(app)/account/domains/domains-polls")>(
         "@/app/(app)/account/domains/domains-polls"
@@ -825,13 +816,6 @@ const CASES: Case[] = [
             ).appWidgets(),
         action: "readAppWidgetsAction",
         args: []
-    },
-    {
-        name: "a channel's state",
-        path: "/api/admin/channels/state",
-        ask: async () => (await channels()).channelState("channel-1"),
-        action: "channelStateAction",
-        args: ["channel-1"]
     },
     {
         name: "a mail server's detail",

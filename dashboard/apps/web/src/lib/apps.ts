@@ -604,7 +604,7 @@ export const POLARIS_APPS: AppEntry[] = [
         adminOnly: true,
         guest: {
             permission: "inbox.read",
-            href: "/admin/email",
+            href: "/admin/integrations/email",
             label: "Email & SMS", // i18n-ignore
             description: "The senders your mail and texts go out through" // i18n-ignore
         }
@@ -936,40 +936,11 @@ const ADMIN_AREAS: AppSubapp[] = [
         id: "admin-communication",
         label: "Communication", // i18n-ignore
         icon: MessageSquare,
-        base: "/admin/email",
-        match: ["/admin/announcements", "/admin/safety"],
+        base: "/admin/announcements",
+        match: ["/admin/safety"],
         parent: { label: "Management", href: "/admin" }, // i18n-ignore
         parentAppId: "admin",
         sections: [
-            {
-                // Senders belong to whoever added them, so anybody holding
-                // `inbox.read` can add their own; only the account-mail choice is an admin's.
-                label: "Email & SMS", // i18n-ignore
-                href: "/admin/email",
-                needs: "inbox.read",
-                icon: Mail,
-                keywords: [
-                    "smtp",
-                    "sender",
-                    "sms",
-                    "texts",
-                    "twilio",
-                    "resend",
-                    "brevo",
-                    "mailjet",
-                    "ses",
-                    "outgoing",
-                    "account mail"
-                ]
-            },
-            {
-                // The channels alerts, notices and sign-in codes go out through.
-                label: "Channels", // i18n-ignore
-                href: "/admin/email/channels",
-                needs: "inbox.read",
-                icon: Radio,
-                keywords: ["whatsapp", "telegram", "slack", "discord", "bot", "messaging"]
-            },
             {
                 label: "Announcements", // i18n-ignore
                 href: "/admin/announcements",
@@ -1174,6 +1145,27 @@ const ADMIN_AREAS: AppSubapp[] = [
                     "openrouter",
                     "api key",
                     "agents"
+                ]
+            },
+            {
+                // Senders belong to whoever added them, so anybody holding
+                // `inbox.read` can add their own; only the account-mail choice is an admin's.
+                label: "Email & SMS", // i18n-ignore
+                href: "/admin/integrations/email",
+                needs: "inbox.read",
+                icon: Mail,
+                keywords: [
+                    "smtp",
+                    "sender",
+                    "sms",
+                    "texts",
+                    "twilio",
+                    "resend",
+                    "brevo",
+                    "mailjet",
+                    "ses",
+                    "outgoing",
+                    "account mail"
                 ]
             },
             {

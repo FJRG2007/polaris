@@ -239,7 +239,7 @@ function RelayForm({
                 <p className="text-xs text-muted-foreground">
                     {t.rich("sending.channel", {
                         link: (chunks) => (
-                            <Link key="link" href="/admin/email" className="underline">
+                            <Link key="link" href="/admin/integrations/email" className="underline">
                                 {chunks}
                             </Link>
                         )

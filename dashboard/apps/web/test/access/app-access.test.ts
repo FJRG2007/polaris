@@ -94,7 +94,7 @@ describe("the Email & SMS door inside Management", () => {
         expect(apps.map((app) => app.id)).toEqual(["overview", "vpn", "polar", "admin"]);
         const app = apps.find((entry) => entry.id === "admin");
         expect(app?.label).toBe("Email & SMS");
-        expect(app?.href).toBe("/admin/email");
+        expect(app?.href).toBe("/admin/integrations/email");
     });
 
     it("keeps the member's one door out of the Overview they land on", async () => {
@@ -128,7 +128,7 @@ describe("the Email & SMS door inside Management", () => {
         const input = { ...holding("inbox.read"), isInstalled: async () => false };
         const app = (await reachableApps(input)).find((entry) => entry.id === "admin");
         expect(app?.label).toBe("Email & SMS");
-        expect(app?.href).toBe("/admin/email");
+        expect(app?.href).toBe("/admin/integrations/email");
         const navIds = await reachableAppNav(input);
         expect(navIds.guestIds).toEqual(["admin"]);
         expect(navIds.otherwiseIds).toEqual([]);

@@ -1,18 +1,14 @@
 "use client";
 
-/**
- * The card a connected channel is listed on: the Inbox's messaging channels and
- * the email senders on Email & SMS.
- */
+/** The card an email sender is listed on, on Email & SMS. */
 
 import type { ComponentType } from "react";
 import { CheckCircle2, Settings2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { CHANNEL_STATUS_TONE } from "./email/channels/platform-meta";
+import { CHANNEL_STATUS_TONE } from "./email-mark";
 
-/** One connected channel, whatever it carries. A messaging channel and an email
- *  sender differ only in what their subtitle says, so they share a card. */
+/** One sender: its mark, its name, where it sends from and whether it works. */
 export function ChannelCard({
     Logo,
     color,

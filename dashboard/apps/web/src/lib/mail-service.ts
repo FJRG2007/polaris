@@ -2,7 +2,7 @@
  * Email channels: the control plane for how Polaris sends mail.
  *
  * They live in the same Channel table as the messaging channels and are set up
- * under Management > Email & SMS. Mail is sent from this process, over HTTPS or
+ * under Management > Integrations > Email & SMS. Mail is sent from this process, over HTTPS or
  * SMTP, so verification links and sign-in codes keep working on a deployment with
  * no messaging channel at all.
  *

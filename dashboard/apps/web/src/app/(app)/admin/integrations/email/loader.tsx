@@ -1,10 +1,10 @@
 "use client";
 
-import { paintRead } from "../paint-read";
+import { paintRead } from "@/app/(app)/admin/paint-read";
 import { AccountMailView } from "./email-admin";
 import { SmsSenderCard } from "./sms-sender-card";
 import { EmailSendersView } from "./senders-view";
-import { CardSkeleton } from "../region-skeletons";
+import { CardSkeleton } from "@/app/(app)/admin/region-skeletons";
 import { AfterPaint } from "@/components/after-paint";
 
 /** The senders and the account mail channel. Not kept in the tab: mail delivery setup. */

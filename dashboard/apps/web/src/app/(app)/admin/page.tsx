@@ -7,7 +7,6 @@ import {
     EyeOff,
     Flag,
     Megaphone,
-    Radio,
     Stethoscope,
     Store,
     Trash2,
@@ -69,8 +68,6 @@ const GROUPS = [
     {
         key: "communication",
         sections: [
-            { key: "email", href: "/admin/email", icon: Mail },
-            { key: "channels", href: "/admin/email/channels", icon: Radio },
             { key: "announcements", href: "/admin/announcements", icon: Megaphone },
             { key: "safety", href: "/admin/safety", icon: Flag },
             { key: "chat", href: "/admin/apps/chat/settings", icon: MessageSquare }
@@ -92,6 +89,7 @@ const GROUPS = [
         sections: [
             { key: "integrations", href: "/admin/integrations", icon: Blocks },
             { key: "integrationsModels", href: "/admin/integrations/models", icon: Sparkles },
+            { key: "email", href: "/admin/integrations/email", icon: Mail },
             { key: "agents", href: "/admin/agents", icon: Bot }
         ]
     },

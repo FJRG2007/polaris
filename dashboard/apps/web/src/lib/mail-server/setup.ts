@@ -512,7 +512,7 @@ const sender: StepRunner = async (server) => {
     if (created.channel.status !== "connected") {
         await appendLog(
             server.id,
-            "Polaris will send through it once its DNS is published and its certificate issued; the channel is under Management > Email."
+            "Polaris will send through it once its DNS is published and its certificate issued; the channel is under Management > Integrations > Email & SMS."
         );
     }
 };

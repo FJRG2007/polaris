@@ -74,7 +74,7 @@ export async function createEmailChannelAction(input: unknown): Promise<ChannelR
             targetId: result.channel.id,
             metadata: { provider: result.channel.provider }
         });
-        revalidatePath("/admin/email");
+        revalidatePath("/admin/integrations/email");
     }
     return result;
 }
@@ -98,7 +98,7 @@ export async function updateEmailChannelAction(
             targetType: "channel",
             targetId: id.data
         });
-        revalidatePath("/admin/email");
+        revalidatePath("/admin/integrations/email");
     }
     return result;
 }
@@ -117,7 +117,7 @@ export async function deleteEmailChannelAction(channelId: unknown): Promise<{ er
         targetType: "channel",
         targetId: id.data
     });
-    revalidatePath("/admin/email");
+    revalidatePath("/admin/integrations/email");
     return {};
 }
 
@@ -130,7 +130,7 @@ export async function recheckEmailChannelAction(channelId: unknown): Promise<{ e
     if (!(await requireOwnedChannel(user.id, id.data)))
         return { error: t("inboxChannels.errors.gone") };
     const result = await recheckEmailChannel(id.data);
-    revalidatePath("/admin/email");
+    revalidatePath("/admin/integrations/email");
     return result;
 }
 
@@ -167,6 +167,6 @@ export async function sendTestEmailAction(
         subject: t("inboxChannels.email.testSubject"),
         text: t("inboxChannels.email.testBody")
     });
-    revalidatePath("/admin/email");
+    revalidatePath("/admin/integrations/email");
     return result;
 }

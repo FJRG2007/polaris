@@ -26,7 +26,7 @@ export async function setAuthMailChannelAction(channelId: unknown): Promise<{ er
             targetType: "channel",
             targetId: parsed.data ?? undefined
         });
-        revalidatePath("/admin/email");
+        revalidatePath("/admin/integrations/email");
     }
     return result;
 }

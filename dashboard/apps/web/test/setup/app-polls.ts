@@ -314,14 +314,6 @@ vi.mock("@/app/(app)/home/home-polls", () => ({
     )
 }));
 
-vi.mock("@/app/(app)/admin/email/channels/channel-polls", () => ({
-    channelState: forward(
-        () => import("@/app/(app)/admin/email/channels/actions"),
-        "channelStateAction",
-        1
-    )
-}));
-
 vi.mock("@/app/(app)/mail-server/mail-server-polls", () => ({
     serverDetail: forward(() => import("@/app/(app)/mail-server/actions"), "serverDetailAction", 1),
     dnsPlan: forward(() => import("@/app/(app)/mail-server/actions"), "planDnsAction", 1)

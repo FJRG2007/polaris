@@ -156,7 +156,7 @@ export function NoticeDeliveryFields({
                                 <>
                                     {t("delivery.emailUnavailable")}{" "}
                                     {channels.canSetUpMail ? (
-                                        <Link className="underline" href="/admin/email">
+                                        <Link className="underline" href="/admin/integrations/email">
                                             {t("delivery.emailSetUp")}
                                         </Link>
                                     ) : (
@@ -375,14 +375,9 @@ export function NoticeDeliveryFields({
                             if (!on) set({ messaging: null });
                         }}
                         hint={
-                            channels && messagingChannels.length === 0 ? (
-                                <>
-                                    {t("delivery.messagingNone")}{" "}
-                                    <Link className="underline" href="/admin/email/channels">
-                                        {t("delivery.messagingAdd")}
-                                    </Link>
-                                </>
-                            ) : undefined
+                            channels && messagingChannels.length === 0
+                                ? t("delivery.messagingNone")
+                                : undefined
                         }
                     >
                         {(messagingOpen || delivery.messaging) && messagingChannels.length > 0 ? (

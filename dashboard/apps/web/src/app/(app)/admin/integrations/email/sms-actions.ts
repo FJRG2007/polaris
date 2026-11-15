@@ -42,7 +42,7 @@ export async function saveSmsSenderAction(
         };
     }
     const result = await saveSmsSender(user.id, parsed.data);
-    if (!result.error) revalidatePath("/admin/email");
+    if (!result.error) revalidatePath("/admin/integrations/email");
     // The sender answers in English; the reader gets their own words.
     return result.error
         ? { ...result, error: deliveryText(await getTranslations("components"), result.error) }
@@ -54,5 +54,5 @@ export async function deleteSmsSenderAction(id: unknown): Promise<void> {
     const parsed = z.string().uuid().safeParse(id);
     if (!parsed.success) return;
     await deleteSmsSender(user.id, parsed.data);
-    revalidatePath("/admin/email");
+    revalidatePath("/admin/integrations/email");
 }

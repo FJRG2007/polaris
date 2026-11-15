@@ -100,7 +100,7 @@ function authentication(readings: EvidenceReadings, { t }: EvidenceWords): Secti
         title: t("sections.authentication.title"),
         where: [
             { label: t("where.security"), href: "/admin/security" },
-            { label: t("where.email"), href: "/admin/email" }
+            { label: t("where.email"), href: "/admin/integrations/email" }
         ],
         facts: [
             {

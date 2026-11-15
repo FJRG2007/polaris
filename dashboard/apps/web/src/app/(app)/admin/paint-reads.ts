@@ -16,8 +16,7 @@ import * as apps from "./apps/data";
 import * as appSettings from "./apps/[appId]/settings/data";
 import * as billing from "./billing/data";
 import * as diagnostics from "./diagnostics/data";
-import * as email from "./email/data";
-import * as channels from "./email/channels/data";
+import * as email from "./integrations/email/data";
 import * as integrations from "./integrations/data";
 import * as models from "./integrations/models/data";
 import * as retention from "./retention/data";
@@ -31,8 +30,8 @@ import * as user from "./users/[id]/data";
 const none = z.object({});
 const person = z.object({ id: z.string().trim().min(1).max(200) });
 
-/** `inbox` marks a read held by whoever holds `inbox.read` (Email & SMS and its
- *  channels), not the operator alone. */
+/** `inbox` marks a read held by whoever holds `inbox.read` (Email & SMS), not
+ *  the operator alone. */
 function read<Q extends z.ZodTypeAny, A>(
     query: Q,
     run: (input: z.infer<Q>) => Promise<A>,
@@ -55,7 +54,6 @@ export const PAINT_READS = {
     "billing.rates": read(none, () => billing.loadBillingRatesAction()),
     diagnostics: read(none, () => diagnostics.loadDiagnosticsAction()),
     email: read(none, () => email.loadEmailAdminAction(), true),
-    channels: read(none, () => channels.loadChannelsAction(), true),
     integrations: read(none, () => integrations.loadIntegrationsAction()),
     "integrations.runners": read(none, () => integrations.loadRunnerAccessAction()),
     "integrations.models": read(none, () => models.loadModelProvidersAction()),
