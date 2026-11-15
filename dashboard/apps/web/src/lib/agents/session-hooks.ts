@@ -47,6 +47,9 @@ export const CLAUDE_HOOK_EVENTS = [
     // A turn that ended on an API error or a usage limit. Without it such a
     // session stayed on "Working" with nothing left running.
     { event: "StopFailure", matcher: null },
+    // A subagent's launch and end, which the Code thread draws as a tree
+    // (session-subagents). Start names the agent its tool events then carry.
+    { event: "SubagentStart", matcher: null },
     { event: "SubagentStop", matcher: null },
     // After, not before: a manual /compact never sends Stop, so the end of the
     // compaction is the only thing that says the agent is back at its prompt.
@@ -302,6 +305,7 @@ const CLAUDE_EVENT_KINDS: Record<string, AgentSessionEventKind> = {
     PermissionRequest: "permission",
     Stop: "turn.end",
     StopFailure: "turn.failed",
+    SubagentStart: "subagent.start",
     SubagentStop: "subagent.end",
     PostCompact: "compact",
     SessionEnd: "session.end",
@@ -363,6 +367,8 @@ function toolDetail(tool: string, input: Record<string, unknown>): string {
             return clip(str("pattern"));
         case "WebFetch":
             return clip(str("url"));
+        // The subagent launcher: `Agent`, called `Task` before Claude Code 2.1.
+        case "Agent":
         case "Task":
             return clip(str("description"));
         default:
@@ -459,6 +465,13 @@ export function normalizeHookEvent(payload: unknown): NormalizedHookEvent | null
             detail: clip(typeof record.prompt === "string" ? record.prompt : ""),
             subject: ""
         };
+    }
+    // The subagent's type ("Explore", "general-purpose") as the subject, which
+    // the thread shows beside the line; never the detail, which would become
+    // the session's own one-line status.
+    if (kind === "subagent.start" || kind === "subagent.end") {
+        const type = typeof record.agent_type === "string" ? clip(record.agent_type, 80) : "";
+        return { kind, detail: "", subject: type };
     }
     if (kind === "question") {
         return {

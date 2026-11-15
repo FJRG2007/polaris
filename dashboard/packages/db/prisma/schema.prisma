@@ -9281,6 +9281,13 @@ model AgentSessionEvent {
     detail    String   @default("")
     // The tool or subagent it concerns, where it concerns one.
     subject   String   @default("")
+    // The subagent it fired in (Claude Code's agent_id) and that subagent's type,
+    // or for a launch the type it asked for. Null for the main agent's events.
+    agentId   String?
+    agentType String?
+    // The tool call's id, or a finished subagent's transcript path: what pairs
+    // a launch with its end when the thread draws the subagent tree.
+    ref       String?
     // When Polaris received it, never when the machine says it happened: a clock
     // on somebody else's machine is not one this instance can order anything by.
     createdAt DateTime @default(now())

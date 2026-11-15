@@ -19,6 +19,7 @@
 
 import { isTaskTool, readTodos, reportedPermissionMode } from "@/lib/agents/session-asks";
 import { hookConversation, hookEventFailed, normalizeHookEvent } from "@/lib/agents/session-hooks";
+import { hookSubagentRef } from "@/lib/agents/session-subagents";
 import {
     recordSessionConversation,
     recordSessionEvents,
@@ -110,7 +111,13 @@ export async function POST(
         kind === "prompt" ? ((await turnAccountName(id).catch(() => null)) ?? event.subject) : event.subject;
 
     const seq = parseHookSequence(request.headers.get("x-polaris-seq"));
-    const state = await recordSessionEvents(id, [{ kind, detail: event.detail, subject }], seq);
+    // Which subagent it fired in and the call it belongs to, checked, for the
+    // thread's subagent tree.
+    const state = await recordSessionEvents(
+        id,
+        [{ kind, detail: event.detail, subject, ...hookSubagentRef(payload) }],
+        seq
+    );
     // A finished turn or tool is when the transcript has something new. After
     // the answer, so the hook is never held on a read of the machine; the read
     // is claimed per session, so a burst of tools is one read.

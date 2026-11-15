@@ -32,7 +32,7 @@ const POLL_MS = 2_500;
 
 type Translate = ReturnType<typeof useTranslations<"polar">>;
 
-function durationOf(t: Translate, startedAt: number, endedAt: number | null, now: number): string {
+export function durationOf(t: Translate, startedAt: number, endedAt: number | null, now: number): string {
     const seconds = Math.max(0, Math.round(((endedAt ?? now) - startedAt) / 1000));
     const min = Math.floor(seconds / 60);
     const sec = seconds % 60;
@@ -40,7 +40,7 @@ function durationOf(t: Translate, startedAt: number, endedAt: number | null, now
 }
 
 /** Ticks once a second while `on`, for a running duration. */
-function useNow(on: boolean): number {
+export function useNow(on: boolean): number {
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
         if (!on) return;
@@ -81,7 +81,7 @@ export function useThreadSubagents(threadId: string | null, wake = 0) {
     return { list, failed, reload: load };
 }
 
-function StatusMark({ status }: { status: shared.SubagentStatus }) {
+export function StatusMark({ status }: { status: shared.SubagentStatus }) {
     if (status === "running")
         return <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" aria-hidden />;
     return (

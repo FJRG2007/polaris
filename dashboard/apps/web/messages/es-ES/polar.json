@@ -1468,6 +1468,13 @@
             "noMatch": "Sin agentes",
             "clear": "Dejar este agente"
         },
+        "subagents": {
+            "show": "Ver subagentes",
+            "hide": "Plegar subagentes",
+            "untitled": "Sin descripción",
+            "noSteps": "Aún sin pasos",
+            "stopNote": "Detiene todo el turno del agente"
+        },
         "todos": {
             "title": "Plan",
             "done": "{done} de {total} hechas",

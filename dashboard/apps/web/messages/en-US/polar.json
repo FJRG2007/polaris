@@ -1468,6 +1468,13 @@
             "noMatch": "No agents match",
             "clear": "Stop using this agent"
         },
+        "subagents": {
+            "show": "Show subagents",
+            "hide": "Hide subagents",
+            "untitled": "No description",
+            "noSteps": "No steps yet",
+            "stopNote": "Stops the agent's whole turn"
+        },
         "todos": {
             "title": "Plan",
             "done": "{done} of {total} done",

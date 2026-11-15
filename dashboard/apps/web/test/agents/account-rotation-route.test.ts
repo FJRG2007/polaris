@@ -94,7 +94,14 @@ describe("POST /api/agents/sessions/:id/events", () => {
 
     it("names the account a turn runs on and starts the counts over when one finishes", async () => {
         await post({ hook_event_name: "UserPromptSubmit", prompt: "Fix the flaky test" });
-        expect(seen.recorded[0]).toEqual({ kind: "prompt", detail: "Fix the flaky test", subject: "second@example.test" });
+        expect(seen.recorded[0]).toEqual({
+            kind: "prompt",
+            detail: "Fix the flaky test",
+            subject: "second@example.test",
+            agentId: null,
+            agentType: null,
+            ref: null
+        });
         await post({ hook_event_name: "Stop" });
         await vi.waitFor(() => expect(seen.finished).toEqual([SESSION]));
     });

@@ -54,8 +54,10 @@ import {
     getSession,
     hideSessionFromPolar,
     renameSession,
+    sessionSubagentEvents,
     type SessionView
 } from "@/lib/agents/session-service";
+import { subagentTreeFromEvents, type SubagentNode } from "@/lib/agents/session-subagents";
 import { keepSpare } from "@/lib/agents/session-spares";
 import { queuePosition } from "@/lib/agents/session-queue";
 import { capacityRefusal, sessionCapacity } from "@/lib/agents/session-capacity";
@@ -148,6 +150,26 @@ export interface PolarCodeThread {
     readonly queued: { readonly reason: string | null; readonly position: number | null } | null;
     /** The agent's todo list as it last wrote it; empty when it keeps none. */
     readonly todos: readonly SessionTodo[];
+    /** The subagents its agent launched, oldest first, each with its steps;
+     *  empty when it ran none or the tool does not report them. */
+    readonly subagents: readonly PolarCodeSubagent[];
+}
+
+/** A subagent as the thread shows it. Without its transcript path, which names
+ *  a folder on the agent's machine and is not shown anywhere. */
+export type PolarCodeSubagent = Omit<SubagentNode, "transcriptPath">;
+
+/** The session's subagent tree, or none when it cannot be read: a missing
+ *  tree is never a reason to fail the thread. */
+async function subagentsOf(sessionId: string): Promise<PolarCodeSubagent[]> {
+    try {
+        return subagentTreeFromEvents(await sessionSubagentEvents(sessionId)).map(
+            ({ transcriptPath: _path, ...node }) => node
+        );
+    } catch (error) {
+        console.error(`polar: could not read the subagents of ${sessionId}`, error);
+        return [];
+    }
 }
 
 async function todosOf(sessionId: string): Promise<SessionTodo[]> {
@@ -270,11 +292,12 @@ export async function polarCodeThread(
 ): Promise<PolarCodeThread | null> {
     const access = await accessOf(user);
     if (access === "none") return null;
-    const [detail, t, { context, model }, todos] = await Promise.all([
+    const [detail, t, { context, model }, todos, subagents] = await Promise.all([
         sessionDetailAction(sessionId),
         getTranslations("agents"),
         contextOf(sessionId),
-        todosOf(sessionId)
+        todosOf(sessionId),
+        subagentsOf(sessionId)
     ]);
     if (!detail) return null;
     // Only for whoever the answer route takes it from: the person who started
@@ -334,7 +357,8 @@ export async function polarCodeThread(
             access === "manage" && core.isSessionQueued(detail.session.state)
                 ? await queuedReason(t, user.id, sessionId)
                 : null,
-        todos
+        todos,
+        subagents
     };
 }
 

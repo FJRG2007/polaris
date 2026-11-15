@@ -5,7 +5,17 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { decodeSubagentTree, subagentDuration } from "@/lib/agents/session-subagents";
+import { hookEventFailed, normalizeHookEvent } from "@/lib/agents/session-hooks";
+import {
+    decodeSubagentTree,
+    hookSubagentRef,
+    subagentDuration,
+    subagentTreeFromEvents,
+    SUBAGENT_LAUNCHERS,
+    SUBAGENT_MARKER_KINDS,
+    SUBAGENT_TOOL_KINDS,
+    type StoredSubagentEvent
+} from "@/lib/agents/session-subagents";
 
 const SESSION = { session_id: "00000000-0000-4000-8000-000000000001", transcript_path: "/home/agent/.claude/projects/x/s.jsonl" };
 
@@ -118,3 +128,67 @@ describe("decodeSubagentTree", () => {
         ]);
     });
 });
+
+/** A payload as the events route stores it (`normalizeHookEvent` plus
+ *  `hookSubagentRef`), or null for one it drops or the tree does not read. */
+function stored(payload: unknown, at: number): StoredSubagentEvent | null {
+    const event = normalizeHookEvent(payload);
+    if (!event) return null;
+    const kind = event.kind === "tool.end" && hookEventFailed(payload) ? "tool.failed" : event.kind;
+    const row = { kind, detail: event.detail, subject: event.subject, ...hookSubagentRef(payload), at };
+    // The same filter `sessionSubagentEvents` reads with.
+    const tool = (SUBAGENT_TOOL_KINDS as readonly string[]).includes(kind);
+    const read =
+        (SUBAGENT_MARKER_KINDS as readonly string[]).includes(kind) ||
+        (tool && row.agentId !== null) ||
+        (tool && (SUBAGENT_LAUNCHERS as readonly string[]).includes(row.subject));
+    return read ? row : null;
+}
+
+describe("subagentTreeFromEvents", () => {
+    it("draws from stored events the same tree the payloads give", () => {
+        const payloads = [
+            launch("toolu_1", "Explore", "Find the API routes"),
+            launch("toolu_2", "Plan", "Plan the change"),
+            launch("toolu_3", "general-purpose", "Old CLI", "Task"),
+            start("a1", "Explore"),
+            start("a2", "Plan"),
+            tool("a1", "Grep", "toolu_g", "PreToolUse"),
+            tool("a1", "Grep", "toolu_g", "PostToolUse", { matches: 3 }),
+            tool("a1", "Read", "toolu_r", "PreToolUse"),
+            tool("a1", "Read", "toolu_r", "PostToolUse", { error: "ENOENT" }),
+            tool("a2", "Bash", "toolu_b", "PreToolUse"),
+            stop("a1", "Explore"),
+            launched("toolu_1"),
+            launched("toolu_3", { error: "denied" }, "Task"),
+            { ...SESSION, hook_event_name: "Stop" }
+        ];
+        const rows = payloads
+            .map((payload, index) => stored(payload, 1000 + index * 1000))
+            .filter((row): row is StoredSubagentEvent => row !== null);
+        const fromRows = subagentTreeFromEvents(rows);
+        expect(fromRows).toEqual(decodeSubagentTree(timed(payloads)));
+        expect(fromRows.map((node) => [node.id, node.type, node.description, node.status, node.steps.length])).toEqual([
+            ["a1", "Explore", "Find the API routes", "done", 2],
+            ["a2", "Plan", "Plan the change", "stopped", 1],
+            ["toolu_3", "general-purpose", "Old CLI", "failed", 0]
+        ]);
+    });
+
+    it("lets a background subagent's own end replace the stop the turn gave it", () => {
+        const tree = decodeSubagentTree(
+            timed([launch("toolu_1", "Explore", "Look"), start("a1", "Explore"), { ...SESSION, hook_event_name: "Stop" }, stop("a1", "Explore")])
+        );
+        expect(tree[0]).toMatchObject({ status: "done", endedAt: 4000 });
+    });
+
+    it("skips the stored events the tree has no use for", () => {
+        expect(
+            subagentTreeFromEvents([
+                { kind: "prompt", detail: "hi", subject: "", agentId: null, agentType: null, ref: null, at: 1 },
+                { kind: "permission", detail: "Bash: ls", subject: "Bash", agentId: null, agentType: null, ref: null, at: 2 }
+            ])
+        ).toEqual([]);
+    });
+});
+

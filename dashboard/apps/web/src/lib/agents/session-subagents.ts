@@ -47,12 +47,18 @@ export interface TimedHookPayload {
 }
 
 /** The tool that launches a subagent, by its current and its earlier name. */
-const LAUNCHERS = new Set(["Agent", "Task"]);
+export const SUBAGENT_LAUNCHERS = ["Agent", "Task"] as const;
+const LAUNCHERS = new Set<string>(SUBAGENT_LAUNCHERS);
 const STEPS_MOST = 500;
 const SUBAGENTS_MOST = 100;
 const TEXT_MAX = 200;
-/** An absolute path ending in `.jsonl`, with nothing a shell or a URL would read. */
-const TRANSCRIPT = /^\/[A-Za-z0-9._\/-]{1,1024}\.jsonl$/;
+/** An absolute or home-relative path ending in `.jsonl`, with nothing a shell
+ *  or a URL would read. The hooks reference shows `~/.claude/projects/...`. */
+const TRANSCRIPT = /^~?\/[A-Za-z0-9._\/-]{1,1024}\.jsonl$/;
+/** The CLI's agent ids (`agent-abc123`, `def456`) and tool call ids (`toolu_...`). */
+const AGENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const CALL_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const TYPE_MAX = 80;
 
 const text = z.string().max(4096);
 const payloadSchema = z.object({
@@ -202,8 +208,10 @@ export function decodeSubagentTree(events: readonly TimedHookPayload[]): Subagen
             const node = byAgent.get(event.agent_id);
             if (!node) continue;
             const path = event.agent_transcript_path;
-            if (path && TRANSCRIPT.test(path) && !path.includes("..")) node.transcriptPath = path;
-            if (node.status === "running") {
+            if (path && isSubagentTranscript(path)) node.transcriptPath = path;
+            // Stopped too: a background subagent outlives the turn that
+            // launched it, and its own end is the better word.
+            if (node.status === "running" || node.status === "stopped") {
                 node.status = "done";
                 node.endedAt = at;
             }
@@ -221,3 +229,129 @@ export function subagentDuration(node: SubagentNode, now: number): number | null
     if (node.startedAt === null) return null;
     return Math.max(0, (node.endedAt ?? (node.status === "running" ? now : node.startedAt)) - node.startedAt);
 }
+
+function isSubagentTranscript(path: string): boolean {
+    return TRANSCRIPT.test(path) && !path.split("/").includes("..");
+}
+
+/** What one stored event keeps of its hook payload, for the tree to be read
+ *  again later. Every field null when the payload does not carry it. */
+export interface SubagentRef {
+    readonly agentId: string | null;
+    readonly agentType: string | null;
+    /** The tool call's id, or a finished subagent's transcript path. */
+    readonly ref: string | null;
+}
+
+const refSchema = z.object({
+    hook_event_name: text,
+    agent_id: text.optional(),
+    agent_type: text.optional(),
+    agent_transcript_path: text.optional(),
+    tool_name: text.optional(),
+    tool_use_id: text.optional(),
+    tool_input: z.object({ subagent_type: z.unknown().optional() }).passthrough().optional()
+});
+
+/** The subagent fields of a hook payload, checked; nothing for a payload that
+ *  has none or carries them in a shape this does not trust. */
+export function hookSubagentRef(payload: unknown): SubagentRef {
+    const none: SubagentRef = { agentId: null, agentType: null, ref: null };
+    const parsed = refSchema.safeParse(payload);
+    if (!parsed.success) return none;
+    const event = parsed.data;
+    const agentId = event.agent_id && AGENT_ID.test(event.agent_id) ? event.agent_id : null;
+    const launcher = !agentId && LAUNCHERS.has(event.tool_name ?? "");
+    const type = clip(launcher ? event.tool_input?.subagent_type : event.agent_type).slice(0, TYPE_MAX);
+    const path = event.agent_transcript_path;
+    const ref =
+        event.hook_event_name === "SubagentStop"
+            ? path && isSubagentTranscript(path)
+                ? path
+                : null
+            : event.tool_use_id && CALL_ID.test(event.tool_use_id)
+              ? event.tool_use_id
+              : null;
+    return { agentId, agentType: (agentId || launcher) && type ? type : null, ref };
+}
+
+/** One stored session event, as the thread reads it back. */
+export interface StoredSubagentEvent extends SubagentRef {
+    readonly kind: string;
+    readonly detail: string;
+    readonly subject: string;
+    readonly at: number;
+}
+
+/** The hook payload a stored event came from, as far as the tree needs it. */
+function payloadOf(row: StoredSubagentEvent): Record<string, unknown> | null {
+    const ids = {
+        ...(row.agentId ? { agent_id: row.agentId } : {}),
+        ...(row.agentType ? { agent_type: row.agentType } : {})
+    };
+    switch (row.kind) {
+        case "tool.start": {
+            const launcher = !row.agentId && LAUNCHERS.has(row.subject);
+            const prefix = `${row.subject}: `;
+            const description = row.detail.startsWith(prefix) ? row.detail.slice(prefix.length) : "";
+            return {
+                hook_event_name: "PreToolUse",
+                tool_name: row.subject,
+                ...(row.ref ? { tool_use_id: row.ref } : {}),
+                ...(launcher
+                    ? { tool_input: { description, ...(row.agentType ? { subagent_type: row.agentType } : {}) } }
+                    : ids)
+            };
+        }
+        case "tool.end":
+        case "tool.failed":
+            return {
+                hook_event_name: "PostToolUse",
+                tool_name: row.subject,
+                ...(row.ref ? { tool_use_id: row.ref } : {}),
+                ...(row.kind === "tool.failed" ? { tool_response: { success: false } } : {}),
+                ...ids
+            };
+        case "subagent.start":
+            return { hook_event_name: "SubagentStart", ...ids };
+        case "subagent.end":
+            return {
+                hook_event_name: "SubagentStop",
+                ...ids,
+                ...(row.ref ? { agent_transcript_path: row.ref } : {})
+            };
+        case "turn.end":
+            return { hook_event_name: "Stop" };
+        case "turn.failed":
+            return { hook_event_name: "StopFailure" };
+        case "session.end":
+        case "session.clear":
+            return { hook_event_name: "SessionEnd" };
+        default:
+            return null;
+    }
+}
+
+/** The tree from a session's stored events, oldest first. */
+export function subagentTreeFromEvents(rows: readonly StoredSubagentEvent[]): SubagentNode[] {
+    const events: TimedHookPayload[] = [];
+    for (const row of rows) {
+        const payload = payloadOf(row);
+        if (payload) events.push({ payload, at: row.at });
+    }
+    return decodeSubagentTree(events);
+}
+
+/** The stored tool events: a launch and its end (subject one of
+ *  `SUBAGENT_LAUNCHERS`), or a step inside a subagent (an `agentId`). */
+export const SUBAGENT_TOOL_KINDS = ["tool.start", "tool.end", "tool.failed"] as const;
+/** The other stored events the tree reads: the subagents' own, and the
+ *  turn's end that stops whatever still runs. */
+export const SUBAGENT_MARKER_KINDS = [
+    "subagent.start",
+    "subagent.end",
+    "turn.end",
+    "turn.failed",
+    "session.end",
+    "session.clear"
+] as const;

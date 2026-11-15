@@ -21,6 +21,7 @@ import { generateToken, hashToken } from "@polaris/core/tokens";
 import { readSessionCursor } from "./session-cursor";
 import { GENERAL_SCOPE, getPlatformAgentDefaults, scopeOf, withTierGate } from "./agent-defaults-service";
 import { clearSessionWaiting, noticeSessionEnded, noticeSessionWaiting } from "./agent-notices";
+import * as subagents from "./session-subagents";
 
 /**
  * A failure whose message is meant for whoever is reading the screen.
@@ -596,7 +597,15 @@ export async function sessionOwner(sessionId: string): Promise<string | null> {
  */
 export async function recordSessionEvents(
     sessionId: string,
-    events: readonly { kind: core.AgentSessionEventKind; detail: string; subject: string }[],
+    events: readonly {
+        kind: core.AgentSessionEventKind;
+        detail: string;
+        subject: string;
+        /** The subagent fields of the payload (`hookSubagentRef`), when it had any. */
+        agentId?: string | null;
+        agentType?: string | null;
+        ref?: string | null;
+    }[],
     /** When the hook ran on the machine; see `core.applySessionEvents`. */
     seq: bigint | null = null
 ): Promise<core.AgentSessionState | null> {
@@ -641,7 +650,10 @@ export async function recordSessionEvents(
                     sessionId,
                     kind: event.kind,
                     detail: event.detail,
-                    subject: event.subject
+                    subject: event.subject,
+                    agentId: event.agentId ?? null,
+                    agentType: event.agentType ?? null,
+                    ref: event.ref ?? null
                 }))
             });
             return true;
@@ -798,6 +810,40 @@ async function tellOwner(
     if (before === "waiting") await clearSessionWaiting(sessionId);
     if (core.isSessionOver(before) || !core.isSessionOver(after)) return;
     await noticeSessionEnded(sessionId, after === "failed" ? "failed" : "exited");
+}
+
+/** How many stored events the subagent tree is read from: the newest, which
+ *  covers the turns a reader is looking at without reading a long session whole. */
+const SUBAGENT_EVENTS_MOST = 2000;
+
+/** The events a session's subagent tree is drawn from, oldest first. */
+export async function sessionSubagentEvents(sessionId: string): Promise<subagents.StoredSubagentEvent[]> {
+    const tools = [...subagents.SUBAGENT_TOOL_KINDS];
+    // Never the main agent's own tool calls, which are most of a session.
+    const records = await prisma.agentSessionEvent.findMany({
+        where: {
+            sessionId,
+            OR: [
+                { kind: { in: [...subagents.SUBAGENT_MARKER_KINDS] } },
+                { kind: { in: tools }, agentId: { not: null } },
+                { kind: { in: tools }, subject: { in: [...subagents.SUBAGENT_LAUNCHERS] } }
+            ]
+        },
+        orderBy: { createdAt: "desc" },
+        take: SUBAGENT_EVENTS_MOST,
+        select: {
+            kind: true,
+            detail: true,
+            subject: true,
+            agentId: true,
+            agentType: true,
+            ref: true,
+            createdAt: true
+        }
+    });
+    return records
+        .map(({ createdAt, ...record }) => ({ ...record, at: createdAt.getTime() }))
+        .reverse();
 }
 
 /** What a session has reported, oldest first. */

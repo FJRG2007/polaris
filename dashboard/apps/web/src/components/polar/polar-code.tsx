@@ -108,6 +108,7 @@ import {
 } from "@/components/polar/polar-code-context";
 import type { PendingPermission } from "@/lib/agents/session-permissions";
 import { CodeAskCard, CodeTodos } from "@/components/polar/polar-code-asks";
+import { CodeSubagents } from "@/components/polar/polar-code-subagents";
 import type { PolarCodeTask } from "@/lib/polar/code-task";
 import type {
     PolarCodeAccess,
@@ -1286,6 +1287,20 @@ function CodeThread({
         });
     };
 
+    /** Interrupt the agent's turn: `/stop`, and the Stop on a running subagent. */
+    const stopTurn = () => {
+        setError(null);
+        startTransition(() => {
+            void runAction(
+                () => postCode<{ error?: string }>("/api/polar/code/interrupt", { sessionId }),
+                setError
+            ).then((result) => {
+                if (result?.error) setError(result.error);
+                read();
+            });
+        });
+    };
+
     /** What a "/" command does here: Polaris's own run on this screen, the
      *  rest go to the agent in its CLI's own spelling. */
     const runCommand = (command: codeCommands.CodeCommand, rest: string) => {
@@ -1305,18 +1320,7 @@ function CodeThread({
                 else setError(t("slash.code.renameFailed"));
             });
         }
-        if (command === "stop") {
-            setError(null);
-            return startTransition(() => {
-                void runAction(
-                    () => postCode<{ error?: string }>("/api/polar/code/interrupt", { sessionId }),
-                    setError
-                ).then((result) => {
-                    if (result?.error) setError(result.error);
-                    read();
-                });
-            });
-        }
+        if (command === "stop") return stopTurn();
         const text = cli ? codeCommands.forwardedText(command, rest, cli) : null;
         if (text) sendText(text);
     };
@@ -1685,6 +1689,12 @@ function CodeThread({
                                 </Work>
                             )
                         )}
+                        {/* A thread cached before subagents were read has none. */}
+                        <CodeSubagents
+                            subagents={thread.subagents ?? []}
+                            onStop={live && thread.canManage && canPrompt ? stopTurn : null}
+                            stopping={busy}
+                        />
                         {firstPrompt && !thread.entries.some((entry) => entry.role === "user") ? (
                             <Message from="user">
                                 <MessageContent from="user">
