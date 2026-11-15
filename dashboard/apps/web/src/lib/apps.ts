@@ -128,6 +128,7 @@ import {
     EthernetPort,
     FileBadge,
     Award,
+    Laptop,
     type LucideIcon
 } from "lucide-react";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
@@ -2589,6 +2590,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "oauth"
             ],
             group: DEVELOPERS_GROUP
+        },
+        // The computers Polar Code sessions can run on, through their runner.
+        {
+            label: "Your computers", // i18n-ignore
+            href: "/account/computers",
+            icon: Laptop,
+            keywords: ["computer", "pc", "runner", "pair", "this computer", "claude code", "codex"],
+            group: DEVELOPERS_GROUP,
+            needs: "agents.manage"
         },
         {
             label: "AI provider keys", // i18n-ignore

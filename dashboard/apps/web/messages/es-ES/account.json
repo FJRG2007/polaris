@@ -1926,5 +1926,48 @@
             "on": "Sí",
             "floor": "Nunca"
         }
+    },
+    "computers": {
+        "page": {
+            "title": "Tus equipos",
+            "intro": "Los equipos que vincules aquí ejecutan sesiones de Polar Code con sus propias herramientas.",
+            "noAccess": "Tu cuenta no puede iniciar sesiones de agentes ni vincular equipos."
+        },
+        "pair": {
+            "button": "Vincular equipo",
+            "title": "Vincular equipo",
+            "description": "Escribe este código en el equipo o escanéalo. Sirve una vez, 10 minutos.",
+            "waiting": "Esperando al equipo...",
+            "expired": "El código caducó.",
+            "again": "Otro código",
+            "close": "Cerrar"
+        },
+        "list": {
+            "empty": "Aún no hay equipos. Vincula uno para usarlo.",
+            "online": "En línea",
+            "offline": "Apagado",
+            "lastSeen": "Visto",
+            "neverSeen": "Nunca conectado",
+            "version": "Runner {version}",
+            "signedOut": "Sin sesión iniciada en este equipo",
+            "signedOutShort": "sin sesión",
+            "actions": "Acciones de {name}"
+        },
+        "rename": {
+            "button": "Renombrar",
+            "title": "Renombrar equipo",
+            "label": "Nombre",
+            "save": "Guardar"
+        },
+        "revoke": {
+            "title": "¿Olvidar {name}?",
+            "description": "Se desconecta ya y debe vincularse de nuevo. Sus sesiones acabadas se quedan.",
+            "confirm": "Olvidar"
+        },
+        "errors": {
+            "pair": "No se pudo crear un código. Reinténtalo.",
+            "gone": "Ese equipo ya no está vinculado.",
+            "name": "Usa un nombre de 1 a 60 caracteres."
+        }
     }
 }

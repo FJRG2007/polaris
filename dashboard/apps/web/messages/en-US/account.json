@@ -1926,5 +1926,48 @@
             "on": "On",
             "floor": "Never"
         }
+    },
+    "computers": {
+        "page": {
+            "title": "Your computers",
+            "intro": "Computers you pair here can run Polar Code sessions with the coding tools installed on them.",
+            "noAccess": "Your account cannot start agent sessions, so it cannot pair computers."
+        },
+        "pair": {
+            "button": "Pair a computer",
+            "title": "Pair a computer",
+            "description": "Enter this code on the computer, or scan it. It works once, for 10 minutes.",
+            "waiting": "Waiting for the computer...",
+            "expired": "This code expired.",
+            "again": "New code",
+            "close": "Close"
+        },
+        "list": {
+            "empty": "No computers yet. Pair one to run sessions on it.",
+            "online": "Online",
+            "offline": "Offline",
+            "lastSeen": "Last seen",
+            "neverSeen": "Never connected",
+            "version": "Runner {version}",
+            "signedOut": "Not signed in on this computer",
+            "signedOutShort": "signed out",
+            "actions": "Actions for {name}"
+        },
+        "rename": {
+            "button": "Rename",
+            "title": "Rename computer",
+            "label": "Name",
+            "save": "Save"
+        },
+        "revoke": {
+            "title": "Forget {name}?",
+            "description": "It disconnects now and has to be paired again to run sessions. Its finished sessions stay.",
+            "confirm": "Forget"
+        },
+        "errors": {
+            "pair": "A code could not be made. Try again.",
+            "gone": "That computer is no longer paired.",
+            "name": "Use a name of 1 to 60 characters."
+        }
     }
 }

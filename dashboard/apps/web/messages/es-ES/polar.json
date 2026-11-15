@@ -1544,11 +1544,11 @@
         "modelBusy": "Responde al agente primero y luego cambia el modelo.",
         "goalFailed": "No se pudo fijar el objetivo aquí.",
         "place": {
-            "label": "Se ejecuta en",
+            "label": "Corre en",
             "polaris": "Polaris",
             "polarisHint": "Su propia máquina en este servidor.",
             "online": "En línea",
-            "offline": "Sin conexión",
+            "offline": "Apagado",
             "pair": "Vincular un equipo",
             "manage": "Tus equipos"
         }
