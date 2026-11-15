@@ -33,7 +33,7 @@ export function SelectionTranslation({
     const translator = useTextTranslator();
     const [to, setTo] = useState<string | null>(null);
     const [outcome, setOutcome] = useState<TranslationOutcome | null>(null);
-    const target = to ?? translator?.target ?? "en";
+    const target = to ?? translator?.preferred ?? "en";
     const text = selection?.text ?? "";
 
     useEffect(() => {
@@ -76,7 +76,10 @@ export function SelectionTranslation({
                     </span>
                     <LanguageSelect
                         value={target}
-                        onChange={setTo}
+                        onChange={(code) => {
+                            setTo(code);
+                            translator.choose(code);
+                        }}
                         label={t("textTranslation.language")}
                         className="h-7 w-40 min-w-0 text-xs"
                     />

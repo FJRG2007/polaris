@@ -86,6 +86,8 @@ describe("Translate in the message menu", () => {
     it("is absent on a deleted message", async () => {
         translator.current = {
             target: "en",
+            preferred: "en",
+            choose: () => {},
             translate: async () => ({ kind: "same" }),
             openHref: () => ""
         };
@@ -101,7 +103,7 @@ describe("Translate in the message menu", () => {
             text: "Hello",
             detected: "fr"
         }));
-        translator.current = { target: "en", translate, openHref: () => "" };
+        translator.current = { target: "en", preferred: "en", choose: () => {}, translate, openHref: () => "" };
         menu();
         await open();
         await userEvent.click(await screen.findByText("Translate"));

@@ -96,7 +96,7 @@ function comesIntoView() {
 
 function fakeTranslator(answer: (text: string, to: string) => TranslationOutcome) {
     const translate = vi.fn(async (text: string, to: string) => answer(text, to));
-    translator.current = { target: "en", translate, openHref: () => "/translate" };
+    translator.current = { target: "en", preferred: "en", choose: () => {}, translate, openHref: () => "/translate" };
     return translate;
 }
 
@@ -334,7 +334,7 @@ describe("sending in another language", () => {
                 ? new Promise<TranslationOutcome>((resolve) => (answer = resolve))
                 : Promise.resolve<TranslationOutcome>({ kind: "same" })
         );
-        translator.current = { target: "en", translate, openHref: () => "/translate" };
+        translator.current = { target: "en", preferred: "en", choose: () => {}, translate, openHref: () => "/translate" };
         const onSend = vi.fn();
         const user = userEvent.setup();
         const { container } = box(onSend);

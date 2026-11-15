@@ -96,6 +96,7 @@ import {
 } from "../model/schemas";
 import { forgetAction, forgetAllAction, historyAction, rememberAction } from "../actions/translate";
 import { AUTO, languageName, normalizeDetected, type SourceLanguage } from "../model/languages";
+import { readLastTarget, writeLastTarget } from "./last-target";
 
 /** How long typing has to pause before a request leaves. */
 const DEBOUNCE_MS = 450;
@@ -172,6 +173,14 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
 
     const [from, setFrom] = useState<SourceLanguage>(AUTO);
     const [to, setTo] = useState<string | null>(null);
+    // Read after the first paint: the server cannot see this device's storage.
+    const [lastTarget, setLastTarget] = useState<string | null>(null);
+    useEffect(() => setLastTarget(readLastTarget()), []);
+    const pickTarget = useCallback((code: string) => {
+        setTo(code);
+        setLastTarget(code);
+        writeLastTarget(code);
+    }, []);
     const [chosen, setChosen] = useState<EngineId | null>(null);
     const [input, setInput] = useState<Input>({ kind: "text" });
     const [dragging, setDragging] = useState(false);
@@ -276,7 +285,14 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         [browser, local, available, settings]
     );
     const engineId = pickEngine(usable, chosen);
-    const targetLanguage = to ?? status?.defaultTarget ?? DEFAULT_SETTINGS.defaultTarget;
+    // A link's language, then the one last picked, then the language Polaris is
+    // read in; the administrator's default only for a language Translate lacks.
+    const targetLanguage =
+        to ??
+        lastTarget ??
+        normalizeDetected(locale) ??
+        status?.defaultTarget ??
+        DEFAULT_SETTINGS.defaultTarget;
     const charLimit = status?.charLimit ?? null;
     const overLimit = charLimit !== null && source.length > charLimit;
 
@@ -481,7 +497,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 ? { source: nextSource, from: nextFrom, to: swapFrom, chosen }
                 : null;
         setFrom(nextFrom);
-        setTo(swapFrom);
+        pickTarget(swapFrom);
         setSource(nextSource);
         setTarget(loaded.current ? source : "");
         setDetected(null);
@@ -795,7 +811,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                     className="w-full min-w-0 sm:w-56"
                     aria-label={t("lang.to")}
                     value={targetLanguage}
-                    onValueChange={setTo}
+                    onValueChange={pickTarget}
                     options={languages}
                     searchPlaceholder={t("lang.search")}
                     emptyText={t("lang.none")}

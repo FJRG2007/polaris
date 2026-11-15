@@ -7,10 +7,10 @@
  */
 
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { TextTranslationOffer } from "@/lib/app-extensions/types";
 import { useLocale } from "@/components/i18n/i18n-provider";
-import { localeLanguage } from "@/lib/text-translation/logic";
+import { localeLanguage, TARGET_LANGUAGES } from "@/lib/text-translation/logic";
 import {
     TranslationQueue,
     type DeviceEngines,
@@ -18,12 +18,30 @@ import {
     type TranslationOutcome
 } from "@/lib/text-translation/queue";
 
+/** Where the language last translated into is kept on this device - the same
+ *  key the Translate app writes (`apps/translate/src/screens/last-target.ts`). */
+const LAST_TARGET_KEY = "polaris:translate-to";
+
+function readLastTarget(): string | null {
+    try {
+        const stored = localStorage.getItem(LAST_TARGET_KEY);
+        return stored && (TARGET_LANGUAGES as readonly string[]).includes(stored) ? stored : null;
+    } catch {
+        return null;
+    }
+}
+
 /** The most of a text carried into the Translate app's address. */
 const OPEN_TEXT_MAX = 2000;
 
 export interface TextTranslator {
-    /** The reader's own language, the default target everywhere. */
+    /** The reader's own language: what live chat translation reads into. */
     readonly target: string;
+    /** What a translation the reader asks for starts in: the language last
+     *  picked on this device, else the reader's own. */
+    readonly preferred: string;
+    /** Remembers a language the reader picked, so the next translation starts in it. */
+    readonly choose: (to: string) => void;
     readonly translate: (text: string, to: string) => Promise<TranslationOutcome>;
     /** The app's own screen, with this text and target carried along. */
     readonly openHref: (text: string, to: string) => string;
@@ -60,6 +78,17 @@ export function TextTranslationProvider({
 }) {
     const locale = useLocale();
     const router = useRouter();
+    // Read after the first paint: the server cannot see this device's storage.
+    const [last, setLast] = useState<string | null>(null);
+    useEffect(() => setLast(readLastTarget()), []);
+    const choose = useCallback((to: string) => {
+        setLast(to);
+        try {
+            localStorage.setItem(LAST_TARGET_KEY, to);
+        } catch {
+            // Private windows and blocked storage: the reader's language stays the default.
+        }
+    }, []);
     const value = useMemo<TextTranslator | null>(() => {
         if (!offer) return null;
         const queue = new TranslationQueue(
@@ -71,13 +100,15 @@ export function TextTranslationProvider({
         );
         return {
             target: localeLanguage(locale),
+            preferred: last ?? localeLanguage(locale),
+            choose,
             translate: (text, to) => queue.translate(text, to),
             openHref: (text, to) => {
                 const query = new URLSearchParams({ text: text.slice(0, OPEN_TEXT_MAX), to });
                 return `${offer.page}?${query.toString()}`;
             }
         };
-    }, [offer, locale, router]);
+    }, [offer, locale, router, last, choose]);
     return <TranslatorContext.Provider value={value}>{children}</TranslatorContext.Provider>;
 }
 

@@ -188,7 +188,7 @@ export function useTranslateToggle(
                       message.id,
                       message.body,
                       plainText(message.body),
-                      translator.target,
+                      translator.preferred,
                       translator.translate,
                       "menu"
                   )
