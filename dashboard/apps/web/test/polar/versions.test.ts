@@ -35,6 +35,21 @@ describe("the version tree", () => {
         expect(ids(pathThrough(tree, [question], 1, "a1"))).toEqual(["u1", "a1"]);
     });
 
+    it("never pages to an answer that shows nothing, unless it is the one on screen", () => {
+        const tree: VersionTree = new Map();
+        const question = message("u1", "user");
+        const blank: UIMessage = {
+            id: "a2",
+            role: "assistant",
+            parts: [{ type: "step-start" }, { type: "text", text: "  " }]
+        };
+        learnPath(tree, [question, message("a1", "assistant")]);
+        learnPath(tree, [question, blank]);
+        learnPath(tree, [question, message("a3", "assistant")]);
+        expect(versionsOf(tree, "a3")).toEqual(["a1", "a3"]);
+        expect(versionsOf(tree, "a2")).toEqual(["a1", "a2", "a3"]);
+    });
+
     it("places stored messages by the parent they were saved with", () => {
         const tree: VersionTree = new Map();
         const stored = [message("u1", "user"), message("a1", "assistant"), message("u1b", "user")];

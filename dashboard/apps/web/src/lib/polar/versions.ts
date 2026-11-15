@@ -43,14 +43,30 @@ export function learnPath(
     });
 }
 
-/** Every version of the turn this message is one of, oldest first. */
+/** An answer that shows nothing: no text, no tool call, no file, no failure
+ *  notice - a turn handed to another model before it said a word, or one
+ *  stopped at once. Reasoning alone is not an answer. */
+export function isEmptyAnswer(message: UIMessage): boolean {
+    if (message.role !== "assistant") return false;
+    return message.parts.every(
+        (part) =>
+            part.type === "step-start" ||
+            part.type === "reasoning" ||
+            (part.type === "text" && !part.text.trim())
+    );
+}
+
+/** Every version of the turn this message is one of, oldest first. An empty
+ *  answer is not a version worth paging to ("3 of 3" on a blank turn), unless
+ *  it is the one on screen. */
 export function versionsOf(tree: VersionTree, id: string): string[] {
     const node = tree.get(id);
     if (!node) return [id];
     const versions: string[] = [];
     for (const [key, entry] of tree) {
-        if (entry.parentId === node.parentId && entry.message.role === node.message.role)
-            versions.push(key);
+        if (entry.parentId !== node.parentId || entry.message.role !== node.message.role) continue;
+        if (key !== id && isEmptyAnswer(entry.message)) continue;
+        versions.push(key);
     }
     return versions;
 }
