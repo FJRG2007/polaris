@@ -27,9 +27,11 @@
  */
 
 import { shellQuote } from "./session-hooks";
+import { INSTALL_GH } from "./session-gh";
 import {
     FIRST_RUN_WORKDIR,
     hasControlCharacter,
+    SAFE_MODEL_ID,
     isVendorSessionId,
     promptSubmitDelayMs,
     sanitizeAgentPrompt,
@@ -780,6 +782,8 @@ export const LAUNCH_SCRIPT = [
     "# Written by Polaris. Starts this session's agent; an argument reopens that conversation.",
     "# --turn <file> runs the prompt in that file without the agent's interface, on the conversation its hooks last named.",
     READ_CREDENTIALS,
+    // The session's own tools first: its `gh`, which mints its token per run.
+    'if [ -d "$POLARIS_STATE_DIR/bin" ]; then PATH="$POLARIS_STATE_DIR/bin:$PATH"; export PATH; fi',
     'turn=""',
     'if [ "${1:-}" = "--turn" ]; then',
     '  turn="${2:-}"',
@@ -817,6 +821,11 @@ export const LAUNCH_SCRIPT = [
     // takes it. Last on the line, so it outranks the one the boot gave.
     '  m="$(head -c 40 "$POLARIS_STATE_DIR/permission-mode" 2>/dev/null || true)"',
     '  case "$m" in default|acceptEdits|plan|bypassPermissions) line="$line --permission-mode $m" ;; esac',
+    // A model changed mid-session (see modelCommand), last for the same reason.
+    // The flag outranks ANTHROPIC_MODEL, which is how the boot named one.
+    '  m="$(head -c 200 "$POLARIS_STATE_DIR/model" 2>/dev/null || true)"',
+    // Quoted on the line: an id like `sonnet[1m]` is otherwise a glob.
+    `  if printf %s "$m" | grep -Eq '^[A-Za-z0-9][][A-Za-z0-9._:/@-]{0,199}$'; then line="$line --model '$m'"; fi`,
     '  line="$line --settings \\"$POLARIS_STATE_DIR/settings.json\\" --mcp-config \\"$POLARIS_STATE_DIR/mcp.json\\""',
     `  if [ -n "\${POLARIS_PREVIEW_BASE:-}" ]; then line="$line --append-system-prompt \\"${PREVIEW_PROMPT}\\""; fi`,
     "fi",
@@ -1005,6 +1014,28 @@ export function permissionModeCommand(stateDir: string, claudeMode: string, pres
         keys
             ? `t=${shellQuote(TMUX_SESSION)}; if ${interfaceOpen()}; then t=${shellQuote(`${TMUX_SESSION}:${INTERFACE_WINDOW}`)}; fi; tmux send-keys -t "$t" ${keys}`
             : ":"
+    ].join("\n");
+}
+
+/**
+ * Change a running Claude session's model.
+ *
+ * Like the mode, written beside the checkout for the launch script, so a session
+ * that runs each prompt as its own turn takes it from the next one. One with the
+ * agent's interface open is told where it stands with `/model <id>`, which
+ * Claude Code takes without opening its picker - only when it is idle at its
+ * prompt, which the caller checks. The id is held to SAFE_MODEL_ID here because
+ * it is about to be a word on a command line.
+ */
+export function modelCommand(stateDir: string, model: string): string {
+    if (!SAFE_MODEL_ID.test(model)) throw new Error("not a model id");
+    const target = `${TMUX_SESSION}:${INTERFACE_WINDOW}`;
+    return [
+        `printf %s ${shellQuote(model)} > "${stateDir}/model"`,
+        `if ${runnerIn(stateDir)} && ! ${interfaceOpen()}; then exit 0; fi`,
+        `t=${shellQuote(TMUX_SESSION)}; if ${interfaceOpen()}; then t=${shellQuote(target)}; fi`,
+        `tmux send-keys -t "$t" -l ${shellQuote(`/model ${model}`)}`,
+        'tmux send-keys -t "$t" Enter'
     ].join("\n");
 }
 
@@ -1197,6 +1228,7 @@ export const SESSION_SETUP = [
     ...INSTALL_ENIGMA,
     ...INSTALL_AGENT,
     ...REQUIRE_AGENT,
+    ...INSTALL_GH,
     ...REPO_SETUP,
     ...START_AGENT
 ].join("\n");

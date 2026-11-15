@@ -525,6 +525,47 @@ export async function setSessionModeAction(input: unknown): Promise<{ error?: st
     return {};
 }
 
+const sessionModelSchema = z
+    .object({
+        sessionId: z.string().trim().uuid(),
+        // Null is the account's own default, which Claude Code calls `default`.
+        model: z.string().trim().regex(core.SAFE_MODEL_ID).nullable()
+    })
+    .strict();
+
+/**
+ * Change a running Claude session's model mid-session, on the account it
+ * already signs in with. Not while the agent waits on an answer: in an open
+ * terminal the typed `/model` would answer that prompt instead.
+ */
+export async function setSessionModelAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const [t, tp] = await Promise.all([getTranslations("agents"), getTranslations("polar")]);
+    const parsed = sessionModelSchema.safeParse(input);
+    if (!parsed.success) return { error: t("sessions.errors.gone") };
+    const session = await sessions.getSession(parsed.data.sessionId, user.id);
+    if (!session || core.isSessionOver(session.state)) return { error: t("sessions.errors.gone") };
+    if (!core.takesPermissionMode(session.cli)) return { error: tp("code.modelFailed") };
+    const model = parsed.data.model;
+    if ((session.modelChoice?.model ?? null) === model) return {};
+    if (await permissions.pendingPermission(session.id)) return { error: tp("code.modelBusy") };
+    try {
+        await runtime.changeSessionModel(session.id, model ?? "default");
+        const provider = core.agentCliById(session.cli)?.model?.provider ?? null;
+        await prisma.agentSession.update({
+            where: { id: session.id },
+            data: model
+                ? { model, modelProvider: session.modelChoice?.provider ?? provider }
+                : { model: null, modelProvider: null },
+            select: { id: true }
+        });
+    } catch (error) {
+        console.error(`[agent-session] ${session.id}: model change failed:`, error);
+        return { error: tp("code.modelFailed") };
+    }
+    return {};
+}
+
 export async function stopSessionAction(sessionId: string): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
     const session = await sessions.getSession(sessionId, user.id);

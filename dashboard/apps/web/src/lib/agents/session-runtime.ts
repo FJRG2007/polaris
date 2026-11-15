@@ -1031,6 +1031,20 @@ export async function changeSessionMode(
     );
 }
 
+/**
+ * Change a running Claude session's model, as the thread's picker does
+ * mid-session: for its next turn, or at once in an open interface.
+ */
+export async function changeSessionModel(sessionId: string, model: string): Promise<void> {
+    const placement = await sessionPlacement(sessionId);
+    if (!placement) throw new Error("That session no longer exists.");
+    await steer(
+        sessionId,
+        commands.modelCommand(stateDirFor(placement), model),
+        "The agent's terminal did not take the model"
+    );
+}
+
 /** Stop what the agent is doing without ending the session. */
 export async function interruptSession(sessionId: string): Promise<void> {
     const placement = await sessionPlacement(sessionId);

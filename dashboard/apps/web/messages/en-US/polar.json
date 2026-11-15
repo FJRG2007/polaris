@@ -1452,7 +1452,9 @@
             "send": "Send back"
         },
         "modeFailed": "The mode could not be changed. Try again.",
-        "modeBusy": "Answer the agent first, then change the mode."
+        "modeBusy": "Answer the agent first, then change the mode.",
+        "modelFailed": "The model could not be changed. Try again.",
+        "modelBusy": "Answer the agent first, then change the model."
     },
     "compare": {
         "open": "Ask several models",

@@ -65,6 +65,7 @@ import {
     listSessionsAction,
     promptSessionAction,
     setSessionModeAction,
+    setSessionModelAction,
     sessionChoicesAction,
     sessionDetailAction,
     startSessionAction,
@@ -564,6 +565,13 @@ export async function polarCodeInterrupt(
     const parsed = polarCodeInterruptSchema.safeParse(input);
     // An id that is not one reads as a session that is not there.
     return interruptSessionAction(parsed.success ? parsed.data.sessionId : "");
+}
+
+/** Change a running Claude session's model from its thread. */
+export async function polarCodeModel(user: SessionUser, input: unknown): Promise<{ error?: string }> {
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    return setSessionModelAction(input);
 }
 
 /** Change a running session's permission mode from its thread. */

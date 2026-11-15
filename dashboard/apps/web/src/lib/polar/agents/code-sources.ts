@@ -128,6 +128,28 @@ export const serverSourceKey = (engine: string) => `server:${engine}`;
 export { polarSourceKey };
 export const isPolarSource = (key: string) => key.startsWith("polar:");
 
+/**
+ * The source a running session signs in with, for a model changed mid-session:
+ * only that source's models are offered, because the change keeps the session's
+ * sign-in and only swaps the model. Its account when it picked one, else the
+ * machine's own sign-in or the deployment's; null when none of them is listed.
+ */
+export function liveSourceFor(
+    sources: readonly CodeSource[],
+    session: { readonly cli: string; readonly accountId: string | null; readonly useMachineLogin: boolean }
+): CodeSource | null {
+    const keys = session.accountId
+        ? [accountSourceKey(session.accountId)]
+        : session.useMachineLogin
+          ? [machineSourceKey(session.cli)]
+          : [machineSourceKey(session.cli), serverSourceKey(session.cli)];
+    for (const key of keys) {
+        const found = sources.find((source) => source.key === key && source.engines.includes(session.cli));
+        if (found) return found;
+    }
+    return null;
+}
+
 /** The chat provider slug an API key credential is (`MODEL_PROVIDERS`). */
 const POLAR_PROVIDER_OF: Readonly<Record<string, string>> = {
     ANTHROPIC_API_KEY: "anthropic",

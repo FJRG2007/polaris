@@ -33,6 +33,7 @@ import {
     AUTOMATIC_PICK,
     CODE_PICK_STORAGE_KEY,
     isAutomaticPick,
+    liveSourceFor,
     migrateStoredAgent,
     polarSourcesFor,
     POLAR_RUNTIME,
@@ -1300,6 +1301,46 @@ function CodeThread({
         });
     };
 
+    // The model, changeable while it runs: Claude Code only, among the models
+    // of the source it already signs in with. The sources are the start
+    // picker's, read once here when this tab has not read them yet.
+    const modelLive = Boolean(cli && core.takesPermissionMode(cli) && thread?.session.live);
+    const [sources, setSources] = useState<readonly CodeSource[] | null>(
+        () => choicesCache?.code?.sources ?? null
+    );
+    useEffect(() => {
+        if (!modelLive || sources !== null) return;
+        void readPoll<Choices | null>("/api/polar/code/choices", {}, signal())
+            .then((loaded) => {
+                if (!loaded) return;
+                choicesCache = loaded;
+                setSources(loaded.code?.sources ?? []);
+            })
+            .catch(() => undefined);
+    }, [modelLive, sources, signal]);
+    const view = thread?.view ?? null;
+    const liveSource = modelLive && view && sources ? liveSourceFor(sources, view) : null;
+    const livePick: CodePick | null = liveSource
+        ? {
+              source: liveSource.key,
+              provider: view?.modelChoice?.provider ?? liveSource.models[0]?.provider ?? "",
+              model: view?.modelChoice?.model ?? null
+          }
+        : null;
+    const changeModel = (next: CodePick) => {
+        if (next.source !== livePick?.source || next.model === livePick.model) return;
+        setError(null);
+        startTransition(() => {
+            void runAction(
+                () => postCode<{ error?: string }>("/api/polar/code/model", { sessionId, model: next.model }),
+                setError
+            ).then((result) => {
+                if (result?.error) setError(result.error);
+                read();
+            });
+        });
+    };
+
     const session = thread?.session;
     const blocks = useMemo(() => codeBlocks(thread?.entries ?? []), [thread]);
     // The agent mid-turn draws its steps moving; a message on its way to it
@@ -1411,8 +1452,21 @@ function CodeThread({
                 maxLength={PROMPT_MAX}
                 onSubmit={send}
                 picker={
-                    liveMode ? (
-                        <PermissionModePicker value={liveMode} onChange={changeMode} disabled={busy} />
+                    liveSource || liveMode ? (
+                        <>
+                            {liveSource ? (
+                                <CodeModelPicker
+                                    sources={[liveSource]}
+                                    value={livePick}
+                                    onChange={changeModel}
+                                    automatic={false}
+                                    disabled={busy}
+                                />
+                            ) : null}
+                            {liveMode ? (
+                                <PermissionModePicker value={liveMode} onChange={changeMode} disabled={busy} />
+                            ) : null}
+                        </>
                     ) : null
                 }
                 attach={parts.attach}

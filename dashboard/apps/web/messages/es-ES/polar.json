@@ -1452,7 +1452,9 @@
             "send": "Devolver"
         },
         "modeFailed": "No se pudo cambiar el modo. Inténtalo de nuevo.",
-        "modeBusy": "Responde al agente primero y luego cambia el modo."
+        "modeBusy": "Responde al agente primero y luego cambia el modo.",
+        "modelFailed": "No se pudo cambiar el modelo. Inténtalo de nuevo.",
+        "modelBusy": "Responde al agente primero y luego cambia el modelo."
     },
     "compare": {
         "open": "Preguntar a varios",
