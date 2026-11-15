@@ -29,7 +29,5 @@ CREATE TABLE IF NOT EXISTS "PolarSubagentRun" (
 CREATE INDEX IF NOT EXISTS "PolarSubagentRun_threadId_startedAt_idx" ON "PolarSubagentRun"("threadId", "startedAt");
 CREATE INDEX IF NOT EXISTS "PolarSubagentRun_userId_status_idx" ON "PolarSubagentRun"("userId", "status");
 
-DO $$ BEGIN
-    ALTER TABLE "PolarSubagentRun" ADD CONSTRAINT "PolarSubagentRun_threadId_fkey" FOREIGN KEY ("threadId") REFERENCES "PolarThread"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "PolarSubagentRun" DROP CONSTRAINT IF EXISTS "PolarSubagentRun_threadId_fkey";
+ALTER TABLE "PolarSubagentRun" ADD CONSTRAINT "PolarSubagentRun_threadId_fkey" FOREIGN KEY ("threadId") REFERENCES "PolarThread"("id") ON DELETE CASCADE ON UPDATE CASCADE;
