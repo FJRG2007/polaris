@@ -1774,7 +1774,7 @@
         }
     },
     "ask": {
-        "title": "Polar asks",
+        "title": "Polar asks you",
         "chip": "Asked a question",
         "chipMany": "Asked {count} questions",
         "waiting": "Waiting for your answer",
@@ -1782,7 +1782,7 @@
         "unanswered": "Not answered"
     },
     "form": {
-        "title": "Form",
+        "title": "Details",
         "submit": "Send",
         "sent": "Sent",
         "required": "Required",

@@ -34,7 +34,7 @@ export function polarAskTools(): ToolSet {
         [POLAR_ASK_TOOL]: tool({
             description: ASK_DESCRIPTION,
             inputSchema: polarInputSchema(polarAskInputSchema),
-            outputSchema: polarAskOutputSchema
+            outputSchema: polarInputSchema(polarAskOutputSchema)
         }),
         [POLAR_FORM_TOOL]: tool({
             description: FORM_DESCRIPTION,
