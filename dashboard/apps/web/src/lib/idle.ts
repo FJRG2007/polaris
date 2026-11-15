@@ -1,13 +1,17 @@
 /**
- * Whether anybody can be looking at the page: hidden, or its window not the
- * one in front.
+ * Whether anybody can be looking at the page: hidden, minimized or in the tray.
+ *
+ * A window that is merely not the one in front is still being looked at - the
+ * page beside the editor, a setting open on the other monitor - so losing focus
+ * never pauses anything; animations freezing there read as broken.
  *
  * The desktop app keeps `backgroundThrottling` off so a call survives behind a
- * full-screen game, which also means Chromium keeps drawing every decorative
- * loop while the window sits minimized or in the tray - a sampled install spent
- * an eighth of a core in its GPU process doing that. The page cannot rely on
- * `visibilitychange` there, but the window's own `blur` does fire when it is
- * minimized, hidden or simply behind another window, so both count.
+ * full-screen game, which also keeps `visibilityState` at "visible" while the
+ * window sits minimized or in the tray, where Chromium would keep drawing every
+ * decorative loop (a sampled install spent an eighth of a core in its GPU
+ * process doing that). The app tells the page itself (`onWindowShown`). An app
+ * older than that cannot, so there - and only there - the window's focus still
+ * stands in for it, as it did before.
  *
  * While idle, `<html data-idle>` pauses infinite CSS animations (globals.css)
  * and `animateWhileAwake` stops script loops. Nothing here touches media or
@@ -15,6 +19,7 @@
  */
 
 import { useSyncExternalStore } from "react";
+import { desktopBridge } from "@/lib/desktop-bridge";
 
 export const IDLE_ATTRIBUTE = "data-idle";
 
@@ -22,10 +27,15 @@ const listeners = new Set<(idle: boolean) => void>();
 let idle = false;
 let watchers = 0;
 let detach: (() => void) | null = null;
+/** What the desktop app last said about its window; true outside the app. */
+let windowShown = true;
+/** Whether the window's focus decides, for a desktop app too old to say. */
+let focusDecides = false;
 
-/** Whether the document, read right now, is out of sight or out of focus. */
+/** Whether the document, read right now, is out of sight. */
 export function readIdle(doc: Document = document): boolean {
-    return doc.visibilityState === "hidden" || !doc.hasFocus();
+    if (doc.visibilityState === "hidden" || !windowShown) return true;
+    return focusDecides && !doc.hasFocus();
 }
 
 /** The last state the watcher saw; false where nothing is watching. */
@@ -49,6 +59,12 @@ export function watchIdle(): () => void {
     if (typeof document === "undefined") return () => {};
     watchers += 1;
     if (!detach) {
+        const desktop = desktopBridge();
+        const stopShown = desktop?.onWindowShown?.((shown) => {
+            windowShown = shown;
+            settle();
+        });
+        focusDecides = desktop !== null && !stopShown;
         // Focus moving into an iframe blurs the window too; by the next task
         // `hasFocus()` knows the page still holds it, so read it then.
         let pending: ReturnType<typeof setTimeout> | undefined;
@@ -57,18 +73,21 @@ export function watchIdle(): () => void {
             pending = setTimeout(settle, 0);
         };
         document.addEventListener("visibilitychange", settle);
-        window.addEventListener("focus", settle);
-        window.addEventListener("blur", later);
         window.addEventListener("pagehide", settle);
         window.addEventListener("pageshow", settle);
+        if (focusDecides) {
+            window.addEventListener("focus", settle);
+            window.addEventListener("blur", later);
+        }
         settle();
         detach = () => {
             clearTimeout(pending);
+            stopShown?.();
             document.removeEventListener("visibilitychange", settle);
-            window.removeEventListener("focus", settle);
-            window.removeEventListener("blur", later);
             window.removeEventListener("pagehide", settle);
             window.removeEventListener("pageshow", settle);
+            window.removeEventListener("focus", settle);
+            window.removeEventListener("blur", later);
         };
     }
     let stopped = false;
@@ -80,6 +99,8 @@ export function watchIdle(): () => void {
         detach();
         detach = null;
         idle = false;
+        windowShown = true;
+        focusDecides = false;
         document.documentElement.removeAttribute(IDLE_ATTRIBUTE);
     };
 }

@@ -19,7 +19,7 @@
 import { join } from "node:path";
 import { release } from "node:os";
 import { textSize } from "./settings";
-import { TEXT_SIZE_ARGUMENT, VERSION_ARGUMENT } from "@/shared/bridge";
+import { CHANNELS, TEXT_SIZE_ARGUMENT, VERSION_ARGUMENT } from "@/shared/bridge";
 import { defaultTitleBarColors, foreignPageCss, overlayHeight } from "@/shared/title-bar";
 import { classifyNavigation, isServerUrl, mainFrameStep } from "./navigation";
 import {
@@ -216,6 +216,15 @@ export function openPolarisWindow(
     );
     register(window.webContents, "polaris");
     contain(window.webContents, server);
+    // Whether anybody can see it, for the page's decorative animations: the
+    // page cannot read it itself while background throttling is off.
+    const tellShown = (shown: boolean) => {
+        if (!window.isDestroyed()) window.webContents.send(CHANNELS.windowShown, shown);
+    };
+    window.on("minimize", () => tellShown(false));
+    window.on("hide", () => tellShown(false));
+    window.on("restore", () => tellShown(window.isVisible()));
+    window.on("show", () => tellShown(!window.isMinimized()));
     // The page's own <title> is kept for the main window; a window opened for one
     // job keeps the name it was given, so two log windows can be told apart.
     if (options.title) window.on("page-title-updated", (event) => event.preventDefault());

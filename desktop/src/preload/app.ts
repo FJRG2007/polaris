@@ -80,6 +80,13 @@ const bridge: PolarisDesktop = {
     },
     defaultBrowser: () => ipcRenderer.invoke(CHANNELS.defaultBrowser),
     systemIdle: () => ipcRenderer.invoke(CHANNELS.systemIdle),
+    onWindowShown: (listener) => {
+        const heard = (_event: unknown, shown: boolean) => listener(shown === true);
+        ipcRenderer.on(CHANNELS.windowShown, heard);
+        return () => {
+            ipcRenderer.removeListener(CHANNELS.windowShown, heard);
+        };
+    },
     setCallHotkeys: (input) => ipcRenderer.invoke(CHANNELS.callHotkeys, input),
     onCallHotkey: (listener) => {
         const heard = (_event: unknown, which: CallHotkey) => listener(which);

@@ -125,6 +125,11 @@ export interface PolarisDesktop {
      *  screen. The dashboard lets a browser elsewhere make the sounds while
      *  nobody is here. */
     systemIdle(): Promise<SystemIdle>;
+    /** Hear this window minimized or sent to the tray (false) and brought back
+     *  (true). Background throttling is off so a call survives behind a game,
+     *  which keeps the page's visibility "visible" while minimized; this is how
+     *  it knows nobody can see it. Answers the way to stop. */
+    onWindowShown(listener: (shown: boolean) => void): () => void;
     /** Hold a call's mute and deafen keys system-wide, so they work with
      *  another program in front; null lets them go. Says which controls the
      *  system gave, so the page keeps listening itself for any it did not. */
@@ -525,6 +530,7 @@ export const CHANNELS = {
     installTool: "desktop:install-tool",
     defaultBrowser: "desktop:default-browser",
     systemIdle: "desktop:system-idle",
+    windowShown: "desktop:window-shown",
     callHotkeys: "desktop:call-hotkeys",
     callHotkey: "desktop:call-hotkey",
     voiceState: "desktop:voice-state",

@@ -17,8 +17,8 @@
 /*
  * Nobody looking, nothing moving.
  *
- * `data-idle` is on the root while the page is hidden or its window is not the
- * one in front (`lib/idle`). The desktop app keeps drawing a minimized window,
+ * `data-idle` is on the root while the page is hidden, minimized or in the tray
+ * (`lib/idle`) - never merely unfocused. The desktop app keeps drawing a minimized window,
  * so every spinner, skeleton pulse and decorative loop otherwise costs the GPU
  * for as long as the app is open. Paused, not removed: it resumes where it
  * stopped. Elements with `data-state` are left running, because that is how
