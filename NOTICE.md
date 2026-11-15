@@ -57,6 +57,9 @@ in [CITATION.cff](CITATION.cff).
   `dashboard/apps/web/public/logos/agents/` are copied from its
   `frontend/src/renderer/assets/agents/`, and the agent catalogue entries listed
   in [docs/agent-catalogue.md](docs/agent-catalogue.md) were written from its
-  adapter source. The Codewhale and MiMo Code marks are MIT and the Stakpak mark
+  adapter source. The session hook files and hook activity mapping
+  (`dashboard/packages/core/src/agent-hook-files.ts`,
+  `dashboard/apps/web/src/lib/agents/hook-activity.ts`) are ported from its
+  `backend/internal/adapters/agent/` at commit e4ded08c6f15. The Codewhale and MiMo Code marks are MIT and the Stakpak mark
   Apache-2.0, with their notices kept beside the files. The marks remain their
   owners' trademarks.

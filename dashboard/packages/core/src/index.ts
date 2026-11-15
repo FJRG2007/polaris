@@ -120,6 +120,7 @@ export * from "./runner-protocol.js";
 export * from "./runner-relay.js";
 export * from "./agents.js";
 export * from "./agent-clis.js";
+export * from "./agent-hook-files.js";
 export * from "./agent-sessions.js";
 export * from "./enigma.js";
 export * from "./review.js";

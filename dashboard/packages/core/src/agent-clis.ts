@@ -32,6 +32,8 @@
  * encoding a command line per vendor that would rot in a month.
  */
 
+import { AGENT_HOOK_RELAY, hookFileAnswers, hookGroup } from "./agent-hook-files.js";
+
 /** How Polaris can tell what a running session is doing. */
 export const AGENT_OBSERVATIONS = ["hooks", "output"] as const;
 export type AgentObservation = (typeof AGENT_OBSERVATIONS)[number];
@@ -160,22 +162,6 @@ export type AgentFirstRunValue =
     | readonly AgentFirstRunValue[]
     | { readonly [key: string]: AgentFirstRunValue };
 
-/**
- * The one command every tool's hook configuration runs.
- *
- * Fixed text, and the same in every home: a container home is shared by every
- * session that account runs, so a hook naming one session's script would report
- * every other session's events as that one's. The session it belongs to is
- * whichever exported `POLARIS_STATE_DIR` into the agent's environment, and a
- * tool started anywhere else - the sign-in container, a terminal somebody
- * opened by hand - finds no script and reports nothing.
- *
- * It prints `{}` either way: Codex and Gemini CLI read a hook's output as JSON,
- * and an empty object is the answer that changes nothing.
- */
-export const AGENT_HOOK_RELAY =
-    'h="$POLARIS_STATE_DIR/hook.sh"; if [ -n "$POLARIS_STATE_DIR" ] && [ -x "$h" ]; then exec "$h"; fi; cat >/dev/null; printf "{}"';
-
 /** Seconds a hook may take before the tool gives up on it. */
 const HOOK_TIMEOUT_SECONDS = 5;
 
@@ -199,9 +185,9 @@ export const CODEX_HOOK_EVENTS = [
 ] as const;
 
 function codexHooks(): Record<string, AgentFirstRunValue> {
-    const hook = { type: "command", command: AGENT_HOOK_RELAY, timeout: HOOK_TIMEOUT_SECONDS };
     const hooks: Record<string, AgentFirstRunValue> = {};
-    for (const event of CODEX_HOOK_EVENTS) hooks[event] = [{ hooks: [hook] }];
+    for (const event of CODEX_HOOK_EVENTS)
+        hooks[event] = [hookGroup(AGENT_HOOK_RELAY, HOOK_TIMEOUT_SECONDS)];
     return { hooks };
 }
 
@@ -224,18 +210,11 @@ export const GEMINI_HOOK_EVENTS = [
 ] as const;
 
 function geminiHooks(): Record<string, AgentFirstRunValue> {
-    const hook = {
-        name: "polaris",
-        type: "command",
-        command: AGENT_HOOK_RELAY,
-        timeout: HOOK_TIMEOUT_SECONDS * 1000
-    };
+    const extra = { name: "polaris" };
     const hooks: Record<string, AgentFirstRunValue> = {};
     for (const event of GEMINI_HOOK_EVENTS) {
-        hooks[event] =
-            event === "BeforeTool" || event === "AfterTool"
-                ? [{ matcher: "*", hooks: [hook] }]
-                : [{ hooks: [hook] }];
+        const matcher = event === "BeforeTool" || event === "AfterTool" ? "*" : null;
+        hooks[event] = [hookGroup(AGENT_HOOK_RELAY, HOOK_TIMEOUT_SECONDS * 1000, { matcher, extra })];
     }
     return { hooks };
 }
@@ -771,7 +750,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["cursor-agent"],
         install: "curl -fsSL https://cursor.com/install | bash",
         home: ".cursor",
-        observe: "output",
+        observe: "hooks",
         docs: "https://cursor.com/docs/cli/overview",
         credentials: [
             {
@@ -784,7 +763,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: ["--yolo"],
         autonomyEnv: {},
-        firstRun: [],
+        firstRun: hookFileAnswers("cursor"),
         acp: ["acp"]
     },
     {
@@ -816,7 +795,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["goose"],
         install: "curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash",
         home: ".config/goose",
-        observe: "output",
+        observe: "hooks",
         docs: "https://block.github.io/goose/docs/quickstart",
         credentials: [
             {
@@ -836,7 +815,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: [],
         autonomyEnv: { GOOSE_MODE: "auto" },
-        firstRun: []
+        firstRun: hookFileAnswers("goose")
     },
     {
         id: "aider",
@@ -874,7 +853,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["droid"],
         install: "npm install -g droid",
         home: ".factory",
-        observe: "output",
+        observe: "hooks",
         docs: "https://docs.factory.ai/cli/getting-started/quickstart",
         credentials: [
             {
@@ -887,7 +866,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: [],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("droid")
     },
     {
         id: "qwen",
@@ -896,7 +875,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["qwen"],
         install: "npm install -g @qwen-code/qwen-code",
         home: ".qwen",
-        observe: "output",
+        observe: "hooks",
         docs: "https://github.com/QwenLM/qwen-code",
         acp: ["--acp"],
         // It signs in through its own `/auth`, and which variable it reads for a
@@ -905,7 +884,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         credentials: [],
         autonomyArgs: [],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("qwen")
     },
     {
         id: "crush",
@@ -977,7 +956,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         // installed" refusal rather than a session that starts without it.
         install: "uv tool install openhands",
         home: ".openhands",
-        observe: "output",
+        observe: "hooks",
         docs: "https://docs.all-hands.dev",
         credentials: [
             {
@@ -997,7 +976,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: ["--always-approve"],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("openhands")
     },
     {
         id: "openclaw",
@@ -1113,12 +1092,12 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["devin"],
         install: "curl -fsSL https://cli.devin.ai/install.sh | bash",
         home: null,
-        observe: "output",
+        observe: "hooks",
         docs: "https://docs.devin.ai/get-started/devin-intro",
         credentials: [apiKey("DEVIN_API_KEY", "Devin API key", "https://docs.devin.ai/get-started/devin-intro")],
         autonomyArgs: ["--permission-mode", "dangerous"],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("devin")
     },
     {
         id: "kiro",
@@ -1189,13 +1168,13 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["agy"],
         install: "curl -fsSL https://antigravity.google/cli/install.sh | bash",
         home: null,
-        observe: "output",
+        observe: "hooks",
         docs: "https://github.com/google-antigravity/antigravity-cli",
         // A Google account sign-in; no variable was sourced.
         credentials: [],
         autonomyArgs: ["--dangerously-skip-permissions"],
         autonomyEnv: {},
-        firstRun: [],
+        firstRun: hookFileAnswers("agy"),
         acp: ["acp"]
     },
     {
@@ -1205,7 +1184,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["autohand"],
         install: "npm install -g autohand-cli",
         home: null,
-        observe: "output",
+        observe: "hooks",
         docs: "https://docs.autohand.ai/working-with-autohand-code/cli",
         credentials: [
             apiKey("AUTOHAND_API_KEY", "Autohand API key", "https://docs.autohand.ai/working-with-autohand-code/cli"),
@@ -1214,7 +1193,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: ["--unrestricted"],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("autohand")
     },
     {
         id: "kimchi",
@@ -1223,12 +1202,12 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["kimchi"],
         install: "curl -fsSL https://github.com/getkimchi/kimchi/releases/latest/download/install.sh | sh",
         home: ".config/kimchi",
-        observe: "output",
+        observe: "hooks",
         docs: "https://docs.kimchi.dev/docs/coding-getting-started",
         credentials: [apiKey("KIMCHI_API_KEY", "Kimchi API key", "https://docs.kimchi.dev/docs/coding-getting-started")],
         autonomyArgs: ["--yolo"],
         autonomyEnv: {},
-        firstRun: [],
+        firstRun: hookFileAnswers("kimchi"),
         acp: ["--mode", "acp"]
     },
     {
@@ -1351,12 +1330,12 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["command-code", "cmd"],
         install: "npm install -g command-code",
         home: ".commandcode",
-        observe: "output",
+        observe: "hooks",
         docs: "https://commandcode.ai/docs/quickstart",
         credentials: [],
         autonomyArgs: ["--trust", "--skip-onboarding", "--yolo"],
         autonomyEnv: {},
-        firstRun: [],
+        firstRun: hookFileAnswers("command-code"),
         acp: ["acp"]
     },
     {
