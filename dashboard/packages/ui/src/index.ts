@@ -156,6 +156,17 @@ export {
     type AsyncPage
 } from "./lib/use-async-options";
 export { SegmentedControl, type SegmentedOption } from "./components/segmented-control";
+export { ControlSlider, type ControlSliderProps } from "./components/control-slider";
+export { KEY_SETTLE_MS, useReleasedValue } from "./lib/use-released-value";
+export {
+    bigStep,
+    fractionOf,
+    keyedValue,
+    snapValue,
+    stepPlaces,
+    valueAt,
+    type ValueRange
+} from "./lib/control-values";
 export {
     MultiSeriesChart,
     RadialGauge,

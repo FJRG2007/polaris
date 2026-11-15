@@ -44,7 +44,8 @@ export function SegmentedControl<T extends string>({
     value: T | null;
     onValueChange: (value: T) => void;
     options: readonly SegmentedOption<T>[];
-    size?: "sm" | "md";
+    /** `lg` is a device control: 44px tall for a finger, an icon over its label. */
+    size?: "sm" | "md" | "lg";
     className?: string;
     "aria-label"?: string;
 }) {
@@ -70,6 +71,7 @@ export function SegmentedControl<T extends string>({
             // chosen option kept in view) instead of running off the side.
             className={cn(
                 "no-scrollbar inline-flex min-w-0 max-w-full items-center gap-0.5 rounded-md bg-muted p-0.5",
+                size === "lg" && "rounded-xl p-1",
                 className
             )}
         >
@@ -109,7 +111,11 @@ export function SegmentedControl<T extends string>({
                             // `shrink-0 whitespace-nowrap`: an option never gets
                             // narrower than its label - the track scrolls instead.
                             "flex-1 shrink-0 basis-auto whitespace-nowrap rounded font-medium transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50",
-                            size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-[0.8125rem]",
+                            size === "sm"
+                                ? "px-2 py-0.5 text-xs"
+                                : size === "lg"
+                                  ? "inline-flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg px-3 py-1.5 text-xs"
+                                  : "px-3 py-1 text-[0.8125rem]",
                             active
                                 ? "border border-border-strong bg-card-hover text-foreground"
                                 : "border border-transparent text-muted-foreground hover:text-foreground"
