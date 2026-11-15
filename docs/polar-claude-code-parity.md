@@ -265,3 +265,179 @@ OpenTelemetry; artifacts from sessions.
    effort on the runner. Recommended: phase 3 on Polar's own loop, since the
    router, tools, skills and connectors already live there; opencode stays as an
    engine.
+
+## 7. Daily-driver parity: Enigma, multi-account, memory, effort (researched 2026-11-15)
+
+The bar: an operator who runs Claude Code through Enigma every day (several
+accounts, hooks, gate, skills, recall, code graph, handoff, subagents, `gh`)
+starts the same model in Polar Code and notices no difference, except that it
+keeps running with the PC off and can be steered from any device. Codex,
+opencode and the other engines get the same treatment where their CLIs allow.
+
+Sources for this section: `enigma --help` and `enigma <cmd> --help` for the
+commands named below (Enigma 1.73.x on the dev machine), the operator's
+`~/.claude/settings.json` (hooks, status line, permissions and env keys only,
+no values), the Enigma repository README and `docs/notes/` (`multi-account.md`,
+`local-api-server.md`, `recall.md`, `handoff.md`, `host-integration.md`), and
+the Polaris files cited per row. Nothing here was exercised in a container (no
+Docker on this machine).
+
+### 7.1 What Enigma gives the operator every day
+
+| Capability | Command / mechanism | What it gives daily |
+| --- | --- | --- |
+| Multi-account | `enigma account add/use/login/transfer/sessions`, `enigma <tool> <account>` | Several logins per tool (Claude, Codex, opencode, Kimi), each in its own config dir (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, an XDG pair), switched without logging out; every account inherits skills, memory file and mirrored settings; `transfer` reuses a live OAuth login without the refresh-token ping-pong |
+| Cross-account transcripts | config `share-sessions` (default on) or `shared-store` | A conversation recorded under account A resumes under account B (`--resume` sees it), so switching accounts mid-task keeps the thread |
+| Profiles | `enigma profile add/use/set` | One account per tool pinned under a name ("work" = claude:acme + codex:acme) |
+| Account rotation | `enigma api --rotation round-robin/least-used/fill-first/random`, `api-account-pool` | On a usage limit (429, `rate_limit_error`, limit wording) the account cools down (reported reset, else 2 min doubling to 30 min) and the request reruns on the next account; overload (529) is deliberately not a trigger; streams hold back the first 160 chars so the retry is invisible. Only in the local API, not in interactive sessions |
+| Skills and operating contract | `enigma install`, `enigma skills` | Policy skills plus the CLAUDE.md contract in every agent |
+| Hooks | settings.json: `PostToolUse` Edit/Write -> `__post-edit-hook` (guardrails, trim); `PreToolUse` Bash -> `__attribution-guard`, `__push-guard`, `__browser-guard`; `PreToolUse` Agent/Task + `SubagentStart/Stop` -> `__subagent-hook`; `Stop` -> `__verify-hook`, `__codegraph-hook stop`; `SessionStart` -> `__codegraph-hook`, `__handoff-hook claude` (startup, clear); `UserPromptSubmit` -> `__codegraph-hook prompt`; `PostToolUse` Bash -> `__ci-hook rewake` | Conventions enforced after every edit, no co-author trailers, guarded pushes, headless-only browsers, subagent bounds, unfinished-work check at turn end, a CI watch that wakes the agent |
+| Gate | `enigma gate axi run` (`/gate`) | Review, tests, lint, docs, push, PR and CI before work lands |
+| Verify | `enigma verify [--all]`, `verify parity` | Turn-end check for stubs and unfinished markers plus the project's verify command |
+| Guardrails | `enigma guardrails list/check/stats` | Convention rules (UUID keys, Prisma default...) checked by the post-edit hook |
+| Recall | `enigma recall sync/search/...`, MCP `enigma_recall*` | Hybrid keyword + vector memory built from the person's own transcripts (Claude and Codex rollouts), scoped to the current project (`basename(cwd)`) |
+| Code graph | `enigma codegraph index/ask/callers/skeleton/map/grep/report`, MCP | Structural code intelligence; a `report` page a new session reads; refreshed by the prompt and stop hooks |
+| Handoff and relay | `enigma handoff save/show`, `/handoff`, `enigma relay "<task>"` | One page per git root (`~/.enigma/handoff/<sha1(root)>.md`) delivered once to the next fresh session; `relay` chains fresh headless sessions through handoffs |
+| Compression | `enigma compress`, MCP `enigma_compress/retrieve` | Fewer tokens on logs and JSON, reversible |
+| Status line | `enigma statusline` (settings `statusLine`) | Badge, model, context, cost, live gate progress |
+| Isolated agents | `enigma agent install/run` (Helio, Orion, Vega) | Specialist agents whose skills and MCP servers never load into the normal one |
+| Config | `enigma config set k=v`; keys include `parallel-subagents`, `subagent-limit`, `subagent-turns`, `compact-window`, `output-style`, `minimal-code`, `bypass-*` | Subagent fan-out limits, compaction window, terse output |
+| Host integration | `enigma config --json`, `enigma memory render`, `enigma serve --http --data-dir --token-file` | A multi-tenant JSON API for recall, code graph and compression (`X-Enigma-Tenant`), built for Polaris; single writer per store |
+
+Plain Claude Code settings the operator also relies on: `model: opus[1m]`,
+`autoCompactWindow: 400000`, `permissions.defaultMode: bypassPermissions` with
+19 deny rules, three plugins (one an LSP), voice dictation.
+
+Finding on the operator's own machine: the `PreToolUse` Bash matcher holds
+`__attribution-guard` 10 times, `__browser-guard` 30 times and `__push-guard`
+twice, so every Bash call spawns about 42 hook processes. Repeated
+`enigma install` runs appear to append rather than merge. This matters for
+Polar too: a session home now persists (7.2), and the boot runs
+`enigma install` every time (`core/enigma.ts:412-440`), so the same growth can
+happen there. To check against Enigma 1.73.0 before relying on persisted homes.
+
+### 7.2 What Polar Code sessions get from Enigma today
+
+| Enigma capability | In Polar sessions today | Where | Gap | Design note |
+| --- | --- | --- | --- | --- |
+| Install + skills + contract | have | `core/enigma.ts:361` (`enigmaSetupScript`, checksum-pinned release), `:412-440` (`enigmaConfigureScript`); boot `web/lib/agents/session-commands.ts:1112-1123` | - | - |
+| Hooks (post-edit, verify, guards, subagent, codegraph, handoff) | partial | Scope `all` wires them; scope `policies` passes `--no-hooks` and skips `commands,dashboard,statusline,mcp` (`core/enigma.ts:213-220`) | The policies scope loses every hook | Fine as an explicit choice; the scope picker should say the hooks go with it |
+| Gate | have | `core/enigma.ts:287` (`enigmaGateArgv`), applied in `enigmaConfigureScript` | Not exercised in a container | - |
+| Config keys | have | `core/enigma.ts:271` (`enigmaConfigArgv`, key/value allowlist) | - | - |
+| Launcher (`enigma claude`) | have | `web/lib/agents/session-runtime.ts:238`; boot falls back to the bare binary, `session-commands.ts:1165-1176` | - | - |
+| Multi-account on the box | partial | Home kept per owner per box: `session-commands.ts:109` (`AGENT_HOME`), `:119` (`agentHomeSource` = `agent-homes/u-<owner>`), bind in `web/lib/agents/session-container.ts:60-80`; the boot tells the person `enigma account add` exists (`session-commands.ts:1175`) | Accounts made with `enigma account` live on one box only; Polaris's own stored sign-ins (`web/lib/agents/model-keys.ts:1080` `signinAccountsFor`) are a separate list; neither rotates | One account list: Polaris's stored sign-ins, written into the home per turn (already done by `refreshCredentials`, `session-runtime.ts:419`) |
+| Rotation on a usage limit | missing | `StopFailure` -> `turn.failed` (`web/lib/agents/session-hooks.ts:49,281`); only credential refusals are acted on (`web/app/api/agents/sessions/[id]/events/route.ts:117` -> `web/lib/agents/signin-refusal.ts:69` `noteRefusedSignIn`) | A rate-limited turn just fails; the operator retries by hand or waits for the reset | 7.5 item 2 |
+| Auto memory (CLI) | partial, keyed wrong | `~/.claude/projects/<project>/memory/` lands in the persisted home, so it survives on the same box. But a repository checkout is always `/session/repo` (`session-runtime.ts:77`), and Claude Code derives `<project>` from the git repository path (`memory#storage-location`), so every repository of one owner on one box shares ONE memory dir | Cross-repo bleed on one box; nothing on another box of the pool or after a home reset | 7.5 item 1 |
+| Handoff | partial, keyed wrong | Same home; Enigma keys it by `sha1(git root)` (`handoff.md`), and the root is always `/session/repo` | A handoff saved in repo A can be delivered to the next fresh session of repo B | 7.5 item 1 |
+| Recall | missing in practice | Recall is opt-in (`config recall`) and Polaris does not turn it on; its project key is `basename(cwd)` = `repo` for every repository | No past-session memory; switched on, every repository would be one project | 7.5 item 1: seed from Polaris's stored Code history (`web/lib/agents/session-history.ts`) or call `enigma serve` with tenant = person |
+| Code graph | partial | Hooks index on prompt and stop when scope is `all`; the index lives in the persisted home | Rebuilt per box; project key collides the same way | Same keying fix |
+| Status line | missing in the UI | `statusline` skipped for scope `policies`; with `all` it renders only inside the terminal | Polar's thread has no footer | Phase 0 status line row (section 4) reads model, context and cost Polaris already has (`session-usage.ts`) |
+| Subagents | have (the CLI's own), observed | `SubagentStop` observed (`session-hooks.ts`); Enigma `__subagent-hook` with scope `all` | Tree view in flight (slash2) | - |
+| `gh` | have, unverified | `web/lib/agents/session-gh.ts` | The person's own `gh` login is not reused | Goal ledger G8 |
+| Effort | missing | The model picker hides intelligence for agent sessions (`web/components/polar/elements/model-selector.tsx:199`); only `--model` is passed (`core.agentModelArgs`, `session-runtime.ts:241`) | No `--effort` / `-c model_reasoning_effort=` / `--variant` | 7.4 |
+| Queued prompts | partial | The machine already queues a prompt as a file when the runner takes prompts (`session-commands.ts:964` `queuePromptCommand`, used by `promptSession`, `session-runtime.ts:950`) | No visible queue, no take-back | 7.5 item 4 |
+
+Confirmed gaps from the goal ledger:
+
+- **(a) Memory does not follow the work.** It persists only per owner per box,
+  under a key that is the same for every repository, and nothing (auto memory,
+  handoff, recall, code graph) is carried to another box or survives a home
+  reset. Claude Code's docs say auto memory is machine-local and "not shared
+  across machines or cloud environments" (`memory#storage-location`), so this
+  is Polaris's to solve.
+- **(b) No account switch on a usage limit.** Claude Code reports the cause as
+  the `StopFailure` matcher value `rate_limit` (others: `overloaded`,
+  `authentication_failed`, `billing_error`, `account_on_hold`...; `hooks`), and
+  Polaris already receives that event, but only refusals are acted on. The
+  pieces to rotate exist: credentials are re-resolved before every prompt
+  (`refreshCredentials`, `session-runtime.ts:419`), the session carries an
+  `accountId` (`session-runtime.ts:378`), refused accounts are cooled the way
+  the router cools keys (`signin-refusal.ts`, `COOLING_MS`), and Enigma's
+  `api-rotation.ts` has the classifier and backoff to copy.
+
+### 7.3 How people actually work with these tools (sources read 2026-11-15)
+
+| Pattern | What the vendors and tools do | Source | What Polar takes |
+| --- | --- | --- | --- |
+| Cloud session while the laptop is shut | Claude Code cloud sessions keep running and are steered from web, phone, desktop, or `claude -p "msg" --cloud <id>`; history is restored when an idle VM is reclaimed, background shells and subagents are not | https://code.claude.com/docs/en/claude-code-on-the-web | Already the model; add "send a follow-up" to a running session from the CLI and the phone |
+| Queued message, take back | A message sent while Claude works queues; the X on it returns the text to the box until Claude reads it | same page, "Take back a queued message" | 7.5 item 4 |
+| Cloud to local | `claude --teleport` pulls branch + conversation; the local copy then diverges; terminal to cloud only through the Desktop app | same page | Phase 2 teleport both ways |
+| Remote Control of a local session | `claude remote-control` (server mode, URL + QR on spacebar, `--spawn same-dir/worktree`), `claude --rc`, `/rc`; conversation and subagent progress in sync on every device; filesystem and MCP stay local. Needs a claude.ai subscription; unavailable with an API key, with `ANTHROPIC_BASE_URL` pointed at a gateway, or with feature flags off | https://code.claude.com/docs/en/remote-control | Confirms decision 3: Polaris's runner is the only path that works for every engine and for sessions on Polaris's own gateway |
+| Codex in the cloud | A workspace per task that keeps running while the computer sleeps; environments with install script, network level, secrets; `codex cloud` picker, `codex cloud exec --env <id> --attempts 1-4` (best-of-N), `codex apply <task>` | https://learn.chatgpt.com/docs/cloud, https://learn.chatgpt.com/docs/developer-commands?surface=cli | `apply` is teleport of a diff |
+| Codex remote control | `codex remote-control start/stop/pair` (experimental), `codex app-server --listen ws://...`, `codex --remote <ws-url>`, `codex resume --remote` | developer-commands page above | The runner can drive Codex through its app-server instead of a PTY where present |
+| opencode headless | `opencode serve` (OpenAPI 3.1, `127.0.0.1:4096`, basic auth by `OPENCODE_SERVER_PASSWORD`), SSE `/event`; the TUI is a client of the same server | https://opencode.ai/docs/server/ | Same: structured control instead of keystrokes |
+| Phone clients for local agents | Happy (E2E relay, Claude/Codex/ACP), Omnara (`omnarad` outbound daemon), Orca (fleet + mobile ping) | Prior art table above | Phase 1 relay shape |
+| Parallel local sessions | claude-squad: tmux + a git worktree per session, background auto-yes (`-y`), review before apply; AGPL-3.0 (ideas only) | https://github.com/smtg-ai/claude-squad | Worktree per runner session |
+| Multi-account switching | No native Claude Code feature (open request). Community: claude-swap (`auto` loop polls every 60 s, takes Claude Code's credential lock), ccswap (`auto` on a usage threshold), clauth (fallback chain while open), teamclaude (proxy, switches at 98 % quota), ccdaddy, cux (drain / balanced / manual) | Web search summary, repositories not individually read: https://github.com/realiti4/claude-swap, https://awesome.ecosyste.ms/projects/github.com%2Fipfans%2Fccswap, https://docs.rs/crate/clauth/0.7.3, https://awesome.ecosyste.ms/projects/github.com%2Fkarpeleslab%2Fteamclaude, https://github.com/anthropics/claude-code/issues/64376 | Two converged strategies: switch on the limit error (reactive) and switch before it from a usage threshold (proactive). Polar does reactive first, proactive once the 5-hour window is read |
+| Gateway with key pools | claude-code-router: one local endpoint for Claude Code and Codex, credential pools, key rotation, ordered fallback models (MIT) | https://github.com/musistudio/claude-code-router | Polaris's compat API + router already does this for API keys (`router/chain.ts`); subscriptions need the session-level rotation instead |
+| Usage windows | ccusage: reads the local transcripts of 19 tools; daily, monthly, session reports and Claude's 5-hour blocks; a status line (MIT) | https://github.com/ryoppippi/ccusage | Proactive rotation and the status line read the same 5-hour window from `session-usage.ts` |
+| Memory | Claude Code: CLAUDE.md + auto memory (first 200 lines / 25 KB of `MEMORY.md`), per repository, machine-local, relocatable with `autoMemoryDirectory`; subagents get `memory: user/project/local` dirs | https://code.claude.com/docs/en/memory, https://code.claude.com/docs/en/sub-agents | 7.5 item 1 uses `autoMemoryDirectory` |
+| Effort | Claude Code: `low/medium/high/xhigh/max`, `/effort`, `--effort`, `CLAUDE_CODE_EFFORT_LEVEL`, per-model `modelSettings`, subagent and skill frontmatter `effort`; `ultrathink` raises one turn to `xhigh`; Opus 5.5 defaults to `medium` | https://code.claude.com/docs/en/model-config | 7.4 |
+
+### 7.4 Effort and deep-thinking UX spec
+
+What the references do:
+
+- **DeepSeek chat-demo** (https://github.com/deepseek-ai/chat-demo, MIT): two
+  pill toggles in the row under the input, left of voice and send:
+  "DeepThink" (tooltip "Think before responding to solve reasoning problems")
+  and "Search", each a `button` with `aria-pressed`
+  (`src/components/chatInput/ChatInput.tsx:203-228`). The choice is a global
+  setting kept in localStorage (`src/services/settings.ts`, key
+  `chat-demo:thinking`) and sent as `thinking: {type: "enabled" | "disabled"}`
+  on an Anthropic-compatible Messages request (`src/services/api/types.ts:175-183`;
+  models `deepseek-flash`, `deepseek-v4-pro`). Thinking streams as its own
+  block and the reply shows "Thought for N seconds".
+- **Provider knobs** (official docs read, except where noted):
+
+| Provider | Parameter | Levels | Default | Notes |
+| --- | --- | --- | --- | --- |
+| Anthropic | `output_config.effort` | `low`, `medium`, `high`, `xhigh`, `max` (per model) | `medium` on Opus 5.5 and Haiku 5.5, `high` elsewhere | Adaptive thinking always on for Opus 5.5 (disabling it is a 400); changing top-level effort mid-conversation can break the prompt cache, per-message effort keeps it. https://platform.claude.com/docs/en/build-with-claude/effort |
+| OpenAI | `reasoning.effort` (Responses), `reasoning_effort` (Chat) | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` (per model) | model-dependent, `medium` on GPT-5.5 and 5.6 | Some models refuse `none` or `minimal`. https://developers.openai.com/api/docs/guides/reasoning |
+| DeepSeek | `thinking: {type}` + `reasoning_effort` (OpenAI shape), or `output_config.effort` / `reasoning.effort: none` (Anthropic shape) | `low`, `high`, `max`; `minimal` -> low, `medium` and `xhigh` -> high | thinking on, `high` | https://api-docs.deepseek.com/guides/thinking_mode |
+| Google | `thinking_level` | `minimal`, `low`, `medium`, `high`, `xhigh` (per model) | per model (medium or high) | `thinkingBudget` is not on the page read. https://aistudio.google.com/docs/thinking |
+| Codex CLI | `model_reasoning_effort` (config or `-c`) | `minimal` .. `xhigh` | - | Values from secondary sources only; verify against the official config reference before shipping |
+| Claude Code CLI | `--effort`, `/effort <level>`, `CLAUDE_CODE_EFFORT_LEVEL` | as Anthropic | as Anthropic | `ultrathink` = one turn at `xhigh` |
+
+Polaris already has the axis: Chat's composer "intelligence"
+(`fast/balanced/deep/max`, `web/lib/polar/shared.ts:17`) maps to AI SDK levels
+(`web/lib/polar/models.ts:237`), routes can force a level
+(`web/lib/polar/routing.ts:25`), compat requests map names
+(`web/lib/polar/compat/anthropic-request.ts:384`), and the Agents runtime stores
+effort as a position on [0, 1] resolved against each model's published ladder,
+rounding down (`dashboard/packages/agent-runtime/effort.ts:45,92`). So the
+section 2 row "No effort picker in Polar Chat or Code" is half true: Chat has
+one, inside the model menu, with four steps; Code has none.
+
+The spec:
+
+| Element | Decision |
+| --- | --- |
+| Where | A pill beside the model chip in the composer row, in Chat and in Code (DeepSeek's position), not only inside the model menu. One click opens a segmented control; the pill shows the current label |
+| Levels shown | The ladder of the selected model, labelled Fast, Balanced, Deep, Extra deep, Max; steps the model does not publish are hidden, never greyed; a model that does not reason shows no pill |
+| Storage | The position on [0, 1] (`agent-runtime/effort.ts`), per person and per model like Claude Code's `modelSettings`; a thread remembers its own last value |
+| Deep-thinking toggle | Where thinking is a switch rather than a ladder (DeepSeek, Haiku at `high` or below), the pill becomes an on/off "Think" toggle in the same place |
+| One-turn boost | Typing `ultrathink`, or a "Think harder" action on a reply, runs that one turn at `xhigh` (Claude Code parity) without changing the saved level |
+| Mapping | Anthropic `output_config.effort` (Code: `--effort`); OpenAI `reasoning.effort` / `reasoning_effort`; DeepSeek `thinking` + `reasoning_effort`; Gemini `thinking_level`; Codex `-c model_reasoning_effort=`; opencode `--variant` (already in `agent-runtime`). Always through `resolveRung`, so no provider receives a level it lacks |
+| Automatic (router) | Effort follows the tier the router picks: fast models at low, one step up on a retry after a failed or truncated turn, `xhigh` for long agentic runs; a forced route level (`routing.ts`) wins over Automatic; the person's explicit pick wins over both |
+| Cache | Change effort only at a turn boundary; on Anthropic models that support it, send the change per message so the cache holds |
+| Code sessions | A start flag per CLI; mid-session for Claude Code send `/effort <level>` the way the model change is sent (`changeSessionModel`, `session-runtime.ts:1038`); other CLIs take it on the next relaunch |
+| Caps | An org cap (like Claude Code's `maxEffortLevel`) clamps the ladder; the pill says why a step is missing |
+
+### 7.5 Build list, in order
+
+| # | Item | Size | Files | Notes |
+| --- | --- | --- | --- | --- |
+| 1 | **Memory that follows the person and the repository.** (a) Key every per-repo store by the repository: `autoMemoryDirectory` = `~/.polaris/memory/<owner>__<repo>` in the settings Polaris writes for the CLI, and the checkout at `/session/<owner>__<repo>` (or the same key exported for Enigma), so handoff (`sha1(root)`), recall (`basename(cwd)`) and code graph stop colliding. (b) Carry it across boxes: on save, pack the memory dir, the handoff page and the code-graph report into a per person + repo store; on boot, restore them before the agent starts. (c) Turn recall on and seed it from stored Code transcripts, or call `enigma serve` with tenant = person. (d) The same for Codex (`AGENTS.md` + Enigma handoff) and for Polar Chat projects | M | `web/lib/agents/session-runtime.ts` (`CONTAINER_WORKDIR`, boot env), `web/lib/agents/session-commands.ts` (`START_AGENT` restore and save steps), `web/lib/agents/session-hooks.ts` (settings it writes), `web/lib/agents/session-work.ts` (save), `web/lib/agents/session-history.ts` (seed), `core/enigma.ts` (recall config key), new `web/lib/agents/session-memory.ts`, a Prisma model for the store, tests beside each | Fixes a live cross-repo bleed before adding anything; the per-box copy stays as the fast path |
+| 2 | **Account rotation on a usage limit.** On `turn.failed` whose hook error is `rate_limit` or limit wording (port Enigma's `classifyAccountError`), cool the account until its reported reset (else 2 min doubling to 30 min), set the session's `accountId` to the next usable sign-in of that CLI in the person's order, refresh credentials, and resume the same conversation with a "continue" prompt (open interface: relaunch with `--resume <vendor id>` through `resumeAgent`, `session-runtime.ts:1100`). A notice in the thread names both accounts. All accounts cooling: say when the first frees and queue the prompt. Never on `overloaded` | M | `web/app/api/agents/sessions/[id]/events/route.ts`, new `web/lib/agents/account-rotation.ts` (classifier + pick, pure, tested), `web/lib/agents/signin-refusal.ts` (shared cooling), `web/lib/agents/model-keys.ts` (`signinAccountsFor`, order), `web/lib/agents/session-runtime.ts` (`refreshCredentials`, `resumeAgent`), a session setting "switch accounts on a limit" (default on with two or more sign-ins) | Proactive switch at a 5-hour threshold later, from `session-usage.ts` |
+| 3 | **Effort picker** per 7.4 | S | `web/components/polar/elements/model-selector.tsx` (pill; drop the agent-session exclusion), `web/lib/polar/shared.ts`, `web/lib/polar/models.ts`, `core/agent-clis.ts` (effort args per CLI), `web/lib/agents/session-runtime.ts` (start flag, mid-session `/effort`), `dashboard/packages/agent-runtime/effort.ts` (reuse), i18n tables | - |
+| 4 | **Queued messages with take-back.** Store queued prompts on the session; show them above the reply box with an X; deliver on idle through the existing `queuePromptCommand` | S | `web/lib/agents/session-runtime.ts` (`promptSession`), `web/lib/agents/session-service.ts`, `web/components/polar/polar-code.tsx`, a Prisma field | - |
+| 5 | **Live multi-device sync, pushed.** `web/lib/agents/session-live.ts` is an in-process EventEmitter, and the page keeps a poll because changes made by another process are missed (`web/components/polar/polar-code.tsx:1201`). Publish session changes on a cross-process bus (Postgres `LISTEN/NOTIFY` on the existing database) and stream them; the poll becomes a slow safety net | M | `web/lib/agents/session-live.ts`, `web/app/api/agents/sessions/[id]/live/route.ts`, `web/components/polar/polar-code.tsx`, `web/components/polar/polar-code-workspace.tsx` | Prerequisite for runner sessions, whose events arrive from outside the web process |
+| 6 | **Runner phase 1** (see "Build order", phase 1). (a) `polaris-runner` as a system service installed by the desktop app, also standalone; (b) one outbound WebSocket to Polaris, reconnecting, no inbound port; (c) a PTY host running the same hook script as containers, plus structured control where the CLI offers it (`codex app-server`, `opencode serve`); (d) placement "This computer" with a git worktree per session; (e) pairing by the QR device flow, enrolled as a trusted device | L | new `runner/` package; `desktop/src/main/` (installer, service registration, tray state); `web/lib/agents/session-placement.ts`; `web/lib/cli/sign-in.ts` (pairing); `web/app/(app)/account/sessions/trusted-devices-card.tsx`; a new `web/app/api/runner/` WebSocket endpoint; `web/lib/agents/session-hooks.ts` (hook target) | Decisions 1, 2 and 5 above still apply |
+| 7 | **Attach to sessions already running on the PC** (phase 2). The runner lists the CLIs' transcripts (Claude `~/.claude/projects`, every Enigma account dir, Codex rollouts), resumes one in its PTY, and a `polaris claude` shim starts new ones attached; the transcript is stored on Polaris | M | `runner/` (transcript readers), `web/lib/agents/session-history.ts`, `web/lib/polar/code-history.ts`, `web/components/polar/polar-code.tsx` | Enigma's per-account dirs are the case to test |
+
+Order rationale: 1 and 2 are what the operator hits every day in today's
+cloud sessions (forgetting, and stopping on a limit), and both reuse pieces
+that exist. 3 and 4 are small and close Phase 0. 5 has to land before 6,
+because runner events come from outside the web process. 6 and 7 are the "the
+PC is the machine" half.
