@@ -255,7 +255,7 @@ export function UpdateChangelog({
     const fold = installed ? (
         <button
             type="button"
-            className="flex min-w-0 items-center gap-1.5 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex min-w-0 items-center gap-1.5 rounded text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-expanded={!folded}
             aria-controls={foldId}
             onClick={() => setFolded((value) => !value)}
