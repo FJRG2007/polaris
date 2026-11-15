@@ -3201,5 +3201,42 @@
             "tinted": "Tinted",
             "gradient": "Gradient"
         }
+    },
+    "readings": {
+        "title": "Readings",
+        "range": "Window",
+        "measure": "Measure",
+        "ranges": {
+            "24h": "24 h",
+            "7d": "7 days",
+            "30d": "30 days",
+            "1y": "1 year"
+        },
+        "measures": {
+            "temperature": "Temperature",
+            "humidity": "Humidity",
+            "target": "Target",
+            "pm25": "PM2.5",
+            "allergen": "Allergens",
+            "gas": "Gases (VOC)",
+            "filter": "Filter life",
+            "power": "Power",
+            "energy": "Energy",
+            "co2": "CO2",
+            "reading": "Reading"
+        },
+        "stats": {
+            "min": "Min",
+            "avg": "Avg",
+            "max": "Max"
+        },
+        "empty": "Nothing recorded in this window yet.",
+        "failed": "The readings could not be loaded.",
+        "tracking": "Readings history",
+        "trackingHint": "Which measures are kept over time.",
+        "trackName": "Keep the history of {measure}",
+        "offTitle": "Stop keeping {measure}?",
+        "offBody": "Its stored history is deleted now, to save storage or for privacy, and nothing new is recorded until you turn it back on.",
+        "offConfirm": "Stop and delete"
     }
 }

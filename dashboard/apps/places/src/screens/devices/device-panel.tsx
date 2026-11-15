@@ -39,6 +39,7 @@ import { LightControls } from "./light-controls";
 import { ApplianceControls } from "./appliance-controls";
 import { LitterControls } from "./litter-controls";
 import { SwitchSettings } from "./switch-settings";
+import { DeviceReadings } from "./device-readings";
 import {
     Badge,
     Button,
@@ -533,6 +534,8 @@ export function DevicePanel({
                                     />
                                 )}
                             </section>
+
+                            <DeviceReadings key={device.id} device={device} />
 
                             <section className="flex flex-col gap-2 border-t border-border pt-4">
                                 <h3 className="text-sm font-medium">{t("devicePanel.history")}</h3>

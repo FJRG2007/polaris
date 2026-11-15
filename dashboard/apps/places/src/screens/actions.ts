@@ -36,6 +36,8 @@ import * as rooms from "../lib/rooms";
 import * as labels from "../lib/labels";
 import * as automations from "../lib/automations";
 import * as devices from "../lib/devices";
+import * as readings from "../lib/readings";
+import * as readingKinds from "../lib/reading-kinds";
 import { operateDevice } from "../lib/device-operation";
 import * as cameras from "../lib/cameras";
 import * as privacy from "../lib/privacy";
@@ -1763,6 +1765,56 @@ export async function deviceUsageAction(
         return devices.deviceUsage(install.id, one);
     });
     return result.error ? { error: result.error } : { used: result.value };
+}
+
+const readingHistoryInput = zod.object({
+    deviceId: zod.string().uuid(),
+    measure: readingKinds.readingMeasureSchema,
+    range: readingKinds.readingRangeSchema
+});
+
+/** One measure's history on one device, for the Readings chart. Whoever may
+ *  open the device may read it; a measure switched off reads as empty. */
+export async function readingHistoryAction(
+    input: unknown
+): Promise<{ history?: readingKinds.ReadingHistory; error?: string }> {
+    const { install, reach } = await requireHomeShared();
+    const parsed = readingHistoryInput.safeParse(input);
+    if (!parsed.success) return { error: await schemaSay(undefined, "actions.checkDetails") };
+    const { deviceId, measure, range } = parsed.data;
+    const result = await guard(() => {
+        if (!reachesDevice(reach, deviceId)) throw new HomeError("That device is not shared with you");
+        return readings.readingHistory(install.id, deviceId, measure, range);
+    });
+    return result.error ? { error: result.error } : { history: result.value };
+}
+
+const readingTrackingInput = zod.object({
+    deviceId: zod.string().uuid(),
+    measure: readingKinds.readingMeasureSchema,
+    on: zod.boolean()
+});
+
+/** Keep or stop keeping one measure's history. `home.manage`, like the rest of
+ *  the device's settings; off deletes what was stored for it. */
+export async function setReadingTrackingAction(
+    input: unknown
+): Promise<{ readingsOff?: string[]; error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const parsed = readingTrackingInput.safeParse(input);
+    if (!parsed.success) return { error: await schemaSay(undefined, "actions.checkDetails") };
+    const { deviceId, measure, on } = parsed.data;
+    const result = await guard(() =>
+        readings.setReadingTracking(install.id, deviceId, measure, on)
+    );
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: on ? "places.device.readings.on" : "places.device.readings.off",
+        targetType: "placeDevice",
+        targetId: deviceId
+    });
+    return { readingsOff: result.value };
 }
 
 /**

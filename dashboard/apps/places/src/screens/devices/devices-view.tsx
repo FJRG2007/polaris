@@ -696,6 +696,7 @@ export function DevicesView({
                     settle(device);
                     setEditing(null);
                 }}
+                onTracked={settle}
             />
 
             <NukiLocalDialog account={linking} onClose={() => setLinking(null)} />

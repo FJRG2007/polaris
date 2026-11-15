@@ -18,6 +18,7 @@
 
 import * as actions from "../actions";
 import { useEffect, useState } from "react";
+import { ReadingTracking } from "./device-readings";
 import {
     batteryLineSchema,
     deviceEditSchema,
@@ -60,12 +61,15 @@ export function DeviceDialog({
     device,
     places,
     onClose,
-    onSaved
+    onSaved,
+    onTracked
 }: {
     device: DeviceView | null;
     places: readonly PlaceView[];
     onClose: () => void;
     onSaved: (device: DeviceView) => void;
+    /** Which measures' history is kept changed; the dialog stays open. */
+    onTracked?: (device: DeviceView) => void;
 }) {
     const t = usePlacesT();
     const [name, setName] = useState("");
@@ -408,6 +412,13 @@ export function DeviceDialog({
                                     : ""}
                             </span>
                         </label>
+                    )}
+
+                    {device && (
+                        <ReadingTracking
+                            device={device}
+                            onChange={(readingsOff) => onTracked?.({ ...device, readingsOff })}
+                        />
                     )}
 
                     {error && (
