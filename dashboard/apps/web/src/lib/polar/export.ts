@@ -229,17 +229,10 @@ export function threadJson(thread: ExportThread): string {
     return `${JSON.stringify({ version: 1, ...thread }, null, 2)}\n`;
 }
 
-/** A file name a browser keeps as typed: ASCII, no separators. */
-export function exportFileName(title: string, id: string, extension: string): string {
-    const slug = title
-        .normalize("NFKD")
-        .replace(/[^\x20-\x7e]/g, "")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 60);
-    return `${slug || "chat"}-${id.slice(0, 8)}.${extension}`;
-}
+// Pure, so files that only name a download need not load this module.
+import { exportFileName } from "@/lib/polar/export-name";
+
+export { exportFileName };
 
 /** One chat with its messages, or null when it is not this person's. */
 export async function readExportThread(userId: string, id: string): Promise<ExportThread | null> {

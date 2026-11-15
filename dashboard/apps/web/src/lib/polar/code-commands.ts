@@ -12,7 +12,8 @@
  * and /compress. Commands that open a picker inside the terminal (/model,
  * /resume, /config, Codex's /review) are left out: nothing here can answer
  * that picker. Only Claude Code takes words after a command; the others are
- * sent the bare name.
+ * sent the bare name. /context and /export are Polaris's own: they read what
+ * the session reported and its stored transcript, for every CLI.
  *
  * Client-safe: no server imports.
  */
@@ -31,7 +32,9 @@ export const CODE_COMMANDS = [
     "init",
     "stop",
     "rename",
-    "diff"
+    "diff",
+    "context",
+    "export"
 ] as const;
 export type CodeCommand = (typeof CODE_COMMANDS)[number];
 
@@ -59,7 +62,9 @@ const LOCAL: Record<Exclude<CodeCommand, Forwarded>, readonly CodeCommandPlace[]
     model: ["start"],
     stop: ["thread"],
     rename: ["thread"],
-    diff: ["thread"]
+    diff: ["thread"],
+    context: ["thread"],
+    export: ["thread"]
 };
 
 /** Commands whose words after them matter, so picking one from the list

@@ -26,7 +26,9 @@ describe("the commands on offer", () => {
             "init",
             "stop",
             "rename",
-            "diff"
+            "diff",
+            "context",
+            "export"
         ]);
     });
 
@@ -42,7 +44,9 @@ describe("the commands on offer", () => {
             "resume",
             "stop",
             "rename",
-            "diff"
+            "diff",
+            "context",
+            "export"
         ]);
         expect(codeCommands.codeCommandsFor("thread", null)).not.toContain("compact");
     });

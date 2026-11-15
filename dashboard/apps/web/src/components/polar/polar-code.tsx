@@ -80,6 +80,14 @@ import { useCodeSlash } from "@/components/polar/polar-code-slash";
 import * as codeCommands from "@/lib/polar/code-commands";
 import { usePolarCommands } from "@/components/polar/polar-commands";
 import { ContextBar } from "@/components/polar/polar-context";
+import * as codeStatus from "@/lib/polar/code-status";
+import {
+    CodeContextCard,
+    CodeExportMenu,
+    CodeQueuedList,
+    CodeStatusLine,
+    downloadTranscript
+} from "@/components/polar/polar-code-status";
 import { estimateTokens } from "@/lib/polar/compaction";
 import {
     CodeIssueChip,
@@ -1185,6 +1193,8 @@ function CodeThread({
     const [workspace, setWorkspace] = useState(false);
     const [failed, setFailed] = useState(false);
     const [reply, setReply] = useState("");
+    // The "/context" card, open until closed.
+    const [showContext, setShowContext] = useState(false);
     const { commands: own, enigma } = usePolarCommands();
     const [error, setError] = useState<string | null>(null);
     const [busy, startTransition] = useTransition();
@@ -1253,7 +1263,7 @@ function CodeThread({
         setReply("");
         startTransition(() => {
             void runAction(
-                () => postCode<{ error?: string }>("/api/polar/code/prompt", {
+                () => postCode<{ error?: string; queued?: boolean }>("/api/polar/code/prompt", {
                         sessionId,
                         text,
                         attachments
@@ -1267,6 +1277,9 @@ function CodeThread({
                     if (result?.error) setError(result.error);
                     return;
                 }
+                // Mid-turn it waits in the queue, drawn there rather than as
+                // a message the agent already has.
+                if (result.queued) setSent(null);
                 parts.uploads.clear();
                 read();
             });
@@ -1281,6 +1294,8 @@ function CodeThread({
         if (command === "new") return onNew();
         if (command === "resume") return onHistory();
         if (command === "diff") return setWorkspace(true);
+        if (command === "context") return setShowContext(true);
+        if (command === "export") return downloadTranscript(sessionId, rest.toLowerCase() === "jsonl" ? "jsonl" : "md");
         if (command === "rename") {
             if (!rest) return setReply("/rename ");
             setError(null);
@@ -1404,6 +1419,40 @@ function CodeThread({
         });
     };
 
+    /** Change a queued message, or take it back into the reply box. */
+    const changeQueued = (id: string, text: string | null) => {
+        setError(null);
+        startTransition(() => {
+            void runAction(
+                () =>
+                    postCode<{ text?: string; gone?: boolean; error?: string }>(
+                        "/api/polar/code/queue",
+                        text === null
+                            ? { action: "remove", sessionId, id }
+                            : { action: "edit", sessionId, id, text }
+                    ),
+                setError
+            ).then((result) => {
+                if (result?.error) setError(result.error);
+                else if (result?.gone) setError(t("code.queue.gone"));
+                else if (result?.text) {
+                    const back = result.text;
+                    setReply((current) => (current.trim() ? `${back}\n\n${current}` : back));
+                }
+                read();
+            });
+        });
+    };
+
+    // The status line, from what the session reported.
+    const statusParts = codeStatus.codeStatusParts({
+        model: thread?.model ?? null,
+        effort: view?.effort ?? null,
+        context: thread?.context ?? null,
+        costUsd: view?.usage?.costUsd ?? null,
+        branch: session?.branch ?? ""
+    });
+
     /** Take this session out of the queue it is waiting in. */
     const cancelQueued = () => {
         setError(null);
@@ -1463,6 +1512,20 @@ function CodeThread({
                     onAnswered={read}
                 />
             ) : null}
+            {showContext ? (
+                <CodeContextCard
+                    context={thread.context ?? null}
+                    model={thread.model ?? null}
+                    onClose={() => setShowContext(false)}
+                />
+            ) : null}
+            {/* A thread cached before the queue existed has none. */}
+            <CodeQueuedList
+                waiting={thread.waiting ?? []}
+                disabled={busy}
+                onEdit={(id, text) => changeQueued(id, text)}
+                onTakeBack={(id) => changeQueued(id, null)}
+            />
             {thread.context ? (
                 // How full the agent's own conversation is: the tool compacts it
                 // itself, so there is nothing here to press.
@@ -1527,6 +1590,7 @@ function CodeThread({
                 }}
             />
             </div>
+            <CodeStatusLine parts={statusParts} />
             {error ? <Notice error>{error}</Notice> : null}
         </div>
     );
@@ -1555,6 +1619,7 @@ function CodeThread({
                         <PanelRight className="size-4" />
                     </button>
                 ) : null}
+                {thread ? <CodeExportMenu sessionId={sessionId} /> : null}
                 {thread?.canManage ? <SessionTools session={thread.view} /> : null}
             </CodeSessionBar>
             <PolarThreadFrame fullPage={fullPage} dock={dock}>

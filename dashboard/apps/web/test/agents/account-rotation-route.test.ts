@@ -49,6 +49,7 @@ vi.mock("@/lib/agents/account-rotation", () => ({
     turnAccountName: async () => "second@example.test"
 }));
 vi.mock("@polaris/db", () => ({ prisma: {} }));
+vi.mock("@/lib/agents/session-prompt-queue", () => ({ deliverNextQueued: async () => false }));
 
 const { POST } = await import("@/app/api/agents/sessions/[id]/events/route");
 

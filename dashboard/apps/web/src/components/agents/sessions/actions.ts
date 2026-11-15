@@ -42,6 +42,7 @@ import {
 import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
 import { chatCredentialFor } from "@/lib/agents/model-keys";
 import * as sessionAttachments from "@/lib/agents/session-attachments";
+import * as promptQueue from "@/lib/agents/session-prompt-queue";
 import {
     sharedWorkspaceAllowed,
     workspaceHolders,
@@ -444,7 +445,7 @@ async function noteOnTask(session: sessions.SessionView, userId: string): Promis
     }
 }
 
-export async function promptSessionAction(input: unknown): Promise<{ error?: string }> {
+export async function promptSessionAction(input: unknown): Promise<{ error?: string; queued?: boolean }> {
     const user = await requirePermission("agents.manage");
     const parsed = core.agentSessionPromptSchema.safeParse(input);
     const t = await getTranslations("agents");
@@ -463,16 +464,22 @@ export async function promptSessionAction(input: unknown): Promise<{ error?: str
     // would be typed into a machine that does not exist.
     if (core.isSessionQueued(session.state)) return { error: t("sessions.errors.queued") };
 
-    const files = await sessionAttachments.sessionAttachmentsFor(user.id, parsed.data.attachments);
-    if ("refusal" in files) return { error: t(`sessions.errors.files.${files.refusal}`) };
-    const text = sessionAttachments.withAttachmentNote(
-        parsed.data.text,
-        files.files.map((file) => file.path)
-    );
-    await sessions.addSessionMessage(session.id, "user", text, user.id);
+    // Mid-turn, or behind messages already waiting: it joins the queue and is
+    // sent when the turn ends (`session-prompt-queue`).
+    if (promptQueue.shouldQueuePrompt(session.state, await promptQueue.queuedCount(session.id))) {
+        const files = await sessionAttachments.sessionAttachmentsFor(user.id, parsed.data.attachments);
+        if ("refusal" in files) return { error: t(`sessions.errors.files.${files.refusal}`) };
+        if (!(await promptQueue.queuePrompt(session.id, user.id, parsed.data.text, parsed.data.attachments)))
+            return { error: t("sessions.errors.queueFull", { count: promptQueue.QUEUE_MAX }) };
+        // The turn may have ended between the read and the write; then nothing
+        // would ever send it, so it goes now.
+        const now = await sessions.getSession(session.id, user.id);
+        if (now && core.isSessionListening(now.state)) await promptQueue.deliverNextQueued(session.id);
+        return { queued: true };
+    }
     try {
-        await runtime.placeAttachments(session, user.id, files.files);
-        await runtime.promptSession(session.id, text);
+        const sent = await promptQueue.sendPromptNow(session, user.id, parsed.data.text, parsed.data.attachments);
+        if (sent.refusal) return { error: t(`sessions.errors.files.${sent.refusal}`) };
     } catch (error) {
         return { error: agentText(t, sessions.readableFailure(error, `prompting ${session.id}`)) };
     }

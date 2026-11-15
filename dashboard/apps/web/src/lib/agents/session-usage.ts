@@ -71,20 +71,47 @@ export function claudeLineUsage(line: string): TurnUsage | null {
     };
 }
 
+/** The last turn's context split the way the transcript reports it. */
+export interface ContextParts {
+    readonly input: number;
+    readonly cacheRead: number;
+    readonly cacheWrite: number;
+    readonly output: number;
+}
+
 /** The main conversation's size after the last of these turns, or null when
  *  none of them is the main conversation's. Pure. */
 export function contextAfter(
     lines: readonly TurnUsage[]
-): { tokens: number; model: string } | null {
+): { tokens: number; model: string; parts: ContextParts } | null {
     for (let index = lines.length - 1; index >= 0; index--) {
         const turn = lines[index]!;
         if (turn.sidechain) continue;
         return {
             tokens: turn.input + turn.cacheRead + turn.cacheWrite + turn.output,
-            model: turn.model
+            model: turn.model,
+            parts: {
+                input: turn.input,
+                cacheRead: turn.cacheRead,
+                cacheWrite: turn.cacheWrite,
+                output: turn.output
+            }
         };
     }
     return null;
+}
+
+const partsSchema = z.object({
+    input: count,
+    cacheRead: count,
+    cacheWrite: count,
+    output: count
+});
+
+/** A stored `contextUsage` read back, or null when it is not one. Pure. */
+export function storedContextParts(value: unknown): ContextParts | null {
+    const parsed = partsSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
 }
 
 /**
@@ -176,7 +203,9 @@ export async function recordSessionUsage(
             tokensIn: { increment: tokensIn },
             tokensOut: { increment: tokensOut },
             usageMessageId: last,
-            ...(context ? { contextTokens: context.tokens, contextModel: context.model } : {}),
+            ...(context
+                ? { contextTokens: context.tokens, contextModel: context.model, contextUsage: { ...context.parts } }
+                : {}),
             ...(priced ? { costUsd: (row.costUsd ?? 0) + cost } : {})
         }
     });

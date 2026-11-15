@@ -35,13 +35,16 @@ import { codeStartersSchema, starterPrompt, type StarterSkill } from "@/lib/pola
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { userHasManage, type SessionUser } from "@/lib/session";
 import { sessionCursor } from "@/lib/agents/session-cursor";
-import { priceSlugs } from "@/lib/agents/session-usage";
+import { priceSlugs, storedContextParts, type ContextParts } from "@/lib/agents/session-usage";
+import * as promptQueue from "@/lib/agents/session-prompt-queue";
+import * as transcript from "@/lib/polar/code-transcript";
 import { getCatalogModel } from "@/lib/agents/model-catalog";
 import {
     dedupeCodeRows,
     POLAR_CODE_PAGE,
     polarCodeEditSchema,
     polarCodeInterruptSchema,
+    polarCodeQueueSchema,
     threadEvents
 } from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
@@ -120,8 +123,21 @@ export interface PolarCodeThread {
      *  the session; null when nothing is waiting. */
     readonly permission: PendingPermission | null;
     /** How full the agent's context is, as its last turn reported it; null
-     *  when no turn was read or the model's window is not known. */
-    readonly context: { readonly used: number; readonly window: number } | null;
+     *  when no turn was read or the model's window is not known. `used` is
+     *  the input side (fresh, cache reads, cache writes), the way Claude
+     *  Code's own `used_percentage` counts it; `parts` splits the turn as the
+     *  transcript reports it, null for a session read before it was kept. */
+    readonly context: {
+        readonly used: number;
+        readonly window: number;
+        readonly parts: ContextParts | null;
+    } | null;
+    /** The model the agent's last turn ran on, as its transcript names it;
+     *  null before a turn was read. */
+    readonly model: string | null;
+    /** Messages typed mid-turn, waiting for it to end, oldest first. Only for
+     *  somebody who may steer it; empty otherwise. */
+    readonly waiting: readonly promptQueue.QueuedPrompt[];
     /** The latest turn failed because the provider refused the account the
      *  agent signs in with: what to call that account (null when the session
      *  picked none). Only for somebody who may steer it; null otherwise. */
@@ -141,21 +157,27 @@ async function todosOf(sessionId: string): Promise<SessionTodo[]> {
     return storedTodos(row?.todos);
 }
 
-/** The session's last reported size against its model's window, or null. */
-async function contextOf(sessionId: string): Promise<PolarCodeThread["context"]> {
+/** The session's last reported size against its model's window (null when
+ *  either is unknown), and the model that turn ran on. */
+async function contextOf(
+    sessionId: string
+): Promise<{ context: PolarCodeThread["context"]; model: string | null }> {
     const row = await prisma.agentSession
         .findUnique({
             where: { id: sessionId },
-            select: { contextTokens: true, contextModel: true }
+            select: { contextTokens: true, contextModel: true, contextUsage: true }
         })
         .catch(() => null);
-    if (!row?.contextTokens || !row.contextModel) return null;
-    for (const slug of priceSlugs(row.contextModel)) {
-        const model = await getCatalogModel(slug).catch(() => null);
-        if (model && model.contextTokens > 0)
-            return { used: row.contextTokens, window: model.contextTokens };
+    const model = row?.contextModel || null;
+    if (!row?.contextTokens || !model) return { context: null, model };
+    const parts = storedContextParts(row.contextUsage);
+    const used = parts ? parts.input + parts.cacheRead + parts.cacheWrite : row.contextTokens;
+    for (const slug of priceSlugs(model)) {
+        const found = await getCatalogModel(slug).catch(() => null);
+        if (found && found.contextTokens > 0)
+            return { context: { used, window: found.contextTokens, parts }, model };
     }
-    return null;
+    return { context: null, model };
 }
 
 async function accessOf(user: SessionUser): Promise<PolarCodeAccess> {
@@ -248,7 +270,7 @@ export async function polarCodeThread(
 ): Promise<PolarCodeThread | null> {
     const access = await accessOf(user);
     if (access === "none") return null;
-    const [detail, t, context, todos] = await Promise.all([
+    const [detail, t, { context, model }, todos] = await Promise.all([
         sessionDetailAction(sessionId),
         getTranslations("agents"),
         contextOf(sessionId),
@@ -299,6 +321,11 @@ export async function polarCodeThread(
         canManage: access === "manage",
         permission,
         context,
+        model,
+        waiting:
+            access === "manage" && !core.isSessionOver(detail.session.state)
+                ? await promptQueue.listQueuedPrompts(sessionId).catch(() => [])
+                : [],
         refusedSignIn:
             access === "manage" && lastTurnRefused(detail.events)
                 ? { account: await refusedAccountName(detail.session.accountId) }
@@ -553,7 +580,7 @@ export async function polarCodeWarm(user: SessionUser): Promise<{ warm: boolean 
 export async function polarCodePrompt(
     user: SessionUser,
     input: unknown
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; queued?: boolean }> {
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
     return promptSessionAction(input);
@@ -638,4 +665,59 @@ export async function polarCodeEdit(user: SessionUser, body: unknown): Promise<{
     }
     if (access !== "manage") return { ok: false };
     return { ok: await renameSession(edit.sessionId, user.id, edit.title) };
+}
+
+/**
+ * Change a message waiting in a session's queue, or take it back. A taken-back
+ * message answers with its text, for the reply box; one already sent answers
+ * `gone`, so the screen can say it went.
+ */
+export async function polarCodeQueue(
+    user: SessionUser,
+    body: unknown
+): Promise<{ text?: string; gone?: boolean; error?: string }> {
+    const t = await getTranslations("polar");
+    if ((await accessOf(user)) !== "manage") return { error: t("code.noAccess") };
+    const parsed = polarCodeQueueSchema.safeParse(body);
+    if (!parsed.success) return { error: t("code.queue.invalid") };
+    const edit = parsed.data;
+    // Only the person who started the session steers it.
+    if (!(await getSession(edit.sessionId, user.id))) return { error: t("code.queue.invalid") };
+    if (edit.action === "edit")
+        return (await promptQueue.editQueuedPrompt(edit.sessionId, edit.id, edit.text)) ? {} : { gone: true };
+    const text = await promptQueue.takeBackQueuedPrompt(edit.sessionId, edit.id);
+    return text === null ? { gone: true } : { text };
+}
+
+/** A session's transcript as a file in one of the formats, or null when this
+ *  reader cannot open the session. */
+export async function polarCodeTranscript(
+    user: SessionUser,
+    sessionId: string,
+    format: transcript.TranscriptFormat
+): Promise<{ name: string; type: string; body: string } | null> {
+    const thread = await polarCodeThread(user, sessionId);
+    if (!thread) return null;
+    const session: transcript.TranscriptSession = {
+        id: thread.view.id,
+        title: thread.view.title,
+        repo: thread.session.repo,
+        branch: thread.session.branch,
+        cli: thread.view.cli,
+        createdAt: thread.session.createdAt
+    };
+    const t = await getTranslations("polar");
+    const body =
+        format === "md"
+            ? transcript.transcriptMarkdown(session, thread.entries, {
+                  you: t("code.transcript.you"),
+                  agent: t("code.transcript.agent"),
+                  polaris: t("code.transcript.polaris"),
+                  repository: t("code.transcript.repository"),
+                  branch: t("code.transcript.branch"),
+                  started: t("code.transcript.started"),
+                  steps: t("code.transcript.steps")
+              })
+            : transcript.transcriptJsonl(session, thread.entries);
+    return { ...transcript.transcriptFile(session, format), body };
 }

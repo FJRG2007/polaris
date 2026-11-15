@@ -96,6 +96,26 @@ export const polarCodeEditSchema = z.discriminatedUnion("action", [
         .strict()
 ]);
 
+/** A change to a message waiting in a session's queue: new words, or taken
+ *  back out. */
+export const polarCodeQueueSchema = z.discriminatedUnion("action", [
+    z
+        .object({
+            action: z.literal("edit"),
+            sessionId: z.string().trim().uuid(),
+            id: z.string().trim().uuid(),
+            text: z.string().trim().min(1).max(20_000)
+        })
+        .strict(),
+    z
+        .object({
+            action: z.literal("remove"),
+            sessionId: z.string().trim().uuid(),
+            id: z.string().trim().uuid()
+        })
+        .strict()
+]);
+
 /** As many lines of activity as the thread shows; the session's own page keeps
  *  the rest. */
 const EVENTS_SHOWN = 80;

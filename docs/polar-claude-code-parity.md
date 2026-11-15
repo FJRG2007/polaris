@@ -89,7 +89,7 @@ through Polaris's Anthropic- and OpenAI-compatible API (`web/lib/polar/compat/`,
 | Worktree per parallel session | `worktrees` | Fresh clone on its own branch per session (`session-branch.ts`, `session-commands.ts`) | Local worktrees need the runner | Runner creates `git worktree` per session | S after runner | partial |
 | Checkpoints and rewind (code and conversation) | `checkpointing` | Chat versions and branches (`web/lib/polar/versions.ts`); no code checkpoints | Cannot rewind files | Snapshot the checkout per turn (git stash-like ref on the session branch) so it works for every engine | M | partial |
 | `/compact` and auto-compact | `commands`, `context-window` | Chat compaction and auto (`web/lib/polar/compaction.ts`, `preferences.ts`), with a conservative 32k window assumed when the model's is unknown; `/compact` forwarded to CLIs (`code-commands.ts`) | | | - | have |
-| `/context` view of what fills the window | `debug-your-config` | None | | Chat knows its token counts (`usage.ts`); show them per part | S | missing |
+| `/context` view of what fills the window | `debug-your-config` | Code `/context` card (`web/components/polar/polar-code-status.tsx`): used vs window as Claude Code counts it (input side), split into fresh input, cache reads, cache writes, output from the transcript's last main-thread turn (`session-usage.ts` `contextUsage`) | Claude Code's own categories (system prompt, tools, memory files) are not in the transcript or hooks | - | - | have |
 | Effort and fast mode | `model-config`, `fast-mode` | Reasoning in compat routes (`compat/route-model.ts`); effort in the run runtime (`dashboard/packages/agent-runtime/effort.ts`); Automatic picks fast models (`automatic.ts`) | No effort picker in Polar Chat or Code | Map one effort scale to each provider's knob | S | partial |
 | Model picker | `model-config` | `web/lib/polar/models.ts`, `components/polar/code-model-picker.tsx`; changeable mid-session in the Code thread for Claude Code, among the models of the source it signs in with (`modelCommand` in `session-commands.ts`: `--model` on the next turn, `/model` in an open interface) | Other CLIs keep the model they started with | | - | have |
 | Fallback when a model fails | `model-config` | Router chain with key rotation and cooldowns (`router/chain.ts`, `turn-fallback.ts`); beyond Claude Code | | | - | have |
@@ -100,10 +100,10 @@ through Polaris's Anthropic- and OpenAI-compatible API (`web/lib/polar/compat/`,
 | --- | --- | --- | --- | --- | --- | --- |
 | Resume / continue / session picker | `sessions` | Chat threads; Code `/resume` and history (`code-commands.ts`, `code-history.ts`) | | | - | have |
 | Name, branch, fork | `sessions#branch-a-session` | Rename; Chat versions; Code fork (`session-fork.ts`) | | | - | have |
-| Export transcript | `sessions#export-and-locate-session-data` | Chat Markdown or JSON (`web/lib/polar/export.ts`); Code history stored (`session-history.ts`) | No export for Code threads | Same exporter over the stored Code history | S | partial |
+| Export transcript | `sessions#export-and-locate-session-data` | Chat Markdown or JSON (`web/lib/polar/export.ts`); Code Markdown or JSONL from the thread (`web/lib/polar/code-transcript.ts`, `/api/polar/code/transcript`, `/export [jsonl]` and the session bar's download menu) | - | - | - | have |
 | Share a session | `claude-code-on-the-web#share-sessions` | Chat share links (`share.ts`); sessions can be shared (`docs/features/agents.md`) | | | - | have |
 | Turns that survive closing the tab | `claude-code-on-the-web` | Chat runs (`runs.ts`); Code sessions run in tmux | | | - | have |
-| Queue a message while busy, take it back | `claude-code-on-the-web#take-back-a-queued-message` | Not found | | Queue on the session row, pasted when the agent goes idle | S | missing |
+| Queue a message while busy, take it back | `claude-code-on-the-web#take-back-a-queued-message` | `AgentQueuedPrompt` table (`web/lib/agents/session-prompt-queue.ts`): queued while `working`, shown above the reply box on every device, editable or taken back, one sent per `turn.end` | Not exercised in a container | - | - | have |
 | Resume a session started in a local terminal | `remote-control#resume-sessions-after-stopping-the-server` | None | | Runner lists transcripts in the CLI's own folder and resumes one in its PTY (phase 2) | M | missing |
 
 ## 4. Customization
@@ -121,7 +121,7 @@ through Polaris's Anthropic- and OpenAI-compatible API (`web/lib/polar/compat/`,
 | MCP client, local stdio servers | `mcp` | None | Needs a machine to run on | Runner spawns stdio servers and bridges them | S after runner | missing |
 | Polaris as an MCP server | `mcp` | `web/lib/mcp/`; written into every session (`mcpConfig`) | | | - | have |
 | Output styles | `output-styles` | Enigma output style preference (`web/lib/polar/enigma-prefs.ts`), writing settings | No user-defined style files | Style = a system-prompt fragment, same for every provider | S | partial |
-| Status line | `statusline` | None | | Session footer: model, branch, context use, cost | S | missing |
+| Status line | `statusline` | Line under the Code reply box (`web/lib/polar/code-status.ts`): model, effort, context %, cost, branch, each only when reported | Rate-limit windows not shown | - | - | have |
 | Settings precedence (user, project, managed) | `settings` | Policy tiers for runs (`resolveAgentPolicy`, `agent-defaults-service.ts`) | Not for Polar Code or Chat | Reuse the tier resolver | M | partial |
 | Keybindings and vim mode | `keybindings` | None | | Low value in a web UI; TUI client only | S | missing |
 | Channels: push external events into a session | `channels` | PR comments and CI failures sent back (`session-review-loop.ts`); automations post via webhooks | No generic event into a live session | Automation action "prompt session" | S | partial |

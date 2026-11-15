@@ -241,6 +241,8 @@
             "init": "Escribir una guía del repositorio",
             "stop": "Parar el turno del agente",
             "rename": "Renombrar la sesión",
+            "context": "Ver cuánto contexto usa el agente",
+            "export": "Descargar la transcripción (jsonl para JSONL)",
             "diff": "Ver archivos y cambios",
             "renameFailed": "No se pudo renombrar. Reinténtalo."
         }
@@ -1312,6 +1314,46 @@
         "ended": "Esta sesión terminó.",
         "continue": "Seguir en una sesión nueva",
         "continueFailed": "No se pudo seguir con esta sesión. Inténtalo de nuevo.",
+        "status": {
+            "label": "Estado de sesión",
+            "effort": "Esfuerzo {effort}",
+            "context": "{percent}% contexto"
+        },
+        "context": {
+            "title": "Contexto",
+            "used": "{used} de {window} tokens ({percent}%)",
+            "none": "Ningún turno ha dado su tamaño aún.",
+            "input": "Entrada nueva",
+            "cacheRead": "Caché leída",
+            "cacheWrite": "Caché escrita",
+            "output": "Salida",
+            "note": "Del último turno del agente. El porcentaje cuenta la entrada; la salida entra en el siguiente.",
+            "close": "Cerrar"
+        },
+        "queue": {
+            "title": "En cola, se envía cuando el agente acabe su turno",
+            "edit": "Editar",
+            "remove": "Recuperar",
+            "save": "Guardar",
+            "cancel": "Cancelar",
+            "files": "+{count} archivos",
+            "gone": "Ese mensaje ya se envió.",
+            "invalid": "Ese mensaje no se puede cambiar."
+        },
+        "export": {
+            "label": "Descargar transcripción",
+            "markdown": "Markdown",
+            "jsonl": "JSONL"
+        },
+        "transcript": {
+            "you": "Tú",
+            "agent": "Agente",
+            "polaris": "Polaris",
+            "repository": "Repositorio",
+            "branch": "Rama",
+            "started": "Inicio",
+            "steps": "Pasos"
+        },
         "queued": {
             "waiting": "Esperando un hueco libre. Empieza solo.",
             "position": "Puesto en tu cola: {position}.",

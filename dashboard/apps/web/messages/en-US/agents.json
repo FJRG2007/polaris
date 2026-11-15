@@ -217,6 +217,7 @@
             "taskUnreachable": "That task is not one you can reach.",
             "saySomething": "Say something",
             "gone": "That session no longer exists.",
+            "queueFull": "{count} messages are already waiting. Send this once the agent takes them.",
             "ended": "That session has ended.",
             "queued": "This session is still waiting for a free slot. It gets its first prompt when it starts; send more once it has.",
             "noAnswer": "The machine running this session did not answer.",

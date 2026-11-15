@@ -31,6 +31,7 @@ import { readerWords } from "@/lib/i18n/reader-words";
 import { isSessionOver, parseHookSequence } from "@polaris/core";
 import { after } from "next/server";
 import * as history from "@/lib/agents/session-history";
+import { deliverNextQueued } from "@/lib/agents/session-prompt-queue";
 import { isSignInRefusal, noteRefusedSignIn } from "@/lib/agents/signin-refusal";
 import { handleTurnFailure, noteTurnFinished, turnAccountName } from "@/lib/agents/account-rotation";
 
@@ -122,7 +123,12 @@ export async function POST(
     // (`account-rotation.ts`). Read from the whole payload: the stored detail
     // is clipped before the reset time.
     else if (kind === "turn.failed") after(() => handleTurnFailure(id, payload, seq));
-    else if (kind === "turn.end") after(() => noteTurnFinished(id));
+    // A finished turn also sends the oldest message typed while it ran.
+    else if (kind === "turn.end")
+        after(async () => {
+            await noteTurnFinished(id);
+            await deliverNextQueued(id);
+        });
     if (state && isSessionOver(state)) after(() => history.syncFinalSessionHistory(id));
     else if (HISTORY_KINDS.has(kind)) after(() => history.syncSessionHistorySoon(id));
     return acknowledged();

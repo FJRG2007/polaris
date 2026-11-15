@@ -52,7 +52,20 @@ vi.mock("@/lib/i18n/request", () => ({
     getTranslations: async () => (key: string) => `t:${key}`
 }));
 const contextRow = vi.hoisted(() => ({
-    value: null as { contextTokens: number; contextModel: string } | null
+    value: null as { contextTokens: number; contextModel: string; contextUsage?: unknown } | null
+}));
+const queue = vi.hoisted(() => ({
+    waiting: [] as { id: string; text: string; at: string; files: number }[],
+    edited: [] as string[],
+    takenBack: null as string | null
+}));
+vi.mock("@/lib/agents/session-prompt-queue", () => ({
+    listQueuedPrompts: async () => queue.waiting,
+    editQueuedPrompt: async (_session: string, id: string, text: string) => {
+        queue.edited.push(`${id}:${text}`);
+        return id === "00000000-0000-4000-8000-0000000000a1";
+    },
+    takeBackQueuedPrompt: async () => queue.takenBack
 }));
 vi.mock("@/lib/agents/model-catalog", () => ({
     getCatalogModel: async (slug: string) =>
@@ -177,8 +190,95 @@ vi.mock("@/components/agents/sessions/actions", () => ({
     }
 }));
 
-const { polarCodeCancel, polarCodeChoices, polarCodeOverview, polarCodeStart, polarCodeThread } =
-    await import("@/lib/polar/code");
+const {
+    polarCodeCancel,
+    polarCodeChoices,
+    polarCodeOverview,
+    polarCodeQueue,
+    polarCodeStart,
+    polarCodeThread,
+    polarCodeTranscript
+} = await import("@/lib/polar/code");
+
+const QUEUED = "00000000-0000-4000-8000-0000000000a1";
+
+describe("the message queue", () => {
+    beforeEach(() => {
+        queue.waiting = [];
+        queue.edited = [];
+        queue.takenBack = null;
+    });
+
+    it("shows what waits to the person who may steer, and to nobody else", async () => {
+        queue.waiting = [{ id: QUEUED, text: "then add tests", at: "2026-10-20T10:00:05.000Z", files: 0 }];
+        state.held = new Set(["agents.read", "agents.manage"]);
+        expect((await polarCodeThread(USER, SESSION))?.waiting).toEqual(queue.waiting);
+        state.held = new Set(["agents.read"]);
+        expect((await polarCodeThread(USER, SESSION))?.waiting).toEqual([]);
+    });
+
+    it("edits a waiting message and says when it already went", async () => {
+        state.held = new Set(["agents.read", "agents.manage"]);
+        expect(await polarCodeQueue(USER, { action: "edit", sessionId: SESSION, id: QUEUED, text: " new words " })).toEqual(
+            {}
+        );
+        expect(queue.edited).toEqual([`${QUEUED}:new words`]);
+        expect(
+            await polarCodeQueue(USER, {
+                action: "edit",
+                sessionId: SESSION,
+                id: "00000000-0000-4000-8000-0000000000b2",
+                text: "late"
+            })
+        ).toEqual({ gone: true });
+    });
+
+    it("takes a message back with its words, for the reply box", async () => {
+        state.held = new Set(["agents.read", "agents.manage"]);
+        queue.takenBack = "then add tests";
+        expect(await polarCodeQueue(USER, { action: "remove", sessionId: SESSION, id: QUEUED })).toEqual({
+            text: "then add tests"
+        });
+        queue.takenBack = null;
+        expect(await polarCodeQueue(USER, { action: "remove", sessionId: SESSION, id: QUEUED })).toEqual({
+            gone: true
+        });
+    });
+
+    it("refuses a reader, a malformed change and somebody else's session", async () => {
+        state.held = new Set(["agents.read"]);
+        expect(await polarCodeQueue(USER, { action: "remove", sessionId: SESSION, id: QUEUED })).toEqual({
+            error: "t:code.noAccess"
+        });
+        state.held = new Set(["agents.read", "agents.manage"]);
+        expect(await polarCodeQueue(USER, { action: "remove", sessionId: "nope", id: QUEUED })).toEqual({
+            error: "t:code.queue.invalid"
+        });
+        state.owner = false;
+        expect(await polarCodeQueue(USER, { action: "remove", sessionId: SESSION, id: QUEUED })).toEqual({
+            error: "t:code.queue.invalid"
+        });
+        state.owner = true;
+    });
+});
+
+describe("the transcript download", () => {
+    it("is the thread as Markdown or JSONL, for whoever can read the session", async () => {
+        state.held = new Set(["agents.read"]);
+        const md = await polarCodeTranscript(USER, SESSION, "md");
+        expect(md?.name).toMatch(/^fix-the-login-form-11111111\.md$/);
+        expect(md?.body).toContain("Fix it");
+        const jsonl = await polarCodeTranscript(USER, SESSION, "jsonl");
+        const lines = jsonl?.body.trimEnd().split("\n") ?? [];
+        expect(JSON.parse(lines[0]!)).toMatchObject({ type: "session", id: SESSION });
+        expect(lines.slice(1).some((line) => (JSON.parse(line) as { text: string }).text === "Fix it")).toBe(true);
+    });
+
+    it("is nothing for somebody who cannot read Code sessions", async () => {
+        state.held = new Set();
+        expect(await polarCodeTranscript(USER, SESSION, "md")).toBeNull();
+    });
+});
 
 beforeEach(() => {
     state.held = new Set();
@@ -302,8 +402,22 @@ describe("polarCodeThread", () => {
         contextRow.value = { contextTokens: 50_000, contextModel: "claude-sonnet-4-5-20250929" };
         expect((await polarCodeThread(USER, SESSION))?.context).toEqual({
             used: 50_000,
-            window: 200_000
+            window: 200_000,
+            parts: null
         });
+        // Split by kind, the percentage counts the input side as Claude Code does.
+        contextRow.value = {
+            contextTokens: 50_000,
+            contextModel: "claude-sonnet-4-5-20250929",
+            contextUsage: { input: 1000, cacheRead: 40_000, cacheWrite: 5000, output: 4000 }
+        };
+        const thread = await polarCodeThread(USER, SESSION);
+        expect(thread?.context).toEqual({
+            used: 46_000,
+            window: 200_000,
+            parts: { input: 1000, cacheRead: 40_000, cacheWrite: 5000, output: 4000 }
+        });
+        expect(thread?.model).toBe("claude-sonnet-4-5-20250929");
         // A model the catalogue does not know has no window to measure against.
         contextRow.value = { contextTokens: 50_000, contextModel: "made-up" };
         expect((await polarCodeThread(USER, SESSION))?.context).toBeNull();

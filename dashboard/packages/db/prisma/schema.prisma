@@ -9080,6 +9080,9 @@ model AgentSession {
     // for every tool whose transcript reports no usage.
     contextTokens Int?
     contextModel  String?
+    // The same last turn split the way the transcript reports it: fresh input,
+    // cache reads, cache writes and output, for "/context". Null before one.
+    contextUsage  Json?
     // When the person who started it took it out of Polar's Code history. The
     // session stays, listed in Agents: it is a record of work that happened.
     polarHiddenAt DateTime?
@@ -9198,6 +9201,7 @@ model AgentSession {
     events   AgentSessionEvent[]
     permissionRequests AgentPermissionRequest[]
     messages AgentSessionMessage[]
+    queuedPrompts AgentQueuedPrompt[]
 
     @@unique([tokenHash])
     @@index([repoId, createdAt])
@@ -9316,6 +9320,23 @@ model AgentSessionMessage {
     session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
     @@unique([sessionId, vendorId])
+    @@index([sessionId, createdAt])
+}
+
+// A message typed while the agent was mid-turn, held here until the turn ends
+// and then sent, oldest first. Kept on the server so every device that opens
+// the session sees the same queue and can edit or take one back.
+model AgentQueuedPrompt {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    sessionId   String   @db.Uuid
+    text        String
+    // Upload ids the message carries, resolved again when it is sent.
+    attachments String[] @default([])
+    authorId    String   @db.Uuid
+    createdAt   DateTime @default(now())
+
+    session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
     @@index([sessionId, createdAt])
 }
 

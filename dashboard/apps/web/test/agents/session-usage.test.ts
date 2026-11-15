@@ -38,6 +38,7 @@ import {
     recordSessionUsage,
     turnCost,
     contextAfter,
+    storedContextParts,
     type TurnUsage
 } from "@/lib/agents/session-usage";
 
@@ -165,7 +166,19 @@ describe("contextAfter", () => {
                 turn("a", { input: 5, cacheRead: 1000, cacheWrite: 200, output: 40 }),
                 turn("b", { input: 1, output: 1, sidechain: true })
             ])
-        ).toEqual({ tokens: 1245, model: "claude-sonnet-4-5" });
+        ).toEqual({
+            tokens: 1245,
+            model: "claude-sonnet-4-5",
+            parts: { input: 5, cacheRead: 1000, cacheWrite: 200, output: 40 }
+        });
+    });
+
+    it("reads a stored split back, and nothing else", () => {
+        const parts = { input: 5, cacheRead: 1000, cacheWrite: 200, output: 40 };
+        expect(storedContextParts(parts)).toEqual(parts);
+        expect(storedContextParts(null)).toBeNull();
+        expect(storedContextParts({ input: 1 })).toEqual({ input: 1, cacheRead: 0, cacheWrite: 0, output: 0 });
+        expect(storedContextParts("x")).toBeNull();
     });
 
     it("says nothing when only sub-agents spoke", () => {

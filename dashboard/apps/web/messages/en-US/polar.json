@@ -241,6 +241,8 @@
             "init": "Write a guide to this repository for the agent",
             "stop": "Stop the agent's current turn",
             "rename": "Rename this session",
+            "context": "Show how full the agent's context is",
+            "export": "Download the transcript (add jsonl for JSONL)",
             "diff": "See the files and changes",
             "renameFailed": "Couldn't rename the session. Try again."
         }
@@ -1312,6 +1314,46 @@
         "ended": "This session has ended.",
         "continue": "Continue in a new session",
         "continueFailed": "Couldn't continue this session. Try again.",
+        "status": {
+            "label": "Session status",
+            "effort": "{effort} effort",
+            "context": "{percent}% context"
+        },
+        "context": {
+            "title": "Context",
+            "used": "{used} of {window} tokens ({percent}%)",
+            "none": "No turn has reported its size yet.",
+            "input": "Fresh input",
+            "cacheRead": "Cache reads",
+            "cacheWrite": "Cache writes",
+            "output": "Output",
+            "note": "From the agent's last turn. The percentage counts input; output joins the next turn's input.",
+            "close": "Close"
+        },
+        "queue": {
+            "title": "Queued, sent when the agent finishes its turn",
+            "edit": "Edit",
+            "remove": "Take back",
+            "save": "Save",
+            "cancel": "Cancel",
+            "files": "+{count} files",
+            "gone": "That message was already sent.",
+            "invalid": "That message can't be changed."
+        },
+        "export": {
+            "label": "Download transcript",
+            "markdown": "Markdown",
+            "jsonl": "JSONL"
+        },
+        "transcript": {
+            "you": "You",
+            "agent": "Agent",
+            "polaris": "Polaris",
+            "repository": "Repository",
+            "branch": "Branch",
+            "started": "Started",
+            "steps": "Steps"
+        },
         "queued": {
             "waiting": "Waiting for a free slot. It starts on its own.",
             "position": "Place in your queue: {position}.",

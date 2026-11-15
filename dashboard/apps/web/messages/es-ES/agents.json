@@ -217,6 +217,7 @@
             "taskUnreachable": "No tienes acceso a esa tarea.",
             "saySomething": "Escribe algo",
             "gone": "Esa sesión ya no existe.",
+            "queueFull": "Ya hay {count} mensajes esperando. Envía este cuando el agente los reciba.",
             "ended": "Esa sesión ha terminado.",
             "queued": "Esta sesión aún espera un hueco libre. Recibe su primer mensaje al iniciarse; envía más cuando ya haya arrancado.",
             "noAnswer": "La máquina que ejecuta esta sesión no respondió.",

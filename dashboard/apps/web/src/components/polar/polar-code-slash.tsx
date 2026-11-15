@@ -12,6 +12,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     CircleHelp,
     Cpu,
+    Download,
+    Gauge,
     Eraser,
     FileDiff,
     FilePlus2,
@@ -53,7 +55,9 @@ const COMMAND_ICONS: Record<CodeCommand, SuggestionListItem["icon"]> = {
     init: FilePlus2,
     stop: Square,
     rename: Pencil,
-    diff: FileDiff
+    diff: FileDiff,
+    context: Gauge,
+    export: Download
 };
 
 type CommandLine = Exclude<CodeCommand, "security-review"> | "securityReview" | "clearDraft";
