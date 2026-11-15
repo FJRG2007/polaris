@@ -91,7 +91,8 @@ import {
     sectionTitleKey
 } from "./analytics-sections";
 import { List, Plus } from "lucide-react";
-import { grouped, percent, duration } from "./analytics-format";
+import { grouped, percent, duration, notesByPoint } from "./analytics-format";
+import { Annotations } from "./annotations";
 
 const RANGES: VisitRange[] = ["24h", "7d", "30d", "90d", "12m"];
 
@@ -308,7 +309,7 @@ export function AnalyticsView({
                 <FilterPick.Provider value={addFilter}>
                     {tab === "overview" ? (
                         <>
-                            <Overview data={data} range={range} compare={compare} onCompare={setCompare} />
+                            <Overview data={data} range={range} compare={compare} onCompare={setCompare} onReload={load} />
                             <Breakdowns data={data} />
                             <Card className="min-w-0">
                                 <CardHeader className="pb-2">
@@ -482,12 +483,14 @@ function Overview({
     data,
     range,
     compare,
-    onCompare
+    onCompare,
+    onReload
 }: {
     data: AnalyticsOverview | null;
     range: VisitRange;
     compare: "previous" | "year";
     onCompare: (next: "previous" | "year") => void;
+    onReload: () => void;
 }) {
     const t = useTranslations("analytics");
     const format = useDisplayFormat();
@@ -599,10 +602,15 @@ function Overview({
                 <CardBody>
                     {data ? (
                         <TimeSeriesChart
-                            points={data.view.series.map((point) => ({
-                                t: point.t,
-                                v: point.views
-                            }))}
+                            points={(() => {
+                                const notes = notesByPoint(data.view.series, data.annotations);
+                                return data.view.series.map((point, index) => ({
+                                    t: point.t,
+                                    v: point.views,
+                                    ...(notes.has(index) ? { note: notes.get(index) } : {})
+                                }));
+                            })()}
+                            markers={data.annotations.map((note) => note.at)}
                             from={data.view.from}
                             to={data.view.to}
                             summary="sum"
@@ -613,6 +621,14 @@ function Overview({
                     ) : (
                         <Skeleton className="h-[132px] w-full" />
                     )}
+                    {data ? (
+                        <Annotations
+                            site={data.site}
+                            notes={data.annotations}
+                            canEdit={data.level !== "view"}
+                            onChange={onReload}
+                        />
+                    ) : null}
                 </CardBody>
             </Card>
         </div>

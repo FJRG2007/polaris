@@ -656,5 +656,19 @@
         "doNotTrack": "Respetar No rastrear",
         "doNotTrackHint": "Omitir navegadores que piden no rastreo",
         "invalid": "No se pudieron guardar las opciones."
+    },
+    "annotations": {
+        "title": "Notas en el gráfico",
+        "new": "Añadir nota",
+        "when": "Cuándo",
+        "text": "Nota",
+        "placeholder": "Lanzamos la nueva página de precios",
+        "add": "Añadir",
+        "cancel": "Cancelar",
+        "delete": "Quitar nota",
+        "deleteTitle": "¿Quitar esta nota?",
+        "invalid": "Escribe una nota de hasta 200 caracteres y elige cuándo pasó.",
+        "tooMany": "Este sitio ya tiene 500 notas. Quita una antigua antes.",
+        "gone": "Esa nota ya se había quitado."
     }
 }

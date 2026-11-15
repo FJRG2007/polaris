@@ -118,6 +118,7 @@ export function TimeSeriesChart({
     summary = "last",
     label,
     height = 132,
+    markers,
     className
 }: {
     points: TimePoint[];
@@ -138,6 +139,9 @@ export function TimeSeriesChart({
     summary?: SeriesSummary;
     label?: string;
     height?: number;
+    /** Moments to flag on the plot (a release, a campaign), drawn as dashed
+     *  vertical lines. What they say belongs in the matching point's `note`. */
+    markers?: readonly number[];
     className?: string;
 }) {
     const color = TONE_VAR[tone];
@@ -289,6 +293,21 @@ export function TimeSeriesChart({
                                 opacity={0.5}
                             />
                         ))}
+                        {(markers ?? [])
+                            .filter((at) => at >= from && at <= to)
+                            .map((at) => (
+                                <line
+                                    key={`m${at}`}
+                                    x1={x(at)}
+                                    x2={x(at)}
+                                    y1={0}
+                                    y2={height}
+                                    stroke="hsl(var(--warning))"
+                                    strokeWidth={1.5}
+                                    strokeDasharray="4 3"
+                                    vectorEffect="non-scaling-stroke"
+                                />
+                            ))}
                         {runs.map((segment, index) => (
                             <path
                                 key={`a${index}`}

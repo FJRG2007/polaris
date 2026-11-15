@@ -656,5 +656,19 @@
         "doNotTrack": "Respect Do Not Track",
         "doNotTrackHint": "Skip browsers that ask not to be tracked",
         "invalid": "Those options could not be saved."
+    },
+    "annotations": {
+        "title": "Notes on the chart",
+        "new": "Add a note",
+        "when": "When",
+        "text": "Note",
+        "placeholder": "Launched the new pricing page",
+        "add": "Add",
+        "cancel": "Cancel",
+        "delete": "Remove note",
+        "deleteTitle": "Remove this note?",
+        "invalid": "Write a note of up to 200 characters and pick when it happened.",
+        "tooMany": "This site already has 500 notes. Remove an old one first.",
+        "gone": "That note was already removed."
     }
 }

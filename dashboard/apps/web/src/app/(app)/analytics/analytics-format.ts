@@ -20,3 +20,24 @@ export function duration(seconds: number | null): string {
     if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
     return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
 }
+
+/**
+ * Hangs each note on the chart point whose bucket holds it, as that point's
+ * hover note: the nearest point at or before the note, so a note never reads
+ * against the bucket after its own.
+ */
+export function notesByPoint(
+    points: readonly { t: number }[],
+    notes: readonly { at: number; text: string }[]
+): Map<number, string> {
+    const byPoint = new Map<number, string[]>();
+    for (const note of notes) {
+        let index = -1;
+        for (let i = 0; i < points.length && points[i]!.t <= note.at; i += 1) index = i;
+        if (index < 0) continue;
+        const list = byPoint.get(index) ?? [];
+        list.push(note.text);
+        byPoint.set(index, list);
+    }
+    return new Map([...byPoint].map(([index, texts]) => [index, texts.join(" / ")]));
+}

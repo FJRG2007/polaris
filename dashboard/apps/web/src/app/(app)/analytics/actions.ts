@@ -36,6 +36,7 @@ import * as alerts from "@/lib/analytics-alerts";
 import * as shareLinks from "@/lib/analytics-share";
 import * as lab from "@/lib/analytics-lab";
 import * as trackerOptions from "@/lib/analytics-tracker-options";
+import * as annotations from "@/lib/analytics-annotations";
 import { externalSiteSchema } from "./site-input";
 import {
     createExternalSite,
@@ -93,6 +94,8 @@ export interface AnalyticsOverview {
     readonly canShare: boolean;
     /** The site was shared with this reader. */
     readonly shared: boolean;
+    /** Notes pinned inside the window, for the traffic chart. */
+    readonly annotations: readonly annotations.AnnotationView[];
 }
 
 /**
@@ -418,11 +421,14 @@ export async function getAnalyticsOverviewAction(input: {
         getAnalyticsSettings(),
         reports.listReports(access.site.id)
     ]);
-    const previous = await reports.previousPeriod(
-        { siteId: access.site.id, from: view.from, to: view.to, filters },
-        view.source,
-        core.visitCompareSchema.parse(input.compare)
-    );
+    const [previous, notes] = await Promise.all([
+        reports.previousPeriod(
+            { siteId: access.site.id, from: view.from, to: view.to, filters },
+            view.source,
+            core.visitCompareSchema.parse(input.compare)
+        ),
+        annotations.annotationsBetween(access.site.id, view.from, view.to)
+    ]);
     return {
         site: access.site,
         range: range.data,
@@ -437,7 +443,8 @@ export async function getAnalyticsOverviewAction(input: {
         // Whoever owns a site may hand it on: a service's configurer, a site's
         // author, an operator for Polaris's own. A grant is never passed on.
         canShare: access.level === "own",
-        shared: access.shared
+        shared: access.shared,
+        annotations: notes
     };
 }
 
@@ -858,6 +865,49 @@ export async function deleteShareLinkAction(input: {
     await recordAudit({
         actorId: reached.userId,
         action: "analytics.share.delete",
+        targetType: "analytics",
+        targetId: reached.access.site.id
+    });
+    return {};
+}
+
+// --- annotations -------------------------------------------------------------------
+
+/** Pin a note to a moment on the site's chart. */
+export async function createAnnotationAction(input: {
+    scopeType: string;
+    scopeId: string;
+    annotation: unknown;
+}): Promise<{ error?: string; annotation?: annotations.AnnotationView }> {
+    const reached = await reach(input, "edit");
+    if ("error" in reached) return reached;
+    const parsed = annotations.annotationInputSchema.safeParse(input.annotation);
+    if (!parsed.success) return { error: await say("annotations.invalid") };
+    const annotation = await annotations.createAnnotation(reached.access.site.id, reached.userId, parsed.data);
+    if (!annotation) return { error: await say("annotations.tooMany") };
+    await recordAudit({
+        actorId: reached.userId,
+        action: "analytics.annotation.create",
+        targetType: "analytics",
+        targetId: reached.access.site.id
+    });
+    return { annotation };
+}
+
+export async function deleteAnnotationAction(input: {
+    scopeType: string;
+    scopeId: string;
+    id: unknown;
+}): Promise<{ error?: string }> {
+    const reached = await reach(input, "edit");
+    if ("error" in reached) return reached;
+    const id = z.string().uuid().safeParse(input.id);
+    if (!id.success || !(await annotations.deleteAnnotation(reached.access.site.id, id.data))) {
+        return { error: await say("annotations.gone") };
+    }
+    await recordAudit({
+        actorId: reached.userId,
+        action: "analytics.annotation.delete",
         targetType: "analytics",
         targetId: reached.access.site.id
     });
