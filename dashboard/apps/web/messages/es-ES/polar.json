@@ -1793,7 +1793,7 @@
         "stars": "{count} de {max} estrellas"
     },
     "effort": {
-        "default": "Por defecto",
+        "default": "Estándar",
         "title": "Esfuerzo",
         "think": "Pensar",
         "thinkHint": "Piensa antes de responder, para problemas difíciles",
@@ -1801,7 +1801,7 @@
         "levels": {
             "low": "Rápido",
             "medium": "Equilibrado",
-            "high": "Profundo",
+            "high": "A fondo",
             "xhigh": "Muy profundo",
             "max": "Máximo"
         }
