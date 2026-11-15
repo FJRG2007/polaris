@@ -66,6 +66,7 @@ export function volumeDockerName(applicationId: string, source: string): string 
 
 interface VolumeRow {
     readonly id: string;
+    readonly applicationId: string;
     readonly dockerName: string;
     readonly label: string;
 }
@@ -133,6 +134,7 @@ async function volumesOf(targetId: string, ids?: readonly string[]): Promise<Vol
     const names = await currentApps(rows.map((row) => row.applicationId!));
     return rows.map((row) => ({
         id: row.id,
+        applicationId: row.applicationId!,
         dockerName: volumeDockerName(row.applicationId!, row.source!),
         label: `${names.get(row.applicationId!)?.name ?? row.application?.name ?? "?"} / ${row.name}`
     }));
@@ -238,7 +240,7 @@ export async function listServers(request: {
 }
 
 export async function serverOverview(targetId: string) {
-    const [volumes, apps, scans, quarantine, baselines] = await Promise.all([
+    const [allVolumes, allApps, scans, quarantine, baselines] = await Promise.all([
         volumesOf(targetId),
         appsOf(targetId),
         prisma.securityScan.findMany({
@@ -276,8 +278,18 @@ export async function serverOverview(targetId: string) {
             take: 100
         })
     ]);
+    // Polaris's own helpers (Places' camera relay, the VPN's control server...)
+    // are its machinery, read in Management: not apps to scan here.
+    const parts = await polarisParts(allApps.map((app) => app.id));
+    const apps = allApps.filter((app) => !parts.has(app.id));
+    const volumes = allVolumes.filter((volume) => !parts.has(volume.applicationId));
+    const ownScan = (raw: string | null) => {
+        const id = subjects.applicationIdOf(safeJson(raw));
+        return id !== null && id !== undefined && parts.has(id);
+    };
+    const shown = scans.filter((scan) => !ownScan(scan.input));
     const names = await currentApps(
-        scans.flatMap((scan) => {
+        shown.flatMap((scan) => {
             const id = subjects.applicationIdOf(safeJson(scan.input));
             return id ? [id] : [];
         })
@@ -286,7 +298,7 @@ export async function serverOverview(targetId: string) {
         volumes: volumes.map(({ id, label }) => ({ id, label })),
         apps,
         // The stored input stays here: it is the scan's own record, not the screen's.
-        scans: scans.map(({ input: raw, ...scan }) => ({
+        scans: shown.map(({ input: raw, ...scan }) => ({
             ...scan,
             label: subjects.subjectName({ label: scan.label, input: safeJson(raw) }, names),
             subject: subjects.subjectKind({ kind: scan.kind, input: safeJson(raw) }),
@@ -324,7 +336,7 @@ const VULN_KINDS = ["image", "deps"];
  * with no source.
  */
 const NOT_OWN_IMAGE = {
-    OR: [{ source: null }, { source: { not: "polaris" } }, { target: { kind: { not: "local" } } }]
+    OR: [{ source: null }, { source: { not: "polaris" } }]
 };
 
 /**
@@ -543,6 +555,18 @@ export async function queueImage(targetId: string, applicationId: string, userId
  * Places' side upgrade), so their image is Polaris's to update - nobody
  * installed them on purpose, and nobody can update them as an app.
  */
+/**
+ * The builtin apps whose helpers are Polaris's own machinery - the camera relay
+ * and face recognition behind Places, the VPN's control server, the network
+ * filter's DNS server - rather than something the operator runs. Game servers are
+ * the exception: a Minecraft world is the operator's, however it was installed.
+ */
+const WORKLOAD_OWNERS: ReadonlySet<string> = new Set(["game-servers"]);
+
+function isPolarisPart(ownedBy: string | undefined): boolean {
+    return ownedBy !== undefined && !WORKLOAD_OWNERS.has(ownedBy);
+}
+
 async function polarisParts(applicationIds: readonly string[]): Promise<Set<string>> {
     if (applicationIds.length === 0) return new Set();
     const rows = await prisma.installedApp.findMany({
@@ -552,7 +576,7 @@ async function polarisParts(applicationIds: readonly string[]): Promise<Set<stri
     });
     return new Set(
         rows
-            .filter((row) => host.appsCatalog.findApp(row.catalogId)?.ownedBy === "home")
+            .filter((row) => isPolarisPart(host.appsCatalog.findApp(row.catalogId)?.ownedBy))
             .map((row) => row.applicationId!)
     );
 }
@@ -593,8 +617,9 @@ export async function serverImages(targetId: string) {
     const target = await targetRow(targetId);
     const listed = await imagesOn(target);
     if (!listed) return { available: false as const, images: [] };
-    // Polaris's own images on its own machine are read in Management.
-    const found = target.kind === "local" ? listed.filter((image) => !image.polarisOnly) : listed;
+    // Polaris's own images are read in Management, on every server: the edge
+    // Polaris runs on a remote one is as much its own as the one here.
+    const found = listed.filter((image) => !image.polarisOnly);
     const scans = await prisma.securityScan.findMany({
         where: { targetId, kind: "image", imageId: { in: found.map((image) => image.imageId) } },
         orderBy: { createdAt: "desc" },

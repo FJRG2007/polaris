@@ -1,4 +1,5 @@
 {
+    "onServer": "On {server}",
     "title": "Image",
     "scanNow": "Scan now",
     "scanAgain": "Scan again",

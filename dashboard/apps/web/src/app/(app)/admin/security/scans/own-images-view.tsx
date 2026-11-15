@@ -24,6 +24,12 @@ import {
 
 type Findings = { scanId: string; rows: ImageFindingRow[] | null; failed: boolean };
 
+/** One row per image per server: the same reference on two servers is two
+ *  images to keep up to date. */
+function rowKey(image: OwnImage): string {
+    return `${image.server ?? ""}|${image.ref}`;
+}
+
 export function OwnImagesView() {
     const t = useTranslations("imageScans");
     const admin = useTranslations("admin");
@@ -90,7 +96,7 @@ export function OwnImagesView() {
     useEffect(() => {
         const image = linkedRef?.ref ? images?.find((row) => row.ref === linkedRef.ref) : null;
         if (!image) return;
-        setOpen(image.ref);
+        setOpen(rowKey(image));
         if (image.scan.state === "done") void readFindings(image.scan.id);
     }, [linkedRef, readFindings]);
 
@@ -100,7 +106,7 @@ export function OwnImagesView() {
     }, [scanning]);
 
     async function scanAgain(image: OwnImage) {
-        setPending(image.ref);
+        setPending(rowKey(image));
         setMessage(null);
         const result = await actions
             .scanOwnImageAction(image.scan.id)
@@ -115,8 +121,8 @@ export function OwnImagesView() {
     }
 
     function toggle(image: OwnImage) {
-        if (open === image.ref) return setOpen(null);
-        setOpen(image.ref);
+        if (open === rowKey(image)) return setOpen(null);
+        setOpen(rowKey(image));
         if (image.scan.state === "done") void readFindings(image.scan.id);
     }
 
@@ -162,11 +168,11 @@ export function OwnImagesView() {
                               </li>
                           ))
                         : images.map((image) => {
-                              const expanded = open === image.ref;
+                              const expanded = open === rowKey(image);
                               const shown = findings?.scanId === image.scan.id ? findings : null;
                               return (
                                   <li
-                                      key={image.ref}
+                                      key={rowKey(image)}
                                       className="flex flex-col gap-2 border-t border-border py-2 first:border-t-0"
                                   >
                                       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
@@ -183,8 +189,9 @@ export function OwnImagesView() {
                                               </span>
                                               <span
                                                   className="block truncate text-xs text-muted-foreground"
-                                                  title={image.users.join(", ")}
+                                                  title={[image.server, ...image.users].filter(Boolean).join(", ")}
                                               >
+                                                  {image.server ? `${t("onServer", { server: image.server })} - ` : null}
                                                   {image.users.length > 0
                                                       ? `${image.users.join(", ")} - `
                                                       : null}
@@ -207,11 +214,11 @@ export function OwnImagesView() {
                                                   size="xs"
                                                   variant="outline"
                                                   disabled={
-                                                      pending === image.ref || scanBusy(image.scan)
+                                                      pending === rowKey(image) || scanBusy(image.scan)
                                                   }
                                                   onClick={() => void scanAgain(image)}
                                               >
-                                                  {pending === image.ref && (
+                                                  {pending === rowKey(image) && (
                                                       <Loader2
                                                           className="size-3 animate-spin"
                                                           aria-hidden

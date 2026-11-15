@@ -230,6 +230,8 @@ export interface OwnImage {
     readonly imageId: string | null;
     /** The Polaris parts that run it: `web`, `hostd`. */
     readonly users: readonly string[];
+    /** The server it runs on; null for the machine Polaris runs on. */
+    readonly server: string | null;
     readonly scan: ImageScanView;
 }
 
@@ -249,34 +251,48 @@ function ownInput(raw: string): z.infer<typeof ownInputSchema> {
 }
 
 /**
- * Polaris's own images on this machine, each with its newest scan, worst first.
+ * Polaris's own images on every server, each with its newest scan, worst first.
  * Only references scanned within the same window the Settings summary counts,
  * so an image an update replaced drops off as the summary drops it.
  */
 export async function ownImages(now = new Date()): Promise<OwnImage[]> {
     const rows = await prisma.securityScan.findMany({
-        where: ownScansWhere(now),
+        where: ownScansWhere(now, { everywhere: true }),
         orderBy: { createdAt: "desc" },
         take: OWN_SCANS,
-        select: { ...SCAN_SELECT, label: true, input: true, imageId: true }
+        select: {
+            ...SCAN_SELECT,
+            label: true,
+            input: true,
+            imageId: true,
+            targetId: true,
+            target: { select: { kind: true, name: true } }
+        }
     });
-    const running = await runningImageIds();
-    const current = ofRunningImages(
-        rows,
-        (row) => row.imageId ?? ownInput(row.input).imageId,
-        running
-    );
+    // One server's images at a time: the same reference on two servers is two
+    // images to keep up to date, and only this machine's daemon is asked which
+    // ones still run.
+    const byTarget = new Map<string, typeof rows>();
+    for (const row of rows) byTarget.set(row.targetId, [...(byTarget.get(row.targetId) ?? []), row]);
+    const running = rows.some((row) => row.target.kind === "local") ? await runningImageIds() : null;
     const out: OwnImage[] = [];
-    for (const row of newestPerRef(current)) {
-        const scan = scanView(row);
-        if (!scan) continue;
-        const input = ownInput(row.input);
-        out.push({
-            ref: input.ref ?? row.label,
-            imageId: row.imageId ?? input.imageId,
-            users: input.users,
-            scan
-        });
+    for (const group of byTarget.values()) {
+        const local = group[0]?.target.kind === "local";
+        const current = local
+            ? ofRunningImages(group, (row) => row.imageId ?? ownInput(row.input).imageId, running)
+            : group;
+        for (const row of newestPerRef(current)) {
+            const scan = scanView(row);
+            if (!scan) continue;
+            const input = ownInput(row.input);
+            out.push({
+                ref: input.ref ?? row.label,
+                imageId: row.imageId ?? input.imageId,
+                users: input.users,
+                server: local ? null : row.target.name,
+                scan
+            });
+        }
     }
     return out.sort(
         (a, b) =>
@@ -289,7 +305,7 @@ export async function ownImages(now = new Date()): Promise<OwnImage[]> {
 /** The image reference one of Polaris's own scans was of; null when it is not one of those. */
 export async function ownScanRef(scanId: string): Promise<string | null> {
     const scan = await prisma.securityScan.findFirst({
-        where: { id: scanId, source: "polaris", kind: "image", target: { kind: "local" } },
+        where: { id: scanId, source: "polaris", kind: "image" },
         select: { label: true, input: true }
     });
     return scan ? (ownInput(scan.input).ref ?? scan.label) : null;
@@ -298,7 +314,7 @@ export async function ownScanRef(scanId: string): Promise<string | null> {
 /** One of Polaris's own scans' findings; null when the scan is not one of those. */
 export async function ownImageFindings(scanId: string): Promise<ImageFindingRow[] | null> {
     const scan = await prisma.securityScan.findFirst({
-        where: { id: scanId, source: "polaris", kind: "image", target: { kind: "local" } },
+        where: { id: scanId, source: "polaris", kind: "image" },
         select: { id: true, state: true }
     });
     if (!scan) return null;
@@ -315,7 +331,7 @@ export async function queueOwnImageScan(
     userId: string
 ): Promise<{ scanId: string } | { refused: QueueRefusal }> {
     const scan = await prisma.securityScan.findFirst({
-        where: { id: scanId, source: "polaris", kind: "image", target: { kind: "local" } },
+        where: { id: scanId, source: "polaris", kind: "image" },
         select: { targetId: true, label: true, input: true, imageId: true }
     });
     const input = scan ? ownInput(scan.input) : null;

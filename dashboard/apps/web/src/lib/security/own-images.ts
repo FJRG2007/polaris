@@ -129,12 +129,14 @@ export function ofRunningImages<T>(
 }
 
 /** Scans of Polaris's own images on this machine recent enough to be shown. */
-export function ownScansWhere(now: Date) {
+export function ownScansWhere(now: Date, { everywhere = false }: { everywhere?: boolean } = {}) {
     return {
         source: "polaris",
         kind: "image",
         createdAt: { gt: new Date(now.getTime() - WINDOW_MS) },
-        target: { kind: "local" }
+        // The Updates card speaks for this machine; Management lists every
+        // server's Polaris images - the edge a remote server runs is Polaris's.
+        ...(everywhere ? {} : { target: { kind: "local" } })
     } as const;
 }
 
