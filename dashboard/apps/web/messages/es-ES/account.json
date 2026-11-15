@@ -1695,6 +1695,7 @@
         "add": "Añadir conector",
         "empty": "Aún no hay conectores. Añade un servidor MCP para dar sus herramientas a Polar.",
         "signedIn": "Sesión iniciada. Polar ya puede usar el conector.",
+        "waiting": "Termina el inicio de sesión en la página que se abrió. Se actualiza solo.",
         "enabled": "Usar {name} en Polar",
         "signIn": "Entrar",
         "test": "Probar conexión",

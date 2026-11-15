@@ -1695,6 +1695,7 @@
         "add": "Add connector",
         "empty": "No connectors yet. Add an MCP server to give Polar its tools.",
         "signedIn": "Signed in. Polar can use this connector now.",
+        "waiting": "Finish signing in on the page that opened. This updates on its own.",
         "enabled": "Use {name} in Polar",
         "signIn": "Sign in",
         "test": "Test connection",

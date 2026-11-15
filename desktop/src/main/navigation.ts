@@ -11,7 +11,8 @@
  * address is dropped.
  *
  * One exception: a round trip to an outside provider that the Polaris itself
- * starts (linking an account, or signing in with one). Its state cookie lives in
+ * starts (linking an account, signing in with one, or signing one of Polar's
+ * MCP connectors in). Its state cookie lives in
  * this app's session, so the provider's pages have to be shown here and the
  * callback has to land here. From the moment the Polaris sends the window out
  * until a page of the Polaris is shown again, the main frame may go anywhere on
@@ -21,7 +22,10 @@
 const WEB = new Set(["http:", "https:"]);
 
 /** The Polaris routes that send the window to a provider and expect it back. */
-const PROVIDER_TRIP = /^\/api\/connections\/[a-z0-9_-]+\/(link|signin)$/;
+const PROVIDER_TRIPS: readonly RegExp[] = [
+    /^\/api\/connections\/[a-z0-9_-]+\/(link|signin)$/,
+    /^\/api\/polar\/connectors\/[0-9a-f-]{36}\/sign-in$/
+];
 
 /** Schemes handed to the operating system: web pages, and a mail link, which
  *  opens the mail app. Nothing else - a `file:` or UNC path, or a custom scheme,
@@ -67,7 +71,7 @@ export function classifyNavigation(url: string, serverOrigin: string): Navigatio
 /** Whether a URL is the Polaris sending the window out to a provider. */
 export function startsProviderTrip(url: string, serverOrigin: string): boolean {
     const target = parse(url);
-    return Boolean(target && isServerUrl(url, serverOrigin) && PROVIDER_TRIP.test(target.pathname));
+    return Boolean(target && isServerUrl(url, serverOrigin) && PROVIDER_TRIPS.some((trip) => trip.test(target.pathname)));
 }
 
 export interface MainFrameStep {

@@ -176,6 +176,29 @@ describe("the sign-in callback", () => {
     });
 });
 
+describe("signing in by navigating", () => {
+    const go = (id: string) => signIn.GET(new Request("https://x.test"), params(id));
+
+    it("sends the window on to the authorization server for the caller's own one", async () => {
+        const response = await go(ID);
+        expect(response.status).toBe(303);
+        expect(response.headers.get("location")).toBe("https://auth.example.test/");
+    });
+
+    it("sends it back to the screen with a failure for anything else", async () => {
+        for (const id of [ELSEWHERE, "not-an-id"]) {
+            expect((await go(id)).headers.get("location")).toContain("connector=failed");
+        }
+        state.connectors = false;
+        expect((await go(ID)).headers.get("location")).toContain("connector=failed");
+        state.connectors = true;
+        state.user = null;
+        expect((await go(ID)).headers.get("location")).toContain("connector=failed");
+        state.user = { id: OWNER, viewingAs: "22222222-2222-4222-8222-222222222222" };
+        expect((await go(ID)).headers.get("location")).toContain("connector=failed");
+    });
+});
+
 describe("Always allow on a connector's tool", () => {
     const grant = (body: unknown) =>
         grants.POST(

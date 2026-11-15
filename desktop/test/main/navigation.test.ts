@@ -62,6 +62,9 @@ describe("startsProviderTrip", () => {
     });
 
     it("is nothing else, and nothing on another origin", () => {
+        expect(startsProviderTrip("https://polaris.example.com/api/polar/connectors/0190a000-0000-7000-8000-000000000001/sign-in", SERVER)).toBe(true);
+        expect(startsProviderTrip("https://polaris.example.com/api/polar/connectors/x/sign-in", SERVER)).toBe(false);
+        expect(startsProviderTrip("https://polaris.example.com/api/polar/connectors/callback", SERVER)).toBe(false);
         expect(startsProviderTrip("https://polaris.example.com/account/connections", SERVER)).toBe(false);
         expect(startsProviderTrip("https://polaris.example.com/api/connections/google/callback", SERVER)).toBe(false);
         expect(startsProviderTrip("https://polaris.example.com/api/connections/google/link/x", SERVER)).toBe(false);

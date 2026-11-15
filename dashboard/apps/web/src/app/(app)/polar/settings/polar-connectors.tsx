@@ -8,10 +8,16 @@
  * server answers a connector without its secret (`ConnectorView`), so nothing
  * typed into the token fields ever comes back to the page. A new one is added
  * from a dialog, as ChatGPT and Claude do, rather than a form on the page.
+ *
+ * A sign-in may finish somewhere this page cannot see - the desktop app of an
+ * older release hands the provider's page to the system browser, and another
+ * tab may finish one - so the list is read again from the server while one is
+ * waiting, whenever the window comes back into view, and when another tab of
+ * this screen says a sign-in came back.
  */
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Plug, RefreshCw, Trash2, LogIn, ChevronDown } from "lucide-react";
 import {
     Badge,
@@ -86,6 +92,12 @@ async function send(path: string, init: RequestInit): Promise<{ ok: boolean; bod
 /** A list this long is easier to search than to scroll. */
 const SEARCH_FROM = 6;
 
+/** How often, and for how long, a sign-in that left this page is checked on. */
+const WAIT_EVERY_MS = 3_000;
+const WAIT_MOST_MS = 120_000;
+/** Where a tab of this screen says a sign-in came back. */
+const CHANNEL = "polar-connectors";
+
 export function PolarConnectors({
     initial,
     returned,
@@ -110,6 +122,71 @@ export function PolarConnectors({
     const [busy, setBusy] = useState<string | null>(null);
     const [removing, setRemoving] = useState<ConnectorView | null>(null);
     const [open, setOpen] = useState<string | null>(null);
+    const [signedInNow, setSignedInNow] = useState(false);
+    /** The connector a sign-in left this page for, and since when. */
+    const [waiting, setWaiting] = useState<{ id: string; since: number } | null>(null);
+    const waitingRef = useRef(waiting);
+    waitingRef.current = waiting;
+
+    /** The list as the server has it now; the server decides what is signed in. */
+    const reload = useCallback(async () => {
+        const answer = await send("/api/polar/connectors", { method: "GET" });
+        if (!answer.ok || !Array.isArray(answer.body.connectors)) return;
+        const next = answer.body.connectors as ConnectorView[];
+        setRows(next);
+        const wait = waitingRef.current;
+        const row = wait && next.find((entry) => entry.id === wait.id);
+        if (wait && (!row || (row.signedIn && row.status !== "sign_in"))) {
+            setWaiting(null);
+            setBusy(null);
+            if (row) {
+                setError(null);
+                setSignedInNow(true);
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!waiting) return;
+        const timer = window.setInterval(() => {
+            if (Date.now() - waiting.since > WAIT_MOST_MS) {
+                setWaiting(null);
+                setBusy(null);
+                return;
+            }
+            void reload();
+        }, WAIT_EVERY_MS);
+        return () => window.clearInterval(timer);
+    }, [waiting, reload]);
+
+    useEffect(() => {
+        const visible = () => {
+            if (document.visibilityState === "visible") void reload();
+        };
+        // Back from the provider's page through the browser's cache: the
+        // page is as it was left, so its sign-in button is freed again.
+        const shown = (event: PageTransitionEvent) => {
+            if (!event.persisted) return;
+            setWaiting(null);
+            setBusy(null);
+            void reload();
+        };
+        window.addEventListener("focus", visible);
+        document.addEventListener("visibilitychange", visible);
+        window.addEventListener("pageshow", shown);
+        let channel: BroadcastChannel | null = null;
+        if (typeof BroadcastChannel !== "undefined") {
+            channel = new BroadcastChannel(CHANNEL);
+            channel.onmessage = () => void reload();
+            if (returned === "signed_in") channel.postMessage("signed_in");
+        }
+        return () => {
+            window.removeEventListener("focus", visible);
+            document.removeEventListener("visibilitychange", visible);
+            window.removeEventListener("pageshow", shown);
+            channel?.close();
+        };
+    }, [reload, returned]);
 
     const say = (code: unknown) =>
         setError(t(`polarConnectors.errors.${isErrorCode(code) ? code : "failed"}`));
@@ -141,16 +218,18 @@ export function PolarConnectors({
         } else say(answer.body.error);
     }
 
-    async function signIn(row: ConnectorView) {
+    /**
+     * Sends the window to the sign-in route, which forwards it to the
+     * provider: a round trip the desktop app keeps in its own window. Should
+     * the page stay - the provider opened somewhere else - it waits for the
+     * server to say the connector is signed in.
+     */
+    function signIn(row: ConnectorView) {
         setError(null);
+        setSignedInNow(false);
         setBusy(row.id);
-        const answer = await send(`/api/polar/connectors/${row.id}/sign-in`, { method: "POST" });
-        if (answer.ok && typeof answer.body.url === "string") {
-            window.location.assign(answer.body.url);
-            return;
-        }
-        setBusy(null);
-        say(answer.body.error);
+        setWaiting({ id: row.id, since: Date.now() });
+        window.location.assign(`/api/polar/connectors/${row.id}/sign-in`);
     }
 
     async function remove(row: ConnectorView) {
@@ -190,7 +269,11 @@ export function PolarConnectors({
                     </Button>
                 ) : null}
             </div>
-            {returned === "signed_in" ? (
+            {waiting ? (
+                <p role="status" className="text-sm text-muted-foreground">
+                    {t("polarConnectors.waiting")}
+                </p>
+            ) : returned === "signed_in" || signedInNow ? (
                 <p role="status" className="text-sm text-success-ink">
                     {t("polarConnectors.signedIn")}
                 </p>
@@ -209,7 +292,7 @@ export function PolarConnectors({
                     setRows((current) => [...current, view]);
                     setAdding(false);
                     setOpen(view.id);
-                    if (view.auth === "oauth" && !view.signedIn) void signIn(view);
+                    if (view.auth === "oauth" && !view.signedIn) signIn(view);
                 }}
             />
             {rows.length === 0 ? (
@@ -295,7 +378,7 @@ export function PolarConnectors({
                                     type="button"
                                     size="sm"
                                     disabled={busy === row.id}
-                                    onClick={() => void signIn(row)}
+                                    onClick={() => signIn(row)}
                                 >
                                     <LogIn className="h-3.5 w-3.5 shrink-0" />
                                     {t("polarConnectors.signIn")}
@@ -410,7 +493,7 @@ export function PolarConnectors({
                     setError(null);
                     setRows((current) => [...current, view]);
                     setOpen(view.id);
-                    if (view.auth === "oauth" && !view.signedIn) void signIn(view);
+                    if (view.auth === "oauth" && !view.signedIn) signIn(view);
                 }}
             />
             <ConfirmDeleteDialog
