@@ -610,8 +610,8 @@ export function PanelsView({
                                 ) : undefined
                             }
                         />
-                    ) : (
-                        <div className={cn(editing && "rounded-xl bg-muted/40 p-2")}>
+                    ) : editing ? (
+                        <div className="rounded-xl bg-muted/40 p-2">
                             <PanelBoard
                                 placeId={placeId}
                                 cards={selected.cards}
@@ -620,13 +620,46 @@ export function PanelsView({
                                 cameras={cameras}
                                 automations={automations}
                                 access={access}
-                                editing={editing}
+                                editing
                                 onCardsChange={(cards) => void saveCards(cards)}
                                 onError={setError}
                                 density={selected.style.density}
                                 weather={weather}
                             />
                         </div>
+                    ) : (
+                        <section className="flex flex-col gap-2" aria-label={t("panels.preview")}>
+                            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                                <h3 className="text-sm font-medium">{t("panels.preview")}</h3>
+                                <p className="min-w-0 text-xs text-muted-foreground">
+                                    {t("panels.previewHint")}
+                                </p>
+                            </div>
+                            {/* The tablet: its shape follows the panel's orientation, and the
+                                cards are fitted to it exactly as the wall fits them. */}
+                            <div
+                                className={cn(
+                                    "flex w-full flex-col overflow-hidden rounded-[1.5rem] border-[10px] border-foreground/80 bg-background p-3 shadow-sm",
+                                    selected.style.orientation === "portrait"
+                                        ? "aspect-[10/16] max-w-sm"
+                                        : "aspect-[16/10] max-w-4xl"
+                                )}
+                            >
+                                <PanelBoard
+                                    placeId={placeId}
+                                    cards={selected.cards}
+                                    devices={devices}
+                                    rooms={rooms}
+                                    cameras={cameras}
+                                    automations={automations}
+                                    access={access}
+                                    onError={setError}
+                                    density={selected.style.density}
+                                    weather={weather}
+                                    fitStyle={selected.style}
+                                />
+                            </div>
+                        </section>
                     )}
                 </section>
             ) : null}
