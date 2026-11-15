@@ -44,7 +44,24 @@ describe("the rule table", () => {
         GEMINI_API_KEY: "gemini",
         CURSOR_API_KEY: "cursor",
         AMP_API_KEY: "amp",
-        FACTORY_API_KEY: "droid"
+        FACTORY_API_KEY: "droid",
+        CLINE_API_KEY: "cline",
+        XAI_API_KEY: "grok",
+        KIMI_API_KEY: "kimi",
+        DEVIN_API_KEY: "devin",
+        KIRO_API_KEY: "kiro",
+        KILO_API_KEY: "kilocode",
+        MISTRAL_API_KEY: "vibe",
+        META_API_KEY: "muse",
+        AUTOHAND_API_KEY: "autohand",
+        KIMCHI_API_KEY: "kimchi",
+        PRIME_API_KEY: "prime-agent",
+        MINIMAX_API_KEY: "minimax-code",
+        DEEPSEEK_API_KEY: "deepseek-harness",
+        MEMCODE_API_TOKEN: "memcode",
+        NOUS_API_KEY: "hermes",
+        OPENROUTER_API_KEY: "hermes",
+        STAKPAK_API_KEY: "stakpak"
     };
 
     it.each(Object.entries(EXPECTED))("%s runs on %s", (env, engine) => {

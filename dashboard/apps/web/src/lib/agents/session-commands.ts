@@ -218,6 +218,11 @@ const AGENT_ACCOUNT: readonly string[] = [
     '  PATH="$POLARIS_HOME/.npm-global/bin:$PATH"',
     "  export HOME NPM_CONFIG_PREFIX PATH",
     "fi",
+    // Where the vendors' own install scripts put their binary (Cursor, Kiro,
+    // fx and most of the curl installers in the catalogue), so a tool installed
+    // that way is found by the check that follows rather than reported missing.
+    'PATH="$HOME/.local/bin:$PATH"',
+    "export PATH",
     'if [ "$POLARIS_AS_ROOT" = "yes" ]; then',
     "  command -v sudo >/dev/null 2>&1 || apt-get install -y -qq sudo >/dev/null 2>&1 || true",
     '  printf "%s ALL=(ALL) NOPASSWD:ALL\\n" "$POLARIS_RUNAS" > /etc/sudoers.d/polaris-agent 2>/dev/null || true',

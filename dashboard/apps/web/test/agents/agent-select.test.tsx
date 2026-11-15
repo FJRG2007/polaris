@@ -79,10 +79,22 @@ describe("AgentSelect", () => {
         // Codex has its own credential (OPENAI_API_KEY) that nothing here holds,
         // so it is the row that has to say it cannot sign in - the whole reason
         // this component exists over a plain listbox.
-        const codexRow = screen.getByRole("option", { name: /codex/i });
+        const codexRow = screen.getByRole("option", { name: /^codex/i });
         expect(codexRow.textContent).toContain("Not linked");
         const claudeRow = screen.getByRole("option", { name: /claude code/i });
         expect(claudeRow.textContent).not.toContain("Not linked");
+    });
+
+    it("lists every catalogued tool by its own name", async () => {
+        render(<AgentSelect options={choicesFor(new Set())} value="" onChange={() => {}} />, {
+            wrapper: MessagesWrapper
+        });
+        await userEvent.click(screen.getByRole("button", { name: /pick an agent/i }));
+
+        const rows = screen.getAllByRole("option").map((row) => row.textContent ?? "");
+        for (const cli of core.AGENT_CLIS) {
+            expect(rows.some((row) => row.includes(cli.label)), cli.id).toBe(true);
+        }
     });
 
     it("narrows the list by vendor, not only by the tool's own name", async () => {
@@ -94,7 +106,7 @@ describe("AgentSelect", () => {
 
         await userEvent.type(screen.getByPlaceholderText("Search agents"), "openai");
 
-        expect(screen.getByRole("option", { name: /codex/i })).not.toBeNull();
+        expect(screen.getByRole("option", { name: /^codex/i })).not.toBeNull();
         expect(screen.queryByRole("option", { name: /claude code/i })).toBeNull();
     });
 

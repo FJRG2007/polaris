@@ -418,7 +418,25 @@ export interface AgentCli {
      * tool gets no effort control and runs at its own default.
      */
     readonly effort?: AgentEffortSupport;
+    /**
+     * The arguments that start the tool as an Agent Client Protocol server on
+     * standard input and output, as Agent Orchestrator's chat driver for it
+     * starts it. Recorded so the catalogue says which tools speak ACP; a session
+     * still runs the terminal interface. Absent where the tool has no ACP mode
+     * or its arguments depend on a configuration file Polaris does not write.
+     */
+    readonly acp?: readonly string[];
 }
+
+/** An API key read from the environment, which is most of the catalogue's
+ *  sign-ins. */
+function apiKey(env: string, label: string, url: string): AgentCredential {
+    return { env, label, url, howto: null, subscription: false };
+}
+
+/** The two provider keys every multi-provider tool below reads. */
+const ANTHROPIC_KEY = apiKey("ANTHROPIC_API_KEY", "Anthropic API key", "https://console.anthropic.com/settings/keys");
+const OPENAI_KEY = apiKey("OPENAI_API_KEY", "OpenAI API key", "https://platform.openai.com/api-keys");
 
 /**
  * Effort levels a coding tool can be started at, ascending. Claude Code's own
@@ -644,6 +662,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         home: ".config/opencode",
         observe: "output",
         docs: "https://opencode.ai/docs",
+        acp: ["acp"],
         credentials: [
             // Multi-provider: it reads whichever provider variables are set, so
             // either of these on its own is enough to get it started.
@@ -742,14 +761,15 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: ["--yolo"],
         autonomyEnv: {},
-        firstRun: [{ file: ".copilot/hooks/polaris.json", assert: copilotHooks() }]
+        firstRun: [{ file: ".copilot/hooks/polaris.json", assert: copilotHooks() }],
+        acp: ["--acp"]
     },
     {
         id: "cursor",
         label: "Cursor",
         vendor: "Cursor",
         binaries: ["cursor-agent"],
-        install: null,
+        install: "curl -fsSL https://cursor.com/install | bash",
         home: ".cursor",
         observe: "output",
         docs: "https://cursor.com/docs/cli/overview",
@@ -764,14 +784,15 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: ["--yolo"],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: [],
+        acp: ["acp"]
     },
     {
         id: "amp",
         label: "Amp",
         vendor: "Sourcegraph",
         binaries: ["amp"],
-        install: "npm install -g @sourcegraph/amp",
+        install: "npm install -g @ampcode/cli",
         home: ".config/amp",
         observe: "output",
         docs: "https://ampcode.com/manual",
@@ -793,7 +814,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         label: "Goose",
         vendor: "Block",
         binaries: ["goose"],
-        install: null,
+        install: "curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash",
         home: ".config/goose",
         observe: "output",
         docs: "https://block.github.io/goose/docs/quickstart",
@@ -851,7 +872,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         label: "Droid",
         vendor: "Factory",
         binaries: ["droid"],
-        install: null,
+        install: "npm install -g droid",
         home: ".factory",
         observe: "output",
         docs: "https://docs.factory.ai/cli/getting-started/quickstart",
@@ -877,6 +898,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         home: ".qwen",
         observe: "output",
         docs: "https://github.com/QwenLM/qwen-code",
+        acp: ["--acp"],
         // It signs in through its own `/auth`, and which variable it reads for a
         // key was not something the documentation said plainly. Empty rather than
         // guessed: see the field.
@@ -910,7 +932,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 subscription: false
             }
         ],
-        autonomyArgs: [],
+        autonomyArgs: ["--yolo"],
         autonomyEnv: {},
         firstRun: []
     },
@@ -920,12 +942,12 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         vendor: "Cline",
         binaries: ["cline"],
         install: "npm install -g cline",
-        // Not sourced. A wrong one shows up as a tool Polaris cannot configure on
-        // a machine that has it, which is worse than admitting it is unknown.
-        home: null,
+        // Where Agent Orchestrator reads its sessions from.
+        home: ".cline",
         observe: "output",
         docs: "https://github.com/cline/cline",
         credentials: [
+            apiKey("CLINE_API_KEY", "Cline API key", "https://github.com/cline/cline"),
             {
                 env: "ANTHROPIC_API_KEY",
                 label: "Anthropic API key",
@@ -941,7 +963,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 subscription: false
             }
         ],
-        autonomyArgs: [],
+        autonomyArgs: ["--yolo"],
         autonomyEnv: {},
         firstRun: []
     },
@@ -953,8 +975,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         // Python rather than npm, which is why it is spelled out: the machine has
         // to have uv, and a machine that does not gets the "could not be
         // installed" refusal rather than a session that starts without it.
-        install: "pip install openhands",
-        home: null,
+        install: "uv tool install openhands",
+        home: ".openhands",
         observe: "output",
         docs: "https://docs.all-hands.dev",
         credentials: [
@@ -973,7 +995,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 subscription: false
             }
         ],
-        autonomyArgs: [],
+        autonomyArgs: ["--always-approve"],
         autonomyEnv: {},
         firstRun: []
     },
@@ -987,6 +1009,396 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         observe: "output",
         docs: "https://github.com/openclaw/openclaw",
         credentials: [],
+        autonomyArgs: [],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    // The entries below come from Agent Orchestrator's adapters
+    // (github.com/OrchestratorInc/agent-orchestrator, Apache-2.0): the binary
+    // each one resolves, the installer its install plan runs, the variables its
+    // sign-in probe reads, and the flags its full-access permission mode passes.
+    // `docs/agent-catalogue.md` records the source of every field and what was
+    // left out because it could not be verified.
+    {
+        id: "grok",
+        label: "Grok Build",
+        vendor: "xAI",
+        binaries: ["grok"],
+        install: "curl -fsSL https://x.ai/cli/install.sh | bash",
+        home: ".grok",
+        observe: "output",
+        docs: "https://docs.x.ai/build/overview",
+        credentials: [apiKey("XAI_API_KEY", "xAI API key", "https://docs.x.ai/build/overview")],
+        autonomyArgs: ["--permission-mode", "bypassPermissions"],
+        autonomyEnv: {},
+        firstRun: [],
+        acp: ["agent", "stdio"]
+    },
+    {
+        id: "kimi",
+        label: "Kimi Code",
+        vendor: "Moonshot AI",
+        binaries: ["kimi"],
+        install: "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash",
+        home: ".kimi",
+        observe: "output",
+        docs: "https://moonshotai.github.io/kimi-code/en/",
+        credentials: [apiKey("KIMI_API_KEY", "Kimi API key", "https://moonshotai.github.io/kimi-code/en/")],
+        autonomyArgs: ["-y"],
+        autonomyEnv: {},
+        firstRun: [],
+        acp: ["acp"]
+    },
+    {
+        id: "pi",
+        label: "Pi",
+        vendor: "Earendil",
+        binaries: ["pi"],
+        install: "npm install -g @earendil-works/pi-coding-agent",
+        home: ".pi",
+        observe: "output",
+        docs: "https://github.com/earendil-works/pi",
+        credentials: [ANTHROPIC_KEY, OPENAI_KEY],
+        // Pi has no permission prompt to skip.
+        autonomyArgs: [],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "auggie",
+        label: "Auggie",
+        vendor: "Augment Code",
+        binaries: ["auggie"],
+        install: "npm install -g @augmentcode/auggie",
+        home: ".augment",
+        observe: "output",
+        docs: "https://docs.augmentcode.com/cli/overview",
+        // Signs in through its own login; no variable was sourced.
+        credentials: [],
+        autonomyArgs: [],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "continue",
+        label: "Continue",
+        vendor: "Continue",
+        binaries: ["cn"],
+        install: "npm install -g @continuedev/cli",
+        home: null,
+        observe: "output",
+        docs: "https://docs.continue.dev/cli/quickstart",
+        credentials: [],
+        autonomyArgs: ["--auto"],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "devin",
+        label: "Devin",
+        vendor: "Cognition",
+        binaries: ["devin"],
+        install: "curl -fsSL https://cli.devin.ai/install.sh | bash",
+        home: null,
+        observe: "output",
+        docs: "https://docs.devin.ai/get-started/devin-intro",
+        credentials: [apiKey("DEVIN_API_KEY", "Devin API key", "https://docs.devin.ai/get-started/devin-intro")],
+        autonomyArgs: ["--permission-mode", "dangerous"],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "kiro",
+        label: "Kiro",
+        vendor: "Amazon",
+        binaries: ["kiro-cli"],
+        install: "curl -fsSL https://cli.kiro.dev/install | bash",
+        home: null,
+        observe: "output",
+        docs: "https://kiro.dev/docs/getting-started/installation/",
+        credentials: [apiKey("KIRO_API_KEY", "Kiro API key", "https://kiro.dev/docs/getting-started/installation/")],
+        // Agent Orchestrator starts its `chat` subcommand and trusts every tool.
+        autonomyArgs: ["chat", "--trust-all-tools"],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "kilocode",
+        label: "Kilo Code",
+        vendor: "Kilo Code",
+        binaries: ["kilo", "kilocode"],
+        install: "npm install -g @kilocode/cli",
+        home: null,
+        observe: "output",
+        docs: "https://kilo.ai/docs/code-with-ai/platforms/cli",
+        credentials: [
+            apiKey("KILO_API_KEY", "Kilo API key", "https://kilo.ai/docs/code-with-ai/platforms/cli"),
+            ANTHROPIC_KEY,
+            OPENAI_KEY
+        ],
+        // Its permissions are a configuration file, not a flag.
+        autonomyArgs: [],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "vibe",
+        label: "Mistral Vibe",
+        vendor: "Mistral AI",
+        binaries: ["vibe"],
+        install: "uv tool install mistral-vibe",
+        home: ".vibe",
+        observe: "output",
+        docs: "https://github.com/mistralai/mistral-vibe",
+        credentials: [apiKey("MISTRAL_API_KEY", "Mistral API key", "https://github.com/mistralai/mistral-vibe")],
+        autonomyArgs: ["--trust", "--agent", "auto-approve"],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "muse",
+        label: "Muse Code",
+        vendor: "Meta",
+        binaries: ["muse"],
+        install: "curl -fsSL https://dev.meta.ai/install.sh | bash",
+        home: ".config/muse",
+        observe: "output",
+        docs: "https://ai.meta.com/llama/",
+        credentials: [apiKey("META_API_KEY", "Meta API key", "https://ai.meta.com/llama/")],
+        autonomyArgs: ["--trust-workspace", "--yolo"],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "agy",
+        label: "Antigravity",
+        vendor: "Google",
+        binaries: ["agy"],
+        install: "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+        home: null,
+        observe: "output",
+        docs: "https://github.com/google-antigravity/antigravity-cli",
+        // A Google account sign-in; no variable was sourced.
+        credentials: [],
+        autonomyArgs: ["--dangerously-skip-permissions"],
+        autonomyEnv: {},
+        firstRun: [],
+        acp: ["acp"]
+    },
+    {
+        id: "autohand",
+        label: "Autohand",
+        vendor: "Autohand",
+        binaries: ["autohand"],
+        install: "npm install -g autohand-cli",
+        home: null,
+        observe: "output",
+        docs: "https://docs.autohand.ai/working-with-autohand-code/cli",
+        credentials: [
+            apiKey("AUTOHAND_API_KEY", "Autohand API key", "https://docs.autohand.ai/working-with-autohand-code/cli"),
+            ANTHROPIC_KEY,
+            OPENAI_KEY
+        ],
+        autonomyArgs: ["--unrestricted"],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "kimchi",
+        label: "Kimchi",
+        vendor: "Kimchi",
+        binaries: ["kimchi"],
+        install: "curl -fsSL https://github.com/getkimchi/kimchi/releases/latest/download/install.sh | sh",
+        home: ".config/kimchi",
+        observe: "output",
+        docs: "https://docs.kimchi.dev/docs/coding-getting-started",
+        credentials: [apiKey("KIMCHI_API_KEY", "Kimchi API key", "https://docs.kimchi.dev/docs/coding-getting-started")],
+        autonomyArgs: ["--yolo"],
+        autonomyEnv: {},
+        firstRun: [],
+        acp: ["--mode", "acp"]
+    },
+    {
+        id: "prime-agent",
+        label: "Prime Agent",
+        vendor: "Prime Intellect",
+        binaries: ["prime-agent"],
+        install: "curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh",
+        home: ".prime",
+        observe: "output",
+        docs: "https://github.com/PrimeIntellect-ai/prime-agent/blob/main/packages/coding-agent/docs/quickstart.md",
+        credentials: [
+            apiKey(
+                "PRIME_API_KEY",
+                "Prime Intellect API key",
+                "https://github.com/PrimeIntellect-ai/prime-agent/blob/main/packages/coding-agent/docs/quickstart.md"
+            ),
+            ANTHROPIC_KEY,
+            OPENAI_KEY
+        ],
+        autonomyArgs: [],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "omp",
+        label: "Oh My Pi",
+        vendor: "Oh My Pi",
+        binaries: ["omp"],
+        install: "curl -fsSL https://omp.sh/install | sh",
+        home: ".omp",
+        observe: "output",
+        docs: "https://github.com/can1357/oh-my-pi",
+        credentials: [],
+        autonomyArgs: [],
+        autonomyEnv: {},
+        firstRun: [],
+        acp: ["acp"]
+    },
+    {
+        id: "fx",
+        label: "fx",
+        vendor: "fx",
+        binaries: ["fx"],
+        install: "curl -fsSL https://fx.sh/setup.sh | bash",
+        home: ".fx",
+        observe: "output",
+        docs: "https://fx.sh/docs",
+        credentials: [],
+        autonomyArgs: [],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "codewhale",
+        label: "Codewhale",
+        vendor: "Codewhale",
+        binaries: ["codewhale", "codew"],
+        // Agent Orchestrator does not install it either: the upstream
+        // instructions are not one command.
+        install: null,
+        home: ".codewhale",
+        observe: "output",
+        docs: "https://github.com/Hmbown/Codewhale",
+        credentials: [],
+        autonomyArgs: ["--yolo"],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "mimo-code",
+        label: "MiMo Code",
+        vendor: "Xiaomi",
+        binaries: ["mimo"],
+        install: "npm install -g @mimo-ai/cli",
+        home: null,
+        observe: "output",
+        docs: "https://github.com/XiaomiMiMo/MiMo-Code",
+        credentials: [],
+        autonomyArgs: ["--trust"],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "minimax-code",
+        label: "MiniMax Code",
+        vendor: "MiniMax",
+        binaries: ["mcode"],
+        install: "npm install -g @minimax-ai/code",
+        home: ".minimax",
+        observe: "output",
+        docs: "https://agent.minimax.io/docs/cli/quick-start",
+        credentials: [
+            apiKey("MINIMAX_API_KEY", "MiniMax API key", "https://agent.minimax.io/docs/cli/quick-start"),
+            ANTHROPIC_KEY,
+            OPENAI_KEY
+        ],
+        autonomyArgs: [],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "deepseek-harness",
+        label: "DeepSeek Harness",
+        vendor: "DeepSeek",
+        binaries: ["dsh"],
+        install: "npm install -g @deepseek-ai/dsh",
+        home: null,
+        observe: "output",
+        docs: "https://github.com/deepseek-ai/deepseek-harness",
+        credentials: [apiKey("DEEPSEEK_API_KEY", "DeepSeek API key", "https://github.com/deepseek-ai/deepseek-harness")],
+        autonomyArgs: [],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "command-code",
+        label: "Command Code",
+        vendor: "Command Code",
+        binaries: ["command-code", "cmd"],
+        install: "npm install -g command-code",
+        home: ".commandcode",
+        observe: "output",
+        docs: "https://commandcode.ai/docs/quickstart",
+        credentials: [],
+        autonomyArgs: ["--trust", "--skip-onboarding", "--yolo"],
+        autonomyEnv: {},
+        firstRun: [],
+        acp: ["acp"]
+    },
+    {
+        id: "memcode",
+        label: "memcode",
+        vendor: "memcode",
+        binaries: ["memcode"],
+        install: "curl -fsSL https://memcode.ai/install.sh | sh",
+        home: ".config/memcode",
+        observe: "output",
+        docs: "https://github.com/memcode-ai/memcode/releases",
+        credentials: [
+            apiKey("MEMCODE_API_TOKEN", "memcode API token", "https://github.com/memcode-ai/memcode/releases"),
+            ANTHROPIC_KEY,
+            OPENAI_KEY
+        ],
+        autonomyArgs: ["--allow-all"],
+        autonomyEnv: {},
+        firstRun: []
+    },
+    {
+        id: "hermes",
+        label: "Hermes Agent",
+        vendor: "Nous Research",
+        binaries: ["hermes"],
+        install: "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash",
+        home: ".hermes",
+        observe: "output",
+        docs: "https://github.com/NousResearch/hermes-agent",
+        credentials: [
+            apiKey("NOUS_API_KEY", "Nous API key", "https://github.com/NousResearch/hermes-agent"),
+            apiKey("OPENROUTER_API_KEY", "OpenRouter API key", "https://openrouter.ai/settings/keys"),
+            ANTHROPIC_KEY,
+            OPENAI_KEY
+        ],
+        autonomyArgs: ["--yolo"],
+        autonomyEnv: {},
+        firstRun: [],
+        acp: ["acp"]
+    },
+    {
+        id: "stakpak",
+        label: "Stakpak",
+        vendor: "Stakpak",
+        binaries: ["stakpak"],
+        install: "curl -fsSL https://stakpak.dev/install.sh | bash",
+        home: ".stakpak",
+        observe: "output",
+        docs: "https://github.com/stakpak/agent#installation",
+        credentials: [
+            apiKey("STAKPAK_API_KEY", "Stakpak API key", "https://github.com/stakpak/agent#installation"),
+            ANTHROPIC_KEY,
+            OPENAI_KEY
+        ],
+        // Its permissions are a profile file, not a flag.
         autonomyArgs: [],
         autonomyEnv: {},
         firstRun: []

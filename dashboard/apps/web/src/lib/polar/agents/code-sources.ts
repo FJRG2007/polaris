@@ -60,7 +60,24 @@ export const SOURCE_RULES: Readonly<Record<string, SourceRule>> = {
     GEMINI_API_KEY: { id: "geminiKey", kind: "apiKey", vendor: "Google", logo: "google-ai", engines: ["gemini"] },
     CURSOR_API_KEY: { id: "cursorKey", kind: "apiKey", vendor: "Cursor", logo: null, engines: ["cursor"] },
     AMP_API_KEY: { id: "ampKey", kind: "apiKey", vendor: "Amp", logo: null, engines: ["amp"] },
-    FACTORY_API_KEY: { id: "factoryKey", kind: "apiKey", vendor: "Factory", logo: null, engines: ["droid"] }
+    FACTORY_API_KEY: { id: "factoryKey", kind: "apiKey", vendor: "Factory", logo: null, engines: ["droid"] },
+    CLINE_API_KEY: { id: "clineKey", kind: "apiKey", vendor: "Cline", logo: null, engines: ["cline"] },
+    XAI_API_KEY: { id: "xaiKey", kind: "apiKey", vendor: "xAI", logo: null, engines: ["grok"] },
+    KIMI_API_KEY: { id: "kimiKey", kind: "apiKey", vendor: "Moonshot AI", logo: null, engines: ["kimi"] },
+    DEVIN_API_KEY: { id: "devinKey", kind: "apiKey", vendor: "Cognition", logo: null, engines: ["devin"] },
+    KIRO_API_KEY: { id: "kiroKey", kind: "apiKey", vendor: "Amazon", logo: null, engines: ["kiro"] },
+    KILO_API_KEY: { id: "kiloKey", kind: "apiKey", vendor: "Kilo Code", logo: null, engines: ["kilocode"] },
+    MISTRAL_API_KEY: { id: "mistralKey", kind: "apiKey", vendor: "Mistral AI", logo: null, engines: ["vibe"] },
+    META_API_KEY: { id: "metaKey", kind: "apiKey", vendor: "Meta", logo: null, engines: ["muse"] },
+    AUTOHAND_API_KEY: { id: "autohandKey", kind: "apiKey", vendor: "Autohand", logo: null, engines: ["autohand"] },
+    KIMCHI_API_KEY: { id: "kimchiKey", kind: "apiKey", vendor: "Kimchi", logo: null, engines: ["kimchi"] },
+    PRIME_API_KEY: { id: "primeKey", kind: "apiKey", vendor: "Prime Intellect", logo: null, engines: ["prime-agent"] },
+    MINIMAX_API_KEY: { id: "minimaxKey", kind: "apiKey", vendor: "MiniMax", logo: null, engines: ["minimax-code"] },
+    DEEPSEEK_API_KEY: { id: "deepseekKey", kind: "apiKey", vendor: "DeepSeek", logo: null, engines: ["deepseek-harness"] },
+    MEMCODE_API_TOKEN: { id: "memcodeToken", kind: "apiKey", vendor: "memcode", logo: null, engines: ["memcode"] },
+    NOUS_API_KEY: { id: "nousKey", kind: "apiKey", vendor: "Nous Research", logo: null, engines: ["hermes"] },
+    OPENROUTER_API_KEY: { id: "openrouterKey", kind: "apiKey", vendor: "OpenRouter", logo: null, engines: ["hermes"] },
+    STAKPAK_API_KEY: { id: "stakpakKey", kind: "apiKey", vendor: "Stakpak", logo: null, engines: ["stakpak"] }
 };
 
 /** The vendors whose own tool can run on a machine's sign-in, one each. */

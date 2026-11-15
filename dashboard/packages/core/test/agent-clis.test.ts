@@ -104,3 +104,56 @@ describe("parseAgentCliVersion", () => {
         expect(parseAgentCliVersion("")).toBeNull();
     });
 });
+
+describe("every catalogue entry", () => {
+    /** Characters a session would carry into a command line or an environment
+     *  value; the host daemon refuses a control character outright. */
+    const CONTROL = /[\u0000-\u001f\u007f]/;
+
+    it.each(AGENT_CLIS.map((cli) => [cli.id, cli] as const))("%s has a valid shape", (_id, cli) => {
+        expect(cli.id).toMatch(/^[a-z][a-z0-9-]*$/);
+        expect(cli.label.trim()).not.toBe("");
+        expect(cli.binaries.length).toBeGreaterThan(0);
+        for (const binary of cli.binaries) expect(binary).toMatch(/^[A-Za-z0-9._-]+$/);
+        expect(cli.docs).toMatch(/^https:\/\//);
+        if (cli.install !== null) {
+            expect(cli.install).not.toMatch(CONTROL);
+            expect(cli.install).toMatch(/^(npm install -g |uv tool install |python -m pip |curl -fsSL https:\/\/)/);
+            // A downloaded installer is piped into a shell and nothing else.
+            if (cli.install.startsWith("curl")) expect(cli.install).toMatch(/\| (CONFIGURE=false )?(ba)?sh$/);
+        }
+        if (cli.home !== null) expect(cli.home).toMatch(/^\.[A-Za-z0-9._/-]+$/);
+        for (const credential of cli.credentials) {
+            expect(credential.env).toMatch(/^[A-Z][A-Z0-9_]*$/);
+            expect(credential.label.trim()).not.toBe("");
+            expect(credential.url).toMatch(/^https:\/\//);
+        }
+        // Each one is a word on the launch line: no spaces, no shell syntax.
+        for (const arg of [...cli.autonomyArgs, ...(cli.acp ?? []), ...(cli.headless ?? [])]) {
+            expect(arg).toMatch(/^[A-Za-z0-9=._-]+$/);
+        }
+        if (cli.acp) expect(cli.acp.length).toBeGreaterThan(0);
+        for (const value of Object.values(cli.autonomyEnv)) expect(value).not.toMatch(CONTROL);
+    });
+
+    it("names each credential once per tool", () => {
+        for (const cli of AGENT_CLIS) {
+            const envs = cli.credentials.map((credential) => credential.env);
+            expect(new Set(envs).size, cli.id).toBe(envs.length);
+        }
+    });
+
+    it("knows every agent Agent Orchestrator runs from a terminal", () => {
+        // Its adapters under backend/internal/adapters/agent, less the two it
+        // runs only through its own runtime (Docker Agent's ACP chat, Unreal
+        // Agent built into it) and OpenCode 2, whose binary it never names.
+        const orchestrator = [
+            "agy", "aider", "amp", "auggie", "autohand", "claude", "cline", "codewhale",
+            "codex", "command-code", "continue", "copilot", "crush", "cursor",
+            "deepseek-harness", "devin", "droid", "fx", "gemini", "goose", "grok", "hermes",
+            "kilocode", "kimchi", "kimi", "kiro", "memcode", "mimo-code", "minimax-code",
+            "muse", "omp", "opencode", "openhands", "pi", "prime-agent", "qwen", "stakpak", "vibe"
+        ];
+        for (const id of orchestrator) expect(agentCliById(id), id).not.toBeNull();
+    });
+});
