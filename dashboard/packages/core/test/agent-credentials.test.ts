@@ -147,7 +147,11 @@ describe("agentRunsUnattended", () => {
     it("carries a flag or a variable for every tool, and never invents one", () => {
         for (const cli of AGENT_CLIS) {
             expect(Array.isArray(cli.autonomyArgs), cli.id).toBe(true);
-            for (const arg of cli.autonomyArgs) expect(arg, cli.id).toMatch(/^--/);
+            // A flag, or the value of the flag before it (`--permission-mode dangerous`).
+            cli.autonomyArgs.forEach((arg, index) => {
+                const previous = cli.autonomyArgs[index - 1];
+                if (!arg.startsWith("--")) expect(previous, `${cli.id}: ${arg}`).toMatch(/^--/);
+            });
             for (const value of Object.values(cli.autonomyEnv)) {
                 expect(typeof value, cli.id).toBe("string");
             }
