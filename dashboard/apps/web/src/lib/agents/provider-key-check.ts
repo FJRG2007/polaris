@@ -22,6 +22,7 @@ import {
     anthropicWorkspaceHeaders
 } from "@/lib/agents/agent-providers";
 import { catalogProvider } from "@/lib/integrations/provider-catalog-snapshot";
+import { configuredRequest, readAtMost, RefusedAddressError } from "@/lib/safe-fetch";
 
 /** Why a key was not accepted, in the terms a caller can branch on. `workspace`
  *  is an Anthropic key that needs a workspace ID, or was given a wrong one. */
@@ -57,6 +58,9 @@ interface Probe {
     header: string;
     /** What precedes it in that header, when anything does. */
     prefix: string | null;
+    /** An address the catalogue store holds (the index's, an operator's own)
+     *  rather than one written here: asked through the guarded fetch. */
+    guarded?: boolean;
     /** Anything else the vendor requires for the call to be understood. */
     extraHeaders?: Record<string, string>;
 }
@@ -143,8 +147,15 @@ const PROBES: Record<string, Probe> = {
 function probeFor(provider: string): Probe | undefined {
     const written = PROBES[provider];
     if (written) return written;
-    const probe = catalogProvider(provider)?.probe;
-    return probe ? { endpoint: probe, method: "GET", header: "Authorization", prefix: "Bearer " } : undefined;
+    const row = catalogProvider(provider);
+    if (!row?.probe) return undefined;
+    return {
+        endpoint: row.probe,
+        method: "GET",
+        header: "Authorization",
+        prefix: "Bearer ",
+        guarded: row.source !== "seed"
+    };
 }
 
 /** Whether this provider can be checked at all, for a screen that says so before
@@ -216,13 +227,32 @@ async function probeKey(
         provider === "anthropic" ? anthropicWorkspaceHeaders(options.workspaceId) : {};
     let response: Response;
     try {
-        response = await fetch(probe.endpoint, {
+        const init = {
             method: probe.method,
-            headers: { [probe.header]: credential, ...probe.extraHeaders, ...workspace },
-            signal: AbortSignal.timeout(TIMEOUT_MS),
-            cache: "no-store"
-        });
+            headers: { [probe.header]: credential, ...probe.extraHeaders, ...workspace }
+        };
+        // A stored address is checked where it resolves, at the moment of
+        // asking: a name that now points inside the network is refused.
+        response = probe.guarded
+            ? await configuredRequest(
+                  probe.endpoint,
+                  { ...init, timeoutMs: TIMEOUT_MS },
+                  { allowPrivate: false }
+              )
+            : await fetch(probe.endpoint, {
+                  ...init,
+                  signal: AbortSignal.timeout(TIMEOUT_MS),
+                  cache: "no-store"
+              });
     } catch (caught) {
+        if (caught instanceof RefusedAddressError) {
+            return {
+                state: "unverified",
+                code: "network",
+                reason: "Could not reach the provider to check the key.",
+                words: { key: "unreachable" }
+            };
+        }
         const timedOut = caught instanceof Error && caught.name === "TimeoutError";
         return {
             state: "unverified",
@@ -235,8 +265,24 @@ async function probeKey(
     }
 
     if (response.ok) return classify(response.status);
-    const body = await response.text().catch(() => "");
+    const body = await errorBody(response);
     return classify(response.status, providerMessage(body, secret), provider);
+}
+
+/** The most of an error body read: far more than any provider's sentence, and
+ *  a bound on what an endpoint somebody else chose can make the server hold. */
+const ERROR_BODY_BYTES = 64 * 1024;
+
+async function errorBody(response: Response): Promise<string> {
+    try {
+        const bytes = await readAtMost(
+            response as unknown as Parameters<typeof readAtMost>[0],
+            ERROR_BODY_BYTES
+        );
+        return bytes ? new TextDecoder().decode(bytes) : "";
+    } catch {
+        return "";
+    }
 }
 
 /** How much of a provider's own sentence is shown: enough for any error message

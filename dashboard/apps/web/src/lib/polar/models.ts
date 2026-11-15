@@ -21,6 +21,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createMistral } from "@ai-sdk/mistral";
 import { PROVIDER_ENDPOINTS } from "@/lib/polar/provider-endpoints";
+import { configuredFetch } from "@/lib/safe-fetch";
 import { catalogEndpoint, catalogProvider } from "@/lib/integrations/provider-catalog-snapshot";
 import { polarRouting } from "@/lib/polar/router/store";
 import {
@@ -533,15 +534,24 @@ export function languageModel(
         default: {
             const endpoint =
                 PROVIDER_ENDPOINTS[credential.provider] ?? catalogEndpoint(credential.provider);
+            // An endpoint read from the store rather than written here (the
+            // index's, an operator's own) is an address somebody else chose, so
+            // every call to it goes through the guarded fetch.
+            const fetch = catalogAddressed(credential.provider) ? endpointFetch() : undefined;
             if (endpoint?.api === "anthropic") {
-                return createAnthropic({ apiKey, baseURL: endpoint.baseUrl })(model);
+                return createAnthropic({ apiKey, baseURL: endpoint.baseUrl, fetch })(model);
             }
             if (endpoint?.api === "mistral") {
-                return createMistral({ apiKey, baseURL: endpoint.baseUrl })(model);
+                return createMistral({ apiKey, baseURL: endpoint.baseUrl, fetch })(model);
             }
             const baseURL = OPENAI_COMPATIBLE_BASES[credential.provider] ?? endpoint?.baseUrl;
             if (!baseURL) throw new Error(`polar: no client for ${credential.provider}`);
-            const client = createOpenAICompatible({ name: credential.provider, baseURL, apiKey });
+            const client = createOpenAICompatible({
+                name: credential.provider,
+                baseURL,
+                apiKey,
+                fetch
+            });
             if (credential.provider !== "openrouter") return client(model);
             return wrapLanguageModel({
                 model: client(model),
@@ -549,6 +559,23 @@ export function languageModel(
             });
         }
     }
+}
+
+/** How long a call to a stored endpoint may take, streamed answer included. */
+const ENDPOINT_TIMEOUT_MS = 10 * 60_000;
+
+/** Whether this provider is reached at an address the catalogue store holds
+ *  rather than one this file or the endpoint table names. */
+export function catalogAddressed(provider: string): boolean {
+    if (provider in PROVIDER_ENDPOINTS || provider in OPENAI_COMPATIBLE_BASES) return false;
+    const row = catalogProvider(provider);
+    return Boolean(row?.baseUrl) && row?.source !== "seed";
+}
+
+let guarded: typeof fetch | null = null;
+function endpointFetch(): typeof fetch {
+    guarded ??= configuredFetch(ENDPOINT_TIMEOUT_MS);
+    return guarded;
 }
 
 /** Providers that serve other providers' models under their own ids, so a

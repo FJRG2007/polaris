@@ -48,7 +48,7 @@ vi.mock("node:dns/promises", () => ({
     }
 }));
 
-const { configuredRequest, fetchImage, safeUrl, vettedAddresses } = await import(
+const { configuredFetch, configuredRequest, fetchImage, safeUrl, vettedAddresses } = await import(
     "@/lib/safe-fetch"
 );
 
@@ -169,6 +169,24 @@ describe("a request to an address somebody configured", () => {
     it("still refuses one that resolves inside the network", async () => {
         await expect(
             configuredRequest("https://inside.test/cal", {}, { allowPrivate: false })
+        ).rejects.toThrow("cannot be reached");
+        expect(fetched).toEqual([]);
+    });
+});
+
+describe("a client library's fetch on a configured endpoint", () => {
+    it("reaches a public endpoint with whatever the library sends", async () => {
+        const address = "https://pictures.example/v1/chat/completions";
+        responses.set(address, { status: 200, headers: {}, body: "{}" });
+        const fetchFor = configuredFetch(60_000);
+        const response = await fetchFor(new URL(address), { method: "POST", body: "{}" });
+        expect(response.status).toBe(200);
+        expect(fetched).toEqual([address]);
+    });
+
+    it("refuses an endpoint whose name resolves inside the network, at request time", async () => {
+        await expect(
+            configuredFetch(60_000)("https://inside.test/v1/models")
         ).rejects.toThrow("cannot be reached");
         expect(fetched).toEqual([]);
     });

@@ -359,6 +359,22 @@ export async function configuredRequest(
     return (await guardedFetch(url, request)) as unknown as Response;
 }
 
+/**
+ * `configuredRequest` in the shape of `fetch`, for a client library that takes
+ * its own (`fetch` on an AI SDK provider): every request it makes is checked
+ * like any other configured address, at request time, so a name that later
+ * resolves somewhere private is refused rather than reached. Public addresses
+ * only. `timeoutMs` bounds the whole exchange, body included, so a streamed
+ * answer needs a long one.
+ */
+export function configuredFetch(timeoutMs: number): typeof fetch {
+    return (input, init) => {
+        const address =
+            typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        return configuredRequest(address, { ...init, timeoutMs }, { allowPrivate: false });
+    };
+}
+
 /** Read at most `maxBytes`, whatever the other end says it is sending. */
 export async function readCapped(
     response: GuardedResponse,
