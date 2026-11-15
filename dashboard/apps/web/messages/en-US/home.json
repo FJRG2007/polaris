@@ -213,8 +213,7 @@
         "cannotDo": "That could not be done.",
         "empty": "Nothing to show yet.",
         "pick": "Choose what to show",
-        "increase": "Raise {label} on {name}",
-        "decrease": "Lower {label} on {name}"
+        "setting": "{label} on {name}"
     },
     "dnsBlocker": {
         "unavailable": "The network filter could not be read just now.",

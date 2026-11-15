@@ -213,8 +213,7 @@
         "cannotDo": "No se ha podido hacer.",
         "empty": "Todavía no hay nada que mostrar.",
         "pick": "Elegir qué mostrar",
-        "increase": "Subir {label} en {name}",
-        "decrease": "Bajar {label} en {name}"
+        "setting": "{label} en {name}"
     },
     "dnsBlocker": {
         "unavailable": "No se ha podido leer Filtro de red ahora mismo.",

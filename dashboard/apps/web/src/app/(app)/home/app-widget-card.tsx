@@ -12,9 +12,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Check, ChevronDown, Minus, Plus } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import {
     Badge,
+    ControlSlider,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -173,7 +174,6 @@ function Control({
     busy: boolean;
     onAct: (input: AppWidgetInput) => void;
 }) {
-    const t = useTranslations("home");
     const blocked = Boolean(control.disabled) || busy;
     const why = control.disabled ?? undefined;
     if (control.kind === "toggle") {
@@ -201,41 +201,44 @@ function Control({
     if (control.kind === "action") {
         return <ActionControl item={item} control={control} blocked={blocked} onAct={onAct} />;
     }
-    const value = control.value;
-    const step = (direction: 1 | -1) => {
-        const from = value ?? (direction > 0 ? control.min : control.max);
-        const next = Math.min(control.max, Math.max(control.min, from + direction * control.step));
-        // Rounded to the step's own places, so 21.5 + 0.5 is 22 and not 21.999.
-        const places = String(control.step).split(".")[1]?.length ?? 0;
-        onAct({ item: item.id, control: control.id, value: Number(next.toFixed(places)) });
-    };
+    return <NumberControl item={item} control={control} blocked={blocked} onAct={onAct} />;
+}
+
+/** A setting dragged along a bar rather than stepped with - and +: the value
+ *  shows while it moves and only the one let go on is sent. */
+function NumberControl({
+    item,
+    control,
+    blocked,
+    onAct
+}: {
+    item: AppWidgetItem;
+    control: Extract<AppWidgetControl, { kind: "number" }>;
+    blocked: boolean;
+    onAct: (input: AppWidgetInput) => void;
+}) {
+    const t = useTranslations("home");
+    const [live, setLive] = useState<number | null>(null);
+    const shown = live ?? control.value;
+    const text = (value: number) => `${value}${control.unit}`;
     return (
-        <div className="flex items-center gap-1.5 text-xs" title={why}>
-            <span className="text-muted-foreground">{control.label}</span>
-            <button
-                type="button"
-                disabled={blocked || (value !== null && value <= control.min)}
-                onClick={() => step(-1)}
-                aria-label={t("appCards.decrease", { label: control.label, name: item.title })}
-                className="grid size-7 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-            >
-                <Minus className="size-3.5" aria-hidden="true" />
-            </button>
-            <span
-                className="min-w-12 text-center text-sm font-medium tabular-nums"
-                aria-live="polite"
-            >
-                {value === null ? "-" : `${value}${control.unit}`}
+        <div className="flex min-w-0 items-center gap-2 text-xs" title={control.disabled ?? undefined}>
+            <span className="shrink-0 text-muted-foreground">{control.label}</span>
+            <ControlSlider
+                min={control.min}
+                max={control.max}
+                step={control.step}
+                value={control.value}
+                label={t("appCards.setting", { label: control.label, name: item.title })}
+                valueText={text}
+                disabled={blocked}
+                onLive={setLive}
+                onCommit={(value) => onAct({ item: item.id, control: control.id, value })}
+                className="w-32 shrink"
+            />
+            <span className="min-w-12 shrink-0 text-sm font-medium tabular-nums" aria-hidden="true">
+                {shown === null ? "-" : text(shown)}
             </span>
-            <button
-                type="button"
-                disabled={blocked || (value !== null && value >= control.max)}
-                onClick={() => step(1)}
-                aria-label={t("appCards.increase", { label: control.label, name: item.title })}
-                className="grid size-7 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-            >
-                <Plus className="size-3.5" aria-hidden="true" />
-            </button>
         </div>
     );
 }

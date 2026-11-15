@@ -4,7 +4,7 @@
  * An app's card, as the Overview draws it.
  *
  * The app answers with data - rows, readings, controls - and the dashboard
- * draws it: a switch for an on and an off, a stepper for a setting, and the
+ * draws it: a switch for an on and an off, a slider for a setting, and the
  * reason a control cannot be used where the control is. A press is drawn at once
  * (`withPressed`) and put back if the app refuses.
  */
@@ -76,10 +76,25 @@ describe("an app's card", () => {
         const onAct = card(READOUT);
         fireEvent.click(screen.getByRole("switch", { name: "Power - Living room AC" }));
         expect(onAct).toHaveBeenLastCalledWith({ item: "ac", control: "power", value: false });
-        fireEvent.click(screen.getByRole("button", { name: "Raise Set to on Living room AC" }));
-        expect(onAct).toHaveBeenLastCalledWith({ item: "ac", control: "target", value: 23.5 });
-        fireEvent.click(screen.getByRole("button", { name: "Lower Set to on Living room AC" }));
-        expect(onAct).toHaveBeenLastCalledWith({ item: "ac", control: "target", value: 22.5 });
+        const setting = screen.getByRole("slider", { name: "Set to on Living room AC" });
+        expect(setting.getAttribute("aria-valuetext")).toBe("23°C");
+        vi.useFakeTimers();
+        try {
+            fireEvent.keyDown(setting, { key: "ArrowUp" });
+            expect(setting.getAttribute("aria-valuenow")).toBe("23.5");
+            // Presses are gathered, then sent as one.
+            expect(onAct).toHaveBeenCalledTimes(1);
+            vi.advanceTimersByTime(800);
+            expect(onAct).toHaveBeenLastCalledWith({ item: "ac", control: "target", value: 23.5 });
+            // From the 23.5 still shown while the app has not answered.
+            fireEvent.keyDown(setting, { key: "ArrowDown" });
+            fireEvent.keyDown(setting, { key: "ArrowDown" });
+            vi.advanceTimersByTime(800);
+            expect(onAct).toHaveBeenLastCalledWith({ item: "ac", control: "target", value: 22.5 });
+            expect(onAct).toHaveBeenCalledTimes(3);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("does not offer a control the app says cannot be used, and says why", () => {
