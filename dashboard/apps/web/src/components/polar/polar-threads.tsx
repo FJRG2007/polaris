@@ -19,6 +19,7 @@
  * the actions are `usePolarSidebar`'s.
  */
 
+import Link from "next/link";
 import {
     useEffect,
     useMemo,
@@ -59,6 +60,7 @@ import {
     Trash2,
     Copy,
     ExternalLink,
+    LayoutGrid,
     Users,
     X
 } from "lucide-react";
@@ -647,12 +649,26 @@ function NavRow({
     );
 }
 
-function Section({ id, label, children }: { id: string; label: string; children: ReactNode }) {
+function Section({
+    id,
+    label,
+    action,
+    children
+}: {
+    id: string;
+    label: string;
+    /** A link beside the heading, such as the Code board. */
+    action?: ReactNode;
+    children: ReactNode;
+}) {
     return (
         <div role="group" aria-labelledby={id} className="pt-4">
-            <p id={id} className={cn("truncate px-2 pb-1", HEADING)}>
-                {label}
-            </p>
+            <div className="flex min-w-0 items-center gap-2 px-2 pb-1">
+                <p id={id} className={cn("min-w-0 flex-1 truncate", HEADING)}>
+                    {label}
+                </p>
+                {action}
+            </div>
             {children}
         </div>
     );
@@ -779,7 +795,20 @@ function CodeList({
             if (!ok) toast.show({ title: t("history.renameFailed") });
         });
     return (
-        <Section id="polar-code" label={t("history.codeSessions")}>
+        <Section
+            id="polar-code"
+            label={t("history.codeSessions")}
+            action={
+                <Link
+                    href="/polar/board"
+                    prefetch={false}
+                    className="flex shrink-0 items-center gap-1 rounded text-[0.6875rem] text-foreground-subtle hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <LayoutGrid className="size-3.5" aria-hidden />
+                    {t("history.openBoard")}
+                </Link>
+            }
+        >
             <div ref={box} onKeyDown={onKey}>
                 {picked.length > 0 ? (
                     <div

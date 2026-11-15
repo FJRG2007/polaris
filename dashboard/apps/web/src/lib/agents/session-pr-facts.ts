@@ -458,25 +458,53 @@ export const PULL_FACTS_SELECT = {
 /** The most sessions one read asks facts for: a page of a board or a list. */
 const READ_CAP = 200;
 
-/** The pull request facts of a page of sessions, keyed by session id. */
-export async function readSessionPullFacts(
+/** What a card shows beside the status: the number and the check counts. */
+export const PULL_CARD_SELECT = {
+    ...PULL_FACTS_SELECT,
+    number: true,
+    checksTotal: true,
+    checksFailed: true,
+    checksPending: true
+} as const;
+
+/** One stored pull request row, as a board card reads it. */
+export interface PullCardRow extends PullFactsRow {
+    sessionId: string;
+    number: number;
+    checksTotal: number;
+    checksFailed: number;
+    checksPending: number;
+}
+
+/** The stored pull request rows of a page of sessions, keyed by session id. */
+export async function readSessionPullRows(
     sessionIds: readonly string[]
-): Promise<Map<string, status.PullFacts[]>> {
+): Promise<Map<string, PullCardRow[]>> {
     const ids = [...new Set(sessionIds)].slice(0, READ_CAP);
-    const out = new Map<string, status.PullFacts[]>();
+    const out = new Map<string, PullCardRow[]>();
     if (ids.length === 0) return out;
     const rows = await prisma.sessionPullFacts.findMany({
         where: { sessionId: { in: ids } },
-        select: PULL_FACTS_SELECT,
+        select: PULL_CARD_SELECT,
         // Bounded by the ids: a session has a handful of pull requests at most,
         // and the cap keeps a pathological one from filling the page.
         take: ids.length * 10
     });
     for (const row of rows) {
         const list = out.get(row.sessionId) ?? [];
-        list.push(pullFactsOf(row));
+        list.push(row);
         out.set(row.sessionId, list);
     }
+    return out;
+}
+
+/** The pull request facts of a page of sessions, keyed by session id. */
+export async function readSessionPullFacts(
+    sessionIds: readonly string[]
+): Promise<Map<string, status.PullFacts[]>> {
+    const rows = await readSessionPullRows(sessionIds);
+    const out = new Map<string, status.PullFacts[]>();
+    for (const [sessionId, list] of rows) out.set(sessionId, list.map(pullFactsOf));
     return out;
 }
 

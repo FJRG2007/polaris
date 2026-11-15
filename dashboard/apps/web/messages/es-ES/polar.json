@@ -125,7 +125,8 @@
         "bulkDeleteQuestion": "{count, plural, one {# conversación y sus mensajes se eliminarán} other {# conversaciones y sus mensajes se eliminarán}} para siempre.",
         "bulkKind": "conversaciones",
         "selectionActions": "Conversaciones seleccionadas",
-        "codeSessions": "Sesiones de Code"
+        "codeSessions": "Sesiones de Code",
+        "openBoard": "Tablero"
     },
     "actions": {
         "new": "Nuevo chat",
@@ -1898,6 +1899,68 @@
             "high": "A fondo",
             "xhigh": "Muy profundo",
             "max": "Máximo"
+        }
+    },
+    "board": {
+        "title": "Tablero",
+        "openCode": "Abrir Code",
+        "refreshing": "Actualizando",
+        "noAccess": "No puedes ver las sesiones de Code",
+        "noAccessHint": "Pide acceso a Agentes a un administrador.",
+        "loadFailed": "No se pudo cargar el tablero",
+        "staleNotice": "No se pudo actualizar. Se muestra el último tablero leído.",
+        "truncated": "Se muestran las 150 sesiones activas más recientes. Filtra para ver el resto.",
+        "noMatch": "Ninguna sesión coincide con los filtros",
+        "clearFilters": "Quitar filtros",
+        "empty": "Aún no hay sesiones",
+        "emptyHint": "Empieza una tarea y aparecerá aquí.",
+        "columnsLabel": "Columnas",
+        "moreDone": "Ver más",
+        "allRepos": "Todos los repos",
+        "allAgents": "Todos los agentes",
+        "allPeople": "Todos",
+        "repoFilter": "Repositorio",
+        "agentFilter": "Agente",
+        "personFilter": "Iniciada por",
+        "searchPeople": "Buscar personas",
+        "noPersonMatch": "Nadie coincide",
+        "workspace": "Espacio",
+        "untitled": "Sesión sin título",
+        "openPull": "Abrir pull request #{number}",
+        "checks": "Checks: {passed} bien, {failed} fallidos, {pending} en curso",
+        "columns": {
+            "needs_you": "Te necesita",
+            "working": "Trabajando",
+            "in_review": "En revisión",
+            "fix_needed": "Por corregir",
+            "ready": "Lista para merge",
+            "done": "Hecho"
+        },
+        "columnEmpty": {
+            "needs_you": "Nada te espera.",
+            "working": "Ningún agente trabaja.",
+            "in_review": "Nada en revisión.",
+            "fix_needed": "Nada que corregir.",
+            "ready": "Nada listo para merge.",
+            "done": "Nada terminado aún."
+        },
+        "status": {
+            "working": "Trabajando",
+            "pr_open": "PR abierta",
+            "draft": "Borrador",
+            "ci_failed": "Checks fallan",
+            "review_pending": "Por revisar",
+            "changes_requested": "Piden cambios",
+            "commented": "Comentada",
+            "merge_conflict": "Conflicto",
+            "approved": "Aprobada",
+            "mergeable": "Fusionable",
+            "merged": "Fusionada",
+            "needs_input": "Espera respuesta",
+            "exited": "Salió",
+            "idle": "Inactiva",
+            "terminated": "Terminada",
+            "no_signal": "Sin señal"
         }
     }
 }

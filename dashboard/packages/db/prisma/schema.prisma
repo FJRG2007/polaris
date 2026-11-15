@@ -9300,6 +9300,8 @@ model AgentSession {
     // session recorded, or by the branch the pull request was opened from.
     @@index([repoId, prNumber])
     @@index([repoId, branch])
+    // The session board's agent filter, newest first.
+    @@index([cli, createdAt])
 }
 
 // What GitHub last said about a pull request opened from a session's branch:

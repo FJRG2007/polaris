@@ -125,7 +125,8 @@
         "bulkDeleteQuestion": "{count, plural, one {# conversation and its messages} other {# conversations and their messages}} will be deleted for good.",
         "bulkKind": "conversations",
         "selectionActions": "Selected conversations",
-        "codeSessions": "Code sessions"
+        "codeSessions": "Code sessions",
+        "openBoard": "Board"
     },
     "actions": {
         "new": "New chat",
@@ -1898,6 +1899,68 @@
             "high": "Deep",
             "xhigh": "Extra deep",
             "max": "Max"
+        }
+    },
+    "board": {
+        "title": "Board",
+        "openCode": "Open Code",
+        "refreshing": "Refreshing",
+        "noAccess": "You can't see Code sessions",
+        "noAccessHint": "Ask an administrator for access to Agents.",
+        "loadFailed": "Couldn't load the board",
+        "staleNotice": "Couldn't refresh. Showing the last board read.",
+        "truncated": "Showing the newest 150 running sessions. Filter to see the rest.",
+        "noMatch": "No sessions match these filters",
+        "clearFilters": "Clear filters",
+        "empty": "No sessions yet",
+        "emptyHint": "Start a task and it shows up here.",
+        "columnsLabel": "Columns",
+        "moreDone": "Show more",
+        "allRepos": "All repositories",
+        "allAgents": "All agents",
+        "allPeople": "Everyone",
+        "repoFilter": "Repository",
+        "agentFilter": "Agent",
+        "personFilter": "Started by",
+        "searchPeople": "Search people",
+        "noPersonMatch": "Nobody matches",
+        "workspace": "Workspace",
+        "untitled": "Untitled session",
+        "openPull": "Open pull request #{number}",
+        "checks": "Checks: {passed} passed, {failed} failed, {pending} running",
+        "columns": {
+            "needs_you": "Needs you",
+            "working": "Working",
+            "in_review": "In review",
+            "fix_needed": "Fix needed",
+            "ready": "Ready to merge",
+            "done": "Done"
+        },
+        "columnEmpty": {
+            "needs_you": "Nothing waiting on you.",
+            "working": "No agent is working.",
+            "in_review": "Nothing in review.",
+            "fix_needed": "Nothing to fix.",
+            "ready": "Nothing ready to merge.",
+            "done": "Nothing finished yet."
+        },
+        "status": {
+            "working": "Working",
+            "pr_open": "PR open",
+            "draft": "Draft",
+            "ci_failed": "Checks failed",
+            "review_pending": "Review pending",
+            "changes_requested": "Changes requested",
+            "commented": "Commented",
+            "merge_conflict": "Conflict",
+            "approved": "Approved",
+            "mergeable": "Mergeable",
+            "merged": "Merged",
+            "needs_input": "Needs input",
+            "exited": "Exited",
+            "idle": "Idle",
+            "terminated": "Ended",
+            "no_signal": "No signal"
         }
     }
 }
