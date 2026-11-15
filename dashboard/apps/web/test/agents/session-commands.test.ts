@@ -1104,3 +1104,86 @@ describe("hostSessionScope", () => {
         expect(commands.AGENT_READY_FLAG).toBe("$(printenv TMPDIR || echo /tmp)/polaris-agent-started");
     });
 });
+
+describe("a spare's installs ahead of its session", () => {
+    /** Both fragments, with their fixed `/tmp` files moved into `dir`. */
+    function scripted(lines: readonly string[], dir: string): string {
+        return lines
+            .join("\n")
+            .replaceAll(commands.PREINSTALL_PENDING, `${dir}/pending`)
+            .replaceAll(commands.PREINSTALL_LOG, `${dir}/preinstall.log`);
+    }
+
+    function prepared() {
+        const dir = mkdtempSync(join(tmpdir(), "polaris-preinstall-")).replace(/\\/g, "/");
+        // A `gh` already on the PATH, so nothing here downloads a release.
+        mkdirSync(`${dir}/bin`);
+        writeFileSync(`${dir}/bin/gh`, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+        const setup = `echo "polaris: installing Enigma 9.9.9"\nsleep 1\n: > "${dir}/enigma-installed"\n`;
+        const env = {
+            ...process.env,
+            PATH: `${dir}/bin:${process.env.PATH ?? ""}`,
+            TMPDIR: dir,
+            // An account this machine does not have, so nothing runs as root.
+            POLARIS_RUNAS: "polaris-test-nobody",
+            POLARIS_HOME: `${dir}/home`,
+            POLARIS_ENIGMA_SETUP: Buffer.from(setup, "utf8").toString("base64")
+        };
+        return { dir, env };
+    }
+
+    it("runs before the spare waits for its claim, and the session waits for it before its own Enigma step", () => {
+        const spare = commands.SPARE_BOOT;
+        const install = commands.SPARE_PREINSTALL.join("\n");
+        expect(spare).toContain(install);
+        expect(spare.indexOf(install)).toBeLessThan(spare.indexOf(commands.CLAIM_FILE));
+        const setup = commands.SESSION_SETUP;
+        const wait = commands.AWAIT_PREINSTALL.join("\n");
+        expect(setup.indexOf(wait)).toBeGreaterThan(-1);
+        expect(setup.indexOf(wait)).toBeLessThan(setup.indexOf('if [ -n "$POLARIS_ENIGMA_SETUP" ]; then'));
+        // Fetching the repository does not wait for it.
+        expect(setup.indexOf("polaris: fetching ")).toBeLessThan(setup.indexOf(wait));
+        expect(install).not.toMatch(/\$\{/);
+        expect(commands.SESSION_BOOT).not.toContain(commands.PREINSTALL_PENDING);
+    });
+
+    it("holds the session's own install until the spare's has finished, showing what it printed", () => {
+        const { dir, env } = prepared();
+        const script = `set -eu\n${scripted(commands.SPARE_PREINSTALL, dir)}\nset +u\n${scripted(commands.AWAIT_PREINSTALL, dir)}\n[ -f "${dir}/enigma-installed" ] && echo "polaris: installed before the session went on"\n`;
+        const done = spawnSync("sh", ["-c", script], { env, encoding: "utf8", timeout: 20_000 });
+        expect(done.status).toBe(0);
+        expect(done.stdout).toContain("polaris: installing Enigma 9.9.9");
+        expect(done.stdout).toContain("polaris: installed before the session went on");
+        expect(() => readFileSync(`${dir}/pending`)).toThrow();
+        expect(bootProgress(done.stdout)!.find((step) => step.key === "enigma")?.label).toBe(
+            "Installing Enigma 9.9.9"
+        );
+    });
+
+    it("installs nothing and leaves no lock on a spare that was not handed an account", () => {
+        const { dir, env } = prepared();
+        const script = `set -eu\n${scripted(commands.SPARE_PREINSTALL, dir)}\nwait\n${scripted(commands.AWAIT_PREINSTALL, dir)}\necho went on\n`;
+        const done = spawnSync("sh", ["-c", script], {
+            env: { ...env, POLARIS_RUNAS: "" },
+            encoding: "utf8",
+            timeout: 20_000
+        });
+        expect(done.status).toBe(0);
+        expect(done.stdout).toContain("went on");
+        expect(() => readFileSync(`${dir}/pending`)).toThrow();
+        expect(() => readFileSync(`${dir}/enigma-installed`)).toThrow();
+    });
+
+    it("clears a lock a restarted container left behind before it starts again", () => {
+        const { dir, env } = prepared();
+        writeFileSync(`${dir}/pending`, "");
+        const script = `set -eu\n${scripted(commands.SPARE_PREINSTALL, dir)}\n`;
+        const done = spawnSync("sh", ["-c", script], {
+            env: { ...env, POLARIS_RUNAS: "" },
+            encoding: "utf8",
+            timeout: 20_000
+        });
+        expect(done.status).toBe(0);
+        expect(() => readFileSync(`${dir}/pending`)).toThrow();
+    });
+});

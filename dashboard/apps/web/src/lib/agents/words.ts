@@ -152,6 +152,7 @@ const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
 };
 
 const SHAPED: readonly (readonly [RegExp, NamespaceKey<"agents">, readonly string[]])[] = [
+    [/^Installing Enigma (\d+(?:\.\d+){1,3})$/, "boot.enigmaVersion", ["version"]],
     [
         /^Polaris has no GitHub App installation for (.+), so it cannot write the workflow file\.$/,
         "text.noInstallationWorkflow",

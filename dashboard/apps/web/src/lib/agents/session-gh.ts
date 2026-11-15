@@ -83,6 +83,29 @@ export const GH_WRAPPER_SCRIPT = [
 const INSTALL_BASE64 = Buffer.from(GH_INSTALL_SCRIPT, "utf8").toString("base64");
 const WRAPPER_BASE64 = Buffer.from(GH_WRAPPER_SCRIPT, "utf8").toString("base64");
 
+/** Run the install script as the agent. Needs `as_agent`. */
+const RUN_GH_INSTALL: readonly string[] = [
+    'gh_setup="$(mktemp "$(printenv TMPDIR || echo /tmp)/polaris-gh.XXXXXX")" || gh_setup=""',
+    'if [ -n "$gh_setup" ]; then',
+    `  printf %s ${INSTALL_BASE64} | base64 -d > "$gh_setup"`,
+    '  chmod 0644 "$gh_setup" 2>/dev/null || true',
+    '  as_agent "sh \\"$gh_setup\\"" || echo "polaris: the GitHub CLI did not install; git still works"',
+    '  rm -f "$gh_setup"',
+    "fi"
+];
+
+/**
+ * The same install, ahead of a session: what a spare runs while the message is
+ * still being typed (see `SPARE_BOOT`), so the session that claims it finds the
+ * release already in the kept home. Unconditional on a repository, because a
+ * spare does not know yet whether it will have one; once per version per home.
+ */
+export const PREINSTALL_GH: readonly string[] = [
+    "if ! command -v gh >/dev/null 2>&1; then",
+    ...RUN_GH_INSTALL.map((line) => `  ${line}`),
+    "fi"
+];
+
 /**
  * The boot's lines: only for a session with a repository and the credential
  * helper written, best effort throughout (the setup runs under `set -e`, and a
@@ -93,13 +116,7 @@ export const INSTALL_GH: readonly string[] = [
     'if [ -n "$GITHUB_REPOSITORY" ] && [ -f "$POLARIS_STATE_DIR/git-credential.sh" ]; then',
     '  gh_real="$(command -v gh 2>/dev/null || true)"',
     '  if [ -z "$gh_real" ]; then',
-    '    gh_setup="$(mktemp "$(printenv TMPDIR || echo /tmp)/polaris-gh.XXXXXX")" || gh_setup=""',
-    '    if [ -n "$gh_setup" ]; then',
-    `      printf %s ${INSTALL_BASE64} | base64 -d > "$gh_setup"`,
-    '      chmod 0644 "$gh_setup" 2>/dev/null || true',
-    '      as_agent "sh \\"$gh_setup\\"" || echo "polaris: the GitHub CLI did not install; git still works"',
-    '      rm -f "$gh_setup"',
-    "    fi",
+    ...RUN_GH_INSTALL.map((line) => `    ${line}`),
     `    [ -x "${GH_DIR}/bin/gh" ] && gh_real="${GH_DIR}/bin/gh" || true`,
     "  fi",
     '  if [ -n "$gh_real" ]; then',

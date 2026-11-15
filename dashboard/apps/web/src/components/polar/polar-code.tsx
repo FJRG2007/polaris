@@ -48,6 +48,7 @@ import { CodeView } from "@/components/json-view";
 import { Work } from "@/components/polar/elements/work";
 import { Shimmer } from "@/components/polar/elements/shimmer";
 import { BusyVerb } from "@/components/polar/elements/busy-verb";
+import { CodeBootLine } from "@/components/polar/polar-code-boot";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
@@ -1895,7 +1896,13 @@ function CodeThread({
                         {thread.entries.length === 0 && live ? (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <ThinkingOrb state="breathing" size={20} decorative />
-                                <Shimmer>{t("code.quiet")}</Shimmer>
+                                <Shimmer>
+                                    {thread.session.state === "starting" && thread.canManage ? (
+                                        <CodeBootLine sessionId={sessionId} fallback={t("code.quiet")} />
+                                    ) : (
+                                        t("code.quiet")
+                                    )}
+                                </Shimmer>
                             </div>
                         ) : null}
                         {thread.error ? <Notice error>{thread.error}</Notice> : null}

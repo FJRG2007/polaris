@@ -286,6 +286,7 @@
         "opening": "Abriendo tu espacio",
         "reopening": "Reabriendo la copia",
         "enigma": "Instalando Enigma",
+        "enigmaVersion": "Instalando Enigma {version}",
         "agent": "Instalando el agente",
         "agentHere": "El agente ya está aquí",
         "start": "Iniciando el agente"

@@ -32,6 +32,7 @@
  */
 
 import { z } from "zod";
+import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { Readable } from "node:stream";
 import { randomUUID } from "node:crypto";
@@ -39,6 +40,7 @@ import { shellQuote } from "./session-hooks";
 import * as commands from "./session-commands";
 import { totalCeiling } from "./session-capacity";
 import { startContainer } from "./session-container";
+import { resolveAccountEnigma } from "./session-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { containerState, withContainerPorts } from "./session-ports";
 import { choosePlacement, poolCandidates, readPool } from "./session-placement";
@@ -170,7 +172,7 @@ export async function keepSpare(userId: string, now = Date.now()): Promise<boole
         if (held) await removeUnclaimed(held);
         await startContainer(
             { id: spare.sessionId, hostId, ownerId: userId, sharedHome: false },
-            {},
+            await spareEnv(userId),
             commands.SPARE_BOOT
         );
         return true;
@@ -178,6 +180,31 @@ export async function keepSpare(userId: string, now = Date.now()): Promise<boole
         console.error(`[agent-spare] could not prepare a spare for ${userId}:`, error);
         return false;
     }
+}
+
+/**
+ * What a spare knows before its session exists: whose home it opens on, and the
+ * Enigma that account's sessions install - so both the account's setup and the
+ * slow installs happen while the message is still being typed (see
+ * `SPARE_PREINSTALL`). The same names the session's own environment uses, and
+ * the claim writes them again, so nothing here can outlive the claim.
+ *
+ * Enigma resolved with Code's own session tier (Enigma on) over the account's
+ * general defaults and the instance's: a spare does not know the repository, so
+ * a repository that pins another version installs that one after the claim, as
+ * it always did. A resolution that fails costs only the head start.
+ */
+export async function spareEnv(userId: string): Promise<Record<string, string>> {
+    const enigma = await resolveAccountEnigma(userId, { ...core.INHERIT_ENIGMA, enabled: true }).catch(
+        () => null
+    );
+    const setup = enigma?.enabled ? core.enigmaSetupScript(enigma) : "";
+    return {
+        POLARIS_RUNAS: commands.CONTAINER_USER,
+        POLARIS_HOME: commands.AGENT_HOME,
+        // A file, so encoded like every other: see `asFile` in session-runtime.
+        POLARIS_ENIGMA_SETUP: setup ? Buffer.from(setup, "utf8").toString("base64") : ""
+    };
 }
 
 /** Where the account's home already is. Same rule as placement's. */

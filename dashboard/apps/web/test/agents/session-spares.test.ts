@@ -9,6 +9,8 @@ interface Row {
 }
 
 const settings = new Map<string, string>();
+// What the account's Enigma tiers resolve to; `enabled` follows the tier Code asks for.
+let enigmaAnswer: Record<string, unknown> = {};
 const spareRows = new Map<string, Row>();
 const sessions = new Set<string>();
 const calls = {
@@ -87,6 +89,12 @@ vi.mock("@/lib/agents/session-container", () => ({
         calls.started.push(args);
     }
 }));
+vi.mock("@/lib/agents/session-service", () => ({
+    resolveAccountEnigma: async (_owner: string, tier: { enabled: boolean | null }) => ({
+        ...enigmaAnswer,
+        enabled: tier.enabled ?? false
+    })
+}));
 vi.mock("@/lib/agents/session-capacity", () => ({ totalCeiling: async () => 12 }));
 vi.mock("@/lib/agents/session-placement", () => ({
     readPool: async () => ({ box: true, servers: [] }),
@@ -125,6 +133,7 @@ describe("a spare session machine", () => {
         calls.written = [];
         calls.moved = [];
         calls.down = [];
+        enigmaAnswer = {};
     });
 
     it("is started once and kept while Code stays open", async () => {
@@ -138,6 +147,20 @@ describe("a spare session machine", () => {
         expect(await spares.keepSpare(USER, 1_000 + 6 * 60_000)).toBe(true);
         expect(read()).toBe(1_000 + 16 * 60_000);
         expect(calls.started).toHaveLength(1);
+    });
+
+    it("is handed the account and the Enigma its sessions install, so both happen before the message is sent", async () => {
+        const core = await import("@polaris/core");
+        enigmaAnswer = { ...core.resolveEnigma(), version: "1.73.0" };
+        expect(await spares.keepSpare(USER, 1_000)).toBe(true);
+        const [, env, script] = calls.started[0] as [unknown, Record<string, string>, string];
+        expect(script).toBe((await import("@/lib/agents/session-commands")).SPARE_BOOT);
+        expect(env.POLARIS_RUNAS).toBe("node");
+        expect(env.POLARIS_HOME).toBe("/home/node");
+        const setup = Buffer.from(env.POLARIS_ENIGMA_SETUP!, "base64").toString("utf8");
+        expect(setup).toContain("polaris: installing Enigma 1.73.0");
+        // Encoded: the daemon refuses a control character in any value.
+        expect(env.POLARIS_ENIGMA_SETUP).not.toMatch(/\s/);
     });
 
     it("is not started when an administrator switched spares off", async () => {

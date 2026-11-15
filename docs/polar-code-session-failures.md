@@ -84,6 +84,12 @@ show a recurrence is listed).
   A failed read sets `failed` and keeps the last answer on screen.
 - **Not proven yet:** whether reads failed, the tab was hidden, or the label
   comes from a stale cached overview (`polar.code.overview.v2`).
+- **Checked 2026-11-15, not reproduced in the client:** the bar's label is the
+  thread's own `session.stateLabel`, read every 3 s while the session is not
+  over (`starting` and `idle` are both live), and pushed by `watchSession` in
+  between - neither stops while a session starts. The one server-side way to
+  keep "Starting" after an answer is a row in `idle` with `lastEventAt` null
+  (`sessionStateWord`), which `recordSessionEvents` never writes. Left open.
 - **Next time:** open the browser's network panel on the thread, or check the
   web container's log for `/api/polar/code/thread` errors in the same minute.
 

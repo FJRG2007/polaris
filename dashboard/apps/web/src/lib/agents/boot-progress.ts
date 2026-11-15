@@ -78,6 +78,10 @@ const BOOT_STEPS: readonly {
     { key: "start", label: "Starting the agent", marks: [{ text: "polaris: starting " }] }
 ];
 
+/** The version an Enigma install line names: digits and dots, nothing a
+ *  screen could smuggle into a label. */
+const ENIGMA_VERSION = /polaris: installing Enigma (\d+(?:\.\d+){1,3})/;
+
 /**
  * The steps, with where it has got to - or null once the agent has the terminal,
  * which is when a progress readout stops being information and starts being
@@ -91,6 +95,11 @@ export function bootProgress(screen: string): BootStep[] | null {
         if (!hit) continue;
         reached = index;
         if (hit.label) labels.set(step.key, hit.label);
+        // The version, when the line names one: a wait of forty seconds reads as
+        // a known install rather than a hang. See `enigmaSetupScript`.
+        const version = step.key === "enigma" ? ENIGMA_VERSION.exec(screen)?.[1] : undefined;
+        // i18n-ignore said in the reader's words by lib/agents/words.ts
+        if (version) labels.set(step.key, `Installing Enigma ${version}`);
     }
     if (reached === BOOT_STEPS.length - 1) return null;
     // Nothing yet: the container is up and installing a terminal to run in, and

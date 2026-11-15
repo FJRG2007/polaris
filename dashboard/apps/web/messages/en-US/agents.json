@@ -286,6 +286,7 @@
         "opening": "Opening your workspace",
         "reopening": "Reopening the checkout",
         "enigma": "Installing Enigma",
+        "enigmaVersion": "Installing Enigma {version}",
         "agent": "Installing the agent",
         "agentHere": "The agent is already here",
         "start": "Starting the agent"

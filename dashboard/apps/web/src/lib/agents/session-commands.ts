@@ -27,7 +27,7 @@
  */
 
 import { shellQuote } from "./session-hooks";
-import { INSTALL_GH } from "./session-gh";
+import { INSTALL_GH, PREINSTALL_GH } from "./session-gh";
 import {
     FIRST_RUN_WORKDIR,
     HOOK_BLOCK_END,
@@ -422,6 +422,80 @@ const INSTALL_ENIGMA = [
     '  printf %s "$POLARIS_ENIGMA_SETUP" | base64 -d > $(printenv TMPDIR || echo /tmp)/polaris-enigma-setup.sh',
     '  as_agent "sh $(printenv TMPDIR || echo /tmp)/polaris-enigma-setup.sh" || echo "polaris: Enigma did not install"',
     "  rm -f $(printenv TMPDIR || echo /tmp)/polaris-enigma-setup.sh",
+    "fi"
+];
+
+/**
+ * A spare's installs, while they are still running: the file exists from the
+ * moment they start until they end. See `SPARE_PREINSTALL`.
+ *
+ * In the container's own `/tmp` rather than the kept home, because it is about
+ * this container's background job and nothing else: a second container on the
+ * same home has no job to wait for. A restart keeps `/tmp`, so the spare boot
+ * removes it first, and the wait below is bounded either way.
+ */
+export const PREINSTALL_PENDING = "/tmp/polaris-preinstall.pending";
+
+/** What those installs print, shown in the session's window while it waits. */
+export const PREINSTALL_LOG = "/tmp/polaris-preinstall.log";
+
+/** How long the session waits on a spare's installs before doing them itself,
+ *  in half seconds: ten minutes, well past the slowest install measured. */
+const PREINSTALL_WAIT_TICKS = 1200;
+
+/**
+ * What a spare installs before it has a session, so the person is not the one
+ * waiting for it: sudo, Enigma and the GitHub CLI, none of which depend on the
+ * session. Measured on a production boot: 41.6 s of Enigma after a version bump,
+ * 3.3 s of `gh` and 2 s of `apt-get install sudo`, all after the message was
+ * sent.
+ *
+ * The account preamble (and with it sudo and the once-only hand-over of the
+ * home) runs in front, because the session's own preamble would otherwise race
+ * it for the package manager's lock. Enigma and `gh` run behind, so a claim that
+ * arrives meanwhile starts fetching the repository at once; the session's setup
+ * waits for `PREINSTALL_PENDING` to go before its own Enigma step, which then
+ * finds the pinned version already installed and returns.
+ *
+ * Only when the spare was handed the account (`POLARIS_RUNAS`); a spare started
+ * without it waits exactly as it used to. Best effort throughout: anything that
+ * did not install here is installed after the claim, as it always was.
+ */
+export const SPARE_PREINSTALL: readonly string[] = [
+    `rm -f ${PREINSTALL_PENDING}`,
+    'if [ -n "$(printenv POLARIS_RUNAS)" ]; then',
+    "  (",
+    "    set +eu",
+    ...AGENT_ACCOUNT.map((line) => `    ${line}`),
+    "  ) || true",
+    `  : > ${PREINSTALL_PENDING}`,
+    "  (",
+    "    set +eu",
+    ...AGENT_ACCOUNT.map((line) => `    ${line}`),
+    ...INSTALL_ENIGMA.map((line) => `    ${line}`),
+    ...PREINSTALL_GH.map((line) => `    ${line}`),
+    `    rm -f ${PREINSTALL_PENDING}`,
+    `  ) > ${PREINSTALL_LOG} 2>&1 &`,
+    "fi"
+];
+
+/**
+ * The session's side of that: never a second install into the same folder
+ * while the spare's is still writing it. Shows what the spare's installs print
+ * while it waits, so the window (and the progress read off it) says "installing
+ * Enigma" rather than nothing. Returns at once on any container that is not a
+ * claimed spare, where the file never exists.
+ */
+export const AWAIT_PREINSTALL: readonly string[] = [
+    `if [ -f ${PREINSTALL_PENDING} ]; then`,
+    `  tail -n +1 -f ${PREINSTALL_LOG} 2>/dev/null &`,
+    "  polaris_tail=$!",
+    "  polaris_waited=0",
+    `  while [ -f ${PREINSTALL_PENDING} ] && [ "$polaris_waited" -lt ${PREINSTALL_WAIT_TICKS} ]; do`,
+    "    sleep 0.5",
+    "    polaris_waited=$((polaris_waited + 1))",
+    "  done",
+    '  kill "$polaris_tail" 2>/dev/null || true',
     "fi"
 ];
 
@@ -1462,6 +1536,7 @@ export const SESSION_SETUP = [
     "set -e",
     ...AGENT_ACCOUNT,
     ...PREPARE_WORKTREE,
+    ...AWAIT_PREINSTALL,
     ...INSTALL_ENIGMA,
     ...INSTALL_AGENT,
     ...REQUIRE_AGENT,
@@ -1566,7 +1641,8 @@ export const CLAIM_FILE = `${SESSION_ROOT}/claim.env`;
  * a session that does not exist yet, so it can know nothing about it: no
  * repository, no token, no credentials. What it can do is everything that does
  * not depend on those - the container itself and tmux, which is a package
- * install - and then wait. The claim writes the session's environment to
+ * install, then sudo, Enigma and the GitHub CLI into the account's kept home
+ * (`SPARE_PREINSTALL`) - and then wait. The claim writes the session's environment to
  * `CLAIM_FILE`, and from there it is exactly the boot of `SESSION_BOOT`.
  *
  * Polling a file rather than any signal because a file is the one thing both
@@ -1576,6 +1652,7 @@ export const CLAIM_FILE = `${SESSION_ROOT}/claim.env`;
 export const SPARE_BOOT = [
     "set -eu",
     ...INSTALL_TMUX,
+    ...SPARE_PREINSTALL,
     `while [ ! -s ${CLAIM_FILE} ]; do sleep 0.2; done`,
     `set -a; . ${CLAIM_FILE}; set +a`,
     ...SESSION_BOOT.split("\n").slice(1)

@@ -1051,6 +1051,37 @@ export async function resolveSessionEnigma(sessionId: string): Promise<core.Reso
     // stored under a lowercased login, and a row looked up by the repository's own
     // casing is a tier that silently decides nothing.
     const account = session.repo ? scopeOf(session.repo.repoFullName) : GENERAL_SCOPE;
+    const repoTier = withTierGate(
+        core.parseEnigmaSettings(session.repo?.enigma ?? null),
+        session.repo?.gate
+    );
+    return resolveEnigmaTiers(owner, account, core.parseEnigmaSettings(session.enigma), repoTier);
+}
+
+/**
+ * The Enigma setup a session of this account with no repository would run
+ * under, for a spare started before the session exists (see `session-spares`).
+ *
+ * `sessionTier` is what the screen that starts the session asks for - Code
+ * turns Enigma on. A session about a repository whose own tier pins another
+ * version installs that one after the claim, exactly as it always has; this is
+ * only the guess that makes the common case already done.
+ */
+export async function resolveAccountEnigma(
+    ownerId: string,
+    sessionTier: core.EnigmaSettings = core.INHERIT_ENIGMA
+): Promise<core.ResolvedEnigma> {
+    return resolveEnigmaTiers(ownerId, GENERAL_SCOPE, sessionTier, core.INHERIT_ENIGMA);
+}
+
+/** The tiers below a session and its repository: the account's, then the
+ *  instance's. */
+async function resolveEnigmaTiers(
+    owner: string,
+    account: string,
+    sessionTier: core.EnigmaSettings,
+    repoTier: core.EnigmaSettings
+): Promise<core.ResolvedEnigma> {
     const [tiers, platform] = await Promise.all([
         prisma.agentDefaults.findMany({
             where: { ownerId: owner, scope: { in: [account, GENERAL_SCOPE] } },
@@ -1063,24 +1094,13 @@ export async function resolveSessionEnigma(sessionId: string): Promise<core.Reso
         return row ? withTierGate(core.parseEnigmaSettings(row.enigma), row.gate) : core.INHERIT_ENIGMA;
     };
 
-    const repoTier = withTierGate(
-        core.parseEnigmaSettings(session.repo?.enigma ?? null),
-        session.repo?.gate
-    );
-
     // The instance tier last, and from the setting store rather than from a row:
     // it is an administrator's answer for the whole deployment, so it has no owner
     // to key a row on. Its own `gate` column is folded in the same way the others
     // are, so an administrator who set only that still reaches a session.
     const platformEnigma = withTierGate(platform.enigma, platform.gate);
 
-    return core.resolveEnigma(
-        core.parseEnigmaSettings(session.enigma),
-        repoTier,
-        byScope(account),
-        byScope(GENERAL_SCOPE),
-        platformEnigma
-    );
+    return core.resolveEnigma(sessionTier, repoTier, byScope(account), byScope(GENERAL_SCOPE), platformEnigma);
 }
 
 /** Sessions that can still be told something: taking one out of a history
