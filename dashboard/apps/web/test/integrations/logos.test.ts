@@ -11,6 +11,8 @@
  * rather than on the screen.
  */
 
+import { join } from "node:path";
+import { existsSync } from "node:fs";
 import { createElement } from "react";
 import { AGENT_CLIS } from "@polaris/core";
 import { describe, expect, it } from "vitest";
@@ -73,9 +75,9 @@ const MONOGRAM_PROVIDERS = [
     "cortecs",
     "edenai"
 ];
-// Amp and Droid are drawn from their vendors' own marks now; Aider and Crush
-// publish no square mark, so they stay letters.
-const MONOGRAM_AGENTS = ["aider", "crush"];
+// Every catalogued agent has a mark: Aider and Crush are drawn from the files
+// Agent Orchestrator ships for them, like the agents added from its catalogue.
+const MONOGRAM_AGENTS: string[] = [];
 
 /** A monogram is the one logo drawn as a tinted span of letters. */
 function isMonogram(markup: string): boolean {
@@ -98,6 +100,15 @@ describe("provider and agent logos", () => {
         const agents = new Set(AGENT_CLIS.map((cli) => cli.id));
         expect(MONOGRAM_PROVIDERS.filter((slug) => !seeds.has(slug))).toEqual([]);
         expect(MONOGRAM_AGENTS.filter((id) => !agents.has(id))).toEqual([]);
+    });
+
+    it("points every image mark at a file that is in public/", () => {
+        for (const cli of AGENT_CLIS) {
+            const markup = renderToStaticMarkup(createElement(AgentLogo, { id: cli.id, label: cli.label }));
+            for (const [, src] of markup.matchAll(/src="([^"]+)"/g)) {
+                expect(existsSync(join(process.cwd(), "public", src ?? "")), `${cli.id}: ${src}`).toBe(true);
+            }
+        }
     });
 
     it("keeps the monogram for a slug nobody knows", () => {

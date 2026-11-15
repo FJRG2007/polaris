@@ -49,3 +49,14 @@ changes private, embedding Polaris in a closed-source product, or selling a
 hosted service built on it without publishing its source - a separate
 commercial license is available from the author. Contact the maintainer listed
 in [CITATION.cff](CITATION.cff).
+
+## Third-party material
+
+- **Agent Orchestrator** (github.com/OrchestratorInc/agent-orchestrator),
+  Apache License 2.0. The coding-agent logos under
+  `dashboard/apps/web/public/logos/agents/` are copied from its
+  `frontend/src/renderer/assets/agents/`, and the agent catalogue entries listed
+  in [docs/agent-catalogue.md](docs/agent-catalogue.md) were written from its
+  adapter source. The Codewhale and MiMo Code marks are MIT and the Stakpak mark
+  Apache-2.0, with their notices kept beside the files. The marks remain their
+  owners' trademarks.

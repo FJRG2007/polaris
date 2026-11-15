@@ -15,6 +15,7 @@ import { SIGNIN_PREFIX } from "@/lib/agents/agent-signins";
 import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
 import { SPEECH_PROVIDER_SEEDS } from "@/lib/integrations/speech-providers";
 import * as models from "./model-marks";
+import themed from "./agent-logo.module.css";
 
 /** The Models catalog, keyed by its integration slug. Kept as a map because that
  *  list grows with every provider a run can be handed a key for. */
@@ -297,12 +298,44 @@ const AGENT_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     openclaw: models.OpenClawMark
 };
 
-/** Coding agents whose vendor ships only a full-colour app icon, drawn from
- *  that file: Amp's and Factory's own favicons. */
+/** Coding agents drawn from an image file: Amp's and Factory's own favicons,
+ *  and the marks Agent Orchestrator (Apache-2.0) ships for the agents it runs,
+ *  under `/logos/agents` - see docs/agent-catalogue.md for each one's source. */
 const AGENT_IMAGES: Record<string, string> = {
     amp: "/logos/amp.svg",
-    droid: "/logos/factory-droid.svg"
+    droid: "/logos/factory-droid.svg",
+    aider: "/logos/agents/aider.svg",
+    crush: "/logos/agents/crush.svg",
+    kiro: "/logos/agents/kiro.svg",
+    vibe: "/logos/agents/vibe.svg",
+    muse: "/logos/agents/muse.svg",
+    agy: "/logos/agents/agy.svg",
+    kimchi: "/logos/agents/kimchi.svg",
+    omp: "/logos/agents/omp.svg",
+    "mimo-code": "/logos/agents/mimo-code.svg",
+    "minimax-code": "/logos/agents/minimax-code.svg",
+    memcode: "/logos/agents/memcode.png",
+    hermes: "/logos/agents/hermes.png",
+    stakpak: "/logos/agents/stakpak.png"
 };
+
+/** Coding agents whose mark is a single ink, so it comes in two files: `-dark`
+ *  for a dark page and `-light` for a light one. */
+const AGENT_THEMED_IMAGES: readonly string[] = [
+    "grok",
+    "kimi",
+    "pi",
+    "auggie",
+    "continue",
+    "devin",
+    "kilocode",
+    "autohand",
+    "prime-agent",
+    "fx",
+    "codewhale",
+    "deepseek-harness",
+    "command-code"
+];
 
 /** The logo for a coding agent, by its catalogue id. `custom` is a tool Polaris
  *  knows nothing about, including what it looks like, so it draws the same
@@ -321,6 +354,21 @@ export function AgentLogo({
     const image = AGENT_IMAGES[id];
     if (image)
         return <img src={image} alt="" className={cn("shrink-0 rounded-sm object-contain", className)} />;
+    if (AGENT_THEMED_IMAGES.includes(id))
+        return (
+            <>
+                <img
+                    src={`/logos/agents/${id}-dark.svg`}
+                    alt=""
+                    className={cn("shrink-0 object-contain", themed.onDark, className)}
+                />
+                <img
+                    src={`/logos/agents/${id}-light.svg`}
+                    alt=""
+                    className={cn("shrink-0 object-contain", themed.onLight, className)}
+                />
+            </>
+        );
     if (id === "custom") return <Blocks className={className} />;
     return <ProviderMonogram slug={id} name={label} className={className} />;
 }

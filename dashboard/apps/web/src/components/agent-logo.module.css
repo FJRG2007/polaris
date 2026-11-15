@@ -1,0 +1,25 @@
+/* A coding agent whose mark ships in two inks is in the page twice, and the one
+   that does not match the reader's theme is hidden: dark is the default, `.light`
+   and a light machine under `.system` turn it the other way. Picked by CSS so the
+   right one is there on the first paint, with no swap after hydration. */
+.onLight {
+    display: none;
+}
+
+:global(:root.light) .onDark {
+    display: none;
+}
+
+:global(:root.light) .onLight {
+    display: inline-block;
+}
+
+@media (prefers-color-scheme: light) {
+    :global(:root.system) .onDark {
+        display: none;
+    }
+
+    :global(:root.system) .onLight {
+        display: inline-block;
+    }
+}
