@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { packOverviewSpans, type PackItem } from "@/lib/overview/pack";
+import { packOverviewSpans, type PackItem } from "@polaris/core";
 
 /** A card, at the width it is set to and the widths it is legible at. */
 function card(preferred: number, min = 1, max = 4): PackItem {

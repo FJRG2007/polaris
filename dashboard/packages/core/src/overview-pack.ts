@@ -16,7 +16,8 @@
  * its catalogue entry allows, and never above the widest either, except on a last
  * row that has run out of cards to fill itself with.
  *
- * Pure, and separate from the grid, because it is the one part of the layout
+ * Shared with the Places wall panels (`fitPanel`), which size their cards the
+ * same way. Pure, and separate from the grid, because it is the one part of the layout
  * that is arithmetic and can be read back in a test at every column count.
  */
 

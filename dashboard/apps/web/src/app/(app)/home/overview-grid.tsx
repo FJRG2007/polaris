@@ -16,7 +16,7 @@
  * contents, so the page does not move under the reader when it does.
  */
 
-import { firstName } from "@polaris/core";
+import { firstName, packOverviewSpans } from "@polaris/core";
 import { sizeLabel, widgetDescription, widgetLabel } from "./widget-names";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { WidgetCard } from "./widget-card";
@@ -24,7 +24,6 @@ import { ShortcutPicker } from "./shortcut-picker";
 import { MailWidget } from "./widgets/mail";
 import { CustomizeDialog, type CustomizeRow } from "./customize-dialog";
 import { saveOverviewPreferencesAction } from "./actions";
-import { packOverviewSpans } from "@/lib/overview/pack";
 import { useShelfScope } from "@/components/shelf-scope";
 import { clearRecentPlaces } from "@/lib/overview/recent-places";
 import { overviewRequestGroups } from "@/lib/overview/request-groups";
