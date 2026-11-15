@@ -29,6 +29,7 @@ import { getPorts, type TargetRow } from "./runtime";
 import { resolveMountTarget } from "@/lib/storage-service";
 import { nasBinding } from "./nas-binding";
 import { notifyVolumeHealth, type VolumeHealth } from "@/lib/notifications/volume-events";
+import { diagnoseShare, mountSourceHost, sharingPort, type ShareCause } from "@/lib/storage/share-reach";
 
 const FIRST_PASS_MS = 90_000;
 const WATCH_INTERVAL_MS = 3 * 60_000;
@@ -156,7 +157,8 @@ async function watchedServices(): Promise<Watched[]> {
 async function checkMachine(ports: RuntimePorts, apps: Watched[]): Promise<void> {
     // The shares first: a service cannot have its volumes while the share under
     // them is not mounted, and mounting it again restarts everybody bound to it.
-    const unreachable = new Map<string, string>();
+    /** Shares that did not answer, with why when that could be told. */
+    const unreachable = new Map<string, ShareCause | null>();
     /** Services the share step restarted, each already told it was reconnected. */
     const restarted = new Set<string>();
     const shares = new Set(apps.flatMap((app) => app.volumes.map((volume) => volume.connectionId)));
@@ -166,8 +168,9 @@ async function checkMachine(ports: RuntimePorts, apps: Watched[]): Promise<void>
     // keep attached - and every pass would otherwise read as a NAS that is away.
     if (machine === null && !getCapabilities().nativeMounts) return;
     for (const connectionId of shares) {
+        let mount: Awaited<ReturnType<typeof resolveMountTarget>> = null;
         try {
-            const mount = await resolveMountTarget(connectionId, apps[0]!.ownerId);
+            mount = await resolveMountTarget(connectionId, apps[0]!.ownerId);
             // A kind the host does not mount itself: nothing here to keep attached.
             if (!mount) continue;
             const created = await withTimeout(
@@ -179,15 +182,18 @@ async function checkMachine(ports: RuntimePorts, apps: Watched[]): Promise<void>
                 const { restartAppsOnShare } = await import("@/lib/deploy-service");
                 for (const id of await restartAppsOnShare(connectionId, machine)) restarted.add(id);
             }
-        } catch (error) {
-            unreachable.set(connectionId, error instanceof Error ? error.message : String(error));
+        } catch {
+            unreachable.set(connectionId, mount ? await causeOf(mount, machine) : null);
         }
     }
 
     for (const app of apps) {
         const lost = app.volumes.filter((volume) => unreachable.has(volume.connectionId));
         if (lost.length > 0) {
-            await say(app, "unreachable", lost);
+            const causes = lost.map((volume) => unreachable.get(volume.connectionId) ?? null);
+            // One cause only when every lost share agrees on it.
+            const cause = causes.every((each) => each === causes[0]) ? causes[0]! : null;
+            await say(app, "unreachable", lost, cause);
             continue;
         }
         const container = deployReleases.serviceRef(app.projectSlug, app.slug, app.id).name;
@@ -233,15 +239,33 @@ async function answers(ports: RuntimePorts, container: string, app: Watched): Pr
     return binding === "share" || binding === "unknown";
 }
 
+/**
+ * Why a share would not mount: its file sharing refused, or the device is not
+ * there. Asked from here, so only for a share mounted on the machine Polaris runs
+ * on - from another machine's network the answer here would say nothing about
+ * that one's. Never throws; null is "could not tell".
+ */
+async function causeOf(
+    mount: { kind: string; source: string },
+    machine: string | null
+): Promise<ShareCause | null> {
+    if (machine !== null) return null;
+    const host = mountSourceHost(mount.kind, mount.source);
+    const port = sharingPort(mount.kind);
+    if (!host || port === null) return null;
+    return diagnoseShare(host, port).catch(() => null);
+}
+
 /** Say a service's volumes are down, once for as long as they stay that way. */
 async function say(
     app: Watched,
     health: "unreachable" | "detached",
-    volumes: Watched["volumes"]
+    volumes: Watched["volumes"],
+    cause: ShareCause | null = null
 ): Promise<void> {
     if (told.get(app.id) === health) return;
     told.set(app.id, health);
-    await notifyVolumeHealth(subjectOf(app, volumes), health);
+    await notifyVolumeHealth({ ...subjectOf(app, volumes), cause }, health);
 }
 
 /** The volumes answer: if they had been said to be down, say they are back. */

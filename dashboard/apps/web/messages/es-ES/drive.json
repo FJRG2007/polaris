@@ -333,6 +333,8 @@
         "checkSources": "Comprobar los orígenes que no responden",
         "noConnections": "Aún no hay conexiones.",
         "notAnswering": "No responde: {reason}",
+        "shareSharingOff": "El uso compartido está apagado en el NAS o se está reiniciando. Activa SMB en sus ajustes, o espera un minuto.",
+        "shareHostDown": "Nada responde en esta dirección. El NAS está apagado, desconectado o en otra red.",
         "updateCredentialsFor": "Actualizar las credenciales de {name}",
         "updateCredentials": "Renovar acceso",
         "editNamed": "Editar {name}",

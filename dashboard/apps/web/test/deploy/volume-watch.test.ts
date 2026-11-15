@@ -75,6 +75,11 @@ vi.mock("@/lib/storage-service", () => ({
 }));
 vi.mock("@/lib/deploy-service", () => ({ restartAppsOnShare }));
 vi.mock("@/lib/notifications/volume-events", () => ({ notifyVolumeHealth }));
+const diagnoseShare = vi.fn(async (_host: string, _port: number): Promise<string | null> => null);
+vi.mock("@/lib/storage/share-reach", async (original) => ({
+    ...(await original<typeof import("@/lib/storage/share-reach")>()),
+    diagnoseShare
+}));
 
 /** A fresh watcher, as a fresh process would have: nothing said yet. */
 async function watcher() {
@@ -159,6 +164,20 @@ describe("a share that does not answer", () => {
         mount = async () => false;
         await checkNasVolumes();
         expect(notifyVolumeHealth).toHaveBeenLastCalledWith(expect.anything(), "back");
+    });
+
+    it("says the NAS answers with its file sharing off, asking the SMB port of its host", async () => {
+        mount = async () => {
+            throw new Error("mounting //nas/share failed: Connection refused");
+        };
+        diagnoseShare.mockResolvedValueOnce("sharing-off");
+        const { checkNasVolumes } = await watcher();
+        await checkNasVolumes();
+        expect(diagnoseShare).toHaveBeenCalledWith("nas", 445);
+        expect(notifyVolumeHealth).toHaveBeenLastCalledWith(
+            expect.objectContaining({ cause: "sharing-off" }),
+            "unreachable"
+        );
     });
 
     it("mounted again restarts everybody bound to it, who is not told twice", async () => {

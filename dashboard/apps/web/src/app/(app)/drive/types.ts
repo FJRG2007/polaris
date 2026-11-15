@@ -45,6 +45,9 @@ export interface SourceStatus {
      * about a machine that is underneath it.
      */
     local?: boolean;
+    /** For a file share that is down: whether the device answers with its file
+     *  sharing refused, or nothing answers at all. Absent when it could not be told. */
+    cause?: import("@/lib/storage/share-reach").ShareCause;
     /** Why it is not answering, in the words the connection used. */
     detail: string | null;
     /**

@@ -11,6 +11,7 @@ import { notify } from "./dispatch";
 import { prisma } from "@polaris/db";
 import { wordsFor } from "./notice-words";
 import * as follow from "../follow/follow";
+import type { ShareCause } from "@/lib/storage/share-reach";
 
 /** What happened to a service's NAS volumes. */
 export type VolumeHealth =
@@ -46,6 +47,20 @@ export interface VolumeSubject {
     storage: string;
     /** The volumes' names. */
     volumes: readonly string[];
+    /** Why the storage does not answer, when that could be told. */
+    cause?: ShareCause | null;
+}
+
+/** The unreachable body for each cause the storage could be told apart by. */
+const UNREACHABLE_BODY = {
+    "sharing-off": "volume.unreachableSharingOffBody",
+    "host-down": "volume.unreachableHostDownBody"
+} as const;
+
+/** The body key for a notice, the cause folded in for an unreachable one. */
+export function volumeBodyKey(health: VolumeHealth, cause?: ShareCause | null) {
+    if (health === "unreachable" && cause) return UNREACHABLE_BODY[cause];
+    return BODY[health];
 }
 
 /**
@@ -86,14 +101,14 @@ export async function notifyVolumeHealth(
                 userId,
                 event: down ? "volume.down" : "volume.up",
                 title: t(TITLE[health], words),
-                body: t(BODY[health], words),
+                body: t(volumeBodyKey(health, subject.cause), words),
                 href: `/apps/deploy/${project.id}?service=${subject.applicationId}`,
                 shelf: { orgId: project.orgId },
                 actionRequired: down,
                 // A reconnect is good news about something that went wrong: not a
                 // success in green, which reads as nothing having happened.
                 level: health === "reconnected" ? "info" : undefined,
-                metadata: { applicationId: subject.applicationId, health }
+                metadata: { applicationId: subject.applicationId, health, cause: subject.cause ?? null }
             });
         }
     } catch (error) {

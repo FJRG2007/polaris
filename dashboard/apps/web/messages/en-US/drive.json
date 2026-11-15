@@ -333,6 +333,8 @@
         "checkSources": "Check the sources that are not answering",
         "noConnections": "No connections yet.",
         "notAnswering": "Not answering: {reason}",
+        "shareSharingOff": "File sharing is off on the NAS or it is restarting. Turn SMB back on in its settings, or wait a minute.",
+        "shareHostDown": "Nothing answers at this address. The NAS is off, unplugged or on another network.",
         "updateCredentialsFor": "Update credentials for {name}",
         "updateCredentials": "Update credentials",
         "editNamed": "Edit {name}",

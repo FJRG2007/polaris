@@ -349,6 +349,8 @@
     "volume": {
         "downTitle": "{service} no puede leer sus volúmenes NAS",
         "unreachableBody": "Polaris no llega a {storage}, donde están los volúmenes de {service} ({volumes}). El servicio sigue en marcha, pero no puede leer ni escribir esos archivos. Comprueba que el dispositivo está encendido y conectado: Polaris lo reconecta solo en cuanto responda.",
+        "unreachableSharingOffBody": "{storage} responde, pero su uso compartido de archivos rechaza la conexión, así que {service} no puede usar sus volúmenes ({volumes}). El uso compartido está apagado en el NAS o se está reiniciando: vuelve a activar SMB en sus ajustes, o espera a que termine. Polaris se reconecta solo.",
+        "unreachableHostDownBody": "Nada responde en la dirección de {storage}, donde están los volúmenes de {service} ({volumes}). El NAS está apagado, desconectado o en otra red. Enciéndelo o vuelve a conectarlo: Polaris se reconecta solo en cuanto responda.",
         "detachedBody": "Los volúmenes de {service} ({volumes}) no responden dentro del servicio, aunque {storage} sí responde, y reiniciarlo no los ha recuperado. Vuelve a desplegar el servicio; si también falla, su registro de despliegue dice por qué.",
         "backTitle": "{service} vuelve a leer sus volúmenes NAS",
         "backBody": "Los volúmenes de {service} ({volumes}) en {storage} vuelven a responder.",

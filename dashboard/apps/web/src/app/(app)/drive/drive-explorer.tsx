@@ -363,7 +363,10 @@ export function DriveExplorer({
         (id: string | null): string | null => {
             if (!id || !reachability) return null;
             const status = reachability.find((entry) => entry.id === id);
-            return status?.state === "down" ? (status.detail ?? t("explorer.noAnswer")) : null;
+            if (status?.state !== "down") return null;
+            if (status.cause === "sharing-off") return t("explorer.shareSharingOff");
+            if (status.cause === "host-down") return t("explorer.shareHostDown");
+            return status.detail ?? t("explorer.noAnswer");
         },
         [reachability, t]
     );

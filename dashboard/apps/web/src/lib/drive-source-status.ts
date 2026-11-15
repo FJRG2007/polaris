@@ -26,6 +26,7 @@ import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { isLocalMachine, localMachineIdentity } from "./local-machine";
 import type { SourceStatus } from "@/app/(app)/drive/types";
 import { listAccessibleConnections } from "./storage-service";
+import { diagnoseShare, sharingPort } from "@/lib/storage/share-reach";
 
 /** Ports the protocol itself defines, used when a connection names none. */
 const PROTOCOL_PORTS: Record<string, number> = {
@@ -95,9 +96,17 @@ export async function driveSourceStatuses(userId: string): Promise<SourceStatus[
             const endpoint = sourceEndpoint(config);
             if (!endpoint) return null;
             const { detail } = await probeTcp(endpoint.host, endpoint.port);
+            // A file share that does not answer is told apart: its sharing refused
+            // on a device that is there, or no device at all.
+            const kind = typeof config.kind === "string" ? config.kind : "";
+            const cause =
+                detail !== null && sharingPort(kind) === endpoint.port
+                    ? await diagnoseShare(endpoint.host, endpoint.port).catch(() => null)
+                    : null;
             return {
                 id: connection.id,
                 state: detail === null ? "up" : "down",
+                ...(cause ? { cause } : {}),
                 local: Boolean(
                     identity && isLocalMachine({ address: endpoint.host }, identity)
                 ),

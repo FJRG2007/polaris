@@ -349,6 +349,8 @@
     "volume": {
         "downTitle": "{service} cannot read its NAS volumes",
         "unreachableBody": "Polaris cannot reach {storage}, where the volumes of {service} live ({volumes}). The service is still running, but cannot read or write those files. Check that the device is on and connected: Polaris reconnects it on its own as soon as it answers.",
+        "unreachableSharingOffBody": "{storage} answers, but its file sharing refuses the connection, so {service} cannot read or write its volumes ({volumes}). File sharing is off on the NAS or it is restarting: turn SMB back on in its settings, or wait for it to finish. Polaris reconnects on its own.",
+        "unreachableHostDownBody": "Nothing answers at the address of {storage}, where the volumes of {service} live ({volumes}). The NAS is off, unplugged or on another network. Turn it on or reconnect it: Polaris reconnects on its own as soon as it answers.",
         "detachedBody": "The volumes of {service} ({volumes}) do not answer inside the service, although {storage} does, and restarting the service did not bring them back. Redeploy the service; if that fails too, its deploy log says why.",
         "backTitle": "{service} can read its NAS volumes again",
         "backBody": "The volumes of {service} ({volumes}) on {storage} answer again.",
