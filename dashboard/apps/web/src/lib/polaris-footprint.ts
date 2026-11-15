@@ -21,9 +21,10 @@
  * panel almost nobody has open.
  */
 
-import type { DockerDriver } from "@polaris/docker";
+import type { ContainerStats, ContainerSummary, DockerDriver } from "@polaris/docker";
+import { cachedSamples, rememberSample } from "@/lib/container-stats-cache";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
-import { localDockerDriver } from "@/lib/docker-service";
+import { LOCAL_DOCKER_CONNECTION_ID, localDockerDriver } from "@/lib/docker-service";
 import { describePart, isPolarisPart } from "@/lib/polaris-parts";
 import type {
     FootprintPart,
@@ -55,14 +56,14 @@ let running: Promise<PolarisFootprint> | null = null;
 export async function readPolarisFootprint(force = false): Promise<PolarisFootprint> {
     if (!force && cached && Date.now() - cached.at < CACHE_MS) return cached.footprint;
     if (running) return running;
-    running = measureOnce();
+    running = measureOnce(force);
     return running;
 }
 
-async function measureOnce(): Promise<PolarisFootprint> {
+async function measureOnce(force: boolean): Promise<PolarisFootprint> {
     const driver = localDockerDriver();
     try {
-        const footprint = await measure(driver);
+        const footprint = await measure(driver, force);
         cached = { at: Date.now(), footprint };
         return footprint;
     } finally {
@@ -71,7 +72,65 @@ async function measureOnce(): Promise<PolarisFootprint> {
     }
 }
 
-async function measure(driver: DockerDriver): Promise<PolarisFootprint> {
+/** A usage sample the Containers table took this recently is as good as a new
+ *  one: the table polls every five seconds, so on the page this card sits on
+ *  there nearly always is one. */
+const SAMPLE_REUSE_MS = 30_000;
+
+/** How many volumes are measured at once. Each is a `du` inside a container,
+ *  which walks a filesystem; a handful in parallel turns a stack's worth of them
+ *  from a sum of waits into roughly the longest one, without asking the disk to
+ *  walk every tree at once. */
+const DU_CONCURRENCY = 4;
+
+/**
+ * CPU and memory for every container asked about. Samples the Containers table
+ * already holds for the local engine are reused - sampling is a second-long wait
+ * per container in the daemon - and only the containers it has none for are
+ * read now, then remembered for the table. A forced reading samples them all.
+ */
+async function usageFor(
+    driver: DockerDriver,
+    containers: readonly ContainerSummary[],
+    force: boolean
+): Promise<Map<string, ContainerStats>> {
+    const held = cachedSamples(LOCAL_DOCKER_CONNECTION_ID);
+    const usage = new Map<string, ContainerStats>();
+    const missing: ContainerSummary[] = [];
+    for (const container of containers) {
+        const sample = force ? undefined : held.get(container.id);
+        if (sample && Date.now() - sample.at < SAMPLE_REUSE_MS) usage.set(container.id, sample.stats);
+        else missing.push(container);
+    }
+    if (missing.length === 0) return usage;
+    const fresh = await driver.statsMany(missing.map((container) => container.id));
+    for (const container of missing) {
+        const stats = fresh.get(container.id);
+        if (!stats) continue;
+        usage.set(container.id, stats);
+        rememberSample(LOCAL_DOCKER_CONNECTION_ID, [container.id, container.name], stats);
+    }
+    return usage;
+}
+
+/** `work` over every item, at most `limit` at a time. */
+async function eachLimited<T>(
+    items: readonly T[],
+    limit: number,
+    work: (item: T) => Promise<void>
+): Promise<void> {
+    let next = 0;
+    const lane = async (): Promise<void> => {
+        while (next < items.length) {
+            const item = items[next] as T;
+            next += 1;
+            await work(item);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
+}
+
+async function measure(driver: DockerDriver, force: boolean): Promise<PolarisFootprint> {
     const all = await driver.listContainers(true);
     const own = all.filter(isPolarisPart);
     const running = own.filter((container) => container.state === "running");
@@ -82,15 +141,15 @@ async function measure(driver: DockerDriver): Promise<PolarisFootprint> {
     const rest = all.filter(
         (container) => container.state === "running" && !isPolarisPart(container)
     );
-    const [info, stats] = await Promise.all([
+    // One round trip for everything that only needs the listing: the engine,
+    // usage, and one inspect per part for what it has written and what its image
+    // weighs (`size` is the whole reason to ask: the fields are absent without
+    // it). The inspects used to wait for the stats pass for no reason but the
+    // order they were written in.
+    const [info, stats, inspected] = await Promise.all([
         driver.info().catch(() => null),
-        driver.statsMany([...running, ...rest].map((container) => container.id))
-    ]);
-
-    // One inspect per part, for what it has written and what its image weighs.
-    // `size` is the whole reason to ask: the fields are absent without it.
-    const details = new Map(
-        await Promise.all(
+        usageFor(driver, [...running, ...rest], force),
+        Promise.all(
             own.map(
                 async (container) =>
                     [
@@ -99,58 +158,63 @@ async function measure(driver: DockerDriver): Promise<PolarisFootprint> {
                     ] as const
             )
         )
-    );
+    ]);
+    const details = new Map(inspected);
 
     // Volumes are measured from inside the container that mounts them, which is
     // the one place a named volume has a path at all. Once each: several parts
     // mount the same volume, and counting it twice would report a stack twice the
-    // size of the one on disk.
-    const ports = new HostdPorts();
+    // size of the one on disk. A stopped part cannot be asked, and a read-only
+    // mount is somebody else's volume seen from here - so each volume is measured
+    // through the first running part that mounts it writable, or not at all.
     /** Every named volume the stack mounts, measured or not - which is what says
      *  whether the disk figures are a total or a floor. */
     const seen = new Set<string>();
-    /** Only the readings that came back. A failed attempt is not cached as a
-     *  measurement of null, or the first part to mount a shared volume while
-     *  stopped would settle it for every running part that mounts it too. */
-    const measured = new Map<string, number>();
+    const plan = new Map<string, { container: string; path: string }>();
     const parts: FootprintPart[] = [];
-    try {
-        for (const container of own) {
-            const detail = details.get(container.id) ?? null;
-            const sample = stats.get(container.id) ?? null;
-            const volumes: FootprintVolume[] = [];
-            for (const mount of detail?.mounts ?? []) {
-                if (!mount.name) continue;
-                seen.add(mount.name);
-                // A stopped part cannot be asked, and a read-only mount is
-                // somebody else's volume seen from here - both are measured
-                // wherever they are writable and running, or not at all.
-                if (!measured.has(mount.name) && container.state === "running" && mount.rw) {
-                    const used = await ports.diskUsage(container.name, mount.destination);
-                    if (used !== null) measured.set(mount.name, used);
-                }
-                volumes.push({ name: mount.name, path: mount.destination, usedBytes: null });
+    for (const container of own) {
+        const detail = details.get(container.id) ?? null;
+        const sample = stats.get(container.id) ?? null;
+        const volumes: FootprintVolume[] = [];
+        for (const mount of detail?.mounts ?? []) {
+            if (!mount.name) continue;
+            seen.add(mount.name);
+            if (!plan.has(mount.name) && container.state === "running" && mount.rw) {
+                plan.set(mount.name, { container: container.name, path: mount.destination });
             }
-            parts.push({
-                id: container.id,
-                name: container.name,
-                ...describePart(container),
-                image: container.image,
-                state: container.state,
-                cpuPercent: sample ? Math.round(sample.cpuPercent * 100) / 100 : null,
-                memUsedBytes: sample?.memUsage ?? null,
-                writableBytes: detail?.sizeRw ?? null,
-                imageBytes:
-                    detail && detail.sizeRootFs !== null
-                        ? Math.max(0, detail.sizeRootFs - (detail.sizeRw ?? 0))
-                        : null,
-                volumes
-            });
+            volumes.push({ name: mount.name, path: mount.destination, usedBytes: null });
         }
+        parts.push({
+            id: container.id,
+            name: container.name,
+            ...describePart(container),
+            image: container.image,
+            state: container.state,
+            cpuPercent: sample ? Math.round(sample.cpuPercent * 100) / 100 : null,
+            memUsedBytes: sample?.memUsage ?? null,
+            writableBytes: detail?.sizeRw ?? null,
+            imageBytes:
+                detail && detail.sizeRootFs !== null
+                    ? Math.max(0, detail.sizeRootFs - (detail.sizeRw ?? 0))
+                    : null,
+            volumes
+        });
+    }
+
+    // Measured side by side rather than one after another, which is what made
+    // this card the slowest thing on the page: one `du` per volume, in series.
+    /** Only the readings that came back: a failed attempt leaves its volume
+     *  unmeasured, which is what keeps the disk figure honest about being a floor. */
+    const measured = new Map<string, number>();
+    const ports = new HostdPorts();
+    try {
+        await eachLimited([...plan], DU_CONCURRENCY, async ([name, target]) => {
+            const used = await ports.diskUsage(target.container, target.path);
+            if (used !== null) measured.set(name, used);
+        });
     } finally {
         await ports.dispose().catch(() => undefined);
     }
-
     // Filled in once every part has been walked, so a volume a stopped part
     // mounts still carries the figure the running part that shares it measured,
     // whichever of the two the engine listed first.

@@ -138,13 +138,7 @@ export function PolarisFootprintCard() {
                                     ? footprint.parts.map((part) => (
                                           <PartRow key={part.id} part={part} />
                                       ))
-                                    : [0, 1, 2, 3].map((row) => (
-                                          <tr key={row} className="border-t border-border">
-                                              <td className="py-2 pr-3" colSpan={4}>
-                                                  <Skeleton className="h-4 w-full" />
-                                              </td>
-                                          </tr>
-                                      ))}
+                                    : [0, 1, 2, 3].map((row) => <PartRowSkeleton key={row} />)}
                             </tbody>
                         </table>
                     </div>
@@ -194,6 +188,30 @@ function Totals({ footprint }: { footprint: PolarisFootprint }) {
                 </>
             ) : null}
         </p>
+    );
+}
+
+/** A part's row before it has been measured, shaped like the row that replaces
+ *  it - a name with two lines under it, then three figures - so the table does
+ *  not jump when the reading lands. */
+function PartRowSkeleton() {
+    return (
+        <tr className="border-t border-border align-top">
+            <td className="py-2 pr-3">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="mt-1 h-3 w-48" />
+                <Skeleton className="mt-1 h-3 w-24" />
+            </td>
+            <td className="py-2 pr-3">
+                <Skeleton className="h-4 w-10" />
+            </td>
+            <td className="py-2 pr-3">
+                <Skeleton className="h-4 w-14" />
+            </td>
+            <td className="py-2">
+                <Skeleton className="h-4 w-14" />
+            </td>
+        </tr>
     );
 }
 
