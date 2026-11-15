@@ -7,6 +7,14 @@
  * gathered while the page is open and sent once, when it is hidden or left, as
  * one request. One load in ten is sent, and every load over a Web Vitals target,
  * so a slow screen always shows up and a fast one costs almost nothing.
+ *
+ * The report function handed to `useReportWebVitals` must keep one identity for
+ * the life of the page. The hook subscribes again whenever it changes, and the
+ * Web Vitals library never unsubscribes: an inline function, new on every
+ * render, added a set of document listeners and performance observers on every
+ * navigation. A desktop window open for hours carried thousands of them, and
+ * every click and key ran them all - the window lagged, and short animations
+ * finished before the frame that should have shown them.
  */
 
 import { useEffect } from "react";
@@ -44,18 +52,26 @@ function flush(): void {
     }).catch(() => undefined);
 }
 
+/** What `useReportWebVitals` is given: one function for the whole page, so it
+ *  subscribes once (see the note at the top). */
+export function recordVital(metric: { name: string; value: number }): void {
+    const vital = VITALS[metric.name];
+    if (!vital || pending.sent) return;
+    // The address the document was loaded at, not one navigated to later:
+    // these numbers describe that first load.
+    pending.path ??= window.location.pathname;
+    // CLS is stored in thousandths, the way the ingest stores it.
+    pending.values[vital] = vital === "cls" ? metric.value * 1000 : metric.value;
+}
+
 export function PageTiming() {
     const pathname = usePathname();
+    useReportWebVitals(recordVital);
 
-    useReportWebVitals((metric) => {
-        const vital = VITALS[metric.name];
-        if (!vital || pending.sent) return;
-        // The address the document was loaded at, not one navigated to later:
-        // these numbers describe that first load.
+    // The first address this document showed, before any metric arrives.
+    useEffect(() => {
         pending.path ??= pathname;
-        // CLS is stored in thousandths, the way the ingest stores it.
-        pending.values[vital] = vital === "cls" ? metric.value * 1000 : metric.value;
-    });
+    }, [pathname]);
 
     useEffect(() => {
         const onHide = () => {
