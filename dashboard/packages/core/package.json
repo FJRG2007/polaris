@@ -68,6 +68,14 @@
         "./tv-compat": {
             "types": "./dist/tv-compat/index.d.ts",
             "import": "./dist/tv-compat/index.js"
+        },
+        "./runner-relay": {
+            "types": "./dist/runner-relay.d.ts",
+            "import": "./dist/runner-relay.js"
+        },
+        "./runner-protocol": {
+            "types": "./dist/runner-protocol.d.ts",
+            "import": "./dist/runner-protocol.js"
         }
     },
     "main": "./dist/index.js",

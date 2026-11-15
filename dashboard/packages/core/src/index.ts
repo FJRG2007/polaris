@@ -116,6 +116,8 @@ export * from "./runners.js";
 export * from "./runner-policy.js";
 export * from "./runner-runs.js";
 export * from "./runner-placement.js";
+export * from "./runner-protocol.js";
+export * from "./runner-relay.js";
 export * from "./agents.js";
 export * from "./agent-clis.js";
 export * from "./agent-sessions.js";
