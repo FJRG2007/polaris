@@ -8,8 +8,13 @@
  * the control plane's own figure, and the figure would still look plausible.
  */
 
-import { describe, expect, it } from "vitest";
-import { describePart, isPolarisPart } from "@/lib/polaris-parts";
+import { describe, expect, it, vi } from "vitest";
+
+// host-volumes is imported for its pure project-name helper only.
+vi.mock("@polaris/db", () => ({ prisma: {} }));
+vi.mock("@polaris/hostd-client", () => ({ HostdClient: class {} }));
+
+const { describePart, isPolarisPart } = await import("@/lib/polaris-parts");
 
 function container(name: string, project: string | null, service: string | null = null) {
     return { name, composeProject: project, composeService: service };

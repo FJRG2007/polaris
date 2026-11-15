@@ -19,7 +19,7 @@ import { useCallback, useRef } from "react";
 import { formatBytes } from "@polaris/core";
 import { RefreshCw, Sparkles } from "lucide-react";
 import { useLiveRead } from "@/components/use-live-resource";
-import { partCatalogKey } from "@/lib/polaris-parts";
+import { partCatalogKey } from "@/lib/polaris-part-keys";
 import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
 import { footprintDiskBytes, type FootprintPart, type PolarisFootprint } from "./types";
 import { useTranslations } from "@/components/i18n/i18n-provider";

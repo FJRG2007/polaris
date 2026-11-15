@@ -40,7 +40,9 @@ import { prisma, type Prisma } from "@polaris/db";
 import { localDisk } from "@/lib/deploy/local-disk";
 import { hostSpace } from "@/lib/deploy/host-space";
 import { cachedSamples } from "@/lib/container-stats-cache";
-import { containerParts, type DeployedApp } from "./container-rows";
+import { containerParts, type CodeSession, type DeployedApp } from "./container-rows";
+import { codeSessionId } from "@/lib/polaris-parts";
+import { officialAppProjectsOrNone } from "@/lib/official-app-projects";
 import {
     accessCan,
     accessInEnvironment,
@@ -50,7 +52,7 @@ import {
 import { getLocalHostId } from "@/lib/local-server";
 import { machineProcesses } from "./machine-processes";
 import { hostVolumes } from "@/lib/deploy/host-volumes";
-import { LOCAL_SERVER_ID, serverIdSchema, type Permission } from "@polaris/core";
+import { atLeast, LOCAL_SERVER_ID, serverIdSchema, type Permission } from "@polaris/core";
 import { counterAdvance, hostSubject, RAW_MAX_SPAN_MS } from "@/lib/metrics-shared";
 import type { ContainerStats, ContainerSummary, DockerDriver } from "@polaris/docker";
 import {
@@ -235,7 +237,11 @@ async function machineLoad(
         }
 
         const { samples, at } = await sampleContainers(driver, connectionId, running);
-        const owners = await deployedOn(serverId, viewerId);
+        const [owners, official, sessions] = await Promise.all([
+            deployedOn(serverId, viewerId),
+            officialAppProjectsOrNone(),
+            codeSessionsOf(running, viewerId)
+        ]);
         // CPU is already a share of the whole machine, so the machine is 100 of
         // it. Memory is against what the machine actually has, which is the
         // figure the chart puts a percentage beside.
@@ -247,7 +253,8 @@ async function machineLoad(
             metric,
             connectionId,
             owners,
-            metric === "mem" ? machine : null
+            metric === "mem" ? machine : null,
+            { official, sessions }
         );
         if (parts.length === 0) {
             return nothingToShow("This server would not say what its containers are using.");
@@ -459,6 +466,79 @@ async function deployedOn(serverId: string, viewerId: string): Promise<Map<strin
             ];
         })
     );
+}
+
+/** The most session rows read for one breakdown: a machine runs a handful. */
+const SESSIONS_AT_MOST = 200;
+
+/**
+ * The Code sessions behind the running session containers: what each is called,
+ * on which repository, who started it, and whether the reader may open it - the
+ * same rule Polar opens one by (their repository, their own scratch session, or
+ * a grant on it). The reader has already been gated on reading this machine.
+ */
+async function codeSessionsOf(
+    running: readonly ContainerSummary[],
+    viewerId: string
+): Promise<Map<string, CodeSession>> {
+    const ids = [
+        ...new Set(running.map(codeSessionId).filter((id): id is string => id !== null))
+    ].filter((id) => z.string().uuid().safeParse(id).success);
+    if (ids.length === 0) return new Map();
+    try {
+        const rows = await prisma.agentSession.findMany({
+            where: { id: { in: ids.slice(0, SESSIONS_AT_MOST) } },
+            select: {
+                id: true,
+                title: true,
+                startedById: true,
+                repoId: true,
+                repo: { select: { repoFullName: true, ownerId: true } }
+            }
+        });
+        const people = await prisma.user.findMany({
+            where: {
+                id: {
+                    in: [
+                        ...new Set(
+                            rows.map((row) => row.startedById).filter((id): id is string => !!id)
+                        )
+                    ]
+                }
+            },
+            select: { id: true, name: true }
+        });
+        const names = new Map(people.map((person) => [person.id, person.name]));
+        const { grantedCapability } = await import("@/lib/access/grants");
+        const answers = await Promise.all(
+            rows.map(async (row): Promise<[string, CodeSession]> => {
+                const own = row.repo
+                    ? row.repo.ownerId === viewerId
+                    : row.repoId === null && row.startedById === viewerId;
+                const canOpen =
+                    own ||
+                    atLeast(
+                        "agents.session",
+                        await grantedCapability(viewerId, "agents.session", row.id).catch(
+                            () => ""
+                        ),
+                        "view"
+                    );
+                return [
+                    row.id,
+                    {
+                        title: row.title,
+                        repository: row.repo?.repoFullName ?? null,
+                        owner: row.startedById ? (names.get(row.startedById) ?? null) : null,
+                        canOpen
+                    }
+                ];
+            })
+        );
+        return new Map(answers);
+    } catch {
+        return new Map();
+    }
 }
 
 /** Which deploy targets are the machine in question. The local target is the one

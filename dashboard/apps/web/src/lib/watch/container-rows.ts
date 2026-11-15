@@ -15,9 +15,17 @@
  */
 
 import type { BreakdownPart } from "./breakdown-shape";
+import { polarSessionHref } from "@/lib/agents/agent-notices";
 import { baseProject } from "@/lib/deploy/host-volumes";
 import type { ContainerStats, ContainerSummary } from "@polaris/docker";
-import { describePart, isPolarisPart, partCatalogKey } from "@/lib/polaris-parts";
+import {
+    codeSessionId,
+    describePart,
+    isPolarisPart,
+    officialAppOf,
+    type OfficialProjects
+} from "@/lib/polaris-parts";
+import { partCatalogKey } from "@/lib/polaris-part-keys";
 
 /** A service Polaris deployed, in the terms a row needs it. */
 export interface DeployedApp {
@@ -33,6 +41,26 @@ export interface DeployedApp {
     /** Whether the reader may restart it - the check the restart action makes. */
     readonly canRestart: boolean;
 }
+
+/** A Code session as a row names it. */
+export interface CodeSession {
+    readonly title: string;
+    /** "owner/repo", or null for a session with nothing checked out. */
+    readonly repository: string | null;
+    /** Who started it, by name. */
+    readonly owner: string | null;
+    /** Whether the reader may open it - the check Polar itself makes. */
+    readonly canOpen: boolean;
+}
+
+/** What else is known about the containers on a machine, beyond Deploy. */
+export interface KnownContainers {
+    readonly official: OfficialProjects;
+    /** By session id. A session container missing here has no row. */
+    readonly sessions: ReadonlyMap<string, CodeSession>;
+}
+
+const NOTHING_KNOWN: KnownContainers = { official: new Map(), sessions: new Map() };
 
 /**
  * Below this fraction of the machine, a container's memory limit is a cap
@@ -52,16 +80,33 @@ export function memoryLimit(
     return machine === null ? null : limit;
 }
 
-/** What to call a container, and where its page is. Three answers in order of how
- *  much is known: part of Polaris itself, a service Polaris deployed, or
- *  something started on the machine that only the Containers screen knows. */
+/** What to call a container, and where its page is. Answers in order of how much
+ *  is known: an official app, part of Polaris itself, a service Polaris deployed,
+ *  a Code session, or something started on the machine that only the Containers
+ *  screen knows - and for that last one, whether Polaris started it. */
 export function describeContainer(
     container: ContainerSummary,
     connectionId: string,
-    owners: ReadonlyMap<string, DeployedApp>
+    owners: ReadonlyMap<string, DeployedApp>,
+    known: KnownContainers = NOTHING_KNOWN
 ): Omit<BreakdownPart, "kind" | "value"> {
     const containerHref = `/apps/containers/${encodeURIComponent(container.name)}?c=${encodeURIComponent(connectionId)}`;
     const engineName = container.name || container.id.slice(0, 12);
+    const official = officialAppOf(container, known.official);
+    if (official) {
+        // Named by the app it belongs to, in the catalog's English; the action
+        // that answers the reader says both in their language.
+        const part = describePart(container, known.official);
+        return {
+            key: container.id,
+            label: part.label || engineName,
+            detail: part.summary || null,
+            href: containerHref,
+            group: "polaris",
+            container: engineName,
+            app: official
+        };
+    }
     if (isPolarisPart(container)) {
         const part = describePart(container);
         return {
@@ -88,6 +133,24 @@ export function describeContainer(
             service: { id: app.id, source: app.source, canRestart: app.canRestart }
         };
     }
+    const sessionId = codeSessionId(container);
+    if (sessionId) {
+        const session = known.sessions.get(sessionId);
+        return {
+            key: container.id,
+            // i18n-ignore said in the reader's words by breakdown-actions (breakdown.session)
+            label: session?.title || "Code session",
+            detail: null,
+            href: session?.canOpen ? polarSessionHref(sessionId) : null,
+            group: "sessions",
+            container: engineName,
+            session: {
+                known: session !== undefined,
+                repository: session?.repository ?? null,
+                owner: session?.owner ?? null
+            }
+        };
+    }
     return {
         key: container.id,
         label: engineName,
@@ -95,7 +158,10 @@ export function describeContainer(
         href: containerHref,
         group: "other",
         container: engineName,
-        image: container.image || null
+        image: container.image || null,
+        // Every compose project Polaris starts is named `polaris-...`; a container
+        // under one that nothing above claimed was left by something since removed.
+        origin: container.composeProject?.startsWith("polaris-") ? "polaris" : "elsewhere"
     };
 }
 
@@ -106,14 +172,15 @@ export function containerParts(
     metric: "cpu" | "mem",
     connectionId: string,
     owners: ReadonlyMap<string, DeployedApp>,
-    machineMemory: number | null
+    machineMemory: number | null,
+    known: KnownContainers = NOTHING_KNOWN
 ): BreakdownPart[] {
     return running.flatMap<BreakdownPart>((container) => {
         const stats = samples.get(container.id);
         if (!stats) return [];
         return [
             {
-                ...describeContainer(container, connectionId, owners),
+                ...describeContainer(container, connectionId, owners, known),
                 kind: "container",
                 value: metric === "cpu" ? stats.cpuPercent : stats.memUsage,
                 limit: metric === "mem" ? memoryLimit(stats, machineMemory) : null

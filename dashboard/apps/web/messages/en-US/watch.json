@@ -211,6 +211,7 @@
         "group": {
             "polaris": "Polaris",
             "apps": "Your apps",
+            "sessions": "Code sessions",
             "other": "Other containers",
             "machine": "The machine",
             "free": "Free"
@@ -223,7 +224,19 @@
         "restarting": "Restarting",
         "restarted": "Restarted",
         "restartFailed": "Could not restart it. Open it in Deploy to see why.",
-        "noAccess": "You do not have access to this service in Deploy."
+        "noAccess": "You do not have access to this service in Deploy.",
+        "session": {
+            "untitled": "Code session",
+            "plain": "Code session",
+            "repo": "Code session on {repository}",
+            "owner": "Code session started by {owner}",
+            "repoOwner": "Code session on {repository}, started by {owner}",
+            "orphan": "Code session container with no session behind it"
+        },
+        "origin": {
+            "polaris": "Started by Polaris for something since removed.",
+            "elsewhere": "Not started by Polaris."
+        }
     },
     "subject": {
         "metrics": "Metrics",

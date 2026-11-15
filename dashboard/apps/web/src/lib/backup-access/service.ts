@@ -129,12 +129,13 @@ import {
 } from "./inbound";
 import { combineVerdicts, outsideScript, readOutside, type OutsideAnswer } from "./outside-check";
 import { CLOUDFLARED_IMAGE } from "@/lib/tunnel-images";
+import { BACKUP_TUNNEL_PROJECT } from "@/lib/polaris-parts";
 
 const TTL_KEY = "backupAccess.ttl";
 const RELAY_KEY = "backupAccess.relay";
 const PROBE_KEY = "backupAccess.probe";
 
-const TUNNEL_PROJECT = "polaris-backup-tunnel";
+const TUNNEL_PROJECT = BACKUP_TUNNEL_PROJECT;
 const TUNNEL_IMAGE = CLOUDFLARED_IMAGE;
 const PROXY_NETWORK = "polaris-proxy";
 /** The edge, as the connector reaches it on the proxy network. */

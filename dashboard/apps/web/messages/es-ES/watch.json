@@ -211,6 +211,7 @@
         "group": {
             "polaris": "Polaris",
             "apps": "Tus apps",
+            "sessions": "Sesiones de Code",
             "other": "Otros contenedores",
             "machine": "La máquina",
             "free": "Libre"
@@ -223,7 +224,19 @@
         "restarting": "Reiniciando",
         "restarted": "Reiniciado",
         "restartFailed": "No se pudo reiniciar. Ábrelo en Deploy para ver por qué.",
-        "noAccess": "No tienes acceso a este servicio en Deploy."
+        "noAccess": "No tienes acceso a este servicio en Deploy.",
+        "session": {
+            "untitled": "Sesión de Code",
+            "plain": "Sesión de Code",
+            "repo": "Sesión de Code en {repository}",
+            "owner": "Sesión de Code iniciada por {owner}",
+            "repoOwner": "Sesión de Code en {repository}, iniciada por {owner}",
+            "orphan": "Contenedor de Code sin ninguna sesión detrás"
+        },
+        "origin": {
+            "polaris": "Lo inició Polaris para algo ya eliminado.",
+            "elsewhere": "No lo inició Polaris."
+        }
     },
     "subject": {
         "metrics": "Métricas",

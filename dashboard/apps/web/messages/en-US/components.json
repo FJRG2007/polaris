@@ -914,6 +914,18 @@
             "vpnGateway": {
                 "label": "VPN gateway",
                 "summary": "Connects this server's private networks to the VPN."
+            },
+            "relayPorts": {
+                "label": "Relay ports",
+                "summary": "Carries game, call and other side ports through the relay."
+            },
+            "relayLink": {
+                "label": "Relay link",
+                "summary": "Keeps Polaris reachable through your relay server."
+            },
+            "backupTunnel": {
+                "label": "Backup access",
+                "summary": "A second way in while the main address is down."
             }
         }
     },

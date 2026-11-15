@@ -12,6 +12,10 @@
  * on the next self-update; the compose labels do not move.
  */
 
+import { relayProject } from "@/lib/backup-access/relay";
+import { findApp } from "@/lib/apps/catalog";
+import { baseProject } from "@/lib/deploy/host-volumes";
+
 /**
  * The compose projects of the two tunnels the control plane opens for its own
  * address, defined here and used by the services that start them.
@@ -27,6 +31,11 @@ export const PUBLIC_TUNNEL_PROJECT = "polaris-ptunnel";
 export const TAILSCALE_PROJECT = "polaris-tailscale";
 /** A server's way into the VPN's private networks, started with the first one. */
 export const GATEWAY_PROJECT = "polaris-network-gateway";
+/** The backup way in, started while backup access is on. */
+export const BACKUP_TUNNEL_PROJECT = "polaris-backup-tunnel";
+/** What an agent session's container and compose project are named after: the
+ *  session id follows. */
+export const SESSION_CONTAINER_PREFIX = "polaris-session-";
 
 /**
  * The compose projects that are Polaris rather than something it runs.
@@ -40,7 +49,10 @@ const OWN_PROJECTS = [
     TUNNEL_PROJECT,
     PUBLIC_TUNNEL_PROJECT,
     TAILSCALE_PROJECT,
-    GATEWAY_PROJECT
+    GATEWAY_PROJECT,
+    BACKUP_TUNNEL_PROJECT,
+    relayProject("relay"),
+    relayProject("home")
 ];
 
 /** What each part of the stack is called, and what it is for. Keyed by the compose
@@ -90,6 +102,40 @@ const PARTS: Record<string, { label: string; summary: string }> = {
     }
 };
 
+/** The relay's own parts, by what the container does rather than its service
+ *  name, which carries the relay's id. */
+const RELAY_PORTS = {
+    // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
+    label: "Relay ports",
+    summary: "Carries game, call and other side ports through the relay."
+};
+const RELAY_LINK = {
+    // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
+    label: "Relay link",
+    summary: "Keeps Polaris reachable through your relay server."
+};
+const BACKUP_TUNNEL = {
+    // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
+    label: "Backup access",
+    summary: "A second way in while the main address is down."
+};
+
+/**
+ * An official app's install, keyed by the compose project its container runs
+ * under. Read from the database (`official-app-projects`), passed in here so the
+ * rule stays pure.
+ */
+export interface OfficialApp {
+    /** The Polaris app it belongs to, by catalog id ("vpn"). */
+    readonly owner: string;
+    /** The install itself, by catalog id ("vpn-engine"). */
+    readonly install: string;
+}
+
+export type OfficialProjects = ReadonlyMap<string, OfficialApp>;
+
+const NO_OFFICIAL: OfficialProjects = new Map();
+
 /** What the classification needs of a container. A subset of the engine's summary
  *  so the rule can be exercised without one. */
 export interface PartIdentity {
@@ -98,38 +144,55 @@ export interface PartIdentity {
     readonly composeService: string | null;
 }
 
-/** Whether a container is part of Polaris itself rather than something it runs. */
-export function isPolarisPart(container: PartIdentity): boolean {
-    return container.composeProject !== null && OWN_PROJECTS.includes(container.composeProject);
+/** The official app a container runs for, or null. */
+export function officialAppOf(
+    container: PartIdentity,
+    official: OfficialProjects = NO_OFFICIAL
+): OfficialApp | null {
+    return official.get(baseProject(container.composeProject) ?? "") ?? null;
+}
+
+/**
+ * Whether a container is part of Polaris itself rather than something it runs:
+ * the stack and its tunnels, and - given the installs - every official app's
+ * containers, which Polaris deploys into its own Marketplace project but nobody
+ * deployed by hand. Every screen that splits Polaris from the rest asks this.
+ */
+export function isPolarisPart(
+    container: PartIdentity,
+    official: OfficialProjects = NO_OFFICIAL
+): boolean {
+    if (container.composeProject !== null && OWN_PROJECTS.includes(container.composeProject))
+        return true;
+    return officialAppOf(container, official) !== null;
+}
+
+/** The agent session a container runs, by id, or null for anything else. */
+export function codeSessionId(container: PartIdentity): string | null {
+    const name = container.composeProject ?? container.name;
+    if (!name.startsWith(SESSION_CONTAINER_PREFIX)) return null;
+    const id = name.slice(SESSION_CONTAINER_PREFIX.length);
+    return id || null;
 }
 
 /** What to call a part. Anything the stack grows that this file has not been told
  *  about still gets a row and a figure, under whatever compose calls it. */
-export function describePart(container: PartIdentity): { label: string; summary: string } {
+export function describePart(
+    container: PartIdentity,
+    official: OfficialProjects = NO_OFFICIAL
+): { label: string; summary: string } {
+    const app = officialAppOf(container, official);
+    if (app) {
+        const install = findApp(app.install);
+        return {
+            label: findApp(app.owner)?.name ?? install?.name ?? container.name,
+            summary: install?.summary ?? ""
+        };
+    }
+    const project = container.composeProject;
+    if (project === BACKUP_TUNNEL_PROJECT) return BACKUP_TUNNEL;
+    if (project === relayProject("relay") || project === relayProject("home"))
+        return container.name.endsWith("-frp") ? RELAY_PORTS : RELAY_LINK;
     const known = container.composeService ? PARTS[container.composeService] : undefined;
     return known ?? { label: container.composeService ?? container.name, summary: "" };
-}
-
-/** Each part by the English name `PARTS` gives it, as its key in the catalog
- *  (`components.footprint.parts.<key>`), so a screen can say it in the reader's
- *  words. Keyed by that name rather than the compose service so a reading
- *  already on its way keeps meaning the same row. */
-const PART_CATALOG_KEYS: Readonly<Record<string, string>> = {
-    Dashboard: "web",
-    Database: "postgres",
-    Edge: "traefik",
-    "Edge guard": "edgeGuard",
-    "Host daemon": "hostd",
-    "Call server": "livekit",
-    "Local discovery": "mdns",
-    "Minecraft router": "mcRouter",
-    "Edge (legacy)": "caddy",
-    "Public tunnel": "tunnel",
-    "Remote access": "tailscale",
-    "VPN gateway": "vpnGateway"
-};
-
-/** A part's catalog key, or null for a part the catalog does not know. */
-export function partCatalogKey(label: string): string | null {
-    return PART_CATALOG_KEYS[label] ?? null;
 }

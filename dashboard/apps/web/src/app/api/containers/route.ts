@@ -26,6 +26,7 @@ import {
 } from "@/lib/container-stats-cache";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { isPolarisPart } from "@/lib/polaris-parts";
+import { officialAppProjectsOrNone } from "@/lib/official-app-projects";
 import { DEFAULT_DIRECTION } from "@/lib/watch/card-order";
 import { queryContainers } from "@/app/(app)/apps/containers/container-list";
 
@@ -41,7 +42,11 @@ export async function GET(request: Request): Promise<Response> {
 
     try {
         const payload = await withDockerDriver(parsed.data.c, caller.userId, async (driver) => {
-            const [info, list] = await Promise.all([driver.info(), driver.listContainers()]);
+            const [info, list, official] = await Promise.all([
+                driver.info(),
+                driver.listContainers(),
+                officialAppProjectsOrNone()
+            ]);
             // A stopped container has nothing to sample, so it is neither read nor
             // waited for; the sampler is only ever pointed at the running ones.
             const running = list.filter((container) => container.state === "running");
@@ -55,7 +60,7 @@ export async function GET(request: Request): Promise<Response> {
                     memUsage: sample?.stats.memUsage ?? null,
                     memPercent: sample?.stats.memPercent ?? null,
                     statsAt: sample?.at ?? null,
-                    polaris: isPolarisPart(container)
+                    polaris: isPolarisPart(container, official)
                 };
             });
             // Filtered, ordered and cut here rather than in the browser, so a host

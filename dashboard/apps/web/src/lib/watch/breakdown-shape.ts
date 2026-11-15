@@ -38,7 +38,7 @@ export type BreakdownMetric = (typeof BREAKDOWN_METRICS)[number];
 export type BreakdownKind = "container" | "volume" | "store" | "process" | "rest";
 
 /** Whose it is, where the list can tell. Free memory is nobody's. */
-export const BREAKDOWN_GROUPS = ["polaris", "apps", "other", "machine", "free"] as const;
+export const BREAKDOWN_GROUPS = ["polaris", "apps", "sessions", "other", "machine", "free"] as const;
 
 export type BreakdownGroup = (typeof BREAKDOWN_GROUPS)[number];
 
@@ -67,11 +67,25 @@ export interface BreakdownRow {
     readonly part?: string | null;
     /** A service Polaris deployed: how Deploy draws it and what the reader may do. */
     readonly service?: BreakdownService | null;
+    /** An official app's container: which app, and which of its installs, by
+     *  catalog id, so the reader gets the app's name in their language. */
+    readonly app?: { readonly owner: string; readonly install: string } | null;
+    /** A Code session's container. Absent fields are said as unknown. */
+    readonly session?: BreakdownSession | null;
+    /** For a container nobody here can name: whether Polaris started it. */
+    readonly origin?: "polaris" | "elsewhere" | null;
     /** The memory cap set on it, in bytes. Null when it may use the whole machine. */
     readonly limit?: number | null;
 }
 
 /** The deployed service behind a row. */
+export interface BreakdownSession {
+    /** False for a container with no session row: a spare, or one left behind. */
+    readonly known: boolean;
+    readonly repository: string | null;
+    readonly owner: string | null;
+}
+
 export interface BreakdownService {
     readonly id: string;
     readonly source: "github" | "image";

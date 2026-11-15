@@ -26,6 +26,7 @@ import { cachedSamples, rememberSample } from "@/lib/container-stats-cache";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { LOCAL_DOCKER_CONNECTION_ID, localDockerDriver } from "@/lib/docker-service";
 import { describePart, isPolarisPart } from "@/lib/polaris-parts";
+import { officialAppProjectsOrNone } from "@/lib/official-app-projects";
 import type {
     FootprintPart,
     FootprintRest,
@@ -131,15 +132,18 @@ async function eachLimited<T>(
 }
 
 async function measure(driver: DockerDriver, force: boolean): Promise<PolarisFootprint> {
-    const all = await driver.listContainers(true);
-    const own = all.filter(isPolarisPart);
+    const [all, official] = await Promise.all([
+        driver.listContainers(true),
+        officialAppProjectsOrNone()
+    ]);
+    const own = all.filter((container) => isPolarisPart(container, official));
     const running = own.filter((container) => container.state === "running");
     // Everything else that is running: what Polaris deploys, what was installed
     // through it, and anything started on the box by hand. Read in the same pass
     // and the same batch as the parts, so the two halves of the machine are
     // measured a moment apart rather than a request apart.
     const rest = all.filter(
-        (container) => container.state === "running" && !isPolarisPart(container)
+        (container) => container.state === "running" && !isPolarisPart(container, official)
     );
     // One round trip for everything that only needs the listing: the engine,
     // usage, and one inspect per part for what it has written and what its image
@@ -187,7 +191,7 @@ async function measure(driver: DockerDriver, force: boolean): Promise<PolarisFoo
         parts.push({
             id: container.id,
             name: container.name,
-            ...describePart(container),
+            ...describePart(container, official),
             image: container.image,
             state: container.state,
             cpuPercent: sample ? Math.round(sample.cpuPercent * 100) / 100 : null,

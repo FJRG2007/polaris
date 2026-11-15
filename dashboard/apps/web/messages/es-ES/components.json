@@ -914,6 +914,18 @@
             "vpnGateway": {
                 "label": "Pasarela VPN",
                 "summary": "Conecta las redes privadas de este servidor a la VPN."
+            },
+            "relayPorts": {
+                "label": "Puertos del relé",
+                "summary": "Lleva por el relé los puertos de juegos, llamadas y demás."
+            },
+            "relayLink": {
+                "label": "Enlace del relé",
+                "summary": "Mantiene Polaris accesible a través de tu servidor relé."
+            },
+            "backupTunnel": {
+                "label": "Acceso de respaldo",
+                "summary": "Otra forma de entrar mientras la dirección principal cae."
             }
         }
     },

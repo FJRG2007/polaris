@@ -16,6 +16,9 @@ import type { ContainerStats, ContainerSummary } from "@polaris/docker";
 // host-volumes is imported for its pure project-name helper only.
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@polaris/hostd-client", () => ({ HostdClient: class {} }));
+vi.mock("@/lib/agents/agent-notices", () => ({
+    polarSessionHref: (id: string) => `/polar?session=${id}`
+}));
 
 const { containerParts, describeContainer, memoryLimit } =
     await import("@/lib/watch/container-rows");
@@ -136,17 +139,18 @@ describe("naming a running container", () => {
     it("calls an unknown container by its container name and says what it runs", () => {
         const row = describeContainer(
             container({
-                name: "wg-nat-000000bac-frp",
-                image: "fatedier/frpc:v0.71.0",
-                composeProject: "polaris-wg-nat-000000bac"
+                name: "portainer",
+                image: "portainer/portainer-ce:2.21.0",
+                composeProject: "tools"
             }),
             CONNECTION,
             new Map()
         );
-        expect(row.label).toBe("wg-nat-000000bac-frp");
-        expect(row.image).toBe("fatedier/frpc:v0.71.0");
+        expect(row.label).toBe("portainer");
+        expect(row.image).toBe("portainer/portainer-ce:2.21.0");
         expect(row.group).toBe("other");
-        expect(row.href).toBe("/apps/containers/wg-nat-000000bac-frp?c=local-docker");
+        expect(row.origin).toBe("elsewhere");
+        expect(row.href).toBe("/apps/containers/portainer?c=local-docker");
     });
 
     it("falls back to the engine id when a container has no name at all", () => {
