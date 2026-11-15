@@ -58,7 +58,7 @@ export interface ListedContainer {
     readonly name: string;
     readonly image: string;
     readonly state: string;
-    readonly polaris: boolean;
+    readonly polaris?: boolean | undefined;
     readonly cpuPercent: number | null;
     readonly memUsage: number | null;
 }
