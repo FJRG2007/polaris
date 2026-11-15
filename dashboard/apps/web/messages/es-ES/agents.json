@@ -180,6 +180,8 @@
         "accountsCooling": "Todas las cuentas de este agente están en su límite ({accounts}). La sesión espera y sigue a las {at} con {account}.",
         "accountsOut": "Todas las cuentas de este agente están en su límite o rechazadas ({accounts}). La sesión espera a que una se vuelva a vincular o vuelva a la rotación.",
         "accountResumed": "Sigue con {account} ahora que su límite se ha restablecido.",
+        "accountMoved": "Movida a {to} desde {from}.",
+        "accountMovedFresh": "Movida a {to}.",
         "overloadedRetry": "El proveedor está saturado. Polaris vuelve a enviar el turno en {count} segundos.",
         "resendYourself": "Vuelve a enviar tu último mensaje para seguir."
     },
@@ -289,6 +291,22 @@
         "start": "Iniciando el agente"
     },
     "session": {
+        "account": {
+            "button": "Cuenta",
+            "title": "Cambiar cuenta",
+            "intro": "El siguiente turno usa la cuenta elegida y sigue la misma conversación.",
+            "current": "En uso",
+            "cooling": "En su límite hasta {at}",
+            "loadFailed": "Polaris no pudo listar las cuentas. Inténtalo de nuevo.",
+            "cancel": "Cancelar",
+            "errors": {
+                "unknown": "Esa cuenta no puede iniciar esta sesión.",
+                "busy": "Responde antes a la pregunta del agente.",
+                "machine": "Esta sesión entra con su máquina. Inicia otra para usar una cuenta guardada.",
+                "raced": "La sesión cambió de cuenta. Revísala e inténtalo de nuevo.",
+                "failed": "Polaris no pudo cambiar la cuenta. Inténtalo de nuevo."
+            }
+        },
         "share": "Compartir sesión",
         "sharedWithYou": "Compartida contigo",
         "events": {

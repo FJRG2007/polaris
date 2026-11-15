@@ -180,6 +180,8 @@
         "accountsCooling": "Every account for this agent is at its limit ({accounts}). The session waits and carries on at {at} on {account}.",
         "accountsOut": "Every account for this agent is at its limit or refused ({accounts}). The session waits until one is linked again or put back in rotation.",
         "accountResumed": "Carrying on with {account} now that its limit has reset.",
+        "accountMoved": "Moved to {to} from {from}.",
+        "accountMovedFresh": "Moved to {to}.",
         "overloadedRetry": "The provider is overloaded. Polaris sends the turn again in {count} seconds.",
         "resendYourself": "Send your last message again to carry on."
     },
@@ -289,6 +291,22 @@
         "start": "Starting the agent"
     },
     "session": {
+        "account": {
+            "button": "Account",
+            "title": "Switch account",
+            "intro": "The next turn runs on the account you pick and carries on the same conversation.",
+            "current": "In use",
+            "cooling": "At its limit until {at}",
+            "loadFailed": "Polaris could not list the accounts. Try again.",
+            "cancel": "Cancel",
+            "errors": {
+                "unknown": "That account cannot sign in this session.",
+                "busy": "Answer the agent's question first, then switch.",
+                "machine": "This session signs in on its machine. Start a new one to use a stored account.",
+                "raced": "The session changed account meanwhile. Check it and try again.",
+                "failed": "Polaris could not switch the account. Try again."
+            }
+        },
         "share": "Share session",
         "sharedWithYou": "Shared with you",
         "events": {

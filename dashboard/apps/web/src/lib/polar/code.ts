@@ -78,6 +78,8 @@ import {
     promptSessionAction,
     setSessionModeAction,
     setSessionEffortAction,
+    sessionAccountsAction,
+    switchSessionAccountAction,
     setSessionModelAction,
     sessionChoicesAction,
     sessionDetailAction,
@@ -729,6 +731,24 @@ export async function polarCodeEffort(user: SessionUser, input: unknown): Promis
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
     return setSessionEffortAction(input);
+}
+
+/** The accounts a running session could move to, from its thread. */
+export async function polarCodeAccounts(
+    user: SessionUser,
+    input: unknown
+): Promise<Awaited<ReturnType<typeof sessionAccountsAction>> | { error: string }> {
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    const parsed = polarCodeInterruptSchema.safeParse(input);
+    return parsed.success ? sessionAccountsAction(parsed.data.sessionId) : null;
+}
+
+/** Move a running session to another account, from its thread. */
+export async function polarCodeSwitchAccount(user: SessionUser, input: unknown): Promise<{ error?: string }> {
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    return switchSessionAccountAction(input);
 }
 
 /** Change a running session's permission mode from its thread. */

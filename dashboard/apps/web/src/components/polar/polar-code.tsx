@@ -43,6 +43,7 @@ import {
     type CodeSource
 } from "@/lib/polar/agents/code-sources";
 import { CodeModelPicker } from "@/components/polar/code-model-picker";
+import { CodeAccountSwitch } from "@/components/polar/code-account-switch";
 import { CodeView } from "@/components/json-view";
 import { Work } from "@/components/polar/elements/work";
 import { Shimmer } from "@/components/polar/elements/shimmer";
@@ -1505,6 +1506,9 @@ function CodeThread({
               model: view?.modelChoice?.model ?? null
           }
         : null;
+    // The account, changeable while it runs, for a session that signs in with
+    // a stored account rather than its machine's own login.
+    const liveAccount = Boolean(thread?.session.live && thread.canManage && !thread.view.useMachineLogin);
     // The effort, changeable while it runs, for a tool with an effort command.
     const liveEffort = Boolean(cli && core.agentEffortLevels(cli).length > 0 && thread?.session.live);
     const changeEffort = (next: core.AgentEffortLevel) => {
@@ -1719,8 +1723,16 @@ function CodeThread({
                 maxLength={PROMPT_MAX}
                 onSubmit={send}
                 picker={
-                    liveSource || liveMode || liveEffort ? (
+                    liveSource || liveMode || liveEffort || liveAccount ? (
                         <>
+                            {liveAccount ? (
+                                <CodeAccountSwitch
+                                    sessionId={sessionId}
+                                    disabled={busy}
+                                    onSwitched={read}
+                                    onError={setError}
+                                />
+                            ) : null}
                             {liveSource ? (
                                 <CodeModelPicker
                                     sources={[liveSource]}

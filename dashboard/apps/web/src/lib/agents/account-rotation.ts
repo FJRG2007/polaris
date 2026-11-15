@@ -18,6 +18,13 @@
  * while the row still holds the account, hook sequence and wait it was read
  * with, so two copies of one failure move the session once.
  *
+ * A session can also be moved by hand (`switchSessionAccount`), the way AO's
+ * `ao account switch` pins a session to another account: the same claim on
+ * the row, the launch reads the new account before the next turn, and an
+ * agent that left its terminal is brought back on its conversation.
+ * Ported from Agent Orchestrator (Apache-2.0),
+ * backend/internal/service/agentaccounts/service.go (session handoff).
+ *
  * Server-only apart from the pure readers.
  */
 
@@ -351,6 +358,11 @@ export function resumedNotice(name: string): string {
     return `Carrying on with ${name} now that its limit has reset.`;
 }
 
+/** Somebody moved the session to another account by hand. Pure. */
+export function movedNotice(to: string, from: string | null): string {
+    return from ? `Moved to ${to} from ${from}.` : `Moved to ${to}.`;
+}
+
 /** The turn could not be queued again (no runner, or the agent's interface is
  *  open): the person sends it. */
 export const RESEND_YOURSELF = "Send your last message again to carry on.";
@@ -651,4 +663,70 @@ export async function turnAccountName(sessionId: string): Promise<string | null>
         .findUnique({ where: { id: sessionId }, select: { accountId: true } })
         .catch(() => null);
     return refusedAccountName(row?.accountId ?? null);
+}
+
+export type SwitchOutcome = "moved" | "same" | "unknown" | "machine" | "over" | "raced";
+
+/** Ports a switch reaches out through, so a test can watch them. */
+export interface SwitchPorts {
+    readonly notice: (sessionId: string, body: string) => Promise<void>;
+    /** Puts the new account where the next launch reads it, and brings back an
+     *  agent that left its terminal on its conversation. */
+    readonly restart: (sessionId: string) => Promise<void>;
+    /** Sends the turn a limit left waiting. */
+    readonly resend: (sessionId: string) => Promise<boolean>;
+}
+
+/**
+ * Move a session to another of its owner's accounts for its tool, by hand.
+ * Only accounts the rotation could pick are taken, so a switch can never land
+ * on somebody else's sign-in or another tool's. A wait on a usage limit ends,
+ * and the turn it held is sent again on the new account. Never throws on a
+ * lost race: two switches at once move the session once.
+ */
+export async function switchSessionAccount(
+    sessionId: string,
+    targetId: string,
+    ports: SwitchPorts
+): Promise<SwitchOutcome> {
+    const row = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { startedById: true, cli: true, accountId: true, useMachineLogin: true, state: true, limitWaitUntil: true }
+    });
+    if (!row || core.isSessionOver(row.state as core.AgentSessionState)) return "over";
+    if (row.useMachineLogin) return "machine";
+    if (row.accountId === targetId) return "same";
+    const accounts = await rotationAccounts(row.startedById, row.cli, row.accountId);
+    const target = accounts.find((account) => account.id === targetId);
+    if (!target) return "unknown";
+    const claimed = await prisma.agentSession.updateMany({
+        where: { id: sessionId, accountId: row.accountId, useMachineLogin: false },
+        data: { accountId: target.id, limitWaitUntil: null, limitRetries: 0 }
+    });
+    if (claimed.count === 0) return "raced";
+    const from = row.accountId
+        ? (accounts.find((account) => account.id === row.accountId)?.name ?? (await refusedAccountName(row.accountId)))
+        : null;
+    await ports.notice(sessionId, movedNotice(target.name, from)).catch(() => undefined);
+    await ports.restart(sessionId);
+    if (row.limitWaitUntil) await ports.resend(sessionId).catch(() => false);
+    return "moved";
+}
+
+/** The accounts a running session could be moved to, for its picker. */
+export async function sessionAccountChoices(
+    sessionId: string
+): Promise<{ current: string | null; accounts: RotationAccount[] } | null> {
+    const row = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { startedById: true, cli: true, accountId: true, useMachineLogin: true, state: true }
+    });
+    if (!row || row.useMachineLogin || core.isSessionOver(row.state as core.AgentSessionState)) return null;
+    const accounts = await rotationAccounts(row.startedById, row.cli, row.accountId);
+    return { current: row.accountId, accounts };
+}
+
+/** The real ports: the turn's resend as rotation does it. */
+export function switchPorts(restart: (sessionId: string) => Promise<void>): SwitchPorts {
+    return { notice: PORTS.notice, restart, resend };
 }

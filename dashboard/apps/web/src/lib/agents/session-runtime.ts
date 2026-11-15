@@ -22,6 +22,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { execCommand } from "@polaris/ssh";
 import * as commands from "./session-commands";
+import * as accountHomes from "./account-homes";
 import { borrowSsh } from "@/lib/connection-pool";
 import { appBaseUrl } from "@/lib/domain-service";
 import { containerState, withContainerPorts } from "./session-ports";
@@ -472,7 +473,9 @@ async function credentialEnvFor(
  * `commands.CREDENTIALS_FILE`), and read by the launch script right before the
  * agent starts. Every variable the tool reads is cleared first, so one that is
  * gone does not survive from the boot. File-shaped credentials stay as the boot
- * wrote them: the tool reads those from its home, not from the environment.
+ * wrote them: the tool reads those from its home, not from the environment -
+ * except a pinned account of a tool with account homes (Codex), which runs in
+ * that account's own home so a switch or a rotation reaches the next launch.
  *
  * Never fails the prompt it runs before: a store that blinked, a machine that
  * did not answer or a session that is still booting keeps the credentials it
@@ -492,12 +495,30 @@ export async function refreshCredentials(sessionId: string): Promise<void> {
         const files = new Set(
             cli.credentials.filter((entry) => entry.file).map((entry) => entry.env)
         );
-        const env = Object.fromEntries(
+        const env: Record<string, string> = Object.fromEntries(
             Object.entries(fresh).filter(([name]) => !files.has(name))
         );
-        const cleared = [...cli.credentials.map((entry) => entry.env), ANTHROPIC_HEADERS_ENV];
-        const body = commands.credentialsFileBody(cleared, guardEnv(env));
         const stateDir = stateDirFor(placement);
+        // A pinned account of a tool that keeps its sign-in in a file runs in
+        // that account's own home (`account-homes.ts`), so a switch or a
+        // rotation reaches the next launch. Only in a container: on somebody's
+        // own server the tool's home is theirs and is never touched.
+        const home = placement.place === "host" ? null : accountHomes.accountHomeFor(cli.id);
+        const signin = home ? cli.credentials.find((entry) => entry.file && fresh[entry.env]) : undefined;
+        const pinned =
+            home && signin && session.accountId && !session.useMachineLogin
+                ? {
+                      bytes: Buffer.from(fresh[signin.env]!, "base64"),
+                      dir: accountHomes.accountHomeDir(commands.AGENT_HOME, cli.id, session.accountId)
+                  }
+                : null;
+        if (pinned && home) env[home.env] = pinned.dir;
+        const cleared = [
+            ...cli.credentials.map((entry) => entry.env),
+            ANTHROPIC_HEADERS_ENV,
+            ...accountHomes.accountHomeEnvs()
+        ];
+        const body = commands.credentialsFileBody(cleared, guardEnv(env));
         const part = `credentials.${randomBytes(8).toString("hex")}.part`;
         if (placement.place === "host") {
             const result = await runInSession(
@@ -512,6 +533,29 @@ export async function refreshCredentials(sessionId: string): Promise<void> {
         await withContainerPorts(placement.hostId, async (ports) => {
             // A daemon too old to write a file keeps the boot's credentials.
             if (!ports.writeFile) return;
+            if (pinned && session.accountId) {
+                const signinPart = `account.${randomBytes(8).toString("hex")}.part`;
+                await ports.writeFile(
+                    containerId,
+                    `${stateDir}/${signinPart}`,
+                    Readable.from([pinned.bytes]),
+                    pinned.bytes.length
+                );
+                const prepared = await ports.runIn(
+                    containerId,
+                    commands.shellArgv(
+                        accountHomes.accountHomeCommand({
+                            cliId: cli.id,
+                            userHome: commands.AGENT_HOME,
+                            accountId: session.accountId,
+                            stateDir,
+                            part: signinPart,
+                            digest: accountHomes.storedDigest(pinned.bytes)
+                        })
+                    )
+                );
+                if (prepared.code !== 0) throw new Error(`the container answered ${prepared.code}`);
+            }
             const bytes = Buffer.from(body, "utf8");
             await ports.writeFile(
                 containerId,

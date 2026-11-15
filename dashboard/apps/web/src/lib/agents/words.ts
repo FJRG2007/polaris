@@ -239,6 +239,8 @@ const SHAPED: readonly (readonly [RegExp, NamespaceKey<"agents">, readonly strin
         ["accounts"]
     ],
     [/^Carrying on with (.+) now that its limit has reset\.$/, "text.accountResumed", ["account"]],
+    [/^Moved to (.+) from (.+)\.$/, "text.accountMoved", ["to", "from"]],
+    [/^Moved to (.+)\.$/, "text.accountMovedFresh", ["to"]],
     [/^Send your last message again to carry on\.$/, "text.resendYourself", []],
     [/^The provider is overloaded\. Polaris sends the turn again in (\d+) seconds\.$/, "text.overloadedRetry", ["count"]]
 ];

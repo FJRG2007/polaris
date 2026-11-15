@@ -29,6 +29,7 @@ import * as timelines from "@/lib/agents/session-pr-timeline";
 import * as files from "@/lib/agents/session-files";
 import * as preview from "@/lib/agents/session-preview";
 import * as history from "@/lib/agents/session-history";
+import * as rotation from "@/lib/agents/account-rotation";
 import { appBaseUrl } from "@/lib/domain-service";
 import { safeChangePath } from "@/lib/agents/session-changes";
 import { addComment } from "@/lib/tasks/task-detail-service";
@@ -900,6 +901,74 @@ export async function resumeSessionAction(input: unknown): Promise<{ error?: str
         return { error: agentText(t, sessions.readableFailure(error, `resuming ${session.id}`)) };
     }
     return {};
+}
+
+const sessionAccountSchema = z
+    .object({ sessionId: sessionIdSchema, accountId: z.string().trim().regex(/^[A-Za-z0-9_-]{1,64}$/) })
+    .strict();
+
+export interface SessionAccountChoice {
+    readonly id: string;
+    readonly name: string;
+    /** Until when it is at its limit or refused, ISO, or null when ready. */
+    readonly coolingUntil: string | null;
+}
+
+/** The accounts a running session could move to, and the one it is on. */
+export async function sessionAccountsAction(
+    sessionId: string
+): Promise<{ current: string | null; accounts: SessionAccountChoice[] } | null> {
+    const parsed = sessionIdSchema.safeParse(sessionId);
+    if (!parsed.success) return null;
+    const session = await controlledSession(parsed.data);
+    if (!session) return null;
+    const found = await rotation.sessionAccountChoices(session.id).catch(() => null);
+    if (!found) return null;
+    const now = Date.now();
+    return {
+        current: found.current,
+        accounts: found.accounts.map((account) => ({
+            id: account.id,
+            name: account.name,
+            coolingUntil:
+                account.coolingUntil && account.coolingUntil > now ? new Date(account.coolingUntil).toISOString() : null
+        }))
+    };
+}
+
+/**
+ * Move a running session to another of its owner's accounts for its tool. The
+ * next turn launches on it and resumes the same conversation; an agent that
+ * left its terminal is brought back on it now. Not while the agent waits on an
+ * answer, which a restart would drop.
+ */
+export async function switchSessionAccountAction(input: unknown): Promise<{ error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = sessionAccountSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.account.errors.unknown") };
+    const session = await controlledSession(parsed.data.sessionId);
+    if (!session || core.isSessionOver(session.state)) return { error: t("sessions.errors.gone") };
+    if (await permissions.pendingPermission(session.id)) return { error: t("session.account.errors.busy") };
+    const restart = async (id: string) => {
+        await runtime.refreshCredentials(id);
+        const conversation = await resumableConversation(session);
+        if (conversation && (await runtime.agentHasExited(id))) await runtime.resumeAgent(id, conversation);
+    };
+    try {
+        const outcome = await rotation.switchSessionAccount(
+            session.id,
+            parsed.data.accountId,
+            rotation.switchPorts(restart)
+        );
+        if (outcome === "moved" || outcome === "same") return {};
+        if (outcome === "over") return { error: t("sessions.errors.gone") };
+        if (outcome === "machine") return { error: t("session.account.errors.machine") };
+        if (outcome === "raced") return { error: t("session.account.errors.raced") };
+        return { error: t("session.account.errors.unknown") };
+    } catch (error) {
+        console.error(`[agent-session] ${session.id}: account switch failed:`, error instanceof Error ? error.message : "unknown");
+        return { error: t("session.account.errors.failed") };
+    }
 }
 
 /**
