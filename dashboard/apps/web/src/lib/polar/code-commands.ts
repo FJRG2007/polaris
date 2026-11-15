@@ -17,7 +17,8 @@
  * the session reported and its stored transcript, for every CLI.
  *
  * Polaris runs /goal itself for every CLI, the way Polar's chat does
- * (`lib/agents/session-goal.ts`), plus /copy and /exit. The full inventory
+ * (`lib/agents/session-goal.ts`), at the start too, plus /memory (the
+ * repository's agent memory), /copy and /exit. The full inventory
  * and why each other command is or is not here is in
  * `docs/polar-claude-code-parity.md` (section 8).
  *
@@ -41,6 +42,7 @@ export const CODE_COMMANDS = [
     "diff",
     "context",
     "export",
+    "memory",
     "goal",
     "plan",
     "simplify",
@@ -78,7 +80,8 @@ const LOCAL: Record<Exclude<CodeCommand, Forwarded>, readonly CodeCommandPlace[]
     diff: ["thread"],
     context: ["thread"],
     export: ["thread"],
-    goal: ["thread"],
+    memory: ["thread"],
+    goal: ["start", "thread"],
     copy: ["thread"],
     exit: ["thread"]
 };

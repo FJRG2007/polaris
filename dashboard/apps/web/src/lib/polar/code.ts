@@ -569,7 +569,14 @@ export async function polarCodeStart(
     const asAgent = await promptWithAgent(user, raw, typed);
     if (asAgent && "error" in asAgent) return { error: asAgent.error };
     const prompt = asAgent?.prompt ?? started?.prompt;
-    const { agentId: _agentId, ...body } = (raw ?? {}) as { agentId?: unknown } & Record<string, unknown>;
+    const { agentId: _agentId, goal: rawGoal, ...body } = (raw ?? {}) as {
+        agentId?: unknown;
+        goal?: unknown;
+    } & Record<string, unknown>;
+    // `/goal` typed at the start: kept on the session from its creation, so its
+    // first turn is judged (`lib/agents/session-goal.ts`).
+    const goal = startGoalSchema.safeParse(rawGoal ?? null);
+    if (!goal.success) return { error: (await getTranslations("polar"))("goal.tooLong", { max: GOAL_CONDITION_MAX }) };
     const resolved = await resolvedStart(user, body);
     if ("error" in resolved) return { error: resolved.error };
     const rest = resolved.input;
@@ -591,12 +598,24 @@ export async function polarCodeStart(
         );
         if (!credential) return { error: (await getTranslations("agents"))("sessions.errors.noModelKey") };
         // Pinned to the key Polar resolved, so the session spends that one.
-        return startSessionAction({
-            ...(input as object),
-            modelChoice: { ...choice.data, payer: credential.source }
-        });
+        return withGoal(
+            await startSessionAction({
+                ...(input as object),
+                modelChoice: { ...choice.data, payer: credential.source }
+            }),
+            goal.data
+        );
     }
-    return startSessionAction(input);
+    return withGoal(await startSessionAction(input), goal.data);
+}
+
+const startGoalSchema = z.string().trim().min(1).max(GOAL_CONDITION_MAX).nullable();
+
+/** Puts the start's `/goal` on the session just created. Its first prompt is
+ *  delivered once the machine is up, well after this, so that turn is judged. */
+async function withGoal<T extends { id?: string }>(started: T, condition: string | null): Promise<T> {
+    if (started.id && condition) await setSessionGoal(started.id, condition);
+    return started;
 }
 
 /**

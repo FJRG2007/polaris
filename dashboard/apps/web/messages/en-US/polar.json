@@ -252,7 +252,10 @@
             "exit": "End this session",
             "copied": "Copied the answer.",
             "copyNone": "No answer to copy there.",
-            "copyFailed": "Couldn't copy. Try again."
+            "copyFailed": "Couldn't copy. Try again.",
+            "memory": "See what the agent remembers of this repository",
+            "memoryNone": "This session has no repository to remember.",
+            "memoryClose": "Close memory"
         }
     },
     "context": {

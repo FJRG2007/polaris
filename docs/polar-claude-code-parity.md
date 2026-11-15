@@ -458,7 +458,7 @@ Polar's skills and the person's own "/" commands, so they are not listed one by 
 
 | Command | What it does | Polar Chat | Polar Code | Decision |
 | --- | --- | --- | --- | --- |
-| /goal [condition\|clear] | Keep working across turns until a condition holds, judged after each turn | Built (`goals.ts`) | Built | Polaris runs it for every CLI: kept on `AgentSession.goal`, judged on `turn.end` (`lib/agents/session-goal.ts`), continued through the normal prompt path, bar above the composer |
+| /goal [condition\|clear] | Keep working across turns until a condition holds, judged after each turn | Built (`goals.ts`) | Built (start and running session) | Polaris runs it for every CLI: kept on `AgentSession.goal` (at the start, stored on the new session right after it is created, before its first prompt is delivered), judged on `turn.end` (`lib/agents/session-goal.ts`), continued through the normal prompt path, bar above the composer |
 | /help | List commands | Built | Built | Opens the "/" list |
 | /clear [name] | Empty context | Built (new chat) | Built | Handed to the CLI (`/new` on Codex and opencode) |
 | /compact [instructions] | Summarize to free context | Built | Built | Handed to the CLI (`/compress` on Gemini) |
@@ -480,7 +480,7 @@ Polar's skills and the person's own "/" commands, so they are not listed one by 
 | /copy [N] | Copy the Nth newest answer | Built | Built | Polaris, to the clipboard |
 | /export [filename] | Export the conversation | Built | Not built | Owned elsewhere (transcript export) |
 | /branch [name], /fork [prompt] | Branch the conversation | Built (/branch) | Continue on an ended session | Not built for a running session: the CLI forks into its own background session Polaris does not track |
-| /memory | Edit CLAUDE.md, auto memory | Built | Not built | Repository memory is Polaris's (`repo-memory-store.ts`); the CLI's editor is a picker |
+| /memory | Edit CLAUDE.md, auto memory | Built | Built | Opens the session repository's agent memory (`AgentRepoMemory`, the same section as the repository dialog): what is kept and Clear; the CLI's editor is a picker and is never typed |
 | /rewind | Restore an earlier point | Not built | Not built | Picker in the terminal; checkpoints live in the CLI |
 | /btw [question] | Side question outside the conversation | n/a | Not built | Overlay in the terminal; ask Polar Chat beside the session instead |
 | /recap | One-line session summary | n/a | Not built | Printed in the terminal, never in the transcript Polaris reads |

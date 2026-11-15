@@ -11,7 +11,7 @@ import * as enigmaSlash from "@/lib/polar/enigma-slash";
 
 describe("the commands on offer", () => {
     it("starts a task with its own commands only", () => {
-        expect(codeCommands.codeCommandsFor("start", null)).toEqual(["help", "resume", "model", "clear"]);
+        expect(codeCommands.codeCommandsFor("start", null)).toEqual(["help", "resume", "model", "clear", "goal"]);
     });
 
     it("gives a Claude Code session every handed-over command", () => {
@@ -29,6 +29,7 @@ describe("the commands on offer", () => {
             "diff",
             "context",
             "export",
+            "memory",
             "goal",
             "plan",
             "simplify",
@@ -52,6 +53,7 @@ describe("the commands on offer", () => {
             "diff",
             "context",
             "export",
+            "memory",
             "goal",
             "copy",
             "exit"
@@ -174,12 +176,16 @@ describe("the commands added for Claude Code parity", () => {
     const claude = codeCommands.codeCommandsFor("thread", "claude");
     const codex = codeCommands.codeCommandsFor("thread", "codex");
 
-    it("runs /goal, /copy and /exit in Polaris for every CLI, never at the start", () => {
-        for (const command of ["goal", "copy", "exit"] as const) {
+    it("runs /goal, /memory, /copy and /exit in Polaris for every CLI", () => {
+        for (const command of ["goal", "memory", "copy", "exit"] as const) {
             expect(codex).toContain(command);
             expect(codeCommands.forwardedText(command, "x", "claude")).toBeNull();
-            expect(codeCommands.codeCommandsFor("start", null)).not.toContain(command);
         }
+        // Only /goal is offered at the start: the others need a session.
+        const start = codeCommands.codeCommandsFor("start", null);
+        expect(start).toContain("goal");
+        for (const command of ["memory", "copy", "exit"] as const) expect(start).not.toContain(command);
+        expect(codeCommands.codeCommandIn("/goal ship it", start)).toEqual({ command: "goal", rest: "ship it" });
     });
 
     it("reads a goal's condition after /goal and keeps it for the box", () => {

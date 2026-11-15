@@ -80,6 +80,7 @@ import { useCodeSlash } from "@/components/polar/polar-code-slash";
 import * as codeCommands from "@/lib/polar/code-commands";
 import * as goals from "@/lib/polar/goals";
 import { goalStateKey, PolarGoalBar } from "@/components/polar/polar-goal";
+import { RepoMemorySection } from "@/app/(app)/automations/code-review/repo-memory-section";
 import { usePolarCommands } from "@/components/polar/polar-commands";
 import { ContextBar } from "@/components/polar/polar-context";
 import * as codeStatus from "@/lib/polar/code-status";
@@ -121,7 +122,7 @@ import type {
     PolarCodeThread
 } from "@/lib/polar/code";
 import type { SessionView } from "@/lib/agents/session-service";
-import { Code2, MessageSquare, PanelRight, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Code2, MessageSquare, PanelRight, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import dynamic from "next/dynamic";
 
 /** Loaded after the thread, not with it: its terminal is not needed to read one. */
@@ -854,8 +855,9 @@ function CodeStart({
         place: "start",
         commands: START_COMMANDS,
         enigma: enigma.code,
-        onCommand: (command) => {
+        onCommand: (command, rest) => {
             setPrompt("");
+            if (command === "goal") return startGoal(rest);
             if (command === "help") return setPrompt("/");
             if (command === "resume") return onHistory();
             if (command === "model") return setModelOpen(true);
@@ -939,8 +941,22 @@ function CodeStart({
         // An agent can start from the issue alone; Polar answers words.
         (prompt.trim().length > 0 || (!polar && issue !== null));
 
-    const submit = () => {
-        if (slash.run(prompt)) return;
+    /** `/goal` at the start: the condition becomes the task, and the goal is
+     *  kept on the session from its creation. */
+    const startGoal = (rest: string) => {
+        const asked = goals.parseGoalCommand(rest);
+        if (asked.kind === "too_long") return setError(t("goal.tooLong", { max: goals.GOAL_CONDITION_MAX }));
+        if (asked.kind !== "set") return setError(t("goal.none"));
+        // A task Polar answers itself has no session to keep a goal on.
+        if (polar) {
+            setPrompt(`/goal ${asked.condition}`);
+            return setError(t("code.goalFailed"));
+        }
+        submit(asked.condition);
+    };
+
+    const submit = (goal: string | null = null) => {
+        if (goal === null && slash.run(prompt)) return;
         if (!ready || busy) return;
         if (polar && model) {
             const text = slash.expand(prompt.trim());
@@ -955,7 +971,7 @@ function CodeStart({
         if (!tool || !runOn) return;
         setError(null);
         setGap(null);
-        const text = slash.expand(prompt.trim());
+        const text = goal ?? slash.expand(prompt.trim());
         const started = { issue, skill };
         setSent(text || (issue ? `#${issue.number} ${issue.title}` : ""));
         setPrompt("");
@@ -963,7 +979,7 @@ function CodeStart({
         // typed is lost to a failure.
         const restore = () => {
             setSent(null);
-            setPrompt((current) => current || text);
+            setPrompt((current) => current || (goal ? `/goal ${text}` : text));
         };
         startTransition(() => {
             void runAction(
@@ -999,7 +1015,8 @@ function CodeStart({
                             skill: started.skill,
                             // Code in Polar is the harness's work: Enigma on, the
                             // rest following the repository and the instance.
-                            enigma: { enabled: true }
+                            enigma: { enabled: true },
+                            goal
                         }
                     ),
                 setError
@@ -1050,7 +1067,7 @@ function CodeStart({
                 placeholder={t("code.placeholder")}
                 disabled={!canStart || busy}
                 maxLength={PROMPT_MAX}
-                onSubmit={submit}
+                onSubmit={() => submit()}
                 sendable={!polar && issue !== null}
                 picker={
                     canStart || pending ? (
@@ -1154,7 +1171,7 @@ function CodeStart({
                     </Link>
                 </Notice>
             ) : null}
-            {gap ? <GithubAppGapNotice gap={gap} onCheckAgain={submit} checking={busy} /> : null}
+            {gap ? <GithubAppGapNotice gap={gap} onCheckAgain={() => submit()} checking={busy} /> : null}
             {shownError ? <Notice error>{shownError}</Notice> : null}
         </div>
     );
@@ -1202,6 +1219,8 @@ function CodeThread({
     const [error, setError] = useState<string | null>(null);
     // What a command answered that is not a failure: copied, goal cleared.
     const [info, setInfo] = useState<string | null>(null);
+    // `/memory`: what the agent remembers of this session's repository.
+    const [memoryOpen, setMemoryOpen] = useState(false);
     const [busy, startTransition] = useTransition();
     const parts = useCodeComposerParts(busy);
     const signal = useUnmountSignal();
@@ -1376,6 +1395,10 @@ function CodeThread({
         if (command === "goal") return goalCommand(rest);
         if (command === "copy") return copyAnswer(rest);
         if (command === "exit") return endSession();
+        if (command === "memory") {
+            if (!thread?.view.repoFullName) return setInfo(t("slash.code.memoryNone"));
+            return setMemoryOpen(true);
+        }
         if (command === "help") return setReply("/");
         if (command === "new") return onNew();
         if (command === "resume") return onHistory();
@@ -1580,6 +1603,23 @@ function CodeThread({
                     onContinue={() => thread.goal && sendText(goals.continuationText(thread.goal))}
                     onClear={clearGoal}
                 />
+            ) : null}
+            {memoryOpen && thread.view.repoFullName ? (
+                <div className="flex min-w-0 items-start gap-2 rounded-lg border border-border px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                        <RepoMemorySection repoFullName={thread.view.repoFullName} />
+                    </div>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t("slash.code.memoryClose")}
+                        title={t("slash.code.memoryClose")}
+                        onClick={() => setMemoryOpen(false)}
+                    >
+                        <X />
+                    </Button>
+                </div>
             ) : null}
             <CodeTodos todos={thread.todos ?? []} />
             {thread.permission?.ask ? (

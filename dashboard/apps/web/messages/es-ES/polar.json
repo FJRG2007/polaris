@@ -252,7 +252,10 @@
             "exit": "Terminar esta sesión",
             "copied": "Respuesta copiada.",
             "copyNone": "No hay respuesta que copiar.",
-            "copyFailed": "No se pudo copiar. Reintenta."
+            "copyFailed": "No se pudo copiar. Reintenta.",
+            "memory": "Ver lo que el agente recuerda de este repositorio",
+            "memoryNone": "Esta sesión no tiene repositorio que recordar.",
+            "memoryClose": "Cerrar memoria"
         }
     },
     "context": {
