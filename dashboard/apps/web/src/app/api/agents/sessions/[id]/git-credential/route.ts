@@ -44,10 +44,18 @@ export async function POST(
         : null;
     if (!scoped) return refused(404);
 
-    const token = await githubAppInstallationToken(scoped.owner, scoped.scope).catch((error) => {
-        console.error(`[agent-session] ${id}: no scoped token for ${repository}:`, error);
-        return null;
-    });
+    // The session's `gh` asks with `?tool=gh` for the issue and pull request
+    // permissions too. An App installed before it held those cannot mint them,
+    // so that falls back to the git token: `gh` still works where it can, and
+    // says what was refused where it cannot.
+    const forGh = new URL(request.url).searchParams.get("tool") === "gh";
+    const mint = (permissions: scoping.InstallationScope["permissions"]) =>
+        githubAppInstallationToken(scoped.owner, { ...scoped.scope, permissions }).catch((error) => {
+            console.error(`[agent-session] ${id}: no scoped token for ${repository}:`, error);
+            return null;
+        });
+    const token =
+        (forGh ? await mint(scoping.AGENT_GH_PERMISSIONS) : null) ?? (await mint(scoping.AGENT_GIT_PERMISSIONS));
     if (!token) return refused(403);
 
     return new Response(scoping.gitCredentialAnswer(token), {

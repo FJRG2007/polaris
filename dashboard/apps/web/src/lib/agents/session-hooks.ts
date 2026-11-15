@@ -209,11 +209,20 @@ export function hookScript(ingestUrl: string, token: string, askUrl?: string): s
  * installation. Only `get` is answered: git's `store` and `erase` have nothing
  * to keep here. And only for https://github.com: a remote or submodule pointed
  * anywhere else is handed nothing.
+ *
+ * `token` is the session's `gh` asking (see `session-gh.ts`): the same mint,
+ * with the issue and pull request permissions the GitHub CLI needs, answered as
+ * the bare token for `GH_TOKEN` rather than in git's format.
  */
 export function gitCredentialScript(url: string, token: string): string {
     return [
         "#!/bin/sh",
         "# Written by Polaris. Hands git a short-lived token for this session's repository.",
+        'if [ "$1" = "token" ]; then',
+        `  curl -sS -f -m 15 -X POST ${shellQuote(`${url}?tool=gh`)} \\`,
+        `    -H ${shellQuote(`Authorization: Bearer ${token}`)} 2>/dev/null | sed -n 's/^password=//p' | head -n 1`,
+        "  exit 0",
+        "fi",
         '[ "$1" = "get" ] || exit 0',
         'protocol=""',
         'host=""',

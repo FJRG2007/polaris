@@ -50,6 +50,15 @@ export function repositoryScope(
 
 /** What an agent's git needs, and nothing it does not: clone, fetch, push. */
 export const AGENT_GIT_PERMISSIONS = { contents: "write" } as const;
+/** What a session's `gh` is minted: its repository's contents, issues and pull
+ *  requests, and its CI read-only - still that one repository, for an hour. */
+export const AGENT_GH_PERMISSIONS = {
+    contents: "write",
+    issues: "write",
+    pull_requests: "write",
+    actions: "read",
+    checks: "read"
+} as const;
 /** What a clone needs. */
 export const CLONE_PERMISSIONS = { contents: "read" } as const;
 
