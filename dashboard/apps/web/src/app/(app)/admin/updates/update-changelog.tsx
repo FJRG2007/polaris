@@ -270,9 +270,6 @@ export function UpdateChangelog({
 
     return (
         <section {...sectionProps} className="flex flex-col gap-2 border-t border-border pt-3">
-            {installed ? null : (
-                <p className="text-xs text-muted-foreground">{t("settings.changelog.availableHint")}</p>
-            )}
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
                 {title}
                 <ul className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -290,6 +287,10 @@ export function UpdateChangelog({
                     })}
                 </ul>
             </div>
+
+            {installed ? null : (
+                <p className="text-xs text-muted-foreground">{t("settings.changelog.availableHint")}</p>
+            )}
 
             <div className="flex flex-col divide-y divide-border rounded-md border border-border">
                 {groups.map(({ group, entries }) => {
