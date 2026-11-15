@@ -73,6 +73,20 @@ jobs:
             /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/share/powershell
           df -h /
 
+      # The web build's peak outgrows the runner's memory: the kernel killed
+      # Next's build worker (SIGKILL) and took the runner down with it, which
+      # reads as "The runner has received a shutdown signal". Swap on the disk
+      # freed above absorbs the peak instead.
+      - name: Add swap
+        continue-on-error: true
+        working-directory: .
+        run: |
+          sudo fallocate -l 12G /polaris-swap
+          sudo chmod 600 /polaris-swap
+          sudo mkswap /polaris-swap
+          sudo swapon /polaris-swap
+          free -h
+
       - uses: actions/checkout@v7
         continue-on-error: true
 

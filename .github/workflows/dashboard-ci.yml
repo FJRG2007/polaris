@@ -267,6 +267,18 @@ jobs:
             /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/share/powershell
           df -h /
 
+      # The same build's peak outgrew the runner's memory in Dashboard cache:
+      # the kernel killed Next's build worker and the runner with it. Swap on
+      # the disk freed above absorbs the peak.
+      - name: Add swap
+        working-directory: .
+        run: |
+          sudo fallocate -l 12G /polaris-swap
+          sudo chmod 600 /polaris-swap
+          sudo mkswap /polaris-swap
+          sudo swapon /polaris-swap
+          free -h
+
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
