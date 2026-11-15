@@ -1,87 +1,42 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { cn } from "@polaris/ui";
+/**
+ * A light's more-info controls, after Home Assistant's light dialog and the
+ * Google Home / Apple Home tiles: a tall brightness bar you drag, a colour
+ * temperature bar painted warm to cold in kelvin, and a colour wheel - each
+ * drawn only when the light reports it. Every one shows where it is dragged at
+ * once and sends the value it is let go on; the row's optimistic update and
+ * rollback are `useDeviceAct`'s, which is what `onAct` reaches.
+ */
+
+import { useState } from "react";
+import { ControlSlider, cn } from "@polaris/ui";
+import { Sun } from "lucide-react";
 import { usePlacesT } from "../use-places-t";
 import { ColorWheel } from "./color-wheel";
 import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
 
-/** How long a slider is left still before what it says is sent: a drag is one
- *  setting, not forty. */
-const SETTLE_MS = 400;
+/**
+ * The colour of white light at a temperature, as sRGB 0-255: Tanner Helland's
+ * fit to the blackbody curve, which Home Assistant's `temperature2rgb` uses too.
+ */
+export function kelvinToRgb(kelvin: number): [number, number, number] {
+    const k = Math.min(40_000, Math.max(1_000, kelvin)) / 100;
+    const clamp = (n: number) => Math.round(Math.min(255, Math.max(0, n)));
+    const red = k <= 66 ? 255 : 329.698727446 * (k - 60) ** -0.1332047592;
+    const green =
+        k <= 66 ? 99.4708025861 * Math.log(k) - 161.1195681661 : 288.1221695283 * (k - 60) ** -0.0755148492;
+    const blue = k >= 66 ? 255 : k <= 19 ? 0 : 138.5177312231 * Math.log(k - 10) - 305.0447927307;
+    return [clamp(red), clamp(green), clamp(blue)];
+}
 
-const WARMTH_TRACK = "linear-gradient(to right, #ffb46b, #fff1e0, #dbe8ff)";
-
-/** A slider that shows where it is dragged at once and sends only once it is
- *  let go of for a moment. The row's own optimistic update and rollback are
- *  `useDeviceAct`'s, which is what `onCommit` reaches. */
-function SettlingSlider({
-    label,
-    value,
-    min,
-    max,
-    step,
-    unit,
-    disabled,
-    track,
-    onCommit
-}: {
-    label: string;
-    value: number | null;
-    min: number;
-    max: number;
-    step: number;
-    unit: string;
-    disabled: boolean;
-    track?: string;
-    onCommit: (value: number) => void;
-}) {
-    const [shown, setShown] = useState<number | null>(value);
-    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const pending = useRef<number | null>(null);
-    const commit = useRef(onCommit);
-    commit.current = onCommit;
-    // A later sync wins over a drag that has already been sent.
-    useEffect(() => {
-        if (!timer.current) setShown(value);
-    }, [value]);
-    const flush = () => {
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = null;
-        const next = pending.current;
-        pending.current = null;
-        if (next !== null) commit.current(next);
-    };
-    // Leaving with a drag gathered sends it rather than dropping it.
-    useEffect(() => () => flush(), []);
-    const change = (next: number) => {
-        setShown(next);
-        pending.current = next;
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(flush, SETTLE_MS);
-    };
-    return (
-        <label className="flex min-w-0 flex-col gap-1">
-            <span className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
-                <span className="truncate">{label}</span>
-                <span className="shrink-0 tabular-nums">
-                    {shown === null ? "-" : `${shown}${unit}`}
-                </span>
-            </span>
-            <input
-                type="range"
-                min={min}
-                max={max}
-                step={step}
-                value={shown ?? min}
-                disabled={disabled}
-                aria-label={label}
-                onChange={(event) => change(Number(event.target.value))}
-                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary disabled:cursor-not-allowed disabled:opacity-50"
-                style={track ? { background: track } : undefined}
-            />
-        </label>
-    );
+/** The colour temperature track, warm at the left (its minimum) to cold. */
+export function kelvinTrack(min: number, max: number, stops = 6): string {
+    const colors = Array.from({ length: stops }, (_, index) => {
+        const [r, g, b] = kelvinToRgb(min + ((max - min) * index) / (stops - 1));
+        return `rgb(${r} ${g} ${b})`;
+    });
+    return `linear-gradient(to right, ${colors.join(", ")})`;
 }
 
 /** Brightness, colour temperature and a colour wheel, each drawn only when the light has it. */
@@ -97,56 +52,90 @@ export function LightControls({
     className?: string;
 }) {
     const t = usePlacesT();
+    const [liveLevel, setLiveLevel] = useState<number | null>(null);
+    const [liveKelvin, setLiveKelvin] = useState<number | null>(null);
     const light = device.light ?? null;
     if (!light) return null;
     const disabled = !canControl || !device.online;
+    const brightness = light.brightness;
+    const temperature = light.temperature;
+    const brightnessLabel = t("devices.actions.set-brightness");
+    const warmthLabel = t("devices.actions.set-color-temp");
+    const brightnessShown = liveLevel ?? brightness?.level ?? null;
+    const kelvinShown = liveKelvin ?? temperature?.kelvin ?? null;
     return (
-        <div className={cn("flex flex-col gap-3", className)}>
-            {light.brightness ? (
-                <SettlingSlider
-                    label={t("devices.actions.set-brightness")}
-                    value={light.brightness.level}
-                    min={1}
-                    max={100}
-                    step={1}
-                    unit="%"
-                    disabled={disabled}
-                    onCommit={(level) =>
-                        onAct("set-brightness", { action: "set-brightness", level })
-                    }
-                />
+        <div className={cn("flex flex-col gap-4", className)}>
+            {brightness || light.color ? (
+                <div className="flex flex-wrap items-center justify-center gap-6">
+                    {brightness ? (
+                        <ControlSlider
+                            orientation="vertical"
+                            label={brightnessLabel}
+                            value={brightness.level}
+                            min={1}
+                            max={100}
+                            step={1}
+                            valueText={(level) => `${level}%`}
+                            disabled={disabled}
+                            onLive={setLiveLevel}
+                            onCommit={(level) =>
+                                onAct("set-brightness", { action: "set-brightness", level })
+                            }
+                            className="h-56 w-24"
+                        >
+                            <Sun className="size-5 shrink-0" aria-hidden="true" />
+                            <span>{brightnessShown === null ? "-" : `${brightnessShown}%`}</span>
+                        </ControlSlider>
+                    ) : null}
+                    {light.color ? (
+                        <ColorWheel
+                            className="w-56 max-w-full"
+                            label={t("devices.actions.set-color")}
+                            valueText={({ hue, saturation }) =>
+                                t("devices.colorValue", { hue, saturation })
+                            }
+                            value={
+                                light.color.hue === null
+                                    ? null
+                                    : {
+                                          hue: light.color.hue,
+                                          saturation: light.color.saturation ?? 100
+                                      }
+                            }
+                            disabled={disabled}
+                            onCommit={({ hue, saturation }) =>
+                                onAct("set-color", { action: "set-color", hue, saturation })
+                            }
+                        />
+                    ) : null}
+                </div>
             ) : null}
-            {light.temperature ? (
-                <SettlingSlider
-                    label={t("devices.actions.set-color-temp")}
-                    value={light.temperature.kelvin}
-                    min={light.temperature.min}
-                    max={light.temperature.max}
-                    step={50}
-                    unit=" K"
-                    disabled={disabled}
-                    track={WARMTH_TRACK}
-                    onCommit={(kelvin) =>
-                        onAct("set-color-temp", { action: "set-color-temp", kelvin })
-                    }
-                />
-            ) : null}
-            {light.color ? (
-                <ColorWheel
-                    label={t("devices.actions.set-color")}
-                    valueText={({ hue, saturation }) =>
-                        t("devices.colorValue", { hue, saturation })
-                    }
-                    value={
-                        light.color.hue === null
-                            ? null
-                            : { hue: light.color.hue, saturation: light.color.saturation ?? 100 }
-                    }
-                    disabled={disabled}
-                    onCommit={({ hue, saturation }) =>
-                        onAct("set-color", { action: "set-color", hue, saturation })
-                    }
-                />
+            {temperature ? (
+                <div className="flex min-w-0 flex-col gap-1">
+                    <span className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+                        <span className="truncate">{warmthLabel}</span>
+                        <span className="shrink-0 tabular-nums">
+                            {kelvinShown === null
+                                ? "-"
+                                : t("devices.kelvinValue", { value: kelvinShown })}
+                        </span>
+                    </span>
+                    <ControlSlider
+                        mode="cursor"
+                        label={warmthLabel}
+                        value={temperature.kelvin}
+                        min={temperature.min}
+                        max={temperature.max}
+                        step={50}
+                        valueText={(kelvin) => t("devices.kelvinValue", { value: kelvin })}
+                        track={kelvinTrack(temperature.min, temperature.max)}
+                        disabled={disabled}
+                        onLive={setLiveKelvin}
+                        onCommit={(kelvin) =>
+                            onAct("set-color-temp", { action: "set-color-temp", kelvin })
+                        }
+                    />
+                </div>
             ) : null}
         </div>
     );

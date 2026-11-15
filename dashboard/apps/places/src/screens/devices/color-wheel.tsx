@@ -5,15 +5,19 @@
  * centre out to the rim - the picker Home Assistant's more-info dialog and the
  * Hue app both use, because one drag picks both at once.
  *
+ * Home Assistant's is `ha-hs-color-picker` (Apache-2.0); this is adapted from
+ * the idea, not the code.
+ *
  * Keyboard: Left and Right turn the hue, Up and Down move the saturation, Shift
- * takes bigger steps. Like the sliders beside it, what it shows moves at once
- * and is sent once the drag has been still for a moment.
+ * takes bigger steps. Like the sliders beside it, what it shows moves at once,
+ * a drag sends the colour it is let go on and keys are gathered for a moment
+ * (`useReleasedValue`).
  */
 
-import { cn } from "@polaris/ui";
-import { useEffect, useRef, useState } from "react";
+import { cn, useReleasedValue } from "@polaris/ui";
 
-const SETTLE_MS = 400;
+/** Keys turn a colour quicker than they step a temperature, so they settle sooner. */
+const KEY_SETTLE_MS = 400;
 
 export interface HueSaturation {
     readonly hue: number;
@@ -74,42 +78,30 @@ export function ColorWheel({
     onCommit: (value: HueSaturation) => void;
     className?: string;
 }) {
-    const [shown, setShown] = useState<HueSaturation>(value ?? { hue: 0, saturation: 0 });
-    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const pending = useRef<HueSaturation | null>(null);
-    const dragging = useRef(false);
-    const commit = useRef(onCommit);
-    commit.current = onCommit;
-    // A later sync wins over a pick that has already been sent.
-    const syncedHue = value?.hue ?? null;
-    const syncedSaturation = value?.saturation ?? null;
-    useEffect(() => {
-        if (syncedHue === null || syncedSaturation === null) return;
-        if (!timer.current && !dragging.current)
-            setShown({ hue: syncedHue, saturation: syncedSaturation });
-    }, [syncedHue, syncedSaturation]);
-    const flush = () => {
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = null;
-        const next = pending.current;
-        pending.current = null;
-        if (next) commit.current(next);
-    };
-    useEffect(() => () => flush(), []);
-    const change = (next: HueSaturation) => {
-        setShown(next);
-        pending.current = next;
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(flush, SETTLE_MS);
-    };
+    // Held as a pair so a pick back onto the light's own colour is seen as one.
+    const device: readonly [number, number] | null =
+        value === null ? null : [value.hue, value.saturation];
+    const held = useReleasedValue(
+        device,
+        (next) => {
+            if (next) onCommit({ hue: next[0], saturation: next[1] });
+        },
+        { settleMs: KEY_SETTLE_MS }
+    );
+    const shown: HueSaturation = held.shown
+        ? { hue: held.shown[0], saturation: held.shown[1] }
+        : { hue: 0, saturation: 0 };
+    const pair = (next: HueSaturation) => [next.hue, next.saturation] as const;
     const pick = (event: React.PointerEvent<HTMLDivElement>) => {
         const box = event.currentTarget.getBoundingClientRect();
         const radius = Math.min(box.width, box.height) / 2;
-        change(
-            hsFromPoint(
-                event.clientX - (box.left + box.width / 2),
-                event.clientY - (box.top + box.height / 2),
-                radius
+        held.drag(
+            pair(
+                hsFromPoint(
+                    event.clientX - (box.left + box.width / 2),
+                    event.clientY - (box.top + box.height / 2),
+                    radius
+                )
             )
         );
     };
@@ -136,36 +128,37 @@ export function ColorWheel({
                 aria-valuenow={shown.hue}
                 aria-valuetext={valueText(shown)}
                 className={cn(
-                    "relative aspect-square w-full max-w-48 touch-none self-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    "relative aspect-square w-full max-w-56 touch-none self-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                     disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
                 )}
                 style={{ background: WHEEL }}
                 onPointerDown={(event) => {
-                    if (disabled) return;
-                    dragging.current = true;
-                    event.currentTarget.setPointerCapture(event.pointerId);
+                    if (disabled || event.button > 0) return;
+                    event.currentTarget.setPointerCapture?.(event.pointerId);
                     pick(event);
                 }}
                 onPointerMove={(event) => {
-                    if (dragging.current && !disabled) pick(event);
+                    if (held.holding() && !disabled) pick(event);
                 }}
                 onPointerUp={() => {
-                    dragging.current = false;
+                    if (held.holding()) held.release();
                 }}
-                onPointerCancel={() => {
-                    dragging.current = false;
+                onPointerCancel={() => held.cancel()}
+                onLostPointerCapture={() => {
+                    if (held.holding()) held.release();
                 }}
+                onBlur={() => held.flush()}
                 onKeyDown={(event) => {
                     if (disabled) return;
                     const next = stepHs(shown, event.key, event.shiftKey);
                     if (!next) return;
                     event.preventDefault();
-                    change(next);
+                    held.nudge(pair(next));
                 }}
             >
                 <span
                     aria-hidden
-                    className="pointer-events-none absolute size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.4)]"
+                    className="pointer-events-none absolute size-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white shadow-[0_0_0_1px_rgb(0_0_0/0.4)]"
                     style={{
                         left: `${50 + point.x * 50}%`,
                         top: `${50 + point.y * 50}%`,

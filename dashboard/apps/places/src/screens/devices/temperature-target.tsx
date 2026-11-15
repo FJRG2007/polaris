@@ -1,30 +1,27 @@
 "use client";
 
 /**
- * The temperature a unit is aiming for: lower, raise, or type it.
+ * The temperature a unit is aiming for: drag it, or type it.
  *
- * The buttons are for "a bit warmer". Typing is for "27, please" - from 20 that
- * is seven presses on a phone, and on a unit that steps by half a degree it is
- * fourteen. So the number between the buttons is itself a field: tap it, type,
- * and Enter or leaving it applies; Escape puts it back.
+ * In the panel it is a thermostat dial (`ThermostatDial`) with the target large
+ * in the middle; in a row it is a slider beside the number. Dragging is for "a
+ * bit warmer"; typing is for "27, please". So the number is itself a field: tap
+ * it, type, and Enter or leaving it applies; Escape puts it back.
  *
  * What is typed is held to the unit's own range and step, the same rule the
  * service checks before anything is sent, and a value off either is refused and
- * said rather than quietly moved to the nearest one that fits. Presses of the
- * buttons are gathered for a moment and sent as one change; a typed value is
- * one change already and goes at once. Either way the number shown is the one
- * being sent, and the screen above puts it back if the unit refuses.
+ * said rather than quietly moved to the nearest one that fits. A drag sends the
+ * value it is let go on, key presses are gathered for a moment and sent as one,
+ * and a typed value goes at once. Either way the number shown is the one being
+ * sent, and the screen above puts it back if the unit refuses.
  */
 
-import { Button, cn } from "@polaris/ui";
-import { Minus, Plus } from "lucide-react";
+import { ControlSlider, cn } from "@polaris/ui";
 import { usePlacesT } from "../use-places-t";
 import * as kinds from "../../lib/device-kinds";
 import { useEffect, useId, useRef, useState } from "react";
+import { ThermostatDial, type DialTone } from "./controls/thermostat-dial";
 import type { ClimateSettings } from "../../lib/device-kinds";
-
-/** How long the stepper waits for another press before it sends the total. */
-const STEP_SETTLE_MS = 700;
 
 /** How long a refusal stays under the field once it has been left. Long enough
  *  to read, short enough not to sit there describing a value nobody kept. */
@@ -35,7 +32,10 @@ export function TemperatureTarget({
     settings,
     disabled,
     describedBy,
-    onSet
+    onSet,
+    variant = "row",
+    tone = "idle",
+    current = null
 }: {
     /** The device's name, for every label read aloud. */
     name: string;
@@ -43,15 +43,18 @@ export function TemperatureTarget({
     disabled: boolean;
     describedBy?: string;
     onSet: (target: number) => void;
+    /** `dial` is the panel's thermostat; `row` a slider that fits in a list. */
+    variant?: "row" | "dial";
+    /** What the unit is doing, which colours the dial. */
+    tone?: DialTone;
+    /** The room's temperature, shown under the target on the dial. */
+    current?: number | null;
 }) {
     const t = usePlacesT();
     const issueId = useId();
 
-    // The target as shown while a change is on its way; null whenever nothing
-    // is waiting, so the device's own value is shown.
-    const [draft, setDraft] = useState<number | null>(null);
-    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const pending = useRef<number | null>(null);
+    // The target being dragged to, while it is held; null shows the unit's.
+    const [live, setLive] = useState<number | null>(null);
     const send = useRef(onSet);
     send.current = onSet;
 
@@ -65,36 +68,12 @@ export function TemperatureTarget({
     const number = useRef<HTMLButtonElement | null>(null);
     const refocus = useRef(false);
 
-    const flush = () => {
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = null;
-        const target = pending.current;
-        pending.current = null;
-        setDraft(null);
-        if (target !== null) send.current(target);
-    };
-
-    // Leaving with a change gathered sends it rather than dropping it: closing
-    // the panel straight after pressing + is still pressing +.
     useEffect(
         () => () => {
-            flush();
             if (linger.current) clearTimeout(linger.current);
         },
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- on the way out only.
         []
     );
-
-    // Pressed back to where the device already is: nothing to send.
-    const settled = settings.target;
-    useEffect(() => {
-        if (draft !== null && draft === settled && pending.current === settled) {
-            if (timer.current) clearTimeout(timer.current);
-            timer.current = null;
-            pending.current = null;
-            setDraft(null);
-        }
-    }, [draft, settled]);
 
     // Selected as it opens, so typing replaces the number rather than adding
     // to the end of it.
@@ -115,7 +94,7 @@ export function TemperatureTarget({
         setTyping(null);
     };
 
-    const shown = draft ?? settings.target;
+    const shown = live ?? settings.target;
     const unit = `°${settings.unit}`;
 
     const say = (found: kinds.TypedTemperatureIssue): string => {
@@ -135,21 +114,6 @@ export function TemperatureTarget({
         if (linger.current) clearTimeout(linger.current);
         linger.current = null;
         setIssue(null);
-    };
-
-    const nudge = (direction: 1 | -1) => {
-        clearIssue();
-        const from = pending.current ?? settings.target ?? settings.min;
-        const next =
-            Math.round(
-                Math.min(settings.max, Math.max(settings.min, from + direction * settings.step)) *
-                    100
-            ) / 100;
-        if (next === (pending.current ?? settings.target)) return;
-        pending.current = next;
-        setDraft(next);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(flush, STEP_SETTLE_MS);
     };
 
     const open = () => {
@@ -180,14 +144,12 @@ export function TemperatureTarget({
         }
         close(!leaving);
         clearIssue();
-        // Already what it is set to, or already on its way: nothing to send.
-        if (read.target === (pending.current ?? settings.target)) return;
-        pending.current = read.target;
-        setDraft(read.target);
-        flush();
+        // Already what it is set to: nothing to send.
+        if (read.target === settings.target) return;
+        send.current(read.target);
     };
 
-    const live = (text: string) => {
+    const typed = (text: string) => {
         setTyping(text);
         const read = kinds.typedTemperature(text, settings);
         // Said while typing, except for a number that is only too small because
@@ -206,93 +168,133 @@ export function TemperatureTarget({
     // from anybody listening to the page.
     const buttonLabel = t("devicePanel.climate.typeTargetNow", { name, value: shownText });
 
-    return (
-        <div className="flex flex-col gap-1">
-            <div
-                role="group"
-                aria-label={t("devicePanel.climate.targetName", { name })}
-                aria-describedby={describedBy}
+    const big = variant === "dial";
+    const range = { min: settings.min, max: settings.max, step: settings.step };
+    const valueText = (value: number) => kinds.temperatureText(value, settings.unit);
+    const groupName = t("devicePanel.climate.targetName", { name });
+
+    // The number beside the slider or in the dial's middle, or the field it
+    // turns into.
+    const numberField = (
+        typing === null ? (
+            <button
+                ref={number}
+                type="button"
+                aria-label={buttonLabel}
+                title={editLabel}
+                disabled={disabled}
+                onClick={open}
                 className={cn(
-                    "inline-flex h-8 items-center rounded-md border border-border",
-                    issue && "border-danger-edge"
+                    "cursor-text rounded-md px-1 text-center font-medium tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default",
+                    big ? "min-h-11 min-w-[6rem] text-4xl" : "h-11 min-w-[4.5rem] text-sm"
                 )}
             >
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-full rounded-r-none px-2"
-                    aria-label={t("devicePanel.climate.lower", { name })}
-                    title={t("devicePanel.climate.lower", { name })}
-                    disabled={disabled || (shown !== null && shown <= settings.min)}
-                    onClick={() => nudge(-1)}
-                >
-                    <Minus className="size-4" aria-hidden="true" />
-                </Button>
-                {typing === null ? (
-                    <button
-                        ref={number}
-                        type="button"
-                        aria-label={buttonLabel}
-                        title={editLabel}
-                        disabled={disabled}
-                        onClick={open}
-                        className="h-full min-w-[4.5rem] cursor-text px-1 text-center text-sm font-medium tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
-                    >
-                        <span aria-live="polite">{shownText}</span>
-                    </button>
-                ) : (
-                    <span className="flex h-full min-w-[4.5rem] items-center justify-center gap-0.5 px-1">
-                        <input
-                            ref={field}
-                            autoFocus
-                            type="text"
-                            // A keypad with a decimal key on a phone. Not
-                            // type="number": that one refuses "24,5" outright
-                            // in a browser set to English and turns the wheel
-                            // into a second stepper.
-                            inputMode="decimal"
-                            enterKeyHint="done"
-                            autoComplete="off"
-                            aria-label={editLabel}
-                            aria-invalid={issue ? true : undefined}
-                            aria-describedby={issue ? issueId : undefined}
-                            value={typing}
-                            onChange={(event) => live(event.target.value)}
-                            onBlur={() => apply(true)}
-                            onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                    event.preventDefault();
-                                    apply(false);
-                                } else if (event.key === "Escape") {
-                                    // Kept from the dialog around it: Escape
-                                    // here means "not that number", not
-                                    // "close the panel".
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    clearIssue();
-                                    close(true);
-                                }
-                            }}
-                            // 16px on a phone, or the browser zooms the page
-                            // in to show the field and leaves it zoomed.
-                            className="w-12 bg-transparent text-center text-base font-medium tabular-nums outline-none sm:text-sm"
-                        />
-                        <span className="text-sm text-muted-foreground" aria-hidden="true">
-                            {unit}
-                        </span>
-                    </span>
+                <span aria-live="polite">{shownText}</span>
+            </button>
+        ) : (
+            <span
+                className={cn(
+                    "flex items-center justify-center gap-0.5 px-1",
+                    big ? "min-h-11 min-w-[6rem]" : "h-11 min-w-[4.5rem]"
                 )}
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-full rounded-l-none px-2"
-                    aria-label={t("devicePanel.climate.raise", { name })}
-                    title={t("devicePanel.climate.raise", { name })}
-                    disabled={disabled || (shown !== null && shown >= settings.max)}
-                    onClick={() => nudge(1)}
-                >
-                    <Plus className="size-4" aria-hidden="true" />
-                </Button>
+            >
+                <input
+                    ref={field}
+                    autoFocus
+                    type="text"
+                    // A keypad with a decimal key on a phone. Not
+                    // type="number": that one refuses "24,5" outright
+                    // in a browser set to English and turns the wheel
+                    // into a second stepper.
+                    inputMode="decimal"
+                    enterKeyHint="done"
+                    autoComplete="off"
+                    aria-label={editLabel}
+                    aria-invalid={issue ? true : undefined}
+                    aria-describedby={issue ? issueId : undefined}
+                    value={typing}
+                    onChange={(event) => typed(event.target.value)}
+                    onBlur={() => apply(true)}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                            event.preventDefault();
+                            apply(false);
+                        } else if (event.key === "Escape") {
+                            // Kept from the dialog around it: Escape
+                            // here means "not that number", not
+                            // "close the panel".
+                            event.preventDefault();
+                            event.stopPropagation();
+                            clearIssue();
+                            close(true);
+                        }
+                    }}
+                    // 16px on a phone, or the browser zooms the page
+                    // in to show the field and leaves it zoomed.
+                    className={cn(
+                        "bg-transparent text-center font-medium tabular-nums outline-none",
+                        big ? "w-20 text-3xl" : "w-12 text-base sm:text-sm"
+                    )}
+                />
+                <span className="text-sm text-muted-foreground" aria-hidden="true">
+                    {unit}
+                </span>
+            </span>
+        )
+    );
+
+    return (
+        <div className="flex min-w-0 flex-col gap-1">
+            <div
+                role="group"
+                aria-label={groupName}
+                aria-describedby={describedBy}
+                className={cn(
+                    big ? "flex w-full justify-center" : "inline-flex min-w-0 items-center gap-2",
+                    issue && !big && "rounded-md ring-1 ring-danger-edge"
+                )}
+            >
+                {big ? (
+                    <ThermostatDial
+                        range={range}
+                        value={settings.target}
+                        tone={tone}
+                        current={current}
+                        label={groupName}
+                        valueText={valueText}
+                        disabled={disabled}
+                        describedBy={describedBy}
+                        onLive={setLive}
+                        onCommit={(value) => send.current(value)}
+                    >
+                        <span className="text-xs text-muted-foreground">
+                            {t("devicePanel.climate.target")}
+                        </span>
+                        {numberField}
+                        {current !== null ? (
+                            <span className="text-sm tabular-nums text-muted-foreground">
+                                {t("devicePanel.climate.roomNow", {
+                                    value: kinds.temperatureText(current, settings.unit)
+                                })}
+                            </span>
+                        ) : null}
+                    </ThermostatDial>
+                ) : (
+                    <>
+                        <ControlSlider
+                            {...range}
+                            value={settings.target}
+                            label={groupName}
+                            valueText={valueText}
+                            disabled={disabled}
+                            describedBy={describedBy}
+                            onLive={setLive}
+                            onCommit={(value) => send.current(value)}
+                            className="w-32 shrink-0"
+                        />
+                        {numberField}
+                    </>
+                )}
             </div>
             {issue ? (
                 <p id={issueId} aria-live="polite" className="text-xs text-danger">

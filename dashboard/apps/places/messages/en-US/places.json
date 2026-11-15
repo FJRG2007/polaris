@@ -1841,6 +1841,7 @@
             "litterLevel": "Litter {percent}%"
         },
         "colorValue": "Hue {hue} degrees, saturation {saturation}%",
+        "kelvinValue": "{value} K",
         "reach": {
             "local": "Reached on your network",
             "cloud": "Not found on this network, using the cloud",
@@ -1960,10 +1961,9 @@
             "modeName": "Mode of {name}",
             "fanName": "Fan speed of {name}",
             "targetName": "Target temperature of {name}",
-            "lower": "Lower the target on {name}",
-            "raise": "Raise the target on {name}",
             "typeTarget": "Type the target for {name}",
             "typeTargetNow": "{value}, type the target for {name}",
+            "roomNow": "Room {value}",
             "typedNumber": "Type a number",
             "typedRange": "Between {min} and {max}",
             "typedStep": "In steps of {step}",
@@ -1980,8 +1980,6 @@
             "speedName": "Fan speed of {name}",
             "target": "Target humidity",
             "targetName": "Target humidity of {name}",
-            "lower": "Lower the target humidity on {name}",
-            "raise": "Raise the target humidity on {name}",
             "switches": "Options",
             "optionName": "{option} on {name}",
             "readings": "Readings",

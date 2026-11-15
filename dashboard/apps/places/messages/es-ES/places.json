@@ -1841,6 +1841,7 @@
             "litterLevel": "Arena {percent}%"
         },
         "colorValue": "Tono {hue} grados, saturación {saturation}%",
+        "kelvinValue": "{value} K",
         "reach": {
             "local": "Conectado en tu red",
             "cloud": "No está en esta red, se usa la nube",
@@ -1960,10 +1961,9 @@
             "modeName": "Modo de {name}",
             "fanName": "Ventilador de {name}",
             "targetName": "Temperatura objetivo de {name}",
-            "lower": "Bajar el objetivo de {name}",
-            "raise": "Subir el objetivo de {name}",
             "typeTarget": "Escribir el objetivo de {name}",
             "typeTargetNow": "{value}, escribir el objetivo de {name}",
+            "roomNow": "Sala {value}",
             "typedNumber": "Escribe un número",
             "typedRange": "Entre {min} y {max}",
             "typedStep": "En pasos de {step}",
@@ -1980,8 +1980,6 @@
             "speedName": "Velocidad de {name}",
             "target": "Humedad objetivo",
             "targetName": "Humedad objetivo de {name}",
-            "lower": "Bajar la humedad objetivo de {name}",
-            "raise": "Subir la humedad objetivo de {name}",
             "switches": "Opciones",
             "optionName": "{option} en {name}",
             "readings": "Lecturas",

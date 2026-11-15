@@ -5,7 +5,8 @@
  * target, switches, readings and filters.
  *
  * Every control moves the moment it is used and moves back when the unit
- * refuses. The humidity stepper gathers presses into one change. What a unit
+ * refuses. The humidity target is a slider: key presses on it are gathered into
+ * one change, and a drag sends the value it is let go on. What a unit
  * cannot do is never offered, a worn filter is flagged on the row, and a unit
  * that cannot be operated says why.
  *
@@ -255,14 +256,16 @@ describe("an air purifier's panel", () => {
         expect(panel.getByText("Fine for most people. Auto keeps it there.")).toBeTruthy();
     });
 
-    it("gathers presses of the humidity stepper into one change", async () => {
+    it("gathers key presses on the humidity slider into one change", async () => {
         const dialog = await opened(purifier());
         vi.useFakeTimers();
-        const raise = within(dialog).getByRole("button", {
-            name: "Raise the target humidity on Bedroom purifier"
+        const slider = within(dialog).getByRole("slider", {
+            name: "Target humidity of Bedroom purifier"
         });
-        fireEvent.click(raise);
-        fireEvent.click(raise);
+        expect(slider.getAttribute("aria-valuenow")).toBe("50");
+        fireEvent.keyDown(slider, { key: "ArrowUp" });
+        fireEvent.keyDown(slider, { key: "ArrowUp" });
+        expect(slider.getAttribute("aria-valuetext")).toBe("70%");
         expect(
             within(dialog).getByRole("group", { name: "Target humidity of Bedroom purifier" })
                 .textContent
@@ -274,6 +277,20 @@ describe("an air purifier's panel", () => {
         expect(pressed).toEqual([
             ["air-1", "set-humidity", { action: "set-humidity", target: 70 }]
         ]);
+    });
+
+    it("picks a fan speed from the panel's buttons", async () => {
+        const dialog = await opened(purifier());
+        const speeds = within(dialog).getByRole("radiogroup", {
+            name: "Fan speed of Bedroom purifier"
+        });
+        const unchecked = within(speeds)
+            .getAllByRole("radio")
+            .find((radio) => radio.getAttribute("aria-checked") === "false");
+        expect(unchecked).toBeTruthy();
+        fireEvent.click(unchecked!);
+        expect(pressed).toHaveLength(1);
+        expect(pressed[0]?.[1]).toBe("set-fan");
     });
 
     it("flips a switch at once and puts it back when the unit refuses", async () => {

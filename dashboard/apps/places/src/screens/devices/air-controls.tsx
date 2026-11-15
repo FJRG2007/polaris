@@ -7,7 +7,7 @@
  *
  * Built like the air conditioner's (`climate-controls.tsx`): every control moves
  * the moment it is used, the screen above puts it back if the unit refuses, and
- * the humidity stepper gathers presses into one change. What a unit cannot do is
+ * the humidity target is a slider that sends the value it is let go on. What a unit cannot do is
  * never offered; when it cannot be operated at all the controls stay, showing
  * its settings, and say why.
  *
@@ -18,14 +18,11 @@
 
 import { usePlacesT } from "../use-places-t";
 import * as kinds from "../../lib/device-kinds";
-import { useEffect, useId, useRef, useState } from "react";
-import { Droplets, Minus, Plus, Wind } from "lucide-react";
+import { useId, useState } from "react";
+import { Droplets, Wind } from "lucide-react";
 import { DeviceSwitch, controlReason } from "./device-switch";
-import { Badge, Button, Select, Switch, cn } from "@polaris/ui";
+import { Badge, ControlSlider, SegmentedControl, Select, Switch, cn } from "@polaris/ui";
 import type { AirSettings, DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
-
-/** How long the stepper waits for another press before it sends the total. */
-const STEP_SETTLE_MS = 700;
 
 const FILTER_TONES: Readonly<Record<kinds.FilterState, string>> = {
     ok: "border-border bg-muted text-muted-foreground",
@@ -145,36 +142,8 @@ export function AirControls({
     const reason = controlReason(device, canControl, t);
     const locked = reason !== "";
 
-    // The humidity target as the stepper shows it while presses are gathered;
-    // null whenever nothing is waiting, so the unit's own value is shown.
-    const [draft, setDraft] = useState<number | null>(null);
-    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const pending = useRef<number | null>(null);
-    const send = useRef(onAct);
-    send.current = onAct;
-
-    const flush = () => {
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = null;
-        const target = pending.current;
-        pending.current = null;
-        setDraft(null);
-        if (target !== null) send.current("set-humidity", { action: "set-humidity", target });
-    };
-
-    // Leaving with a change gathered sends it rather than dropping it.
-    useEffect(() => () => flush(), []);
-
-    // Pressed back to where the unit already is: nothing to send.
-    const settledTarget = air?.humidity?.target ?? null;
-    useEffect(() => {
-        if (draft !== null && draft === settledTarget && pending.current === settledTarget) {
-            if (timer.current) clearTimeout(timer.current);
-            timer.current = null;
-            pending.current = null;
-            setDraft(null);
-        }
-    }, [draft, settledTarget]);
+    // The humidity target being dragged to, while it is held.
+    const [liveHumidity, setLiveHumidity] = useState<number | null>(null);
 
     const switchControl = (
         <DeviceSwitch
@@ -237,81 +206,71 @@ export function AirControls({
         </label>
     );
 
+    const speedName = t("devicePanel.air.speedName", { name: device.name });
+    const pickSpeed = (value: string) => {
+        const next = kinds.AIR_SPEEDS.find((entry) => entry === value);
+        if (next && next !== air.speed) onAct("set-fan", { action: "set-fan", speed: next });
+    };
+    const speedOptions = air.speeds.map((value) => ({
+        value,
+        label: kinds.airSpeedText(value, t)
+    }));
     const speed = air.speeds.length > 0 && (
-        <label className="flex min-w-0 flex-col gap-1" title={reason || undefined}>
+        <div
+            className={cn("flex min-w-0 flex-col gap-1", detailed && "w-full")}
+            title={reason || undefined}
+        >
             {label(t("devicePanel.air.speed"))}
-            <Select
-                value={air.speed ?? ""}
-                placeholder={t("devicePanel.air.noSpeed")}
-                disabled={disabled}
-                aria-label={t("devicePanel.air.speedName", { name: device.name })}
-                className="w-32"
-                options={air.speeds.map((value) => ({
-                    value,
-                    label: kinds.airSpeedText(value, t)
-                }))}
-                onValueChange={(value) => {
-                    const next = kinds.AIR_SPEEDS.find((entry) => entry === value);
-                    if (next && next !== air.speed)
-                        onAct("set-fan", { action: "set-fan", speed: next });
-                }}
-            />
-        </label>
+            {detailed ? (
+                // The unit's named speeds, in its own order, as large buttons.
+                <SegmentedControl
+                    size="lg"
+                    value={air.speed}
+                    aria-label={speedName}
+                    className="w-full"
+                    options={speedOptions.map((option) => ({ ...option, disabled }))}
+                    onValueChange={pickSpeed}
+                />
+            ) : (
+                <Select
+                    value={air.speed ?? ""}
+                    placeholder={t("devicePanel.air.noSpeed")}
+                    disabled={disabled}
+                    aria-label={speedName}
+                    className="w-32"
+                    options={speedOptions}
+                    onValueChange={pickSpeed}
+                />
+            )}
+        </div>
     );
 
     const range = air.humidity;
-    const shown = draft ?? range?.target ?? null;
-    const nudge = (direction: 1 | -1) => {
-        if (!range) return;
-        const from = pending.current ?? range.target ?? range.min;
-        const next =
-            Math.round(
-                Math.min(range.max, Math.max(range.min, from + direction * range.step)) * 100
-            ) / 100;
-        if (next === (pending.current ?? range.target)) return;
-        pending.current = next;
-        setDraft(next);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(flush, STEP_SETTLE_MS);
-    };
-
+    const shown = liveHumidity ?? range?.target ?? null;
+    const humidityName = t("devicePanel.air.targetName", { name: device.name });
     const humidity = range && (
-        <div className="flex flex-col gap-1" title={reason || undefined}>
-            {label(t("devicePanel.air.target"))}
-            <div
-                role="group"
-                aria-label={t("devicePanel.air.targetName", { name: device.name })}
-                aria-describedby={describedBy}
-                className="inline-flex h-8 items-center rounded-md border border-border"
-            >
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-full rounded-r-none px-2"
-                    aria-label={t("devicePanel.air.lower", { name: device.name })}
-                    title={t("devicePanel.air.lower", { name: device.name })}
-                    disabled={disabled || (shown !== null && shown <= range.min)}
-                    onClick={() => nudge(-1)}
+        <div className="flex w-full min-w-0 flex-col gap-1" title={reason || undefined}>
+            <span className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+                <span className="truncate">{t("devicePanel.air.target")}</span>
+            </span>
+            <div role="group" aria-label={humidityName} aria-describedby={describedBy}>
+                <ControlSlider
+                    min={range.min}
+                    max={range.max}
+                    step={range.step}
+                    value={range.target}
+                    label={humidityName}
+                    valueText={(value) => `${value}%`}
+                    disabled={disabled}
+                    describedBy={describedBy}
+                    onLive={setLiveHumidity}
+                    onCommit={(target) =>
+                        onAct("set-humidity", { action: "set-humidity", target })
+                    }
                 >
-                    <Minus className="size-4" aria-hidden="true" />
-                </Button>
-                <output
-                    aria-live="polite"
-                    className="min-w-[3.5rem] px-1 text-center text-sm font-medium tabular-nums"
-                >
-                    {shown === null ? "-" : `${shown}%`}
-                </output>
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-full rounded-l-none px-2"
-                    aria-label={t("devicePanel.air.raise", { name: device.name })}
-                    title={t("devicePanel.air.raise", { name: device.name })}
-                    disabled={disabled || (shown !== null && shown >= range.max)}
-                    onClick={() => nudge(1)}
-                >
-                    <Plus className="size-4" aria-hidden="true" />
-                </Button>
+                    <Droplets className="size-4 shrink-0" aria-hidden="true" />
+                    <output aria-live="polite">{shown === null ? "-" : `${shown}%`}</output>
+                </ControlSlider>
             </div>
         </div>
     );
@@ -331,14 +290,15 @@ export function AirControls({
                 {reading}
                 {!detailed && <AirQualityChip air={air} />}
                 {mode}
-                {speed}
-                {detailed && humidity}
+                {!detailed && speed}
                 {locked && (
                     <span id={reasonId} className="sr-only">
                         {reason}
                     </span>
                 )}
             </div>
+            {detailed && speed}
+            {detailed && humidity}
             {detailed && <AirQualityChip air={air} detailed />}
             {detailed && switches.length > 0 && (
                 <fieldset className="flex flex-col gap-2" aria-describedby={describedBy}>
