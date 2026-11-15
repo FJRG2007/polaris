@@ -32,7 +32,7 @@ import {
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { EmailChannelView } from "@/lib/mail-service";
-import { ProviderSelect } from "@/components/model-keys/provider-select";
+import { EmailProviderSelect } from "./email-provider-select";
 import { PolarisMailPanel } from "./polaris-mail-panel";
 import { POLARIS_MAIL, providerOptions, providerSummary } from "./email-providers";
 import {
@@ -199,7 +199,7 @@ export function EmailChannelDialog({
                 <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto overscroll-contain">
                     <div className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("inboxChannels.email.provider")}</span>
-                        <ProviderSelect
+                        <EmailProviderSelect
                             options={options}
                             value={own ? POLARIS_MAIL : provider}
                             onChange={changeProvider}
