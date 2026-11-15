@@ -660,6 +660,14 @@
         "alertsUrgent": {
             "label": "Alerts: urgent",
             "description": "An urgent alert. Reaches you through quiet hours."
+        },
+        "analyticsTraffic": {
+            "label": "Traffic spike or drop",
+            "description": "A site you follow in Analytics passed the visitor count you set."
+        },
+        "analyticsDigest": {
+            "label": "Analytics summary",
+            "description": "A site's visitors and views for the week or month you chose."
         }
     },
     "groups": {

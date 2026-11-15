@@ -8455,6 +8455,7 @@ model AnalyticsSite {
     days     AnalyticsDay[]
     reports  AnalyticsReport[]
     vitals   AnalyticsVital[]
+    alerts   AnalyticsAlert[]
 
     @@unique([scopeType, scopeId])
 }
@@ -8604,6 +8605,31 @@ model AnalyticsDay {
 /// A question about one site, saved to be asked again: a funnel, a goal, a
 /// journey or a segment (a named set of filters). The definition is validated
 /// against its kind's schema in `@polaris/core` on every write and every read.
+/// One reader's traffic alerts and digest for one site. Each reader asks for
+/// their own, so a notification only ever reaches somebody who can read the
+/// site, and losing access drops the row on the next pass.
+model AnalyticsAlert {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    siteId        String    @db.Uuid
+    userId        String
+    /// Tell when this many visitors are on the site at once; null is off.
+    spikeVisitors Int?
+    /// Tell when fewer than this many visited in the last 24 hours; null is off.
+    dropVisitors  Int?
+    /// off | weekly | monthly
+    digest        String    @default("off")
+    spikeSentAt   DateTime?
+    dropSentAt    DateTime?
+    digestSentAt  DateTime?
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    site AnalyticsSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+    @@unique([siteId, userId])
+    @@index([userId])
+}
+
 model AnalyticsReport {
     id          String   @id @default(uuid(7)) @db.Uuid
     siteId      String   @db.Uuid

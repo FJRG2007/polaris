@@ -525,5 +525,21 @@
         "busiest": "Busiest: {day} at {hour}",
         "cell": "{day} {hour}: {visitors} visits",
         "zone": "Times in {zone}."
+    },
+    "alerts": {
+        "title": "Your notifications",
+        "intro": "Only you get these, in your Polaris notifications.",
+        "spike": "Traffic spike",
+        "spikeHint": "Visitors on the site at once",
+        "drop": "Traffic drop",
+        "dropHint": "Fewer visitors than this in 24 hours",
+        "off": "Off",
+        "digest": "Summary",
+        "digestOff": "Off",
+        "digestWeekly": "Every week",
+        "digestMonthly": "Every month",
+        "save": "Save",
+        "saved": "Saved",
+        "invalid": "Use a whole number from 1 to 1,000,000, or leave it empty."
     }
 }

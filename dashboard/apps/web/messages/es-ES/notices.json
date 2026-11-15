@@ -195,7 +195,12 @@
         "planSecurityNow": "Corrige una vulnerabilidad {severity}, así que se está instalando ahora.",
         "planSecurityQuiet": "Corrige una vulnerabilidad {severity}, así que se instala sola a las {at}, la hora más tranquila aquí.",
         "planSecurityDaily": "Corrige una vulnerabilidad {severity}, así que se instala sola a las {at}.",
-        "severity": {"critical": "crítica", "high": "alta", "medium": "media", "low": "baja"},
+        "severity": {
+            "critical": "crítica",
+            "high": "alta",
+            "medium": "media",
+            "low": "baja"
+        },
         "planManual": "Instálala desde Ajustes, donde también puedes ver qué ha cambiado.",
         "installingTitle": "Polaris instala una actualización",
         "installingBody": "Build {sha}. El panel sigue funcionando mientras arranca la nueva build; Ajustes muestra el registro.",
@@ -559,5 +564,16 @@
     },
     "repeats": {
         "burstTitle": "Llegaron más alertas como esta, demasiado rápido para listarlas"
+    },
+    "analytics": {
+        "spikeTitle": "Pico de tráfico en {site}",
+        "spikeBody": "{count, plural, one {# visitante está} other {# visitantes están}} en el sitio ahora.",
+        "dropTitle": "Caída de tráfico en {site}",
+        "dropBody": "{count, plural, one {# visitante} other {# visitantes}} en las últimas 24 horas, bajo los {threshold} fijados.",
+        "weeklyTitle": "{site}: tu semana",
+        "monthlyTitle": "{site}: tu mes",
+        "digestBody": "{visitors} visitantes ({visitorsChange}) y {views} vistas ({viewsChange}) frente al periodo anterior.",
+        "noChange": "sin cambios",
+        "noPrevious": "sin datos previos"
     }
 }

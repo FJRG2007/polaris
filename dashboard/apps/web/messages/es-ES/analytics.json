@@ -525,5 +525,21 @@
         "busiest": "Más activo: {day} a las {hour}",
         "cell": "{day} {hour}: {visitors} visitas",
         "zone": "Horas en {zone}."
+    },
+    "alerts": {
+        "title": "Tus avisos",
+        "intro": "Solo tú los recibes, en tus avisos de Polaris.",
+        "spike": "Pico de tráfico",
+        "spikeHint": "Visitantes a la vez en el sitio",
+        "drop": "Tráfico bajo",
+        "dropHint": "Menos visitantes que esto en 24 h",
+        "off": "No",
+        "digest": "Resumen",
+        "digestOff": "No",
+        "digestWeekly": "Cada semana",
+        "digestMonthly": "Cada mes",
+        "save": "Guardar",
+        "saved": "Guardado",
+        "invalid": "Usa un número entero de 1 a 1.000.000, o déjalo vacío."
     }
 }

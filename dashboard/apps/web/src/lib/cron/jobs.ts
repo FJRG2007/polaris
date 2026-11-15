@@ -1092,6 +1092,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: async () => (await import("@/lib/automations/job")).runAutomationsPass()
     },
     {
+        key: "analytics-alerts",
+        // Every five minutes: a spike is told by the visitors on the site in the
+        // realtime panel's five-minute window, so checking more often only reads
+        // the same window again. Summaries and drops are daily-grained.
+        everyMs: 5 * MINUTE,
+        // Leased: two runners would both find the same spike due and tell it twice.
+        leaseMs: 10 * MINUTE,
+        run: async () => (await import("@/lib/analytics-alerts")).runAnalyticsAlerts()
+    },
+    {
         key: "outbound-webhooks",
         // Every minute: the first retry of a signed webhook is due a minute after
         // the try that failed. Also drops log rows past their thirty days, and

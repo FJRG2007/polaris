@@ -18,6 +18,7 @@ import { CodeLine } from "@/components/json-view";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
 import { IgnoredTraffic } from "./ignored-traffic";
+import { AlertSettingsCard } from "./alert-settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Download, Filter, Plus, Trash2, X } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useTransition } from "react";
@@ -1125,6 +1126,8 @@ function SitePanel(props: PanelProps) {
                     return null;
                 }}
             />
+
+            <AlertSettingsCard scope={props.scope} siteId={props.siteId} />
 
             <Card>
                 <CardHeader>

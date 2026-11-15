@@ -32,6 +32,7 @@ import {
 } from "@/lib/analytics-service";
 import * as reports from "@/lib/analytics-reports";
 import * as lists from "@/lib/analytics-lists";
+import * as alerts from "@/lib/analytics-alerts";
 import { externalSiteSchema } from "./site-input";
 import {
     createExternalSite,
@@ -702,5 +703,36 @@ export async function setAnalyticsSettingsAction(input: unknown): Promise<{ erro
         targetId: "global"
     });
     revalidatePath(ANALYTICS_PATH);
+    return {};
+}
+
+// --- the reader's own alerts -------------------------------------------------------
+
+const alertSettingsSchema = z.object({
+    spikeVisitors: z.number().int().min(1).max(1_000_000).nullable(),
+    dropVisitors: z.number().int().min(1).max(1_000_000).nullable(),
+    digest: z.enum(alerts.ALERT_DIGESTS)
+});
+
+/** This reader's traffic alerts and summary on a site; anybody who can see it may ask. */
+export async function getAlertSettingsAction(input: {
+    scopeType: string;
+    scopeId: string;
+}): Promise<{ error?: string; settings?: alerts.AlertSettings }> {
+    const reached = await reach(input, "view");
+    if ("error" in reached) return reached;
+    return { settings: await alerts.readAlertSettings(reached.access.site.id, reached.userId) };
+}
+
+export async function setAlertSettingsAction(input: {
+    scopeType: string;
+    scopeId: string;
+    settings: unknown;
+}): Promise<{ error?: string }> {
+    const reached = await reach(input, "view");
+    if ("error" in reached) return reached;
+    const parsed = alertSettingsSchema.safeParse(input.settings);
+    if (!parsed.success) return { error: await say("alerts.invalid") };
+    await alerts.writeAlertSettings(reached.access.site.id, reached.userId, parsed.data);
     return {};
 }

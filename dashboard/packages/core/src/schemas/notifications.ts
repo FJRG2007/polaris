@@ -409,6 +409,22 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "analytics.traffic",
+        group: "watch",
+        label: "Traffic spike or drop",
+        description: "A site you follow in Analytics passed the visitor count you set.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "analytics.digest",
+        group: "watch",
+        label: "Analytics summary",
+        description: "A site's visitors and views for the week or month you chose.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "domain.security",
         group: "security",
         label: "A domain's security got worse",
