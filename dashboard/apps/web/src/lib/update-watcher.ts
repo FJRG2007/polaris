@@ -22,12 +22,13 @@
  */
 
 import { prisma } from "@polaris/db";
-import { getCapabilities } from "@polaris/config";
+import { getCapabilities, loadEnv } from "@polaris/config";
 import { dataSaverActive } from "@/lib/backup-access";
 import { usersWithPermission } from "@polaris/auth";
 import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus, type UpdateStatus } from "@/lib/update-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { recordInstallFrom } from "@/lib/update-installed";
 import { currentUpdateRun, markUpdateStarted } from "@/lib/update-timing-store";
 import { notifyOperators, type OperatorAlert } from "@/lib/notifications/operators";
 import { translatorFor } from "@/lib/i18n/translate";
@@ -180,8 +181,9 @@ async function tellOperators(input: {
     actionRequired?: boolean;
     say?: OperatorAlert["say"];
     recipients?: OperatorAlert["recipients"];
+    href?: string;
 }): Promise<void> {
-    await notifyOperators({ ...input, permission: UPDATE_PERMISSION, href: "/admin/updates" });
+    await notifyOperators({ ...input, permission: UPDATE_PERMISSION, href: input.href ?? "/admin/updates" });
 }
 
 /**
@@ -283,8 +285,17 @@ async function firstSeen(
 export async function startUpdate(): Promise<UpdateTrigger> {
     await publishUpdateSource(await getUpdateSource());
     const trigger = await startHostUpdate();
-    // Timed from here, for the progress bar on the Updates screen.
-    if (trigger === "started") await markUpdateStarted().catch(() => undefined);
+    if (trigger === "started") {
+        // Timed from here, for the progress bar on the Updates screen.
+        await markUpdateStarted().catch(() => undefined);
+        // And the build it starts from, so the next one can still say what
+        // this update changed once it has landed.
+        try {
+            await recordInstallFrom(loadEnv().POLARIS_BUILD_SHA ?? "");
+        } catch {
+            // Best-effort: without it the screen says the range is unknown.
+        }
+    }
     return trigger;
 }
 
@@ -401,6 +412,8 @@ async function retireLandedNotices(status: UpdateStatus): Promise<void> {
     const sha = status.current ?? announced;
     await tellOperators({
         event: "system.updated",
+        // Straight to what this update changed, kept on the Updates screen.
+        href: "/admin/updates#installed",
         ...inWords((t) => ({
             title: t("update.installedTitle"),
             body: t("update.installedBody", { sha })

@@ -15,6 +15,7 @@ import { collectUpdateReport, issueUrl } from "@/lib/update-report";
 import { getUpdateStatus, resetUpdateStatus, type UpdateStatus } from "@/lib/update-service";
 import { getAutoUpdatePolicy, saveAutoUpdatePolicy, startUpdate } from "@/lib/update-watcher";
 import { recordAudit } from "@/lib/audit-service";
+import { installedRange, type InstalledRange } from "@/lib/update-installed";
 import {
     DEFAULT_QUIET_HOUR,
     getSecurityUpdatePolicy,
@@ -100,12 +101,41 @@ export async function saveAutoUpdateAction(
     return { policy: parsed.data };
 }
 
-/** What the update on offer carries, read from its commits; null when there is
- *  nothing on offer or GitHub could not be read. */
+/**
+ * What the update on offer carries, read from its commits; null when there is
+ * nothing on offer or GitHub could not be read. The range ends at `latest`, the
+ * commit the published image was built from - what Update would pull - and
+ * never at the branch head, which may hold commits no image carries yet. Only
+ * an installable update has one: a blocked or still-building phase lists
+ * nothing rather than commits the button would not install.
+ */
 export async function updateChangelogAction(): Promise<UpdateChangelog | null> {
     await requireAdmin();
     const status = await getUpdateStatus();
+    if (status.phase !== "available") return null;
     return updateChangelog(status.current, status.latest).catch(() => null);
+}
+
+/** The update the running build was installed by, and what it changed. */
+export interface InstalledUpdate extends InstalledRange {
+    /** Null when the range is unknown or GitHub could not be read. */
+    readonly changelog: UpdateChangelog | null;
+}
+
+/**
+ * What the last installed update changed: the build that ran before it to the
+ * one running now. The range is recorded when the install starts, so it ends
+ * where the update on offer begins and the two never share a commit; an install
+ * made before that was recorded answers `from: null`, said as unknown on screen
+ * rather than guessed.
+ */
+export async function installedChangelogAction(): Promise<InstalledUpdate> {
+    await requireAdmin();
+    const range = await installedRange(loadEnv().POLARIS_BUILD_SHA ?? null).catch(
+        (): InstalledRange => ({ from: null, to: null })
+    );
+    const changelog = range.from ? await updateChangelog(range.from, range.to).catch(() => null) : null;
+    return { ...range, changelog };
 }
 
 /** How a security fix installs itself here, and the hour "quiet" means. */

@@ -44,6 +44,7 @@ import { loadEnv } from "@polaris/config";
 import { readPublishedImage } from "./registry";
 import { getUpdateSource } from "./update-source";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { settleInstalled } from "@/lib/update-installed";
 import { DEFAULT_UPDATE_SOURCE, type UpdateSource } from "@polaris/core";
 
 /** Where a deployment stands relative to what has been published. */
@@ -418,6 +419,17 @@ async function keptStatus(): Promise<{ status: UpdateStatus; at: number } | null
     }
 }
 
+/** The build the kept answer was made by, whichever build that was. */
+async function keptBuild(): Promise<string | null> {
+    try {
+        const raw = await getSetting(KEPT_KEY);
+        const current = raw ? (JSON.parse(raw) as { status?: { current?: unknown } }).status?.current : null;
+        return typeof current === "string" ? current : null;
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Current update status, without waiting on GitHub whenever an answer exists.
  *
@@ -445,7 +457,12 @@ function check(): Promise<UpdateStatus> {
     if (inflight) return inflight;
 
     inflight = query()
-        .then((status) => {
+        .then(async (status) => {
+            // The answer about to be replaced was made by whichever build ran
+            // last; when that is not this one, it names the build this update
+            // was installed over - the only record an install started by an
+            // older build leaves behind.
+            await settleInstalled(loadEnv().POLARIS_BUILD_SHA, await keptBuild()).catch(() => undefined);
             cache = { status, at: Date.now() };
             void setSetting(KEPT_KEY, JSON.stringify(cache)).catch(() => undefined);
             return status;

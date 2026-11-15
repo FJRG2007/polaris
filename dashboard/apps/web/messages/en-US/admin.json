@@ -3715,6 +3715,13 @@
         },
         "changelog": {
             "title": "What this update carries",
+            "installedTitle": "What the last update changed",
+            "installedLabel": "Installed",
+            "availableLabel": "Available",
+            "to": "to",
+            "availableHint": "Every commit listed is in the published build.",
+            "installedUnknown": "The build that ran before this one was not recorded, so what changed is unknown.",
+            "installedUnavailable": "GitHub could not be reached to read what this update changed.",
             "kinds": {
                 "security": "Security",
                 "feature": "New",

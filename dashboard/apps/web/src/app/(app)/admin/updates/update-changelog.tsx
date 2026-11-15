@@ -13,11 +13,12 @@
  * bounded height instead of pushing the Update button off the screen.
  */
 
-import { updateChangelogAction } from "./actions";
+import { installedChangelogAction, updateChangelogAction } from "./actions";
 import { AppLogo, Badge, Skeleton, cn, hasAppLogo } from "@polaris/ui";
 import type { ChangelogEntry } from "@polaris/core";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+    ArrowRight,
     Bug,
     ChevronRight,
     Gauge,
@@ -111,23 +112,100 @@ const SEVERITY_BADGE = {
     low: "neutral"
 } as const;
 
-export function UpdateChangelog({ head }: { head: string }) {
+/** Which range a changelog describes: the update on offer, or the one the
+ *  running build was installed by. */
+export type ChangelogKind = "available" | "installed";
+
+/** One range as the screen draws it; `from` null when it is not known. */
+interface RangeRead {
+    readonly from: string | null;
+    readonly changelog: Changelog | null;
+}
+
+/** Ranges read in this tab, so coming back paints the last answer at once
+ *  while a fresh one is asked for behind it. */
+const readRanges = new Map<string, RangeRead>();
+const STORE_PREFIX = "polaris.updates.changelog.";
+
+function rememberedRange(key: string): RangeRead | undefined {
+    const known = readRanges.get(key);
+    if (known) return known;
+    try {
+        const raw = window.sessionStorage.getItem(STORE_PREFIX + key);
+        if (!raw) return undefined;
+        const parsed = JSON.parse(raw) as RangeRead;
+        readRanges.set(key, parsed);
+        return parsed;
+    } catch {
+        return undefined;
+    }
+}
+
+function rememberRange(key: string, value: RangeRead): void {
+    readRanges.set(key, value);
+    try {
+        window.sessionStorage.setItem(STORE_PREFIX + key, JSON.stringify(value));
+    } catch {
+        // Storage full or blocked: the copy in memory still serves this tab.
+    }
+}
+
+async function loadRange(kind: ChangelogKind): Promise<RangeRead> {
+    if (kind === "installed") {
+        const installed = await installedChangelogAction();
+        return { from: installed.from, changelog: installed.changelog };
+    }
+    const changelog = await updateChangelogAction();
+    return { from: changelog?.base ?? null, changelog };
+}
+
+/**
+ * What a range of builds carries. `head` is the build the range ends at: the
+ * published one for the update on offer, the running one for the update
+ * installed - so the two ranges meet at the running build and never overlap.
+ */
+export function UpdateChangelog({
+    head,
+    kind = "available",
+    base = null
+}: {
+    head: string;
+    kind?: ChangelogKind;
+    /** The build the range starts at, when the caller already knows it. */
+    base?: string | null;
+}) {
     const t = useTranslations("admin");
-    const [changelog, setChangelog] = useState<Changelog | null | undefined>(undefined);
+    const key = `${kind}:${head}`;
+    const [read, setRead] = useState<RangeRead | null | undefined>(() =>
+        typeof window === "undefined" ? undefined : rememberedRange(key)
+    );
+    const changelog = read === undefined ? undefined : (read?.changelog ?? null);
     const [expanded, setExpanded] = useState<Partial<Record<ChangelogGroup, boolean>>>({});
     const [showAll, setShowAll] = useState<Partial<Record<ChangelogGroup, boolean>>>({});
+    const section = useRef<HTMLElement | null>(null);
 
     useEffect(() => {
         let live = true;
-        setChangelog(undefined);
-        void updateChangelogAction()
-            .then((answer) => live && setChangelog(answer))
-            .catch(() => live && setChangelog(null));
+        // The last answer for this range stays on screen while it is asked again.
+        setRead(rememberedRange(key));
+        void loadRange(kind)
+            .then((answer) => {
+                if (!live) return;
+                rememberRange(key, answer);
+                setRead(answer);
+            })
+            .catch(() => live && setRead((current) => current ?? null));
         return () => {
             live = false;
         };
-    }, [head]);
+    }, [key, kind]);
 
+    // Opened from the "updated" notice: bring this range into view once drawn.
+    const drawn = read !== undefined;
+    useEffect(() => {
+        if (kind !== "installed" || !drawn) return;
+        if (window.location.hash === "#installed") section.current?.scrollIntoView?.({ block: "start" });
+    }, [kind, drawn]);
     const groups = useMemo(() => groupChangelog(changelog?.entries ?? []), [changelog]);
     // The website, desktop and extension ship on their own: counted with the
     // rest that is not listed, never shown as something this update installs.
@@ -136,11 +214,34 @@ export function UpdateChangelog({ head }: { head: string }) {
         [changelog]
     );
 
-    const title = <h3 className="text-sm font-medium text-foreground">{t("settings.changelog.title")}</h3>;
+    const installed = kind === "installed";
+    const from = read?.from ?? base;
+    const sectionProps = {
+        ref: section,
+        id: installed ? "installed" : undefined,
+        "aria-label": installed ? t("settings.changelog.installedTitle") : t("settings.changelog.title")
+    };
+    const title = (
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+            <h3 className="text-sm font-medium text-foreground">
+                {installed ? t("settings.changelog.installedTitle") : t("settings.changelog.title")}
+            </h3>
+            <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                {installed ? t("settings.changelog.installedLabel") : t("settings.changelog.availableLabel")}
+                {from ? (
+                    <>
+                        <span className="font-mono">{from.slice(0, 7)}</span>
+                        <ArrowRight className="size-3 shrink-0" aria-label={t("settings.changelog.to")} />
+                    </>
+                ) : null}
+                <span className="font-mono">{head.slice(0, 7)}</span>
+            </span>
+        </div>
+    );
 
-    if (changelog === undefined) {
+    if (read === undefined) {
         return (
-            <section className="flex flex-col gap-2 border-t border-border pt-3" aria-busy="true">
+            <section {...sectionProps} className="flex flex-col gap-2 border-t border-border pt-3" aria-busy="true">
                 {title}
                 <Skeleton className="h-4 w-48" />
                 <Skeleton className="h-3 w-full" />
@@ -148,14 +249,18 @@ export function UpdateChangelog({ head }: { head: string }) {
             </section>
         );
     }
-    if (changelog === null || groups.length === 0) {
+    if (!changelog || groups.length === 0) {
         return (
-            <section className="flex flex-col gap-1 border-t border-border pt-3">
+            <section {...sectionProps} className="flex flex-col gap-1 border-t border-border pt-3">
                 {title}
                 <p className="text-xs text-muted-foreground">
-                    {changelog === null
-                        ? t("settings.changelog.unavailable")
-                        : t("settings.changelog.nothingVisible")}
+                    {installed && !read?.from
+                        ? t("settings.changelog.installedUnknown")
+                        : !changelog
+                          ? installed
+                              ? t("settings.changelog.installedUnavailable")
+                              : t("settings.changelog.unavailable")
+                          : t("settings.changelog.nothingVisible")}
                 </p>
             </section>
         );
@@ -164,7 +269,10 @@ export function UpdateChangelog({ head }: { head: string }) {
     const repo = changelog.url.replace(/\/compare\/.*$/, "");
 
     return (
-        <section className="flex flex-col gap-2 border-t border-border pt-3">
+        <section {...sectionProps} className="flex flex-col gap-2 border-t border-border pt-3">
+            {installed ? null : (
+                <p className="text-xs text-muted-foreground">{t("settings.changelog.availableHint")}</p>
+            )}
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
                 {title}
                 <ul className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -189,7 +297,7 @@ export function UpdateChangelog({ head }: { head: string }) {
                     const all = showAll[group] ?? false;
                     const shown = all ? entries : entries.slice(0, FOLDED);
                     const security = group === "security";
-                    const listId = `changelog-${group}`;
+                    const listId = `changelog-${kind}-${group}`;
                     const Icon = GROUP_ICONS[group];
                     return (
                         <div key={group} className={cn("min-w-0", security && "bg-danger-soft")}>

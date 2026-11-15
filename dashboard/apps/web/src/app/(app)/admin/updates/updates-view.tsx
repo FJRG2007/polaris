@@ -926,7 +926,13 @@ export function UpdatesView({
 
                     <OwnVulnerabilitiesLine available={available} />
 
-                    {available && status?.latest ? <UpdateChangelog head={status.latest} /> : null}
+                    {/* Installed ends at the running build and Available starts there,
+                        so the two lists never share a commit. */}
+                    {status?.current ? <UpdateChangelog kind="installed" head={status.current} /> : null}
+
+                    {available && status?.latest ? (
+                        <UpdateChangelog head={status.latest} base={status.current} />
+                    ) : null}
 
                     {available || updating || logText ? (
                         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">

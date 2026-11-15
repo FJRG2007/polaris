@@ -3715,6 +3715,13 @@
         },
         "changelog": {
             "title": "Qué trae esta actualización",
+            "installedTitle": "Qué cambió la última actualización",
+            "installedLabel": "Instalada",
+            "availableLabel": "Disponible",
+            "to": "a",
+            "availableHint": "Cada commit listado está en la build publicada.",
+            "installedUnknown": "No se registró la build anterior a esta, así que no se sabe qué cambió.",
+            "installedUnavailable": "No se pudo contactar con GitHub para leer qué cambió esta actualización.",
             "kinds": {
                 "security": "Seguridad",
                 "feature": "Nuevo",

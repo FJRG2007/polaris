@@ -43,7 +43,11 @@ export interface UpdateChangelog {
     readonly url: string;
 }
 
-let kept: UpdateChangelog | null = null;
+/** Ranges already read, newest last. Two are on screen at once - the update
+ *  installed and the one on offer - so a single slot made them evict each other
+ *  and read GitHub again on every visit. */
+const kept = new Map<string, UpdateChangelog>();
+const KEPT_RANGES = 4;
 let inflight: { key: string; promise: Promise<UpdateChangelog | null> } | null = null;
 
 interface ComparePage {
@@ -137,12 +141,16 @@ export async function updateChangelog(
     head: string | null
 ): Promise<UpdateChangelog | null> {
     if (!base || !head || base === head) return null;
-    if (kept && kept.base === base && kept.head === head) return kept;
     const key = `${base}...${head}`;
+    const known = kept.get(key);
+    if (known) return known;
     if (inflight?.key === key) return inflight.promise;
     const promise = read(loadEnv().POLARIS_REPO, base, head)
         .then((result) => {
-            if (result) kept = result;
+            if (result) {
+                kept.set(key, result);
+                if (kept.size > KEPT_RANGES) kept.delete(kept.keys().next().value!);
+            }
             return result;
         })
         .finally(() => {
