@@ -225,6 +225,8 @@ import { agentNameAction } from "@/app/(app)/polar/settings/agents-actions";
 import { useAnnounceWrites } from "@/lib/polar/tool-changes";
 import { PolarReachContext } from "@/components/polar/polar-reach";
 import { listsCodeSessions } from "@/lib/polar/code-history";
+import { useViewSubject } from "@/components/notifications/presence-reporter";
+import { sessionViewSubject } from "@/lib/notifications/view-subject";
 
 // ---------------------------------------------------------------------------
 // Page context
@@ -898,6 +900,11 @@ export function PolarChat({
     /** The conversation is on screen: in Chat, or in Code for a task Polar
      *  answers itself on a repository, which stays in Code. */
     const threadShown = code.mode === "chat" || inCode;
+    // A session on screen is what this tab is watching: its alerts arrive read
+    // and ring no device while it stays in front of the reader.
+    useViewSubject(
+        code.mode === "code" && !inCode && code.selected ? sessionViewSubject(code.selected) : null
+    );
     const tree = useRef<VersionTree>(new Map());
     const textarea = useRef<HTMLTextAreaElement>(null);
     // Text asked about from a right-click menu: quoted here, once, with the

@@ -15,17 +15,26 @@
 import { prisma } from "@polaris/db";
 import { notify, pushNotice } from "@/lib/notifications/dispatch";
 import { wordsFor } from "@/lib/notifications/notice-words";
+import { sessionViewSubject } from "@/lib/notifications/view-subject";
 
 export const WAITING_EVENT = "agent.waiting";
+
+/** A permission prompt pushed with Allow and Deny on it: its own switch in
+ *  Settings, apart from the "needs you" notice the bell keeps. */
+export const APPROVAL_EVENT = "agent.approval";
 
 /** One notification per session on a device: a later push replaces the earlier. */
 export function sessionPushTag(sessionId: string): string {
     return `agent-session:${sessionId}`;
 }
 
-/** The same session opened in Polar's Code side. */
+/**
+ * The same session opened in Polar's Code side. Also what a tab showing the
+ * session reports to presence, so an alert about it rings no device while it
+ * is in front of its owner.
+ */
 export function polarSessionHref(sessionId: string): string {
-    return `/polar?session=${sessionId}`;
+    return sessionViewSubject(sessionId);
 }
 
 /** The page a run's notices point at. */
@@ -162,7 +171,8 @@ export async function pushPermissionRequest(
         const t = await wordsFor(subject.ownerId, "notices");
         await pushNotice({
             userId: subject.ownerId,
-            event: WAITING_EVENT,
+            // A question or a plan is the agent needing input, not an approval.
+            event: buttons ? APPROVAL_EVENT : WAITING_EVENT,
             title: t("agents.permissionTitle", { session: subject.title }),
             body: detail || t("agents.waitingBody"),
             href: polarSessionHref(subject.id),
@@ -207,6 +217,67 @@ export async function noticeSessionEnded(sessionId: string, reason: EndedReason)
         });
     } catch (error) {
         quietly(`session ${sessionId} ended`, error);
+    }
+}
+
+/** What happened to a session's pull request that its owner hears about. */
+export type PullNoticeKind = "ci_failed" | "pr_ready" | "pr_merged";
+
+const PULL_NOTICES = {
+    ci_failed: {
+        event: "agent.ci.failed",
+        title: "agents.ciFailedTitle",
+        body: "agents.ciFailedBody",
+        level: "danger"
+    },
+    pr_ready: {
+        event: "agent.pr.ready",
+        title: "agents.prReadyTitle",
+        body: "agents.prReadyBody",
+        level: "info"
+    },
+    pr_merged: {
+        event: "agent.pr.merged",
+        title: "agents.prMergedTitle",
+        body: "agents.prMergedBody",
+        level: "success"
+    }
+} as const;
+
+/**
+ * Tell a session's owner its pull request failed its checks, became ready, or
+ * was merged. Called from the GitHub webhook (`session-pull-notices`) and by
+ * anything else that learns those facts about a session.
+ *
+ * Once per pull request for ready and merged, and once per commit for failed
+ * checks: GitHub sends one failure per check suite, and three suites failing
+ * on one push is one thing to go and fix.
+ */
+export async function noticeSessionPull(
+    sessionId: string,
+    kind: PullNoticeKind,
+    detail: { prNumber: number; headSha?: string | null }
+): Promise<void> {
+    try {
+        const subject = await sessionSubject(sessionId);
+        if (!subject?.ownerId) return;
+        const words = PULL_NOTICES[kind];
+        const t = await wordsFor(subject.ownerId, "notices");
+        const number = detail.prNumber;
+        const once = kind === "ci_failed" ? (detail.headSha ?? number) : number;
+        await notify({
+            userId: subject.ownerId,
+            event: words.event,
+            title: t(words.title, { session: subject.title }),
+            body: t(words.body, { number }),
+            href: polarSessionHref(subject.id),
+            level: words.level,
+            metadata: { sessionId: subject.id, prNumber: number, kind },
+            dedupKey: `${words.event}:${subject.id}:${once}`,
+            push: { tag: sessionPushTag(subject.id) }
+        });
+    } catch (error) {
+        quietly(`session ${sessionId} pull request`, error);
     }
 }
 

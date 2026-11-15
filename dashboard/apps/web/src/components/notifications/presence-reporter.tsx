@@ -19,24 +19,60 @@
  * name.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { attending } from "@/components/use-attention";
 
 const ENDPOINT = "/api/notifications/presence";
+
+/**
+ * What this tab has open inside its page, when the page's path does not say -
+ * an agent session in Polar's Code side, on /polar or in the side panel. One
+ * per tab: the screen that draws it claims it, and lets go when it stops.
+ */
+let subject: string | null = null;
+const subjectListeners = new Set<() => void>();
+
+function setSubject(value: string | null): void {
+    if (subject === value) return;
+    subject = value;
+    for (const listener of subjectListeners) listener();
+}
+
+function subscribeSubject(listener: () => void): () => void {
+    subjectListeners.add(listener);
+    return () => subjectListeners.delete(listener);
+}
+
+/**
+ * Report `value` (an in-app link, see lib/notifications/view-subject) as what
+ * this tab is showing, while the calling screen is mounted with it. Null claims
+ * nothing.
+ */
+export function useViewSubject(value: string | null): void {
+    useEffect(() => {
+        if (!value) return;
+        setSubject(value);
+        return () => {
+            // Only its own claim: a screen that took over keeps what it set.
+            if (subject === value) setSubject(null);
+        };
+    }, [value]);
+}
 
 /** Comfortably inside the window the server believes a report for. */
 const BEAT_MS = 25000;
 
 export function PresenceReporter() {
     const pathname = usePathname();
+    const showing = useSyncExternalStore(subscribeSubject, () => subject, () => null);
     const viewerId = useRef("");
     if (!viewerId.current) viewerId.current = newViewerId();
 
     useEffect(() => {
         const id = viewerId.current;
         const payload = (viewing: boolean): string =>
-            JSON.stringify({ viewerId: id, path: pathname, viewing });
+            JSON.stringify({ viewerId: id, path: pathname, subject: showing, viewing });
 
         function report(viewing: boolean): void {
             void fetch(ENDPOINT, {
@@ -94,7 +130,7 @@ export function PresenceReporter() {
             window.removeEventListener("blur", settle);
             window.removeEventListener("pagehide", withdraw);
         };
-    }, [pathname]);
+    }, [pathname, showing]);
 
     return null;
 }

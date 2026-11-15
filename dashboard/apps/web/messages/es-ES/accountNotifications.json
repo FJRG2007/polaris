@@ -621,6 +621,22 @@
             "label": "Una sesión terminó sola",
             "description": "Una sesión falló, dejó de informar o su agente salió sin que nadie pulsara Detener."
         },
+        "agentApproval": {
+            "label": "Un agente pide aprobación",
+            "description": "Una sesión quiere ejecutar algo y puedes permitirlo o denegarlo desde el aviso."
+        },
+        "agentCiFailed": {
+            "label": "Fallaron las pruebas del PR de una sesión",
+            "description": "Una comprobación del pull request de una sesión terminó con un fallo."
+        },
+        "agentPrReady": {
+            "label": "El pull request de una sesión está listo",
+            "description": "Se abrió el pull request de una sesión o se marcó listo para revisar."
+        },
+        "agentPrMerged": {
+            "label": "Se fusionó el pull request de una sesión",
+            "description": "Se fusionó el pull request que abrió una sesión."
+        },
         "agentWork": {
             "label": "No se subió el trabajo",
             "description": "Una sesión terminó con commits o cambios que Polaris no pudo subir, y los guardó."

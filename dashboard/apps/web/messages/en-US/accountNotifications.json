@@ -621,6 +621,22 @@
             "label": "A session ended on its own",
             "description": "A session failed, stopped reporting, or its agent exited without anybody pressing Stop."
         },
+        "agentApproval": {
+            "label": "An agent asks for approval",
+            "description": "A session wants to run something, and you can allow or deny it from the notification."
+        },
+        "agentCiFailed": {
+            "label": "Checks failed on a session's pull request",
+            "description": "A check on the pull request a session opened finished with a failure."
+        },
+        "agentPrReady": {
+            "label": "A session's pull request is ready",
+            "description": "A session's pull request was opened or marked ready for review."
+        },
+        "agentPrMerged": {
+            "label": "A session's pull request was merged",
+            "description": "The pull request a session opened was merged."
+        },
         "agentWork": {
             "label": "A session's work could not be pushed",
             "description": "A session ended with commits or changes Polaris could not push, so it kept them for you."

@@ -20,6 +20,8 @@
  * one account can hold is capped, so a client inventing viewer ids grows nothing.
  */
 
+import { viewSubject } from "./view-subject";
+
 /**
  * How long a report is believed for. Comfortably longer than the heartbeat, so a
  * tab that is merely slow is not treated as gone, and short enough that a closed
@@ -33,6 +35,9 @@ const MAX_VIEWERS_PER_USER = 24;
 
 interface Viewer {
     path: string;
+    /** What the tab has open inside that path, when the path does not say
+     *  (see `view-subject`): an agent session in Polar. */
+    subject: string | null;
     at: number;
 }
 
@@ -70,7 +75,8 @@ export function recordPresence(
     userId: string,
     viewerId: string,
     path: string,
-    now = Date.now()
+    now = Date.now(),
+    subject: string | null = null
 ): void {
     sweep(now);
     const normalized = viewPath(path);
@@ -81,7 +87,7 @@ export function recordPresence(
         held = new Map();
         viewers.set(userId, held);
     }
-    held.set(viewerId, { path: normalized, at: now });
+    held.set(viewerId, { path: normalized, subject: viewSubject(subject), at: now });
 
     // Past the cap the oldest report goes, which is the one least likely to be a
     // tab somebody is looking at.
@@ -109,6 +115,10 @@ export function dropPresence(userId: string, viewerId: string): void {
  * screen open is watching it whichever service tab they left selected. It is
  * also exact rather than a prefix, because being somewhere above a page is not
  * seeing it - a list of tasks does not show what happened to one of them.
+ *
+ * A link that names a subject (an agent session) is matched on the subject
+ * instead, wherever the tab is: the session may be open in the side panel over
+ * another page, and `/polar` showing a different session is not seeing this one.
  */
 export function isViewing(
     userId: string,
@@ -119,8 +129,10 @@ export function isViewing(
     if (!target) return false;
     const held = viewers.get(userId);
     if (!held) return false;
+    const subject = viewSubject(href);
     for (const viewer of held.values()) {
-        if (viewer.path === target && now - viewer.at <= PRESENCE_TTL_MS) return true;
+        if (now - viewer.at > PRESENCE_TTL_MS) continue;
+        if (subject ? viewer.subject === subject : viewer.path === target) return true;
     }
     return false;
 }

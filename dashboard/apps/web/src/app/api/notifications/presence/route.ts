@@ -24,6 +24,9 @@ const presenceSchema = z.object({
      *  against its own account. */
     viewerId: z.string().uuid(),
     path: z.string().min(1).max(512).startsWith("/"),
+    /** What the tab has open inside that path (an agent session), as the link
+     *  its alerts carry. Anything that does not name a known subject is dropped. */
+    subject: z.string().min(1).max(512).startsWith("/").nullish(),
     /** False when the tab went to the background or is closing. */
     viewing: z.boolean()
 });
@@ -46,8 +49,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     const parsed = presenceSchema.safeParse(body);
     if (!parsed.success) return accepted();
 
-    const { viewerId, path, viewing } = parsed.data;
-    if (viewing) recordPresence(session.id, viewerId, path);
+    const { viewerId, path, subject, viewing } = parsed.data;
+    if (viewing) recordPresence(session.id, viewerId, path, Date.now(), subject ?? null);
     else dropPresence(session.id, viewerId);
     return accepted();
 }

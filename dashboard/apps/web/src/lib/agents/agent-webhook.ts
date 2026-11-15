@@ -20,6 +20,7 @@ import { considerFallback } from "@/lib/agents/agent-fallback";
 import { githubAppInstallationToken } from "@/lib/github-service";
 import { policyForRepo } from "@/lib/agents/agent-defaults-service";
 import { agentRepoByFullName } from "@/lib/agents/agent-repo-service";
+import { noticePullEvent } from "@/lib/agents/session-pull-notices";
 import { mentionsThisHour, reviewedPushes, reviewSettingsFor } from "@/lib/agents/review-gate";
 import { startIssueSession } from "@/lib/agents/issue-sessions";
 import { finishAgentRun, sweepStaleRuns } from "@/lib/agents/agent-run-service";
@@ -365,6 +366,11 @@ export async function handleAgentWebhook(params: {
     // used to swallow it and leave every failed run running until the six-hour
     // sweep while the Actions tab had said "failed" within the minute.
     if (params.event === "workflow_run") return closeOutWorkflowRun(payload);
+
+    // A session's pull request failing its checks, readied or merged is news to
+    // whoever started the session. Before the self-ignore below, because that
+    // pull request was opened by our own App. Not awaited, like the sweep.
+    void noticePullEvent(params.event, params.payload);
 
     // A run's own comments and pushes come back as webhooks. Answering them is how
     // an agent ends up in a conversation with itself.

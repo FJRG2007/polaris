@@ -1058,6 +1058,41 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "agent.approval",
+        group: "agents",
+        label: "An agent asks for approval",
+        description:
+            "A session wants to run something and can be allowed or denied from the notification on your devices.",
+        level: "warning",
+        // The prompt itself goes to devices only: the session's "needs you" notice
+        // is the one on the bell, so this switch decides the Allow/Deny push.
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "agent.ci.failed",
+        group: "agents",
+        label: "Checks failed on a session's pull request",
+        description: "A check on the pull request a session opened finished with a failure.",
+        level: "danger",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "agent.pr.ready",
+        group: "agents",
+        label: "A session's pull request is ready",
+        description: "A session's pull request was opened or marked ready for review.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "agent.pr.merged",
+        group: "agents",
+        label: "A session's pull request was merged",
+        description: "The pull request a session opened was merged.",
+        level: "success",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "agent.work",
         group: "agents",
         label: "A session's work could not be pushed",

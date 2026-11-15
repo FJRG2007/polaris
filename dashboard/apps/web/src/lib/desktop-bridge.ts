@@ -366,9 +366,17 @@ export function desktopBridge(): PolarisDesktop | null {
 }
 
 /** The alerts the desktop app raises a notice for as they arrive: a deploy that
- *  finished, either way, and an agent session that needs its owner or ended on
- *  its own. The dashboard's bell still lists them as it always did. */
-const DEPLOY_RESULTS = new Set(["deploy.succeeded", "deploy.failed", "agent.waiting", "agent.ended"]);
+ *  finished, either way, and an agent session that needs its owner, ended on
+ *  its own, or whose pull request failed its checks, became ready or merged. The dashboard's bell still lists them as it always did. */
+const DEPLOY_RESULTS = new Set([
+    "deploy.succeeded",
+    "deploy.failed",
+    "agent.waiting",
+    "agent.ended",
+    "agent.ci.failed",
+    "agent.pr.ready",
+    "agent.pr.merged"
+]);
 
 interface FeedRow {
     readonly id: string;
