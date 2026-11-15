@@ -9254,6 +9254,7 @@ model AgentSession {
     permissionRequests AgentPermissionRequest[]
     messages AgentSessionMessage[]
     queuedPrompts AgentQueuedPrompt[]
+    pullFacts SessionPullFacts[]
 
     @@unique([tokenHash])
     @@index([repoId, createdAt])
@@ -9273,6 +9274,58 @@ model AgentSession {
     // The sweep that carries on a session once an account frees up.
     @@index([limitWaitUntil])
     @@index([runnerId])
+
+    // A pull request webhook finds the sessions it concerns by the number the
+    // session recorded, or by the branch the pull request was opened from.
+    @@index([repoId, prNumber])
+    @@index([repoId, branch])
+}
+
+// What GitHub last said about a pull request opened from a session's branch:
+// the facts its derived status reads (lib/agents/session-status.ts), written by
+// the GitHub App webhook and by a bounded poll for the pull requests no webhook
+// reaches (lib/agents/session-pr-facts.ts). Never a display status: that is
+// computed when it is read, so a rule change applies to every row at once.
+//
+// One row per session and pull request number: a session that opens a second
+// one after the first merged keeps both, and the merged one still counts.
+model SessionPullFacts {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    sessionId    String   @db.Uuid
+    repoFullName String
+    number       Int
+    url          String
+    // open | closed | merged. Closed is never merged: the two are exclusive.
+    state        String   @default("open")
+    draft        Boolean  @default(false)
+    // unknown | mergeable | conflicting | blocked | unstable
+    mergeable    String   @default("unknown")
+    // The aggregate of the head commit's checks: unknown | pending | passing |
+    // failing, and how many of the newest run of each check stand where.
+    checks        String  @default("unknown")
+    checksTotal   Int     @default(0)
+    checksFailed  Int     @default(0)
+    checksPending Int     @default(0)
+    // none | approved | changes_requested | review_required, as GitHub's
+    // reviewDecision gives it.
+    review       String   @default("none")
+    // Unresolved review threads a person (not a bot) opened.
+    unresolvedComments Int @default(0)
+    headSha      String   @default("")
+    sourceBranch String   @default("")
+    targetBranch String   @default("")
+    // When GitHub last answered for it. The poll refreshes the oldest first.
+    fetchedAt    DateTime @default(now())
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    @@unique([sessionId, number])
+    // A webhook names a repository and a number.
+    @@index([repoFullName, number])
+    // The poll: open ones, stalest first.
+    @@index([state, fetchedAt])
 }
 
 // What a person's agent remembers about one repository, carried between the
