@@ -169,6 +169,8 @@ const nextConfig = {
     // start, which is why it is named explicitly.
     outputFileTracingIncludes: {
         "/api/agents/runtime/bundle/**": ["../../packages/agent-runtime/dist/**"],
+        // The native session engine, built by scripts/build-native-agent.mjs.
+        "/api/agents/native/bundle/**": ["./native-agent/**"],
         // The command-line client and its install scripts, served by
         // `/cli/[file]` and imported by nothing - so named, or the image ships
         // without them and the install line downloads a 503.

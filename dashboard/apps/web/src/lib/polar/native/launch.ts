@@ -60,11 +60,14 @@ export function sessionRoutes(config: Pick<LaunchConfig, "POLARIS_URL" | "POLARI
 }
 
 /** The transcript's path: the one given, or one beside the CLIs' own. */
-export function transcriptPathOf(config: LaunchConfig): string {
-    return (
-        config.POLARIS_TRANSCRIPT ??
-        path.join(os.homedir(), ".polaris-agent", "sessions", `${config.POLARIS_SESSION_ID}.jsonl`)
-    );
+export function transcriptPathOf(config: LaunchConfig, conversationId: string = config.POLARIS_SESSION_ID): string {
+    return config.POLARIS_TRANSCRIPT ?? path.join(transcriptDir(), `${conversationId}.jsonl`);
+}
+
+/** Where every native conversation's transcript is kept, in the home that
+ *  outlives the session (`readableTranscriptPath` accepts this shape). */
+export function transcriptDir(): string {
+    return path.join(os.homedir(), ".polaris-agent", "sessions");
 }
 
 /** The model, called through Polaris's compatible API with the session token. */
@@ -85,13 +88,16 @@ export interface LaunchParts {
     readonly writeTranscript: (line: string) => void;
     readonly memory?: NativeSessionOptions["environment"]["memory"];
     readonly task?: string | null;
+    /** The conversation's own id, as hooks report it; the session's when absent. */
+    readonly conversationId?: string;
 }
 
 /** A session ready to `start()`, from a validated config. */
 export function launchSession(config: LaunchConfig, parts: LaunchParts): NativeSession {
     const routes = sessionRoutes(config);
+    const conversationId = parts.conversationId ?? config.POLARIS_SESSION_ID;
     return new NativeSession({
-        sessionId: config.POLARIS_SESSION_ID,
+        sessionId: conversationId,
         ws: parts.ws ?? nodeWorkspace(config.POLARIS_WORKDIR),
         model: launchModel(config, parts.fetchImpl),
         modelName: config.POLARIS_MODEL,
@@ -104,7 +110,7 @@ export function launchSession(config: LaunchConfig, parts: LaunchParts): NativeS
                 ...(parts.fetchImpl ? { fetchImpl: parts.fetchImpl } : {})
             }),
         writeTranscript: parts.writeTranscript,
-        transcriptPath: transcriptPathOf(config),
+        transcriptPath: transcriptPathOf(config, conversationId),
         environment: {
             platform: process.platform,
             // What the Bash tool runs (`tools.ts`): bash on Windows, sh elsewhere.

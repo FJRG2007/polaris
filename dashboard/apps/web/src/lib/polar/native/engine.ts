@@ -97,6 +97,11 @@ export class NativeSession {
         return this.messages;
     }
 
+    /** Continues a conversation read back from a transcript (`resume.ts`). */
+    restore(messages: readonly ModelMessage[]): void {
+        this.messages = [...messages];
+    }
+
     setModel(model: LanguageModel, name: string): void {
         this.model = model;
         this.modelName = name;
@@ -142,8 +147,8 @@ export class NativeSession {
     }
 
     /** Tells Polaris the session is up and where its transcript is. */
-    async start(): Promise<void> {
-        await this.options.hooks.event({ ...this.base("SessionStart"), source: "startup" });
+    async start(source: "startup" | "resume" = "startup"): Promise<void> {
+        await this.options.hooks.event({ ...this.base("SessionStart"), source });
     }
 
     /** One user turn, to its end, an interruption, or the step ceiling. */
@@ -391,12 +396,8 @@ export class NativeSession {
             maxRetries: 0,
             abortSignal: signal
         });
-        this.messages = [
-            {
-                role: "user",
-                content: `This session continues from an earlier conversation, summarized here:\n\n${result.text.trim()}`
-            }
-        ];
-        this.transcript.compacted();
+        const summary = `This session continues from an earlier conversation, summarized here:\n\n${result.text.trim()}`;
+        this.messages = [{ role: "user", content: summary }];
+        this.transcript.compacted(summary);
     }
 }

@@ -35,6 +35,7 @@ export interface TranscriptRecord {
     readonly isSidechain: boolean;
     readonly cwd: string;
     readonly subtype?: string;
+    readonly isCompactSummary?: boolean;
     readonly content?: string;
     readonly message?: {
         readonly role: "user" | "assistant";
@@ -43,7 +44,7 @@ export interface TranscriptRecord {
     };
 }
 
-type RecordBody = Pick<TranscriptRecord, "type" | "subtype" | "content" | "message">;
+type RecordBody = Pick<TranscriptRecord, "type" | "subtype" | "content" | "message" | "isCompactSummary">;
 
 export const INTERRUPTED_TEXT = "[Request interrupted by user]";
 
@@ -88,8 +89,18 @@ export class TranscriptWriter {
         return this.emit({ type: "user", message: { role: "user", content: results } });
     }
 
-    compacted(): string {
-        return this.emit({ type: "system", subtype: "compact_boundary", content: "Conversation compacted" });
+    /** The boundary, then the summary the work continues from, flagged the way
+     *  Claude Code flags it so history readers skip it and a resume reads it. */
+    compacted(summary?: string): string {
+        const boundary = this.emit({ type: "system", subtype: "compact_boundary", content: "Conversation compacted" });
+        if (summary) {
+            this.emit({
+                type: "user",
+                isCompactSummary: true,
+                message: { role: "user", content: [{ type: "text", text: summary }] }
+            });
+        }
+        return boundary;
     }
 
     interrupted(): string {
