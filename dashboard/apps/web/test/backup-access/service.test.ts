@@ -6,7 +6,8 @@
 
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { relayHelper } from "../../src/lib/backup-access/relay";
+import { RELAY_SPEC, relayHelper, relayProject } from "../../src/lib/backup-access/relay";
+import { HELPER_IMAGE, WIREGUARD_IMAGE } from "../../src/lib/deploy/wireguard/tunnel-config";
 
 interface FakeRecord {
     id: string;
@@ -38,6 +39,10 @@ let tunnelPorts: number[] = [];
 const tunnelRelays: (string | null)[] = [];
 /** The last spec each fake runtime was brought up with, by `where/project`. */
 const brought = new Map<string, { services: { name: string; image: string }[] }>();
+/** Somebody on a call, somebody in a game, and a read of either that fails. */
+let onCall = false;
+let inGame = false;
+let busyReadFails = false;
 
 vi.mock("@/lib/setting-store", () => ({
     getSetting: async (key: string) => settings.get(key) ?? null,
@@ -66,7 +71,14 @@ vi.mock("@polaris/db", () => ({
         },
         domain: { findMany: async () => servedDomains.map((hostname) => ({ hostname })) },
         host: { findMany: async () => [] },
-        user: { findMany: async () => [{ id: "admin" }] }
+        user: { findMany: async () => [{ id: "admin" }] },
+        meetingParticipant: {
+            findFirst: async () => {
+                if (busyReadFails) throw new Error("database gone");
+                return onCall ? { id: "seat" } : null;
+            }
+        },
+        gamePlayerSession: { findFirst: async () => (inGame ? { id: "visit" } : null) }
     }
 }));
 
@@ -337,6 +349,9 @@ beforeEach(() => {
     callNodeIps.length = 0;
     tunnelRelays.length = 0;
     callSyncFails = false;
+    onCall = false;
+    inGame = false;
+    busyReadFails = false;
     settings.set("published", HOME);
     for (const name of NAMES) {
         const id = `r${nextId++}`;
@@ -902,6 +917,81 @@ describe("runBackupAccess", () => {
         expect(records().map((record) => record.content)).toEqual([RELAY, RELAY]);
     });
 
+    it("moves a relay from an older design over only once nobody is on a call or in a game", async () => {
+        await service.saveConfig({
+            mode: "automatic",
+            path: "relay",
+            relayTargetId: "11111111-1111-4111-8111-111111111111",
+            dataSaver: true,
+            manualOn: false
+        });
+        await pass();
+        const current = JSON.parse(settings.get("backupAccess.relay") ?? "{}");
+        expect(current.spec).toBe(RELAY_SPEC);
+        // What a relay brought up by the previous release stored.
+        settings.set("backupAccess.relay", JSON.stringify({ ...current, spec: RELAY_SPEC - 1 }));
+        const stored = () => JSON.parse(settings.get("backupAccess.relay") ?? "{}");
+
+        const reasons = [() => (onCall = true), () => (inGame = true), () => (busyReadFails = true)];
+        for (const busy of reasons) {
+            onCall = inGame = busyReadFails = false;
+            busy();
+            brought.clear();
+            await pass();
+            // Neither end is brought up again, and the older design is still recorded.
+            expect([...brought.keys()]).toEqual([]);
+            expect(stored().spec).toBe(RELAY_SPEC - 1);
+        }
+
+        // An end that is gone carries nothing, so it does not wait.
+        busyReadFails = false;
+        onCall = true;
+        containers.delete(`home/${relayProject("home")}`);
+        brought.clear();
+        await pass();
+        expect([...brought.keys()].sort()).toEqual([
+            `home/${relayProject("home")}`,
+            `relay/${relayProject("relay")}`
+        ]);
+        expect(stored().spec).toBe(RELAY_SPEC);
+
+        // Quiet: an older relay moves over on the next pass.
+        settings.set("backupAccess.relay", JSON.stringify({ ...stored(), spec: RELAY_SPEC - 1 }));
+        onCall = false;
+        brought.clear();
+        await pass();
+        expect([...brought.keys()].sort()).toEqual([
+            `home/${relayProject("home")}`,
+            `relay/${relayProject("relay")}`
+        ]);
+        expect(stored().spec).toBe(RELAY_SPEC);
+
+        // Up to date, a call no longer matters and nothing is brought up again.
+        onCall = true;
+        brought.clear();
+        await pass();
+        expect([...brought.keys()]).toEqual([]);
+    });
+
+    it("brings nothing up and changes nothing where no relay is chosen", async () => {
+        for (const path of [null, "tunnel"] as const) {
+            await service.saveConfig({
+                mode: "automatic",
+                path,
+                relayTargetId: null,
+                dataSaver: true,
+                manualOn: false
+            });
+            brought.clear();
+            await passes(3);
+            const relayEnds = [...brought.keys()].filter(
+                (key) => key.endsWith(relayProject("home")) || key.endsWith(relayProject("relay"))
+            );
+            expect(relayEnds).toEqual([]);
+            expect(settings.get("backupAccess.relay")).toBeUndefined();
+        }
+    });
+
     it("brings a relay from before UDP was carried up again with the UDP ports", async () => {
         const relayConfig = {
             mode: "automatic" as const,
@@ -915,7 +1005,9 @@ describe("runBackupAccess", () => {
             [...brought.entries()]
                 .filter(([key]) => key.startsWith(`${where}/`))
                 .flatMap(([, spec]) => spec.services.map((s) => s.image));
-        expect(images("home").some((image) => image.includes("frp"))).toBe(false);
+        expect(
+            images("home").filter((image) => image !== WIREGUARD_IMAGE && image !== HELPER_IMAGE)
+        ).toEqual([]);
 
         // What an install from before stored: TCP only, the UDP ports named as skipped.
         const old = JSON.parse(settings.get("backupAccess.relay") ?? "{}");
@@ -931,8 +1023,14 @@ describe("runBackupAccess", () => {
         ];
         brought.clear();
         await pass();
-        expect(images("home")).toContain("fatedier/frpc:v0.71.0");
-        expect(images("relay")).toContain("fatedier/frps:v0.71.0");
+        // Both links at each end: the web link and the side link the games ride.
+        for (const where of ["home", "relay"]) {
+            expect(images(where).filter((image) => image === WIREGUARD_IMAGE)).toHaveLength(2);
+            // Nothing else runs there but the helpers that own each end's namespace.
+            expect(
+                images(where).filter((image) => image !== WIREGUARD_IMAGE && image !== HELPER_IMAGE)
+            ).toEqual([]);
+        }
         const stored = JSON.parse(settings.get("backupAccess.relay") ?? "{}");
         expect(stored.tcp).toEqual([80, 443, 7881, 25565]);
         expect(stored.udp).toEqual([7882, 19132]);

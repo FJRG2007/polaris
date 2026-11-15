@@ -110,6 +110,7 @@ import {
 } from "./relay";
 import { holdersCanBeFreed } from "./port-holders";
 import { CALL_PORTS } from "@/lib/chat/call-ports";
+import { PARTICIPANT_TTL_MS } from "@/lib/chat/meetings";
 import { getTailscaleHost } from "@/lib/tailscale/tailscale-service";
 import { syncCallNodeIp } from "@/lib/chat/call-address-watch";
 import { getHostLanIp } from "@/lib/host-address";
@@ -887,6 +888,16 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
         stored.lan !== lan ||
         stored.tcp.join(",") !== ports.tcp.join(",") ||
         stored.udp.join(",") !== ports.udp.join(",");
+    // A relay already running an older design is moved over only while nobody is
+    // on a call or in a game: both ends come up again, which cuts what rides them
+    // for a moment. Until then the old ends keep carrying everything as before. An
+    // end that is not running carries nothing, so then both move over at once.
+    const deferred =
+        changed &&
+        stored.routes !== null &&
+        stored.spec < RELAY_SPEC &&
+        (await relayInUse()) &&
+        (await relayEndsRunning(target));
     const names = await ownedZoneNames(await getDomainZones());
     if (names.length === 0) throw new PathRefusal("no-domain");
     const served = await prisma.domain.findMany({
@@ -912,7 +923,7 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
         await getPorts(target, target.ownerId),
         relayProject("relay"),
         () => relaySpec("relay", configs.relay, ports, [target.proxyNetwork]),
-        changed
+        changed && !deferred
     ).catch((caught: unknown) => {
         // The server already publishes one of the ports for something of its own.
         throw /port is already allocated|address already in use|bind for/i.test(message(caught))
@@ -923,9 +934,15 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
         new HostdPorts(),
         relayProject("home"),
         () => relaySpec("home", configs.home, ports),
-        changed
+        changed && !deferred
     );
-    if (changed || repush || stored.routes !== routes) {
+    if (deferred) {
+        // The routes still follow the domains; what both ends carry waits.
+        if (repush || stored.routes !== routes) {
+            await (await relayEdge(target)).pushFile(RELAY_ROUTES_FILE, routes);
+            await setSetting(RELAY_KEY, JSON.stringify({ ...stored, routes }));
+        }
+    } else if (changed || repush || stored.routes !== routes) {
         await (await relayEdge(target)).pushFile(RELAY_ROUTES_FILE, routes);
         await setSetting(
             RELAY_KEY,
@@ -940,6 +957,50 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
         );
     }
     return { kind: "relay", address };
+}
+
+/**
+ * Whether anybody is on a call or in a game now. Asked only while a relay waits to
+ * move to a newer design; a failed read counts as busy, so it waits another pass.
+ */
+async function relayInUse(): Promise<boolean> {
+    try {
+        const [seat, player] = await Promise.all([
+            prisma.meetingParticipant.findFirst({
+                where: {
+                    admission: "admitted",
+                    leftAt: null,
+                    lastSeenAt: { gte: new Date(Date.now() - PARTICIPANT_TTL_MS) },
+                    meeting: { endedAt: null }
+                },
+                select: { id: true }
+            }),
+            prisma.gamePlayerSession.findFirst({ where: { leftAt: null }, select: { id: true } })
+        ]);
+        return seat !== null || player !== null;
+    } catch (caught) {
+        console.error("polaris: could not tell whether the relay is in use:", caught);
+        return true;
+    }
+}
+
+/** Whether both ends of the relay have containers, read the way `keepUp` reads them. */
+async function relayEndsRunning(target: RelayTarget): Promise<boolean> {
+    const running = async (ports: RuntimePorts, project: string) => {
+        try {
+            return ports.listContainers ? (await ports.listContainers(project)).length > 0 : true;
+        } finally {
+            await ports.dispose();
+        }
+    };
+    try {
+        return (
+            (await running(await getPorts(target, target.ownerId), relayProject("relay"))) &&
+            (await running(new HostdPorts(), relayProject("home")))
+        );
+    } catch {
+        return false;
+    }
 }
 
 async function relayEdge(target: { hostId: string | null; ownerId: string }) {
