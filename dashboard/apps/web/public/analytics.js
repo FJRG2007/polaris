@@ -48,7 +48,10 @@
  *                                   - an event on click, its props from the attributes
  *
  * Somebody who does not want to be counted on a site (its own team, usually) runs
- * `localStorage.setItem("polaris.disabled", "1")` there; the script only reads it.
+ * `localStorage.setItem("polaris.disabled", "1")` there, or opens any page of the
+ * site with `?polaris-ignore=on` (`=off` counts that browser again). That link is
+ * the only time the script writes to the visitor's storage, and only because the
+ * visitor asked it to.
  */
 (() => {
     "use strict";
@@ -82,6 +85,15 @@
                   .filter(Boolean)
             : [];
     const beforeSendName = script.getAttribute("data-before-send");
+
+    // The opt-out link: ?polaris-ignore=on stops counting this browser, =off undoes it.
+    try {
+        const ignore = new URLSearchParams(location.search).get("polaris-ignore");
+        if (ignore === "on") localStorage.setItem("polaris.disabled", "1");
+        else if (ignore === "off") localStorage.removeItem("polaris.disabled");
+    } catch {
+        /* storage refused: nothing to remember it in */
+    }
 
     /** Whether this visit is one the site asked not to count. Read each time: a
      *  visitor can opt out without reloading. */

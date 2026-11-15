@@ -188,8 +188,11 @@ sitio:
 localStorage.setItem("polaris.disabled", "1");
 ```
 
-`localStorage.removeItem("polaris.disabled")` lo deshace. El script solo lee esta
-clave; nunca escribe en el equipo del visitante. Para ignorar una oficina o las
+`localStorage.removeItem("polaris.disabled")` lo deshace. Sin consola, abre
+cualquier página del sitio con `?polaris-ignore=on` al final de la dirección
+(por ejemplo `https://example.com/?polaris-ignore=on`); `?polaris-ignore=off`
+vuelve a contar ese navegador. Ese enlace es la única vez que el script escribe
+en el equipo del visitante. Para ignorar una oficina o las
 direcciones de tu equipo, usa **Tráfico ignorado**.
 
 ## Frameworks

@@ -1213,7 +1213,8 @@ function SitePanel(props: PanelProps) {
                             ["data-do-not-track=\"true\"", "site.apiDnt"],
                             ["data-exclude-search=\"true\"", "site.apiSearch"],
                             ["data-before-send=\"beforeSend\"", "site.apiBefore"],
-                            ["localStorage.setItem(\"polaris.disabled\", \"1\")", "site.apiOptOut"]
+                            ["localStorage.setItem(\"polaris.disabled\", \"1\")", "site.apiOptOut"],
+                            ["?polaris-ignore=on", "site.apiOptOutLink"]
                         ] as const
                     ).map(([code, key]) => (
                         <div key={key} className="flex min-w-0 flex-col gap-0.5">

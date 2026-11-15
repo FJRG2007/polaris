@@ -320,7 +320,8 @@
         "exportCsv": "CSV",
         "exportJson": "JSON",
         "exportXlsx": "Excel (first 100,000)",
-        "exportPdf": "PDF report"
+        "exportPdf": "PDF report",
+        "apiOptOutLink": "Add to any page address to stop counting that browser; =off undoes it."
     },
     "sections": {
         "overview": "Overview",
