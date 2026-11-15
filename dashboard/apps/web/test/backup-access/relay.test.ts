@@ -1,27 +1,54 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { generateKeyPair, slotAddresses } from "../../src/lib/deploy/wireguard/tunnel-config";
+import { createPrivateKey, createPublicKey } from "node:crypto";
 import {
-    FRP_CONTROL_PORT,
-    FRPC_IMAGE,
-    FRPS_IMAGE,
+    WIREGUARD_IMAGE,
+    endNames,
+    generateKeyPair,
+    isWireguardKey,
+    slotAddresses
+} from "../../src/lib/deploy/wireguard/tunnel-config";
+import {
+    NESTED_OVERHEAD,
     RELAY_EDGE_ADDRESS,
     RELAY_EDGE_NETWORK,
     RELAY_LISTEN_PORT,
+    RELAY_MTU,
+    RELAY_SIDE_SLOT,
     RELAY_SLOT,
-    frpToken,
+    RELAY_SPEC,
+    SIDE_MTU,
+    SIDE_WIRE_PORT,
     relayConfigs,
-    relayFrp,
     relayHelper,
     relayPorts,
     relayProject,
+    relaySide,
     relaySpec,
     renderRelayRoutes,
     renderHomeConfig,
-    renderHomeFrp,
     renderRelayConfig,
-    renderRelayFrp
+    renderSideHomeConfig,
+    renderSideRelayConfig,
+    sideKeys
 } from "../../src/lib/backup-access/relay";
+
+/** The config a container gets, as its helper decodes it. */
+function decoded(service: { env: Record<string, string> }): string {
+    return Buffer.from(service.env.WG_CONFIG ?? "", "base64").toString("utf8");
+}
+
+/** Every forward section of a config, as `section port`. */
+function forwards(text: string): string[] {
+    const out: string[] = [];
+    let section = "";
+    for (const line of text.split("\n")) {
+        if (line.startsWith("[")) section = line;
+        const port = /^(?:BindAddress = [^:]+:|ListenPort = )(\d+)$/.exec(line)?.[1];
+        if (port && section !== "[Interface]") out.push(`${section} ${port}`);
+    }
+    return out;
+}
 
 const keys = { relay: generateKeyPair(), home: generateKeyPair() };
 const { publicAddress, peerAddress } = slotAddresses(RELAY_SLOT);
@@ -69,64 +96,147 @@ describe("backup relay config", () => {
         );
     });
 
-    it("joins frp's two halves through the link, frps found by name on the relay", () => {
+    it("nests the side link inside the web link through one constant UDP forward", () => {
+        const side = slotAddresses(RELAY_SIDE_SLOT);
         expect(renderRelayConfig(keys)).toContain(
-            `[TCPServerTunnel]\nListenPort = ${FRP_CONTROL_PORT}\nTarget = ${relayFrp()}:${FRP_CONTROL_PORT}`
+            `[UDPServerTunnel]\nListenPort = ${SIDE_WIRE_PORT}\nTarget = ${relaySide()}:${SIDE_WIRE_PORT}`
         );
         expect(renderHomeConfig(keys, "198.51.100.20")).toContain(
-            `[TCPClientTunnel]\nBindAddress = 127.0.0.1:${FRP_CONTROL_PORT}\nTarget = ${publicAddress}:${FRP_CONTROL_PORT}`
+            `[UDPProxyTunnel]\nBindAddress = 0.0.0.0:${SIDE_WIRE_PORT}\nTarget = ${publicAddress}:${SIDE_WIRE_PORT}`
         );
+        const relaySideText = renderSideRelayConfig(keys, withUdp);
+        expect(relaySideText).toContain(`ListenPort = ${SIDE_WIRE_PORT}`);
+        expect(relaySideText).toContain(`Address = ${side.publicAddress}/32`);
+        const homeSide = renderSideHomeConfig(keys, withUdp);
+        // The house's side end dials the web link's forward, never the relay's address.
+        expect(homeSide).toContain(
+            `Endpoint = ${endNames("000000backup", "nat").helper}:${SIDE_WIRE_PORT}`
+        );
+        expect(homeSide).not.toContain("198.51.100.20");
+        expect(homeSide).toContain("PersistentKeepalive = 25");
+        expect(homeSide).toContain(`AllowedIPs = ${side.publicAddress}/32`);
+        // No new public port: the side relay's port is never published.
+        const configs = relayConfigs(keys, "198.51.100.20", withUdp);
+        const relay = relaySpec("relay", configs.relay, withUdp, ["polaris-proxy"]);
+        const published = relay.services.flatMap((service) =>
+            service.ports.map((p) => `${p.host}/${p.protocol ?? "tcp"}`)
+        );
+        expect(published.filter((p) => p === `${SIDE_WIRE_PORT}/udp`)).toEqual([
+            `${RELAY_LISTEN_PORT}/udp`
+        ]);
+        expect(SIDE_WIRE_PORT).toBe(RELAY_LISTEN_PORT);
     });
 
-    it("renders frps: control unpublished, proxies public, only the side ports allowed", () => {
-        const text = renderRelayFrp(keys, withUdp);
-        expect(text).toContain('bindAddr = "0.0.0.0"');
-        expect(text).toContain(`bindPort = ${FRP_CONTROL_PORT}`);
-        expect(text).toContain('proxyBindAddr = "0.0.0.0"');
-        // 25565 is carried as TCP and UDP: one entry; the web ports never.
-        expect(text).toContain("allowPorts = [{ single = 19132 }, { single = 25565 }]");
-        expect(text).toContain(`auth.token = "${frpToken(keys)}"`);
-        expect(text).not.toMatch(/kcpBindPort|quicBindPort|webServer/);
+    it("sets the side link's MTU so a wrapped side packet is exactly one web link packet", () => {
+        expect(NESTED_OVERHEAD).toBe(20 + 8 + 32);
+        expect(RELAY_MTU).toBe(1420);
+        // The web link's own MTU fits a 1500-byte path over IPv6: 1500 - 40 - 8 - 32.
+        expect(1500 - 40 - 8 - 32).toBe(RELAY_MTU);
+        expect(SIDE_MTU).toBe(1360);
+        expect(SIDE_MTU % 16).toBe(0);
+        // A full side packet plus WireGuard's 32 bytes is the largest datagram one web
+        // link packet carries over its IPv4 addresses.
+        expect(SIDE_MTU + 32).toBe(RELAY_MTU - 20 - 8);
+        expect(renderRelayConfig(keys)).toContain(`MTU = ${RELAY_MTU}`);
+        expect(renderHomeConfig(keys, "198.51.100.20")).toContain(`MTU = ${RELAY_MTU}`);
+        expect(renderSideRelayConfig(keys, withUdp)).toContain(`MTU = ${SIDE_MTU}`);
+        expect(renderSideHomeConfig(keys, withUdp)).toContain(`MTU = ${SIDE_MTU}`);
+        // The link's addresses are IPv4, so the IPv4 overhead is the one that applies.
+        expect(publicAddress).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
+        expect(slotAddresses(RELAY_SIDE_SLOT).peerAddress).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
     });
 
-    it("keeps each proxied connection on its own stream, both ends agreeing", () => {
-        for (const text of [renderRelayFrp(keys, withUdp), renderHomeFrp(keys, withUdp)]) {
-            expect(text).toContain("transport.tcpMux = false");
+    it("carries every side port natively: UDP as UDP and TCP as TCP, none on a TCP path", () => {
+        const relaySideText = renderSideRelayConfig(keys, withUdp);
+        const homeSide = renderSideHomeConfig(keys, withUdp, "192.0.2.10");
+        const { peerAddress: sidePeer } = slotAddresses(RELAY_SIDE_SLOT);
+        expect(forwards(relaySideText)).toEqual([
+            "[TCPClientTunnel] 25565",
+            "[UDPProxyTunnel] 19132",
+            "[UDPProxyTunnel] 25565"
+        ]);
+        expect(forwards(homeSide)).toEqual([
+            "[TCPServerTunnel] 25565",
+            "[UDPServerTunnel] 19132",
+            "[UDPServerTunnel] 25565"
+        ]);
+        expect(relaySideText).toContain(
+            `[UDPProxyTunnel]\nBindAddress = 0.0.0.0:19132\nTarget = ${sidePeer}:19132`
+        );
+        // No UDP port anywhere rides a TCP section, on any end, link or config.
+        const sets = [withUdp, { tcp: [80, 443], udp: [7882, 50000, 51820] }];
+        for (const set of sets) {
+            const configs = relayConfigs(keys, "198.51.100.20", set, "192.0.2.10");
+            const texts = [
+                configs.relay.wireguard,
+                configs.home.wireguard,
+                configs.relay.side ?? "",
+                configs.home.side ?? ""
+            ];
+            for (const text of texts)
+                for (const entry of forwards(text)) {
+                    const [section, port] = entry.split(" ");
+                    if (section?.startsWith("[TCP")) {
+                        const udpOnly = set.udp.filter((u) => !set.tcp.includes(u));
+                        expect(udpOnly).not.toContain(Number(port));
+                    }
+                }
+            // Nothing of the old TCP-carried path is left in any file.
+            expect(texts.join("\n")).not.toMatch(/proxies|remotePort|serverPort/i);
         }
-        expect(renderHomeFrp(keys, withUdp)).toContain("transport.poolCount = 5");
-        expect(renderRelayFrp(keys, withUdp)).toContain("transport.maxPoolCount = 5");
-    });
-
-    it("renders frpc: dials through the link, one proxy per side port to this machine", () => {
-        const text = renderHomeFrp(keys, withUdp);
-        expect(text).toContain('serverAddr = "127.0.0.1"');
-        expect(text).toContain(`serverPort = ${FRP_CONTROL_PORT}`);
-        expect(text).toContain("loginFailExit = false");
-        expect(text).toContain(`auth.token = "${frpToken(keys)}"`);
-        expect(text.match(/\[\[proxies\]\]/g)).toHaveLength(3);
-        expect(text).toContain(
-            '[[proxies]]\nname = "tcp-25565"\ntype = "tcp"\nlocalIP = "host.docker.internal"\nlocalPort = 25565\nremotePort = 25565'
-        );
-        expect(text).toContain(
-            '[[proxies]]\nname = "udp-19132"\ntype = "udp"\nlocalIP = "host.docker.internal"\nlocalPort = 19132\nremotePort = 19132'
-        );
-        expect(text).not.toMatch(/name = "tcp-(80|443)"/);
     });
 
     it("hands UDP to the LAN address, where the call server listens, and TCP to the gateway", () => {
         const configs = relayConfigs(keys, "198.51.100.20", withUdp, "192.0.2.10");
-        expect(configs.home.frp).toContain(
-            'name = "udp-19132"\ntype = "udp"\nlocalIP = "192.0.2.10"'
+        expect(configs.home.side).toContain("[UDPServerTunnel]\nListenPort = 19132\nTarget = 192.0.2.10:19132");
+        expect(configs.home.side).toContain(
+            "[TCPServerTunnel]\nListenPort = 25565\nTarget = host.docker.internal:25565"
         );
-        expect(configs.home.frp).toContain(
-            'name = "tcp-25565"\ntype = "tcp"\nlocalIP = "host.docker.internal"'
+        expect(renderSideHomeConfig(keys, withUdp, "fd00::10")).toContain(
+            "Target = [fd00::10]:19132"
         );
     });
-    it("derives one secret token both ends agree on, never a key", () => {
-        expect(frpToken(keys)).toMatch(/^[0-9a-f]{64}$/);
-        expect(frpToken(keys)).toBe(frpToken({ ...keys }));
-        expect(frpToken({ relay: keys.relay, home: generateKeyPair() })).not.toBe(frpToken(keys));
-        expect(renderHomeFrp(keys, { tcp: [], udp: [19132] })).not.toContain(keys.home.privateKey);
+
+    it("derives the side link's keys from the web link's, both ends agreeing, never a stored key", () => {
+        const side = sideKeys(keys);
+        expect(side).toEqual(sideKeys({ ...keys }));
+        for (const pair of [side.relay, side.home]) {
+            expect(isWireguardKey(pair.privateKey)).toBe(true);
+            expect(isWireguardKey(pair.publicKey)).toBe(true);
+        }
+        expect(side.relay.privateKey).not.toBe(keys.relay.privateKey);
+        expect(side.home.privateKey).not.toBe(keys.home.privateKey);
+        expect(side.relay.privateKey).not.toBe(side.home.privateKey);
+        expect(sideKeys({ relay: keys.relay, home: generateKeyPair() }).home).not.toEqual(side.home);
+        // Each public key is its private key's: the pairs are real X25519 pairs.
+        const publicOf = (privateKey: string) =>
+            Buffer.from(
+                createPublicKey(
+                    createPrivateKey({
+                        key: Buffer.concat([
+                            Buffer.from("302e020100300506032b656e04220420", "hex"),
+                            Buffer.from(privateKey, "base64")
+                        ]),
+                        format: "der",
+                        type: "pkcs8"
+                    })
+                ).export({ format: "jwk" }).x ?? "",
+                "base64url"
+            ).toString("base64");
+        expect(publicOf(side.relay.privateKey)).toBe(side.relay.publicKey);
+        expect(publicOf(side.home.privateKey)).toBe(side.home.publicKey);
+        // Each end holds its own private key and the other's public key, nothing more.
+        const relaySideText = renderSideRelayConfig(keys, withUdp);
+        expect(relaySideText).toContain(`PrivateKey = ${side.relay.privateKey}`);
+        expect(relaySideText).toContain(`PublicKey = ${side.home.publicKey}`);
+        expect(relaySideText).not.toContain(side.home.privateKey);
+        const homeSide = renderSideHomeConfig(keys, withUdp);
+        expect(homeSide).toContain(`PrivateKey = ${side.home.privateKey}`);
+        expect(homeSide).not.toContain(side.relay.privateKey);
+        for (const text of [relaySideText, homeSide]) {
+            expect(text).not.toContain(keys.relay.privateKey);
+            expect(text).not.toContain(keys.home.privateKey);
+        }
     });
 
     it("refuses a value that would break a file", () => {
@@ -134,15 +244,16 @@ describe("backup relay config", () => {
         expect(() =>
             renderRelayConfig({ relay: { privateKey: "nope", publicKey: "nope" }, home: keys.home })
         ).toThrow();
-        expect(() => renderRelayFrp(keys, { tcp: [], udp: [RELAY_LISTEN_PORT] })).toThrow();
-        expect(() => renderHomeFrp(keys, { tcp: [], udp: [1.5] })).toThrow();
+        expect(() => renderSideRelayConfig(keys, { tcp: [], udp: [RELAY_LISTEN_PORT] })).toThrow();
+        expect(() => renderSideHomeConfig(keys, { tcp: [], udp: [1.5] })).toThrow();
+        expect(() => renderSideHomeConfig(keys, withUdp, "192.0.2.10\nPostUp = x")).toThrow();
         expect(() => relayConfigs(keys, "198.51.100.20", { tcp: [0], udp: [] })).toThrow();
     });
     it("joins the edge's network on the relay end", () => {
         const configs = relayConfigs(keys, "198.51.100.20", webOnly);
         const relay = relaySpec("relay", configs.relay, webOnly, ["polaris-proxy"]);
         expect(relay.networks).toEqual(["polaris-proxy"]);
-        // `default` is how the link reaches frps.
+        // `default` is how the link reaches the side relay.
         expect(relay.services[0].networks).toEqual(["default", "polaris-proxy"]);
     });
 
@@ -192,8 +303,8 @@ describe("backup relay config", () => {
 
     it("publishes the carried ports on the relay end only", () => {
         const configs = relayConfigs(keys, "198.51.100.20", webOnly);
-        expect(configs.relay.frp).toBeNull();
-        expect(configs.home.frp).toBeNull();
+        expect(configs.relay.side).toBeNull();
+        expect(configs.home.side).toBeNull();
         const relay = relaySpec("relay", configs.relay, webOnly);
         const ports = relay.services[0].ports.map((p) => `${p.host}/${p.protocol ?? "tcp"}`);
         // 80 and 443 belong to the server's edge, so the server can serve its own apps.
@@ -202,7 +313,7 @@ describe("backup relay config", () => {
         const home = relaySpec("home", configs.home, webOnly);
         expect(home.services[0].ports).toEqual([]);
         expect(home.services[0].extraHosts).toContain("host.docker.internal:host-gateway");
-        // WireGuard's resolver never reads the hosts file the entry above lands in.
+        // The files carry the address the entry above gives, whatever the resolver reads.
         const script = home.services[0].command?.[2] ?? "";
         expect(script).toContain("grep -F host.docker.internal /etc/hosts");
         expect(script).toContain('sed "s/host.docker.internal/${PINNED:-host.docker.internal}/g"');
@@ -240,44 +351,47 @@ describe("backup relay config", () => {
         );
     });
 
-    it("runs frp in containers of its own, publishing the side ports on the relay end", () => {
+    it("runs the side link in containers of its own, publishing the side ports on the relay end", () => {
         const configs = relayConfigs(keys, "198.51.100.20", withUdp);
         const relay = relaySpec("relay", configs.relay, withUdp, ["polaris-proxy"]);
-        const [helper, , frps] = relay.services;
+        const [helper, daemon, sideHelper, sideDaemon] = relay.services;
+        expect(relay.services).toHaveLength(4);
         // The link publishes only its own port, whatever is installed.
         expect(helper.ports.map((p) => `${p.host}/${p.protocol ?? "tcp"}`)).toEqual([
             `${RELAY_LISTEN_PORT}/udp`
         ]);
-        expect(frps.name).toBe(relayFrp());
-        expect(frps.image).toBe(FRPS_IMAGE);
-        expect(frps.networkMode).toBeUndefined();
-        expect(frps.networks).toEqual(["default"]);
-        expect(frps.dependsOn).toEqual([helper.name]);
-        expect(frps.ports.map((p) => `${p.host}/${p.protocol ?? "tcp"}`)).toEqual([
+        expect(helper.name).toBe(relayHelper());
+        expect(sideHelper.name).toBe(relaySide());
+        expect(sideHelper.name).not.toBe(helper.name);
+        expect(daemon.image).toBe(WIREGUARD_IMAGE);
+        expect(sideDaemon.image).toBe(WIREGUARD_IMAGE);
+        expect(sideHelper.networks).toEqual(["default"]);
+        expect(sideHelper.dependsOn).toEqual([helper.name]);
+        expect(sideHelper.ports.map((p) => `${p.host}/${p.protocol ?? "tcp"}`)).toEqual([
             "25565/tcp",
             "19132/udp",
             "25565/udp"
         ]);
-        expect(frps.entrypoint).toEqual(["sh", "-c"]);
-        expect(frps.command?.[0]).toContain("exec /usr/bin/frps -c /tmp/frp.toml");
-        expect(frps.command?.[0]).not.toContain("PINNED");
-        expect(Buffer.from(frps.env.FRP_CONFIG ?? "", "base64").toString("utf8")).toBe(
-            configs.relay.frp
-        );
-        // The frp files no longer pass through the link's helper.
-        expect(Object.keys(helper.env)).toEqual(["WG_CONFIG"]);
+        expect(sideDaemon.networkMode).toBe(`service:${sideHelper.name}`);
+        expect(decoded(sideHelper)).toBe(configs.relay.side);
+        expect(decoded(helper)).toBe(configs.relay.wireguard);
+        // A side port may be the status port's number, so the side relay serves none.
+        expect(sideDaemon.command).not.toContain("--info");
+        expect(daemon.command).toContain("--info");
+        // Each end's files live in a volume of its own.
+        expect(relay.volumes).toEqual([`${helper.name}-conf`, `${sideHelper.name}-conf`]);
         // Only the edge's network is declared; `default` is the project's own.
         expect(relay.networks).toEqual(["polaris-proxy"]);
 
         const home = relaySpec("home", configs.home, withUdp);
-        const frpc = home.services[2];
-        expect(frpc.image).toBe(FRPC_IMAGE);
-        expect(frpc.networkMode).toBe(`service:${home.services[0].name}`);
-        expect(frpc.networks).toEqual([]);
-        expect(frpc.ports).toEqual([]);
-        expect(frpc.command?.[0]).toContain("grep -F host.docker.internal /etc/hosts");
-        expect(frpc.command?.[0]).toContain("exec /usr/bin/frpc -c /tmp/frp.toml");
-        expect(home.services[0].ports).toEqual([]);
+        const [homeHelper, , homeSideHelper, homeSideDaemon] = home.services;
+        expect(home.services).toHaveLength(4);
+        expect(homeSideHelper.ports).toEqual([]);
+        expect(homeSideHelper.networks).toEqual(["default"]);
+        expect(homeSideHelper.extraHosts).toEqual(["host.docker.internal:host-gateway"]);
+        expect(homeSideHelper.command?.[2]).toContain("grep -F host.docker.internal /etc/hosts");
+        expect(homeSideDaemon.command).toContain("--info");
+        expect(homeHelper.ports).toEqual([]);
         // Nothing the daemon refuses: no capabilities, no host network, no newline, and
         // nothing of its own on a service that shares another's network.
         for (const service of [...relay.services, ...home.services]) {
@@ -297,6 +411,10 @@ describe("backup relay config", () => {
         }
     });
 
+    it("raises the spec so the Update button brings both ends up as two links", () => {
+        expect(RELAY_SPEC).toBe(6);
+    });
+
     it("adding or removing a game server leaves the link's containers exactly as they were", () => {
         // Compose recreates only what changed, so a link that renders the same is never
         // restarted - and the web, which rides it, never drops.
@@ -313,6 +431,22 @@ describe("backup relay config", () => {
                 return JSON.stringify(spec.services.slice(0, 2));
             });
             expect(new Set(links).size).toBe(1);
+            // The web link's file itself, byte for byte, whatever games are installed.
+            const files = sets.map((set) =>
+                decoded(
+                    relaySpec(
+                        end,
+                        relayConfigs(keys, "198.51.100.20", set, "192.0.2.10")[end],
+                        set
+                    ).services[0]
+                )
+            );
+            expect(new Set(files).size).toBe(1);
+            // Only the side link follows the games.
+            const sides = sets.map(
+                (set) => relayConfigs(keys, "198.51.100.20", set, "192.0.2.10")[end].side
+            );
+            expect(new Set(sides).size).toBe(sets.length);
         }
     });
 });

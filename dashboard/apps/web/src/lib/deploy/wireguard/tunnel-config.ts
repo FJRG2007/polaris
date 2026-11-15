@@ -6,11 +6,11 @@
  * that can be wrong - an address handed out twice, a keepalive missing on the end
  * that sits behind NAT, a router without a priority - is asserted in a test.
  *
- * Each end is userspace WireGuard (wireproxy): it needs no NET_ADMIN, no TUN
- * device and no kernel module, so it runs inside the shapes the host daemon
- * already allows. The public end listens on one UDP port and forwards a TCP port
- * into the tunnel; the end behind NAT dials out with a keepalive and forwards what
- * arrives to the service, so nothing opens at home.
+ * Each end is Polaris' own userspace WireGuard daemon (`crates/polaris-tunnel`):
+ * it needs no NET_ADMIN, no TUN device and no kernel module, so it runs inside
+ * the shapes the host daemon already allows. The public end listens on one UDP
+ * port and forwards a TCP port into the tunnel; the end behind NAT dials out with
+ * a keepalive and forwards what arrives to the service, so nothing opens at home.
  */
 
 import { generateKeyPairSync } from "node:crypto";
@@ -21,13 +21,19 @@ import { FIRST_LISTEN_PORT, LAST_LISTEN_PORT } from "./listen-ports";
 export { isRouteHostname };
 
 /**
- * Userspace WireGuard, pinned to the commit tagged v1.1.3 (2026-07-16). The
- * project publishes its image under the commit hash and `latest`, never under the
- * release name, so the hash is the only tag that cannot move under a running
- * tunnel. Distroless and unprivileged; its `/metrics` answers with the device's
- * own state, which is how the screen reads the handshake.
+ * The tunnel daemon, built from `crates/polaris-tunnel` and published into the
+ * dashboard's public package under its crate version. Containers pull it only
+ * when missing, so a version tag is never moved: the publish refuses to retag a
+ * version with a build of other sources, and CI refuses a source change without
+ * a new version. Static and unprivileged (uid 65532, no shell); its `/metrics`
+ * answers with the device's own state, which is how the screen reads the
+ * handshake. TCP forwards ride the tunnel end to end and UDP forwards ride it
+ * natively, each datagram on its own.
  */
-export const WIREGUARD_IMAGE = "ghcr.io/windtf/wireproxy:31a9a34498267d7fb8aeff05aba79d929b15eb39";
+export const WIREGUARD_IMAGE = "ghcr.io/fjrg2007/polaris-dashboard:latest-service-tunnel-0.1.0";
+
+/** Where the helper writes the config files, in the volume both containers mount. */
+export const CONFIG_DIR = "/etc/polaris-tunnel";
 
 /**
  * The companion that writes the config file and owns the network namespace both
@@ -237,9 +243,13 @@ export interface EndSpecInput {
     /** More files the helper writes beside the config, for a container that joins
      *  the same namespace. Root-owned and readable by root only. */
     readonly extraFiles?: readonly { name: string; content: string }[];
-    /** A name Docker keeps in the helper's hosts file. WireGuard's resolver asks DNS
-     *  only and never finds it, so the files get the address instead. */
+    /** A name Docker keeps in the helper's hosts file, written into the files as
+     *  the address it has there, so a forward never depends on how the daemon's
+     *  resolver treats the hosts file. */
     readonly hostAlias?: string;
+    /** Serve the status endpoint on `STATUS_ADDRESS` (the default). Off for an end
+     *  whose forwards may need that port: nothing reads its status. */
+    readonly status?: boolean;
 }
 
 /**
@@ -263,7 +273,7 @@ export function endSpec(input: EndSpecInput): ComposeSpec {
         ])
     );
     const owned = ["config", ...extras.map((file) => file.name)]
-        .map((name) => `/etc/wireproxy/${name}`)
+        .map((name) => `${CONFIG_DIR}/${name}`)
         .join(" ");
     const alias = input.hostAlias;
     if (alias && !/^[a-z0-9][a-z0-9.-]*$/.test(alias))
@@ -276,13 +286,13 @@ export function endSpec(input: EndSpecInput): ComposeSpec {
                   `PINNED=$(grep -F ${alias} /etc/hosts | head -n 1 | tr -s ' \\t' ' ' | cut -d ' ' -f 1)`
               ]
             : []),
-        `printf %s "$WG_CONFIG" | base64 -d${pin} > /etc/wireproxy/config`,
-        // The WireGuard image runs as the distroless nonroot user.
-        "chown 65532:65532 /etc/wireproxy/config",
-        "chmod 0400 /etc/wireproxy/config",
+        `printf %s "$WG_CONFIG" | base64 -d${pin} > ${CONFIG_DIR}/config`,
+        // The tunnel image runs as uid 65532, never root.
+        `chown 65532:65532 ${CONFIG_DIR}/config`,
+        `chmod 0400 ${CONFIG_DIR}/config`,
         ...extras.flatMap((file, index) => [
-            `printf %s "$WG_FILE_${index}" | base64 -d${pin} > /etc/wireproxy/${file.name}`,
-            `chmod 0400 /etc/wireproxy/${file.name}`
+            `printf %s "$WG_FILE_${index}" | base64 -d${pin} > ${CONFIG_DIR}/${file.name}`,
+            `chmod 0400 ${CONFIG_DIR}/${file.name}`
         ]),
         // The files hold secrets: they do not outlive the tunnel's containers.
         `trap 'rm -f ${owned}; exit 0' TERM INT`,
@@ -302,7 +312,7 @@ export function endSpec(input: EndSpecInput): ComposeSpec {
                 ports: input.listenPort
                     ? [{ host: input.listenPort, container: input.listenPort, protocol: "udp" }]
                     : [],
-                volumes: [{ kind: "volume", source: volume, target: "/etc/wireproxy" }],
+                volumes: [{ kind: "volume", source: volume, target: CONFIG_DIR }],
                 labels: {},
                 command: ["sh", "-c", script],
                 networks: input.networks,
@@ -314,9 +324,11 @@ export function endSpec(input: EndSpecInput): ComposeSpec {
                 pullPolicy: "missing",
                 env: {},
                 ports: [],
-                volumes: [{ kind: "volume", source: volume, target: "/etc/wireproxy" }],
+                volumes: [{ kind: "volume", source: volume, target: CONFIG_DIR }],
                 labels: {},
-                command: ["--config", "/etc/wireproxy/config", "--info", STATUS_ADDRESS],
+                command: input.status === false
+                    ? ["--config", `${CONFIG_DIR}/config`]
+                    : ["--config", `${CONFIG_DIR}/config`, "--info", STATUS_ADDRESS],
                 networks: [],
                 networkMode: `service:${names.helper}`,
                 dependsOn: [names.helper],

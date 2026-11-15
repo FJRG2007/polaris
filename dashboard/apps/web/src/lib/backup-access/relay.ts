@@ -4,25 +4,30 @@
  *
  * Same shape as the self-hosted relays that settled this (a WireGuard endpoint on
  * a cloud server forwarding the public ports into a link the house dials out on),
- * built from the pieces Polaris' WireGuard tunnels already run: userspace
- * WireGuard (wireproxy), so neither end needs NET_ADMIN, a TUN device or a kernel
+ * built from the pieces Polaris' WireGuard tunnels already run: its own userspace
+ * WireGuard daemon, so neither end needs NET_ADMIN, a TUN device or a kernel
  * module, and both fit the shapes the host daemon allows.
  *
- * The link carries the web ports and nothing that changes: the house end dials the
- * relay with a keepalive and hands 80 to this machine and 443 to the edge directly
- * (see `RELAY_EDGE_NETWORK`), so Traefik answers as it does on the direct path. The
- * web ports are not published: 80 and 443 belong to the server's own edge, which
- * hands the house's hostnames to the relay and goes on serving everything else, so
- * a server can be a relay and a deploy target at once.
+ * Two links, nested. The web link carries the web ports and nothing that changes:
+ * the house end dials the relay with a keepalive and hands 80 to this machine and
+ * 443 to the edge directly (see `RELAY_EDGE_NETWORK`), so Traefik answers as it
+ * does on the direct path. The web ports are not published: 80 and 443 belong to
+ * the server's own edge, which hands the house's hostnames to the relay and goes
+ * on serving everything else, so a server can be a relay and a deploy target at
+ * once.
  *
- * Every other port - games, call media, the tunnels' listen ports - rides frp, the
- * way self-hosted game servers are usually relayed: frps on the relay end publishes
- * them, frpc at the house dials it through the link and hands each to the same port
- * here. They run in containers of their own so that a server added or removed
- * recreates only frp, never the link the web rides (see `relaySpec`).
+ * Every other port - games, call media, the tunnels' listen ports - rides the side
+ * link: a second pair of daemons whose WireGuard datagrams travel inside the web
+ * link through one UDP forward that is the same in every config, so it needs no
+ * public port of its own. UDP crosses it as UDP, each datagram on its own, so a
+ * lost or late packet never holds up the ones behind it - the 5-7 s call freezes
+ * of carrying UDP inside a TCP stream are gone. TCP crosses it end to end, one
+ * connection per player. The side link runs in containers of its own so that a
+ * server added or removed recreates only them, never the link the web rides (see
+ * `relaySpec`).
  */
 
-import { createHmac } from "node:crypto";
+import { createHmac, createPrivateKey, createPublicKey } from "node:crypto";
 import type { ComposeSpec } from "@polaris/deploy";
 import * as wg from "@/lib/deploy/wireguard/tunnel-config";
 
@@ -33,19 +38,36 @@ export const RELAY_LISTEN_PORT = wg.LAST_LISTEN_PORT + 1;
  *  never meets a tunnel's. */
 export const RELAY_SLOT = 16383;
 /** Raised when both ends must be brought up again with what this build renders. */
-export const RELAY_SPEC = 5;
+export const RELAY_SPEC = 6;
 /** The web ports every relay carries. */
 export const WEB_PORTS = [80, 443] as const;
 /**
- * frp, pinned to v0.71.0 (2026-08-14), the images the project publishes itself.
- * Alpine with the binary as entrypoint, so the command is its arguments.
+ * The side link's WireGuard port: where the side relay listens on its own
+ * container's network, and where the web link's constant forward carries it, on
+ * the relay's tunnel address and on the house end's network. The relay's own
+ * port number, which no carried port is given, so it never meets one.
  */
-export const FRPS_IMAGE = "fatedier/frps:v0.71.0";
-export const FRPC_IMAGE = "fatedier/frpc:v0.71.0";
-/** Where frp's two halves meet: TCP on loopback at each end, joined by the link.
- *  The relay's own port number, which no carried port is given, so this listener
- *  never meets one. */
-export const FRP_CONTROL_PORT = RELAY_LISTEN_PORT;
+export const SIDE_WIRE_PORT = RELAY_LISTEN_PORT;
+/** The side link's addresses, in namespaces of their own like the web link's. */
+export const RELAY_SIDE_SLOT = 16382;
+/** The compose names of the side link's ends, beside the web link's. */
+export const RELAY_SIDE_ID = "00000051de00";
+/** The web link's MTU, the daemon's default, which fits a 1500-byte path over
+ *  IPv6 (1500 - 40 - 8 - 32). */
+export const RELAY_MTU = 1420;
+/**
+ * What one side packet gains when it is wrapped for the web link, whose addresses
+ * are IPv4: the IP header (20), UDP (8), and WireGuard's data header and tag
+ * (16 + 16). Over IPv6 addresses it would be 80.
+ */
+export const NESTED_OVERHEAD = 20 + 8 + 32;
+/**
+ * The side link's MTU: one side packet, wrapped, is exactly one web link packet,
+ * so the web link never fragments. A multiple of 16, so WireGuard's padding never
+ * adds to it. A game datagram larger than one side packet is fragmented inside the
+ * side link and joined at the other end, as a kernel tunnel would.
+ */
+export const SIDE_MTU = RELAY_MTU - NESTED_OVERHEAD;
 /** The house end reaches this machine's published ports through the gateway. */
 const HOST_ALIAS = "host.docker.internal";
 /** The same entry `@polaris/deploy` gives what it starts (its `HOST_GATEWAY`). */
@@ -78,7 +100,7 @@ export function relayPorts(gamePorts: readonly RelayPort[]): RelayPortSet {
     const udp = new Set<number>();
     for (const entry of gamePorts) {
         if (!isPort(entry.port)) continue;
-        // The link's own UDP port, and frp's TCP one.
+        // The link's own UDP port, which the side link uses inside it too.
         if (entry.port === RELAY_LISTEN_PORT) continue;
         (entry.protocol === "udp" ? udp : tcp).add(entry.port);
     }
@@ -107,8 +129,9 @@ export interface RelayKeys {
     readonly home: wg.KeyPair;
 }
 
-/** The ports that ride frp rather than the link: every carried port but the web
- *  ones. Games, calls and tunnels come and go; the web ports never do. */
+/** The ports that ride the side link rather than the web link: every carried
+ *  port but the web ones. Games, calls and tunnels come and go; the web ports
+ *  never do. */
 function sidePorts(carried: RelayPortSet): RelayPortSet {
     return {
         tcp: carriable(carried.tcp).filter((port) => !WEB_PORTS.some((web) => web === port)),
@@ -116,15 +139,42 @@ function sidePorts(carried: RelayPortSet): RelayPortSet {
     };
 }
 
-/** Whether there is anything for frp to carry. */
+/** Whether there is anything for the side link to carry. */
 function carriesSide(carried: RelayPortSet): boolean {
     const side = sidePorts(carried);
     return side.tcp.length + side.udp.length > 0;
 }
 
+/** PKCS #8 for an X25519 private key, up to the 32 key bytes (RFC 8410). */
+const X25519_PKCS8_PREFIX = Buffer.from("302e020100300506032b656e04220420", "hex");
+
+/** A key pair derived from one of the web link's private keys: the side link's
+ *  keys are never stored, and both ends always agree on them. */
+function sideKeyPair(privateKey: string): wg.KeyPair {
+    const seed = createHmac("sha256", key(privateKey))
+        .update("polaris-backup-relay-side")
+        .digest();
+    // Clamped, as every X25519 private key is written.
+    seed[0] = (seed[0] ?? 0) & 248;
+    seed[31] = ((seed[31] ?? 0) & 127) | 64;
+    const der = Buffer.concat([X25519_PKCS8_PREFIX, seed]);
+    const jwk = createPublicKey(createPrivateKey({ key: der, format: "der", type: "pkcs8" })).export({
+        format: "jwk"
+    });
+    return {
+        privateKey: seed.toString("base64"),
+        publicKey: Buffer.from(jwk.x ?? "", "base64url").toString("base64")
+    };
+}
+
+/** The side link's two key pairs. */
+export function sideKeys(keys: RelayKeys): RelayKeys {
+    return { relay: sideKeyPair(keys.relay.privateKey), home: sideKeyPair(keys.home.privateKey) };
+}
+
 /** The relay end: listens for the house, forwards the web ports into the link, and
- *  lets the house's frpc reach frps. The same file whatever games are installed, so
- *  adding one never restarts the link the web rides. */
+ *  hands the side link's datagrams to the side relay. The same file whatever games
+ *  are installed, so adding one never restarts the link the web rides. */
 export function renderRelayConfig(keys: RelayKeys): string {
     const { publicAddress, peerAddress } = wg.slotAddresses(RELAY_SLOT);
     return [
@@ -132,6 +182,7 @@ export function renderRelayConfig(keys: RelayKeys): string {
         `PrivateKey = ${key(keys.relay.privateKey)}`,
         `Address = ${publicAddress}/32`,
         `ListenPort = ${RELAY_LISTEN_PORT}`,
+        `MTU = ${RELAY_MTU}`,
         "",
         "[Peer]",
         `PublicKey = ${key(keys.home.publicKey)}`,
@@ -143,17 +194,20 @@ export function renderRelayConfig(keys: RelayKeys): string {
             `Target = ${peerAddress}:${port}`,
             ""
         ]),
-        // frps runs in a container of its own, found by name on the project's network:
-        // it publishes the side ports, which this container would otherwise have to.
-        "[TCPServerTunnel]",
-        `ListenPort = ${FRP_CONTROL_PORT}`,
-        `Target = ${relayFrp()}:${FRP_CONTROL_PORT}`,
+        // The side relay runs in a container of its own, found by name on the
+        // project's network: it publishes the side ports, which this container
+        // would otherwise have to. The name is looked up again while datagrams
+        // flow, so a side relay recreated on a new address is followed.
+        "[UDPServerTunnel]",
+        `ListenPort = ${SIDE_WIRE_PORT}`,
+        `Target = ${relaySide()}:${SIDE_WIRE_PORT}`,
         ""
     ].join("\n");
 }
 
 /** The house end: dials the relay, keeps the mapping open, hands the web ports to
- *  this machine, and gives frpc its way to frps. Constant like the relay's. */
+ *  this machine, and gives the side link its way to the relay. Constant like the
+ *  relay's. */
 export function renderHomeConfig(keys: RelayKeys, relayAddress: string): string {
     const { publicAddress, peerAddress } = wg.slotAddresses(RELAY_SLOT);
     const endpoint = `${relayAddress.includes(":") ? `[${relayAddress}]` : relayAddress}:${RELAY_LISTEN_PORT}`;
@@ -162,6 +216,7 @@ export function renderHomeConfig(keys: RelayKeys, relayAddress: string): string 
         "[Interface]",
         `PrivateKey = ${key(keys.home.privateKey)}`,
         `Address = ${peerAddress}/32`,
+        `MTU = ${RELAY_MTU}`,
         "",
         "[Peer]",
         `PublicKey = ${key(keys.relay.publicKey)}`,
@@ -175,96 +230,77 @@ export function renderHomeConfig(keys: RelayKeys, relayAddress: string): string 
             `Target = ${port === TLS_PORT ? RELAY_EDGE_ADDRESS : HOST_ALIAS}:${port}`,
             ""
         ]),
-        "[TCPClientTunnel]",
-        `BindAddress = 127.0.0.1:${FRP_CONTROL_PORT}`,
-        `Target = ${publicAddress}:${FRP_CONTROL_PORT}`,
+        // On the project's network, where the house's side end dials it by name.
+        "[UDPProxyTunnel]",
+        `BindAddress = 0.0.0.0:${SIDE_WIRE_PORT}`,
+        `Target = ${publicAddress}:${SIDE_WIRE_PORT}`,
         ""
     ].join("\n");
 }
 
-/**
- * How frp's two halves hold their link: one TCP connection per proxied
- * connection, with frp's own heartbeat, rather than everything multiplexed over
- * one.
- *
- * Multiplexed (frp's default), every game player, call and tunnel rides a single
- * stream whose writes give up after ten seconds; a satellite line that stalls for
- * longer closes it, and every player on every server is dropped at the same
- * instant, the calls with them - seen on 2026-11-11 as frpc's work connections all
- * ending in EOF together and frps answering "control is closed". Unmultiplexed,
- * the control connection waits out 90 seconds of silence before it gives up, and
- * a stall only slows each connection down. Both ends must agree.
- */
-const FRP_TRANSPORT = ["transport.tcpMux = false"];
-/** Work connections frpc opens ahead of need, so a player joining does not wait
- *  for frps to ask for one through the control connection first. */
-const FRP_POOL = 5;
-
-/** The secret frpc logs in to frps with. frps is only reachable through the link
- *  and its own project's network already, so this is a second lock; derived from
- *  the house's key, so nothing new is stored and both ends always agree. */
-export function frpToken(keys: RelayKeys): string {
-    return createHmac("sha256", key(keys.home.privateKey))
-        .update("polaris-backup-relay-frp")
-        .digest("hex");
-}
-
-/** frps on the relay end: its control port on its own container's network, which
- *  is never published, each side port listening publicly, and no other allowed. */
-export function renderRelayFrp(keys: RelayKeys, carried: RelayPortSet): string {
+/** The side relay: listens for the house's side end inside the web link, and
+ *  forwards each side port into the side link, TCP as TCP and UDP as UDP. */
+export function renderSideRelayConfig(keys: RelayKeys, carried: RelayPortSet): string {
     const side = sidePorts(carried);
-    const allowed = [...new Set([...side.tcp, ...side.udp])]
-        .sort((a, b) => a - b)
-        .map((port) => `{ single = ${port} }`);
-    return [
-        'bindAddr = "0.0.0.0"',
-        `bindPort = ${FRP_CONTROL_PORT}`,
-        'proxyBindAddr = "0.0.0.0"',
-        ...FRP_TRANSPORT,
-        `transport.maxPoolCount = ${FRP_POOL}`,
-        'auth.method = "token"',
-        `auth.token = "${frpToken(keys)}"`,
-        `allowPorts = [${allowed.join(", ")}]`,
-        'log.to = "console"',
-        'log.level = "warn"',
+    const pairs = sideKeys(keys);
+    const { publicAddress, peerAddress } = wg.slotAddresses(RELAY_SIDE_SLOT);
+    const forward = (section: string) => (port: number) => [
+        section,
+        `BindAddress = 0.0.0.0:${port}`,
+        `Target = ${peerAddress}:${port}`,
         ""
+    ];
+    return [
+        "[Interface]",
+        `PrivateKey = ${pairs.relay.privateKey}`,
+        `Address = ${publicAddress}/32`,
+        `ListenPort = ${SIDE_WIRE_PORT}`,
+        `MTU = ${SIDE_MTU}`,
+        "",
+        "[Peer]",
+        `PublicKey = ${pairs.home.publicKey}`,
+        `AllowedIPs = ${peerAddress}/32`,
+        "",
+        ...side.tcp.flatMap(forward("[TCPClientTunnel]")),
+        ...side.udp.flatMap(forward("[UDPProxyTunnel]"))
     ].join("\n");
 }
 
-/** frpc at the house: dials frps through the link, keeps trying until the link is
- *  up, and hands each side port to the same port on this machine. TCP goes to the
- *  gateway, as the link handed it before; UDP to `local`, because the call server
- *  binds its UDP port to the LAN address alone, so the gateway reaches a game's
- *  published port but drops every packet of a call. */
-export function renderHomeFrp(
+/** The house's side end: dials the side relay through the web link's forward and
+ *  hands each side port to the same port on this machine. TCP goes to the gateway,
+ *  as the web link hands it; UDP to `local`, because the call server binds its UDP
+ *  port to the LAN address alone, so the gateway reaches a game's published port
+ *  but drops every packet of a call. */
+export function renderSideHomeConfig(
     keys: RelayKeys,
     carried: RelayPortSet,
     local: string = HOST_ALIAS
 ): string {
     const side = sidePorts(carried);
-    const proxy = (type: "tcp" | "udp", localIP: string) => (port: number) => [
-        "[[proxies]]",
-        `name = "${type}-${port}"`,
-        `type = "${type}"`,
-        `localIP = "${localIP}"`,
-        `localPort = ${port}`,
-        `remotePort = ${port}`,
+    const pairs = sideKeys(keys);
+    const { publicAddress, peerAddress } = wg.slotAddresses(RELAY_SIDE_SLOT);
+    const udpHost = local.includes(":") ? `[${local}]` : local;
+    if (!wg.isHostPort(`${udpHost}:1`)) throw new Error("The LAN address is not an address");
+    const forward = (section: string, host: string) => (port: number) => [
+        section,
+        `ListenPort = ${port}`,
+        `Target = ${host}:${port}`,
         ""
     ];
     return [
-        'serverAddr = "127.0.0.1"',
-        `serverPort = ${FRP_CONTROL_PORT}`,
-        // The link can come up after frpc does; it logs in again until it does.
-        "loginFailExit = false",
-        ...FRP_TRANSPORT,
-        `transport.poolCount = ${FRP_POOL}`,
-        'auth.method = "token"',
-        `auth.token = "${frpToken(keys)}"`,
-        'log.to = "console"',
-        'log.level = "warn"',
+        "[Interface]",
+        `PrivateKey = ${pairs.home.privateKey}`,
+        `Address = ${peerAddress}/32`,
+        `MTU = ${SIDE_MTU}`,
         "",
-        ...side.tcp.flatMap(proxy("tcp", HOST_ALIAS)),
-        ...side.udp.flatMap(proxy("udp", local))
+        "[Peer]",
+        `PublicKey = ${pairs.relay.publicKey}`,
+        `Endpoint = ${wg.endNames(RELAY_ID, "nat").helper}:${SIDE_WIRE_PORT}`,
+        `AllowedIPs = ${publicAddress}/32`,
+        `PersistentKeepalive = ${wg.KEEPALIVE_SECONDS}`,
+        "",
+        ...side.tcp.flatMap(forward("[TCPServerTunnel]", HOST_ALIAS)),
+        ...side.udp.flatMap(forward("[UDPServerTunnel]", udpHost))
     ].join("\n");
 }
 
@@ -365,8 +401,8 @@ export function renderRelayRoutes(
 
 export interface RelayEndConfig {
     readonly wireguard: string;
-    /** frps' or frpc's config; null when there is no side port to carry. */
-    readonly frp: string | null;
+    /** The side link's end; null when there is no side port to carry. */
+    readonly side: string | null;
 }
 
 /** Both ends' files for one set of ports. */
@@ -380,51 +416,33 @@ export function relayConfigs(
     return {
         relay: {
             wireguard: renderRelayConfig(keys),
-            frp: side ? renderRelayFrp(keys, carried) : null
+            side: side ? renderSideRelayConfig(keys, carried) : null
         },
         home: {
             wireguard: renderHomeConfig(keys, relayAddress),
-            frp: side ? renderHomeFrp(keys, carried, lanAddress ?? HOST_ALIAS) : null
+            side: side ? renderSideHomeConfig(keys, carried, lanAddress ?? HOST_ALIAS) : null
         }
     };
 }
 
 /**
- * How an frp container starts: its config arrives in the environment, is written
- * where only it reads it, and the binary takes over. The house's pins the gateway to
- * the address in the hosts file it shares with the helper, as the helper does for
- * WireGuard, so the link and frp hand ports to the same place.
- */
-function frpCommand(binary: "frps" | "frpc", pin: boolean): string {
-    const sed = pin ? ` | sed "s/${HOST_ALIAS}/\${PINNED:-${HOST_ALIAS}}/g"` : "";
-    return [
-        "set -e",
-        ...(pin
-            ? [
-                  `PINNED=$(grep -F ${HOST_ALIAS} /etc/hosts | head -n 1 | tr -s ' \\t' ' ' | cut -d ' ' -f 1)`
-              ]
-            : []),
-        `printf %s "$FRP_CONFIG" | base64 -d${sed} > /tmp/frp.toml`,
-        "chmod 0400 /tmp/frp.toml",
-        `exec /usr/bin/${binary} -c /tmp/frp.toml`
-    ].join("; ");
-}
-
-/**
- * The containers of one end: the WireGuard tunnels' own two-container shape, which
- * carries the web ports and frp's control connection and nothing that changes, plus
- * frp in a container of its own whenever there is a side port to carry.
+ * The containers of one end: the WireGuard tunnels' own two-container shape for
+ * the web link, which carries the web ports and the side link's datagrams and
+ * nothing that changes, plus the same shape again for the side link whenever there
+ * is a side port to carry.
  *
  * The split is what keeps the web up while games come and go. Docker cannot add a
  * published port to a running container, so whatever publishes the game ports is
- * recreated each time one is added or removed; when that was the link itself, every
- * new server took every hostname behind the relay down until both ends had dialled
- * each other again. Now only frp is recreated, and only the side ports blink.
+ * recreated each time one is added or removed; when that was the web link itself,
+ * every new server took every hostname behind the relay down until both ends had
+ * dialled each other again. Now only the side link is recreated, and only the side
+ * ports blink while it shakes hands again.
  *
- * On the relay end frps publishes the side ports and is found by name on the
- * project's own network, which the helper joins besides the edge's. On the house end
- * frpc shares the helper's namespace, where the link's end of frp's control
- * connection listens on loopback.
+ * On the relay end the side helper publishes the side ports and is found by name
+ * on the project's own network, which the web helper joins besides the edge's; its
+ * daemon serves no status endpoint, because a side port may need that port number.
+ * On the house end the side helper dials the web helper by name on the project's
+ * network, and pins the gateway in its files as the web helper does.
  */
 export function relaySpec(
     end: "relay" | "home",
@@ -432,72 +450,65 @@ export function relaySpec(
     carried: RelayPortSet,
     networks: string[] = []
 ): ComposeSpec {
+    const home = end === "home";
     const spec = wg.endSpec({
         tunnelId: RELAY_ID,
-        end: end === "relay" ? "public" : "nat",
+        end: home ? "nat" : "public",
         config: config.wireguard,
         networks,
-        listenPort: end === "relay" ? RELAY_LISTEN_PORT : undefined,
-        hostAlias: end === "home" ? HOST_ALIAS : undefined
+        listenPort: home ? undefined : RELAY_LISTEN_PORT,
+        hostAlias: home ? HOST_ALIAS : undefined
     });
     const [helper, ...rest] = spec.services;
     if (!helper) throw new Error("A WireGuard end has no helper container");
-    const home = end === "home";
-    const side = sidePorts(carried);
-    const published = (protocol: "tcp" | "udp") => (port: number) => ({
-        host: port,
-        container: port,
-        protocol
-    });
-    const common = {
-        name: `${helper.name}-frp`,
-        pullPolicy: "missing" as const,
-        env: { FRP_CONFIG: Buffer.from(config.frp ?? "", "utf8").toString("base64") },
-        volumes: [],
-        labels: {},
-        entrypoint: ["sh", "-c"],
-        restart: "unless-stopped"
-    };
-    const frp: ComposeSpec["services"] = !config.frp
-        ? []
-        : home
-          ? [
-                {
-                    ...common,
-                    image: FRPC_IMAGE,
-                    ports: [],
-                    command: [frpCommand("frpc", true)],
-                    networks: [],
-                    networkMode: `service:${helper.name}`,
-                    dependsOn: [helper.name]
-                }
-            ]
-          : [
-                {
-                    ...common,
-                    image: FRPS_IMAGE,
-                    ports: [...side.tcp.map(published("tcp")), ...side.udp.map(published("udp"))],
-                    command: [frpCommand("frps", false)],
-                    networks: ["default"],
-                    // After the helper: one from before the split still publishes these
-                    // ports until it is recreated, and frps would find them taken.
-                    dependsOn: [helper.name]
-                }
-            ];
+    const services: ComposeSpec["services"] = [
+        {
+            ...helper,
+            // `default` is the way out to the relay at the house, where the edge's
+            // network is internal, and the way to the side relay on the relay.
+            networks: home ? ["default", RELAY_EDGE_NETWORK] : ["default", ...helper.networks],
+            extraHosts: home ? [HOST_GATEWAY] : helper.extraHosts
+        },
+        ...rest
+    ];
+    const volumes = [...(spec.volumes ?? [])];
+    if (config.side) {
+        const side = wg.endSpec({
+            tunnelId: RELAY_SIDE_ID,
+            end: home ? "nat" : "public",
+            config: config.side,
+            networks: ["default"],
+            hostAlias: home ? HOST_ALIAS : undefined,
+            status: home
+        });
+        const [sideHelper, ...sideRest] = side.services;
+        if (!sideHelper) throw new Error("A WireGuard end has no helper container");
+        const ports = sidePorts(carried);
+        const published = (protocol: "tcp" | "udp") => (port: number) => ({
+            host: port,
+            container: port,
+            protocol
+        });
+        services.push(
+            {
+                ...sideHelper,
+                ports: home
+                    ? []
+                    : [...ports.tcp.map(published("tcp")), ...ports.udp.map(published("udp"))],
+                extraHosts: home ? [HOST_GATEWAY] : sideHelper.extraHosts,
+                // After the web helper: on the relay, one from before the split still
+                // publishes these ports until it is recreated or removed.
+                dependsOn: [helper.name]
+            },
+            ...sideRest
+        );
+        volumes.push(...(side.volumes ?? []));
+    }
     return {
         ...spec,
         networks: home ? [RELAY_EDGE_NETWORK] : spec.networks,
-        services: [
-            {
-                ...helper,
-                // `default` is the way out to the relay at the house, where the edge's
-                // network is internal, and the way to frps on the relay.
-                networks: home ? ["default", RELAY_EDGE_NETWORK] : ["default", ...helper.networks],
-                extraHosts: home ? [HOST_GATEWAY] : helper.extraHosts
-            },
-            ...rest,
-            ...frp
-        ]
+        services,
+        volumes
     };
 }
 
@@ -506,9 +517,9 @@ export function relayHelper(): string {
     return wg.endNames(RELAY_ID, "public").helper;
 }
 
-/** The relay end's frps, which publishes the side ports. */
-export function relayFrp(): string {
-    return `${relayHelper()}-frp`;
+/** The relay end's side helper, which publishes the side ports. */
+export function relaySide(): string {
+    return wg.endNames(RELAY_SIDE_ID, "public").helper;
 }
 
 /** The compose project of one end, for taking it down. */

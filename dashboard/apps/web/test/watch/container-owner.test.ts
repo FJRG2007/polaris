@@ -144,7 +144,7 @@ describe("relay helpers", () => {
     it("counts both of the house end's containers as Polaris, said by what they do", () => {
         const project = relayProject("home");
         const link = container({ name: "wg-nat-000000bac-wg", composeProject: project });
-        const ports = container({ name: "wg-nat-000000bac-frp", composeProject: project });
+        const ports = container({ name: "wg-nat-00000051de00-wg", composeProject: project });
         expect(isPolarisPart(link)).toBe(true);
         const linkRow = describeContainer(link, CONNECTION, new Map());
         const portsRow = describeContainer(ports, CONNECTION, new Map());

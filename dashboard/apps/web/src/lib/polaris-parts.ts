@@ -12,7 +12,7 @@
  * on the next self-update; the compose labels do not move.
  */
 
-import { relayProject } from "@/lib/backup-access/relay";
+import { RELAY_SIDE_ID, relayProject } from "@/lib/backup-access/relay";
 import { findApp } from "@/lib/apps/catalog";
 import { baseProject } from "@/lib/deploy/host-volumes";
 import {
@@ -197,7 +197,8 @@ export function describePart(
     const project = container.composeProject;
     if (project === BACKUP_TUNNEL_PROJECT) return BACKUP_TUNNEL;
     if (project === relayProject("relay") || project === relayProject("home"))
-        return container.name.endsWith("-frp") ? RELAY_PORTS : RELAY_LINK;
+        // The side link's ends carry the side ports; the web link's are the link.
+        return container.name.includes(RELAY_SIDE_ID) ? RELAY_PORTS : RELAY_LINK;
     const known = container.composeService ? PARTS[container.composeService] : undefined;
     return known ?? { label: container.composeService ?? container.name, summary: "" };
 }

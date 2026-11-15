@@ -111,7 +111,13 @@ describe("containers", () => {
         expect(helper.ports).toEqual([{ host: 51820, container: 51820, protocol: "udp" }]);
         expect(wireguard.networkMode).toBe(`service:${helper.name}`);
         expect(wireguard.networks).toEqual([]);
-        expect(wireguard.image).toMatch(/:[0-9a-f]{40}$/);
+        expect(wireguard.image).toBe(wg.WIREGUARD_IMAGE);
+        expect(wireguard.command).toEqual([
+            "--config",
+            "/etc/polaris-tunnel/config",
+            "--info",
+            wg.STATUS_ADDRESS
+        ]);
         for (const service of spec.services) {
             for (const value of [...Object.values(service.env), ...(service.command ?? [])]) {
                 expect(value).not.toMatch(/[\u0000-\u001f]/);
@@ -131,11 +137,24 @@ describe("containers", () => {
         );
         // The config file holds a private key, so it goes when the container stops.
         expect(helper.command?.join(" ")).toContain(
-            "trap 'rm -f /etc/wireproxy/config; exit 0' TERM INT"
+            "trap 'rm -f /etc/polaris-tunnel/config; exit 0' TERM INT"
         );
         expect(helper.image).toBe(wg.HELPER_IMAGE);
         expect(helper.pullPolicy).toBe("missing");
         expect(wireguard.pullPolicy).toBe("missing");
+    });
+
+    it("serves no status endpoint when asked not to, so a forward may take that port", () => {
+        const spec = wg.endSpec({
+            tunnelId: ID,
+            end: "public",
+            config: "x",
+            networks: [],
+            status: false
+        });
+        expect(spec.services[1].command).toEqual(["--config", "/etc/polaris-tunnel/config"]);
+        expect(spec.services[0].volumes).toEqual(spec.services[1].volumes);
+        expect(spec.services[1].volumes[0]?.target).toBe(wg.CONFIG_DIR);
     });
 
     it("opens no port on the end behind NAT", () => {
