@@ -16,7 +16,6 @@ import type { ReactNode } from "react";
 import { Card, CardBody } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
-import { modelProviderRows } from "@/lib/agents/model-key-providers";
 import { signinProviderRows } from "@/lib/agents/agent-signins";
 import { ModelProvidersLoader } from "./loader";
 import {
@@ -71,7 +70,6 @@ export default async function ModelProvidersPage() {
                 No assisted sign-in here: an administrator would be asked to
                 authorise a subscription that is not theirs, in their own browser. */}
             <ModelProvidersLoader
-                keyProviders={modelProviderRows()}
                 signinProviders={signinProviderRows()}
                 actions={actions}
                 keysCopy={{

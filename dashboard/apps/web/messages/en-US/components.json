@@ -1181,7 +1181,17 @@
         "pick": "Pick a provider",
         "search": "Search providers",
         "none": "Nothing matches.",
-        "more": "{count, plural, one {# more - type to find it} other {# more - type to find them}}"
+        "kindLabel": "Kind of provider",
+        "freeLabel": "Cost",
+        "freeOnly": "Free to start",
+        "kind": {
+            "all": "All",
+            "lab": "Labs",
+            "host": "Hosts",
+            "gateway": "Gateways",
+            "listed": "Index",
+            "custom": "Yours"
+        }
     },
     "viewAs": {
         "asUser": "Using Polaris as <name>{label}</name>",

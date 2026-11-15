@@ -11,7 +11,7 @@
  */
 
 import { SEEDED_SPEECH_INTEGRATIONS } from "@/lib/integrations/speech-providers";
-import { SEEDED_MODEL_INTEGRATIONS, type FreeTier } from "@/lib/integrations/model-providers";
+import type { FreeTier } from "@/lib/integrations/model-providers";
 
 export type { FreeTier } from "@/lib/integrations/model-providers";
 
@@ -985,10 +985,9 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
             "Enable the Cloud Translation API on the project, then restrict the key to it."
     },
 
-    // The rest of the model providers, from the table that also decides what a
-    // run is handed and where a pasted key is checked. Last, so the nine above
-    // stay at the top of the picker where they are looked for.
-    ...SEEDED_MODEL_INTEGRATIONS,
+    // The rest of the model providers are not here: they are rows in the stored
+    // catalogue (`provider-catalog.ts`), thousands of them, and this module ships
+    // to the browser. Screens page through them on the server.
 
     // Keys that only turn speech into text, for Polar's dictation.
     ...SEEDED_SPEECH_INTEGRATIONS
@@ -999,13 +998,12 @@ export function findIntegration(slug: string): IntegrationCatalogEntry | undefin
     return INTEGRATIONS.find((entry) => entry.slug === slug);
 }
 
-/** The model providers agents run on. Their own screen, because they are a
- *  different job from connecting a service and there are more of them than of
- *  everything else put together. */
+/** The hand-written model providers. The rest of the catalogue is stored, and
+ *  read on the server (`provider-catalog-snapshot.ts`). */
 export const MODEL_INTEGRATIONS = INTEGRATIONS.filter((entry) => entry.category === "Models");
 
-/** What a model provider is called. Kept here, beside the list, because client
- *  components need it and this module is safe to ship to the browser. */
+/** What a hand-written model provider is called, for a client component. Any
+ *  other provider's name is sent by the server with the row that needs it. */
 export function modelProviderName(slug: string): string {
     return MODEL_INTEGRATIONS.find((entry) => entry.slug === slug)?.name ?? slug;
 }

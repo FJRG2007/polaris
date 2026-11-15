@@ -151,7 +151,8 @@ async function AgentsSection({
             provider.models.map((option) => ({
                 provider: option.provider,
                 model: option.model,
-                label: `${option.providerName}: ${option.name}`
+                label: `${option.providerName}: ${option.name}`,
+                providerName: option.providerName
             }))
         )
         .slice(0, 1000);

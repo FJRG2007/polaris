@@ -33,6 +33,11 @@ import {
     type CatalogProvider,
     type CatalogSource
 } from "@/lib/integrations/provider-catalog-snapshot";
+import {
+    customProviderSchema,
+    slugifyProviderName,
+    type CustomProviderRefusal
+} from "@/lib/integrations/custom-provider-schema";
 
 /** The hand-written providers' variables (`agent-providers.ts`), which nothing
  *  from the index or an operator may claim. Written here rather than imported,
@@ -563,24 +568,114 @@ export async function searchProviderCatalog(
     };
     const rows = await prisma.modelProviderEntry.findMany({
         where,
-        select: { slug: true, name: true, kind: true, source: true, freeKind: true, freeNote: true },
+        select: HIT_SELECT,
         orderBy: [{ rank: "asc" }, { name: "asc" }, { slug: "asc" }],
         skip: search.offset,
         take: search.take + 1
     });
-    const hits = rows.slice(0, search.take).map(
-        (row): ProviderHit => ({
-            slug: row.slug,
-            name: row.name,
-            kind: row.kind,
-            source: row.source,
-            freeTier:
-                row.freeKind === "free" || row.freeKind === "trial"
-                    ? { kind: row.freeKind, note: row.freeNote ?? "" }
-                    : null
-        })
-    );
+    const hits = rows.slice(0, search.take).map(toHit);
     return { hits, next: rows.length > search.take ? search.offset + search.take : null };
+}
+
+const HIT_SELECT = {
+    slug: true,
+    name: true,
+    kind: true,
+    source: true,
+    freeKind: true,
+    freeNote: true
+} as const;
+
+function toHit(row: {
+    slug: string;
+    name: string;
+    kind: string;
+    source: string;
+    freeKind: string | null;
+    freeNote: string | null;
+}): ProviderHit {
+    return {
+        slug: row.slug,
+        name: row.name,
+        kind: row.kind,
+        source: row.source,
+        freeTier:
+            row.freeKind === "free" || row.freeKind === "trial"
+                ? { kind: row.freeKind, note: row.freeNote ?? "" }
+                : null
+    };
+}
+
+/** These providers as picker rows, for a picker naming a value it has not listed. */
+export async function providerHits(slugs: readonly string[]): Promise<ProviderHit[]> {
+    const unique = [...new Set(slugs)].slice(0, 50);
+    if (unique.length === 0) return [];
+    const rows = await prisma.modelProviderEntry.findMany({
+        where: { slug: { in: unique } },
+        select: HIT_SELECT
+    });
+    return rows.map(toHit);
+}
+
+/** The most operator-added providers listed on the admin screen. */
+export const CUSTOM_PROVIDERS_LISTED = 200;
+
+/** One operator-added provider, as the admin screen lists it. */
+export interface CustomProviderView {
+    slug: string;
+    name: string;
+    baseUrl: string;
+    wire: "openai" | "anthropic";
+    envVar: string;
+    defaultModel: string;
+    /** Keys stored for it, by anybody: removing it strands them. */
+    keys: number;
+}
+
+/** The operator-added providers, newest last, with how many keys each holds. */
+export async function listCustomProviders(): Promise<CustomProviderView[]> {
+    const rows = await prisma.modelProviderEntry.findMany({
+        where: { source: "custom" },
+        select: { slug: true, name: true, baseUrl: true, wire: true, envVar: true, defaultModelSlug: true },
+        orderBy: { createdAt: "asc" },
+        take: CUSTOM_PROVIDERS_LISTED
+    });
+    if (rows.length === 0) return [];
+    const counts = await prisma.userModelKey.groupBy({
+        by: ["provider"],
+        where: { provider: { in: rows.map((row) => row.slug) } },
+        _count: { _all: true }
+    });
+    const keys = new Map(counts.map((entry) => [entry.provider, entry._count._all]));
+    return rows.map((row) => ({
+        slug: row.slug,
+        name: row.name,
+        baseUrl: row.baseUrl ?? "",
+        wire: row.wire === "anthropic" ? "anthropic" : "openai",
+        envVar: row.envVar,
+        defaultModel: row.defaultModelSlug.slice(row.slug.length + 1),
+        keys: keys.get(row.slug) ?? 0
+    }));
+}
+
+/** When the index was last read into the catalogue, and the last failure. */
+export async function providerIndexState(): Promise<{
+    refreshedAt: string | null;
+    providers: number;
+    lastError: string | null;
+} | null> {
+    const row = await prisma.modelProviderIndexState
+        .findUnique({
+            where: { id: STATE_ID },
+            select: { refreshedAt: true, providers: true, lastError: true }
+        })
+        .catch(() => null);
+    if (!row) return null;
+    return {
+        refreshedAt: row.refreshedAt?.toISOString() ?? null,
+        providers: row.providers,
+        lastError: row.lastError
+    };
 }
 
 /** The names of these providers, for a screen that lists keys by provider. */
@@ -598,63 +693,13 @@ export async function providerNames(slugs: readonly string[]): Promise<Record<st
 // Operator-added providers
 // ---------------------------------------------------------------------------
 
-/** Hosts an operator-added endpoint may not name: this machine and the
- *  networks it sits in, which a server-side request would otherwise probe. */
-export function isPublicHttpsHost(url: string): boolean {
-    let parsed: URL;
-    try {
-        parsed = new URL(url);
-    } catch {
-        return false;
-    }
-    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return false;
-    const host = parsed.hostname.toLowerCase();
-    if (!host.includes(".") || host.startsWith("[") || /^[\d.]+$/.test(host)) return false;
-    return !/(^|\.)(localhost|local|internal|lan|home|arpa)$/.test(host);
-}
-
-const publicUrl = z
-    .string()
-    .trim()
-    .max(500)
-    .refine(isPublicHttpsHost, { message: "publicHttps" });
-
-/** What the Add provider form sends. */
-export const customProviderSchema = z.object({
-    name: z.string().trim().min(2).max(60),
-    baseUrl: publicUrl,
-    wire: z.enum(["openai", "anthropic"]),
-    envVar: z
-        .string()
-        .trim()
-        .toUpperCase()
-        .regex(/^[A-Z][A-Z0-9_]{2,62}$/, { message: "envVar" })
-        .refine((value) => !/^(POLARIS_|OPENCODE_|PATH$|HOME$|NODE_)/.test(value), {
-            message: "envVarReserved"
-        }),
-    defaultModel: z
-        .string()
-        .trim()
-        .min(1)
-        .max(200)
-        .regex(/^[^\s/][^\s]*$/, { message: "model" }),
-    probe: publicUrl.optional().or(z.literal("").transform(() => undefined)),
-    docsUrl: publicUrl.optional().or(z.literal("").transform(() => undefined))
-});
-
-export type CustomProviderInput = z.input<typeof customProviderSchema>;
-
-/** A display name as a slug: lowercase words joined by dashes. */
-export function slugifyProviderName(name: string): string {
-    return name
-        .normalize("NFKD")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 48);
-}
-
-export type CustomProviderRefusal = "taken" | "envTaken" | "invalid";
+export {
+    customProviderSchema,
+    isPublicHttpsHost,
+    slugifyProviderName,
+    type CustomProviderInput,
+    type CustomProviderRefusal
+} from "@/lib/integrations/custom-provider-schema";
 
 /** The seed a custom provider is stored as. Pure, so the rules are testable. */
 export function customProviderSeed(

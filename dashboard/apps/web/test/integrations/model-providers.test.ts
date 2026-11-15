@@ -28,8 +28,12 @@ describe("the Models catalog", () => {
         expect(orphans).toEqual([]);
     });
 
-    it("offers a card for every provider a run can be handed a key for", () => {
-        const listed = new Set(MODEL_INTEGRATIONS.map((entry) => entry.slug));
+    it("offers a card for every provider a run can be handed a key for", async () => {
+        const { catalogProviders } = await import("../../src/lib/integrations/provider-catalog-snapshot");
+        const listed = new Set([
+            ...MODEL_INTEGRATIONS.map((entry) => entry.slug),
+            ...catalogProviders().map((row) => row.slug)
+        ]);
         const hidden = modelProviders().filter((provider) => !listed.has(provider.slug)).map((provider) => provider.slug);
         expect(hidden).toEqual([]);
     });

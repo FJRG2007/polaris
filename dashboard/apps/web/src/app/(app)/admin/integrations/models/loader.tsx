@@ -5,6 +5,8 @@ import type { ComponentProps, ReactNode } from "react";
 import { paintRead } from "@/app/(app)/admin/paint-read";
 import { CardSkeleton } from "@/app/(app)/admin/region-skeletons";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
+import { CustomProvidersCard } from "./custom-providers-card";
+import { searchKeyProvidersAction } from "@/app/(app)/model-key-provider-actions";
 
 type KeysProps = ComponentProps<typeof ModelKeysView>;
 
@@ -13,7 +15,6 @@ type KeysProps = ComponentProps<typeof ModelKeysView>;
  * the tab: these are the deployment's credentials.
  */
 export function ModelProvidersLoader({
-    keyProviders,
     signinProviders,
     actions,
     keysCopy,
@@ -22,7 +23,6 @@ export function ModelProvidersLoader({
     privateFooter,
     revision
 }: {
-    keyProviders: KeysProps["providers"];
     signinProviders: KeysProps["providers"];
     actions: KeysProps["actions"];
     keysCopy: KeysProps["copy"];
@@ -48,13 +48,15 @@ export function ModelProvidersLoader({
             {(data) => (
                 <>
                     <ModelKeysView
-                        providers={keyProviders}
+                        providers={data.providers}
+                        searchProviders={searchKeyProvidersAction}
                         keys={data.keys}
                         health={data.health}
                         actions={actions}
                         copy={keysCopy}
                         footer={data.shared ? sharedFooter : privateFooter}
                     />
+                    <CustomProvidersCard initial={data.custom} />
                     <ModelKeysView
                         providers={signinProviders}
                         keys={data.signins}

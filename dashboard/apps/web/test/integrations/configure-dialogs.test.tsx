@@ -17,7 +17,7 @@ import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GATEWAY_SLUG } from "@/lib/agents/agent-providers";
-import { modelProviderRows } from "@/lib/agents/model-key-providers";
+import { providerRowsFor } from "@/lib/agents/model-key-providers";
 import { MODEL_INTEGRATIONS, SERVICE_INTEGRATIONS } from "@/lib/integrations/registry";
 import type { IntegrationCard } from "../../src/app/(app)/admin/integrations/integrations-view";
 
@@ -85,15 +85,14 @@ describe("the AI provider keys screen", () => {
     it("offers a key for every model provider in the catalog", () => {
         // Both screens that add a key read this one list, so a provider missing
         // here is a provider nobody can bring a key for.
-        expect(modelProviderRows().map((row) => row.slug)).toEqual(
-            MODEL_INTEGRATIONS.map((entry) => entry.slug)
-        );
+        const slugs = MODEL_INTEGRATIONS.map((entry) => entry.slug);
+        expect(providerRowsFor(slugs).map((row) => row.slug)).toEqual(slugs);
     });
 
     it("marks the gateway, and only the gateway", () => {
         // It is the row that asks for an endpoint and a model as well as a token,
         // and the one whose token may be left out altogether.
-        const gateways = modelProviderRows().filter((row) => row.isGateway);
+        const gateways = providerRowsFor(MODEL_INTEGRATIONS.map((entry) => entry.slug)).filter((row) => row.isGateway);
         expect(gateways.map((row) => row.slug)).toEqual([GATEWAY_SLUG]);
     });
 });

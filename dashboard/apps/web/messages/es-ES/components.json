@@ -1181,7 +1181,17 @@
         "pick": "Elige un proveedor",
         "search": "Buscar proveedores",
         "none": "Nada coincide.",
-        "more": "{count, plural, one {# más - escribe para encontrarlo} other {# más - escribe para encontrarlos}}"
+        "kindLabel": "Tipo de proveedor",
+        "freeLabel": "Coste",
+        "freeOnly": "Gratis",
+        "kind": {
+            "all": "Todos",
+            "lab": "Labs",
+            "host": "Hosts",
+            "gateway": "Pasarelas",
+            "listed": "Índice",
+            "custom": "Tuyos"
+        }
     },
     "viewAs": {
         "asUser": "Usando Polaris como <name>{label}</name>",

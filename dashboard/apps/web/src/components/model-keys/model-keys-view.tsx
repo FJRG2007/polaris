@@ -33,7 +33,7 @@ import type { KeyActionResult } from "@/lib/agents/model-key-actions";
 import { anthropicWorkspaceIdSchema, modelKeyNameSchema } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { ProviderSelect } from "@/components/model-keys/provider-select";
+import { ProviderSelect, type ProviderReader } from "@/components/model-keys/provider-select";
 import type { KeyHealthView, KeyLimits } from "@/lib/agents/key-limits";
 import { isCoolingState, revivedStatus } from "@/lib/agents/key-status";
 import { KeyLimitsDialog, KeyStanding } from "@/components/model-keys/key-standing";
@@ -66,6 +66,7 @@ import {
     DropdownMenuTrigger,
     Input,
     isDirty,
+    SearchableSelect,
     Switch,
     DateInput
 } from "@polaris/ui";
@@ -206,6 +207,7 @@ function earliestExpiry(): string {
 
 export function ModelKeysView({
     providers,
+    searchProviders,
     keys,
     actions,
     copy,
@@ -214,7 +216,12 @@ export function ModelKeysView({
     health,
     narrow = false
 }: {
+    /** The providers the table names: the ones its keys belong to, or - with no
+     *  `searchProviders` - every one the Add dialog offers. */
     providers: ProviderRow[];
+    /** Pages the Add dialog's provider picker from the server, for a catalogue
+     *  too long to hand the browser. */
+    searchProviders?: ProviderReader;
     keys: ModelKeyView[];
     /** Each key's standing with Polar's router, by id. Absent where the table
      *  lists something the router does not spend (agent sign-ins). */
@@ -596,6 +603,7 @@ export function ModelKeysView({
             {adding ? (
                 <KeyDialog
                     providers={providers}
+                    searchProviders={searchProviders}
                     actions={actions}
                     adding={copy.adding}
                     action={copy.action}
@@ -864,6 +872,7 @@ function KeyRow({
  */
 function KeyDialog({
     providers,
+    searchProviders,
     actions,
     adding,
     action,
@@ -874,6 +883,7 @@ function KeyDialog({
     onSaved
 }: {
     providers: ProviderRow[];
+    searchProviders?: ProviderReader;
     actions: ModelKeyActions;
     /** What adding a key means on this screen, said under the title. */
     adding: string;
@@ -892,7 +902,11 @@ function KeyDialog({
 }) {
     const t = useTranslations("components");
     const tcommon = useTranslations("common");
-    const [provider, setProvider] = useState(existing?.provider ?? providers[0]?.slug ?? "");
+    const [provider, setProvider] = useState(
+        existing?.provider ?? (searchProviders ? "" : (providers[0]?.slug ?? ""))
+    );
+    // The row the async picker answered with, which the table's list may lack.
+    const [picked, setPicked] = useState<ProviderRow | null>(null);
     const [name, setName] = useState(existing?.name ?? "");
     const [secret, setSecret] = useState("");
     const [signingIn, setSigningIn] = useState(false);
@@ -910,7 +924,10 @@ function KeyDialog({
     // Set once Anthropic answered that this key has to name a workspace.
     const [askedForWorkspace, setAskedForWorkspace] = useState(false);
 
-    const entry = providers.find((row) => row.slug === provider) ?? null;
+    const entry =
+        (picked?.slug === provider ? picked : null) ??
+        providers.find((row) => row.slug === provider) ??
+        null;
     const nameCheck = modelKeyNameSchema.safeParse(name);
     const taken = takenNames.has(name.trim().toLowerCase());
     const nameError =
@@ -1068,12 +1085,40 @@ function KeyDialog({
                                     </span>
                                 </span>
                             ) : (
-                                <ProviderSelect
-                                    options={providers}
-                                    value={provider}
-                                    onChange={setProvider}
-                                    disabled={busy}
-                                />
+                                searchProviders ? (
+                                    <ProviderSelect
+                                        read={searchProviders}
+                                        value={provider}
+                                        selectedLabel={entry?.name}
+                                        onChange={(slug, row) => {
+                                            setProvider(slug);
+                                            setPicked(row);
+                                        }}
+                                        disabled={busy}
+                                    />
+                                ) : (
+                                    <SearchableSelect
+                                        value={provider}
+                                        onValueChange={setProvider}
+                                        options={providers.map((row) => ({
+                                            value: row.slug,
+                                            label: row.name,
+                                            icon: (
+                                                <IntegrationLogo
+                                                    slug={row.slug}
+                                                    name={row.name}
+                                                    className="size-4 shrink-0"
+                                                />
+                                            )
+                                        }))}
+                                        disabled={busy}
+                                        placeholder={t("providerSelect.pick")}
+                                        searchPlaceholder={t("providerSelect.search")}
+                                        emptyText={t("providerSelect.none")}
+                                        aria-label={t("providerSelect.pick")}
+                                        className="h-9"
+                                    />
+                                )
                             )}
                         </label>
 

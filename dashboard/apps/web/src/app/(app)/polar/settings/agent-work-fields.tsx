@@ -28,6 +28,9 @@ export interface AgentModelOption {
     provider: string;
     model: string;
     label: string;
+    /** The provider's name, from the server: the client knows only the
+     *  hand-written providers' names. */
+    providerName?: string;
 }
 
 const ANY_ACCOUNT = "any";
@@ -71,7 +74,7 @@ export function selectorProviders(options: readonly AgentModelOption[]): ModelSe
     for (const option of options) {
         const group = groups.get(option.provider) ?? {
             provider: option.provider,
-            name: modelProviderName(option.provider),
+            name: option.providerName ?? modelProviderName(option.provider),
             payers: [],
             models: []
         };

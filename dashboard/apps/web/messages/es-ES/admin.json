@@ -2375,6 +2375,44 @@
             "title": "Para quién son las claves",
             "shared": "Quien no tenga claves propias para un proveedor usa estas, y la factura es tuya. Primero se usan las claves propias de cada cuenta. <link>Cámbialo en Ajustes de agentes</link>.",
             "private": "Solo para ti. Las ejecuciones usan solo las claves que cada persona añade, así que no se puede usar un proveedor para el que nadie tenga clave. <link>Cámbialo en Ajustes de agentes</link>."
+        },
+        "custom": {
+            "title": "Tus proveedores",
+            "hint": "Cualquier endpoint compatible con OpenAI o Anthropic, en todos los selectores.",
+            "empty": "Aún no hay ninguno.",
+            "add": "Añadir",
+            "remove": "Quitar",
+            "removeTitle": "¿Quitar {name}?",
+            "removeBody": "Deja de ofrecerse para claves nuevas.",
+            "removeKeys": "{count, plural, one {# clave guardada es suya y deja de funcionar hasta que se vuelva a añadir.} other {# claves guardadas son suyas y dejan de funcionar hasta que se vuelva a añadir.}}",
+            "keys": "{count, plural, one {# clave} other {# claves}}",
+            "dialog": {
+                "title": "Añadir proveedor",
+                "intro": "Sus claves se añaden como las demás, y las ejecuciones y Polar lo llaman aquí.",
+                "name": "Nombre",
+                "baseUrl": "URL base",
+                "wire": "Formato API",
+                "wireOpenai": "Compatible OpenAI",
+                "wireAnthropic": "Compatible Anthropic",
+                "envVar": "Variable",
+                "defaultModel": "Modelo base",
+                "probe": "URL de prueba",
+                "docsUrl": "URL de docs",
+                "optional": "(opcional)",
+                "save": "Añadir",
+                "cancel": "Cancelar"
+            },
+            "errors": {
+                "taken": "Ya existe un proveedor con este nombre.",
+                "envTaken": "Otro proveedor ya lee esta variable.",
+                "invalid": "Revisa este valor.",
+                "name": "Usa de 2 a 60 caracteres.",
+                "publicHttps": "Usa una dirección https:// pública.",
+                "envVar": "Mayúsculas, dígitos y _, empezando por letra.",
+                "envVarReserved": "Polaris reserva esta variable.",
+                "model": "Usa el id del modelo, sin espacios.",
+                "failed": "No se pudo guardar. Inténtalo otra vez."
+            }
         }
     },
     "organizations": {

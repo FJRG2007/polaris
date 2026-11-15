@@ -2375,6 +2375,44 @@
             "title": "Who these keys run for",
             "shared": "Anybody whose own keys do not cover a provider runs on these, and the bill is yours. Each account's own keys are used first. <link>Change this under Agent defaults</link>.",
             "private": "Nobody but you. Runs use only the keys people add themselves, so a provider nobody has a key for cannot be reached. <link>Change this under Agent defaults</link>."
+        },
+        "custom": {
+            "title": "Your own providers",
+            "hint": "Any OpenAI- or Anthropic-compatible endpoint, offered in every key picker.",
+            "empty": "None added yet.",
+            "add": "Add provider",
+            "remove": "Remove",
+            "removeTitle": "Remove {name}?",
+            "removeBody": "It stops being offered for new keys.",
+            "removeKeys": "{count, plural, one {# stored key belongs to it and stops working until the provider is added back.} other {# stored keys belong to it and stop working until the provider is added back.}}",
+            "keys": "{count, plural, one {# key} other {# keys}}",
+            "dialog": {
+                "title": "Add a provider",
+                "intro": "Keys for it are added like any other, and runs and Polar call it at this address.",
+                "name": "Name",
+                "baseUrl": "Base URL",
+                "wire": "API format",
+                "wireOpenai": "OpenAI-compatible",
+                "wireAnthropic": "Anthropic-compatible",
+                "envVar": "Key variable",
+                "defaultModel": "Default model",
+                "probe": "Key check URL",
+                "docsUrl": "Docs URL",
+                "optional": "(optional)",
+                "save": "Add provider",
+                "cancel": "Cancel"
+            },
+            "errors": {
+                "taken": "A provider with this name already exists.",
+                "envTaken": "Another provider already reads this variable.",
+                "invalid": "Check this value.",
+                "name": "Use 2 to 60 characters.",
+                "publicHttps": "Use a public https:// address.",
+                "envVar": "Use capitals, digits and _, starting with a letter.",
+                "envVarReserved": "This variable is reserved by Polaris.",
+                "model": "Use the model id, with no spaces.",
+                "failed": "Could not save it. Try again."
+            }
         }
     },
     "organizations": {

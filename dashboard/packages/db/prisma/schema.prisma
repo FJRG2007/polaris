@@ -8814,6 +8814,8 @@ model UserModelKey {
     @@unique([userId, name])
     @@unique([userId, provider, secretFingerprint])
     @@index([userId, priority])
+    // Keys by provider, for the count shown before a custom provider is removed.
+    @@index([provider])
     // The daily expiry sweep reads by date across every account.
     @@index([expiresAt])
 }

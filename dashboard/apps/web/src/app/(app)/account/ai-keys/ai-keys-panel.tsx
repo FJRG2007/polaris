@@ -11,7 +11,9 @@ import { assistedSignins } from "@/lib/agents/signin-runtime";
 import { isSigninRow, signinProviderRows } from "@/lib/agents/agent-signins";
 import { keyStatuses } from "@/lib/agents/key-status-read";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
-import { modelProviderName, modelProviderRows } from "@/lib/agents/model-key-providers";
+import { ensureProviderCatalog } from "@/lib/integrations/provider-catalog";
+import { searchKeyProvidersAction } from "@/app/(app)/model-key-provider-actions";
+import { modelProviderName, providerRowsFor } from "@/lib/agents/model-key-providers";
 import {
     instanceKeysAreShared,
     keySourcesFor,
@@ -60,6 +62,7 @@ export async function AiKeysPanel({
         signinEnvsFor(INSTANCE)
     ]);
 
+    await ensureProviderCatalog();
     const keys = rows.filter((row) => !isSigninRow(row.provider));
     const signins = rows.filter((row) => isSigninRow(row.provider));
     const health = await keyStatuses(keys);
@@ -71,7 +74,8 @@ export async function AiKeysPanel({
     return (
         <div className="flex flex-col gap-4">
             <ModelKeysView
-                providers={modelProviderRows()}
+                providers={providerRowsFor(keys.map((key) => key.provider))}
+                searchProviders={searchKeyProvidersAction}
                 keys={keys}
                 health={health}
                 narrow={narrow}
