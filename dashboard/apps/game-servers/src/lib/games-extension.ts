@@ -208,6 +208,8 @@ export const gameServersExtension: AppExtension = {
 
     readForwardedPorts: async (probe) => (await games()).readGamePorts(probe),
 
+    readForwardedPortsPage: async (query, probe) => (await games()).readGamePortsPage(query, probe),
+
     firewallSlot: async (ownerId, applicationId) => {
         const game = await (await games()).gameServerForApplication(ownerId, applicationId);
         if (!game) return null;

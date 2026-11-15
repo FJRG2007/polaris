@@ -6,6 +6,7 @@
  * tri-state (a value sets it, blank keeps it); a separate action clears it.
  */
 
+import { prisma } from "@polaris/db";
 import { z } from "zod";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
@@ -41,8 +42,10 @@ import {
 } from "@/lib/backup-access/service";
 import { checkedAddresses, removeAddress, type CheckedAddress } from "@/lib/address-health";
 import {
+    getHostPortRanges,
     getPortBlocks,
     getPortPolicy,
+    setHostPortRanges,
     setPortBlock,
     setPortPolicy
 } from "@/lib/apps/port-block-store";
@@ -56,10 +59,12 @@ import {
 } from "@/lib/domain-service";
 import {
     parseBlockInput,
+    parseRangesInput,
     portPolicySchema,
     type PortBlock,
     type PortBlocks,
     type PortPolicy,
+    type PortRanges,
     type PortProtocol
 } from "@/lib/apps/port-block";
 import {
@@ -294,6 +299,58 @@ export async function savePortPolicyAction(
     });
     revalidatePath("/admin/domains");
     return { policy: await getPortPolicy(), blocks: await getPortBlocks() };
+}
+
+/** One host's own port ranges, typed as lists ("25565-25664, 30000-30999"), or a
+ *  reset back to the shared block. Parsed by the helper the form validates with. */
+const hostRangesInputSchema = z.object({
+    targetId: z.string().uuid(),
+    reset: z.boolean().optional(),
+    tcp: z.string().max(400).optional(),
+    udp: z.string().max(400).optional()
+});
+
+/** The ranges a host uses now: its own, or null when it follows the shared block. */
+export async function readHostPortRangesAction(
+    targetId: string
+): Promise<{ ranges?: PortRanges | null; error?: string }> {
+    await requireAdmin();
+    const parsed = z.string().uuid().safeParse(targetId);
+    if (!parsed.success) return { error: (await getTranslations("admin"))("domainsPorts.errors.invalid") };
+    if (!(await prisma.deployTarget.findUnique({ where: { id: parsed.data }, select: { id: true } }))) {
+        return { error: (await getTranslations("admin"))("domainsPorts.hosts.missing") };
+    }
+    return { ranges: await getHostPortRanges(parsed.data) };
+}
+
+export async function saveHostPortRangesAction(
+    input: z.input<typeof hostRangesInputSchema>
+): Promise<{ ranges?: PortRanges | null; error?: string }> {
+    const user = await requireAdmin();
+    const t = await getTranslations("admin");
+    const parsed = hostRangesInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("domainsPorts.errors.invalid") };
+    const { targetId, reset } = parsed.data;
+    if (!(await prisma.deployTarget.findUnique({ where: { id: targetId }, select: { id: true } }))) {
+        return { error: t("domainsPorts.hosts.missing") };
+    }
+    let ranges: PortRanges | null = null;
+    if (!reset) {
+        const tcp = parseRangesInput(parsed.data.tcp ?? "");
+        const udp = parseRangesInput(parsed.data.udp ?? "");
+        if (!tcp) return { error: t("domainsPorts.hosts.invalid", { protocol: "TCP" }) };
+        if (!udp) return { error: t("domainsPorts.hosts.invalid", { protocol: "UDP" }) };
+        ranges = { tcp, udp };
+    }
+    await setHostPortRanges(targetId, ranges);
+    await recordAudit({
+        actorId: user.id,
+        action: "network.ports.host",
+        targetType: "deployTarget",
+        targetId,
+        metadata: { ranges }
+    });
+    return { ranges: await getHostPortRanges(targetId) };
 }
 
 export async function clearDuckdnsTokenAction(): Promise<{ config: DomainConfig }> {

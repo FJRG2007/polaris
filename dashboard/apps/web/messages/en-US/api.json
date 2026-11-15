@@ -30,6 +30,7 @@
         "consumptionFailed": "Could not read what the machine is using",
         "callPortsFailed": "Could not read the call ports",
         "gamePortsFailed": "Could not read the game ports",
+        "gamePortsQuery": "That search or page cannot be read",
         "evidenceExportFailed": "The evidence could not be exported just now. Try again in a minute.",
         "evidenceReadFailed": "The evidence could not be read just now. Try again in a minute.",
         "noFileSent": "No file was sent",

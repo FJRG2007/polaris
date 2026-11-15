@@ -15,6 +15,7 @@
  */
 
 import type { ServerEnvironment } from "@polaris/core";
+import type { GamePortsCursor } from "./game-ports-query";
 import {
     describeBlock,
     DEFAULT_PORT_BLOCKS,
@@ -290,4 +291,13 @@ export interface GamePortsReading {
     readonly lanIp: string | null;
     readonly policy: PortPolicy;
     readonly blocks: PortBlocks;
+}
+
+/** One page of the game servers, with the cursor for the next one. */
+export interface GamePortsPage extends GamePortsReading {
+    /** Where the next page starts, or null on the last one. */
+    readonly next: GamePortsCursor | null;
+    /** Whether any game server exists at all, whatever the filter: an empty
+     *  search result still shows the card, a deployment with none does not. */
+    readonly any: boolean;
 }

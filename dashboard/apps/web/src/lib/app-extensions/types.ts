@@ -17,7 +17,8 @@ import type { AppDeckAction } from "@/lib/deck/types";
 import type { McpSearchProvider } from "@/lib/mcp/search";
 import type { BusyEvent, Locale, PendingAppLink } from "@polaris/core";
 import type { BackupSource } from "@/lib/backups/sources/types";
-import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
+import type { GamePortRow, GamePortsPage, GamePortsReading } from "@/lib/apps/port-advice";
+import type { GamePortsQuery } from "@/lib/apps/game-ports-query";
 import type { FramePlayer } from "@/lib/chat/call-activity";
 
 /** A scheduled job an app runs. Keyed like core's own; the key names the lease. */
@@ -348,6 +349,10 @@ export interface AppExtension {
 
     /** The same, with the advice the Domains card shows, knocking when asked. */
     readonly readForwardedPorts?: (probe: boolean) => Promise<GamePortsReading>;
+
+    /** One bounded page of that reading - searched, filtered and sorted in the
+     *  database - knocking only on the page's running, unproven servers. */
+    readonly readForwardedPortsPage?: (query: GamePortsQuery, probe: boolean) => Promise<GamePortsPage>;
 
     /** What the firewall shows above the web rules for a service it runs. */
     readonly firewallSlot?: (ownerId: string, applicationId: string) => Promise<AppSlot | null>;

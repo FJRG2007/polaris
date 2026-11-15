@@ -15,7 +15,8 @@ import { installedExtensions } from "./installed";
 import type { BusyEvent, Locale } from "@polaris/core";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import type { BackupSource } from "@/lib/backups/sources/types";
-import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
+import type { GamePortRow, GamePortsPage, GamePortsReading } from "@/lib/apps/port-advice";
+import type { GamePortsQuery } from "@/lib/apps/game-ports-query";
 import type {
     AppAutomationsFilter,
     AppDeckAction,
@@ -400,6 +401,18 @@ export async function forwardedPorts(): Promise<GamePortRow[]> {
 export async function readForwardedPorts(probe: boolean): Promise<GamePortsReading | null> {
     for (const extension of extensions()) {
         if (extension.readForwardedPorts) return extension.readForwardedPorts(probe);
+    }
+    return null;
+}
+
+/** One page of the Ports list, from the app that forwards ports. Null when none
+ *  is installed or it cannot page. */
+export async function readForwardedPortsPage(
+    query: GamePortsQuery,
+    probe: boolean
+): Promise<GamePortsPage | null> {
+    for (const extension of extensions()) {
+        if (extension.readForwardedPortsPage) return extension.readForwardedPortsPage(query, probe);
     }
     return null;
 }

@@ -116,3 +116,67 @@ export function parseBlock(raw: string | null, fallback: PortBlock): PortBlock {
         return fallback;
     }
 }
+
+/**
+ * How many separate ranges one host may declare per transport. A hosting machine
+ * outgrows a single hundred-port window long before it outgrows a router rule
+ * per range, and sixteen rules is still a router page somebody can read.
+ */
+export const PORT_RANGES_MAX = 16;
+
+/** Each transport's ranges on one host, in the order they are walked. */
+export type PortRanges = Readonly<Record<PortProtocol, readonly PortBlock[]>>;
+
+/**
+ * The first two ranges that share a port, or null when none do. Two ranges that
+ * overlap would hand the same port out twice under two rules, so a list with
+ * them is refused rather than merged behind the operator's back.
+ */
+export function overlappingRanges(ranges: readonly PortBlock[]): [PortBlock, PortBlock] | null {
+    const sorted = [...ranges].sort((a, b) => a.start - b.start || a.end - b.end);
+    for (let index = 1; index < sorted.length; index += 1) {
+        const previous = sorted[index - 1]!;
+        const current = sorted[index]!;
+        if (current.start <= previous.end) return [previous, current];
+    }
+    return null;
+}
+
+const rangeListSchema = z
+    .array(blockSchema)
+    .min(1)
+    .max(PORT_RANGES_MAX)
+    // i18n-ignore the form checks with parseRangesInput and says its own sentence; this guards the store
+    .refine((ranges) => overlappingRanges(ranges) === null, { message: "Two ranges share a port" });
+
+export const portRangesSchema = z.object({ tcp: rangeListSchema, udp: rangeListSchema });
+
+/** The ranges as typed and displayed: "25565-25664, 30000-30999". */
+export function describeRanges(ranges: readonly PortBlock[]): string {
+    return ranges.map(describeBlock).join(", ");
+}
+
+/**
+ * A list of ranges as it is typed, separated by commas or new lines. Null when
+ * any entry is not a valid block, when there are none or too many, or when two of
+ * them overlap - the same rules the store holds, so the field and the write agree.
+ */
+export function parseRangesInput(text: string): PortBlock[] | null {
+    const entries = text
+        .split(/[,\n]/)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry !== "");
+    if (entries.length === 0 || entries.length > PORT_RANGES_MAX) return null;
+    const ranges: PortBlock[] = [];
+    for (const entry of entries) {
+        const block = parseBlockInput(entry);
+        if (!block) return null;
+        ranges.push(block);
+    }
+    return overlappingRanges(ranges) === null ? ranges : null;
+}
+
+/** Whether a port falls inside any of the ranges. */
+export function inRanges(port: number, ranges: readonly PortBlock[]): boolean {
+    return ranges.some((range) => inBlock(port, range));
+}

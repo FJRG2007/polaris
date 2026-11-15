@@ -254,7 +254,7 @@ export async function installApp(
     const hostPort = pinned
         ? pinned.host
         : declared?.host
-          ? await availableHostPort(declared.host, protocol)
+          ? await availableHostPort(declared.host, protocol, target.id)
           : undefined;
     const extraPorts = ports?.extra;
     const application = await createApplication(ownerId, {

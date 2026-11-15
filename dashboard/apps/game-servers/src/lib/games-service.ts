@@ -11,7 +11,7 @@
 
 import { gameMessage } from "./game-message";
 import { type GameId, gameOfServer, softwareLabel } from "@polaris/core";
-import { prisma } from "@polaris/db";
+import { Prisma, prisma } from "@polaris/db";
 import { freemem, totalmem } from "node:os";
 import { RELEASE_KEY } from "./games-create";
 import type { CrashLoop } from "./crash-loop";
@@ -44,7 +44,13 @@ import {
     resolveInstalls,
     type MinecraftInstall
 } from "./minecraft/service";
-import { gamePorts, probeListening, probeReach, reachConfirmedAt } from "./minecraft/reach";
+import {
+    gamePorts,
+    probeListening,
+    probeReach,
+    portsFromSourceConfig,
+    reachConfirmedAt
+} from "./minecraft/reach";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -61,6 +67,8 @@ const { gameReachAdvice, gameStoppedAdvice } = host.appsPortAdvice;
 type InstallConfig = AppHostTypes["InstallConfig"];
 type GamePortRow = AppHostTypes["GamePortRow"];
 type GamePortsReading = AppHostTypes["GamePortsReading"];
+type GamePortsPage = AppHostTypes["GamePortsPage"];
+type GamePortsQuery = AppHostTypes["GamePortsQuery"];
 
 /** How many players the server was built for. */
 const SLOTS_VAR = "MAX_PLAYERS";
@@ -1007,9 +1015,109 @@ export async function listGamePorts(): Promise<GamePortRow[]> {
  * nothing at all once they are proven.
  */
 export async function sweepGameReach(): Promise<{ pending: number; proven: number }> {
-    const pending = (await listGamePorts()).filter((server) => !server.confirmed && server.running);
-    const proven = await probeReach(pending);
-    return { pending: pending.length, proven: proven.length };
+    // Page by page through the running servers, so a hosting deployment is walked
+    // in bounded reads instead of loaded whole.
+    let pending = 0;
+    let proven = 0;
+    let after: GamePortsQuery["after"] = null;
+    for (;;) {
+        const page = await gamePortsPage({ q: "", status: "running", sort: "name", limit: SWEEP_PAGE, after });
+        const due = page.rows.filter((server) => !server.confirmed && server.running);
+        pending += due.length;
+        proven += (await probeReach(due)).length;
+        if (!page.next) return { pending, proven };
+        after = page.next;
+    }
+}
+
+/** How many servers one step of the reach sweep reads. */
+const SWEEP_PAGE = 200;
+
+interface GamePortSqlRow {
+    id: string;
+    name: string;
+    config: string;
+    applicationId: string | null;
+    createdAt: Date;
+    sourceConfig: string | null;
+    desiredState: string | null;
+}
+
+/**
+ * One page of game servers, filtered, searched and ordered in the database.
+ *
+ * Keyset on (name, id) or (createdAt, id), the two orders the InstalledApp
+ * indexes keep, and one row more than asked for to know whether a next page
+ * exists - never a COUNT over the table. The application is joined rather than
+ * read per row, so a page is one round trip whatever its size.
+ */
+export async function gamePortsPage(
+    query: GamePortsQuery
+): Promise<{ rows: GamePortRow[]; next: GamePortsQuery["after"] }> {
+    const catalogIds = gameServerCatalogIds();
+    if (catalogIds.length === 0) return { rows: [], next: null };
+    const newest = query.sort === "newest";
+    const search = query.q === "" ? Prisma.empty : Prisma.sql`AND i."name" ILIKE ${likePattern(query.q)} ESCAPE '\\'`;
+    const state =
+        query.status === "running"
+            ? Prisma.sql`AND a."desiredState" = 'running'`
+            : query.status === "stopped"
+              ? Prisma.sql`AND a."desiredState" <> 'running'`
+              : Prisma.empty;
+    const after = !query.after
+        ? Prisma.empty
+        : newest
+          ? Prisma.sql`AND (i."createdAt", i."id") < (${new Date(query.after.key)}, ${query.after.id}::uuid)`
+          : Prisma.sql`AND (i."name", i."id") > (${query.after.key}, ${query.after.id}::uuid)`;
+    const order = newest
+        ? Prisma.sql`ORDER BY i."createdAt" DESC, i."id" DESC`
+        : Prisma.sql`ORDER BY i."name" ASC, i."id" ASC`;
+    const rows = await prisma.$queryRaw<GamePortSqlRow[]>`
+        SELECT i."id", i."name", i."config", i."applicationId", i."createdAt",
+               a."sourceConfig", a."desiredState"
+        FROM "InstalledApp" i
+        JOIN "Application" a ON a."id" = i."applicationId"
+        WHERE i."catalogId" IN (${Prisma.join(catalogIds)})
+          AND i."status" <> 'removed'
+          ${search} ${state} ${after}
+        ${order}
+        LIMIT ${query.limit + 1}`;
+    const shown = rows.slice(0, query.limit);
+    const last = shown[shown.length - 1];
+    const next =
+        rows.length > query.limit && last
+            ? { key: newest ? last.createdAt.toISOString() : last.name, id: last.id }
+            : null;
+    return {
+        rows: shown
+            .map((row) => {
+                const confirmedAt = reachConfirmedAt(row.config);
+                return {
+                    installedAppId: row.id,
+                    name: row.name,
+                    ports: portsFromSourceConfig(row.sourceConfig),
+                    confirmed: confirmedAt !== null,
+                    confirmedAt,
+                    running: row.desiredState === "running"
+                };
+            })
+            .filter((row) => row.ports.length > 0),
+        next
+    };
+}
+
+/** A search typed as a LIKE pattern, with its wildcards taken literally. */
+function likePattern(search: string): string {
+    return `%${search.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+}
+
+/** Whether any game server exists at all, by the cheapest read that can say so. */
+async function anyGameServer(): Promise<boolean> {
+    const found = await prisma.installedApp.findFirst({
+        where: { catalogId: { in: gameServerCatalogIds() }, status: { not: "removed" } },
+        select: { id: true }
+    });
+    return found !== null;
 }
 
 export type { GamePortRow, GamePortsReading };
@@ -1032,6 +1140,19 @@ export async function readGamePorts(probe = false): Promise<GamePortsReading> {
         getPortPolicy(),
         getPortBlocks()
     ]);
+    return adviseOn(servers, probe, environment, lanIp, policy, blocks);
+}
+
+/** The reading for a set of rows: knocks on the running, unproven ones when asked,
+ *  then the advice for whatever is still unproven. */
+async function adviseOn(
+    servers: readonly GamePortRow[],
+    probe: boolean,
+    environment: Parameters<typeof gameReachAdvice>[0],
+    lanIp: string | null,
+    policy: GamePortsReading["policy"],
+    blocks: GamePortsReading["blocks"]
+): Promise<GamePortsReading> {
     // Only a running server is knocked on. One that is stopped would refuse the
     // knock because there is nothing behind its port, and that refusal is
     // indistinguishable from a router that never forwarded it.
@@ -1080,4 +1201,23 @@ export async function readGamePorts(probe = false): Promise<GamePortsReading> {
         policy,
         blocks
     };
+}
+
+/**
+ * One page of the Ports list with the advice for what is on it. Only the page's
+ * running, unproven servers are knocked on, so a poll costs at most a page of
+ * knocks however many servers the deployment runs.
+ */
+export async function readGamePortsPage(query: GamePortsQuery, probe = false): Promise<GamePortsPage> {
+    const [page, { environment }, lanIp, policy, blocks] = await Promise.all([
+        gamePortsPage(query),
+        getLocalEnvironment().catch(() => ({ environment: "unknown" as const })),
+        getHostLanIp().catch(() => null),
+        getPortPolicy(),
+        getPortBlocks()
+    ]);
+    const filtered = query.q !== "" || query.status !== "all" || query.after !== null;
+    const any = page.rows.length > 0 || page.next !== null || (filtered && (await anyGameServer()));
+    const reading = await adviseOn(page.rows, probe, environment, lanIp, policy, blocks);
+    return { ...reading, next: page.next, any };
 }

@@ -4274,6 +4274,8 @@ model InstalledApp {
 
     @@index([ownerId])
     @@index([ownerId, name, id])
+    @@index([name, id])
+    @@index([createdAt, id])
     @@index([catalogId])
     @@index([targetId])
     @@index([applicationId])

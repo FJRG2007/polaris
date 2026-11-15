@@ -39,17 +39,23 @@ export async function gamePorts(applicationId: string | null): Promise<GamePort[
         where: { id: applicationId },
         select: { sourceConfig: true }
     });
-    if (!app) return [];
+    return app ? portsFromSourceConfig(app.sourceConfig) : [];
+}
+
+/** The published ports in an application's stored source config. Pure, so a page
+ *  read can parse the config it joined instead of reading each row again. */
+export function portsFromSourceConfig(sourceConfig: string | null): GamePort[] {
     let config: {
         hostPort?: unknown;
         hostProtocol?: unknown;
         extraPorts?: unknown;
     };
     try {
-        config = JSON.parse(app.sourceConfig) as typeof config;
+        config = JSON.parse(sourceConfig ?? "") as typeof config;
     } catch {
         return [];
     }
+    if (typeof config !== "object" || config === null) return [];
     const ports: GamePort[] = [];
     if (typeof config.hostPort === "number") {
         ports.push({
@@ -198,6 +204,24 @@ const PROBE_EVERY_MS = 30_000;
  *  is a rate limit, not a record - what is proven is written to the install. */
 const probedAt = new Map<string, number>();
 
+/** The most installs the rate limit remembers. Past it the oldest entries go, so
+ *  a sweep over a hosting deployment cannot grow this map without end. */
+const PROBED_MAX = 10_000;
+
+/** How many servers are knocked on at once. Each knock can wait out a timeout, so
+ *  a page of them in turn is minutes; all at once is a burst of sockets. */
+const PROBE_CONCURRENCY = 6;
+
+function noteProbed(installedAppId: string): void {
+    probedAt.delete(installedAppId);
+    probedAt.set(installedAppId, Date.now());
+    while (probedAt.size > PROBED_MAX) {
+        const oldest = probedAt.keys().next().value;
+        if (oldest === undefined) break;
+        probedAt.delete(oldest);
+    }
+}
+
 /** A server whose port is not proven yet, as the probe needs it. */
 export interface PendingReach {
     readonly installedAppId: string;
@@ -223,25 +247,30 @@ export async function probeReach(pending: readonly PendingReach[]): Promise<stri
     const host = (await relayAddress().catch(() => null)) ?? (await publicProbeHost());
     if (!host) return [];
     const reached: string[] = [];
-    for (const entry of pending) {
-        const last = probedAt.get(entry.installedAppId) ?? 0;
-        if (fresh(last, PROBE_EVERY_MS)) continue;
-        probedAt.set(entry.installedAppId, Date.now());
-        // Every port of one server at once. Only one of them tends to answer - a
-        // game's own port says nothing to a stranger, while the query port beside
-        // it does - so asking in turn costs a full timeout for each port that was
-        // never going to reply, on a path a screen is waiting on.
-        const answers = await Promise.all(
-            entry.ports.map((port) =>
-                port.protocol === "tcp"
-                    ? probeTcpPort(host, port.port)
-                    : answersOnUdp(host, port.port, PROBE_TIMEOUT_MS)
-            )
-        );
-        if (answers.some(Boolean) && (await noteReachedFrom(entry.installedAppId, host))) {
-            reached.push(entry.installedAppId);
+    const due = pending.filter((entry) => !fresh(probedAt.get(entry.installedAppId) ?? 0, PROBE_EVERY_MS));
+    let next = 0;
+    const knock = async (): Promise<void> => {
+        while (next < due.length) {
+            const entry = due[next]!;
+            next += 1;
+            noteProbed(entry.installedAppId);
+            // Every port of one server at once. Only one of them tends to answer - a
+            // game's own port says nothing to a stranger, while the query port beside
+            // it does - so asking in turn costs a full timeout for each port that was
+            // never going to reply, on a path a screen is waiting on.
+            const answers = await Promise.all(
+                entry.ports.map((port) =>
+                    port.protocol === "tcp"
+                        ? probeTcpPort(host, port.port)
+                        : answersOnUdp(host, port.port, PROBE_TIMEOUT_MS)
+                )
+            );
+            if (answers.some(Boolean) && (await noteReachedFrom(entry.installedAppId, host))) {
+                reached.push(entry.installedAppId);
+            }
         }
-    }
+    };
+    await Promise.all(Array.from({ length: Math.min(PROBE_CONCURRENCY, due.length) }, knock));
     return reached;
 }
 

@@ -987,6 +987,36 @@
         "callLabel": {
             "udp": "Call media",
             "tcp": "Call media over TCP"
+        },
+        "list": {
+            "search": "Search servers by name",
+            "statusAria": "Show servers by state",
+            "sortAria": "Order servers by",
+            "status": {
+                "all": "All servers",
+                "running": "Running",
+                "stopped": "Stopped"
+            },
+            "sort": {
+                "name": "By name",
+                "newest": "Newest first"
+            },
+            "noMatch": "No server matches this search.",
+            "previous": "Previous",
+            "next": "Next",
+            "page": "Page {page}"
+        },
+        "hosts": {
+            "host": "Host ranges",
+            "pick": "Choose a host",
+            "tcpAria": "TCP ranges for this host",
+            "udpAria": "UDP ranges for this host",
+            "reset": "Use shared block",
+            "own": "This host allocates only from these ranges, up to {max} per protocol.",
+            "shared": "This host uses the shared block. Add up to {max} ranges per protocol to give it its own.",
+            "invalidHint": "Write ranges like 25565-25664, 30000-30999: above 1024, no overlap, up to {max}.",
+            "invalid": "The {protocol} ranges overlap, are out of bounds, or are too many.",
+            "missing": "That host no longer exists."
         }
     },
     "domainsRouter": {

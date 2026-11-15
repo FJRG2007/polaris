@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { apiAdmin } from "@/lib/api-session";
 
-import { readForwardedPorts } from "@/lib/app-extensions/registry";
+import { readForwardedPortsPage } from "@/lib/app-extensions/registry";
+import { encodeGamePortsCursor, parseGamePortsQuery } from "@/lib/apps/game-ports-query";
 import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
@@ -25,12 +26,19 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request): Promise<Response> {
     const refused = await apiAdmin();
     if (refused instanceof Response) return refused;
-    const probe = new URL(request.url).searchParams.get("probe") === "1";
+    const params = new URL(request.url).searchParams;
+    const probe = params.get("probe") === "1";
+    // Searched, filtered, sorted and paged in the database; a query out of bounds
+    // is refused here instead of reaching it.
+    const query = parseGamePortsQuery(params);
+    if (!query) {
+        return NextResponse.json({ error: (await readerWords("api"))("errors.gamePortsQuery") }, { status: 400 });
+    }
     try {
-        const reading = await readForwardedPorts(probe);
+        const page = await readForwardedPortsPage(query, probe);
         // No app forwards ports here: the card reads an empty list and draws nothing.
-        if (!reading) return NextResponse.json({ servers: [] });
-        return NextResponse.json(reading);
+        if (!page) return NextResponse.json({ servers: [], any: false, next: null });
+        return NextResponse.json({ ...page, next: page.next ? encodeGamePortsCursor(page.next) : null });
     } catch (caught) {
         return NextResponse.json(
             { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.gamePortsFailed") },

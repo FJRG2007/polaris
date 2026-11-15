@@ -30,6 +30,7 @@
         "consumptionFailed": "No se pudo leer lo que está usando la máquina",
         "callPortsFailed": "Error al leer los puertos de llamadas",
         "gamePortsFailed": "Error al leer los puertos de juegos",
+        "gamePortsQuery": "Esa búsqueda o página no se puede leer",
         "evidenceExportFailed": "No se pudieron exportar las evidencias ahora mismo. Vuelve a intentarlo en un minuto.",
         "evidenceReadFailed": "No se pudieron leer las evidencias ahora mismo. Vuelve a intentarlo en un minuto.",
         "noFileSent": "Falta el archivo",

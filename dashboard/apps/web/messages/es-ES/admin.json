@@ -987,6 +987,36 @@
         "callLabel": {
             "udp": "Llamadas",
             "tcp": "Llamadas por TCP"
+        },
+        "list": {
+            "search": "Buscar servidores por nombre",
+            "statusAria": "Mostrar servidores por estado",
+            "sortAria": "Ordenar servidores por",
+            "status": {
+                "all": "Todos",
+                "running": "En marcha",
+                "stopped": "Detenidos"
+            },
+            "sort": {
+                "name": "Por nombre",
+                "newest": "Más recientes"
+            },
+            "noMatch": "Ningún servidor coincide.",
+            "previous": "Anterior",
+            "next": "Siguiente",
+            "page": "Página {page}"
+        },
+        "hosts": {
+            "host": "Rangos del host",
+            "pick": "Elige un host",
+            "tcpAria": "Rangos TCP de este host",
+            "udpAria": "Rangos UDP de este host",
+            "reset": "Usar bloque común",
+            "own": "Este host solo asigna de estos rangos, hasta {max} por protocolo.",
+            "shared": "Este host usa el bloque común. Añade hasta {max} rangos por protocolo para darle los suyos.",
+            "invalidHint": "Escribe rangos como 25565-25664, 30000-30999: sobre 1024, sin solapes, hasta {max}.",
+            "invalid": "Los rangos {protocol} se solapan, se salen de límites o son demasiados.",
+            "missing": "Ese host ya no existe."
         }
     },
     "domainsRouter": {

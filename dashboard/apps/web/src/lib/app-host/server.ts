@@ -58,9 +58,11 @@ import type { InstallAccessEntry, InstallAccessView } from "@/lib/apps/install-s
 import type {
     GamePort,
     GamePortRow,
+    GamePortsPage,
     GamePortsReading,
     GameReachAdvice
 } from "@/lib/apps/port-advice";
+import type { GamePortsQuery } from "@/lib/apps/game-ports-query";
 import type {
     BackupSource,
     DiscoveredTarget,
@@ -653,6 +655,8 @@ declare module "@polaris/app-host" {
         GamePort: GamePort;
         GamePortRow: GamePortRow;
         GamePortsReading: GamePortsReading;
+        GamePortsPage: GamePortsPage;
+        GamePortsQuery: GamePortsQuery;
         GameReachAdvice: GameReachAdvice;
         InPlaceCopy: InPlaceCopy;
         InstallAccessEntry: InstallAccessEntry;
