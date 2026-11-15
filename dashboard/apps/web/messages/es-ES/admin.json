@@ -990,8 +990,8 @@
         },
         "list": {
             "search": "Buscar servidores por nombre",
-            "statusAria": "Mostrar servidores por estado",
-            "sortAria": "Ordenar servidores por",
+            "statusAria": "Servidores por estado",
+            "sortAria": "Ordenar servidores",
             "status": {
                 "all": "Todos",
                 "running": "En marcha",
@@ -1003,11 +1003,11 @@
             },
             "noMatch": "Ningún servidor coincide.",
             "previous": "Anterior",
-            "next": "Siguiente",
+            "next": "Seguir",
             "page": "Página {page}"
         },
         "hosts": {
-            "host": "Rangos del host",
+            "host": "Rangos propios",
             "pick": "Elige un host",
             "tcpAria": "Rangos TCP de este host",
             "udpAria": "Rangos UDP de este host",
