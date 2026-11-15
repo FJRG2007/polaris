@@ -42,7 +42,7 @@ export function CodeTodos({ todos }: { todos: readonly SessionTodo[] }) {
                 <ChevronDown className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} aria-hidden />
             </button>
             {open ? (
-                <ol className="flex max-h-48 min-w-0 flex-col gap-1 overflow-y-auto text-sm">
+                <ol className="flex max-h-48 min-w-0 flex-col gap-1 overflow-y-auto overscroll-contain text-sm">
                     {todos.map((todo, index) => (
                         <li key={index} className="flex min-w-0 items-start gap-2">
                             <TodoMark status={todo.status} label={t(`code.todos.status.${todo.status}`)} />
@@ -296,7 +296,7 @@ export function CodePlan({
                 <NotebookPen className="size-4 shrink-0 text-primary" aria-hidden />
                 <span className="min-w-0 truncate">{t("code.plan.title")}</span>
             </p>
-            <div className="max-h-72 min-w-0 overflow-y-auto rounded-md border border-border px-3 py-2 text-sm">
+            <div className="max-h-72 min-w-0 overflow-y-auto overscroll-contain rounded-md border border-border px-3 py-2 text-sm">
                 <MessageResponse>{plan}</MessageResponse>
             </div>
             {feedback !== null ? (
