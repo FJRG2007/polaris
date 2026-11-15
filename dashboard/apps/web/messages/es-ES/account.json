@@ -379,7 +379,8 @@
                 "Deploy": "Deploy",
                 "MCP": "MCP",
                 "Polar": "Polar",
-                "Alerts": "Alertas"
+                "Alerts": "Alertas",
+                "Analytics": "Analítica"
             },
             "statuses": {
                 "200": "OK",
@@ -543,6 +544,14 @@
                         "Actions": "Acciones view: view, Texto, https://enlace; separadas por punto y coma.",
                         "Markdown": "yes para mostrar el mensaje como Markdown.",
                         "X-Dedup-Key": "Repeticiones con la misma clave se agrupan una hora."
+                    }
+                },
+                "getAnalyticsStats": {
+                    "summary": "Visitantes, páginas vistas y desgloses de un sitio en un rango",
+                    "description": "Necesita deploy.manage. Los rangos de más de 31 días salen de los totales diarios: source es daily y los desgloses que no guardan figuran en unavailable.",
+                    "params": {
+                        "filters": "Lista JSON de filtros, como la lleva la dirección de Analítica",
+                        "breakdown": "Lista de desgloses separada por comas; todos si se omite"
                     }
                 }
             }

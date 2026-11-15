@@ -379,7 +379,8 @@
                 "Deploy": "Deploy",
                 "MCP": "MCP",
                 "Polar": "Polar",
-                "Alerts": "Alerts"
+                "Alerts": "Alerts",
+                "Analytics": "Analytics"
             },
             "statuses": {
                 "200": "OK",
@@ -543,6 +544,14 @@
                         "Actions": "View actions: view, Label, https://link; separated by semicolons.",
                         "Markdown": "yes to render the message as Markdown.",
                         "X-Dedup-Key": "Repeats with the same key fold into one alert for an hour."
+                    }
+                },
+                "getAnalyticsStats": {
+                    "summary": "A site's visitors, pageviews and breakdowns for a range",
+                    "description": "Needs deploy.manage. Ranges over 31 days come from the daily totals: source is daily and the breakdowns they do not keep are listed in unavailable.",
+                    "params": {
+                        "filters": "JSON list of filters, as the Analytics address carries them",
+                        "breakdown": "Comma list of breakdowns; all when omitted"
                     }
                 }
             }

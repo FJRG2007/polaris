@@ -12,6 +12,7 @@
  * and when a route under /api/v1 is missing from this list.
  */
 
+import * as core from "@polaris/core";
 import { z, type ZodTypeAny } from "zod";
 import { clientConnectSchema } from "@/lib/vpn/wireguard";
 import * as schemas from "@/lib/deploy/api/schemas";
@@ -33,7 +34,7 @@ export interface DocumentedRoute {
     path: string;
     /** The route file, relative to src/app. */
     file: string;
-    tag: "Account" | "Deploy" | "MCP" | "Polar" | "Alerts";
+    tag: "Account" | "Deploy" | "MCP" | "Polar" | "Alerts" | "Analytics";
     /** Authenticated by an alert address's secret rather than an API key. */
     topicSecret?: true;
     summary: string;
@@ -150,6 +151,25 @@ const variableRoutes = (
 ];
 
 export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
+    {
+        method: "GET",
+        path: "/api/v1/analytics/stats",
+        file: "api/v1/analytics/stats/route.ts",
+        tag: "Analytics",
+        summary: "A site's visitors, pageviews and breakdowns for a range",
+        description:
+            "Needs deploy.manage. Ranges over 31 days come from the daily totals: source is daily and the breakdowns they do not keep are listed in unavailable.",
+        changes: false,
+        query: z.object({
+            scopeType: z.enum(["application", "polaris", "external"]),
+            scopeId: z.string().max(64).optional(),
+            range: z.enum(core.VISIT_RANGES),
+            filters: z.string().max(4000).optional().describe("JSON list of filters, as the Analytics address carries them"),
+            compare: z.enum(core.VISIT_COMPARES).optional(),
+            breakdown: z.string().max(400).optional().describe("Comma list of breakdowns; all when omitted")
+        }),
+        responses: { 200: ok(entity("Overview, previous totals, series and breakdowns"), false) }
+    },
     {
         method: "GET",
         path: "/api/v1/me",

@@ -185,8 +185,11 @@ your site:
 localStorage.setItem("polaris.disabled", "1");
 ```
 
-`localStorage.removeItem("polaris.disabled")` undoes it. The script only reads
-this key; it never writes to the visitor's machine. To ignore a whole office or
+`localStorage.removeItem("polaris.disabled")` undoes it. Without a console,
+open any page of the site with `?polaris-ignore=on` added to the address (for
+example `https://example.com/?polaris-ignore=on`); `?polaris-ignore=off` counts
+that browser again. That link is the only time the script writes to the
+visitor's machine. To ignore a whole office or
 your team's addresses, use **Ignored traffic** instead.
 
 ## Frameworks
@@ -294,6 +297,31 @@ Per site, under **Settings**:
   site; it is not a public API.
 - **Delete data** - removes every recorded visit, event and daily total.
   Settings and saved reports stay.
+
+## Stats API
+
+Read a site's figures from a script with a Polaris API key that has the
+**Deploy, restart and configure apps** permission (`deploy.manage`). The key
+sees the sites its owner can see, shared ones included.
+
+```sh
+curl -H "Authorization: Bearer $POLARIS_KEY"   "https://polaris.example.com/api/v1/analytics/stats?scopeType=external&scopeId=<site id>&range=7d&breakdown=path,referrer"
+```
+
+| Parameter | Meaning |
+| --- | --- |
+| `scopeType` | `application` (a deployed service), `external` (a site added by hand) or `polaris` (Polaris itself, operators). |
+| `scopeId` | The service or site id, as in the Analytics address (`?id=`). Empty for `polaris`. |
+| `range` | One of the screen's ranges, such as `24h`, `7d`, `30d`. |
+| `filters` | Optional. JSON list of filters: `[{"dimension":"country","value":"ES","negate":false,"contains":false}]`. |
+| `compare` | `previous` (default) or `year`, for the `previous` totals. |
+| `breakdown` | Optional comma list of breakdowns (`path`, `entry`, `exit`, `referrer`, `channel`, `campaign`, `term`, `content`, `browser`, `browserVersion`, `os`, `osVersion`, `device`, `country`, `language`, `screen`, `event`, `ip`). All when omitted. |
+
+The answer holds `overview` (visitors, visits, pageviews, bounce rate, visit
+length), `previous`, `series` and `breakdowns`. Ranges over 31 days are drawn
+from the daily totals: `source` is then `daily`, the breakdowns those totals do
+not keep are listed in `unavailable`, and filters are not applied
+(`filtersIgnored`). A site the key cannot see answers 404.
 
 ## Limits and validation
 
