@@ -181,3 +181,36 @@ describe("bucketHttpMetrics", () => {
         expect(bucketHttpMetrics(entries, to, from, 1)).toEqual([]);
     });
 });
+
+describe("credentials in a logged address", () => {
+    it("keeps the guard's signed tokens out of a parsed Traefik line", () => {
+        const raw = JSON.stringify({
+            RequestMethod: "GET",
+            RequestPath: "/edge/callback?token=eyJhbGciOi.fixture.sig&etoken=v1.fixture-edge-token&next=%2Fdocs",
+            RequestHost: "app.example.test",
+            DownstreamStatus: 302,
+            ClientHost: "198.51.100.7",
+            "request_Referer": "https://app.example.test/edge/callback?etoken=v1.fixture-edge-token"
+        });
+        const [parsed] = parseHttpLogs(raw);
+        expect(parsed!.path).toBe("/edge/callback?token=redacted&etoken=redacted&next=%2Fdocs");
+        expect(parsed!.referer).toBe("https://app.example.test/edge/callback?etoken=redacted");
+        expect(JSON.stringify(parsed)).not.toContain("fixture");
+    });
+
+    it("redacts every credential-like parameter, in any case, and keeps the rest", () => {
+        const raw =
+            '203.0.113.9 - - [21/Jul/2026:12:32:05 +0000] "GET /cb?Code=abc123&STATE=xyz&page=2&access_token=t0k&Sig=s1&key=k&secret=s&password=p&signature=g#top HTTP/1.1" 200 12 "-" "curl/8"';
+        const [parsed] = parseHttpLogs(raw);
+        expect(parsed!.path).toBe(
+            "/cb?Code=redacted&STATE=redacted&page=2&access_token=redacted&Sig=redacted&key=redacted&secret=redacted&password=redacted&signature=redacted#top"
+        );
+    });
+
+    it("leaves an address with nothing secret in it untouched", () => {
+        const [parsed] = parseHttpLogs(
+            '203.0.113.9 - - [21/Jul/2026:12:32:05 +0000] "GET /search?q=token&page=2 HTTP/1.1" 200 12 "-" "curl/8"'
+        );
+        expect(parsed!.path).toBe("/search?q=token&page=2");
+    });
+});

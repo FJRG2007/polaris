@@ -110,10 +110,68 @@ export function parseHttpLogs(raw: string): HttpLogEntry[] {
         if (!rest) continue;
         let entry = rest.startsWith("{") && rest.endsWith("}") ? fromJson(rest) : fromClf(rest);
         if (!entry) continue;
+        entry = { ...entry, path: redactQuery(entry.path), referer: entry.referer && redactQuery(entry.referer) };
         if (!entry.time && stamp) entry = { ...entry, time: toIso(stamp[1]!) };
         entries.push(entry);
     }
     return entries;
+}
+
+/**
+ * Query parameters whose value is a credential: a signed edge token on the
+ * guard's callback, an OAuth code or state, an API key. Whoever reads an app's
+ * HTTP logs is not necessarily allowed into the app, and a token read there can
+ * be replayed until it expires, so the value never leaves the parser.
+ */
+const SECRET_PARAMS = new Set([
+    "token",
+    "etoken",
+    "access_token",
+    "refresh_token",
+    "id_token",
+    "code",
+    "state",
+    "key",
+    "api_key",
+    "apikey",
+    "secret",
+    "client_secret",
+    "password",
+    "signature",
+    "sig"
+]);
+
+const REDACTED = "redacted";
+
+/**
+ * A path or URL with the value of every credential-like query parameter replaced
+ * by `REDACTED`. Everything else - the other parameters, their order, the
+ * fragment - is kept byte for byte, so the line still reads as the request it was.
+ */
+export function redactQuery(target: string): string {
+    const start = target.indexOf("?");
+    if (start === -1) return target;
+    const hash = target.indexOf("#", start);
+    const end = hash === -1 ? target.length : hash;
+    const query = target
+        .slice(start + 1, end)
+        .split("&")
+        .map((pair) => {
+            const equals = pair.indexOf("=");
+            if (equals === -1) return pair;
+            return SECRET_PARAMS.has(paramName(pair.slice(0, equals))) ? `${pair.slice(0, equals)}=${REDACTED}` : pair;
+        })
+        .join("&");
+    return `${target.slice(0, start + 1)}${query}${target.slice(end)}`;
+}
+
+/** A parameter name as a server would read it: decoded, any case. */
+function paramName(raw: string): string {
+    try {
+        return decodeURIComponent(raw.replace(/\+/g, " ")).trim().toLowerCase();
+    } catch {
+        return raw.toLowerCase();
+    }
 }
 
 function fromClf(line: string): HttpLogEntry | null {
