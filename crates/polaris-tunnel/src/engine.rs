@@ -84,7 +84,12 @@ impl Default for Limits {
             max_tcp_per_source: 1024,
             backlog: 64,
             tcp_buffer: 64 * 1024,
-            tcp_buffer_max: 1024 * 1024,
+            // The window is also what a connection keeps in flight, and the
+            // stack has no SACK: a loss resends half of it again. Measured on
+            // the real relay link (Starlink uplink, ~30 ms): 1 MiB moved
+            // 0.2-1 Mbit/s with 3-9 s stalls and cost call media 2% loss, 256 KiB
+            // 9.5 Mbit/s with 3 s stalls, 128 KiB 13 Mbit/s with media untouched.
+            tcp_buffer_max: 128 * 1024,
             tcp_memory: 1024 * 1024 * 1024,
             stuck_timeout: Duration::from_secs(120),
             zero_window_timeout: Duration::from_secs(300),
