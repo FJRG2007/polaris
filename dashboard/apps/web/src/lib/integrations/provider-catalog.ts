@@ -22,6 +22,7 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
+import { forgetEndpointModels, refreshEndpointModels } from "@/lib/agents/endpoint-models";
 import { MODEL_INTEGRATIONS } from "@/lib/integrations/registry";
 import { PROVIDER_ALIASES } from "@/lib/integrations/provider-aliases";
 import { SPEECH_PROVIDER_SEEDS } from "@/lib/integrations/speech-providers";
@@ -762,6 +763,9 @@ export async function addCustomProvider(
         data: { ...providerToRow(seed, "custom", 150), createdById: actorId }
     });
     await ensureProviderCatalog(true);
+    // Its models are read now rather than at tomorrow's refresh, without holding
+    // the screen that added it.
+    void refreshEndpointModels([seed.slug]).catch(() => undefined);
     return { ok: true, slug: seed.slug };
 }
 
@@ -770,6 +774,7 @@ export async function removeCustomProvider(slug: string): Promise<boolean> {
     const removed = await prisma.modelProviderEntry.deleteMany({
         where: { slug: slug.slice(0, 80), source: "custom" }
     });
+    if (removed.count > 0) await forgetEndpointModels(slug.slice(0, 80));
     await ensureProviderCatalog(true);
     return removed.count > 0;
 }

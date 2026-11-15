@@ -24,6 +24,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { modelProviders } from "@/lib/agents/agent-providers";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { refreshEndpointModels } from "@/lib/agents/endpoint-models";
 import {
     downloadModelIndex,
     noteIndexFailure,
@@ -262,6 +263,20 @@ export interface CatalogRefresh {
  * list shrinks in a later release.
  */
 export async function refreshModelCatalog(): Promise<CatalogRefresh> {
+    // The providers reached by an endpoint of their own are read alongside the
+    // index, whatever the index answers: one does not wait on the other, and a
+    // failing endpoint never fails the refresh.
+    const [index] = await Promise.all([
+        refreshIndexModels(),
+        refreshEndpointModels().catch((error: unknown) => {
+            console.error("polar: could not read endpoint model lists", error);
+            return 0;
+        })
+    ]);
+    return index;
+}
+
+async function refreshIndexModels(): Promise<CatalogRefresh> {
     // One download feeds both catalogues: the providers first, so a provider the
     // index just added is one whose models are kept below.
     const download = await downloadModelIndex();

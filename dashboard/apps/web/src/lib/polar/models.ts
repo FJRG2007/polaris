@@ -52,7 +52,11 @@ import {
     modelProviders,
     anthropicWorkspaceHeaders
 } from "@/lib/agents/agent-providers";
-import { listCatalogModels, type CatalogModel } from "@/lib/agents/model-catalog";
+import {
+    latestCatalogModels,
+    listCatalogModels,
+    type CatalogModel
+} from "@/lib/agents/model-catalog";
 import type { ChatCredential } from "@/lib/agents/model-keys";
 import { providerWindows, WINDOW_PROVIDERS } from "@/lib/polar/provider-windows";
 import { creditMiddleware, freeVariantOf, isFreeModel } from "@/lib/polar/credit";
@@ -155,10 +159,16 @@ export async function polarModelOptions(
         let models: PolarModelOption[];
         const outside = catalogProvider(slug);
         if (outside?.outsideIndex && outside.defaultModel.slug) {
-            // Not in the index, so the catalogue has no models for it: the one
-            // its row names, the way the gateway offers its one model.
+            // Not in the index: the models its own endpoint listed at the last
+            // refresh (`endpoint-models.ts`), then the one its row names when
+            // that list does not carry it - which is all there is for an
+            // endpoint that lists nothing without a key.
+            const listed = (await latestCatalogModels(slug, ENDPOINT_MODELS_SHOWN)).map((model) =>
+                catalogueOption(slug, name, model, null)
+            );
             const model = outside.defaultModel.slug.slice(slug.length + 1);
-            models = model ? [gatewayOption(slug, name, model)] : [];
+            const named = model && !listed.some((entry) => entry.model === model);
+            models = named ? [...listed, gatewayOption(slug, name, model)] : listed;
         } else if (slug === GATEWAY_SLUG) {
             const credential = await polarCredentialFor(userId, slug, null, granted);
             models = credential?.gatewayModel
@@ -560,6 +570,9 @@ export function languageModel(
         }
     }
 }
+
+/** Most models a provider reached by its own endpoint offers in the picker. */
+const ENDPOINT_MODELS_SHOWN = 100;
 
 /** How long a call to a stored endpoint may take, streamed answer included. */
 const ENDPOINT_TIMEOUT_MS = 10 * 60_000;
