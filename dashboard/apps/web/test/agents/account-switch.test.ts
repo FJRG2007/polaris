@@ -78,7 +78,11 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/agents/session-service", () => ({ addSessionMessage: async () => undefined }));
-vi.mock("@/lib/agents/session-runtime", () => ({ queueTurnAgain: async () => true }));
+vi.mock("@/lib/agents/session-runtime", () => ({
+    queueTurnAgain: async () => true,
+    moveAgentToAccount: async () => "next-turn",
+    promptMovedAgent: async () => true
+}));
 vi.mock("@/lib/agents/model-keys", () => ({ instanceKeysAreShared: async () => false }));
 
 const rotation = await import("@/lib/agents/account-rotation");
@@ -102,7 +106,7 @@ function key(id: string, name: string, priority: number, extra: Partial<KeyRow> 
     };
 }
 
-function ports() {
+function ports(moved: "next-turn" | "resumed" | "relaunched" | "stays" = "next-turn") {
     const notices: string[] = [];
     const restarted: string[] = [];
     const resent: string[] = [];
@@ -116,6 +120,7 @@ function ports() {
             },
             restart: async (id: string) => {
                 restarted.push(id);
+                return moved;
             },
             resend: async (id: string) => {
                 resent.push(id);
@@ -165,6 +170,22 @@ describe("switchSessionAccount", () => {
         expect(db.session!.limitWaitUntil).toBeNull();
         expect(db.session!.limitRetries).toBe(0);
         expect(seen.resent).toEqual([SESSION]);
+    });
+
+    it("sends a turn the restart ended in the agent's own interface again, and leaves a runner's alone", async () => {
+        db.session!.state = "working";
+        const relaunched = ports("relaunched");
+        expect(await rotation.switchSessionAccount(SESSION, B, relaunched.ports)).toBe("moved");
+        expect(relaunched.resent).toEqual([SESSION]);
+        // A runner's turn carries on where it is; its next one reads the account.
+        const runner = ports("next-turn");
+        expect(await rotation.switchSessionAccount(SESSION, C, runner.ports)).toBe("moved");
+        expect(runner.resent).toEqual([]);
+        // An idle interface restarted on the new account has nothing to send.
+        db.session!.state = "idle";
+        const idle = ports("relaunched");
+        expect(await rotation.switchSessionAccount(SESSION, A, idle.ports)).toBe("moved");
+        expect(idle.resent).toEqual([]);
     });
 
     it("refuses an account outside the rotation, the one in use, a machine login and an ended session", async () => {

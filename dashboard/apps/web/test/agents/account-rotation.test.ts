@@ -78,7 +78,11 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/agents/session-service", () => ({ addSessionMessage: async () => undefined }));
-vi.mock("@/lib/agents/session-runtime", () => ({ queueTurnAgain: async () => true }));
+vi.mock("@/lib/agents/session-runtime", () => ({
+    queueTurnAgain: async () => true,
+    moveAgentToAccount: async () => "next-turn",
+    promptMovedAgent: async () => true
+}));
 vi.mock("@/lib/agents/model-keys", () => ({ instanceKeysAreShared: async () => false }));
 
 const rotation = await import("@/lib/agents/account-rotation");

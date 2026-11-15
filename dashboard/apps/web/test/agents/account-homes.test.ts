@@ -4,7 +4,11 @@
  * only replaces the account's own sign-in when its owner linked it again.
  */
 
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, statSync, writeFileSync } from "node:fs";
 import * as homes from "@/lib/agents/account-homes";
 
 const ID = "00000000-0000-4000-8000-00000000000a";
@@ -58,4 +62,75 @@ describe("account homes", () => {
         const digest = homes.storedDigest(Buffer.from('{"tokens":{"refresh_token":"x"}}'));
         expect(digest).toMatch(/^[a-f0-9]{64}$/);
     });
+});
+
+/** Git Bash makes a copy for `ln -s` unless told to make a real link. */
+const SH_ENV = { ...process.env, MSYS: "winsymlinks:nativestrict" };
+
+/** Whether sh is here and makes real symbolic links. */
+function shLinks(): boolean {
+    try {
+        const dir = mkdtempSync(join(tmpdir(), "polaris-ln-"));
+        execFileSync("sh", ["-c", 'cd "$1" && mkdir d && ln -s "$PWD/d" l && [ -L l ]', "sh", shPath(dir)], {
+            stdio: "ignore",
+            env: SH_ENV
+        });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/** A path sh can open on this machine: Git Bash takes `/c/...` for `C:\...`. */
+function shPath(path: string): string {
+    return path.replace(/\\/g, "/").replace(/^([A-Za-z]):/, (_all, drive: string) => `/${drive.toLowerCase()}`);
+}
+
+describe.runIf(shLinks())("account home script on a real shell", () => {
+    function prepare(home: string, stateDir: string, signin: string): void {
+        const bytes = Buffer.from(signin);
+        const part = "account.abcdef12.part";
+        writeFileSync(join(stateDir, part), bytes);
+        const script = homes.accountHomeCommand({
+            cliId: "codex",
+            userHome: shPath(home),
+            accountId: ID,
+            stateDir: shPath(stateDir),
+            part,
+            digest: homes.storedDigest(bytes)
+        });
+        execFileSync("sh", ["-c", script], { env: SH_ENV, stdio: "ignore" });
+    }
+
+    it("links the session's entries, keeps the sign-in private, and keeps the copy the tool refreshed", () => {
+        const root = mkdtempSync(join(tmpdir(), "polaris-home-"));
+        const home = join(root, "home");
+        const stateDir = join(root, "state");
+        mkdirSync(join(home, ".codex", "sessions", "2026"), { recursive: true });
+        mkdirSync(stateDir, { recursive: true });
+        writeFileSync(join(home, ".codex", "auth.json"), "machine sign-in");
+        writeFileSync(join(home, ".codex", "config.toml"), "model = \"x\"");
+        prepare(home, stateDir, "first sign-in");
+
+        const account = join(home, homes.ACCOUNTS_DIR, "codex", ID);
+        for (const name of ["sessions", "config.toml", "history.jsonl", "logs"]) {
+            expect(lstatSync(join(account, name)).isSymbolicLink()).toBe(true);
+            expect(shPath(readlinkSync(join(account, name)))).toContain(`.codex/${name}`);
+        }
+        expect(lstatSync(join(account, "auth.json")).isSymbolicLink()).toBe(false);
+        expect(readFileSync(join(account, "auth.json"), "utf8")).toBe("first sign-in");
+        if (process.platform !== "win32") expect(statSync(join(account, "auth.json")).mode & 0o777).toBe(0o600);
+        expect(existsSync(join(stateDir, "account.abcdef12.part"))).toBe(false);
+
+        // Codex refreshed its copy; the same stored sign-in does not overwrite it.
+        writeFileSync(join(account, "auth.json"), "refreshed by codex");
+        prepare(home, stateDir, "first sign-in");
+        expect(readFileSync(join(account, "auth.json"), "utf8")).toBe("refreshed by codex");
+        // Linked again by its owner: the new one goes in.
+        prepare(home, stateDir, "linked again");
+        expect(readFileSync(join(account, "auth.json"), "utf8")).toBe("linked again");
+        // The session's own sign-in is never touched.
+        expect(readFileSync(join(home, ".codex", "auth.json"), "utf8")).toBe("machine sign-in");
+        // Three runs of a script that forks per entry: slow under Git Bash.
+    }, 180_000);
 });
