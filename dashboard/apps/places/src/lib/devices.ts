@@ -83,6 +83,7 @@ const DEVICE_FIELDS = {
     stateAt: true,
     goneAt: true,
     returnedAt: true,
+    readingsOff: true,
     labels: { select: { labelId: true }, take: labels.LABEL_LIMITS.perDevice }
 } as const;
 
@@ -116,6 +117,7 @@ type DeviceRow = {
     stateAt: Date | null;
     goneAt?: Date | null;
     returnedAt?: Date | null;
+    readingsOff?: string[];
     labels?: { labelId: string }[];
 };
 
@@ -232,7 +234,8 @@ function toView(row: DeviceRow): kinds.DeviceView {
         switchSettings: switchSettingsOf(row),
         reach: kinds.deviceReach(row.reach),
         accountId: row.accountId,
-        gone: row.goneAt ? (row.returnedAt ? "back" : "away") : null
+        gone: row.goneAt ? (row.returnedAt ? "back" : "away") : null,
+        readingsOff: row.readingsOff ?? []
     };
 }
 
@@ -562,6 +565,8 @@ async function followUp(
  */
 async function tellAutomations(installedAppId: string, rows: readonly DeviceRow[]): Promise<void> {
     if (rows.length === 0) return;
+    // The history hears every read too, from the same rows; it never throws.
+    await (await import("./readings")).recordReadings(rows);
     try {
         await (await import("./automation-runtime")).observeDevices(installedAppId, rows);
     } catch (error) {

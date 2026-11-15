@@ -12216,6 +12216,9 @@ model PlaceDevice {
     // When a gone device was listed again by one of this install's connections.
     // It stays off limits until somebody restores it or starts it afresh.
     returnedAt DateTime?
+    // The measures whose history is not kept for this device (temperature,
+    // humidity...). Empty is every one of them recorded, which is the default.
+    readingsOff String[] @default([])
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -12226,6 +12229,8 @@ model PlaceDevice {
     events      PlaceDeviceEvent[]
     observation PlaceDeviceObservation?
     labels      PlaceDeviceLabel[]
+    readings    PlaceDeviceReading[]
+    readingHours PlaceDeviceReadingHour[]
 
     // One device per id per account. A sync runs on a schedule and on demand, and
     // the two overlapping must not leave a house with the same door twice. Where a
@@ -12329,6 +12334,41 @@ model PlaceDeviceEvent {
 
     @@unique([deviceId, externalId])
     @@index([deviceId, at])
+}
+
+// One measure a device reported at one moment: the room's temperature, its
+// humidity, a purifier's dust. Written on a sync only when the figure changed or
+// the last one is old, so a device read every minute does not write every minute.
+// Kept for a week; older samples are folded into PlaceDeviceReadingHour by the
+// readings sweep. The key is the index every read uses.
+model PlaceDeviceReading {
+    deviceId String   @db.Uuid
+    /// temperature | humidity | target | pm25 | allergen | gas | filter | power |
+    /// energy | co2 | reading - see `reading-kinds.ts`.
+    measure  String
+    at       DateTime
+    value    Float
+
+    device PlaceDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+    @@id([deviceId, measure, at])
+}
+
+// An hour of one measure, folded from the raw samples once they are a week old,
+// and kept for a bounded time (see `READINGS_RETENTION` in `reading-kinds.ts`).
+model PlaceDeviceReadingHour {
+    deviceId String   @db.Uuid
+    measure  String
+    hour     DateTime
+    avg      Float
+    min      Float
+    max      Float
+    count    Int
+
+    device PlaceDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+    @@id([deviceId, measure, hour])
+    @@index([hour])
 }
 
 // What one device was last seen doing, as the automations read it.

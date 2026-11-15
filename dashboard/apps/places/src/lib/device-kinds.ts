@@ -930,6 +930,9 @@ export interface DeviceView {
      *  behind), `back` when one of this house's connections lists it again and it
      *  waits to be restored. Either way it is off limits. Absent or null: here. */
     readonly gone?: "away" | "back" | null;
+    /** The measures whose history is not kept (see `reading-kinds`). Absent or
+     *  empty: every measure it reports is recorded. */
+    readonly readingsOff?: readonly string[];
 }
 
 /** How something came to happen. `polaris` is the one that carries weight: it is

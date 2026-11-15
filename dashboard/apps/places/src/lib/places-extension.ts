@@ -68,6 +68,15 @@ export const placesExtension: AppExtension = {
             run: async () => (await sweeps()).sweepHomeRetention()
         },
         {
+            key: "home-readings",
+            // Folds a week-old hour of readings into one row and drops what is
+            // past the retention. Hourly: it only ever has an hour to fold.
+            everyMs: Number(process.env.POLARIS_HOME_READINGS_MS) || 60 * MINUTE,
+            // Leased: two passes folding the same hour would count it twice.
+            leaseMs: 30 * MINUTE,
+            run: async () => (await import("./readings")).sweepReadings()
+        },
+        {
             key: "home-automations",
             // A minute, which is the finest time of day an automation can name.
             // A shorter delay inside a run sets its own timer as well; this is
