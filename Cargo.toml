@@ -1,9 +1,10 @@
 # Polaris workspace.
-# The Rust side of Polaris: the privileged host daemon.
+# The Rust side of Polaris: the privileged host daemon and the tunnel daemon.
 [workspace]
 resolver = "2"
 members = [
     "crates/polaris-hostd",
+    "crates/polaris-tunnel",
 ]
 
 [workspace.package]
