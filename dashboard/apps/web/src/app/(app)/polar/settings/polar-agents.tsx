@@ -28,16 +28,15 @@ import {
     DialogTitle,
     Input,
     Select,
-    Switch,
-    Textarea
+    Switch
 } from "@polaris/ui";
+import { MarkdownDocumentField } from "@/components/rich-text/markdown-document-field";
 import { AgentLogo } from "@/components/logos";
 import { writeStored } from "@/lib/polar/stored";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AgentEngine } from "@/lib/polar/agents/composer-agents";
 import {
     AGENT_DESCRIPTION_MAX,
-    AGENT_INSTRUCTIONS_MAX,
     AGENT_NAME_MAX,
     agentFieldError,
     agentInputSchema,
@@ -674,17 +673,13 @@ function AgentEditor({
                     </div>
                     )}
                     <div className="flex flex-col gap-1 text-sm">
-                        <label htmlFor="agent-instructions">
-                            {t("settings.agents.editor.instructions")} *
-                        </label>
-                        <Textarea
-                            id="agent-instructions"
-                            rows={8}
+                        <span>{t("settings.agents.editor.instructions")} *</span>
+                        <MarkdownDocumentField
                             value={values.instructions}
-                            maxLength={AGENT_INSTRUCTIONS_MAX}
-                            aria-invalid={instructionsProblem ? true : undefined}
-                            className="font-mono text-xs"
-                            onChange={(event) => set("instructions", event.target.value)}
+                            ariaLabel={t("settings.agents.editor.instructions")}
+                            frontmatterLabel={t("settings.agents.editor.frontmatter")}
+                            invalid={Boolean(instructionsProblem)}
+                            onChange={(instructions) => set("instructions", instructions)}
                         />
                         <span
                             className={

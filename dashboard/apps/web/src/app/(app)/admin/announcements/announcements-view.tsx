@@ -30,7 +30,6 @@ import {
     EmptyState,
     Input,
     Select,
-    Textarea,
     useToast
 } from "@polaris/ui";
 import { useLiveRead } from "@/components/use-live-resource";
@@ -41,6 +40,7 @@ import { fillPlaceholders, formatDuration } from "@/lib/announcements/placeholde
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { AnnouncementMarkdown } from "@/components/announcements/announcement-markdown";
 import {
+    BODY_MAX,
     composeSchema,
     DEFAULT_LEAD_MINUTES,
     DETAILS_MAX,
@@ -455,28 +455,40 @@ export function AnnouncementsView({
                             aria-invalid={fieldError("title") ? true : undefined}
                         />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
+                    <div className="flex flex-col gap-1 text-sm">
                         <span className="text-xs font-medium text-muted-foreground">
                             {t("admin.compose.bodyLabel")}
                         </span>
-                        <Textarea
+                        <RichTextEditor
                             value={form.body}
+                            bordered
+                            ariaLabel={t("admin.compose.bodyLabel")}
+                            invalid={form.body.length > BODY_MAX}
                             placeholder={
                                 form.template === "generic" ? templates.generic?.body : undefined
                             }
-                            rows={4}
-                            maxLength={2000}
-                            onChange={(event) => set("body", event.target.value)}
+                            onChange={(body) => set("body", body)}
                         />
-                        <span className="text-xs text-muted-foreground">
-                            {t("admin.compose.bodyHint")}
+                        <span
+                            className={
+                                form.body.length > BODY_MAX
+                                    ? "text-xs text-destructive"
+                                    : "text-xs text-muted-foreground"
+                            }
+                        >
+                            {form.body.length > BODY_MAX
+                                ? t("admin.compose.detailsTooLong", {
+                                      count: form.body.length,
+                                      max: BODY_MAX
+                                  })
+                                : t("admin.compose.bodyHint")}
                         </span>
                         <span className="text-xs text-muted-foreground">
                             {form.localized
                                 ? t("admin.compose.translated")
                                 : t("admin.compose.edited")}
                         </span>
-                    </label>
+                    </div>
                     <div className="flex flex-col gap-1 text-sm">
                         <span className="text-xs font-medium text-muted-foreground">
                             {t("admin.compose.detailsLabel")}
@@ -935,14 +947,16 @@ export function AnnouncementsView({
                         <DialogTitle>{t("admin.history.updateTitle")}</DialogTitle>
                         <DialogDescription>{t("admin.history.updateBody")}</DialogDescription>
                     </DialogHeader>
-                    <Textarea
+                    <RichTextEditor
                         value={updateText}
-                        rows={5}
-                        maxLength={UPDATE_MAX}
+                        bordered
+                        autoFocus
+                        ariaLabel={t("admin.history.updateTitle")}
+                        invalid={updateError !== null || updateText.length > UPDATE_MAX}
                         placeholder={t("admin.history.updatePlaceholder")}
-                        aria-invalid={updateError ? true : undefined}
-                        onChange={(event) => {
-                            setUpdateText(event.target.value);
+                        className="min-h-[7rem]"
+                        onChange={(text) => {
+                            setUpdateText(text);
                             setUpdateError(null);
                         }}
                     />
@@ -953,7 +967,11 @@ export function AnnouncementsView({
                         </Button>
                         <Button
                             onClick={() => (updating ? addUpdate(updating) : undefined)}
-                            disabled={pending || updateText.trim().length === 0}
+                            disabled={
+                                pending ||
+                                updateText.trim().length === 0 ||
+                                updateText.length > UPDATE_MAX
+                            }
                         >
                             {t("admin.history.updateConfirm")}
                         </Button>

@@ -11,6 +11,13 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 const saved: unknown[] = [];
 const savedDefaults: unknown[] = [];
 
+// The instructions are the shared rich editor, whose surface jsdom cannot type
+// into; a textarea under the same name stands in for it, Markdown in and out.
+vi.mock("@/components/rich-text/markdown-document-field", () => ({
+    MarkdownDocumentField: (props: { value: string; ariaLabel: string; onChange: (next: string) => void }) => (
+        <textarea aria-label={props.ariaLabel} value={props.value} onChange={(event) => props.onChange(event.target.value)} />
+    )
+}));
 vi.mock("@/app/(app)/polar/settings/agents-actions", () => ({
     saveAgentAction: async (input: { agent: Record<string, unknown> }) => {
         saved.push(input);
@@ -52,7 +59,7 @@ describe("the Agents settings", () => {
         expect(save.getAttribute("aria-disabled")).toBe("true");
         fireEvent.change(screen.getByLabelText("Name *"), { target: { value: "Sales" } });
         expect(save.getAttribute("aria-disabled")).toBe("true");
-        fireEvent.change(screen.getByLabelText("Instructions *"), {
+        fireEvent.change(screen.getByLabelText("Instructions"), {
             target: { value: "Qualify leads." }
         });
         fireEvent.click(screen.getByLabelText("pdf"));
@@ -121,7 +128,7 @@ describe("the Agents settings", () => {
         );
         fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
         fireEvent.change(screen.getByLabelText("Name *"), { target: { value: "Reviewer" } });
-        fireEvent.change(screen.getByLabelText("Instructions *"), {
+        fireEvent.change(screen.getByLabelText("Instructions"), {
             target: { value: "Review the diff." }
         });
         expect(screen.getByLabelText("pdf")).toBeTruthy();

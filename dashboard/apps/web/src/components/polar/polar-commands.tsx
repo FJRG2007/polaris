@@ -10,6 +10,7 @@
  * before the request answers.
  */
 
+import { MarkdownDocumentField } from "@/components/rich-text/markdown-document-field";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -22,7 +23,6 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Textarea,
     useToast
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -267,21 +267,25 @@ export function CommandForm({
                         </p>
                     </div>
                     <div className="space-y-1">
-                        <label
-                            htmlFor="polar-command-prompt"
-                            className="text-xs text-muted-foreground"
-                        >
+                        <span className="text-xs text-muted-foreground">
                             {t("commands.prompt")} *
-                        </label>
-                        <Textarea
-                            id="polar-command-prompt"
-                            required
-                            rows={6}
+                        </span>
+                        {/* The prompt is a Markdown file, edited styled and stored
+                            as the same Markdown. */}
+                        <MarkdownDocumentField
                             value={prompt}
-                            maxLength={polarShared.POLAR_COMMAND_PROMPT_MAX}
-                            onChange={(event) => setPrompt(event.target.value)}
+                            ariaLabel={t("commands.prompt")}
+                            frontmatterLabel={t("settings.skills.editor.frontmatter")}
+                            invalid={prompt.length > polarShared.POLAR_COMMAND_PROMPT_MAX}
+                            onChange={setPrompt}
                         />
-                        <p className="text-right text-xs text-foreground-subtle">
+                        <p
+                            className={
+                                prompt.length > polarShared.POLAR_COMMAND_PROMPT_MAX
+                                    ? "text-right text-xs text-danger-ink"
+                                    : "text-right text-xs text-foreground-subtle"
+                            }
+                        >
                             {prompt.length}/{polarShared.POLAR_COMMAND_PROMPT_MAX}
                         </p>
                     </div>

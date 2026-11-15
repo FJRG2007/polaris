@@ -36,10 +36,10 @@ import {
     DialogTitle,
     SegmentedControl,
     Skeleton,
-    Textarea,
     cn
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 
 export function WorkDetail({
     owner,
@@ -59,6 +59,8 @@ export function WorkDetail({
     const [item, setItem] = useState<CodeDetail | null>(null);
     const [comments, setComments] = useState<readonly CodeComment[] | null>(null);
     const [body, setBody] = useState("");
+    // Bumped on every comment sent, so the box starts over empty.
+    const [sent, setSent] = useState(0);
     const [busy, setBusy] = useState(false);
     const [merging, setMerging] = useState(false);
     const [method, setMethod] = useState("squash");
@@ -205,12 +207,14 @@ export function WorkDetail({
 
             {canWrite && (
                 <div className="flex flex-col gap-2">
-                    <Textarea
+                    <RichTextEditor
+                        key={sent}
                         value={body}
-                        rows={4}
-                        aria-label={t("detail.say")}
+                        bordered
+                        ariaLabel={t("detail.say")}
                         placeholder={t("detail.sayPlaceholder")}
-                        onChange={(event) => setBody(event.target.value)}
+                        className="min-h-[6rem]"
+                        onChange={setBody}
                     />
                     <div className="flex flex-wrap gap-2">
                         <Button
@@ -225,6 +229,7 @@ export function WorkDetail({
                                 setBusy(false);
                                 if (result?.error) return;
                                 setBody("");
+                                setSent((count) => count + 1);
                                 await load();
                             }}
                         >

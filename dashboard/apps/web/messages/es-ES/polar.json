@@ -590,7 +590,8 @@
                 "description": "Cuándo usarla",
                 "descriptionHint": "Polar lo lee para decidir cuándo aplicarla.",
                 "instructions": "Instrucciones",
-                "instructionsHint": "Markdown. Qué debe hacer Polar, paso a paso."
+                "instructionsHint": "Qué debe hacer Polar, paso a paso.",
+                "frontmatter": "Cabecera"
             },
             "errors": {
                 "name_format": "Usa minúsculas, dígitos y guiones.",
@@ -715,7 +716,8 @@
                 "description": "Para qué es",
                 "descriptionHint": "Una línea para distinguirlos.",
                 "instructions": "Instrucciones",
-                "instructionsHint": "Markdown. Quién es y cómo trabaja, paso a paso.",
+                "instructionsHint": "Quién es y cómo trabaja, paso a paso.",
+                "frontmatter": "Cabecera",
                 "web": "Leer la web",
                 "webHint": "Busca y lee páginas si este Polaris lo permite.",
                 "skills": "Skills",

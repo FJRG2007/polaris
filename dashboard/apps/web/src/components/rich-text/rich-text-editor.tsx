@@ -194,6 +194,11 @@ export interface RichTextEditorProps {
     /** Drawn under the text, inside the box: a mail composer's "..." over the
      *  history it trimmed sits where the message ends, not under the field. */
     after?: ReactNode;
+    /** The field's accessible name, for a form field whose label is not a
+     *  `<label for>` the editable surface could be pointed at. */
+    ariaLabel?: string;
+    /** Marks the field invalid for assistive technology, like `aria-invalid`. */
+    invalid?: boolean;
     className?: string;
 }
 
@@ -254,6 +259,8 @@ export function RichTextEditor({
     bordered = false,
     framed = false,
     after = null,
+    ariaLabel,
+    invalid = false,
     className
 }: RichTextEditorProps) {
     // Held in a ref rather than in the dependency list: the editor is built once
@@ -369,7 +376,8 @@ export function RichTextEditor({
                     "[&_p.is-editor-empty:first-child::before]:h-0",
                     "[&_p.is-editor-empty:first-child::before]:text-muted-foreground",
                     "[&_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]"
-                )
+                ),
+                ...(ariaLabel ? { "aria-label": ariaLabel } : {})
             },
             handleKeyDown: (view, event) => {
                 // Somebody is writing. Anything that puts a character in - a
@@ -435,6 +443,15 @@ export function RichTextEditor({
 
     const editorRef = useRef<Editor | null>(null);
     editorRef.current = editor;
+
+    // Validity changes while somebody types, and the attributes above are read
+    // once, when the editor is built.
+    useEffect(() => {
+        const dom = editor && !editor.isDestroyed ? editor.view?.dom : null;
+        if (!dom) return;
+        if (invalid) dom.setAttribute("aria-invalid", "true");
+        else dom.removeAttribute("aria-invalid");
+    }, [editor, invalid]);
 
     // A value that changed elsewhere - another tab, a reload after a save, the
     // panel being pointed at a different task - has to reach the surface. While

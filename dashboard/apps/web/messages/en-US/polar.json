@@ -590,7 +590,8 @@
                 "description": "When to use it",
                 "descriptionHint": "Polar reads this to decide when the skill applies.",
                 "instructions": "Instructions",
-                "instructionsHint": "Markdown. What Polar should do, step by step."
+                "instructionsHint": "What Polar should do, step by step.",
+                "frontmatter": "File header"
             },
             "errors": {
                 "name_format": "Use lowercase letters, digits and hyphens.",
@@ -715,7 +716,8 @@
                 "description": "What it's for",
                 "descriptionHint": "A line to tell your agents apart.",
                 "instructions": "Instructions",
-                "instructionsHint": "Markdown. Who it is and how it works, step by step.",
+                "instructionsHint": "Who it is and how it works, step by step.",
+                "frontmatter": "File header",
                 "web": "Read the web",
                 "webHint": "Search and read pages when this Polaris allows it.",
                 "skills": "Skills",

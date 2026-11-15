@@ -66,7 +66,7 @@
             "severity": "Gravedad",
             "titleLabel": "Título",
             "bodyLabel": "Mensaje",
-            "bodyHint": "Admite **negrita**, *cursiva*, `código`, [enlaces](https://example.com) y viñetas con -. '{start}', '{end}', '{duration}' y '{affected}' se rellenan para cada lector.",
+            "bodyHint": "'{start}', '{end}', '{duration}' y '{affected}' se rellenan para cada lector.",
             "linkUrl": "Enlace botón",
             "linkLabel": "Texto botón",
             "linkHint": "Una ruta de Polaris como /drive, o una dirección https.",

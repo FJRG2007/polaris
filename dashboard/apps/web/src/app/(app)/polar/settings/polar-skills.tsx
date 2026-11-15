@@ -26,9 +26,9 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Switch,
-    Textarea
+    Switch
 } from "@polaris/ui";
+import { MarkdownDocumentField } from "@/components/rich-text/markdown-document-field";
 import { SKILL_CATALOG, catalogSkill } from "@/lib/polar/skills/catalog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -500,16 +500,18 @@ function SkillEditor({
                         const id = `skill-${field.key}`;
                         return (
                             <div key={field.key} className="flex flex-col gap-1 text-sm">
-                                <label htmlFor={id}>{field.label} *</label>
                                 {field.multiline ? (
-                                    <Textarea
-                                        id={id}
-                                        rows={10}
+                                    <span>{field.label} *</span>
+                                ) : (
+                                    <label htmlFor={id}>{field.label} *</label>
+                                )}
+                                {field.multiline ? (
+                                    <MarkdownDocumentField
                                         value={values[field.key]}
-                                        maxLength={field.max}
-                                        aria-invalid={problem ? true : undefined}
-                                        onChange={(event) => set(field.key)(event.target.value)}
-                                        className="font-mono text-xs"
+                                        ariaLabel={field.label}
+                                        frontmatterLabel={t("settings.skills.editor.frontmatter")}
+                                        invalid={Boolean(problem)}
+                                        onChange={set(field.key)}
                                     />
                                 ) : (
                                     <Input

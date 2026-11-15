@@ -66,7 +66,7 @@
             "severity": "Severity",
             "titleLabel": "Title",
             "bodyLabel": "Message",
-            "bodyHint": "Supports **bold**, *italic*, `code`, [links](https://example.com) and - bullets. '{start}', '{end}', '{duration}' and '{affected}' are filled in for each reader.",
+            "bodyHint": "'{start}', '{end}', '{duration}' and '{affected}' are filled in for each reader.",
             "linkUrl": "Button link",
             "linkLabel": "Button text",
             "linkHint": "A path in Polaris such as /drive, or an https address.",
