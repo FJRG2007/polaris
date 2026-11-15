@@ -126,9 +126,9 @@
         "site": "Sitio"
     },
     "compare": {
-        "new": "Nuevo",
-        "same": "Igual",
-        "hint": "Frente al mismo tramo justo antes"
+        "label": "Comparado con",
+        "previous": "Periodo anterior",
+        "year": "Mismo periodo hace un año"
     },
     "filters": {
         "none": "Todas",

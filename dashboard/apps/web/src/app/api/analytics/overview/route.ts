@@ -11,7 +11,9 @@ export const GET = pollRoute(
         scopeType: z.string().trim().min(1).max(200),
         scopeId: z.string().max(200),
         range: z.string().trim().min(1).max(200),
-        filters: z.string().max(4000).optional()
+        filters: z.string().max(4000).optional(),
+        compare: z.string().max(20).optional()
     }),
-    ({ scopeType, scopeId, range, filters }) => getAnalyticsOverviewAction({ scopeType, scopeId, range, filters })
+    ({ scopeType, scopeId, range, filters, compare }) =>
+        getAnalyticsOverviewAction({ scopeType, scopeId, range, filters, compare })
 );

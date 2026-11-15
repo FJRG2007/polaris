@@ -131,6 +131,12 @@ export const VISIT_FILTER_DIMENSIONS = [
 ] as const;
 export type VisitFilterDimension = (typeof VISIT_FILTER_DIMENSIONS)[number];
 
+/** What the overview's deltas compare with: the window just before, or the same
+ *  window a year earlier. */
+export const VISIT_COMPARES = ["previous", "year"] as const;
+export type VisitCompare = (typeof VISIT_COMPARES)[number];
+export const visitCompareSchema = z.enum(VISIT_COMPARES).catch("previous");
+
 export const visitFilterSchema = z.object({
     dimension: z.enum(VISIT_FILTER_DIMENSIONS),
     value: z.string().trim().min(1).max(240),

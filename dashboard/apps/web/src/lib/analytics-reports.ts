@@ -42,6 +42,9 @@ const SESSION_COLUMN: Readonly<Record<Exclude<core.VisitFilterDimension, "path" 
     distinctId: "distinctId"
 };
 
+/** A year, as the comparison steps back: 52 weeks, so a Monday is compared with a Monday. */
+const YEAR_MS = 364 * 86_400_000;
+
 /** What the referrer breakdown calls a visit with no referrer. */
 const DIRECT = "Direct";
 
@@ -136,14 +139,21 @@ export interface PeriodTotals {
  * whether it went up. From the visits when the window is short enough to still
  * have them, from the daily totals otherwise - which cannot be filtered, so a
  * filtered long window has no comparison rather than a wrong one.
+ *
+ * `year` compares with the same window a year earlier instead of the one just
+ * before. A year back is always past the raw retention, so it reads the daily
+ * totals whatever the window's own source is.
  */
 export async function previousPeriod(
     window: ReportWindow,
-    source: "raw" | "daily"
+    source: "raw" | "daily",
+    compare: core.VisitCompare = "previous"
 ): Promise<PeriodTotals | null> {
     const span = window.to - window.from;
-    const from = new Date(window.from - span);
-    const to = new Date(window.from);
+    const back = compare === "year" ? YEAR_MS : span;
+    const from = new Date(window.from - back);
+    const to = new Date(window.to - back);
+    if (compare === "year") source = "daily";
     if (source === "daily") {
         if (window.filters.length) return null;
         const sum = await prisma.analyticsDay.aggregate({

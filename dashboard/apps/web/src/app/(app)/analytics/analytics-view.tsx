@@ -118,6 +118,14 @@ export function AnalyticsView({
     const pathname = usePathname();
     const { filters, filtersParam, set: setFilters, add: addFilter } = useFilterNav();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const compare = searchParams.get("compare") === "year" ? "year" : "previous";
+    const setCompare = (next: "previous" | "year") => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (next === "year") params.set("compare", "year");
+        else params.delete("compare");
+        router.replace(`${pathname}?${params.toString()}`);
+    };
     const [data, setData] = useState<AnalyticsOverview | null>(null);
     const [failure, setFailure] = useState<string | null>(null);
     const [, startLoad] = useTransition();
@@ -170,7 +178,8 @@ export function AnalyticsView({
                 scopeType: scope,
                 scopeId: siteId,
                 range,
-                filters: filtersParam
+                filters: filtersParam,
+                compare
             });
             if ("error" in result) {
                 setFailure(result.error);
@@ -180,7 +189,7 @@ export function AnalyticsView({
             setFailure(null);
             setData(result);
         });
-    }, [scope, siteId, range, filtersParam]);
+    }, [scope, siteId, range, filtersParam, compare]);
 
     useEffect(load, [load]);
 
@@ -299,7 +308,7 @@ export function AnalyticsView({
                 <FilterPick.Provider value={addFilter}>
                     {tab === "overview" ? (
                         <>
-                            <Overview data={data} range={range} />
+                            <Overview data={data} range={range} compare={compare} onCompare={setCompare} />
                             <Breakdowns data={data} />
                             <Card className="min-w-0">
                                 <CardHeader className="pb-2">
@@ -469,7 +478,17 @@ function RangeTabs({ range }: { range: VisitRange }) {
     );
 }
 
-function Overview({ data, range }: { data: AnalyticsOverview | null; range: VisitRange }) {
+function Overview({
+    data,
+    range,
+    compare,
+    onCompare
+}: {
+    data: AnalyticsOverview | null;
+    range: VisitRange;
+    compare: "previous" | "year";
+    onCompare: (next: "previous" | "year") => void;
+}) {
     const t = useTranslations("analytics");
     const format = useDisplayFormat();
     const multiDay = range !== "24h";
@@ -521,6 +540,19 @@ function Overview({ data, range }: { data: AnalyticsOverview | null; range: Visi
 
     return (
         <div className="flex flex-col gap-4">
+            <div className="flex min-w-0 items-center justify-end gap-2">
+                <span className="truncate text-xs text-muted-foreground">{t("compare.label")}</span>
+                <Select
+                    value={compare}
+                    aria-label={t("compare.label")}
+                    className="h-8 w-44 min-w-0"
+                    options={[
+                        { value: "previous", label: t("compare.previous") },
+                        { value: "year", label: t("compare.year") }
+                    ]}
+                    onValueChange={(value) => onCompare(value === "year" ? "year" : "previous")}
+                />
+            </div>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {data
                     ? cards.map((card) => (

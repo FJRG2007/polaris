@@ -126,9 +126,9 @@
         "site": "Site"
     },
     "compare": {
-        "new": "New",
-        "same": "Same",
-        "hint": "Against the same span just before"
+        "label": "Compared with",
+        "previous": "Previous period",
+        "year": "Same period last year"
     },
     "filters": {
         "none": "All visits",

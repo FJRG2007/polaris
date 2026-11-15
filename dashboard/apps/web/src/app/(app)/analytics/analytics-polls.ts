@@ -18,7 +18,7 @@ export const analyticsSites = (signal?: AbortSignal) =>
     );
 
 export const analyticsOverview = (
-    input: { scopeType: string; scopeId: string; range: string; filters: string },
+    input: { scopeType: string; scopeId: string; range: string; filters: string; compare?: string },
     signal?: AbortSignal
 ) =>
     readPoll<Answer<typeof analyticsActionsModule.getAnalyticsOverviewAction>>(

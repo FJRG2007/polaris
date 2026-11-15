@@ -398,6 +398,7 @@ export async function getAnalyticsOverviewAction(input: {
     scopeId: string;
     range: string;
     filters?: string;
+    compare?: string;
 }): Promise<AnalyticsOverview | { error: string }> {
     const reached = await reach(input, "view");
     if ("error" in reached) return reached;
@@ -415,7 +416,8 @@ export async function getAnalyticsOverviewAction(input: {
     ]);
     const previous = await reports.previousPeriod(
         { siteId: access.site.id, from: view.from, to: view.to, filters },
-        view.source
+        view.source,
+        core.visitCompareSchema.parse(input.compare)
     );
     return {
         site: access.site,
