@@ -49,7 +49,7 @@ export function MarkdownDocumentField({
                 ariaLabel={ariaLabel}
                 invalid={invalid}
                 placeholder={placeholder}
-                className="max-h-[50vh] min-h-[10rem] overflow-y-auto"
+                className="max-h-[50vh] min-h-[10rem] overflow-y-auto overscroll-contain"
                 onChange={(next) => onChange(joinFrontmatter(frontmatter, next))}
             />
         </div>
