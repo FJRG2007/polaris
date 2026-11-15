@@ -42,8 +42,10 @@ import {
     sendPaced,
     createSessionRegistry,
     positiveInt,
+    safeEqual,
     sessionsRequest
 } from "./terminal-sessions.mjs";
+import { RUNNER_LIMITS, RUNNER_SOCKET_PATH, createRunnerSidecar } from "./runner-sidecar.mjs";
 
 const port = Number(process.env.POLARIS_WS_PORT || 3001);
 const appPort = Number(process.env.PORT || 3000);
@@ -112,12 +114,30 @@ async function checkStanding() {
 const server = createServer((req, res) => void handleInternal(req, res));
 server.listen(port);
 
+/** Runner sockets and the terminals of sessions on a person's own computer. */
+const runners = createRunnerSidecar({ appPort, internalKey });
+setInterval(() => runners.sweep(), 5_000).unref();
+
 const wss = new WebSocketServer({
-    server,
-    path: "/api/deploy/ws",
+    noServer: true,
     // Accept and echo the offered subprotocol (the ticket token).
     handleProtocols: (protocols) => [...protocols][0] ?? false
 });
+const runnerWss = new WebSocketServer({ noServer: true, maxPayload: RUNNER_LIMITS.frameBytes + 1024 });
+
+// Two kinds of socket share the port, told apart by path: terminals, and the
+// runners on people's own computers (under the same edge prefix, so the
+// existing router reaches it).
+server.on("upgrade", (req, socket, head) => {
+    const path = new URL(req.url ?? "/", "http://sidecar").pathname;
+    const target = path === RUNNER_SOCKET_PATH ? runnerWss : path === "/api/deploy/ws" ? wss : null;
+    if (!target) {
+        socket.destroy();
+        return;
+    }
+    target.handleUpgrade(req, socket, head, (ws) => target.emit("connection", ws, req));
+});
+runnerWss.on("connection", (ws, req) => runners.acceptRunner(ws, req));
 
 server.on("listening", () => console.error(`polaris deploy ws sidecar on :${port}`));
 
@@ -136,6 +156,14 @@ wss.on("connection", async (ws, req) => {
 
     if (ticket.mode === "ssh" || ticket.mode === "ssh-root") {
         await attachServerShell(sessions, openSshSession, ticket, ws);
+        return;
+    }
+
+    // A session running on somebody's own computer, reached through its runner.
+    if (ticket.mode === "agent" && ticket.runner) {
+        liveTerminals.set(ws, ticket.userId);
+        ws.on("close", () => liveTerminals.delete(ws));
+        await runners.openTerminal(ticket, ws);
         return;
     }
 
@@ -179,6 +207,18 @@ wss.on("connection", async (ws, req) => {
 
 /** The web app's loopback calls on a user's sessions (see `sessionsRequest`). */
 async function handleInternal(req, res) {
+    const url = new URL(req.url ?? "/", "http://sidecar");
+    if (url.pathname.startsWith("/runner/")) {
+        const key = String(req.headers["x-internal-key"] ?? "");
+        const answer =
+            req.method === "POST" && internalKey && safeEqual(key, internalKey)
+                ? await runners.internal(url.pathname, (limit) => readBody(req, limit))
+                : { status: 403, body: { error: "forbidden" } };
+        const { status, body } = answer ?? { status: 404, body: { error: "not found" } };
+        res.writeHead(status, { "content-type": "application/json" });
+        res.end(JSON.stringify(body));
+        return;
+    }
     const { status, body } = await sessionsRequest(sessions, internalKey, {
         method: req.method,
         url: new URL(req.url ?? "/", "http://sidecar"),
@@ -189,13 +229,13 @@ async function handleInternal(req, res) {
     res.end(JSON.stringify(body));
 }
 
-function readBody(req) {
+function readBody(req, limit = 16 * 1024) {
     return new Promise((resolve, reject) => {
         let size = 0;
         const parts = [];
         req.on("data", (chunk) => {
             size += chunk.length;
-            if (size > 16 * 1024) {
+            if (size > limit) {
                 reject(new Error("body too large"));
                 req.destroy();
                 return;

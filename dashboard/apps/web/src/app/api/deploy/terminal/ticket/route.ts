@@ -6,7 +6,7 @@ import { currentReleaseRef } from "@/lib/deploy/releases";
 import { resolveDockerTransport } from "@/lib/docker-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { userHasManage } from "@/lib/session";
-import { canOpenHostShell, mintTerminalTicket } from "@/lib/terminal-service";
+import { RUNNER_REF, canOpenHostShell, mintTerminalTicket } from "@/lib/terminal-service";
 import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
@@ -109,14 +109,17 @@ async function mintSessionTicket(sessionId: string): Promise<Response> {
             id: sessionId,
             OR: [{ repo: { ownerId: user.id } }, { repoId: null, startedById: user.id }]
         },
-        select: { containerId: true, place: true, state: true }
+        select: { containerId: true, place: true, state: true, runnerId: true, startedById: true }
     });
     if (!session)
         return NextResponse.json(
             { error: (await readerWords("api"))("errors.sessionNotFound") },
             { status: 404 }
         );
-    if (session.place !== "local" || !session.containerId) {
+    // A session on somebody's own computer is reached through its runner, and
+    // only by the person whose computer it is.
+    const onComputer = session.place === "computer" && session.runnerId && session.startedById === user.id;
+    if (!onComputer && (session.place !== "local" || !session.containerId)) {
         return NextResponse.json(
             {
                 error: (await readerWords("api"))("errors.sessionOnServer")
@@ -132,7 +135,7 @@ async function mintSessionTicket(sessionId: string): Promise<Response> {
     }
     const token = await mintTerminalTicket(user.id, {
         targetId: sessionId,
-        containerRef: session.containerId,
+        containerRef: onComputer ? `${RUNNER_REF}${session.runnerId}` : (session.containerId ?? ""),
         mode: "agent"
     });
     return NextResponse.json({ token });

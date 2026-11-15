@@ -31,9 +31,22 @@ const INLINE_LIMIT = live.NOTIFY_PAYLOAD_LIMIT - 256;
 /** A parked command older than this was never collected (its node went away). */
 const PARKED_TTL_MS = 5 * 60_000;
 
-/** What a node can be told to do with a runner: a protocol command, or close
- *  its socket (revoked). */
-export type RunnerCommand = core.ServerCommand | { readonly type: "close" };
+/** Viewer output for another node's terminal travels on this channel. */
+export const RUNNER_TERMINAL_CHANNEL = "polaris_runner_term";
+
+/** What a node can be told to do with a runner: a protocol command, close its
+ *  socket (revoked), or start / stop watching a session's terminal for a
+ *  viewer on another node (`runner-sidecar.mjs`). */
+export type RunnerCommand =
+    | core.ServerCommand
+    | { readonly type: "close" }
+    | { readonly type: "watch" | "unwatch"; readonly sessionId: string; readonly node: string };
+
+const watchSchema = z.object({
+    type: z.enum(["watch", "unwatch"]),
+    sessionId: z.string().uuid(),
+    node: z.string().min(1).max(255)
+});
 
 /** This node's name, as the sidecar beside it reports runners under. The two
  *  share a container, so they share a hostname. */
@@ -52,7 +65,12 @@ const noticeSchema = z.object({
  *  this build would send itself. */
 export function readCommand(value: unknown): RunnerCommand | null {
     if (typeof value !== "object" || value === null) return null;
-    if ((value as { type?: unknown }).type === "close") return { type: "close" };
+    const type = (value as { type?: unknown }).type;
+    if (type === "close") return { type: "close" };
+    if (type === "watch" || type === "unwatch") {
+        const watch = watchSchema.safeParse(value);
+        return watch.success ? watch.data : null;
+    }
     const parsed = core.serverMessageSchema.safeParse({
         ...(value as object),
         v: core.RUNNER_PROTOCOL_VERSION
@@ -171,10 +189,68 @@ const runnerCommands = createRunnerCommands({
     }
 });
 
+const outputNoticeSchema = z.object({
+    n: z.string().min(1).max(255),
+    r: z.string().uuid(),
+    s: z.string().uuid(),
+    d: z.string().max(live.NOTIFY_PAYLOAD_LIMIT).regex(/^[A-Za-z0-9+/]*={0,2}$/)
+});
+
+/** Split base64 into pieces that each decode on their own (multiples of four
+ *  characters), small enough for one NOTIFY each. Pure, so it is asserted. */
+export function splitBase64(data: string, max: number): string[] {
+    const size = Math.max(4, max - (max % 4));
+    const pieces: string[] = [];
+    for (let at = 0; at < data.length; at += size) pieces.push(data.slice(at, at + size));
+    return pieces;
+}
+
+async function postOutput(runnerId: string, sessionId: string, data: string): Promise<void> {
+    await fetch(sidecarUrl("/runner/output"), {
+        method: "POST",
+        headers: {
+            "content-type": "application/json",
+            "x-internal-key": process.env.POLARIS_AUTH_SECRET ?? ""
+        },
+        body: JSON.stringify({ runnerId, sessionId, data }),
+        signal: AbortSignal.timeout(5_000)
+    }).catch(() => null);
+}
+
+/**
+ * A chunk of a session's terminal, from the sidecar holding the runner, for a
+ * viewer whose socket is on `node`. Same node: straight to the sidecar. Any
+ * other: one NOTIFY per piece on `RUNNER_TERMINAL_CHANNEL`, in order.
+ */
+export async function relayTerminalOutput(node: string, runnerId: string, sessionId: string, data: string): Promise<void> {
+    if (node === relayNode()) return postOutput(runnerId, sessionId, data);
+    for (const piece of splitBase64(data, INLINE_LIMIT - 200)) {
+        const payload = JSON.stringify({ n: node, r: runnerId, s: sessionId, d: piece });
+        await prisma.$executeRaw`SELECT pg_notify(${RUNNER_TERMINAL_CHANNEL}, ${payload})`;
+    }
+}
+
+/** Pieces are handed to the sidecar one at a time, so they stay in order. */
+let outputChain: Promise<void> = Promise.resolve();
+
+function receiveOutput(payload: string): void {
+    let json: unknown;
+    try {
+        json = JSON.parse(payload);
+    } catch {
+        return;
+    }
+    const notice = outputNoticeSchema.safeParse(json);
+    if (!notice.success || notice.data.n !== relayNode()) return;
+    const { r, s, d } = notice.data;
+    outputChain = outputChain.then(() => postOutput(r, s, d));
+}
+
 let listening = false;
 
-/** Start taking other nodes' commands for runners held here. Idempotent;
- *  called whenever this node's sidecar reports a runner. */
+/** Start taking other nodes' commands for runners held here, and terminal
+ *  output for viewers here. Idempotent; called whenever this node's sidecar
+ *  reports a runner or relays a viewer's command. */
 export function listenForRunnerCommands(): void {
     if (listening) return;
     listening = true;
@@ -182,6 +258,7 @@ export function listenForRunnerCommands(): void {
         live.pgListener().listen(RUNNER_CHANNEL, {
             onNotice: (payload) => void runnerCommands.receive(payload)
         });
+        live.pgListener().listen(RUNNER_TERMINAL_CHANNEL, { onNotice: receiveOutput });
     } catch (caught) {
         console.error("[runner] commands from other nodes are off:", caught);
     }

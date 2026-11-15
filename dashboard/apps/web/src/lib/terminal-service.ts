@@ -24,6 +24,11 @@ import { resolveDockerTransport, type DockerTransportTarget } from "@/lib/docker
 
 const TICKET_TTL_MS = 60_000;
 
+/** The `containerRef` of an `agent` ticket for a session on somebody's own
+ *  computer: the runner it is on, after this prefix. Written only by the
+ *  ticket route, from the session row. */
+export const RUNNER_REF = "runner:";
+
 /** What a ticket authorizes. `ssh` is a shell on a registered server as the Polaris
  *  login; `ssh-root` is one as root, which only a server whose enrollment granted
  *  sudo can offer. `agent` attaches to the terminal a coding-agent session is
@@ -81,6 +86,9 @@ export interface RedeemedTicket {
     sessionCap?: number;
     /** Present only for `docker`, and only when the connection still resolves. */
     docker?: DockerTransportTarget;
+    /** For an `agent` ticket on a computer session: the runner and session the
+     *  sidecar attaches through (`runner-sidecar.mjs`). */
+    runner?: { runnerId: string; sessionId: string };
 }
 
 /**
@@ -112,6 +120,25 @@ export async function redeemTerminalTicket(token: string): Promise<RedeemedTicke
             // already burned, which is the right outcome either way.
             return null;
         }
+    }
+    if (mode === "agent" && ticket.containerRef.startsWith(RUNNER_REF)) {
+        const runnerId = ticket.containerRef.slice(RUNNER_REF.length);
+        // Still on that runner, and that runner still the minter's.
+        const [row, runner] = await Promise.all([
+            prisma.agentSession.findFirst({
+                where: { id: ticket.targetId, place: "computer", runnerId, startedById: ticket.userId },
+                select: { id: true }
+            }),
+            prisma.agentRunner.findFirst({ where: { id: runnerId, userId: ticket.userId }, select: { id: true } })
+        ]);
+        if (!row || !runner) return null;
+        return {
+            userId: ticket.userId,
+            targetId: ticket.targetId,
+            containerRef: ticket.containerRef,
+            mode,
+            runner: { runnerId, sessionId: row.id }
+        };
     }
     if (mode === "agent") {
         return {

@@ -14,7 +14,12 @@ import { timingSafeEqual } from "node:crypto";
 import * as core from "@polaris/core";
 import { authenticateRunner, recordPresence } from "@/lib/computers/computer-service";
 import { handleRunnerMessage } from "@/lib/computers/computer-inbound";
-import { listenForRunnerCommands } from "@/lib/computers/computer-commands";
+import {
+    listenForRunnerCommands,
+    readCommand,
+    relayTerminalOutput,
+    sendToRunner
+} from "@/lib/computers/computer-commands";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +30,17 @@ const identitySchema = z.object({ runnerId: z.string().uuid(), userId: z.string(
 const bodySchema = z.discriminatedUnion("op", [
     z.object({ op: z.literal("auth"), token: z.string().min(1).max(200) }),
     z.object({ op: z.literal("presence"), runner: identitySchema, online: z.boolean() }),
-    z.object({ op: z.literal("frame"), runner: identitySchema, message: z.unknown() })
+    z.object({ op: z.literal("frame"), runner: identitySchema, message: z.unknown() }),
+    // A terminal viewer here sending a command to a runner held on another node.
+    z.object({ op: z.literal("command"), runnerId: z.string().uuid(), command: z.unknown() }),
+    // A runner's terminal output, held here, for a viewer on `node`.
+    z.object({
+        op: z.literal("output"),
+        node: z.string().min(1).max(255),
+        runnerId: z.string().uuid(),
+        sessionId: z.string().uuid(),
+        data: z.string().max(Math.ceil(core.RUNNER_LIMITS.terminalChunkBytes / 3) * 4 + 4)
+    })
 ]);
 
 function safeEqual(a: string, b: string): boolean {
@@ -52,6 +67,19 @@ export async function POST(request: Request): Promise<Response> {
     if (!parsed.success) return Response.json({ error: "invalid body" }, { status: 400 });
     const body = parsed.data;
     if (body.op === "auth") return Response.json({ runner: await authenticateRunner(body.token) });
+
+    if (body.op === "command") {
+        // Output for this viewer comes back over NOTIFY, so this node listens.
+        listenForRunnerCommands();
+        const command = readCommand(body.command);
+        // i18n-ignore read by a machine, not shown to a person
+        if (!command || command.type === "close") return Response.json({ error: "invalid command" }, { status: 400 });
+        return Response.json({ sent: await sendToRunner(body.runnerId, command) });
+    }
+    if (body.op === "output") {
+        await relayTerminalOutput(body.node, body.runnerId, body.sessionId, body.data);
+        return Response.json({ ok: true });
+    }
 
     // The credential was checked when the socket opened; a runner revoked since
     // is closed by the revoke itself.
