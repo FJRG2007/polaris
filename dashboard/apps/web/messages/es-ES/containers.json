@@ -71,7 +71,8 @@
         "restart": "Reiniciar",
         "stop": "Detener",
         "start": "Iniciar",
-        "places": "Abrir en Lugares"
+        "places": "Abrir en Lugares",
+        "open": "Abrir"
     },
     "overview": {
         "containers": "Contenedores",
@@ -195,5 +196,27 @@
     "queued": {
         "title": "Esperando al servidor",
         "body": "El servidor no responde. Se enviará en cuanto vuelva; puedes cancelarlo desde Despliegues."
+    },
+    "list": {
+        "search": "Buscar contenedores",
+        "ownerLabel": "De quién son",
+        "owner": {
+            "all": "Todos",
+            "polaris": "Polaris",
+            "other": "Otros"
+        },
+        "stateLabel": "Estado",
+        "state": {
+            "all": "Cualquiera",
+            "running": "En marcha",
+            "stopped": "Detenidos",
+            "paused": "En pausa"
+        },
+        "showing": "{shown} de {matched}",
+        "more": "Mostrar más",
+        "noMatch": "Ningún contenedor coincide.",
+        "clear": "Quitar filtros",
+        "badge": "Polaris",
+        "menu": "Acciones de {name}"
     }
 }

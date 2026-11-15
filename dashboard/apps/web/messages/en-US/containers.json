@@ -71,7 +71,8 @@
         "restart": "Restart",
         "stop": "Stop",
         "start": "Start",
-        "places": "Open in Places"
+        "places": "Open in Places",
+        "open": "Open"
     },
     "overview": {
         "containers": "Containers",
@@ -195,5 +196,27 @@
     "queued": {
         "title": "Waiting for the server",
         "body": "The server is not answering. This goes out as soon as it is back; you can cancel it from Rollouts."
+    },
+    "list": {
+        "search": "Search containers",
+        "ownerLabel": "Whose containers",
+        "owner": {
+            "all": "All",
+            "polaris": "Polaris",
+            "other": "Others"
+        },
+        "stateLabel": "State",
+        "state": {
+            "all": "Any state",
+            "running": "Running",
+            "stopped": "Stopped",
+            "paused": "Paused"
+        },
+        "showing": "{shown} of {matched}",
+        "more": "Show more",
+        "noMatch": "No containers match these filters.",
+        "clear": "Clear filters",
+        "badge": "Polaris",
+        "menu": "Actions for {name}"
     }
 }

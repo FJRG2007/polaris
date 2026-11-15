@@ -25,14 +25,36 @@ import { containerStateLabel } from "./container-words";
 import { containerMachineId, machineHref } from "@/lib/machines/machine-links";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useLiveResource } from "@/components/use-live-resource";
+import { useDebounced } from "@/app/(app)/telemetry/use-debounced";
+import { RowActionsMenu, RowContextMenu, type RowAction } from "./container-row-menu";
 import {
     DEFAULT_DIRECTION,
-    sortByConsumption,
     type ConsumptionOrder,
     type SortDirection
 } from "@/lib/watch/card-order";
+import {
+    DEFAULT_LIST_QUERY,
+    PAGE_SIZE,
+    STATE_FILTERS,
+    listSearchParams,
+    stateGroup,
+    type ContainerListQuery,
+    type OwnerFilter,
+    type StateFilter
+} from "./container-list";
 import { DockerConnectionDialog } from "./docker-connection-dialog";
-import { Badge, Button, Card, CardBody, Skeleton, cn, useToast } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    Input,
+    SegmentedControl,
+    Select,
+    Skeleton,
+    cn,
+    useToast
+} from "@polaris/ui";
 import { PagedPicker } from "@/components/paged-picker";
 import {
     connectionOptionsAction,
@@ -63,11 +85,13 @@ import {
     Cpu,
     FileText,
     House,
+    Info,
     MemoryStick,
     Play,
     RefreshCw,
     RotateCw,
     ScrollText,
+    Search,
     Server,
     Square,
     TerminalSquare,
@@ -88,6 +112,20 @@ interface HostReachability {
 
 /** Which tab of a container's page a row's action opens. */
 type ContainerTab = "details" | "logs" | "files" | "console";
+
+/** How long the search box waits for typing to stop before asking the server. */
+const SEARCH_SETTLE_MS = 250;
+
+/** A lifecycle action as the row shows it before the engine has confirmed it. */
+const OPTIMISTIC_STATE: Record<"start" | "stop" | "restart", string> = {
+    start: "running",
+    stop: "exited",
+    restart: "restarting"
+};
+
+/** How long a state shown ahead of the engine is held without a listing that
+ *  agrees with it, before the row goes back to saying what the engine says. */
+const OPTIMISTIC_HOLD_MS = 20_000;
 
 export function ContainersView({
     connections,
@@ -113,7 +151,7 @@ export function ContainersView({
     const isLocalHost = connections.some(
         (connection) => connection.id === connectionId && connection.local
     );
-    const [pending, startTransition] = useTransition();
+    const [, startTransition] = useTransition();
     const toast = useToast();
     const [live, setLive] = useState(true);
     const [confirm, confirmDialog] = useConfirm();
@@ -129,8 +167,22 @@ export function ContainersView({
     // pointer is only wanted by somebody who asked for it.
     const [sort, setSort] = useState<{ order: ConsumptionOrder; direction: SortDirection }>({
         order: "name",
-        direction: "asc"
+        direction: DEFAULT_LIST_QUERY.direction
     });
+    // Which containers: typed into the search box, whose they are, what state.
+    // Applied by the server, which sends only the rows asked for.
+    const [search, setSearch] = useState("");
+    const settledSearch = useDebounced(search, SEARCH_SETTLE_MS);
+    const [owner, setOwner] = useState<OwnerFilter>(DEFAULT_LIST_QUERY.owner);
+    const [stateFilter, setStateFilter] = useState<StateFilter>(DEFAULT_LIST_QUERY.state);
+    const [limit, setLimit] = useState(PAGE_SIZE);
+    // Containers with a lifecycle action in flight, and the state each is shown
+    // in until the engine's own listing agrees - or the action fails, which puts
+    // the row back the way it was.
+    const [busy, setBusy] = useState<string[]>([]);
+    const [optimistic, setOptimistic] = useState<
+        Record<string, { state: string; settled: boolean; at: number }>
+    >({});
 
     // Whether the registered servers in the list are answering. Only polled when
     // there is one: the local engine and a stored connection are not probed.
@@ -156,6 +208,16 @@ export function ContainersView({
 
     // Seeded from the last answer this tab held for the host, polled while the
     // tab is in front, and folded in so only the numbers that moved re-render.
+    // Only a host with Polaris on it has Polaris containers to tell apart.
+    const listQuery: ContainerListQuery = {
+        q: settledSearch,
+        owner: isLocalHost ? owner : "all",
+        state: stateFilter,
+        order: sort.order,
+        direction: sort.direction,
+        limit
+    };
+    const listParams = connectionId ? listSearchParams(connectionId, listQuery).toString() : "";
     const {
         data: answer,
         loading,
@@ -163,8 +225,11 @@ export function ContainersView({
         stale,
         refresh: reload
     } = useLiveResource<HostSnapshot>({
-        url: connectionId ? `/api/containers?c=${encodeURIComponent(connectionId)}` : "",
-        cacheKey: `containers.${connectionId ?? "none"}`,
+        url: connectionId ? `/api/containers?${listParams}` : "",
+        // One kept answer per host and query, so a revisit paints exactly what it
+        // asked for. Not the bare `containers.<id>` key: a server's page reads
+        // that one expecting every container on the host.
+        cacheKey: `containers.list.${listParams || "none"}`,
         intervalMs: REFRESH_MS,
         // Not asked of a server that is off: it would only spend its SSH connect
         // timeout to fail, every five seconds.
@@ -181,21 +246,40 @@ export function ContainersView({
     // than showing them with their age. Held per host, so switching hosts does not
     // fill one machine's table with another's readings.
     const shown = useRef<{ connectionId: string | null; snapshot: HostSnapshot } | null>(null);
+    // A filter that has just changed has no answer of its own yet; the table goes
+    // on showing what it had for this host until it lands, rather than blanking
+    // to a skeleton on every keystroke.
     const snapshot = useMemo(() => {
-        if (!answer) return null;
         const previous =
             shown.current?.connectionId === connectionId ? shown.current.snapshot : null;
+        if (!answer) return previous;
         const merged = carryForwardUsage(previous, answer);
         shown.current = { connectionId, snapshot: merged };
         return merged;
     }, [answer, connectionId]);
+    const filtering = !answer && snapshot !== null;
 
     // A container the engine no longer lists is gone for real, so it no longer
     // needs hiding; one still listed is still on its way out and stays hidden.
     useEffect(() => {
-        if (!snapshot) return;
-        setRemoving((ids) => ids.filter((id) => snapshot.containers.some((row) => row.id === id)));
-    }, [snapshot]);
+        if (!answer) return;
+        setRemoving((ids) => ids.filter((id) => answer.containers.some((row) => row.id === id)));
+        // A state shown ahead of the engine is dropped once the engine says the
+        // same, once the container has left the listing, or once it has been held
+        // long enough that the engine evidently did something else.
+        setOptimistic((held) => {
+            let changed = false;
+            const next: typeof held = {};
+            for (const [id, entry] of Object.entries(held)) {
+                const row = answer.containers.find((container) => container.id === id);
+                const agreed = !row || stateGroup(row.state) === stateGroup(entry.state);
+                const expired = Date.now() - entry.at > OPTIMISTIC_HOLD_MS;
+                if (entry.settled && (agreed || expired)) changed = true;
+                else next[id] = entry;
+            }
+            return changed ? next : held;
+        });
+    }, [answer]);
 
     const refresh = useCallback(() => {
         if (connectionId) reload();
@@ -203,11 +287,37 @@ export function ContainersView({
 
     function onAction(containerId: string, action: "start" | "stop" | "restart") {
         setActionError(null);
+        setBusy((ids) => [...ids, containerId]);
+        setOptimistic((held) => ({
+            ...held,
+            [containerId]: { state: OPTIMISTIC_STATE[action], settled: false, at: Date.now() }
+        }));
+        const rollback = () =>
+            setOptimistic((held) => {
+                const { [containerId]: _dropped, ...rest } = held;
+                return rest;
+            });
         startTransition(async () => {
-            const result = await containerAction(connectionId!, containerId, action);
-            if (result.error) setActionError(result.error);
-            if (result.queued) toast.show({ title: t("queued.title"), body: t("queued.body") });
-            refresh();
+            try {
+                const result = await containerAction(connectionId!, containerId, action);
+                if (result.error) setActionError(result.error);
+                if (result.queued) toast.show({ title: t("queued.title"), body: t("queued.body") });
+                // Refused, or waiting for a server that is not answering: nothing
+                // has happened to the container yet, so the row says so again.
+                if (result.error || result.queued) rollback();
+                else
+                    setOptimistic((held) =>
+                        held[containerId]
+                            ? { ...held, [containerId]: { ...held[containerId], settled: true } }
+                            : held
+                    );
+            } catch {
+                rollback();
+                setActionError(t("errors.actionFailed"));
+            } finally {
+                setBusy((ids) => ids.filter((id) => id !== containerId));
+                refresh();
+            }
         });
     }
 
@@ -249,20 +359,25 @@ export function ContainersView({
         });
     }
 
+    // Already filtered and ordered by the server; only what this tab knows ahead
+    // of it is applied here - a removal on its way, a state change not yet seen.
     const containers = useMemo(
         () =>
-            sortByConsumption(
-                (snapshot?.containers ?? [])
-                    .filter((container) => !removing.includes(container.id))
-                    // The table calls it memUsage and the sort calls it what every
-                    // other screen does; carried rather than renamed, so the rows
-                    // below are still container rows.
-                    .map((container) => ({ ...container, memUsedBytes: container.memUsage })),
-                sort.order,
-                sort.direction
-            ),
-        [snapshot, removing, sort]
+            (snapshot?.containers ?? [])
+                .filter((container) => !removing.includes(container.id))
+                .map((container) => {
+                    const held = optimistic[container.id];
+                    return held ? { ...container, state: held.state } : container;
+                }),
+        [snapshot, removing, optimistic]
     );
+    const matched = Math.max(
+        containers.length,
+        (snapshot?.matched ?? snapshot?.containers.length ?? 0) -
+            (snapshot?.containers.length ?? 0) +
+            containers.length
+    );
+    const filtered = search.trim() !== "" || owner !== "all" || stateFilter !== "all";
 
     /** Sort by this column, or turn it round when it is the one already sorted. */
     function sortBy(order: ConsumptionOrder): void {
@@ -272,13 +387,113 @@ export function ContainersView({
                 : { order, direction: DEFAULT_DIRECTION[order] }
         );
     }
+
+    /** A narrower question starts from the first page again. */
+    function narrow(apply: () => void): void {
+        apply();
+        setLimit(PAGE_SIZE);
+    }
+
+    function clearFilters(): void {
+        narrow(() => {
+            setSearch("");
+            setOwner("all");
+            setStateFilter("all");
+        });
+    }
+
+    /** Everything a row offers, for its three dots and its right-click alike. Only
+     *  what the caller may do: managing a container is the same `system.manage`
+     *  the actions check, and is left off the menu rather than refused. */
+    function rowActions(container: ContainerRow): RowAction[] {
+        const running = container.state === "running";
+        const rowBusy = busy.includes(container.id);
+        const places = placesId(container);
+        const actions: RowAction[] = [
+            {
+                key: "open",
+                label: t("actions.open"),
+                icon: <Info />,
+                href: containerHref(container, "details")
+            }
+        ];
+        if (places) {
+            actions.push({
+                key: "places",
+                label: t("actions.places"),
+                icon: <House />,
+                href: machineHref("container", places)
+            });
+        }
+        actions.push(
+            {
+                key: "logs",
+                label: t("actions.logs"),
+                icon: <ScrollText />,
+                href: containerHref(container, "logs")
+            },
+            {
+                key: "files",
+                label: t("actions.files"),
+                icon: <FileText />,
+                href: containerHref(container, "files")
+            },
+            {
+                key: "console",
+                label: t("actions.console"),
+                icon: <TerminalSquare />,
+                href: containerHref(container, "console"),
+                disabled: !running
+            }
+        );
+        if (!canManage) return actions;
+        if (running) {
+            actions.push(
+                {
+                    key: "restart",
+                    label: t("actions.restart"),
+                    icon: <RotateCw />,
+                    onSelect: () => onAction(container.id, "restart"),
+                    disabled: rowBusy,
+                    manage: true
+                },
+                {
+                    key: "stop",
+                    label: t("actions.stop"),
+                    icon: <Square />,
+                    onSelect: () => onAction(container.id, "stop"),
+                    disabled: rowBusy,
+                    manage: true
+                }
+            );
+        } else {
+            actions.push({
+                key: "start",
+                label: t("actions.start"),
+                icon: <Play />,
+                onSelect: () => onAction(container.id, "start"),
+                disabled: rowBusy || container.state === "restarting",
+                manage: true
+            });
+        }
+        actions.push({
+            key: "remove",
+            label: t("remove.confirm"),
+            icon: <Trash2 />,
+            onSelect: () => void onRemoveContainer(container),
+            disabled: rowBusy,
+            danger: true,
+            manage: true
+        });
+        return actions;
+    }
     // Usage is sampled behind the request, so the listing can be answered without
     // waiting for it. Say when what is shown was taken rather than let a reading
     // that has aged pass for this instant's.
     const usageAge = snapshot?.statsAt ? Date.now() - snapshot.statsAt : null;
     const statusLabel = !live
         ? t("live.paused")
-        : loading
+        : loading || filtering
           ? t("live.loading")
           : usageAge === null
             ? t("live.firstReading")
@@ -468,8 +683,55 @@ export function ContainersView({
                             what they cost. */}
                         {isLocalHost && <PolarisFootprintCard />}
 
-                        <div className="mb-2 flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">{statusLabel}</span>
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <div className="relative min-w-0 flex-1 basis-48">
+                                <Search
+                                    className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                                    aria-hidden="true"
+                                />
+                                <Input
+                                    type="search"
+                                    value={search}
+                                    onChange={(event) =>
+                                        narrow(() => setSearch(event.target.value))
+                                    }
+                                    placeholder={t("list.search")}
+                                    aria-label={t("list.search")}
+                                    maxLength={200}
+                                    className="pl-8"
+                                />
+                            </div>
+                            {isLocalHost ? (
+                                <SegmentedControl<OwnerFilter>
+                                    size="sm"
+                                    value={owner}
+                                    onValueChange={(value) => narrow(() => setOwner(value))}
+                                    aria-label={t("list.ownerLabel")}
+                                    options={[
+                                        { value: "all", label: t("list.owner.all") },
+                                        { value: "polaris", label: t("list.owner.polaris") },
+                                        { value: "other", label: t("list.owner.other") }
+                                    ]}
+                                />
+                            ) : null}
+                            <Select
+                                value={stateFilter}
+                                onValueChange={(value) =>
+                                    narrow(() => setStateFilter(value as StateFilter))
+                                }
+                                aria-label={t("list.stateLabel")}
+                                className="w-40"
+                                options={STATE_FILTERS.map((value) => ({
+                                    value,
+                                    label: t(`list.state.${value}`)
+                                }))}
+                            />
+                        </div>
+
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                            <span className="min-w-0 truncate text-xs text-muted-foreground">
+                                {statusLabel}
+                            </span>
                             <div className="flex items-center gap-2">
                                 <Button
                                     size="sm"
@@ -482,7 +744,7 @@ export function ContainersView({
                                     size="sm"
                                     variant="ghost"
                                     onClick={refresh}
-                                    disabled={pending}
+                                    disabled={loading}
                                 >
                                     <RefreshCw className="size-4" />
                                     {t("live.refresh")}
@@ -536,169 +798,128 @@ export function ContainersView({
                                                 colSpan={5}
                                                 className="px-3 py-8 text-center text-muted-foreground"
                                             >
-                                                {t("empty.noContainers")}
+                                                {filtered ? (
+                                                    <>
+                                                        {t("list.noMatch")}
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="ml-2"
+                                                            onClick={clearFilters}
+                                                        >
+                                                            {t("list.clear")}
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    t("empty.noContainers")
+                                                )}
                                             </td>
                                         </tr>
                                     ) : (
-                                        containers.map((container) => (
-                                            <tr
-                                                key={container.id}
-                                                className="border-t border-border hover:bg-card-hover"
-                                            >
-                                                <td className="px-3 py-2">
-                                                    <Link
-                                                        href={containerHref(container, "details")}
-                                                        className="block max-w-full truncate text-left font-medium hover:underline"
-                                                        title={container.name}
-                                                    >
-                                                        {container.name}
-                                                    </Link>
-                                                    <span
-                                                        className="block truncate text-xs text-muted-foreground"
-                                                        title={container.image}
-                                                    >
-                                                        {container.image}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <Badge
-                                                        variant={
-                                                            container.state === "running"
-                                                                ? "success"
-                                                                : "neutral"
-                                                        }
-                                                    >
-                                                        {containerStateLabel(t, container.state)}
-                                                    </Badge>
-                                                </td>
-                                                <UsageCell
-                                                    running={container.state === "running"}
-                                                    value={
-                                                        container.cpuPercent === null
-                                                            ? null
-                                                            : `${container.cpuPercent}%`
-                                                    }
-                                                />
-                                                <UsageCell
-                                                    running={container.state === "running"}
-                                                    value={
-                                                        container.memUsage === null
-                                                            ? null
-                                                            : formatBytes(container.memUsage)
-                                                    }
-                                                />
-                                                <td className="px-3 py-2">
-                                                    <div className="flex justify-end gap-1">
-                                                        {placesId(container) ? (
-                                                            <IconLink
-                                                                label={t("actions.places")}
-                                                                href={machineHref(
-                                                                    "container",
-                                                                    placesId(container)!
-                                                                )}
-                                                            >
-                                                                <House className="size-4" />
-                                                            </IconLink>
-                                                        ) : null}
-                                                        <IconLink
-                                                            label={t("actions.logs")}
-                                                            href={containerHref(container, "logs")}
-                                                        >
-                                                            <ScrollText className="size-4" />
-                                                        </IconLink>
-                                                        <IconLink
-                                                            label={t("actions.files")}
-                                                            href={containerHref(container, "files")}
-                                                        >
-                                                            <FileText className="size-4" />
-                                                        </IconLink>
-                                                        {container.state === "running" ? (
-                                                            <IconLink
-                                                                label={t("actions.console")}
-                                                                href={containerHref(
-                                                                    container,
-                                                                    "console"
-                                                                )}
-                                                            >
-                                                                <TerminalSquare className="size-4" />
-                                                            </IconLink>
-                                                        ) : (
-                                                            <IconButton
-                                                                label={t("actions.console")}
-                                                                onClick={() => undefined}
-                                                                disabled
-                                                            >
-                                                                <TerminalSquare className="size-4" />
-                                                            </IconButton>
-                                                        )}
-                                                        {canManage ? (
-                                                            <>
-                                                                {container.state === "running" ? (
-                                                                    <>
-                                                                        <IconButton
-                                                                            label={t(
-                                                                                "actions.restart"
-                                                                            )}
-                                                                            onClick={() =>
-                                                                                onAction(
-                                                                                    container.id,
-                                                                                    "restart"
-                                                                                )
-                                                                            }
-                                                                            disabled={pending}
-                                                                        >
-                                                                            <RotateCw className="size-4" />
-                                                                        </IconButton>
-                                                                        <IconButton
-                                                                            label={t(
-                                                                                "actions.stop"
-                                                                            )}
-                                                                            onClick={() =>
-                                                                                onAction(
-                                                                                    container.id,
-                                                                                    "stop"
-                                                                                )
-                                                                            }
-                                                                            disabled={pending}
-                                                                        >
-                                                                            <Square className="size-4" />
-                                                                        </IconButton>
-                                                                    </>
-                                                                ) : (
-                                                                    <IconButton
-                                                                        label={t("actions.start")}
-                                                                        onClick={() =>
-                                                                            onAction(
-                                                                                container.id,
-                                                                                "start"
-                                                                            )
-                                                                        }
-                                                                        disabled={pending}
-                                                                    >
-                                                                        <Play className="size-4" />
-                                                                    </IconButton>
-                                                                )}
-                                                                <IconButton
-                                                                    label={t("remove.confirm")}
-                                                                    onClick={() =>
-                                                                        void onRemoveContainer(
-                                                                            container
-                                                                        )
-                                                                    }
-                                                                    disabled={pending}
+                                        containers.map((container) => {
+                                            const actions = rowActions(container);
+                                            return (
+                                                <RowContextMenu
+                                                    key={container.id}
+                                                    title={container.name}
+                                                    actions={actions}
+                                                >
+                                                    <tr className="border-t border-border hover:bg-card-hover">
+                                                        <td className="max-w-0 px-3 py-2">
+                                                            <div className="flex min-w-0 items-center gap-2">
+                                                                <Link
+                                                                    href={containerHref(
+                                                                        container,
+                                                                        "details"
+                                                                    )}
+                                                                    className="min-w-0 truncate text-left font-medium hover:underline"
+                                                                    title={container.name}
                                                                 >
-                                                                    <Trash2 className="size-4" />
-                                                                </IconButton>
-                                                            </>
-                                                        ) : null}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
+                                                                    {container.name}
+                                                                </Link>
+                                                                {container.polaris ? (
+                                                                    <Badge
+                                                                        variant="neutral"
+                                                                        className="shrink-0"
+                                                                    >
+                                                                        {t("list.badge")}
+                                                                    </Badge>
+                                                                ) : null}
+                                                            </div>
+                                                            <span
+                                                                className="block truncate text-xs text-muted-foreground"
+                                                                title={container.image}
+                                                            >
+                                                                {container.image}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <Badge
+                                                                variant={
+                                                                    stateGroup(container.state) ===
+                                                                    "running"
+                                                                        ? "success"
+                                                                        : "neutral"
+                                                                }
+                                                            >
+                                                                {containerStateLabel(
+                                                                    t,
+                                                                    container.state
+                                                                )}
+                                                            </Badge>
+                                                        </td>
+                                                        <UsageCell
+                                                            running={container.state === "running"}
+                                                            value={
+                                                                container.cpuPercent === null
+                                                                    ? null
+                                                                    : `${container.cpuPercent}%`
+                                                            }
+                                                        />
+                                                        <UsageCell
+                                                            running={container.state === "running"}
+                                                            value={
+                                                                container.memUsage === null
+                                                                    ? null
+                                                                    : formatBytes(
+                                                                          container.memUsage
+                                                                      )
+                                                            }
+                                                        />
+                                                        <td className="w-12 px-3 py-2 text-right">
+                                                            <RowActionsMenu
+                                                                title={container.name}
+                                                                label={t("list.menu", {
+                                                                    name: container.name
+                                                                })}
+                                                                actions={actions}
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                </RowContextMenu>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
                         </div>
+                        {snapshot && containers.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                                <span>
+                                    {t("list.showing", { shown: containers.length, matched })}
+                                </span>
+                                {matched > containers.length ? (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        disabled={filtering}
+                                        onClick={() => setLimit((held) => held + PAGE_SIZE)}
+                                    >
+                                        {t("list.more")}
+                                    </Button>
+                                ) : null}
+                            </div>
+                        ) : null}
                     </>
                 )}
             </section>
@@ -825,40 +1046,5 @@ function UsageCell({ running, value }: { running: boolean; value: string | null 
         <td className="px-3 py-2 text-muted-foreground">
             {value !== null ? value : running ? <Skeleton className="h-4 w-12" /> : "-"}
         </td>
-    );
-}
-
-function IconButton({
-    label,
-    onClick,
-    disabled,
-    children
-}: {
-    label: string;
-    onClick: () => void;
-    disabled?: boolean;
-    children: ReactNode;
-}) {
-    return (
-        <Button
-            size="icon"
-            variant="ghost"
-            onClick={onClick}
-            disabled={disabled}
-            aria-label={label}
-            title={label}
-        >
-            {children}
-        </Button>
-    );
-}
-
-/** The same control, for the ones that open a page. A link rather than a click
- *  handler so it can be middle-clicked, opened in a tab, or copied. */
-function IconLink({ label, href, children }: { label: string; href: string; children: ReactNode }) {
-    return (
-        <Button size="icon" variant="ghost" asChild aria-label={label} title={label}>
-            <Link href={href}>{children}</Link>
-        </Button>
     );
 }

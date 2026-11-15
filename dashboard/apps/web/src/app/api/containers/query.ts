@@ -12,7 +12,16 @@
 
 import { z } from "zod";
 import { requireUser, userHasManage } from "@/lib/session";
+import type { ConsumptionOrder } from "@/lib/watch/card-order";
 import { LOCAL_DOCKER_CONNECTION_ID, ownsDockerConnection } from "@/lib/docker-service";
+import {
+    LIST_ORDERS,
+    MAX_LIMIT,
+    OWNER_FILTERS,
+    STATE_FILTERS,
+    type OwnerFilter,
+    type StateFilter
+} from "@/app/(app)/apps/containers/container-list";
 
 /** A Docker id or name, plus the prefixed forms a Containers connection id
  *  takes (`local`, `host:<id>`, or a stored row's cuid). */
@@ -30,7 +39,20 @@ const flag = z
     .default("0")
     .transform((value) => value === "1" || value === "true");
 
-export const listQuerySchema = z.object({ c: connectionId });
+/**
+ * A listing: which host, and optionally which of its containers in what order.
+ * Every field past `c` is optional and absent means "as before" - every row,
+ * in the engine's order - so a caller that predates paging keeps getting the whole listing.
+ */
+export const listQuerySchema = z.object({
+    c: connectionId,
+    q: z.string().trim().max(200).default(""),
+    owner: z.enum(OWNER_FILTERS as [OwnerFilter, ...OwnerFilter[]]).default("all"),
+    state: z.enum(STATE_FILTERS as [StateFilter, ...StateFilter[]]).default("all"),
+    sort: z.enum(LIST_ORDERS as [ConsumptionOrder, ...ConsumptionOrder[]]).optional(),
+    dir: z.enum(["asc", "desc"]).optional(),
+    limit: z.coerce.number().int().min(1).max(MAX_LIMIT).optional()
+});
 
 export const containerQuerySchema = z.object({ c: connectionId, id: containerId });
 

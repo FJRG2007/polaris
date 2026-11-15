@@ -25,6 +25,9 @@ import {
     STATS_TTL_MS
 } from "@/lib/container-stats-cache";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { isPolarisPart } from "@/lib/polaris-parts";
+import { DEFAULT_DIRECTION } from "@/lib/watch/card-order";
+import { queryContainers } from "@/app/(app)/apps/containers/container-list";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,8 +54,21 @@ export async function GET(request: Request): Promise<Response> {
                     cpuPercent: sample?.stats.cpuPercent ?? null,
                     memUsage: sample?.stats.memUsage ?? null,
                     memPercent: sample?.stats.memPercent ?? null,
-                    statsAt: sample?.at ?? null
+                    statsAt: sample?.at ?? null,
+                    polaris: isPolarisPart(container)
                 };
+            });
+            // Filtered, ordered and cut here rather than in the browser, so a host
+            // with hundreds of containers sends the page that is being looked at.
+            // The overview below still adds up the whole host.
+            const { data: query } = parsed;
+            const page = queryContainers(containers, {
+                q: query.q,
+                owner: query.owner,
+                state: query.state,
+                order: query.sort ?? null,
+                direction: query.dir ?? (query.sort ? DEFAULT_DIRECTION[query.sort] : "asc"),
+                limit: query.limit ?? null
             });
             const overview: OverviewData = {
                 name: info.name,
@@ -75,7 +91,8 @@ export async function GET(request: Request): Promise<Response> {
             return {
                 snapshot: {
                     overview,
-                    containers,
+                    containers: page.rows,
+                    matched: page.matched,
                     canAttach: accessFor(parsed.data.c) === "hostd" || driver.canAttach,
                     // The oldest of the running containers' samples, and null
                     // while any of them is still unsampled: the totals below add

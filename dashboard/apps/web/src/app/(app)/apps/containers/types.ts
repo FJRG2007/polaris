@@ -39,6 +39,10 @@ export interface ContainerRow {
     /** When the usage on this row was sampled. Null for a container nothing has
      *  sampled yet, and for one that is not running. */
     statsAt: number | null;
+    /** Whether the container is part of Polaris's own stack (its compose project),
+     *  rather than something deployed through it or started by hand. Optional: a
+     *  snapshot a tab kept from before this field existed has none. */
+    polaris?: boolean;
 }
 
 /** What /api/containers answers with for one host. `canAttach` is whether this
@@ -52,6 +56,10 @@ export interface HostSnapshot {
      *  not add up yet and the reading is on its way. An instant rather than an
      *  age, so it stays true in a snapshot held between visits. */
     statsAt: number | null;
+    /** How many containers matched the listing's filters before it was cut to
+     *  its limit. Absent from an answer that predates paging, which carried
+     *  every container. */
+    matched?: number;
 }
 
 /** What /api/containers/stats answers with: one sample and when it was taken.
