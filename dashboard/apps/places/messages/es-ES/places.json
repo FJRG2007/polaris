@@ -866,8 +866,8 @@
             }
         },
         "tuya-app": {
-            "label": "App Smart Life / Tuya Smart",
-            "summary": "Inicia sesión escaneando un código con la app que ya usas. Sin cuenta de desarrollador.",
+            "label": "App Smart Life, como Home Assistant",
+            "summary": "El acceso por QR de Home Assistant: escanea un código con la app que ya usas. Sin cuenta de desarrollador.",
             "note": "Llega a todos los hogares de la cuenta a través de los servidores de Tuya. La sesión se renueva sola, y al quitar esta conexión Polaris también cierra la sesión en Tuya. Es el mismo acceso que usa la integración de Tuya de Home Assistant, así que la app puede mostrar Polaris como Home Assistant.",
             "steps": {
                 "s0": "En la app Smart Life o Tuya Smart, abre tu perfil, toca el engranaje y entra en la seguridad de la cuenta.",
