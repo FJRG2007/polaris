@@ -56,7 +56,8 @@ export type TranscriptDecoder = (line: string) => HistoryRow[];
  * yet; its decoder belongs here once something does.
  */
 export function transcriptDecoder(cli: string): TranscriptDecoder | null {
-    if (cli === "claude") return decodeClaudeLine;
+    // The native engine writes Claude-shaped lines (`lib/polar/native/transcript.ts`).
+    if (cli === "claude" || cli === "polaris-native") return decodeClaudeLine;
     if (cli === "codex") return decodeCodexLine;
     if (cli === "gemini") return decodeGeminiLine;
     return null;

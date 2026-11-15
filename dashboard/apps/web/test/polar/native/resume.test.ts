@@ -101,3 +101,18 @@ describe("nativeBundleDir", () => {
         fs.rmSync(root, { recursive: true, force: true });
     });
 });
+
+describe("the session side reads a native conversation", () => {
+    it("accepts the native transcript path, decodes it as Claude's, and forks it", async () => {
+        const { readableTranscriptPath } = await import("@/lib/agents/session-transcript");
+        const { transcriptDecoder, decodeClaudeLine } = await import("@/lib/agents/transcript-decoders");
+        const { forkTranscript } = await import("@/lib/agents/session-fork");
+        const file = "/home/node/.polaris-agent/sessions/0b1c-2d.jsonl";
+        expect(readableTranscriptPath(file)).toBe(true);
+        expect(readableTranscriptPath("/home/node/.polaris-agent/sessions/../x.jsonl")).toBe(false);
+        expect(transcriptDecoder("polaris-native")).toBe(decodeClaudeLine);
+        const place = { cli: "polaris-native", place: "local", hostId: null, sharedHome: false, ownerId: "u1" };
+        expect(forkTranscript(place, { ...place, transcriptPath: file })).toBe(file);
+        expect(forkTranscript({ ...place, cli: "opencode" }, { ...place, transcriptPath: file })).toBe("");
+    });
+});

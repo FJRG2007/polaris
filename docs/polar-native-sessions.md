@@ -153,14 +153,14 @@ no blocker), **gap** (not planned for the first switch, with the reason).
 | Model change mid-session | `--model` / `/model` | fixed | `/model <provider/model>` read from stdin | exists |
 | Compaction of long context | auto and `/compact` | auto | auto above the budget and `/compact`; `compact_boundary` written | exists |
 | Queue while busy | `AgentQueuedPrompt` | same | same (the queue is Polaris's) | exists (unchanged) |
-| Resume after restart | `--resume` | `--continue` | replays its own JSONL | to build |
-| Fork | transcript copy | - | transcript copy (same shape as Claude) | to build |
+| Resume after restart | `--resume` | `--continue` | replays its own JSONL | exists |
+| Fork | transcript copy | - | transcript copy (same shape as Claude) | exists |
 | Hooks the repository defines | `.claude/settings.json` hooks | plugins | - | gap (Polaris's own hooks are emitted; repo hooks later) |
 | Memory files (`CLAUDE.md`, `AGENTS.md`) | read at start | `AGENTS.md` | read both into the prompt | exists |
 | Runs on the Polaris server, in the session container | yes | yes | same boot, `polaris-agent` binary | to build |
 | Runs on the person's PC through the runner | yes | yes | runner starts `polaris-agent` like any CLI | to build |
 
-Count: 22 exists, 14 to build, 7 gaps. None of the gaps blocks the rollout
+Count: 24 exists, 12 to build, 7 gaps. None of the gaps blocks the rollout
 switch for OpenCode's sessions (each is either absent from OpenCode too or a
 Claude-product feature). Claude Code with a key stays on Claude Code until the
 to-build rows are done.
@@ -283,9 +283,10 @@ an install that never ran the migration's reader still behaves as before.
       interrupt, model change, plan mode, subagents (`lib/polar/native/`)
 - [x] Tests per tool and end to end with a scripted model (`test/polar/native/`)
 - [x] Session-scoped model token accepted by the compatible API (native sessions only)
-- [ ] `polaris-agent` bundle served by the instance; catalogue row; boot
-      script and runner launch
+- [x] `polaris-agent` program and bundle served by the instance (`/api/agents/native/bundle`)
+- [ ] Start path, boot script and runner launch for `polaris-native`
 - [ ] MCP client over the session's `mcpConfig` (Polaris first, then the session's own servers)
 - [ ] WebFetch, WebSearch, Skill, images/PDF in Read
-- [ ] Background subagents, resume, fork
+- [x] Resume and fork (replay of its own transcript)
+- [ ] Background subagents
 - [ ] Side-by-side runs against OpenCode on the same tasks, then flip the switch

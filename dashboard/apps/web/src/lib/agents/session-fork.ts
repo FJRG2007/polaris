@@ -50,7 +50,8 @@ export function forkTranscript(
     child: ForkPlace,
     parent: ForkPlace & { readonly transcriptPath: string | null }
 ): string {
-    if (child.cli !== "claude" || parent.cli !== "claude") return "";
+    // Claude Code and the native engine reopen a transcript as a new conversation.
+    if (child.cli !== parent.cli || (child.cli !== "claude" && child.cli !== "polaris-native")) return "";
     if (child.place !== parent.place || child.sharedHome !== parent.sharedHome) return "";
     if (child.place === "host" && child.hostId !== parent.hostId) return "";
     // A computer keeps its transcripts on itself, and the runner's start frame

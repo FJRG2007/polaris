@@ -166,6 +166,7 @@
         "@typescript-eslint/parser": "8.71.2",
         "autoprefixer": "10.6.1",
         "boneyard-js": "1.10.0",
+        "esbuild": "0.28.1",
         "eslint": "10.13.0",
         "eslint-plugin-react-hooks": "7.1.1",
         "jsdom": "30.0.1",

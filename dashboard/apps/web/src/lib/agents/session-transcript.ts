@@ -52,7 +52,9 @@ export function readableTranscriptPath(path: string | null | undefined): path is
         // link back to the session's `.codex/sessions`, and Codex names the
         // rollout through the home it was started in.
         /\/\.polaris-accounts\/codex\/[A-Za-z0-9_-]{1,64}\/sessions\/(?:[^/]+\/)*[^/]+\.jsonl$/.test(path) ||
-        /\/\.gemini\/tmp\/[^/]+\/chats\/[^/]+\.jsonl$/.test(path)
+        /\/\.gemini\/tmp\/[^/]+\/chats\/[^/]+\.jsonl$/.test(path) ||
+        // Polaris's native engine (`lib/polar/native/launch.ts`, transcriptDir).
+        /\/\.polaris-agent\/sessions\/[A-Za-z0-9_-]+\.jsonl$/.test(path)
     );
 }
 
