@@ -34,6 +34,7 @@ import { after } from "next/server";
 import * as history from "@/lib/agents/session-history";
 import { deliverNextQueued } from "@/lib/agents/session-prompt-queue";
 import { isSignInRefusal, noteRefusedSignIn } from "@/lib/agents/signin-refusal";
+import { judgeSessionGoal } from "@/lib/agents/session-goal";
 import { handleTurnFailure, noteTurnFinished, turnAccountName } from "@/lib/agents/account-rotation";
 
 /** The events after which the transcript is read. */
@@ -130,11 +131,14 @@ export async function POST(
     // (`account-rotation.ts`). Read from the whole payload: the stored detail
     // is clipped before the reset time.
     else if (kind === "turn.failed") after(() => handleTurnFailure(id, payload, seq));
-    // A finished turn also sends the oldest message typed while it ran.
+    // A finished turn sends the oldest message typed while it ran; with
+    // none waiting, it is when a session's /goal is judged and, while it is
+    // not met, the next turn sent (`session-goal.ts`). Never both: a queued
+    // message is the person's own next turn.
     else if (kind === "turn.end")
         after(async () => {
             await noteTurnFinished(id);
-            await deliverNextQueued(id);
+            if (!(await deliverNextQueued(id))) await judgeSessionGoal(id);
         });
     if (state && isSessionOver(state)) after(() => history.syncFinalSessionHistory(id));
     else if (HISTORY_KINDS.has(kind)) after(() => history.syncSessionHistorySoon(id));

@@ -244,7 +244,15 @@
             "context": "Show how full the agent's context is",
             "export": "Download the transcript (add jsonl for JSONL)",
             "diff": "See the files and changes",
-            "renameFailed": "Couldn't rename the session. Try again."
+            "renameFailed": "Couldn't rename the session. Try again.",
+            "goal": "Keep the agent working until a condition holds",
+            "plan": "Plan the work first, without changing anything",
+            "simplify": "Clean up the changed code",
+            "copy": "Copy the agent's last answer",
+            "exit": "End this session",
+            "copied": "Copied the answer.",
+            "copyNone": "No answer to copy there.",
+            "copyFailed": "Couldn't copy. Try again."
         }
     },
     "context": {
@@ -1513,7 +1521,8 @@
         "modeFailed": "The mode could not be changed. Try again.",
         "modeBusy": "Answer the agent first, then change the mode.",
         "modelFailed": "The model could not be changed. Try again.",
-        "modelBusy": "Answer the agent first, then change the model."
+        "modelBusy": "Answer the agent first, then change the model.",
+        "goalFailed": "Couldn't set the goal on this session."
     },
     "compare": {
         "open": "Ask several models",

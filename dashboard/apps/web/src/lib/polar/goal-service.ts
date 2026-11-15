@@ -103,6 +103,21 @@ export async function judgeGoal(
     messages: readonly UIMessage[],
     helper: PolarHelper
 ): Promise<GoalJudgement> {
+    return judgeGoalTranscript(userId, threadId, condition, goalTranscript(messages), helper);
+}
+
+/**
+ * Asks the judge about a conversation already written out as text: a chat's
+ * (`goalTranscript`) or a Code session's (`lib/agents/session-goal.ts`). The
+ * spend is recorded under the chat, or under no thread for a session.
+ */
+export async function judgeGoalTranscript(
+    userId: string,
+    threadId: string | null,
+    condition: string,
+    transcript: string,
+    helper: PolarHelper
+): Promise<GoalJudgement> {
     if (!(await helperMaySpend(userId, helper))) return null;
     try {
         const { text, totalUsage } = await generateText({
@@ -111,7 +126,7 @@ export async function judgeGoal(
             maxRetries: 0,
             model: helper.resolved.model,
             system: SYSTEM,
-            prompt: `Condition:\n${condition}\n\nConversation:\n${goalTranscript(messages)}`,
+            prompt: `Condition:\n${condition}\n\nConversation:\n${transcript.slice(-TRANSCRIPT_MAX)}`,
             maxOutputTokens: OUTPUT_MAX,
             reasoning: helperReasoning(helper),
             abortSignal: AbortSignal.timeout(JUDGE_TIMEOUT_MS)

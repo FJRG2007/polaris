@@ -64,7 +64,7 @@ describe("the / list in Code", () => {
         expect(screen.queryByRole("listbox")).toBeNull();
         type("/");
         const list = screen.getByRole("listbox", { name: "Commands" });
-        expect(options()).toHaveLength(11);
+        expect(options()).toHaveLength(16);
         expect(options()[0]).toMatch(/^\/help/);
         expect(screen.getByText("Summarize the agent's conversation to free room")).toBeTruthy();
         expect(screen.getByTestId("composer").contains(list)).toBe(false);
@@ -92,9 +92,9 @@ describe("the / list in Code", () => {
         fireEvent.keyDown(box, { key: "ArrowUp" });
         fireEvent.keyDown(box, { key: "ArrowUp" });
         // Up from the first wraps to the last.
-        expect(highlighted()).toMatch(/^\/diff/);
+        expect(highlighted()).toMatch(/^\/exit/);
         fireEvent.keyDown(box, { key: "Enter" });
-        expect(onCommand).toHaveBeenCalledWith("diff", "");
+        expect(onCommand).toHaveBeenCalledWith("exit", "");
         expect(onSend).not.toHaveBeenCalled();
         expect(box.value).toBe("");
         expect(screen.queryByRole("listbox")).toBeNull();

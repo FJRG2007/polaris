@@ -11,6 +11,7 @@ import { useId, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     CircleHelp,
+    ClipboardCopy,
     Cpu,
     Download,
     Gauge,
@@ -18,14 +19,18 @@ import {
     FileDiff,
     FilePlus2,
     History,
+    ListTodo,
+    LogOut,
     Minimize2,
     Pencil,
     Plus,
     ScanSearch,
+    Scissors,
     ShieldCheck,
     Sparkles,
     Square,
     SquareSlash,
+    Target,
     Wand2
 } from "lucide-react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -57,7 +62,12 @@ const COMMAND_ICONS: Record<CodeCommand, SuggestionListItem["icon"]> = {
     rename: Pencil,
     diff: FileDiff,
     context: Gauge,
-    export: Download
+    export: Download,
+    goal: Target,
+    plan: ListTodo,
+    simplify: Scissors,
+    copy: ClipboardCopy,
+    exit: LogOut
 };
 
 type CommandLine = Exclude<CodeCommand, "security-review"> | "securityReview" | "clearDraft";

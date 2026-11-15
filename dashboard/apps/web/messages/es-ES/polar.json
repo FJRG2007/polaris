@@ -244,7 +244,15 @@
             "context": "Ver cuánto contexto usa el agente",
             "export": "Descargar la transcripción (jsonl para JSONL)",
             "diff": "Ver archivos y cambios",
-            "renameFailed": "No se pudo renombrar. Reinténtalo."
+            "renameFailed": "No se pudo renombrar. Reinténtalo.",
+            "goal": "Que el agente siga hasta que se cumpla algo",
+            "plan": "Planificar primero, sin cambiar nada",
+            "simplify": "Limpiar el código cambiado",
+            "copy": "Copiar la última respuesta",
+            "exit": "Terminar esta sesión",
+            "copied": "Respuesta copiada.",
+            "copyNone": "No hay respuesta que copiar.",
+            "copyFailed": "No se pudo copiar. Reintenta."
         }
     },
     "context": {
@@ -1513,7 +1521,8 @@
         "modeFailed": "No se pudo cambiar el modo. Inténtalo de nuevo.",
         "modeBusy": "Responde al agente primero y luego cambia el modo.",
         "modelFailed": "No se pudo cambiar el modelo. Inténtalo de nuevo.",
-        "modelBusy": "Responde al agente primero y luego cambia el modelo."
+        "modelBusy": "Responde al agente primero y luego cambia el modelo.",
+        "goalFailed": "No se pudo fijar el objetivo aquí."
     },
     "compare": {
         "open": "Preguntar a varios",

@@ -78,6 +78,8 @@ import {
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
 import { useCodeSlash } from "@/components/polar/polar-code-slash";
 import * as codeCommands from "@/lib/polar/code-commands";
+import * as goals from "@/lib/polar/goals";
+import { goalStateKey, PolarGoalBar } from "@/components/polar/polar-goal";
 import { usePolarCommands } from "@/components/polar/polar-commands";
 import { ContextBar } from "@/components/polar/polar-context";
 import * as codeStatus from "@/lib/polar/code-status";
@@ -1198,6 +1200,8 @@ function CodeThread({
     const [showContext, setShowContext] = useState(false);
     const { commands: own, enigma } = usePolarCommands();
     const [error, setError] = useState<string | null>(null);
+    // What a command answered that is not a failure: copied, goal cleared.
+    const [info, setInfo] = useState<string | null>(null);
     const [busy, startTransition] = useTransition();
     const parts = useCodeComposerParts(busy);
     const signal = useUnmountSignal();
@@ -1256,32 +1260,95 @@ function CodeThread({
         sendText(slash.expand(reply.trim()));
     };
 
-    const sendText = (text: string) => {
+    /** Sends a message, or with `goal` sets it as the session's goal, which
+     *  sends it too; the files wait for the next message then. */
+    const sendText = (text: string, { goal = false }: { goal?: boolean } = {}) => {
         if (!text || busy || parts.uploads.uploading || parts.uploads.failed) return;
         const attachments = parts.uploads.ids;
         setError(null);
+        setInfo(null);
         setSent({ text, said });
         setReply("");
         startTransition(() => {
             void runAction(
-                () => postCode<{ error?: string; queued?: boolean }>("/api/polar/code/prompt", {
-                        sessionId,
-                        text,
-                        attachments
-                    }),
+                () =>
+                    goal
+                        ? postCode<{ error?: string; queued?: boolean }>("/api/polar/code/goal", {
+                              action: "set",
+                              sessionId,
+                              condition: text
+                          })
+                        : postCode<{ error?: string; queued?: boolean }>("/api/polar/code/prompt", {
+                              sessionId,
+                              text,
+                              attachments
+                          }),
                 setError
             ).then((result) => {
                 // Refused: the message goes back where it was typed.
                 if (!result || result.error) {
                     setSent(null);
-                    setReply(text);
+                    setReply(goal ? `/goal ${text}` : text);
                     if (result?.error) setError(result.error);
                     return;
                 }
                 // Mid-turn it waits in the queue, drawn there rather than as
                 // a message the agent already has.
                 if (result.queued) setSent(null);
-                parts.uploads.clear();
+                if (!goal) parts.uploads.clear();
+                read();
+            });
+        });
+    };
+
+    const clearGoal = () => {
+        setError(null);
+        startTransition(() => {
+            void runAction(
+                () => postCode<{ error?: string }>("/api/polar/code/goal", { action: "clear", sessionId }),
+                setError
+            ).then((result) => {
+                if (!result || result.error) return setError(result?.error ?? t("goal.clearFailed"));
+                setInfo(t("goal.cleared"));
+                read();
+            });
+        });
+    };
+
+    /** `/goal`: shown by its bar, cleared, or set and sent as the next turn. */
+    const goalCommand = (rest: string) => {
+        const asked = goals.parseGoalCommand(rest);
+        if (asked.kind === "too_long") return setError(t("goal.tooLong", { max: goals.GOAL_CONDITION_MAX }));
+        if (asked.kind === "set") return sendText(asked.condition, { goal: true });
+        if (!thread?.goal) return setInfo(t("goal.none"));
+        if (asked.kind === "clear") return clearGoal();
+        // The bar already shows it; say where it stands in words too.
+        setInfo(`${t(`goal.state.${goalStateKey(thread.goal)}`)}: ${thread.goal.condition}`);
+    };
+
+    /** `/copy [N]`: the Nth newest answer from the agent, to the clipboard. */
+    const copyAnswer = (rest: string) => {
+        const index = codeCommands.copyIndex(rest);
+        const answers = (thread?.entries ?? []).filter(
+            (entry) => entry.type === "message" && entry.role === "agent" && entry.text.trim()
+        );
+        const answer = index === null ? undefined : answers.at(-index);
+        if (!answer) return setError(t("slash.code.copyNone"));
+        void navigator.clipboard
+            .writeText(answer.text)
+            .then(() => setInfo(t("slash.code.copied")))
+            .catch(() => setError(t("slash.code.copyFailed")));
+    };
+
+    /** Ends the session (`/exit`), as Stop does on the session's page. */
+    const endSession = () => {
+        setError(null);
+        startTransition(() => {
+            void runAction(
+                () => postCode<{ error?: string }>("/api/polar/code/cancel", { sessionId }),
+                setError
+            ).then((result) => {
+                if (result?.error) setError(result.error);
                 read();
             });
         });
@@ -1305,6 +1372,10 @@ function CodeThread({
      *  rest go to the agent in its CLI's own spelling. */
     const runCommand = (command: codeCommands.CodeCommand, rest: string) => {
         setReply("");
+        setInfo(null);
+        if (command === "goal") return goalCommand(rest);
+        if (command === "copy") return copyAnswer(rest);
+        if (command === "exit") return endSession();
         if (command === "help") return setReply("/");
         if (command === "new") return onNew();
         if (command === "resume") return onHistory();
@@ -1501,6 +1572,15 @@ function CodeThread({
                 </div>
             ) : null}
             {/* A thread cached before todos existed has none. */}
+            {/* A thread cached before goals existed has none. */}
+            {thread.goal ? (
+                <PolarGoalBar
+                    goal={thread.goal}
+                    busy={busy || turning}
+                    onContinue={() => thread.goal && sendText(goals.continuationText(thread.goal))}
+                    onClear={clearGoal}
+                />
+            ) : null}
             <CodeTodos todos={thread.todos ?? []} />
             {thread.permission?.ask ? (
                 <CodeAskCard
@@ -1595,7 +1675,7 @@ function CodeThread({
             />
             </div>
             <CodeStatusLine parts={statusParts} />
-            {error ? <Notice error>{error}</Notice> : null}
+            {error ? <Notice error>{error}</Notice> : info ? <Notice>{info}</Notice> : null}
         </div>
     );
 

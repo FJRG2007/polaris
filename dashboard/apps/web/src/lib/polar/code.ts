@@ -13,7 +13,10 @@
  */
 
 import * as core from "@polaris/core";
+import { z } from "zod";
 import { getTranslations } from "@/lib/i18n/request";
+import { GOAL_CONDITION_MAX, readGoal, type PolarGoal } from "@/lib/polar/goals";
+import { clearSessionGoal, setSessionGoal } from "@/lib/agents/session-goal";
 import { prisma } from "@polaris/db";
 import { polarCredentialFor } from "@/lib/polar/access";
 import {
@@ -156,6 +159,8 @@ export interface PolarCodeThread {
     /** The subagents its agent launched, oldest first, each with its steps;
      *  empty when it ran none or the tool does not report them. */
     readonly subagents: readonly PolarCodeSubagent[];
+    /** The session's `/goal`, as last judged; null when it has none. */
+    readonly goal: PolarGoal | null;
 }
 
 /** A subagent as the thread shows it. Without its transcript path, which names
@@ -175,11 +180,11 @@ async function subagentsOf(sessionId: string): Promise<PolarCodeSubagent[]> {
     }
 }
 
-async function todosOf(sessionId: string): Promise<SessionTodo[]> {
+async function todosOf(sessionId: string): Promise<{ todos: SessionTodo[]; goal: PolarGoal | null }> {
     const row = await prisma.agentSession
-        .findUnique({ where: { id: sessionId }, select: { todos: true } })
+        .findUnique({ where: { id: sessionId }, select: { todos: true, goal: true } })
         .catch(() => null);
-    return storedTodos(row?.todos);
+    return { todos: storedTodos(row?.todos), goal: readGoal(row?.goal) };
 }
 
 /** The session's last reported size against its model's window (null when
@@ -295,7 +300,7 @@ export async function polarCodeThread(
 ): Promise<PolarCodeThread | null> {
     const access = await accessOf(user);
     if (access === "none") return null;
-    const [detail, t, { context, model }, todos, subagents] = await Promise.all([
+    const [detail, t, { context, model }, { todos, goal }, subagents] = await Promise.all([
         sessionDetailAction(sessionId),
         getTranslations("agents"),
         contextOf(sessionId),
@@ -361,7 +366,8 @@ export async function polarCodeThread(
                 ? await queuedReason(t, user.id, sessionId)
                 : null,
         todos,
-        subagents
+        subagents,
+        goal
     };
 }
 
@@ -611,6 +617,39 @@ export async function polarCodePrompt(
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
     return promptSessionAction(input);
+}
+
+const polarCodeGoalSchema = z.discriminatedUnion("action", [
+    z.object({
+        action: z.literal("set"),
+        sessionId: z.string().trim().uuid(),
+        condition: z.string().trim().min(1).max(GOAL_CONDITION_MAX)
+    }).strict(),
+    z.object({ action: z.literal("clear"), sessionId: z.string().trim().uuid() }).strict()
+]);
+
+/**
+ * Set or clear a running session's `/goal` (`lib/agents/session-goal.ts`).
+ * Setting one sends its condition as the next prompt, as Claude Code's /goal
+ * starts a turn with it; a prompt that is refused takes the goal back off.
+ */
+export async function polarCodeGoal(user: SessionUser, input: unknown): Promise<{ error?: string }> {
+    const t = await getTranslations("polar");
+    if ((await accessOf(user)) !== "manage") return { error: t("code.noAccess") };
+    const parsed = polarCodeGoalSchema.safeParse(input);
+    if (!parsed.success) return { error: t("goal.tooLong", { max: GOAL_CONDITION_MAX }) };
+    const session = await getSession(parsed.data.sessionId, user.id);
+    if (!session) return { error: t("code.goalFailed") };
+    if (parsed.data.action === "clear") {
+        await clearSessionGoal(session.id);
+        return {};
+    }
+    if (core.isSessionOver(session.state) || core.isSessionQueued(session.state))
+        return { error: t("code.goalFailed") };
+    const goal = await setSessionGoal(session.id, parsed.data.condition);
+    const sent = await promptSessionAction({ sessionId: session.id, text: goal.condition, attachments: [] });
+    if (sent.error) await clearSessionGoal(session.id).catch(() => undefined);
+    return sent;
 }
 
 /** Stop the turn a running session is on ("/stop"), as Escape does in its

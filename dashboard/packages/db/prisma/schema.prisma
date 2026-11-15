@@ -9064,6 +9064,9 @@ model AgentSession {
     // and from a change mid-session. Null leaves it to the tool's own default,
     // as every session before this did.
     effort         String?
+    // The /goal the agent keeps working toward, judged after each turn: the
+    // shape `PolarGoal` in apps/web/src/lib/polar/goals.ts. Null is none.
+    goal           Json?
     // The agent's own todo list, as its last todo tool call wrote it: up to
     // 50 `{ text, status }`. Null until the agent keeps one.
     todos          Json?

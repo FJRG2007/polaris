@@ -441,3 +441,53 @@ cloud sessions (forgetting, and stopping on a limit), and both reuse pieces
 that exist. 3 and 4 are small and close Phase 0. 5 has to land before 6,
 because runner events come from outside the web process. 6 and 7 are the "the
 PC is the machine" half.
+
+## 8. Built-in slash commands (inventory 2026-11-15)
+
+Source: Claude Code's command reference (https://code.claude.com/docs/en/commands)
+and the /goal page (https://code.claude.com/docs/en/goal), read 2026-11-15. Code
+sessions run the real CLI, so a command is either run by Polaris
+(`lib/polar/code-commands.ts`, `LOCAL`) or typed into the CLI in its own spelling
+(`FORWARDED`). A command that opens a picker inside the terminal is never typed:
+nothing here can answer that picker, so it gets Polaris's own control or is not
+applicable. Bundled skills (/run, /verify, /debug, /batch, /loop, /dataviz,
+/design, /slides...) are skills, not commands: they reach a session through
+Polar's skills and the person's own "/" commands, so they are not listed one by one.
+
+"Owned elsewhere" = being built by another change at the time of writing.
+
+| Command | What it does | Polar Chat | Polar Code | Decision |
+| --- | --- | --- | --- | --- |
+| /goal [condition\|clear] | Keep working across turns until a condition holds, judged after each turn | Built (`goals.ts`) | Built | Polaris runs it for every CLI: kept on `AgentSession.goal`, judged on `turn.end` (`lib/agents/session-goal.ts`), continued through the normal prompt path, bar above the composer |
+| /help | List commands | Built | Built | Opens the "/" list |
+| /clear [name] | Empty context | Built (new chat) | Built | Handed to the CLI (`/new` on Codex and opencode) |
+| /compact [instructions] | Summarize to free context | Built | Built | Handed to the CLI (`/compress` on Gemini) |
+| /context | Context usage grid | Built | Context bar | Owned elsewhere |
+| /usage, /cost, /stats | Session cost and plan limits | Built (/usage) | Not built | Owned elsewhere with the status line work; the CLI's /usage opens a dialog |
+| /model [model] | Switch model | Built (picker) | Start: built; running: model pill | Polaris UI; the CLI picker is never typed |
+| /effort | Reasoning effort | Effort pill | Effort pill | Already built |
+| /permissions | Allow/ask/deny rules | Tool grants | Mode pill and approvals card | Polaris UI; rules are Polaris's own approvals, not the CLI's dialog |
+| /plan [description] | Enter plan mode, optionally with a task | n/a | Built (Claude Code) | Handed to Claude Code with its words; the mode pill follows the reported mode |
+| /review, /code-review | Review a PR or the diff | n/a | Built (Claude Code) | Handed over |
+| /security-review | Security review of the branch | n/a | Built (Claude Code) | Handed over |
+| /simplify [target] | Clean up the changed code | n/a | Built (Claude Code) | Handed over |
+| /init | Write CLAUDE.md | n/a | Built | Handed over (Claude Code, Codex, opencode) |
+| /diff | Review working-tree changes | n/a | Built | Opens the workspace's changes |
+| /rename [name] | Rename the session | Built | Built | Polaris history title |
+| /resume [session] | Resume a conversation | Built | Built | Opens Polaris history |
+| /stop | Stop the current turn | Built | Built | Polaris interrupt |
+| /exit | End the CLI | n/a | Built | Ends the session (same as Stop on its page); Continue starts a new one on the branch |
+| /copy [N] | Copy the Nth newest answer | Built | Built | Polaris, to the clipboard |
+| /export [filename] | Export the conversation | Built | Not built | Owned elsewhere (transcript export) |
+| /branch [name], /fork [prompt] | Branch the conversation | Built (/branch) | Continue on an ended session | Not built for a running session: the CLI forks into its own background session Polaris does not track |
+| /memory | Edit CLAUDE.md, auto memory | Built | Not built | Repository memory is Polaris's (`repo-memory-store.ts`); the CLI's editor is a picker |
+| /rewind | Restore an earlier point | Not built | Not built | Picker in the terminal; checkpoints live in the CLI |
+| /btw [question] | Side question outside the conversation | n/a | Not built | Overlay in the terminal; ask Polar Chat beside the session instead |
+| /recap | One-line session summary | n/a | Not built | Printed in the terminal, never in the transcript Polaris reads |
+| /agents, /list-agents, /tasks, /subtask | Subagents and background work | n/a | Not built | Owned elsewhere (subagent tree) |
+| /mcp, /hooks, /skills, /plugin, /reload-*, /config, /status, /output-style | Configure the CLI | Polaris settings | Not applicable | Polaris writes the session's MCP config, hooks and skills at boot (`session-runtime.ts`); the dialogs are pickers |
+| /add-dir, /cd | Working directories | n/a | Not applicable | One checkout per session container |
+| /login, /logout, /setup-bedrock, /setup-vertex, /web-setup | Accounts and providers | n/a | Not applicable | Sign-ins and keys are Polaris's (Agents keys screen, account rotation) |
+| /doctor, /heapdump, /debug, /bug, /feedback, /insights, /team-onboarding | Diagnostics and reports | n/a | Not applicable | About the local install; Polaris owns the session's machine |
+| /background, /desktop, /teleport, /remote-control, /remote-env, /mobile, /restart, /upgrade, /usage-credits, /rate-limit-options, /passes, /privacy-settings, /install-github-app, /install-slack-app, /autofix-pr, /ultrareview, /schedule, /artifacts, /chrome, /import, /advisor, /fast, /autocompact, /auto-mode-setup, /sandbox | Anthropic account, apps and local-terminal features | n/a | Not applicable | Tied to an Anthropic account or the local terminal; Polaris has its own equivalents (sessions page, limits, GitHub app) where one exists |
+| /theme, /color, /tui, /focus, /vim, /keybindings, /terminal-setup, /scroll-speed, /statusline, /voice, /ide, /radio, /stickers, /powerup, /release-notes | Terminal look and extras | n/a | Not applicable | Terminal only; status line owned elsewhere |
