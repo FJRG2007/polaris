@@ -8,13 +8,13 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import { MAIL_PROVIDER_INFO } from "@polaris/core";
 import { Button, Card, CardBody } from "@polaris/ui";
 import { ChannelCard } from "./channel-card";
 import { EMAIL_CHANNEL_MARK } from "./email-mark";
 import { EmailChannelDialog } from "./email-channel-dialog";
 import type { EmailChannelView } from "@/lib/mail-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { providerLabel } from "./email-providers";
 
 export function EmailSendersView({
     initialSenders,
@@ -63,7 +63,7 @@ export function EmailSendersView({
                             statusLabel={t("inboxChannels.status", {
                                 status: sender.status === "connected" ? "ready" : sender.status
                             })}
-                            detail={[MAIL_PROVIDER_INFO[sender.provider].label, sender.from]
+                            detail={[providerLabel(t, sender.provider), sender.from]
                                 .filter(Boolean)
                                 .join(" - ")}
                             error={sender.error}

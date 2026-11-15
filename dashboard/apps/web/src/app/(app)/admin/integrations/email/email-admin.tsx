@@ -10,11 +10,11 @@
  */
 
 import { useState, useTransition } from "react";
-import { MAIL_PROVIDER_INFO } from "@polaris/core";
 import { setAuthMailChannelAction } from "./actions";
 import type { EmailChannelView } from "@/lib/mail-service";
 import { Button, Card, CardBody, Select } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { providerLabel } from "./email-providers";
 
 const NONE = "none";
 
@@ -39,7 +39,7 @@ export function AccountMailView({
             value: channel.id,
             label: t(channel.status === "connected" ? "email.channel" : "email.channelBroken", {
                 name: channel.name,
-                provider: MAIL_PROVIDER_INFO[channel.provider].label
+                provider: providerLabel(t, channel.provider)
             })
         }))
     ];

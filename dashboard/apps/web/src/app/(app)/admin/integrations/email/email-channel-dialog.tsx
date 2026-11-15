@@ -18,12 +18,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { Loader2, Send, Trash2 } from "lucide-react";
-import {
-    MAIL_PROVIDER_INFO,
-    MAIL_PROVIDERS,
-    type MailProvider,
-    type MailProviderField
-} from "@polaris/core";
+import { MAIL_PROVIDER_INFO, type MailProvider, type MailProviderField } from "@polaris/core";
 import {
     Button,
     Dialog,
@@ -32,23 +27,19 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select,
     isDirty
 } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { EmailChannelView } from "@/lib/mail-service";
+import { ProviderSelect } from "@/components/model-keys/provider-select";
+import { providerOptions, providerSummary } from "./email-providers";
 import {
     createEmailChannelAction,
     deleteEmailChannelAction,
     sendTestEmailAction,
     updateEmailChannelAction
 } from "./sender-actions";
-
-const PROVIDER_OPTIONS = MAIL_PROVIDERS.map((id) => ({
-    value: id,
-    label: MAIL_PROVIDER_INFO[id].label
-}));
 
 /** Sensible starting values so a new channel is mostly filled in already. */
 const DEFAULTS: Partial<Record<string, string>> = { port: "587", fromName: "Polaris" };
@@ -99,6 +90,7 @@ export function EmailChannelDialog({
     const [removing, startRemove] = useTransition();
 
     const info = MAIL_PROVIDER_INFO[provider];
+    const options = useMemo(() => providerOptions(t), [t]);
     const busy = saving || testing || removing;
 
     /** Switching provider keeps the values the two providers share (the From
@@ -188,16 +180,17 @@ export function EmailChannelDialog({
                             ? t("inboxChannels.manage.title", { name: channel.name })
                             : t("inboxChannels.email.addTitle")}
                     </DialogTitle>
-                    <DialogDescription>{info.summary}</DialogDescription>
+                    <DialogDescription>{providerSummary(t, provider)}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto overscroll-contain">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <div className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("inboxChannels.email.provider")}</span>
-                        <Select
+                        <ProviderSelect
+                            options={options}
                             value={provider}
-                            onValueChange={(value) => changeProvider(value as MailProvider)}
-                            options={PROVIDER_OPTIONS}
+                            onChange={(value) => changeProvider(value as MailProvider)}
+                            disabled={busy}
                         />
                         <span className="text-xs text-muted-foreground">
                             {t.rich("inboxChannels.email.sendingAddress", {
@@ -215,7 +208,7 @@ export function EmailChannelDialog({
                                 )
                             })}
                         </span>
-                    </label>
+                    </div>
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("inbox.connect.name")}</span>

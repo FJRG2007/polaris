@@ -1528,6 +1528,24 @@
         "accountMail": {
             "title": "Account mail",
             "hint": "Which sender carries address checks, password resets and sign-in codes."
+        },
+        "providers": {
+            "smtp": {
+                "label": "SMTP server",
+                "summary": "Any mail server you already have, including a provider's SMTP endpoint."
+            },
+            "resend": {
+                "summary": "Developer-first API. 3,000 mails a month free."
+            },
+            "brevo": {
+                "summary": "300 mails a day free, and no domain needed."
+            },
+            "mailjet": {
+                "summary": "200 mails a day free, and no domain needed."
+            },
+            "ses": {
+                "summary": "AWS Simple Email Service. Cheapest at volume."
+            }
         }
     },
     "evidence": {

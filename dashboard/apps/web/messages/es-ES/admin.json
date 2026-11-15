@@ -1528,6 +1528,24 @@
         "accountMail": {
             "title": "Correo cuenta",
             "hint": "Qué remitente lleva verificaciones, cambios de contraseña y códigos de acceso."
+        },
+        "providers": {
+            "smtp": {
+                "label": "Servidor SMTP",
+                "summary": "Cualquier servidor de correo que ya tengas, incluido el SMTP de un proveedor."
+            },
+            "resend": {
+                "summary": "API pensada para desarrolladores. 3.000 correos al mes gratis."
+            },
+            "brevo": {
+                "summary": "300 correos al día gratis, sin necesidad de dominio."
+            },
+            "mailjet": {
+                "summary": "200 correos al día gratis, sin necesidad de dominio."
+            },
+            "ses": {
+                "summary": "Amazon Simple Email Service. El más barato a gran volumen."
+            }
         }
     },
     "evidence": {

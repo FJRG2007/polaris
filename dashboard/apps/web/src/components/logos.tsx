@@ -6,7 +6,7 @@
 
 import { cn } from "@polaris/ui";
 import { initialsInk, tintFor } from "@polaris/core";
-import { Blocks } from "lucide-react";
+import { Blocks, Mails, Server } from "lucide-react";
 import { DymoMark } from "./dymo-mark";
 import * as brand from "./brand-icons";
 import type { ComponentType } from "react";
@@ -15,6 +15,7 @@ import { SIGNIN_PREFIX } from "@/lib/agents/agent-signins";
 import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
 import { SPEECH_PROVIDER_SEEDS } from "@/lib/integrations/speech-providers";
 import * as models from "./model-marks";
+import * as email from "./email-marks";
 import themed from "./agent-logo.module.css";
 
 /** The Models catalog, keyed by its integration slug. Kept as a map because that
@@ -145,7 +146,15 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     petkit: PetkitMark,
     vercel: brand.VercelMark,
     railway: brand.RailwayMark,
-    aws: brand.AwsMark
+    aws: brand.AwsMark,
+    // Email senders. "smtp" is any server, so it is drawn as one rather than as a
+    // brand; "polaris-mail" is Polaris's own mail server, drawn as that app's icon.
+    resend: email.ResendMark,
+    brevo: email.BrevoMark,
+    mailjet: email.MailjetMark,
+    ses: email.SesMark,
+    smtp: Server,
+    "polaris-mail": Mails
 };
 
 /**
