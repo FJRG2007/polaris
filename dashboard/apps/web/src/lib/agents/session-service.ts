@@ -851,8 +851,10 @@ export async function sessionEvents(
     sessionId: string,
     limit = 200
 ): Promise<{ kind: string; detail: string; subject: string; at: string }[]> {
+    // The main agent's own: a subagent's tool calls are its steps in the
+    // subagent tree (`sessionSubagentEvents`), not the main agent's.
     const records = await prisma.agentSessionEvent.findMany({
-        where: { sessionId },
+        where: { sessionId, agentId: null },
         orderBy: { createdAt: "desc" },
         take: limit,
         select: { kind: true, detail: true, subject: true, createdAt: true }
