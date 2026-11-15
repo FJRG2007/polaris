@@ -495,6 +495,45 @@ export async function setLocalNetwork(actor: RunActor, id: string, allow: boolea
  * A Watch alarm carried into this automation goes back to Watch switched off,
  * so it neither points at nothing nor starts announcing again unasked.
  */
+/**
+ * A copy of an automation on the same shelf, switched off and unpublished: the
+ * draft is carried over without its pinned test samples, and anything that
+ * needs its own say-so (reaching the local network, running as someone) is left
+ * for the copy's owner to grant again. Webhook addresses derive from the new
+ * id, so the copy never answers on the original's.
+ */
+export async function duplicateAutomation(
+    actor: RunActor,
+    id: string,
+    nameFor: (name: string) => string
+): Promise<string> {
+    const row = await load(actor, id, true);
+    const shelf: Shelf = { orgId: row.orgId, userId: row.orgId ? null : row.userId };
+    if ((await prisma.automation.count({ where: shelfWhere(shelf) })) >= L.perShelf)
+        throw new AutomationAccessError("limit");
+    const parsed = core.automationGraphSchema.safeParse(row.draft);
+    const extra = await prisma.automation.findUnique({
+        where: { id },
+        select: { folderId: true, tags: true }
+    });
+    const copy = await prisma.automation.create({
+        data: {
+            orgId: shelf.orgId,
+            userId: shelf.userId,
+            name: nameFor(row.name).slice(0, core.AUTOMATION_LIMITS.nameLength),
+            description: row.description,
+            folderId: extra?.folderId ?? null,
+            tags: extra?.tags ?? [],
+            draft: (parsed.success ? core.withoutPins(parsed.data) : core.emptyGraph()) as object,
+            mode: row.mode,
+            maxRuns: row.maxRuns,
+            rateLimit: row.rateLimit
+        },
+        select: { id: true }
+    });
+    return copy.id;
+}
+
 export async function deleteAutomation(actor: RunActor, id: string): Promise<void> {
     await load(actor, id, true);
     await prisma.$transaction([

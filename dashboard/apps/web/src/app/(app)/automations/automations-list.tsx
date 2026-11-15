@@ -14,6 +14,7 @@ import {
     Plus,
     Tags,
     Share2,
+    Copy,
     Trash2,
     UserPlus,
     Wifi,
@@ -62,6 +63,7 @@ import {
     createFolderAction,
     creatableShelvesAction,
     deleteAutomationAction,
+    duplicateAutomationAction,
     deleteFolderAction,
     listAutomationsAction,
     moveToFolderAction,
@@ -92,6 +94,7 @@ export function AutomationsList({
     after?: ReactNode;
 } = {}) {
     const t = useTranslations("automations");
+    const router = useRouter();
     const locale = useLocale();
     const toast = useToast();
     const origin = from?.origin ?? null;
@@ -185,6 +188,17 @@ export function AutomationsList({
             error: t("errors.generic")
         }));
         toast.show({ title: answer.ok ? t("editor.runStarted") : answer.error });
+    };
+
+    /** The copy opens in the editor, where it is renamed and switched on. */
+    const duplicate = async (row: AutomationRow) => {
+        const answer = await duplicateAutomationAction(row.id).catch(() => ({
+            ok: false as const,
+            error: t("errors.generic")
+        }));
+        if (!answer.ok) return void toast.show({ title: answer.error ?? t("errors.generic") });
+        toast.show({ title: t("list.duplicated") });
+        router.push(`/automations/${answer.id}`);
     };
 
     /** Gone from the list at once, and back where it was when the server says no. */
@@ -462,6 +476,12 @@ export function AutomationsList({
                                         <DropdownMenuItem onSelect={() => setSharing(row)}>
                                             <Share2 aria-hidden="true" />
                                             {t("list.share")}
+                                        </DropdownMenuItem>
+                                    ) : null}
+                                    {data.canEdit && !row.shared ? (
+                                        <DropdownMenuItem onSelect={() => void duplicate(row)}>
+                                            <Copy aria-hidden="true" />
+                                            {t("list.duplicate")}
                                         </DropdownMenuItem>
                                     ) : null}
                                     {data.canEdit && !row.shared ? <DropdownMenuSeparator /> : null}

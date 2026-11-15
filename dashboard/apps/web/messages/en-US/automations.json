@@ -3,6 +3,9 @@
     "description": "When something happens, do something. Runs as whoever published it.",
     "newAutomation": "New automation",
     "list": {
+        "duplicate": "Duplicate",
+        "copyName": "{name} (copy)",
+        "duplicated": "Copy made",
         "share": "Share access",
         "sharedWithYou": "Shared with you",
         "emptyTitle": "No automations yet",
@@ -1048,7 +1051,7 @@
             "data": "Data",
             "send": "Send",
             "game-servers": "Game servers",
-            "deploy": "Deploy",
+            "deploy": "Apps",
             "chat": "Chat",
             "tasks": "Tasks",
             "mail": "Mail",

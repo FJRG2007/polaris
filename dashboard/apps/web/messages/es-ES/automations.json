@@ -3,6 +3,9 @@
     "description": "Cuando pase algo, haz algo. Actúa como quien lo publicó.",
     "newAutomation": "Nueva automatización",
     "list": {
+        "duplicate": "Duplicar",
+        "copyName": "{name} (copia)",
+        "duplicated": "Copia creada",
         "emptyTitle": "Sin automatizaciones",
         "emptyDescription": "Empieza con un disparador y añade lo que debe hacer.",
         "emptyReadOnly": "Nada aún. Un admin de la organización puede crear una.",
@@ -1048,7 +1051,7 @@
             "data": "Datos",
             "send": "Enviar",
             "game-servers": "Hosting juegos",
-            "deploy": "Deploy",
+            "deploy": "Apps",
             "chat": "Chat",
             "tasks": "Tareas",
             "mail": "Correo",

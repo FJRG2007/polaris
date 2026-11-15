@@ -414,6 +414,23 @@ export async function exportFormSubmissionsAction(
     }
 }
 
+export async function duplicateAutomationAction(
+    automationId: unknown
+): Promise<Result<{ id: string }>> {
+    const parsed = id.safeParse(automationId);
+    if (!parsed.success) return invalid();
+    try {
+        const t = await getTranslations("automations");
+        const newId = await service.duplicateAutomation(await actor(), parsed.data, (name) =>
+            t("list.copyName", { name })
+        );
+        refresh();
+        return { ok: true, id: newId };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
 export async function deleteAutomationAction(automationId: unknown): Promise<Result> {
     const parsed = id.safeParse(automationId);
     if (!parsed.success) return invalid();
