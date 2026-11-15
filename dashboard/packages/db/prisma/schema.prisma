@@ -8480,6 +8480,7 @@ model AnalyticsSite {
     shareLinks AnalyticsShareLink[]
     labRuns  AnalyticsLabRun[]
     annotations AnalyticsAnnotation[]
+    rejections  AnalyticsRejection[]
 
     /// How often Polaris audits the site's home page with Lighthouse: off | daily | weekly | monthly.
     labFrequency String    @default("off")
@@ -8722,6 +8723,24 @@ model AnalyticsLabRun {
 /// The token is only in the URL: the row holds its hash, and the token sealed under
 /// the master key so the owner can be shown the link again. Removing a link deletes
 /// the row, so a link taken down and made again is a new address.
+/// How many beats for a site were turned away on one UTC day, and why: the
+/// tracker switched off, Do Not Track, a bot, an excluded page, an ignored
+/// address, a write that failed. Kept 30 days, so "why is nothing showing up"
+/// has an answer on the site's own screen.
+model AnalyticsRejection {
+    siteId String   @db.Uuid
+    /// UTC midnight.
+    day    DateTime
+    /// off | dnt | bot | path | ip | failed
+    cause  String
+    count  Int      @default(0)
+
+    site AnalyticsSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+    @@id([siteId, day, cause])
+    @@index([day])
+}
+
 /// A note pinned to a moment on a site's traffic chart: a release, a campaign,
 /// an outage. Shown as a dashed line on the chart and in its hover readout.
 model AnalyticsAnnotation {

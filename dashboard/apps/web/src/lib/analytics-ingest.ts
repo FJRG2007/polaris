@@ -16,6 +16,7 @@
  * supplies it.
  */
 
+import { pruneRejections } from "@/lib/analytics-rejections";
 import { prisma } from "@polaris/db";
 import { parseHttpLogs } from "@polaris/deploy";
 import { dashboardHosts } from "@/lib/domain-edge";
@@ -438,6 +439,7 @@ export async function pruneAnalytics(
     const removed = await prisma.analyticsSession.deleteMany({
         where: { lastSeenAt: { lt: new Date(cutoff) } }
     });
+    await pruneRejections(now);
     return { days, sessions: removed.count };
 }
 

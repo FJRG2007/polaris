@@ -37,6 +37,7 @@ import * as shareLinks from "@/lib/analytics-share";
 import * as lab from "@/lib/analytics-lab";
 import * as trackerOptions from "@/lib/analytics-tracker-options";
 import * as annotations from "@/lib/analytics-annotations";
+import * as rejections from "@/lib/analytics-rejections";
 import { externalSiteSchema } from "./site-input";
 import {
     createExternalSite,
@@ -912,4 +913,16 @@ export async function deleteAnnotationAction(input: {
         targetId: reached.access.site.id
     });
     return {};
+}
+
+// --- turned-away beats -------------------------------------------------------------
+
+/** Why beats for the site were turned away over the last 30 days. */
+export async function getRejectionsAction(input: {
+    scopeType: string;
+    scopeId: string;
+}): Promise<{ error?: string; rejections?: rejections.RejectionSummary[] }> {
+    const reached = await reach(input, "view");
+    if ("error" in reached) return reached;
+    return { rejections: await rejections.rejectionSummary(reached.access.site.id) };
 }

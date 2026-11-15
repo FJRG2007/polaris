@@ -10,6 +10,7 @@
  * change follows `level`, the same check every action makes on the server.
  */
 
+import { RejectionsCard } from "./rejections-card";
 import Link from "next/link";
 import * as core from "@polaris/core";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -1130,6 +1131,8 @@ function SitePanel(props: PanelProps) {
             />
 
             <TrackerOptionsCard scope={props.scope} siteId={props.siteId} canEdit={canEdit} />
+
+            <RejectionsCard scope={props.scope} siteId={props.siteId} />
 
             <AlertSettingsCard scope={props.scope} siteId={props.siteId} />
 

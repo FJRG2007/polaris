@@ -13,6 +13,7 @@
  * returns nothing; there is no session to ride and no data to leak.
  */
 
+import { recordRejection } from "@/lib/analytics-rejections";
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit-service";
@@ -84,9 +85,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     const site = await getAnalyticsSiteByKey(beat.key);
     // An unknown or switched-off key is indistinguishable from an accepted one here,
     // on purpose: this endpoint is not a way to find out which keys exist.
-    if (!site || !site.trackerEnabled) return accepted();
+    if (!site) return accepted();
+    // Counted only once the key is known to be real, and answered the same way.
+    if (!site.trackerEnabled) {
+        recordRejection(site.id, "off");
+        return accepted();
+    }
     const options = await readTrackerOptions(site.id);
-    if (options.doNotTrack && asksNotToTrack(request.headers)) return accepted();
+    if (options.doNotTrack && asksNotToTrack(request.headers)) {
+        recordRejection(site.id, "dnt");
+        return accepted();
+    }
 
     const userAgent = request.headers.get("user-agent");
     const at = Date.now();
@@ -129,6 +138,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     } catch (error) {
         // A write that fails is a lost visit, never an error on somebody's page.
         console.error("polaris: could not record a visit:", error);
+        recordRejection(site.id, "failed");
     }
     return accepted();
 }

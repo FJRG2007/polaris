@@ -670,5 +670,28 @@
         "invalid": "Escribe una nota de hasta 200 caracteres y elige cuándo pasó.",
         "tooMany": "Este sitio ya tiene 500 notas. Quita una antigua antes.",
         "gone": "Esa nota ya se había quitado."
+    },
+    "rejections": {
+        "title": "Sin registrar",
+        "intro": "Peticiones del rastreador de los últimos 30 días que se rechazaron, y por qué.",
+        "none": "Nada rechazado en los últimos 30 días.",
+        "failed": "No se pudo cargar lo rechazado.",
+        "last": "Último el {day}",
+        "cause": {
+            "off": "Rastreador apagado",
+            "dnt": "No rastrear",
+            "bot": "Bots",
+            "path": "Páginas excluidas",
+            "ip": "Direcciones ignoradas",
+            "failed": "No se guardó"
+        },
+        "hint": {
+            "off": "Enciende el rastreador arriba para registrar estas visitas.",
+            "dnt": "Pidieron no ser rastreados. Cámbialo en Rastreador.",
+            "bot": "Rastreadores conocidos. Contarlos es un interruptor en Recogida.",
+            "path": "Páginas en las exclusiones del sitio. Edita la lista arriba.",
+            "ip": "Direcciones en la lista ignorada. Edita la lista arriba.",
+            "failed": "Polaris no pudo escribir estas visitas. No se reintentan."
+        }
     }
 }

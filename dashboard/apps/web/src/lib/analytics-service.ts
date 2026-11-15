@@ -12,6 +12,7 @@
  * through `recordVisit` so they cannot drift into counting differently.
  */
 
+import { recordRejection } from "@/lib/analytics-rejections";
 import { prisma } from "@polaris/db";
 import type { WebVitalsInput } from "@polaris/core";
 import { forgetSubject } from "@/lib/access/forget";
@@ -365,11 +366,17 @@ export interface VisitInput {
     readonly scroll?: number | null;
 }
 
-/** Whether this site ignores this visit: an excluded page or an ignored address. */
+/** Whether this site ignores this visit: an excluded page or an ignored address.
+ *  Counted as turned away, so the site's screen can say why it is missing. */
 async function ignored(input: VisitInput, path: string): Promise<boolean> {
     const rules = await siteRules(input.siteId);
-    if (rules.ignoredIps.length && visitIpIgnored(rules.ignoredIps, input.ip)) return true;
-    return rules.excludedPaths.some((pattern) => visitPathMatches(pattern, path));
+    if (rules.ignoredIps.length && visitIpIgnored(rules.ignoredIps, input.ip)) {
+        recordRejection(input.siteId, "ip", input.at);
+        return true;
+    }
+    if (!rules.excludedPaths.some((pattern) => visitPathMatches(pattern, path))) return false;
+    recordRejection(input.siteId, "path", input.at);
+    return true;
 }
 
 /**
@@ -383,7 +390,10 @@ async function ignored(input: VisitInput, path: string): Promise<boolean> {
 export async function recordVisit(input: VisitInput): Promise<void> {
     const settings = await getAnalyticsSettings();
     const agent = parseVisitAgent(input.userAgent);
-    if (agent.device === "bot" && !settings.countBots) return;
+    if (agent.device === "bot" && !settings.countBots) {
+        recordRejection(input.siteId, "bot", input.at);
+        return;
+    }
 
     const [path, query] = splitUrl(input.url);
     if (await ignored(input, path)) return;

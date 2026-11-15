@@ -670,5 +670,28 @@
         "invalid": "Write a note of up to 200 characters and pick when it happened.",
         "tooMany": "This site already has 500 notes. Remove an old one first.",
         "gone": "That note was already removed."
+    },
+    "rejections": {
+        "title": "Not recorded",
+        "intro": "Requests from the tracker in the last 30 days that were turned away, and why.",
+        "none": "Nothing turned away in the last 30 days.",
+        "failed": "Could not load what was turned away.",
+        "last": "Last on {day}",
+        "cause": {
+            "off": "Tracker switched off",
+            "dnt": "Do Not Track",
+            "bot": "Bots",
+            "path": "Excluded pages",
+            "ip": "Ignored addresses",
+            "failed": "Could not be saved"
+        },
+        "hint": {
+            "off": "Switch the tracker on above to record these visits.",
+            "dnt": "Visitors asked not to be tracked. Change it in Tracker options.",
+            "bot": "Recognized crawlers. Counting them is a switch in Collection.",
+            "path": "Pages in the site's exclusions. Edit the list above.",
+            "ip": "Addresses in the site's ignore list. Edit the list above.",
+            "failed": "Polaris could not write these visits. They are not retried."
+        }
     }
 }
