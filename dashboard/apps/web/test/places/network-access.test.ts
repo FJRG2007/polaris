@@ -176,7 +176,7 @@ describe("a camera's and an account's network details", () => {
         manager();
         expect(await home.cameraNetworkAction(CAMERA_ID)).toEqual({ details });
         expect(await home.accountNetworksAction()).toEqual({
-            networks: [{ id: "lock:host", label: "Front lock", details }]
+            networks: [{ id: "lock:host", accountId: "lock", label: "Front lock", details }]
         });
     });
 

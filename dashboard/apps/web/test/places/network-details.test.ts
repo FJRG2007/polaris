@@ -91,6 +91,7 @@ describe("accountNetworks", () => {
         expect(accountNetworks([account("nuki-local", { host: "192.168.1.10" })], local)).toEqual([
             {
                 id: "account:host",
+                accountId: "account",
                 label: "Example",
                 details: { address: "192.168.1.10", mac: "AA:BB:CC:DD:EE:01" }
             }
