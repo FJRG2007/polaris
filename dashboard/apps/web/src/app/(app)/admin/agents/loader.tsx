@@ -43,7 +43,11 @@ export function AgentsAdminLoader({ revision }: { revision: number }) {
                     ) : null}
                     <SharedWorkspaceCard allowed={data.sharedMachine} />
                     <UsageLimitsCard limits={data.limits} />
-                    <CatalogCard models={data.catalogModels} refreshedAt={data.catalogAt} />
+                    <CatalogCard
+                        models={data.catalogModels}
+                        refreshedAt={data.catalogAt}
+                        index={data.providerIndex ?? null}
+                    />
                     <PlatformDefaultsView
                         platform={data.platform}
                         pools={data.pools}

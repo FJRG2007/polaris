@@ -53,7 +53,9 @@
             "empty": "Aún no se ha descargado nada, así que los selectores de modelo solo ofrecen lo que escribas. Se actualiza solo una vez al día.",
             "count": "{count, plural, one {{shown} modelo} other {{shown} modelos}} de los proveedores que admite Polaris. Se actualiza solo una vez al día.",
             "refresh": "Actualizar",
-            "lastRead": "Última lectura: <time>{when}</time>."
+            "lastRead": "Última lectura: <time>{when}</time>.",
+            "indexRead": "Proveedores: {count, plural, one {{shown} proveedor} other {{shown} proveedores}}, leídos <time>{when}</time>.",
+            "indexFailed": "Falló la última lectura de proveedores; la lista mostrada es anterior: {error}"
         },
         "limits": {
             "title": "Límites de uso",

@@ -18,6 +18,7 @@ import { instanceRouteKeys } from "@/lib/polar/routing-screen";
 import { checkRouting, pinnedKeyIds } from "@/lib/polar/routing-keys";
 import { instanceRouting, setInstanceRouting } from "@/lib/polar/router/store";
 import { SHARED_WORKSPACE_KEY } from "@/lib/agents/session-capacity";
+import { providerIndexState } from "@/lib/integrations/provider-catalog";
 import type { PickerModel } from "@/components/model-picker";
 import { savePlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
 import { modelProviders, providerForModel } from "@/lib/agents/agent-providers";
@@ -173,13 +174,15 @@ export async function deleteUsageLimitAction(input: unknown): Promise<{ error?: 
 export async function refreshModelCatalogAction(): Promise<{
     models?: number;
     at?: string;
+    index?: Awaited<ReturnType<typeof providerIndexState>>;
     error?: string;
 }> {
     const admin = await requireAdmin();
     const result = await refreshModelCatalog();
     if (!result.ok)
         return {
-            error: result.error ?? (await getTranslations("admin"))("agents.errors.catalogUnread")
+            error: result.error ?? (await getTranslations("admin"))("agents.errors.catalogUnread"),
+            index: await providerIndexState()
         };
     await recordAudit({
         actorId: admin.id,
@@ -187,7 +190,8 @@ export async function refreshModelCatalogAction(): Promise<{
         metadata: { models: result.models }
     });
     revalidatePath("/admin/agents");
-    return { models: result.models, at: (await catalogRefreshedAt())?.toISOString() };
+    const [at, index] = await Promise.all([catalogRefreshedAt(), providerIndexState()]);
+    return { models: result.models, at: at?.toISOString(), index };
 }
 
 export async function savePlatformAgentDefaultsAction(input: unknown): Promise<{ error?: string }> {

@@ -27,6 +27,7 @@ import { readerWords } from "@/lib/i18n/reader-words";
 import {
     downloadModelIndex,
     noteIndexFailure,
+    noteIndexUnchanged,
     storeProviderIndex
 } from "@/lib/integrations/provider-catalog";
 
@@ -268,6 +269,7 @@ export async function refreshModelCatalog(): Promise<CatalogRefresh> {
         // Nothing moved since the last good download; say so, so the next tick
         // does not ask again for another day.
         await prisma.agentModel.updateMany({ data: { refreshedAt: new Date() } });
+        await noteIndexUnchanged();
         return { ok: true, models: await prisma.agentModel.count() };
     }
     if (download.state === "failed") {

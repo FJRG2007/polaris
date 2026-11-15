@@ -513,6 +513,12 @@ async function rememberIndex(data: {
         .catch(() => undefined);
 }
 
+/** Note a download the index answered with "unchanged": the stored rows are
+ *  current as of now, and whatever failed before has stopped failing. */
+export async function noteIndexUnchanged(): Promise<void> {
+    await rememberIndex({ refreshedAt: new Date(), lastError: null });
+}
+
 /** Note a failed download without touching what is stored. */
 export async function noteIndexFailure(error: string): Promise<void> {
     await rememberIndex({ lastError: error.slice(0, 500) });

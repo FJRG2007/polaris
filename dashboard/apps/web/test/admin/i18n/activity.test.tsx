@@ -64,11 +64,39 @@ describe("audit integrity", () => {
 
 describe("model catalog", () => {
     it("counts models in both languages", () => {
-        expect(renderToStaticMarkup(withMessages(<CatalogCard models={1} refreshedAt={null} />))).toContain(
+        expect(renderToStaticMarkup(withMessages(<CatalogCard models={1} refreshedAt={null} index={null} />))).toContain(
             "1 model across the providers Polaris supports."
         );
-        const spanish = renderToStaticMarkup(withMessages(<CatalogCard models={340} refreshedAt={null} />, "es-ES"));
+        const spanish = renderToStaticMarkup(withMessages(<CatalogCard models={340} refreshedAt={null} index={null} />, "es-ES"));
         expect(spanish).toContain("340 modelos de los proveedores que admite Polaris.");
         expect(spanish).toContain("Modelos");
+    });
+
+    it("says when the provider list was read, and why the last read failed", () => {
+        const index = { refreshedAt: "2026-11-15T08:00:00.000Z", providers: 42, lastError: "HTTP 503" };
+        const html = renderToStaticMarkup(
+            withMessages(<CatalogCard models={1} refreshedAt={null} index={index} />)
+        );
+        expect(html).toContain("Provider list: 42 providers, read <time");
+        expect(html).toContain('dateTime="2026-11-15T08:00:00.000Z"');
+        expect(html).toContain("The last provider list read failed, so the one shown is older: HTTP 503");
+        const spanish = renderToStaticMarkup(
+            withMessages(<CatalogCard models={1} refreshedAt={null} index={index} />, "es-ES")
+        );
+        expect(spanish).toContain("Proveedores: 42 proveedores, leídos <time");
+        expect(spanish).toContain("Falló la última lectura de proveedores");
+    });
+
+    it("says nothing about the provider list before it is first read", () => {
+        const html = renderToStaticMarkup(
+            withMessages(
+                <CatalogCard
+                    models={1}
+                    refreshedAt={null}
+                    index={{ refreshedAt: null, providers: 0, lastError: null }}
+                />
+            )
+        );
+        expect(html).not.toContain("Provider list");
     });
 });

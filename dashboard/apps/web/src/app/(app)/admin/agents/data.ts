@@ -6,6 +6,7 @@ import { readPolarPolicy } from "@/lib/polar/access";
 import { instanceRouting } from "@/lib/polar/router/store";
 import { instanceRouteKeys } from "@/lib/polar/routing-screen";
 import { catalogRefreshedAt } from "@/lib/agents/model-catalog";
+import { providerIndexState } from "@/lib/integrations/provider-catalog";
 import { listUsageLimits } from "@/lib/agents/agent-usage-limits";
 import { sharedWorkspaceAllowed } from "@/lib/agents/session-capacity";
 import { getPlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
@@ -29,7 +30,8 @@ export async function loadAgentsAdminAction() {
         polarPolicy,
         groups,
         routing,
-        routingKeys
+        routingKeys,
+        providerIndex
     ] = await Promise.all([
         getPlatformAgentDefaults(),
         prisma.runnerPool.findMany({
@@ -50,7 +52,8 @@ export async function loadAgentsAdminAction() {
             take: GROUP_CHIPS + 1
         }),
         instanceRouting(),
-        instanceRouteKeys()
+        instanceRouteKeys(),
+        providerIndexState()
     ]);
     const [chosenGroups, people] = await Promise.all([
         prisma.group.findMany({
@@ -68,6 +71,7 @@ export async function loadAgentsAdminAction() {
         providers,
         catalogModels,
         catalogAt: catalogAt?.toISOString() ?? null,
+        providerIndex,
         keysShared,
         limits,
         sharedMachine,

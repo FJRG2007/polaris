@@ -137,16 +137,26 @@ export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
     );
 }
 
+/** The provider index as last read: when, how many providers, the last failure. */
+export interface ProviderIndexView {
+    refreshedAt: string | null;
+    providers: number;
+    lastError: string | null;
+}
+
 export function CatalogCard({
     models,
-    refreshedAt
+    refreshedAt,
+    index
 }: {
     models: number;
     refreshedAt: string | null;
+    index: ProviderIndexView | null;
 }) {
     const t = useTranslations("admin");
     const [count, setCount] = useState(models);
     const [at, setAt] = useState(refreshedAt);
+    const [indexState, setIndexState] = useState(index);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const format = useDisplayFormat();
@@ -156,6 +166,7 @@ export function CatalogCard({
         startTransition(() => {
             void (async () => {
                 const result = await runAction(() => refreshModelCatalogAction(), setError);
+                if (result?.index !== undefined) setIndexState(result.index);
                 if (result?.models !== undefined) {
                     setCount(result.models);
                     setAt(result.at ?? null);
@@ -191,6 +202,25 @@ export function CatalogCard({
                                 </time>
                             )
                         })}
+                    </p>
+                ) : null}
+                {indexState?.refreshedAt ? (
+                    <p className="text-muted-foreground text-xs">
+                        {t.rich("agents.catalog.indexRead", {
+                            count: indexState.providers,
+                            shown: String(indexState.providers),
+                            when: format.dateTime(indexState.refreshedAt),
+                            time: (chunks) => (
+                                <time key="time" dateTime={indexState.refreshedAt ?? undefined}>
+                                    {chunks}
+                                </time>
+                            )
+                        })}
+                    </p>
+                ) : null}
+                {indexState?.lastError ? (
+                    <p className="text-xs text-warning break-words">
+                        {t("agents.catalog.indexFailed", { error: indexState.lastError })}
                     </p>
                 ) : null}
                 {error ? <p className="text-xs text-danger">{error}</p> : null}

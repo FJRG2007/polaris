@@ -53,7 +53,9 @@
             "empty": "Nothing downloaded yet, so the model pickers offer only what you type. It refreshes itself once a day.",
             "count": "{count, plural, one {{shown} model} other {{shown} models}} across the providers Polaris supports. Refreshes itself once a day.",
             "refresh": "Refresh",
-            "lastRead": "Last read <time>{when}</time>."
+            "lastRead": "Last read <time>{when}</time>.",
+            "indexRead": "Provider list: {count, plural, one {{shown} provider} other {{shown} providers}}, read <time>{when}</time>.",
+            "indexFailed": "The last provider list read failed, so the one shown is older: {error}"
         },
         "limits": {
             "title": "Usage limits",
