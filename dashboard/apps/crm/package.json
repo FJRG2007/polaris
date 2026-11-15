@@ -6,7 +6,8 @@
     "description": "CRM: companies, people and opportunities, for one person or shared by an organization. An installable Polaris app.",
     "polaris": {
         "id": "crm",
-        "extension": "src/lib/crm-extension.ts#crmExtension"
+        "extension": "src/lib/crm-extension.ts#crmExtension",
+        "slot": "src/screens/extension-slot.tsx#CrmSlot"
     },
     "dependencies": {
         "@polaris/app-host": "0.1.0",

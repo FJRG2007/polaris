@@ -14,6 +14,8 @@
  * the server refuses it.
  */
 
+import Link from "next/link";
+import { automationsListHref } from "@polaris/core";
 import { Board } from "./board";
 import { useFavorite } from "./use-favorite";
 import { useSearchParams } from "next/navigation";
@@ -31,7 +33,6 @@ import { RecordTable } from "./record-table";
 import { RecordScreen } from "./record-screen";
 import { TrashDialog } from "./trash-dialog";
 import { ImportDialog } from "./import-dialog";
-import { WorkflowsDialog } from "./workflows-dialog";
 import * as actions from "../actions/records";
 import { FilterButton } from "./filter-panel";
 import { hostUi } from "@polaris/app-host/client";
@@ -415,7 +416,6 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const [peek, setPeek] = useState<string | null>(null);
     const [trashOpen, setTrashOpen] = useState(false);
     const [importOpen, setImportOpen] = useState(false);
-    const [workflowsOpen, setWorkflowsOpen] = useState(false);
     const [drafting, setDrafting] = useState(false);
     const [bulkOpen, setBulkOpen] = useState(false);
     const [mergeOpen, setMergeOpen] = useState(false);
@@ -1159,14 +1159,14 @@ export function ListScreen({ object }: { object: CrmObject }) {
                         </Button>
                     ) : null}
                     {canEdit ? (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setWorkflowsOpen(true)}
-                            aria-label={t("workflows.button")}
-                            title={t("workflows.hint")}
-                        >
-                            <Workflow className="size-4" />
+                        <Button variant="ghost" size="sm" asChild>
+                            <Link
+                                href={automationsListHref("crm", object)}
+                                aria-label={t("workflows.button")}
+                                title={t("workflows.hint")}
+                            >
+                                <Workflow className="size-4" />
+                            </Link>
                         </Button>
                     ) : null}
                     <Button
@@ -1282,12 +1282,6 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     />
                 ) : null}
                 {confirmElement}
-                <WorkflowsDialog
-                    object={object}
-                    open={workflowsOpen}
-                    confirm={confirm}
-                    onClose={() => setWorkflowsOpen(false)}
-                />
                 <ImportDialog
                     object={object}
                     open={importOpen}

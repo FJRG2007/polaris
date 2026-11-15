@@ -2182,7 +2182,6 @@
         "crm/src/screens/totals-row.tsx",
         "crm/src/screens/trash-dialog.tsx",
         "crm/src/screens/workflow-fields.tsx",
-        "crm/src/screens/workflows-dialog.tsx",
         "crm/src/screens/use-groups.ts",
         "crm/src/screens/use-records.ts",
         "crm/src/screens/view-picker.tsx",
