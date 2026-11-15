@@ -82,7 +82,8 @@
         },
         "sessionPlace": {
             "local": "This Polaris box",
-            "host": "An enrolled server"
+            "host": "An enrolled server",
+            "computer": "This computer"
         }
     },
     "notice": {

@@ -82,7 +82,8 @@
         },
         "sessionPlace": {
             "local": "Esta máquina Polaris",
-            "host": "Un servidor inscrito"
+            "host": "Un servidor inscrito",
+            "computer": "Este equipo"
         }
     },
     "notice": {
