@@ -358,6 +358,13 @@ const PREPARE_WORKTREE = [
     'printf %s "$POLARIS_HOOK_SETTINGS" | base64 -d > "$POLARIS_STATE_DIR/settings.json"',
     'printf %s "$POLARIS_MCP_CONFIG" | base64 -d > "$POLARIS_STATE_DIR/mcp.json"',
     'chmod 0600 "$POLARIS_STATE_DIR/settings.json" "$POLARIS_STATE_DIR/mcp.json"',
+    // The script that carries the repository's memory between boxes (see
+    // `memorySyncScript`). It holds the session's token, so it is private like
+    // the hook script. Absent where no memory is carried.
+    'if [ -n "$POLARIS_MEMORY_SYNC" ]; then',
+    '  printf %s "$POLARIS_MEMORY_SYNC" | base64 -d > "$POLARIS_STATE_DIR/memory-sync.sh"',
+    '  chmod 0700 "$POLARIS_STATE_DIR/memory-sync.sh"',
+    "fi",
     // Made as root because the image starts as root; owned by the agent, because
     // the agent is who edits it.
     //
@@ -921,7 +928,7 @@ const RUNNER_SCRIPT_BASE64 = Buffer.from(RUNNER_SCRIPT, "utf8").toString("base64
 export const INTERFACE_SCRIPT = [
     "#!/bin/sh",
     "# Written by Polaris. Opens the agent's own interface on this session's conversation.",
-    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP",
+    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP",
     'for pair in $POLARIS_CREDENTIAL_FILES; do unset "$(printf %s "$pair" | cut -d= -f1)"; done',
     'id="$(head -c 128 "$POLARIS_STATE_DIR/agent-session-id" 2>/dev/null || true)"',
     'case "$id" in *[!A-Za-z0-9_-]*) id="" ;; esac',
@@ -1153,8 +1160,16 @@ const START_AGENT = [
     '  as_agent "sh $(printenv TMPDIR || echo /tmp)/polaris-first-run.sh" || true',
     "  rm -f $(printenv TMPDIR || echo /tmp)/polaris-first-run.sh",
     "fi",
+    // What the agent remembers about this repository, from whichever box last
+    // ran a session of it, before the agent starts and reads it. After Enigma
+    // and the first run, which write into the same home. Best effort: a
+    // session that starts without its memory is better than one that does
+    // not start, and the script uploads nothing until a restore succeeded.
+    'if [ -f "$POLARIS_STATE_DIR/memory-sync.sh" ]; then',
+    '  as_agent "sh \\"$POLARIS_STATE_DIR/memory-sync.sh\\" restore" || true',
+    "fi",
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP",
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP",
     // Said once, in the terminal the person is looking at, because on a machine
     // they cannot see "please sign in" with no way to and no reason given is the
     // whole of what was wrong with this. Only when Polaris is carrying no

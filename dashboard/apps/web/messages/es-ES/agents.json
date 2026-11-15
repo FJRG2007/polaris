@@ -529,6 +529,16 @@
         "hostedFree": "Los runners de GitHub son gratis para este repositorio.",
         "nothing": "Aún no hay nada que pueda ejecutar este repositorio. Resuelve uno de los motivos de abajo."
     },
+    "repoMemory": {
+        "title": "Memoria de tu agente",
+        "hint": "Lo que tu agente aprendió de este repositorio. Te sigue a cualquier máquina y nunca llega a otros repositorios.",
+        "empty": "Aún no recuerda nada.",
+        "summary": "{count} archivos, {size} KB, actualizada {when}",
+        "clear": "Borrar",
+        "confirm": "Borrar memoria",
+        "keep": "Conservar",
+        "clearFailed": "No se pudo borrar la memoria. Inténtalo de nuevo."
+    },
     "repoDialog": {
         "setupPlaceholder": "npm ci",
         "setup": "Preparación",

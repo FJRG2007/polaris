@@ -373,7 +373,7 @@ export async function releaseContainer(
             .runIn(containerId, [
                 "sh",
                 "-c",
-                `rm -rf ${commands.SESSION_ROOT}/repo ${commands.SESSION_ROOT}/polaris ${commands.CLAIM_FILE}`
+                `rm -rf ${commands.SESSION_ROOT}/repo ${commands.SESSION_ROOT}/polaris ${commands.SESSION_ROOT}/repos ${commands.CLAIM_FILE}`
             ])
             .catch(() => undefined);
         await ports.composeDown(containerId).catch(() => undefined);

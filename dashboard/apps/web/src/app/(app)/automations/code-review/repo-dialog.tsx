@@ -4,6 +4,7 @@ import { runAction } from "@/lib/run-action";
 import { ExecutionPicker } from "./execution-picker";
 import { useEffect, useState, useTransition } from "react";
 import { RepoSettingsFields } from "./repo-settings-fields";
+import { RepoMemorySection } from "./repo-memory-section";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
 import { updateRepoConfigAction } from "./actions";
 import {
@@ -274,6 +275,8 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                             <span className="text-sm">{t("repoDialog.setupRequired")}</span>
                         </div>
                     ) : null}
+
+                    <RepoMemorySection repoFullName={repo.repoFullName} />
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>

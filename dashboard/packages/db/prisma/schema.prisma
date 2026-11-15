@@ -9200,6 +9200,30 @@ model AgentSession {
     @@index([hostId])
 }
 
+// What a person's agent remembers about one repository, carried between the
+// boxes their Code sessions run on. Uploaded by the session at the end of each
+// turn and restored before the next session's agent starts (session-memory.ts).
+//
+// Per person and repository, never per box: on a laptop the memory follows the
+// person, and a session must not hand one repository's memory to another.
+// `files` is the whole set as the box last had it - `[{ path, data }]`, data in
+// base64 - bounded to 2 MB by the upload's own validation; read it through
+// `readStoredFiles`, which drops anything that no longer passes. Not a relation
+// on the user, the same way a session's starter is not: it is cleared by the
+// person, and goes when they ask for it to.
+model AgentRepoMemory {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    userId       String   @db.Uuid
+    // `owner/name`, lowercased: GitHub names are case-insensitive.
+    repoFullName String
+    files        Json     @default("[]")
+    bytes        Int      @default(0)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@unique([userId, repoFullName])
+}
+
 // A container started for somebody while they are in Polar Code, waiting for
 // the session they are about to send (see `lib/agents/session-spares.ts`). One
 // per account; taken by a conditional delete, so two tabs cannot both take it.

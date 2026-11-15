@@ -529,6 +529,16 @@
         "hostedFree": "GitHub-hosted runners are free for this repository.",
         "nothing": "Nothing can run this repository yet. Fix one of the reasons below."
     },
+    "repoMemory": {
+        "title": "Your agent's memory",
+        "hint": "What your agent learned about this repository. It goes with you to any machine and never reaches other repositories.",
+        "empty": "Nothing remembered yet.",
+        "summary": "{count} files, {size} KB, updated {when}",
+        "clear": "Clear",
+        "confirm": "Clear memory",
+        "keep": "Keep it",
+        "clearFailed": "The memory could not be cleared. Try again."
+    },
     "repoDialog": {
         "setupPlaceholder": "npm ci",
         "setup": "Setup script",

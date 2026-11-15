@@ -47,6 +47,7 @@ import {
     shellQuote
 } from "./session-hooks";
 import * as fork from "./session-fork";
+import * as memory from "./session-memory";
 import { endContainerSession, type SaveOutcome } from "./session-work";
 import { clearSessionWaiting, noticeSessionEnded } from "./agent-notices";
 import { syncFinalSessionHistory } from "./session-history";
@@ -71,8 +72,12 @@ import {
 } from "./session-service";
 
 
-/** Where a `local` session's worktree lives inside its own container: on the
- *  session's own directory on the box, so it outlives the container. See
+/** Where a `local` session's worktree used to live inside its own container,
+ *  for every repository alike. Still what a repository name Polaris cannot key
+ *  falls back to; every other checkout is `memory.repoCheckoutDir`, a path of
+ *  the repository's own, so the stores the agent keys by its path are that
+ *  repository's (see session-memory.ts). Both sit on the session's own
+ *  directory on the box, so they outlive the container. See
  *  `sessionCheckoutSource`. */
 const CONTAINER_WORKDIR = `${commands.SESSION_ROOT}/repo`;
 
@@ -147,6 +152,7 @@ interface Bootstrap {
     readonly firstRun: string;
     readonly hookScript: string;
     readonly hookSettings: string;
+    readonly memorySync: string;
     /** `ENV=relative/path` pairs, space separated: which of `credentials` are
      *  a file the tool keeps, and where. Names and paths from the catalogue. */
     readonly credentialFiles: string;
@@ -262,7 +268,20 @@ function workdirFor(session: SessionView): string {
         // session would open on an empty one and leave another behind.
         return session.repoFullName ? hostWorkdir(session.id) : "$HOME/.polaris/workspace";
     }
-    return session.repoFullName ? CONTAINER_WORKDIR : CONTAINER_WORKSPACE;
+    if (!session.repoFullName) return CONTAINER_WORKSPACE;
+    return memory.memoryKey(session.repoFullName) ? memory.repoCheckoutDir(session.repoFullName) : CONTAINER_WORKDIR;
+}
+
+/**
+ * Whether a session carries its agent's memory of the repository between
+ * boxes, and where that memory lives. Only where Polaris owns the home and it
+ * is one person's: a server's home is already its owner's own, and a machine
+ * everybody shares would hand one person's memory to the next. Must agree
+ * with `sessionMemoryScope`, which is what the endpoint authorises by.
+ */
+function memoryDirFor(session: SessionView): string {
+    if (session.place !== "local" || session.sharedHome || !session.ownerId || !session.repoFullName) return "";
+    return memory.memoryKey(session.repoFullName) ? memory.repoMemoryDir(session.repoFullName) : "";
 }
 
 /** The parent's transcript a forked session reopens, or empty for any other. */
@@ -287,6 +306,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     const enigma = await resolveSessionEnigma(session.id);
     const agent = agentCommandFor(session, enigma.enabled);
     const credentials = await credentialEnvFor(session, agent.cli);
+    const memoryDir = memoryDirFor(session);
     // Only the tools whose turn flags were checked against their own docs.
     const headless = agent.cli.headless?.join(" ") ?? "";
 
@@ -329,11 +349,23 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         hookScript: hookScript(
             ingest,
             token,
-            agent.cli.id === "claude" ? `${base}/api/agents/sessions/${session.id}/permission` : undefined
+            agent.cli.id === "claude" ? `${base}/api/agents/sessions/${session.id}/permission` : undefined,
+            { memorySync: memoryDir !== "" }
         ),
         hookSettings: JSON.stringify(
-            claudeHookSettings(`${stateDirFor(session)}/hook.sh`, { headless: headless !== "" })
+            claudeHookSettings(`${stateDirFor(session)}/hook.sh`, { headless: headless !== "", memoryDir })
         ),
+        // The script that restores the repository's memory before the agent
+        // starts and carries it back after each turn. Empty where none is kept.
+        memorySync: memoryDir
+            ? memory.memorySyncScript({
+                  url: `${base}/api/agents/sessions/${session.id}/memory`,
+                  token,
+                  workdir: workdirFor(session),
+                  memoryDir,
+                  handoffDir: memory.HANDOFF_DIR
+              })
+            : "",
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
         // Empty for a workspace, which clones nothing. A header built around an
         // empty token is a header git would send.
@@ -512,7 +544,10 @@ export async function placeAttachments(
 ): Promise<void> {
     if (files.length === 0) return;
     const bytes = await attachments.attachmentBytes(userId, files);
-    for (const command of attachments.attachmentCommands(workdirFor(session), bytes)) {
+    // Where this session actually checked out: one started before checkouts
+    // moved to a path per repository is still where it began.
+    const workdir = (await sessionPlacement(session.id))?.workdir || workdirFor(session);
+    for (const command of attachments.attachmentCommands(workdir, bytes)) {
         await steer(session.id, command, "The attached files did not reach the session");
     }
 }
@@ -626,6 +661,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_FIRST_RUN: boot.firstRun,
         POLARIS_HOOK_SCRIPT: asFile(boot.hookScript),
         POLARIS_HOOK_SETTINGS: asFile(boot.hookSettings),
+        POLARIS_MEMORY_SYNC: boot.memorySync ? asFile(boot.memorySync) : "",
         POLARIS_CREDENTIAL_FILES: boot.credentialFiles,
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),
         POLARIS_GIT_CREDENTIAL: boot.gitCredential ? asFile(boot.gitCredential) : "",

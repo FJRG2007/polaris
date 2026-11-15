@@ -76,7 +76,7 @@ const PERMISSION_CURL_SECONDS = 125;
  */
 export function claudeHookSettings(
     scriptPath: string,
-    { headless = false }: { headless?: boolean } = {}
+    { headless = false, memoryDir = "" }: { headless?: boolean; memoryDir?: string } = {}
 ): Record<string, unknown> {
     const hooks: Record<string, unknown[]> = {};
     for (const { event, matcher } of CLAUDE_HOOK_EVENTS) {
@@ -102,7 +102,15 @@ export function claudeHookSettings(
     // settings) rather than from `bypassPermissionsModeAccepted`, so the flag
     // file Polaris passes with `--settings` carries it. It only skips the
     // warning; whether permissions are bypassed is still the launch flags' call.
-    return { hooks, skipDangerousModePermissionPrompt: true };
+    // The repository's own memory folder, which the session carries between
+    // boxes (session-memory.ts). Claude Code reads this key from user, local,
+    // flag or policy settings - never from a repository's own - so the flag
+    // file is where it goes.
+    return {
+        hooks,
+        skipDangerousModePermissionPrompt: true,
+        ...(memoryDir ? { autoMemoryDirectory: memoryDir } : {})
+    };
 }
 
 /**
@@ -140,7 +148,12 @@ export function mcpConfig(url: string, token: string): Record<string, unknown> {
  * and Polaris being unreachable must never be a reason for somebody's agent to
  * change what it was doing.
  */
-export function hookScript(ingestUrl: string, token: string, askUrl?: string): string {
+export function hookScript(
+    ingestUrl: string,
+    token: string,
+    askUrl?: string,
+    { memorySync = false }: { memorySync?: boolean } = {}
+): string {
     return [
         "#!/bin/sh",
         "# Written by Polaris. Reports this session's lifecycle events.",
@@ -166,6 +179,16 @@ export function hookScript(ingestUrl: string, token: string, askUrl?: string): s
         // Only a hint for the reboot - Polaris stores what it parses itself.
         `id="$(printf %s "$payload" | grep -o '"session_\\{0,1\\}[iI]d" *: *"[A-Za-z0-9_-]*"' | head -n 1 | cut -d '"' -f 4)"`,
         'if [ -n "$id" ]; then printf %s "$id" > "$(dirname "$0")/agent-session-id" 2>/dev/null || true; fi',
+        // The end of a turn carries the repository's memory to Polaris
+        // (`memorySyncScript`). In the background and detached: it is an
+        // upload, and the agent must not wait on it.
+        ...(memorySync
+            ? [
+                  `if printf %s "$payload" | grep -Eq '"hook_event_name" *: *"(Stop|SessionEnd)"'; then`,
+                  '    (sh "$(dirname "$0")/memory-sync.sh" >/dev/null 2>&1 &)',
+                  "fi"
+              ]
+            : []),
         `printf %s "$payload" | curl -sS -m 4 -X POST ${shellQuote(ingestUrl)} \\`,
         '  -H "X-Polaris-Seq: $seq" \\',
         `  -H ${shellQuote(`Authorization: Bearer ${token}`)} \\`,
