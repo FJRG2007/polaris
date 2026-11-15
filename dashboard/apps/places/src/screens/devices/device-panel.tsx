@@ -40,6 +40,9 @@ import { ApplianceControls } from "./appliance-controls";
 import { LitterControls } from "./litter-controls";
 import { SwitchSettings } from "./switch-settings";
 import { DeviceReadings } from "./device-readings";
+import Link from "next/link";
+import { automationHref, networksFor } from "../../lib/device-list";
+import type { AccountNetwork } from "../../lib/network-details";
 import {
     Badge,
     Button,
@@ -47,6 +50,7 @@ import {
     DialogContent,
     DialogTitle,
     EmptyState,
+    LanDetails,
     Skeleton,
     TimeSeriesChart,
     cn
@@ -72,6 +76,7 @@ import {
     Palette,
     Pencil,
     Share2,
+    Workflow,
     Plug,
     Power,
     PowerOff,
@@ -337,6 +342,9 @@ export function DevicePanel({
     device,
     canControl,
     canManage,
+    placeId,
+    networks = [],
+    devices = [],
     onClose,
     onAct,
     onEdit
@@ -344,6 +352,12 @@ export function DevicePanel({
     device: DeviceView | null;
     canControl: boolean;
     canManage: boolean;
+    /** The place on screen, for a device not placed in one of its own. */
+    placeId?: string;
+    /** The connected accounts' addresses, for whoever manages them. */
+    networks?: readonly AccountNetwork[];
+    /** The other devices, to tell an account's own address from a hub's. */
+    devices?: readonly DeviceView[];
     onClose: () => void;
     onAct: (device: DeviceView, action: DeviceAction, command?: DeviceCommand) => Promise<void>;
     onEdit: (device: DeviceView) => void;
@@ -358,6 +372,15 @@ export function DevicePanel({
     const [sharing, setSharing] = useState(false);
     const [error, setError] = useState("");
     const deviceId = device?.id ?? null;
+    const lan = device ? networksFor(device, networks, devices) : null;
+    const automationPlace = device?.placeId ?? placeId;
+    const automation =
+        device && canManage && automationPlace
+            ? automationHref(
+                  { type: "device", key: `device:${device.id}`, device },
+                  automationPlace
+              )
+            : null;
 
     const load = useCallback(async () => {
         if (!deviceId) return;
@@ -419,6 +442,19 @@ export function DevicePanel({
                             )}
                             {canManage && (
                                 <div className="ml-auto flex items-center gap-1">
+                                    {automation && (
+                                        <Button
+                                            asChild
+                                            size="sm"
+                                            variant="ghost"
+                                            aria-label={t("devicesView.createAutomation")}
+                                            title={t("devicesView.createAutomation")}
+                                        >
+                                            <Link href={automation}>
+                                                <Workflow className="size-4" />
+                                            </Link>
+                                        </Button>
+                                    )}
                                     {/* Lending one door is the thing people came
                                         to a connected lock for. It sits beside
                                         Edit rather than inside it: taking a key
@@ -494,6 +530,27 @@ export function DevicePanel({
                                     <p className="text-xs text-foreground-subtle">
                                         {kinds.reachText(device.reach, t)}
                                     </p>
+                                )}
+                                {lan && lan.networks.length > 0 && (
+                                    <div className="flex min-w-0 flex-col gap-1">
+                                        {lan.networks.map((network) => (
+                                            <LanDetails
+                                                key={network.id}
+                                                details={network.details}
+                                                labels={{
+                                                    address: t("network.address"),
+                                                    mac: t("network.mac")
+                                                }}
+                                            />
+                                        ))}
+                                        {lan.shared && (
+                                            <p className="text-xs text-foreground-subtle">
+                                                {t("devicesView.sharedAddress", {
+                                                    account: lan.networks[0]?.label ?? ""
+                                                })}
+                                            </p>
+                                        )}
+                                    </div>
                                 )}
                                 {batteryLow(device) && (
                                     <p className="flex items-center gap-1.5 text-xs text-danger">
