@@ -26,6 +26,7 @@ import {
     saveConsoleCommand
 } from "../../lib/console-command-service";
 import {
+    BOUND_LIMIT,
     CUSTOM_VARIABLE_TYPES,
     MAX_CUSTOM_VARIABLES,
     MAX_VARIABLE_LABEL,
@@ -99,7 +100,10 @@ const saveSchema = z.object({
                 initial: z
                     .string()
                     .max(MAX_VARIABLE_VALUE * 4)
-                    .optional()
+                    .optional(),
+                min: z.number().finite().min(-BOUND_LIMIT).max(BOUND_LIMIT).optional(),
+                max: z.number().finite().min(-BOUND_LIMIT).max(BOUND_LIMIT).optional(),
+                optional: z.boolean().optional()
             })
         )
         .max(MAX_CUSTOM_VARIABLES)

@@ -11,10 +11,11 @@
  * offered for a command the server will take.
  */
 
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import {
     Button,
+    Checkbox,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -88,6 +89,15 @@ export function KeepCommandDialog({
                 at === index ? { ...declared, ...patch } : declared
             )
         });
+
+    /** Swap a variable with its neighbour: the order is the order it is asked in. */
+    const move = (index: number, by: -1 | 1) => {
+        const to = index + by;
+        if (to < 0 || to >= draft.variables.length) return;
+        const variables = [...draft.variables];
+        [variables[index], variables[to]] = [variables[to]!, variables[index]!];
+        set({ variables });
+    };
 
     // A row still being named is not finished, not wrong: it is left out of the
     // check until it has a name, and Keep waits for it.
@@ -212,6 +222,9 @@ export function KeepCommandDialog({
                                         key={index}
                                         declared={declared}
                                         onChange={(patch) => setVariable(index, patch)}
+                                        onMove={(by) => move(index, by)}
+                                        first={index === 0}
+                                        last={index === draft.variables.length - 1}
                                         onRemove={() =>
                                             set({
                                                 variables: draft.variables.filter(
@@ -283,18 +296,55 @@ export function KeepCommandDialog({
 function VariableEditor({
     declared,
     onChange,
-    onRemove
+    onRemove,
+    onMove,
+    first,
+    last
 }: {
     declared: vars.CustomVariable;
     onChange: (patch: Partial<vars.CustomVariable>) => void;
     onRemove: () => void;
+    onMove: (by: -1 | 1) => void;
+    first: boolean;
+    last: boolean;
 }) {
     const t = useGameText("games");
     const schemaText = useSchemaText();
+    // The bounds are typed as text and kept as numbers: what is typed stays
+    // on screen while it is not yet a number.
+    const [minText, setMinText] = useState(declared.min === undefined ? "" : String(declared.min));
+    const [maxText, setMaxText] = useState(declared.max === undefined ? "" : String(declared.max));
+    const bounded = vars.BOUNDED_TYPES.includes(declared.type);
     const initial = vars.normalizeValue(declared.type, declared.initial);
     // An empty default is allowed: the run dialog then starts empty.
-    const initialProblem = initial.length > 0 ? vars.valueProblem(declared.type, initial) : null;
-    const remove = t("consoleVars.removeVariable", { name: declared.name || "?" });
+    const initialProblem =
+        initial.length > 0 ? vars.valueProblem(declared.type, initial, declared) : null;
+    const boundProblem =
+        bounded && [minText, maxText].some((text) => text.trim() && boundOf(text) === null)
+            ? vars.valueProblem("number", "x")
+            : null;
+    const name = declared.name || "?";
+    const remove = t("consoleVars.removeVariable", { name });
+    const moveButton = (by: -1 | 1) => {
+        const label = t(by < 0 ? "consoleVars.moveUp" : "consoleVars.moveDown", { name });
+        const Icon = by < 0 ? ChevronUp : ChevronDown;
+        return (
+            <button
+                type="button"
+                onClick={() => onMove(by)}
+                disabled={by < 0 ? first : last}
+                aria-label={label}
+                title={label}
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+            >
+                <Icon className="size-4" />
+            </button>
+        );
+    };
+    const setBound = (which: "min" | "max", text: string) => {
+        (which === "min" ? setMinText : setMaxText)(text);
+        onChange({ [which]: boundOf(text) ?? undefined });
+    };
     return (
         <div className="flex flex-col gap-1 rounded-md bg-muted/40 p-2">
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2">
@@ -321,24 +371,33 @@ function VariableEditor({
                         onChange={(event) => onChange({ label: event.target.value })}
                     />
                 </label>
-                <button
-                    type="button"
-                    onClick={onRemove}
-                    aria-label={remove}
-                    title={remove}
-                    className="rounded p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                >
-                    <Trash2 className="size-4" />
-                </button>
+                <div className="flex items-center">
+                    {moveButton(-1)}
+                    {moveButton(1)}
+                    <button
+                        type="button"
+                        onClick={onRemove}
+                        aria-label={remove}
+                        title={remove}
+                        className="rounded p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                    >
+                        <Trash2 className="size-4" />
+                    </button>
+                </div>
                 <div className="flex min-w-0 flex-col gap-0.5">
                     <span className="text-xs text-muted-foreground">
                         {t("consoleVars.variableType")}
                     </span>
                     <Select
                         value={declared.type}
-                        onValueChange={(value) =>
-                            onChange({ type: value as vars.CustomVariableType })
-                        }
+                        onValueChange={(value) => {
+                            const type = value as vars.CustomVariableType;
+                            // A bound means nothing on a type that is not a number.
+                            if (vars.BOUNDED_TYPES.includes(type)) return onChange({ type });
+                            setMinText("");
+                            setMaxText("");
+                            onChange({ type, min: undefined, max: undefined });
+                        }}
                         options={vars.CUSTOM_VARIABLE_TYPES.map((type) => ({
                             value: type,
                             label: t(`consoleVars.types.${type}`)
@@ -353,16 +412,69 @@ function VariableEditor({
                     <Input
                         value={declared.initial}
                         maxLength={vars.MAX_VARIABLE_VALUE}
+                        className={declared.type === "coordinates" ? "font-mono" : undefined}
+                        placeholder={
+                            declared.type === "coordinates"
+                                ? t("consoleVars.coordinatesPlaceholder")
+                                : undefined
+                        }
                         aria-invalid={initialProblem ? true : undefined}
                         onChange={(event) => onChange({ initial: event.target.value })}
                     />
                 </label>
             </div>
-            {initialProblem && (
+            {bounded && (
+                <div className="grid min-w-0 grid-cols-2 gap-2">
+                    <label className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-xs text-muted-foreground">
+                            {t("consoleVars.variableMin")}
+                        </span>
+                        <Input
+                            value={minText}
+                            inputMode="decimal"
+                            maxLength={14}
+                            aria-invalid={
+                                minText.trim() && boundOf(minText) === null ? true : undefined
+                            }
+                            onChange={(event) => setBound("min", event.target.value)}
+                        />
+                    </label>
+                    <label className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-xs text-muted-foreground">
+                            {t("consoleVars.variableMax")}
+                        </span>
+                        <Input
+                            value={maxText}
+                            inputMode="decimal"
+                            maxLength={14}
+                            aria-invalid={
+                                maxText.trim() && boundOf(maxText) === null ? true : undefined
+                            }
+                            onChange={(event) => setBound("max", event.target.value)}
+                        />
+                    </label>
+                </div>
+            )}
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                <Checkbox
+                    checked={declared.optional === true}
+                    onChange={(event) =>
+                        onChange({ optional: event.target.checked ? true : undefined })
+                    }
+                />
+                <span>{t("consoleVars.variableOptional")}</span>
+            </label>
+            {(initialProblem ?? boundProblem) && (
                 <span role="alert" className="text-xs text-danger">
-                    {schemaText(initialProblem)}
+                    {schemaText((initialProblem ?? boundProblem) as string)}
                 </span>
             )}
         </div>
     );
+}
+
+/** A bound as typed, or null when it is not a number a bound can be. */
+function boundOf(text: string): number | null {
+    const trimmed = text.trim();
+    return /^-?\d{1,9}(?:\.\d{1,4})?$/.test(trimmed) ? Number(trimmed) : null;
 }

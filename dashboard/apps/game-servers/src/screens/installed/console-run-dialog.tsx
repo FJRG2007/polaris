@@ -149,7 +149,9 @@ export function RunCommandDialog({
     // Left empty, a value with a default is sent with the default.
     const missing = uses.custom.some(
         (declared) =>
-            declared.initial.length === 0 && (values[declared.name] ?? "").trim().length === 0
+            !declared.optional &&
+            declared.initial.length === 0 &&
+            (values[declared.name] ?? "").trim().length === 0
     );
     const playerProblem =
         uses.perPlayer && !every && player.trim().length > 0
@@ -298,7 +300,7 @@ export function RunCommandDialog({
                         const caption = (
                             <span className="text-sm font-medium">
                                 {declared.label}
-                                {declared.initial.length === 0 && (
+                                {declared.initial.length === 0 && !declared.optional && (
                                     <span aria-hidden="true"> *</span>
                                 )}
                                 <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
@@ -332,11 +334,30 @@ export function RunCommandDialog({
                                 {caption}
                                 <Input
                                     value={values[declared.name] ?? ""}
-                                    inputMode={declared.type === "number" ? "decimal" : undefined}
+                                    inputMode={
+                                        declared.type === "number"
+                                            ? "decimal"
+                                            : declared.type === "integer"
+                                              ? "numeric"
+                                              : undefined
+                                    }
                                     maxLength={vars.MAX_VARIABLE_VALUE}
-                                    className={declared.type === "item" ? "font-mono" : undefined}
-                                    placeholder={declared.initial || undefined}
-                                    aria-required={declared.initial.length === 0 ? true : undefined}
+                                    className={
+                                        ["item", "coordinates", "dimension"].includes(declared.type)
+                                            ? "font-mono"
+                                            : undefined
+                                    }
+                                    placeholder={
+                                        declared.initial ||
+                                        (declared.type === "coordinates"
+                                            ? t("consoleVars.coordinatesPlaceholder")
+                                            : undefined)
+                                    }
+                                    aria-required={
+                                        declared.initial.length === 0 && !declared.optional
+                                            ? true
+                                            : undefined
+                                    }
                                     aria-invalid={problems[declared.name] ? true : undefined}
                                     onChange={(event) => set(event.target.value)}
                                 />

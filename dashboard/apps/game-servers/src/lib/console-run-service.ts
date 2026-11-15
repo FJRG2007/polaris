@@ -34,7 +34,9 @@ import {
     commandUses,
     commandVariables,
     MAX_PLAYER_LINES,
+    POSITION_READS,
     playerReadsIn,
+    usesRelative,
     type CustomVariable,
     type RunTarget
 } from "./console-vars";
@@ -76,6 +78,14 @@ function editionFor(server: RunServer) {
  *  per-player command with nobody chosen to write it for. */
 export function keptRunProblem(server: RunServer, run: KeptRun): string | null {
     const uses = commandUses(run.command, editionFor(server), run.variables);
+    // A `~` counts from where somebody stands, so a command that names nobody
+    // has nobody to count from - never the spot the console happens to be at.
+    if (
+        !uses.perPlayer &&
+        usesRelative(commandVariables(run.command, run.variables).custom, run.values)
+    ) {
+        return gameMessage("games", "consoleVars.errors.relativeNeedsPlayer");
+    }
     return uses.perPlayer && !run.target
         ? gameMessage("games", "consoleVars.errors.whichPlayer")
         : null;
@@ -109,14 +119,17 @@ export async function keptCommandSteps(server: RunServer, run: KeptRun): Promise
                       line
                   }))
         );
-    if (!uses.catalogue) return each(fill, []);
-
     const problem = keptRunProblem(server, run);
     if (problem) throw new Error(problem);
+    if (!uses.catalogue) return each(fill, []);
+
     const players = await shownPlayers(server.ownerId, server.install.id).catch(() => null);
     // Where somebody stands, or where the last death was, is the game's to say:
     // asked right before the lines are written, so they are where it is now.
-    const reads = playerReadsIn(read.command, edition);
+    const relative = usesRelative(read.custom, run.values);
+    const reads = [
+        ...new Set([...playerReadsIn(read.command, edition), ...(relative ? POSITION_READS : [])])
+    ];
     const deathPlace = variablesIn(read.command).some((use) =>
         DEATH_PLACE_VARIABLES.includes(use.spec?.name ?? "")
     );

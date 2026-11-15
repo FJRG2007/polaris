@@ -15,10 +15,13 @@ import * as mc from "../lib/minecraft/motd";
 import type { GameKey } from "../../messages";
 import { colorName, styleName, useGameText, useSchemaText } from "../screens/game-text";
 import { Card, CardBody, cn } from "@polaris/ui";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import type { MinecraftEdition } from "../lib/minecraft/service";
 import { textVariables, type VariableSpec } from "../lib/minecraft/text-vars";
-import { consoleVariables, type CustomVariable } from "../lib/console-vars";
+import { COORDINATE_AXES, consoleVariables, type CustomVariable } from "../lib/console-vars";
+
+/** What an axis of a position with no default shows as its example. */
+const AXIS_SAMPLE = ["100", "64", "-20"] as const;
 
 /** The headings the values are read under, in the order they are shown. */
 function groupOf(spec: VariableSpec): GameKey<"games"> {
@@ -92,17 +95,37 @@ export function VariablesHelp({
                         </p>
                         <dl className="flex flex-col gap-1">
                             {custom.map((declared) => (
-                                <VariableRow
-                                    key={declared.name}
-                                    name={declared.name}
-                                    onInsert={onInsert}
-                                >
-                                    {declared.label} -{" "}
-                                    <span className="italic">
-                                        {declared.initial ||
-                                            t(`consoleVars.types.${declared.type}`)}
-                                    </span>
-                                </VariableRow>
+                                <Fragment key={declared.name}>
+                                    <VariableRow name={declared.name} onInsert={onInsert}>
+                                        {declared.label} -{" "}
+                                        <span className="italic">
+                                            {declared.initial ||
+                                                t(`consoleVars.types.${declared.type}`)}
+                                        </span>
+                                        {declared.optional && ` (${t("consoleVars.optionalTag")})`}
+                                    </VariableRow>
+                                    {/* A position is also written one axis at a time:
+                                        `{pos.y}` alone for a height. */}
+                                    {declared.type === "coordinates" &&
+                                        COORDINATE_AXES.map((axis, index) => (
+                                            <VariableRow
+                                                key={axis}
+                                                name={`${declared.name}.${axis}`}
+                                                onInsert={onInsert}
+                                            >
+                                                {t("consoleVars.axisOf", {
+                                                    axis: axis.toUpperCase(),
+                                                    label: declared.label
+                                                })}{" "}
+                                                -{" "}
+                                                <span className="italic">
+                                                    {(declared.initial &&
+                                                        declared.initial.split(" ")[index]) ||
+                                                        AXIS_SAMPLE[index]}
+                                                </span>
+                                            </VariableRow>
+                                        ))}
+                                </Fragment>
                             ))}
                         </dl>
                     </div>

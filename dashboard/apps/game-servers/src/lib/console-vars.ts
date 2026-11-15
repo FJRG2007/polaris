@@ -37,14 +37,21 @@ import {
     type VariableValues
 } from "./minecraft/text-vars";
 
-export type CustomVariableType = "text" | "number" | "player" | "item";
+export type CustomVariableType =
+    "text" | "number" | "integer" | "coordinates" | "player" | "dimension" | "item";
 
 export const CUSTOM_VARIABLE_TYPES: readonly CustomVariableType[] = [
     "text",
     "number",
+    "integer",
+    "coordinates",
     "player",
+    "dimension",
     "item"
 ];
+
+/** The types a smallest and a largest value apply to. */
+export const BOUNDED_TYPES: readonly CustomVariableType[] = ["number", "integer"];
 
 /** One variable somebody declared on a kept command. */
 export interface CustomVariable {
@@ -55,7 +62,17 @@ export interface CustomVariable {
     readonly type: CustomVariableType;
     /** What the run dialog starts with. May be empty. */
     readonly initial: string;
+    /** For a number or a whole number: the smallest value it takes. */
+    readonly min?: number;
+    /** For a number or a whole number: the largest value it takes. */
+    readonly max?: number;
+    /** May be left empty with no default, and is then written as nothing.
+     *  Absent on every variable declared before it existed: required. */
+    readonly optional?: true;
 }
+
+/** The bounds a value is checked against, read off its variable. */
+export type ValueLimits = Pick<CustomVariable, "min" | "max" | "optional">;
 
 export const MAX_CUSTOM_VARIABLES = 8;
 export const MAX_VARIABLE_LABEL = 40;
@@ -159,6 +176,43 @@ function customOf(name: string, custom: readonly CustomVariable[]): CustomVariab
     return custom.find((declared) => declared.name === key) ?? null;
 }
 
+/** A declared variable a `{...}` writes: the whole of it, or for a position
+ *  one axis of it - `{pos.x}`. */
+function customUse(
+    name: string,
+    custom: readonly CustomVariable[]
+): { readonly declared: CustomVariable; readonly axis: number | null } | null {
+    const whole = customOf(name, custom);
+    if (whole) return { declared: whole, axis: null };
+    const match = /^(.+)\.([xyz])$/i.exec(name);
+    if (!match) return null;
+    const declared = customOf(match[1]!, custom);
+    return declared?.type === "coordinates"
+        ? { declared, axis: COORDINATE_AXES.indexOf(match[2]!.toLowerCase() as CoordinateAxis) }
+        : null;
+}
+
+/** What a run fills a declared variable with: the typed value, or its default. */
+function valueOf(declared: CustomVariable, values: Readonly<Record<string, string>>): string {
+    const typed = values[declared.name];
+    return typed === undefined || typed.length === 0 ? declared.initial : typed;
+}
+
+/**
+ * Whether a run counts a position from where a player stands - a `~` in it -
+ * so it needs a player to count from, and where they are read first.
+ */
+export function usesRelative(
+    custom: readonly CustomVariable[],
+    values: Readonly<Record<string, string>>
+): boolean {
+    return custom.some(
+        (declared) =>
+            declared.type === "coordinates" &&
+            isRelative(normalizeValue("coordinates", valueOf(declared, values)))
+    );
+}
+
 /** What a command uses, of everything it could. */
 export interface CommandUses {
     /** `{player}` or an account value: a line per player. */
@@ -178,11 +232,11 @@ export function commandUses(
     custom = read.custom;
     const uses = variablesIn(read.command);
     const specs = uses.flatMap((use) => {
-        if (customOf(use.name, custom)) return [];
+        if (customUse(use.name, custom)) return [];
         const spec = consoleSpec(use.name, edition);
         return spec ? [spec] : [];
     });
-    const named = new Set(uses.map((use) => use.name.toLowerCase()));
+    const named = usedNames(read.command, custom);
     return {
         perPlayer: specs.some((spec) => spec.kind !== "server"),
         catalogue: specs.length > 0,
@@ -215,7 +269,89 @@ export function needsAsking(
  *  lowercased the way the game writes it. */
 export function normalizeValue(type: CustomVariableType, value: string): string {
     const trimmed = value.trim();
-    return type === "item" ? trimmed.toLowerCase() : trimmed;
+    if (type === "item") return trimmed.toLowerCase();
+    // `100, 64, -20` is how a position is copied out of most places; the game
+    // reads three words.
+    if (type === "coordinates") return trimmed.replace(/,/g, " ").replace(/\s+/g, " ").trim();
+    if (type === "dimension") {
+        const lowered = trimmed.toLowerCase();
+        return DIMENSION_ALIASES[lowered] ?? lowered;
+    }
+    return trimmed;
+}
+
+/** The three the game ships with, by the names somebody will type for them. */
+const DIMENSION_ALIASES: Readonly<Record<string, string>> = {
+    overworld: "minecraft:overworld",
+    nether: "minecraft:the_nether",
+    the_nether: "minecraft:the_nether",
+    end: "minecraft:the_end",
+    the_end: "minecraft:the_end"
+};
+
+/** How far from the middle of the world a position may be: the game's own
+ *  limits, past which it refuses the command anyway. */
+export const HORIZONTAL_LIMIT = 30_000_000;
+export const VERTICAL_LIMIT = 20_000_000;
+
+export const COORDINATE_AXES = ["x", "y", "z"] as const;
+export type CoordinateAxis = (typeof COORDINATE_AXES)[number];
+
+/** One axis of a position: a number, or `~` and an offset from the player. */
+export interface CoordinatePart {
+    readonly relative: boolean;
+    readonly amount: number;
+}
+
+const COORDINATE_PART = /^(~)?(-?\d{1,8}(?:\.\d{1,4})?)?$/;
+
+/**
+ * A position as typed - `100 64 -20`, `~ ~1 ~`, `~-5 70 ~` - read the way the
+ * game reads one, or null when it is not one. Already normalized; within the
+ * world's limits.
+ */
+export function readCoordinates(value: string): readonly CoordinatePart[] | null {
+    const words = value.split(" ");
+    if (words.length !== 3) return null;
+    const parts: CoordinatePart[] = [];
+    for (const [index, word] of words.entries()) {
+        const match = COORDINATE_PART.exec(word);
+        if (!match || (!match[1] && match[2] === undefined)) return null;
+        const amount = match[2] === undefined ? 0 : Number(match[2]);
+        const limit = index === 1 ? VERTICAL_LIMIT : HORIZONTAL_LIMIT;
+        if (!Number.isFinite(amount) || Math.abs(amount) > limit) return null;
+        parts.push({ relative: Boolean(match[1]), amount });
+    }
+    return parts;
+}
+
+/** Whether a position counts from where the player stands. */
+export function isRelative(value: string): boolean {
+    return readCoordinates(value)?.some((part) => part.relative) ?? false;
+}
+
+/** A coordinate as the game takes it: no trailing zeros, no float noise. */
+function coordinateText(amount: number): string {
+    return String(Number(amount.toFixed(4)));
+}
+
+/**
+ * The three numbers a position stands for, with every `~` counted from
+ * `origin` - where the player stands. Null when it counts from a player and
+ * there is none, so a relative position is never quietly measured from where
+ * the console sits.
+ */
+export function resolveCoordinates(
+    value: string,
+    origin: readonly [number, number, number] | null
+): [string, string, string] | null {
+    const parts = readCoordinates(value);
+    if (!parts) return null;
+    if (parts.some((part) => part.relative) && !origin) return null;
+    const [x, y, z] = parts.map((part, index) =>
+        coordinateText(part.relative ? (origin?.[index] ?? 0) + part.amount : part.amount)
+    );
+    return [x!, y!, z!];
 }
 
 const CONTROL = /[\u0000-\u001f\u007f]/;
@@ -223,11 +359,19 @@ const CONTROL = /[\u0000-\u001f\u007f]/;
  *  command opened - a JSON string, an SNBT compound - and write its own. */
 const BREAKS_OUT = /["'\\{}[\]]/;
 const NUMBER = /^-?\d{1,9}(?:\.\d{1,4})?$/;
+const INTEGER = /^-?\d{1,9}$/;
 const ITEM = /^(?:[a-z0-9_.-]{1,32}:)?[a-z0-9_./-]{1,64}$/;
+const DIMENSION = /^[a-z0-9_.-]{1,32}:[a-z0-9_./-]{1,64}$/;
 
 /** What is wrong with a value already normalized, as a carried message, or null. */
-export function valueProblem(type: CustomVariableType, value: string): string | null {
-    if (value.length === 0) return gameMessage("games", "consoleVars.errors.required");
+export function valueProblem(
+    type: CustomVariableType,
+    value: string,
+    limits: ValueLimits = {}
+): string | null {
+    if (value.length === 0) {
+        return limits.optional ? null : gameMessage("games", "consoleVars.errors.required");
+    }
     if (value.length > MAX_VARIABLE_VALUE) {
         return gameMessage("games", "consoleVars.errors.tooLong", { count: MAX_VARIABLE_VALUE });
     }
@@ -236,6 +380,26 @@ export function valueProblem(type: CustomVariableType, value: string): string | 
     }
     if (type === "number" && !NUMBER.test(value)) {
         return gameMessage("games", "consoleVars.errors.number");
+    }
+    if (type === "integer" && !INTEGER.test(value)) {
+        return gameMessage("games", "consoleVars.errors.integer");
+    }
+    if (BOUNDED_TYPES.includes(type)) {
+        const amount = Number(value);
+        if (limits.min !== undefined && amount < limits.min) {
+            return gameMessage("games", "consoleVars.errors.atLeast", { min: limits.min });
+        }
+        if (limits.max !== undefined && amount > limits.max) {
+            return gameMessage("games", "consoleVars.errors.atMost", { max: limits.max });
+        }
+    }
+    if (type === "coordinates" && !readCoordinates(value)) {
+        return gameMessage("games", "consoleVars.errors.coordinates", {
+            count: HORIZONTAL_LIMIT
+        });
+    }
+    if (type === "dimension" && !DIMENSION.test(value)) {
+        return gameMessage("games", "consoleVars.errors.dimension");
     }
     if (type === "player" && playerSelector(value) === null) {
         return gameMessage("games", "consoleVars.errors.player");
@@ -247,13 +411,16 @@ export function valueProblem(type: CustomVariableType, value: string): string | 
 }
 
 /** One value as the schema reads it: normalized, then checked. */
-export function valueSchema(type: CustomVariableType): z.ZodType<string, z.ZodTypeDef, unknown> {
+export function valueSchema(
+    type: CustomVariableType,
+    limits: ValueLimits = {}
+): z.ZodType<string, z.ZodTypeDef, unknown> {
     return z
         .string()
         .max(MAX_VARIABLE_VALUE * 4)
         .transform((value) => normalizeValue(type, value))
         .superRefine((value, context) => {
-            const problem = valueProblem(type, value);
+            const problem = valueProblem(type, value, limits);
             if (problem) context.addIssue({ code: z.ZodIssueCode.custom, message: problem });
         });
 }
@@ -261,13 +428,22 @@ export function valueSchema(type: CustomVariableType): z.ZodType<string, z.ZodTy
 /** One value as a run reads it: left empty or out, a variable with a default
  *  takes the default; one without still has to be filled in. */
 export function runValueSchema(declared: CustomVariable): z.ZodType<string, z.ZodTypeDef, unknown> {
-    if (declared.initial.length === 0) return valueSchema(declared.type);
+    const checked = valueSchema(declared.type, declared);
+    if (declared.initial.length === 0) {
+        if (!declared.optional) return checked;
+        // An optional one left out is the same as one left empty.
+        return z.preprocess((value) => (value === undefined ? "" : value), checked) as z.ZodType<
+            string,
+            z.ZodTypeDef,
+            unknown
+        >;
+    }
     return z.preprocess(
         (value) =>
             value === undefined || (typeof value === "string" && value.trim().length === 0)
                 ? declared.initial
                 : value,
-        valueSchema(declared.type)
+        checked
     ) as z.ZodType<string, z.ZodTypeDef, unknown>;
 }
 
@@ -307,13 +483,18 @@ export function customVariablesProblem(
     if (read.custom.length > MAX_CUSTOM_VARIABLES) {
         return gameMessage("games", "consoleVars.errors.tooMany", { count: MAX_CUSTOM_VARIABLES });
     }
-    const used = new Set(variablesIn(read.command).map((use) => use.name.toLowerCase()));
+    const used = usedNames(read.command, read.custom);
     const seen = new Set<string>();
     for (const declared of read.custom) {
         if (!CUSTOM_NAME.test(declared.name)) {
             return gameMessage("games", "consoleVars.errors.name");
         }
-        if (variable(declared.name)) {
+        // A position named `death` would answer for `{death.x}`, which is
+        // already Polaris's.
+        const shadows =
+            declared.type === "coordinates" &&
+            COORDINATE_AXES.some((axis) => variable(`${declared.name}.${axis}`));
+        if (variable(declared.name) || shadows) {
             return gameMessage("games", "consoleVars.errors.taken", { name: declared.name });
         }
         if (seen.has(declared.name)) {
@@ -323,15 +504,44 @@ export function customVariablesProblem(
         if (!used.has(declared.name)) {
             return gameMessage("games", "consoleVars.errors.unused", { name: declared.name });
         }
+        if (
+            declared.min !== undefined &&
+            declared.max !== undefined &&
+            declared.min > declared.max
+        ) {
+            return gameMessage("games", "consoleVars.errors.range");
+        }
+        if (
+            declared.type === "integer" &&
+            [declared.min, declared.max].some(
+                (bound) => bound !== undefined && !Number.isInteger(bound)
+            )
+        ) {
+            return gameMessage("games", "consoleVars.errors.integer");
+        }
         if (declared.initial.length > 0) {
             const problem = valueProblem(
                 declared.type,
-                normalizeValue(declared.type, declared.initial)
+                normalizeValue(declared.type, declared.initial),
+                declared
             );
             if (problem) return problem;
         }
     }
     return null;
+}
+
+/** The furthest a smallest or largest value may be set: what a number holds. */
+export const BOUND_LIMIT = 999_999_999;
+
+/** The variables a command writes, by name: `{pos.x}` writes `pos` when `pos`
+ *  is a position. */
+function usedNames(command: string, custom: readonly CustomVariable[]): Set<string> {
+    return new Set(
+        variablesIn(command).map(
+            (use) => customUse(use.name, custom)?.declared.name ?? use.name.toLowerCase()
+        )
+    );
 }
 
 /** A declared variable as it was typed, cleaned the way it is stored. */
@@ -340,6 +550,9 @@ export function normalizeCustomVariable(input: {
     label?: string | null;
     type: CustomVariableType;
     initial?: string | null;
+    min?: number | null;
+    max?: number | null;
+    optional?: boolean | null;
 }): CustomVariable {
     const name = input.name
         .trim()
@@ -350,11 +563,25 @@ export function normalizeCustomVariable(input: {
         .replace(/[\0\r\n]/g, " ")
         .trim()
         .slice(0, MAX_VARIABLE_LABEL);
+    // A bound only means something on a number, and one past what a number
+    // holds is no bound at all.
+    const bound = (value: number | null | undefined): number | undefined =>
+        BOUNDED_TYPES.includes(input.type) &&
+        typeof value === "number" &&
+        Number.isFinite(value) &&
+        Math.abs(value) <= BOUND_LIMIT
+            ? value
+            : undefined;
+    const min = bound(input.min);
+    const max = bound(input.max);
     return {
         name,
         label: label.length > 0 ? label : name,
         type: input.type,
-        initial: normalizeValue(input.type, input.initial ?? "")
+        initial: normalizeValue(input.type, input.initial ?? ""),
+        ...(min !== undefined ? { min } : {}),
+        ...(max !== undefined ? { max } : {}),
+        ...(input.optional === true ? { optional: true as const } : {})
     };
 }
 
@@ -371,7 +598,10 @@ export function readCustomVariables(raw: unknown): CustomVariable[] {
             name: row.name,
             label: typeof row.label === "string" ? row.label : null,
             type: row.type as CustomVariableType,
-            initial: typeof row.initial === "string" ? row.initial : null
+            initial: typeof row.initial === "string" ? row.initial : null,
+            min: typeof row.min === "number" ? row.min : null,
+            max: typeof row.max === "number" ? row.max : null,
+            optional: row.optional === true
         });
         return CUSTOM_NAME.test(declared.name) ? [declared] : [];
     });
@@ -405,11 +635,16 @@ export function fillCommand(
 ): string {
     const read = commandVariables(command, fill.custom);
     return replaceVariables(read.command, (use) => {
-        const declared = customOf(use.name, read.custom);
-        if (declared) {
-            const typed = fill.values[declared.name];
-            const value = typed === undefined || typed.length === 0 ? declared.initial : typed;
-            if (value.length === 0) return null;
+        const found = customUse(use.name, read.custom);
+        if (found) {
+            const { declared, axis } = found;
+            const value = valueOf(declared, fill.values);
+            if (value.length === 0) return declared.optional ? "" : null;
+            if (declared.type === "coordinates") {
+                const at = resolveCoordinates(value, player ? positionOf(player.values) : null);
+                if (!at) return null;
+                return axis === null ? at.join(" ") : at[axis]!;
+            }
             return declared.type === "player" ? (playerSelector(value) ?? null) : value;
         }
         const spec = consoleSpec(use.name, fill.edition);
@@ -419,6 +654,15 @@ export function fillCommand(
         return commandSafe(known ?? use.fallback ?? "");
     });
 }
+
+/** Where a player stands, from the values read off them, or null. */
+function positionOf(values: VariableValues): [number, number, number] | null {
+    const axes = COORDINATE_AXES.map((axis) => Number(values[`player.${axis}`] ?? Number.NaN));
+    return axes.every(Number.isFinite) ? [axes[0]!, axes[1]!, axes[2]!] : null;
+}
+
+/** What has to be read off each player before a run with a `~` position. */
+export const POSITION_READS: readonly string[] = COORDINATE_AXES.map((axis) => `player.${axis}`);
 
 /**
  * The lines one press sends: one, or one per player when the command is written
@@ -432,8 +676,12 @@ export function commandLines(
     if (!commandUses(command, fill.edition, fill.custom).perPlayer) {
         return [fillCommand(command, fill, null)];
     }
+    // A `~` is counted from each player's own spot; one whose spot could not be
+    // read gets no line rather than one counted from nowhere.
+    const relative = usesRelative(commandVariables(command, fill.custom).custom, fill.values);
     return players
         .filter((player) => playerSelector(player.name) !== null)
+        .filter((player) => !relative || positionOf(player.values) !== null)
         .slice(0, MAX_PLAYER_LINES)
         .map((player) => fillCommand(command, fill, player));
 }
