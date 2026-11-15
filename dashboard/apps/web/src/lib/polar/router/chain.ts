@@ -39,6 +39,7 @@ import { readsSentFiles, sendsProviderTool, type StandInTarget } from "@/lib/pol
 import { classifyProviderFailure, type FailureKind } from "@/lib/polar/provider-failure";
 import { coolingOf, noteAnswered, noteRefusal, retryAfterMs } from "@/lib/polar/router/health";
 import { reasoningForRoute, type RouteReasoning, type SdkReasoning } from "@/lib/polar/routing";
+import { effortCallOptions, mergeProviderOptions } from "@/lib/polar/effort";
 import {
     MAX_CONTINUATIONS,
     continuable,
@@ -324,10 +325,20 @@ export function withoutProviderTools(params: Pick<CallParams, "tools" | "toolCho
  *  reasoning another provider accepts. */
 function adjust(step: RouteStep, params: CallParams, origin: string): CallParams {
     const current = params.reasoning as SdkReasoning | undefined;
-    const reasoning = step.reasoning
+    const neutral = step.reasoning
         ? reasoningForRoute(step.routeReasoning, current)
         : undefined;
-    let next: CallParams = { ...params, reasoning };
+    // The step's own provider parameter for that level (`effort.ts`), clamped
+    // to a level this model offers.
+    const effort = effortCallOptions(
+        { provider: step.provider, model: step.modelId, reasoning: step.reasoning },
+        neutral
+    );
+    let next: CallParams = {
+        ...params,
+        reasoning: effort.reasoning,
+        providerOptions: mergeProviderOptions(params.providerOptions, effort.providerOptions as never)
+    };
     if (step.provider !== origin) {
         // A provider's own tool (its web search) runs only there: another
         // provider is sent every other tool, unchanged, and answers without it.

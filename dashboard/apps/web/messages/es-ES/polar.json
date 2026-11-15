@@ -1791,5 +1791,19 @@
         "required": "Obligatorio",
         "invalid": "Revisa este campo",
         "stars": "{count} de {max} estrellas"
+    },
+    "effort": {
+        "default": "Por defecto",
+        "title": "Esfuerzo",
+        "think": "Pensar",
+        "thinkHint": "Piensa antes de responder, para problemas difíciles",
+        "failed": "El agente no aceptó el nuevo esfuerzo.",
+        "levels": {
+            "low": "Rápido",
+            "medium": "Equilibrado",
+            "high": "Profundo",
+            "xhigh": "Muy profundo",
+            "max": "Máximo"
+        }
     }
 }

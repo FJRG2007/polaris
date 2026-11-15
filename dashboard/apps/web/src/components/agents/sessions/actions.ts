@@ -298,6 +298,7 @@ async function startParsed(
         sharedHome: value.sharedHome,
         unattended: value.unattended,
         permissionMode: value.permissionMode,
+        effort: value.effort,
         accountId: value.accountId,
         useMachineLogin: value.useMachineLogin,
         modelChoice: value.modelChoice,
@@ -385,6 +386,7 @@ export async function forkSessionAction(
         sharedHome: parent.sharedHome,
         unattended: parent.unattended,
         permissionMode: parent.permissionMode,
+        effort: parent.effort,
         accountId: parent.accountId,
         useMachineLogin: parent.useMachineLogin,
         baseRef: forking.forkBaseRef(parent),
@@ -562,6 +564,41 @@ export async function setSessionModelAction(input: unknown): Promise<{ error?: s
     } catch (error) {
         console.error(`[agent-session] ${session.id}: model change failed:`, error);
         return { error: tp("code.modelFailed") };
+    }
+    return {};
+}
+
+const sessionEffortSchema = z
+    .object({
+        sessionId: z.string().trim().uuid(),
+        effort: z.enum(core.AGENT_EFFORT_LEVELS)
+    })
+    .strict();
+
+/**
+ * Change how hard a running Claude session thinks, as `/effort` does. Not while
+ * the agent waits on an answer, for the same reason as the model.
+ */
+export async function setSessionEffortAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const [t, tp] = await Promise.all([getTranslations("agents"), getTranslations("polar")]);
+    const parsed = sessionEffortSchema.safeParse(input);
+    if (!parsed.success) return { error: t("sessions.errors.gone") };
+    const session = await sessions.getSession(parsed.data.sessionId, user.id);
+    if (!session || core.isSessionOver(session.state)) return { error: t("sessions.errors.gone") };
+    if (core.agentEffortLevels(session.cli).length === 0) return { error: tp("effort.failed") };
+    if (session.effort === parsed.data.effort) return {};
+    if (await permissions.pendingPermission(session.id)) return { error: tp("code.modelBusy") };
+    try {
+        await runtime.changeSessionEffort(session.id, session.cli, parsed.data.effort);
+        await prisma.agentSession.update({
+            where: { id: session.id },
+            data: { effort: parsed.data.effort },
+            select: { id: true }
+        });
+    } catch (error) {
+        console.error(`[agent-session] ${session.id}: effort change failed:`, error);
+        return { error: tp("effort.failed") };
     }
     return {};
 }

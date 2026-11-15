@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * ModelSelector: provider and model, how hard it thinks, and who pays.
+ * ModelSelector: provider and model, and who pays. How hard it thinks is the
+ * effort pill beside it (`effort-pill.tsx`).
  *
  * Ported from AI Elements (github.com/vercel/ai-elements,
  * packages/elements/src/model-selector.tsx at ca8be60), Apache-2.0 - see the
@@ -37,7 +38,6 @@ import { usePickerPrefs } from "@/components/polar/elements/use-picker-prefs";
 import { SourceOrderList } from "@/components/polar/elements/source-order";
 import {
     automaticChoice,
-    INTELLIGENCE_LEVELS,
     isAutomatic,
     type ModelChoice,
     type Payer
@@ -196,8 +196,7 @@ export function ModelSelector({
     /** Opened from outside as well as by its own button, when given. */
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
-    /** For an agent session: no Automatic and no intelligence, which only a
-     *  chat turn has. */
+    /** For an agent session: no Automatic, which only a chat turn has. */
     forCode?: boolean;
     /** Replaces the composer's trigger look, for a picker that is a form field
      *  (Polar's routing settings) rather than a chip on the tool row. */
@@ -230,8 +229,6 @@ export function ModelSelector({
     const provider = providers.find((entry) => entry.provider === choice?.provider);
     const model = provider?.models.find((entry) => entry.model === choice?.model);
     const automatic = isAutomatic(choice);
-    // Automatic sends a reasoning turn at the chosen level, so it can be set.
-    const leveled = automatic || !!model?.reasoning;
     const [query, setQuery] = useState("");
     const index = useMemo(() => modelIndex(providers), [providers]);
     const searching = query.trim().length > 0;
@@ -271,9 +268,6 @@ export function ModelSelector({
                             {automatic ? t("picker.automatic") : (model?.name ?? t("picker.none"))}
                         </span>
                     )}
-                    {!triggerContent && choice && leveled ? (
-                        <span className="min-w-0 max-w-full shrink-0 truncate" title={t(`intelligence.${choice.intelligence}`)}>{t(`intelligence.${choice.intelligence}`)}</span>
-                    ) : null}
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -418,21 +412,6 @@ export function ModelSelector({
                 ) : null}
                 {choice && !searching && !ordering ? (
                     <>
-                        <DropdownMenuSeparator />
-                        {forCode ? null : (
-                            <DropdownMenuLabel>{t("picker.intelligence")}</DropdownMenuLabel>
-                        )}
-                        {(forCode ? [] : INTELLIGENCE_LEVELS).map((level) => (
-                            <DropdownMenuItem
-                                key={level}
-                                disabled={!leveled}
-                                title={leveled ? undefined : t("picker.noReasoning")}
-                                onSelect={() => onChoice({ ...choice, intelligence: level })}
-                            >
-                                {t(`intelligence.${level}`)}
-                                <Mark on={choice.intelligence === level} />
-                            </DropdownMenuItem>
-                        ))}
                         {automatic ? null : (
                             <>
                                 <DropdownMenuSeparator />

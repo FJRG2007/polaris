@@ -15,6 +15,7 @@ import { z } from "zod";
 import { ENIGMA_SCOPES, ENIGMA_SKILL_NAME, ENIGMA_SKILLS_OFF_MOST } from "../enigma.js";
 import { AGENT_GATE_MODES } from "../agents.js";
 import {
+    AGENT_EFFORT_LEVELS,
     agentTakesModel,
     CUSTOM_AGENT_CLI,
     isKnownAgentCli,
@@ -157,6 +158,11 @@ export const startAgentSessionSchema = z
          * answers (Claude Code). Null leaves it to the place and to Enigma.
          */
         permissionMode: z.enum(SESSION_PERMISSION_MODES).nullable().default(null),
+        /**
+         * How hard the agent thinks, for a tool with an effort flag (Claude
+         * Code). Null leaves it to the tool's own default.
+         */
+        effort: z.enum(AGENT_EFFORT_LEVELS).nullable().default(null),
         /**
          * Which stored account signs the agent in.
          *

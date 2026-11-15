@@ -1,0 +1,11 @@
+
+ RUN  v4.1.11 C:/Users/admin/AppData/Local/Temp/claude/7d07d248d9f88c63/484056a8-a659-46b2-b26c-6dc5fe084c93/scratchpad/wt-privacy/dashboard/apps/web
+
+(node:25636) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  17 passed (17)
+      Tests  3410 passed (3410)
+   Start at  17:13:44
+   Duration  31.28s (transform 6.13s, setup 6.92s, import 9.88s, tests 40.40s, environment 2.15s)
+

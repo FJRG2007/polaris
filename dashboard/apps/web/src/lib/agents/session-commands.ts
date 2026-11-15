@@ -31,6 +31,7 @@ import { INSTALL_GH } from "./session-gh";
 import {
     FIRST_RUN_WORKDIR,
     hasControlCharacter,
+    isAgentEffortLevel,
     SAFE_MODEL_ID,
     isVendorSessionId,
     promptSubmitDelayMs,
@@ -833,6 +834,10 @@ export const LAUNCH_SCRIPT = [
     '  m="$(head -c 200 "$POLARIS_STATE_DIR/model" 2>/dev/null || true)"',
     // Quoted on the line: an id like `sonnet[1m]` is otherwise a glob.
     `  if printf %s "$m" | grep -Eq '^[A-Za-z0-9][][A-Za-z0-9._:/@-]{0,199}$'; then line="$line --model '$m'"; fi`,
+    // An effort changed mid-session (see effortCommand), last for the same
+    // reason: the later `--effort` outranks the one the boot gave.
+    '  m="$(head -c 10 "$POLARIS_STATE_DIR/effort" 2>/dev/null || true)"',
+    '  case "$m" in low|medium|high|xhigh|max) line="$line --effort $m" ;; esac',
     '  line="$line --settings \\"$POLARIS_STATE_DIR/settings.json\\" --mcp-config \\"$POLARIS_STATE_DIR/mcp.json\\""',
     `  if [ -n "\${POLARIS_PREVIEW_BASE:-}" ]; then line="$line --append-system-prompt \\"${PREVIEW_PROMPT}\\""; fi`,
     "fi",
@@ -1042,6 +1047,23 @@ export function modelCommand(stateDir: string, model: string): string {
         `if ${runnerIn(stateDir)} && ! ${interfaceOpen()}; then exit 0; fi`,
         `t=${shellQuote(TMUX_SESSION)}; if ${interfaceOpen()}; then t=${shellQuote(target)}; fi`,
         `tmux send-keys -t "$t" -l ${shellQuote(`/model ${model}`)}`,
+        'tmux send-keys -t "$t" Enter'
+    ].join("\n");
+}
+
+/**
+ * Change a running Claude session's effort, as `modelCommand` changes its
+ * model: kept in the state dir for the next start, and typed into the terminal
+ * now when nothing else holds it. `level` is held to the known levels here.
+ */
+export function effortCommand(stateDir: string, command: string, level: string): string {
+    if (!isAgentEffortLevel(level) || !/^\/[a-z-]+$/.test(command)) throw new Error("not an effort level");
+    const target = `${TMUX_SESSION}:${INTERFACE_WINDOW}`;
+    return [
+        `printf %s ${shellQuote(level)} > "${stateDir}/effort"`,
+        `if ${runnerIn(stateDir)} && ! ${interfaceOpen()}; then exit 0; fi`,
+        `t=${shellQuote(TMUX_SESSION)}; if ${interfaceOpen()}; then t=${shellQuote(target)}; fi`,
+        `tmux send-keys -t "$t" -l ${shellQuote(`${command} ${level}`)}`,
         'tmux send-keys -t "$t" Enter'
     ].join("\n");
 }

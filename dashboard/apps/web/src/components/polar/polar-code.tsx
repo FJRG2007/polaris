@@ -89,7 +89,10 @@ import {
     CodeWhereChip,
     CodeSessionBar,
     NO_REPO,
+    CODE_EFFORT_KEY,
+    CodeEffortPill,
     PERMISSION_MODE_KEY,
+    readCodeEffort,
     PermissionModePicker,
     readPermissionMode,
     readRepo,
@@ -817,6 +820,14 @@ function CodeStart({
         setMode(next);
         writeStored(PERMISSION_MODE_KEY, next);
     };
+    // How hard the tool thinks, for one with an effort flag: the level picked
+    // last, read after mount for the same reason as the mode.
+    const [effort, setEffort] = useState<core.AgentEffortLevel | null>(null);
+    useEffect(() => setEffort(readCodeEffort(readStored(CODE_EFFORT_KEY))), []);
+    const chooseEffort = (next: core.AgentEffortLevel) => {
+        setEffort(next);
+        writeStored(CODE_EFFORT_KEY, next);
+    };
     // What the task starts from besides the words: an issue of the repository
     // (dropped when the repository changes) and one of the person's skills.
     const [issuePick, setIssue] = useState<{ repoId: string; issue: PickedIssue } | null>(null);
@@ -972,6 +983,7 @@ function CodeStart({
                             taskId: null,
                             unattended: null,
                             permissionMode: asksMode ? mode : null,
+                            effort: tool && core.agentEffortLevels(tool).length > 0 ? effort : null,
                             issueNumber: workspace ? null : (started.issue?.number ?? null),
                             skill: started.skill,
                             // Code in Polar is the harness's work: Enigma on, the
@@ -1041,6 +1053,14 @@ function CodeStart({
                                 open={modelOpen}
                                 onOpenChange={setModelOpen}
                             />
+                            {tool ? (
+                                <CodeEffortPill
+                                    cli={tool}
+                                    value={effort}
+                                    onChange={chooseEffort}
+                                    disabled={busy || pending}
+                                />
+                            ) : null}
                             {asksMode ? (
                                 <PermissionModePicker
                                     value={mode}
@@ -1330,6 +1350,21 @@ function CodeThread({
               model: view?.modelChoice?.model ?? null
           }
         : null;
+    // The effort, changeable while it runs, for a tool with an effort command.
+    const liveEffort = Boolean(cli && core.agentEffortLevels(cli).length > 0 && thread?.session.live);
+    const changeEffort = (next: core.AgentEffortLevel) => {
+        if (next === view?.effort) return;
+        setError(null);
+        startTransition(() => {
+            void runAction(
+                () => postCode<{ error?: string }>("/api/polar/code/effort", { sessionId, effort: next }),
+                setError
+            ).then((result) => {
+                if (result?.error) setError(result.error);
+                read();
+            });
+        });
+    };
     const changeModel = (next: CodePick) => {
         if (next.source !== livePick?.source || next.model === livePick.model) return;
         setError(null);
@@ -1455,7 +1490,7 @@ function CodeThread({
                 maxLength={PROMPT_MAX}
                 onSubmit={send}
                 picker={
-                    liveSource || liveMode ? (
+                    liveSource || liveMode || liveEffort ? (
                         <>
                             {liveSource ? (
                                 <CodeModelPicker
@@ -1463,6 +1498,14 @@ function CodeThread({
                                     value={livePick}
                                     onChange={changeModel}
                                     automatic={false}
+                                    disabled={busy}
+                                />
+                            ) : null}
+                            {liveEffort && cli ? (
+                                <CodeEffortPill
+                                    cli={cli}
+                                    value={view?.effort ?? null}
+                                    onChange={changeEffort}
                                     disabled={busy}
                                 />
                             ) : null}

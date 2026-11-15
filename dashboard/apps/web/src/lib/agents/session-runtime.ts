@@ -245,10 +245,13 @@ function agentCommandFor(
     // The model picked for this session, on the flag the tool documents. Held
     // to SAFE_MODEL_ID again there: the command is one line of words.
     const modelArgs = core.agentModelArgs(cli.id, session.modelChoice?.model);
+    // The effort picked for this session, on the flag the tool documents; only
+    // a level that tool lists ever reaches the line.
+    const effortArgs = core.agentEffortArgs(cli.id, session.effort);
     return {
         cli,
         binary,
-        command: [binary, ...args, ...modelArgs].join(" "),
+        command: [binary, ...args, ...modelArgs, ...effortArgs].join(" "),
         install: cli.install ?? "",
         launcher
     };
@@ -1096,6 +1099,26 @@ export async function changeSessionModel(sessionId: string, model: string): Prom
         sessionId,
         commands.modelCommand(stateDirFor(placement), model),
         "The agent's terminal did not take the model"
+    );
+}
+
+/**
+ * Change how hard a running session thinks: for its next turn, or at once in
+ * an open interface. Only for a tool with an effort command.
+ */
+export async function changeSessionEffort(
+    sessionId: string,
+    cliId: string,
+    level: core.AgentEffortLevel
+): Promise<void> {
+    const support = core.agentCliById(cliId)?.effort;
+    if (!support || !support.levels.includes(level)) throw new Error("That tool takes no effort level.");
+    const placement = await sessionPlacement(sessionId);
+    if (!placement) throw new Error("That session no longer exists.");
+    await steer(
+        sessionId,
+        commands.effortCommand(stateDirFor(placement), support.command, level),
+        "The agent's terminal did not take the effort"
     );
 }
 

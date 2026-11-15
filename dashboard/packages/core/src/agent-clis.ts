@@ -412,6 +412,48 @@ export interface AgentCli {
      * been sourced; such a tool runs on whatever its own sign-in defaults to.
      */
     readonly model?: AgentModelSupport;
+    /**
+     * How the tool is told how hard to think, where its own documentation says
+     * so. Absent for a tool whose effort setting has not been verified; such a
+     * tool gets no effort control and runs at its own default.
+     */
+    readonly effort?: AgentEffortSupport;
+}
+
+/**
+ * Effort levels a coding tool can be started at, ascending. Claude Code's own
+ * names (code.claude.com/docs/en/model-config): a level the model lacks runs at
+ * the highest one it has at or below it, so every level is safe to send.
+ */
+export const AGENT_EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type AgentEffortLevel = (typeof AGENT_EFFORT_LEVELS)[number];
+
+/** See `AgentCli.effort`. */
+export interface AgentEffortSupport {
+    /** The start flag, followed by the level. */
+    readonly flag: string;
+    /** The command typed into a running session, followed by the level. */
+    readonly command: string;
+    readonly levels: readonly AgentEffortLevel[];
+    /** Where the flag and the command are documented. */
+    readonly docs: string;
+}
+
+export function isAgentEffortLevel(value: unknown): value is AgentEffortLevel {
+    return typeof value === "string" && (AGENT_EFFORT_LEVELS as readonly string[]).includes(value);
+}
+
+/** The levels this tool offers, or none for a tool with no effort control. */
+export function agentEffortLevels(cliId: string): readonly AgentEffortLevel[] {
+    return agentCliById(cliId)?.effort?.levels ?? [];
+}
+
+/** The words that start a tool at an effort level; none for a tool without
+ *  an effort flag, no level, or a level the tool does not list. */
+export function agentEffortArgs(cliId: string, level: string | null | undefined): string[] {
+    const support = agentCliById(cliId)?.effort;
+    if (!support || !level || !support.levels.includes(level as AgentEffortLevel)) return [];
+    return [support.flag, level];
 }
 
 /** See `AgentCli.model`. Exactly one of `env` and `flag`. */
@@ -540,6 +582,16 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         model: {
             provider: "anthropic",
             env: "ANTHROPIC_MODEL",
+            docs: "https://code.claude.com/docs/en/model-config"
+        },
+        // code.claude.com/docs/en/model-config: `--effort <level>` at start,
+        // `/effort <level>` in a running session. Codex's
+        // `model_reasoning_effort` is left out: its levels "depend on the model
+        // and client" in OpenAI's config reference, so none is safe to offer.
+        effort: {
+            flag: "--effort",
+            command: "/effort",
+            levels: AGENT_EFFORT_LEVELS,
             docs: "https://code.claude.com/docs/en/model-config"
         }
     },

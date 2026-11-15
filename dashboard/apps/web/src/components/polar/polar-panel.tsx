@@ -171,6 +171,14 @@ import {
     ModelSelector,
     type ModelSelectorProvider
 } from "@/components/polar/elements/model-selector";
+import { EffortPill } from "@/components/polar/elements/effort-pill";
+import {
+    clampIntelligence,
+    effortControl,
+    readEffortMemory,
+    recallEffort,
+    rememberEffort
+} from "@/lib/polar/effort";
 import { ConversationEmptyState } from "@/components/polar/elements/conversation";
 import { PolarThreadFrame, PolarWelcome } from "@/components/polar/polar-layout";
 import {
@@ -195,6 +203,7 @@ import {
     polarAttachmentId,
     POLAR_ATTACHMENT_MOST,
     POLAR_ATTACHMENT_TYPES,
+    type Intelligence,
     type ModelChoice,
     type PageContext,
     type SiteContext,
@@ -575,6 +584,10 @@ function PolarAsideOpen() {
 // ---------------------------------------------------------------------------
 
 const CHOICE_KEY = "polar.choice";
+/** The level last used on each model (`effort.ts`). */
+const EFFORT_KEY = "polar.effort.models";
+/** A "Think" switch: off, on. */
+const TOGGLE_LEVELS: readonly Intelligence[] = ["fast", "deep"];
 
 function newId(): string {
     return crypto.randomUUID();
@@ -1128,6 +1141,32 @@ export function PolarChat({
             )
             .catch(() => setProviders([]));
     }, []);
+    // How hard it thinks: the steps the picked model offers (`effort.ts`), and
+    // the level last used on each model, kept per person in this browser.
+    const pickedModel = useMemo(() => {
+        if (isAutomatic(choice)) return { provider: "auto", model: "auto", reasoning: true };
+        return (providers ?? [])
+            .find((entry) => entry.provider === choice?.provider)
+            ?.models.find((entry) => entry.model === choice?.model);
+    }, [providers, choice]);
+    const effort = useMemo(() => effortControl(pickedModel), [pickedModel]);
+    const pickModel = useCallback((next: ModelChoice) => {
+        const remembered = recallEffort(readEffortMemory(readStored(EFFORT_KEY)), next);
+        setChoice(remembered ? { ...next, intelligence: remembered } : next);
+    }, []);
+    const pickEffort = useCallback(
+        (level: Intelligence) => {
+            if (!choice) return;
+            setChoice({ ...choice, intelligence: level });
+            writeStored(
+                EFFORT_KEY,
+                JSON.stringify(
+                    rememberEffort(readEffortMemory(readStored(EFFORT_KEY)), { ...choice, intelligence: level })
+                )
+            );
+        },
+        [choice]
+    );
     useEffect(() => {
         if (choice) writeStored(CHOICE_KEY, JSON.stringify(choice));
     }, [choice]);
@@ -2519,10 +2558,19 @@ export function PolarChat({
                         <ModelSelector
                             providers={providers ?? []}
                             choice={choice}
-                            onChoice={setChoice}
+                            onChoice={pickModel}
                             open={modelOpen}
                             onOpenChange={setModelOpen}
                         />
+                        {choice && effort.kind !== "none" ? (
+                            <EffortPill
+                                toggle={effort.kind === "toggle"}
+                                levels={effort.kind === "ladder" ? effort.levels : TOGGLE_LEVELS}
+                                value={clampIntelligence(choice.intelligence, effort)}
+                                onChange={pickEffort}
+                                labelOf={(level) => t(`intelligence.${level}`)}
+                            />
+                        ) : null}
                         {welcome && !temporary ? (
                             <polarCompare.AskSeveral
                                 providers={providers ?? []}

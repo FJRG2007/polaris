@@ -18,6 +18,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { PolarCodeBranches } from "@/lib/polar/code";
 import { readPoll } from "@/lib/poll-fetch";
 import { MODEL_TRIGGER } from "@/components/polar/elements/model-selector";
+import { EffortPill } from "@/components/polar/elements/effort-pill";
 import * as core from "@polaris/core";
 import {
     Bot,
@@ -561,6 +562,42 @@ export function CodeWhereChip({
 
 function Mark({ on }: { on: boolean }) {
     return <Check className={cn("ml-auto size-3.5 shrink-0 text-primary", !on && "opacity-0")} />;
+}
+
+/** Where the picked effort is kept, so the next task starts on it. */
+export const CODE_EFFORT_KEY = "polar.code.effort";
+
+/** The effort a new task starts on: the one picked last, or none (the tool's
+ *  own default). */
+export function readCodeEffort(stored: string | null): core.AgentEffortLevel | null {
+    return core.isAgentEffortLevel(stored) ? stored : null;
+}
+
+/** The effort pill for a coding tool with an effort flag; nothing for one
+ *  without (`AgentCli.effort`). */
+export function CodeEffortPill({
+    cli,
+    value,
+    onChange,
+    disabled = false
+}: {
+    cli: string;
+    value: core.AgentEffortLevel | null;
+    onChange: (level: core.AgentEffortLevel) => void;
+    disabled?: boolean;
+}) {
+    const t = useTranslations("polar");
+    const levels = core.agentEffortLevels(cli);
+    if (levels.length === 0) return null;
+    return (
+        <EffortPill
+            levels={levels}
+            value={value}
+            onChange={onChange}
+            labelOf={(level) => t(`effort.levels.${level}`)}
+            disabled={disabled}
+        />
+    );
 }
 
 /** Where the picked permission mode is kept, so the next task starts on it. */

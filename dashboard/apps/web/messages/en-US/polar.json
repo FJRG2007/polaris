@@ -1791,5 +1791,19 @@
         "required": "Required",
         "invalid": "Check this field",
         "stars": "{count} of {max} stars"
+    },
+    "effort": {
+        "default": "Default",
+        "title": "Effort",
+        "think": "Think",
+        "thinkHint": "Think before answering, for harder problems",
+        "failed": "The agent did not take the new effort.",
+        "levels": {
+            "low": "Fast",
+            "medium": "Balanced",
+            "high": "Deep",
+            "xhigh": "Extra deep",
+            "max": "Max"
+        }
     }
 }

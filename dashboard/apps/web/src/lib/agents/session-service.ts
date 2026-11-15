@@ -102,6 +102,8 @@ export interface SessionView {
     readonly unattended: boolean | null;
     /** How the agent asks before it acts, or null for the place's own rule. */
     readonly permissionMode: core.SessionPermissionMode | null;
+    /** How hard the agent thinks, or null for the tool's own default. */
+    readonly effort: core.AgentEffortLevel | null;
     /** The account picked when the session was started, or null. */
     readonly accountId: string | null;
     /** Whether it was told to sign in with nothing and let the machine's own
@@ -194,6 +196,7 @@ const VIEW_SELECT = {
     sharedHome: true,
     unattended: true,
     permissionMode: true,
+    effort: true,
     accountId: true,
     useMachineLogin: true,
     modelProvider: true,
@@ -238,6 +241,7 @@ type SessionRecord = {
     sharedHome: boolean;
     unattended: boolean | null;
     permissionMode: string | null;
+    effort: string | null;
     accountId: string | null;
     useMachineLogin: boolean;
     modelProvider: string | null;
@@ -291,6 +295,7 @@ function toView(record: SessionRecord): SessionView {
         sharedHome: record.sharedHome,
         unattended: record.unattended,
         permissionMode: core.sessionPermissionMode(record.permissionMode),
+        effort: core.isAgentEffortLevel(record.effort) ? record.effort : null,
         accountId: record.accountId,
         useMachineLogin: record.useMachineLogin,
         modelChoice:
@@ -443,6 +448,8 @@ export interface SessionCreateInput {
     readonly unattended: boolean | null;
     /** How the agent asks before it acts; absent or null for the place's own rule. */
     readonly permissionMode?: core.SessionPermissionMode | null;
+    /** How hard the agent thinks; absent or null for the tool's own default. */
+    readonly effort?: core.AgentEffortLevel | null;
     /** Which stored account signs the agent in, or null for whichever resolves. */
     readonly accountId: string | null;
     /** Sign it in with nothing, and let the machine's own login answer. */
@@ -490,6 +497,7 @@ export async function createSession(
             sharedHome: input.sharedHome,
             unattended: input.unattended,
             permissionMode: input.permissionMode ?? null,
+            effort: input.effort ?? null,
             accountId: input.accountId,
             useMachineLogin: input.useMachineLogin,
             modelProvider: input.modelChoice?.provider ?? null,

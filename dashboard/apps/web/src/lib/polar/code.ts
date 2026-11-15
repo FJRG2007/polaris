@@ -65,6 +65,7 @@ import {
     listSessionsAction,
     promptSessionAction,
     setSessionModeAction,
+    setSessionEffortAction,
     setSessionModelAction,
     sessionChoicesAction,
     sessionDetailAction,
@@ -576,6 +577,13 @@ export async function polarCodeModel(user: SessionUser, input: unknown): Promise
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
     return setSessionModelAction(input);
+}
+
+/** Change how hard a running Claude session thinks, from its thread. */
+export async function polarCodeEffort(user: SessionUser, input: unknown): Promise<{ error?: string }> {
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    return setSessionEffortAction(input);
 }
 
 /** Change a running session's permission mode from its thread. */
