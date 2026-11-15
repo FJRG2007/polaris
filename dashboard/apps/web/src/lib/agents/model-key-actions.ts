@@ -35,6 +35,7 @@ import {
 } from "@/lib/agents/model-keys";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { keyLimitsSchema } from "@/lib/agents/key-limits";
+import { reachable, safeUrl } from "@/lib/safe-fetch";
 
 /** What a write reports back. `warning` is the case that is neither: the key was
  *  stored, and the provider could not be asked whether it is any good. */
@@ -93,6 +94,23 @@ function conflict(caught: unknown): "name" | "secret" | null {
 const NAME_TAKEN = "There is already a key by that name.";
 const SECRET_TAKEN = "That key was already added for this provider.";
 
+/**
+ * Why a person's own endpoint cannot be saved, or null when it can. A key saved
+ * on an account is called by the dashboard from inside the deployment, so its
+ * address has to be a public one; only the deployment's own keys, which an
+ * administrator saves, may point at the local network. Checked again on every
+ * call (`configuredFetch`), since a name can resolve elsewhere tomorrow.
+ */
+async function endpointRefusal(
+    scope: KeyScope,
+    config: { baseUrl?: string } | undefined
+): Promise<string | null> {
+    if (scope.audit !== "account" || !config?.baseUrl) return null;
+    const url = safeUrl(config.baseUrl, Number.POSITIVE_INFINITY);
+    if (url && (await reachable(url.hostname))) return null;
+    return (await readerWords("api"))("refusals.aiKeys.privateEndpoint");
+}
+
 export async function addKey(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
     const parsed = createModelKeySchema.safeParse(input);
     if (!parsed.success)
@@ -108,6 +126,9 @@ export async function addKey(scope: KeyScope, input: unknown): Promise<KeyAction
         return { error: (await readerWords("api"))("refusals.aiKeys.notAProvider") };
 
     if (await ownerHasModelKeyName(scope.owner, parsed.data.name)) return { error: NAME_TAKEN };
+
+    const refusedEndpoint = await endpointRefusal(scope, parsed.data.config);
+    if (refusedEndpoint) return { error: refusedEndpoint };
 
     // Checked before the provider is troubled with it: the same key stored twice
     // is two rows that expire together and hit one ceiling together, and the
@@ -179,6 +200,9 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
 
     if (await ownerHasModelKeyName(scope.owner, parsed.data.name, parsed.data.id))
         return { error: NAME_TAKEN };
+
+    const refusedEndpoint = await endpointRefusal(scope, parsed.data.config);
+    if (refusedEndpoint) return { error: refusedEndpoint };
 
     // Only a key that was actually retyped is checked. A rename, or moving the
     // end date, should not fail because the provider is having a bad morning.

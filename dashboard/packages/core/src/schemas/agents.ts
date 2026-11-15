@@ -266,7 +266,17 @@ export const modelKeySecretSchema = z
 /** A gateway needs more than a key: an endpoint, a model, and the two limits an
  *  OpenAI-compatible endpoint publishes no catalogue for. */
 export const gatewayKeyConfigSchema = z.object({
-    baseUrl: z.string().trim().url("Not a URL").max(500),
+    // http(s) only, and no user:password in it: the dashboard calls this address
+    // with the stored key, so anything else is not an endpoint it should talk to.
+    baseUrl: z
+        .string()
+        .trim()
+        .url("Not a URL")
+        .max(500)
+        .refine((value) => {
+            const url = new URL(value);
+            return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
+        }, "Use an http or https address"),
     model: z.string().trim().min(1, "Name the model your endpoint serves").max(200),
     context: z.number().int().min(0).max(100_000_000),
     maxOutput: z.number().int().min(0).max(100_000_000)

@@ -185,6 +185,7 @@
             "pickKey": "Pick a key",
             "orderUnreadable": "Could not read the new order.",
             "catalogAnswered": "The catalog answered {status}.",
+            "privateEndpoint": "That address is private or does not resolve. Use one reachable from the internet.",
             "check": {
                 "ownEndpoint": "An endpoint of your own is proven by the first run, not from here.",
                 "noProbe": "Polaris has no way to check this provider's keys.",

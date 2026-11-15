@@ -70,6 +70,10 @@ import {
 import { polarLimitReached } from "@/lib/polar/usage";
 import type { FailureKind } from "@/lib/polar/provider-failure";
 
+/** How long one call to a person's own model endpoint may run, a streamed answer
+ *  included: the guarded fetch bounds the whole exchange. */
+const OWN_ENDPOINT_STREAM_MS = 15 * 60 * 1000;
+
 /**
  * Base URLs of the providers that speak the OpenAI chat API, taken from the
  * endpoints Polaris already checks their keys against (`provider-key-check.ts`).
@@ -539,7 +543,11 @@ export function languageModel(
             return createOpenAICompatible({
                 name: "gateway",
                 baseURL: credential.baseUrl ?? "",
-                apiKey: apiKey || undefined
+                apiKey: apiKey || undefined,
+                // A person's own endpoint reaches public addresses only, checked at
+                // every connect; the deployment's (an administrator's) may be on
+                // the local network, like an Ollama beside Polaris.
+                ...(credential.source !== "instance" ? { fetch: configuredFetch(OWN_ENDPOINT_STREAM_MS) } : {})
             })(model);
         default: {
             const endpoint =
