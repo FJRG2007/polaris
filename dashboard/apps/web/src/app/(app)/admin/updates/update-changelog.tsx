@@ -183,8 +183,20 @@ export function UpdateChangelog({
     const [expanded, setExpanded] = useState<Partial<Record<ChangelogGroup, boolean>>>({});
     const [showAll, setShowAll] = useState<Partial<Record<ChangelogGroup, boolean>>>({});
     const section = useRef<HTMLElement | null>(null);
+    // What is already installed matters less than what is on offer: it starts
+    // folded, and is read only once opened - unless the "updated" notice sent
+    // the reader here for it.
+    const [folded, setFolded] = useState(kind === "installed");
+    useEffect(() => {
+        if (kind !== "installed") return;
+        const follow = () => window.location.hash === "#installed" && setFolded(false);
+        follow();
+        window.addEventListener("hashchange", follow);
+        return () => window.removeEventListener("hashchange", follow);
+    }, [kind]);
 
     useEffect(() => {
+        if (folded) return;
         let live = true;
         // The last answer for this range stays on screen while it is asked again.
         setRead(rememberedRange(key));
@@ -198,7 +210,7 @@ export function UpdateChangelog({
         return () => {
             live = false;
         };
-    }, [key, kind]);
+    }, [key, kind, folded]);
 
     // Opened from the "updated" notice: bring this range into view once drawn.
     const drawn = read !== undefined;
@@ -216,6 +228,7 @@ export function UpdateChangelog({
 
     const installed = kind === "installed";
     const from = read?.from ?? base;
+    const foldId = `changelog-${kind}-body`;
     const sectionProps = {
         ref: section,
         id: installed ? "installed" : undefined,
@@ -239,10 +252,36 @@ export function UpdateChangelog({
         </div>
     );
 
+    const fold = installed ? (
+        <button
+            type="button"
+            className="flex min-w-0 items-center gap-1.5 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-expanded={!folded}
+            aria-controls={foldId}
+            onClick={() => setFolded((value) => !value)}
+        >
+            <ChevronRight
+                className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-fast", !folded && "rotate-90")}
+                aria-hidden
+            />
+            {title}
+        </button>
+    ) : (
+        title
+    );
+
+    if (folded) {
+        return (
+            <section {...sectionProps} className="flex flex-col gap-1 border-t border-border pt-3">
+                {fold}
+            </section>
+        );
+    }
+
     if (read === undefined) {
         return (
             <section {...sectionProps} className="flex flex-col gap-2 border-t border-border pt-3" aria-busy="true">
-                {title}
+                {fold}
                 <Skeleton className="h-4 w-48" />
                 <Skeleton className="h-3 w-full" />
                 <Skeleton className="h-3 w-5/6" />
@@ -252,7 +291,7 @@ export function UpdateChangelog({
     if (!changelog || groups.length === 0) {
         return (
             <section {...sectionProps} className="flex flex-col gap-1 border-t border-border pt-3">
-                {title}
+                {fold}
                 <p className="text-xs text-muted-foreground">
                     {installed && !read?.from
                         ? t("settings.changelog.installedUnknown")
@@ -271,7 +310,7 @@ export function UpdateChangelog({
     return (
         <section {...sectionProps} className="flex flex-col gap-2 border-t border-border pt-3">
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-                {title}
+                {fold}
                 <ul className="flex min-w-0 flex-wrap items-center gap-1.5">
                     {groups.map(({ group, entries }) => {
                         const Icon = GROUP_ICONS[group];

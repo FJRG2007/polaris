@@ -8,7 +8,7 @@
 
 import { buildChangelog } from "@polaris/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
 vi.mock("@/components/i18n/i18n-provider", () => ({
     useTranslations: () => Object.assign((key: string) => key, { rich: (key: string) => key })
@@ -42,6 +42,11 @@ vi.mock("@/app/(app)/admin/updates/actions", () => ({
 
 import { UpdateChangelog } from "@/app/(app)/admin/updates/update-changelog";
 
+/** The installed range starts folded: open it the way a reader does. */
+function unfold() {
+    fireEvent.click(screen.getByRole("button", { expanded: false, name: /settings\.changelog\.installedTitle/ }));
+}
+
 afterEach(() => {
     cleanup();
     window.sessionStorage.clear();
@@ -56,6 +61,7 @@ describe("installed and available changelogs", () => {
                 <UpdateChangelog head="ccccccc" base="bbbbbbb" />
             </>
         );
+        unfold();
         const done = await screen.findByRole("region", { name: "settings.changelog.installedTitle" });
         const offer = screen.getByRole("region", { name: "settings.changelog.title" });
         await within(done).findByText("Installed change");
@@ -72,16 +78,39 @@ describe("installed and available changelogs", () => {
     it("says the range is unknown when no previous build was recorded", async () => {
         installed.from = null;
         render(<UpdateChangelog kind="installed" head="bbbbbbb" />);
+        unfold();
         expect(await screen.findByText("settings.changelog.installedUnknown")).toBeTruthy();
     });
 
     it("paints the last answer at once when the range was read before", async () => {
         installed.from = "aaaaaaa";
         const first = render(<UpdateChangelog kind="installed" head="bbbbbbb" />);
+        unfold();
         await screen.findByText("Installed change");
         first.unmount();
         render(<UpdateChangelog kind="installed" head="bbbbbbb" />);
+        unfold();
         // Synchronously there: no skeleton while the fresh read is under way.
         expect(screen.getByText("Installed change")).toBeTruthy();
+    });
+
+    it("keeps what is already installed folded, and unread, until it is opened", async () => {
+        installed.from = "aaaaaaa";
+        render(<UpdateChangelog kind="installed" head="bbbbbbb" />);
+        const toggle = screen.getByRole("button", { name: /settings\.changelog\.installedTitle/ });
+        expect(toggle.getAttribute("aria-expanded")).toBe("false");
+        expect(screen.queryByText("Installed change")).toBeNull();
+        fireEvent.click(toggle);
+        expect(await screen.findByText("Installed change")).toBeTruthy();
+        const open = screen.getByRole("button", { name: /settings\.changelog\.installedTitle/ });
+        expect(open.getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("opens itself when the updated notice links to it", async () => {
+        installed.from = "aaaaaaa";
+        window.history.replaceState(null, "", "#installed");
+        render(<UpdateChangelog kind="installed" head="bbbbbbb" />);
+        expect(await screen.findByText("Installed change")).toBeTruthy();
+        window.history.replaceState(null, "", "#");
     });
 });
