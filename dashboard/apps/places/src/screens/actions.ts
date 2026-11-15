@@ -27,6 +27,8 @@ import * as alerts from "../lib/alerts";
 import * as places from "../lib/places";
 import type { Coordinate, LanDetails } from "@polaris/core";
 import { addressDetails, listAccountNetworks, type AccountNetwork } from "../lib/network-details";
+import { assignRoom, listPlaceHardware } from "../lib/place-hardware";
+import { HARDWARE_KINDS, type HardwareView } from "../lib/device-list";
 import { NearbyRefusal, reportedLocation, type NearbyRefused } from "../lib/nearby";
 import { normalizePlaceLocation, placeLocationSchema } from "../lib/place-kinds";
 import * as people from "../lib/people";
@@ -189,6 +191,49 @@ export async function listCamerasAction(): Promise<{
         );
     });
     return result.error ? { error: result.error } : { cameras: result.value };
+}
+
+/** The cameras, UPSes and NASes at the place being looked at, for the devices
+ *  list: each only to whoever may open it. */
+export async function listPlaceHardwareAction(): Promise<{
+    hardware?: HardwareView[];
+    error?: string;
+}> {
+    const { user, install, reach } = await requireHomeShared();
+    const result = await guard(async () => {
+        const { current } = await currentPlace(install.id);
+        return listPlaceHardware(
+            install.id,
+            current.id,
+            user,
+            reach,
+            await managesHome(user, reach)
+        );
+    });
+    return result.error ? { error: result.error } : { hardware: result.value };
+}
+
+const roomAssignmentSchema = zod.object({
+    kind: zod.enum(["device", ...HARDWARE_KINDS]),
+    id: zod.string().uuid(),
+    roomId: zod.string().uuid().nullable()
+});
+
+/** Put a device, camera, UPS or NAS in one of its place's rooms, or in none. */
+export async function assignRoomAction(input: unknown): Promise<{ error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const parsed = roomAssignmentSchema.safeParse(input);
+    if (!parsed.success) return { error: await schemaSay(undefined, "actions.checkDetails") };
+    const { kind, id, roomId } = parsed.data;
+    const result = await guard(() => assignRoom(install.id, user, kind, id, roomId));
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.room.assign",
+        targetType: kind === "device" ? "placeDevice" : kind,
+        targetId: id
+    });
+    return {};
 }
 
 /** Remember which place this person is looking at. Not authorization: it narrows

@@ -148,6 +148,10 @@ export async function updateRoom(
 export async function deleteRoom(installedAppId: string, id: string): Promise<void> {
     await requireRoom(installedAppId, id);
     await prisma.placeRoom.delete({ where: { id } });
+    // A UPS or a NAS names its room by a bare id (they are core's, not this
+    // app's), so the room's going is said to them here.
+    await prisma.ups.updateMany({ where: { roomId: id }, data: { roomId: null } });
+    await prisma.storageConnection.updateMany({ where: { roomId: id }, data: { roomId: null } });
     // The keys to it go with it: a room made later is not the room they opened.
     await host.accessGrants.dropGrantsFor("place.room", id);
 }

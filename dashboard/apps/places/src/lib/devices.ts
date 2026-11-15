@@ -263,7 +263,7 @@ export async function listDevices(
 }
 
 /** One device, refusing rather than answering when it is not this install's. */
-async function requireDevice(
+export async function requireDevice(
     installedAppId: string,
     id: string
 ): Promise<DeviceRow & { externalId: string }> {

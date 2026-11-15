@@ -13,6 +13,9 @@ import { lanDetails, type LanDetails } from "@polaris/core";
 
 export interface AccountNetwork {
     readonly id: string;
+    /** The connected account it belongs to, so a device's screen shows the
+     *  address of the account that reaches it. */
+    readonly accountId: string;
     readonly label: string;
     readonly details: LanDetails;
 }
@@ -37,7 +40,14 @@ export function accountNetworks(
             const details =
                 field.address === true ? lanDetails(account.settings[field.key], table) : null;
             return details
-                ? [{ id: `${account.id}:${field.key}`, label: account.label, details }]
+                ? [
+                      {
+                          id: `${account.id}:${field.key}`,
+                          accountId: account.id,
+                          label: account.label,
+                          details
+                      }
+                  ]
                 : [];
         });
     });

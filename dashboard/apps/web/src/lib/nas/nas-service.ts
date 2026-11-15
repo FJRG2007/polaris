@@ -153,6 +153,11 @@ export async function setNasPlace(connectionId: string, placeId: string | null):
         });
         if (!place) return false;
     }
+    // A room is one of its place's: moved to another place, it is in none there.
+    await prisma.storageConnection.updateMany({
+        where: { id: connectionId, kind: "unifi-unas", ...(placeId ? { NOT: { placeId } } : {}) },
+        data: { roomId: null }
+    });
     const updated = await prisma.storageConnection.updateMany({
         where: { id: connectionId, kind: "unifi-unas" },
         data: { placeId }

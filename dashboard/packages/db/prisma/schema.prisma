@@ -2125,6 +2125,8 @@ model StorageConnection {
     placeId            String?  @db.Uuid
     // The NAS alert conditions the last poll found (UnasAlert.key), so an
     // Automation event is sent when one starts, not on every poll.
+    // The room of that place it stands in (bare uuid, as placeId).
+    roomId             String?  @db.Uuid
     nasAlertKeys       String[] @default([])
 
     @@index([ownerId])
@@ -16256,6 +16258,9 @@ model Ups {
     // A bare uuid, per the Place/InstalledApp precedent: Places is an app that
     // can be uninstalled, and a UPS must keep protecting its machines when it is.
     placeId                 String?     @db.Uuid
+    // The room of that place it stands in. A bare uuid for the same reason;
+    // a room that is deleted leaves it placed with no room.
+    roomId                  String?     @db.Uuid
     createdAt               DateTime    @default(now())
     updatedAt               DateTime    @updatedAt
     samples                 UpsSample[]

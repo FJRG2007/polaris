@@ -285,6 +285,11 @@ export async function updateUpsPlace(id: string, placeId: string | null): Promis
         !(await prisma.place.findUnique({ where: { id: placeId }, select: { id: true } }))
     )
         return false;
+    // A room is one of its place's: moved to another place, it is in none there.
+    await prisma.ups.updateMany({
+        where: { id, ...(placeId ? { NOT: { placeId } } : {}) },
+        data: { roomId: null }
+    });
     const result = await prisma.ups.updateMany({ where: { id }, data: { placeId } });
     return result.count > 0;
 }
