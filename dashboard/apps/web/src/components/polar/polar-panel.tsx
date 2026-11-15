@@ -151,6 +151,8 @@ import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/
 import { answeredNothing } from "@/lib/polar/unanswered";
 import { askAnswered, isAskPart, pendingAsk, POLAR_ASK_TOOL } from "@/lib/polar/ask";
 import { AskChip, PolarAskBar } from "@/components/polar/polar-ask";
+import { formOf, formRepliesIn, formReplyText, isFormPart, type FormValues } from "@/lib/polar/forms";
+import { PolarFormView } from "@/components/polar/polar-form";
 import { withoutPseudoToolCalls } from "@/lib/polar/pseudo-tools";
 import { repoStepOf } from "@/lib/polar/code-host";
 import {
@@ -1058,6 +1060,8 @@ export function PolarChat({
         ?.parts.some((part) => "state" in part && part.state === "approval-requested");
     // Polar's question waiting on an answer; the composer stays in use beside it.
     const waitingAsk = busy ? null : pendingAsk(chat.messages);
+    // Forms already answered in this chat, by the call that drew them.
+    const formReplies = useMemo(() => formRepliesIn(chat.messages), [chat.messages]);
 
     // Every message on screen joins the version tree as it appears.
     useEffect(() => {
@@ -2939,6 +2943,17 @@ export function PolarChat({
                                         }
                                         onRegenerate={regenerateWith}
                                         onAsk={(text) => void sendSpoken(text)}
+                                        formReplies={formReplies}
+                                        onSubmitForm={(callId, input, values) => {
+                                            const form = formOf(input);
+                                            if (!form || busy) return;
+                                            turnChoice.current = null;
+                                            setLastApproved(false);
+                                            void sendWithRoom({
+                                                text: formReplyText(form, values),
+                                                metadata: { form: { callId, values } }
+                                            });
+                                        }}
                                         subagents={subagentState.list}
                                         onOpenSubagent={setOpenSubagent}
                                         providers={providers ?? []}
@@ -3145,6 +3160,8 @@ function MessageView({
     onSaveCommand,
     onRegenerate,
     onAsk,
+    formReplies,
+    onSubmitForm,
     subagents,
     onOpenSubagent,
     providers,
@@ -3173,6 +3190,8 @@ function MessageView({
     onRegenerate: (options: answerActions.RegenerateOptions) => void;
     /** Sends a line as the next question, for a step offered under an answer. */
     onAsk?: (text: string) => void;
+    formReplies?: ReadonlyMap<string, FormValues>;
+    onSubmitForm?: (callId: string, input: unknown, values: FormValues) => void;
     /** The chat's subagents as last read, for a background card. */
     subagents?: readonly subagentShared.SubagentView[] | null;
     onOpenSubagent?: (id: string) => void;
@@ -3275,7 +3294,7 @@ function MessageView({
         part.type === `tool-${subagentShared.TASK_TOOL}`;
     const folded = (part: UIMessage["parts"][number]) => {
         if (part.type === "reasoning") return true;
-        if (isTask(part) || isAskPart(part)) return false;
+        if (isTask(part) || isAskPart(part) || isFormPart(part)) return false;
         if (isVisualPart(part)) return !drawn(part);
         const found = toolOf(part);
         return !!found && !found.tool.approval && found.tool.state !== "output-error";
@@ -3426,6 +3445,20 @@ function MessageView({
                     if (tool.state === "input-streaming") return null;
                     return (
                         <AskChip key={index} input={tool.input} output={tool.output} waiting={last} />
+                    );
+                }
+                if (isFormPart(part)) {
+                    const tool = part as unknown as ToolPart;
+                    if (tool.state === "input-streaming") return <VisualDrawing key={index} />;
+                    if (tool.state === "output-error") return null;
+                    return (
+                        <PolarFormView
+                            key={index}
+                            input={tool.input}
+                            sent={formReplies?.get(tool.toolCallId) ?? null}
+                            disabled={busy || !onSubmitForm}
+                            onSubmit={(values) => onSubmitForm?.(tool.toolCallId, tool.input, values)}
+                        />
                     );
                 }
                 if (drawn(part)) {

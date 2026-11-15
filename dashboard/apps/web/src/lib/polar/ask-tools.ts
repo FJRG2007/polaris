@@ -11,6 +11,7 @@
 
 import { tool, type ToolSet } from "ai";
 import { polarInputSchema } from "@/lib/polar/tool-input";
+import { POLAR_FORM_TOOL, polarFormSchema } from "@/lib/polar/forms";
 import { POLAR_ASK_TOOL, polarAskInputSchema, polarAskOutputSchema } from "@/lib/polar/ask";
 
 const ASK_DESCRIPTION = [
@@ -21,12 +22,29 @@ const ASK_DESCRIPTION = [
     "The person can always type something else or skip; the answer comes back as this tool's result. Do not list the options again in your text."
 ].join(" ");
 
+const FORM_DESCRIPTION = [
+    "Show the person a small form inside your answer when you need several details from them at once, such as the fields of a request, a booking, a survey or a rating.",
+    "Fields (1-12, each with a unique id and a short label): text, textarea, choice (options 2-12, multiple true for several), rating (max 3-10 stars), number (optional min, max, step), date (optional min, max as YYYY-MM-DD). Mark required fields with required true.",
+    "Optional title, description and submitLabel. What they submit arrives as their next message, one line per field.",
+    "Use polar_ask instead for a single choice; do not use a form for one free-text answer."
+].join(" ");
+
 export function polarAskTools(): ToolSet {
     return {
         [POLAR_ASK_TOOL]: tool({
             description: ASK_DESCRIPTION,
             inputSchema: polarInputSchema(polarAskInputSchema),
             outputSchema: polarAskOutputSchema
+        }),
+        [POLAR_FORM_TOOL]: tool({
+            description: FORM_DESCRIPTION,
+            inputSchema: polarInputSchema(polarFormSchema),
+            async execute() {
+                return {
+                    ok: true,
+                    text: "The form is on screen. Stop here; the answers arrive as the person's next message."
+                };
+            }
         })
     };
 }

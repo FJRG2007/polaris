@@ -35,6 +35,7 @@ import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
 import { polarAskTools } from "@/lib/polar/ask-tools";
 import { settleUnansweredAsks } from "@/lib/polar/ask";
+import { checkFormReply } from "@/lib/polar/forms";
 import { connectorStandIns, polarConnectorTools } from "@/lib/polar/connectors/tools";
 import { offWithServers } from "@/lib/polar/tool-servers";
 import {
@@ -309,9 +310,13 @@ export async function POST(request: Request): Promise<Response> {
         } as never
     });
     if (!checked.success) return refuse("invalid", 400);
+    // A form's answer is checked against the form the model drew, and its text
+    // written from the checked values (`forms.ts`).
+    const replied = checkFormReply(checked.data as UIMessage[]);
+    if (!replied) return refuse("invalid", 400);
     // A question the person moved past without answering is settled as such
     // (`ask.ts`), so no call reaches the model without a result.
-    const messages = settleUnansweredAsks(checked.data as UIMessage[]).map((message, index, list) =>
+    const messages = settleUnansweredAsks(replied).map((message, index, list) =>
         // The newest question carries the screen it was asked on, stored with
         // it; older ones keep what they were saved with.
         index === list.length - 1 && message.role === "user"

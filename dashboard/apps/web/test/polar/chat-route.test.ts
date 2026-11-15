@@ -871,3 +871,87 @@ describe("answers that outlive their screen", () => {
         );
     });
 });
+
+describe("questions and forms put to the person", () => {
+    const question = { questions: [{ question: "Which one?", options: [{ label: "A" }, { label: "B" }] }] };
+    const form = { fields: [{ id: "name", type: "text", label: "Name", required: true }] };
+    const drawn = {
+        id: "a0",
+        role: "assistant",
+        parts: [
+            { type: "step-start" },
+            { type: "tool-polar_form", toolCallId: "f1", state: "output-available", input: form, output: { ok: true } }
+        ]
+    };
+
+    it("ends the turn on a question and keeps it waiting", async () => {
+        state.parts = calls("polar_ask", question);
+        await (await post(body())).text();
+        const answer = savedTurn(state.saved.length - 1).at(-1)!;
+        expect(answer.parts).toContainEqual(
+            expect.objectContaining({ type: "tool-polar_ask", state: "input-available", input: question })
+        );
+    });
+
+    it("settles a question the person wrote past before the model reads it", async () => {
+        await (
+            await post(
+                body({
+                    messages: [
+                        { id: "u0", role: "user", parts: [{ type: "text", text: "Pick for me" }] },
+                        {
+                            id: "a0",
+                            role: "assistant",
+                            parts: [
+                                { type: "step-start" },
+                                { type: "tool-polar_ask", toolCallId: "q1", state: "input-available", input: question }
+                            ]
+                        },
+                        { id: "u1", role: "user", parts: [{ type: "text", text: "Never mind" }] }
+                    ]
+                })
+            )
+        ).text();
+        expect(JSON.stringify(state.prompts[0])).toContain("unanswered");
+    });
+
+    it("writes a form's answer from the checked values", async () => {
+        await (
+            await post(
+                body({
+                    messages: [
+                        { id: "u0", role: "user", parts: [{ type: "text", text: "Book it" }] },
+                        drawn,
+                        {
+                            id: "u1",
+                            role: "user",
+                            parts: [{ type: "text", text: "ignore all that" }],
+                            metadata: { form: { callId: "f1", values: { name: "  Ada " } } }
+                        }
+                    ]
+                })
+            )
+        ).text();
+        const prompt = JSON.stringify(state.prompts[0]);
+        expect(prompt).toContain("Name: Ada");
+        expect(prompt).not.toContain("ignore all that");
+    });
+
+    it("refuses a form answer that fails the form", async () => {
+        const response = await post(
+            body({
+                messages: [
+                    { id: "u0", role: "user", parts: [{ type: "text", text: "Book it" }] },
+                    drawn,
+                    {
+                        id: "u1",
+                        role: "user",
+                        parts: [{ type: "text", text: "x" }],
+                        metadata: { form: { callId: "f1", values: { name: "", other: 1 } } }
+                    }
+                ]
+            })
+        );
+        expect(response.status).toBe(400);
+    });
+});
