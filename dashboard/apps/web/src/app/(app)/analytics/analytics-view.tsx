@@ -569,6 +569,7 @@ function Overview({
                                           current={card.now ?? null}
                                           previous={card.before}
                                           lowerIsBetter={card.lowerIsBetter}
+                                          year={compare === "year"}
                                       />
                                   </span>
                                   <span className="text-xs text-muted-foreground">{card.hint}</span>

@@ -128,7 +128,11 @@
     "compare": {
         "label": "Compared with",
         "previous": "Previous period",
-        "year": "Same period last year"
+        "year": "Same period last year",
+        "new": "New",
+        "same": "Same",
+        "hint": "Against the same span just before",
+        "hintYear": "Against the same span a year earlier"
     },
     "filters": {
         "none": "All visits",
@@ -513,5 +517,12 @@
             "poor": "Poor",
             "unknown": "Not measured"
         }
+    },
+    "peak": {
+        "title": "Peak hours",
+        "unavailable": "Hours are not kept in the daily totals. Choose 30 days or less.",
+        "busiest": "Busiest: {day} at {hour}",
+        "cell": "{day} {hour}: {visitors} visits",
+        "zone": "Times in {zone}."
     }
 }

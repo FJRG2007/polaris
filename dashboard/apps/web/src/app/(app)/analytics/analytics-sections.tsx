@@ -13,6 +13,7 @@
  */
 
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { PeakHoursCard } from "./peak-hours-card";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, Filter, FilterX, Globe, Radio } from "lucide-react";
 import {
@@ -402,6 +403,9 @@ export function GeographySection(props: PanelProps) {
                     title={t("breakdowns.languages")}
                     choices={[{ value: "language", label: t("breakdowns.languages"), empty: t("breakdowns.nothing") }]}
                 />
+                <div className="min-w-0 xl:col-span-2">
+                    <PeakHoursCard {...props} />
+                </div>
             </div>
         </div>
     );

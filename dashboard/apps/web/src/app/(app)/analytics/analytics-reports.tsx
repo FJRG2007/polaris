@@ -161,11 +161,14 @@ export function SectionTabs({ tab }: { tab: AnalyticsTab }) {
 export function Delta({
     current,
     previous,
-    lowerIsBetter = false
+    lowerIsBetter = false,
+    year = false
 }: {
     current: number | null;
     previous: number | null | undefined;
     lowerIsBetter?: boolean;
+    /** Compared with the same window a year earlier rather than the one before. */
+    year?: boolean;
 }) {
     const t = useTranslations("analytics");
     if (current === null || previous === null || previous === undefined) return null;
@@ -177,7 +180,7 @@ export function Delta({
     return (
         <span
             className={cn("inline-flex items-center gap-0.5 text-xs font-medium", good ? "text-success-ink" : "text-danger-ink")}
-            title={t("compare.hint")}
+            title={t(year ? "compare.hintYear" : "compare.hint")}
         >
             <Icon className="size-3 shrink-0" aria-hidden />
             {`${Math.round(Math.abs(change) * 100)}%`}

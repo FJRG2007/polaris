@@ -128,7 +128,11 @@
     "compare": {
         "label": "Comparado con",
         "previous": "Periodo anterior",
-        "year": "Mismo periodo hace un año"
+        "year": "Mismo periodo hace un año",
+        "new": "Nuevo",
+        "same": "Igual",
+        "hint": "Frente al mismo tramo justo antes",
+        "hintYear": "Frente al mismo tramo un año antes"
     },
     "filters": {
         "none": "Todas",
@@ -513,5 +517,12 @@
             "poor": "Mal",
             "unknown": "Sin medir"
         }
+    },
+    "peak": {
+        "title": "Horas punta",
+        "unavailable": "Los totales diarios no guardan horas. Elige 30 días o menos.",
+        "busiest": "Más activo: {day} a las {hour}",
+        "cell": "{day} {hour}: {visitors} visitas",
+        "zone": "Horas en {zone}."
     }
 }

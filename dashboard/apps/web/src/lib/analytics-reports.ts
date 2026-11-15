@@ -317,6 +317,51 @@ export async function vitals(window: ReportWindow): Promise<VitalsReport> {
     return { overall: toVitalsRow(overall[0]) ?? empty, pages: pages.map((row) => ({ path: row.path, ...toVitalsRow(row)! })), unavailable: false };
 }
 
+// --- peak hours ----------------------------------------------------------------
+
+export interface PeakHoursReport {
+    /** ISO weekday (1 Monday .. 7 Sunday) and hour in `timeZone`; empty cells are left out. */
+    readonly cells: readonly { day: number; hour: number; visitors: number }[];
+    readonly timeZone: string;
+    /** Past the raw window, where only daily totals remain and hours are gone. */
+    readonly unavailable: boolean;
+}
+
+/** Whether Intl knows the zone, so a typed value never reaches the query unchecked. */
+export function isTimeZone(value: string): boolean {
+    try {
+        new Intl.DateTimeFormat("en-US", { timeZone: value });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Visits by the weekday and hour they started in, in the reader's zone. At most
+ * 168 rows come back whatever the traffic. The zone is a bound parameter; one
+ * Postgres does not know falls back to UTC rather than failing the card.
+ */
+export async function peakHours(window: ReportWindow, timeZone: string): Promise<PeakHoursReport> {
+    if (window.to - window.from > RAW_MAX_MS) return { cells: [], timeZone, unavailable: true };
+    const run = (zone: string) =>
+        prisma.$queryRaw<{ day: number; hour: number; visitors: number }[]>(Prisma.sql`
+            SELECT extract(isodow FROM (s."startedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${zone})::int AS day,
+                   extract(hour FROM (s."startedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${zone})::int AS hour,
+                   count(*)::int AS visitors
+            FROM "AnalyticsSession" s
+            WHERE s."siteId" = ${window.siteId}::uuid
+              AND s."startedAt" >= ${new Date(window.from)} AND s."startedAt" < ${new Date(window.to)}${sessionSql(window.filters)}
+            GROUP BY 1, 2
+        `);
+    const zone = isTimeZone(timeZone) ? timeZone : "UTC";
+    try {
+        return { cells: await run(zone), timeZone: zone, unavailable: false };
+    } catch {
+        return { cells: await run("UTC"), timeZone: "UTC", unavailable: false };
+    }
+}
+
 /** Postgres hands percentiles back as doubles and counts as ints; keep both as numbers. */
 function toVitalsRow(row: VitalsRow | undefined): VitalsRow | null {
     if (!row) return null;
