@@ -637,5 +637,24 @@
         "version": "Lighthouse {version}",
         "invalid": "Elige una de las opciones de la lista.",
         "device": "Equipo"
+    },
+    "trackerOptions": {
+        "title": "Rastreador",
+        "intro": "Desde aquí, la etiqueta solo necesita su clave. Un atributo en ella manda.",
+        "outbound": "Enlaces externos",
+        "outboundHint": "Clics a otros sitios, correo y teléfono",
+        "downloads": "Descargas",
+        "downloadsHint": "Clics a tipos de archivo habituales",
+        "forms": "Formularios",
+        "formsHint": "Cada formulario enviado",
+        "hash": "Rutas con #",
+        "hashHint": "Contar la parte # de la dirección como página",
+        "vitals": "Core Web Vitals",
+        "vitalsHint": "La velocidad como la viven las visitas",
+        "excludeSearch": "Sin parámetros",
+        "excludeSearchHint": "Las páginas se guardan sin la parte ?",
+        "doNotTrack": "Respetar No rastrear",
+        "doNotTrackHint": "Omitir navegadores que piden no rastreo",
+        "invalid": "No se pudieron guardar las opciones."
     }
 }

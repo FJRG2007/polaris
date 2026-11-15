@@ -75,6 +75,18 @@ All options are attributes on the `<script>` tag.
 | `data-404="true"` | Put this on the tag of your error page: every view of it also records a `404` event with the requested `path`, so broken links show up under **Events**. |
 | `data-vitals="true"` | Measure Core Web Vitals in the visitor's browser (LCP, INP, CLS, FCP, TTFB) and send them once per page load, when the first page is left. Shown under **Pages > Core Web Vitals** at the 75th percentile, overall and per page, for ranges up to 30 days; kept with the per-visit detail. |
 | `data-before-send="beforeSend"` | Name of a global function that sees each beat first. |
+| `data-prop-<name>="value"` | A property sent with every page view of this tag, such as `data-prop-author="Jane"`. `polaris.view(url, props)` adds its own. Shown in the property breakdown. |
+
+### Options set in Polaris
+
+The site panel's **Tracker options** card sets outbound links, downloads, forms,
+hash routing and vitals for the site, so a tag carrying only `data-key` is
+enough. The script asks `GET /api/analytics/collect?key=<key>` once the page is
+idle (the browser keeps the answer for five minutes); an attribute on the tag,
+`"true"` or `"false"`, always wins. **Leave out query strings** and **Respect Do
+Not Track** are applied by Polaris when a beat arrives, whatever the tag says:
+the query string is removed before the page is stored, and a browser sending
+`DNT: 1` or `Sec-GPC: 1` is not counted.
 
 ### `data-before-send`
 

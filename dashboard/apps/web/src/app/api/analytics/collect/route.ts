@@ -13,8 +13,10 @@
  * returns nothing; there is no session to ride and no data to leak.
  */
 
+import { z } from "zod";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { asksNotToTrack, readTrackerOptions, scriptOptions, withoutSearch } from "@/lib/analytics-tracker-options";
 import { parseLanguage, visitBeatSchema } from "@polaris/core";
 import { getAnalyticsSiteByKey, recordVisit, recordVisitIdentify, recordVisitLeave, recordVisitVitals } from "@/lib/analytics-service";
 
@@ -28,7 +30,7 @@ const WINDOW_MS = 60_000;
 
 const CORS = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "86400"
 };
@@ -40,6 +42,25 @@ function accepted(): NextResponse {
 
 export function OPTIONS(): NextResponse {
     return new NextResponse(null, { status: 204, headers: CORS });
+}
+
+const keySchema = z.string().min(1).max(64);
+
+/**
+ * The site's tracker switches, for a tag that carries only its key. An unknown or
+ * switched-off key answers the same empty object as a site with nothing on, so
+ * this is no more a way to find out which keys exist than a beat is. The browser
+ * keeps the answer for five minutes.
+ */
+export async function GET(request: Request): Promise<NextResponse> {
+    const headers = { ...CORS, "Cache-Control": "public, max-age=300" };
+    const key = keySchema.safeParse(new URL(request.url).searchParams.get("key"));
+    if (!key.success) return NextResponse.json({}, { headers });
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip")?.trim() || "";
+    if (!ip || !(await rateLimit(`analytics-options:${ip}`, LIMIT, WINDOW_MS)).ok) return NextResponse.json({}, { headers });
+    const site = await getAnalyticsSiteByKey(key.data);
+    if (!site || !site.trackerEnabled) return NextResponse.json({}, { headers });
+    return NextResponse.json(scriptOptions(await readTrackerOptions(site.id)), { headers });
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -64,6 +85,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     // An unknown or switched-off key is indistinguishable from an accepted one here,
     // on purpose: this endpoint is not a way to find out which keys exist.
     if (!site || !site.trackerEnabled) return accepted();
+    const options = await readTrackerOptions(site.id);
+    if (options.doNotTrack && asksNotToTrack(request.headers)) return accepted();
 
     const userAgent = request.headers.get("user-agent");
     const at = Date.now();
@@ -77,7 +100,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         at,
         ip,
         userAgent,
-        url: beat.url,
+        url: options.excludeSearch ? withoutSearch(beat.url) : beat.url,
         referrer: beat.referrer ?? null,
         self,
         language: parseLanguage(beat.language) ?? null,

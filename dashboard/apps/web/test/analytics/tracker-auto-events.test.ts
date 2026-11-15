@@ -195,3 +195,30 @@ describe("web vitals", () => {
         expect(vitalsBeats()).toEqual([]);
     });
 });
+
+describe("one-tag options and page view properties", () => {
+    it("sends the tag's data-prop attributes with every page view, and polaris.view's own", () => {
+        load({ "data-auto": "false", "data-prop-author": "Jane" });
+        (window as unknown as { polaris: { view: (url?: string, props?: object) => void } }).polaris.view("/a", { plan: "pro" });
+        expect(beats.find((beat) => beat.type === "view")?.props).toEqual({ author: "Jane", plan: "pro" });
+    });
+
+    it("switches on what the site set in Polaris, unless the tag says otherwise", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (url: string, init?: { body?: string }) => {
+                if (!init?.body) return Response.json({ "data-outbound": true, "data-forms": true });
+                beats.push(JSON.parse(init.body) as Beat);
+                return new Response(null, { status: 204 });
+            })
+        );
+        load({ "data-auto": "false", "data-forms": "false" });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        click('<a href="https://elsewhere.example/page">out</a>');
+        document.body.innerHTML = '<form action="/send"></form>';
+        const form = document.body.querySelector("form") as HTMLFormElement;
+        form.addEventListener("submit", (submitted) => submitted.preventDefault());
+        form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        expect(events().map((beat) => beat.name)).toEqual(["outbound-link-click"]);
+    });
+});

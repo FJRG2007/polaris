@@ -637,5 +637,24 @@
         "version": "Lighthouse {version}",
         "invalid": "Pick one of the listed schedules.",
         "device": "Device"
+    },
+    "trackerOptions": {
+        "title": "Tracker options",
+        "intro": "Set here, the tag needs only its key. An attribute on the tag still wins.",
+        "outbound": "Outbound links",
+        "outboundHint": "Clicks on links to other sites, mail and phone",
+        "downloads": "File downloads",
+        "downloadsHint": "Clicks on links to common file types",
+        "forms": "Form submissions",
+        "formsHint": "Every form sent on the site",
+        "hash": "Hash routing",
+        "hashHint": "Count the #part of the address as a page",
+        "vitals": "Core Web Vitals",
+        "vitalsHint": "Page speed as visitors experience it",
+        "excludeSearch": "Leave out query strings",
+        "excludeSearchHint": "Pages are kept without the ?part",
+        "doNotTrack": "Respect Do Not Track",
+        "doNotTrackHint": "Skip browsers that ask not to be tracked",
+        "invalid": "Those options could not be saved."
     }
 }

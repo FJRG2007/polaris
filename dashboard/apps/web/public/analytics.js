@@ -38,9 +38,15 @@
  *                                them once per page load, when the first page is left
  *   data-before-send="fnName"  - a global function that sees every beat first and
  *                                returns it (changed or not), or a falsy value to drop it
+ *   data-prop-<name>="value"   - a property sent with every page view of this tag
+ *
+ * Outbound links, downloads, forms, hash routing and vitals can also be switched on
+ * for the site in Polaris instead of on the tag: the script asks for them once
+ * the page is idle (the browser keeps the answer for five minutes). An attribute
+ * on the tag, "true" or "false", always wins over the site's setting.
  *
  * In the page:
- *   polaris.view(url?)              - count a page by hand
+ *   polaris.view(url?, props?)      - count a page by hand
  *   polaris.event(name, props?)     - a custom event; a numeric `revenue` and a
  *                                     `currency` prop are reported as revenue
  *   polaris.identify(id, data?)     - name this visitor in the site's own terms
@@ -65,25 +71,33 @@
     const host = (script.getAttribute("data-host") || new URL(script.src).origin).replace(/\/$/, "");
     const endpoint = `${host}/api/analytics/collect`;
     const auto = script.getAttribute("data-auto") !== "false";
-    const flag = (name) => script.getAttribute(name) === "true";
+    /** The site's own options, filled in when Polaris answers; empty until then. */
+    const remote = {};
+    const flag = (name) => (script.hasAttribute(name) ? script.getAttribute(name) === "true" : remote[name] === true);
     const domains = (script.getAttribute("data-domains") || "")
         .split(",")
         .map((entry) => entry.trim().toLowerCase())
         .filter(Boolean);
     const excludeSearch = flag("data-exclude-search");
-    const hashRouting = flag("data-hash");
-    const downloadsAttr = script.getAttribute("data-downloads");
     // The extensions a link to a file usually ends in; a site can name its own.
-    const downloads =
-        downloadsAttr && downloadsAttr !== "false"
-            ? (downloadsAttr === "true"
-                  ? "pdf,xlsx,docx,txt,rtf,csv,exe,key,pps,ppt,pptx,7z,pkg,rar,gz,zip,avi,mov,mp4,mpeg,wmv,midi,mp3,wav,wma,dmg"
-                  : downloadsAttr
-              )
-                  .split(",")
-                  .map((entry) => entry.trim().toLowerCase().replace(/^\./, ""))
-                  .filter(Boolean)
-            : [];
+    function downloadList() {
+        const named = script.hasAttribute("data-downloads") ? script.getAttribute("data-downloads") : remote["data-downloads"];
+        if (!named || named === "false") return [];
+        return (
+            named === "true" || named === true
+                ? "pdf,xlsx,docx,txt,rtf,csv,exe,key,pps,ppt,pptx,7z,pkg,rar,gz,zip,avi,mov,mp4,mpeg,wmv,midi,mp3,wav,wma,dmg"
+                : String(named)
+        )
+            .split(",")
+            .map((entry) => entry.trim().toLowerCase().replace(/^\./, ""))
+            .filter(Boolean);
+    }
+    // Properties the tag sends with every page view: data-prop-author="Jane".
+    const tagProps = {};
+    for (const attribute of script.attributes) {
+        const match = /^data-prop-(.+)$/.exec(attribute.name);
+        if (match) tagProps[match[1].slice(0, 60)] = attribute.value.slice(0, 240);
+    }
     const beforeSendName = script.getAttribute("data-before-send");
 
     // The opt-out link: ?polaris-ignore=on stops counting this browser, =off undoes it.
@@ -117,7 +131,7 @@
     let enteredAt = 0;
 
     const currentUrl = () =>
-        location.pathname + (excludeSearch ? "" : location.search) + (hashRouting ? location.hash : "");
+        location.pathname + (excludeSearch ? "" : location.search) + (flag("data-hash") ? location.hash : "");
 
     /**
      * Do this when the browser has nothing better to do.
@@ -192,7 +206,7 @@
     // Core Web Vitals, read from the browser's own performance entries. One set per
     // document: the metrics describe the page that was loaded, so they are sent the
     // first time it is left (a route change, the tab hidden, the page closed).
-    const vitalsOn = flag("data-vitals");
+    let vitalsOn = false;
     const vitals = {};
     let vitalsSent = false;
     function observe(type, take, extra) {
@@ -202,7 +216,12 @@
             /* not supported here: that metric is simply not sent */
         }
     }
-    if (vitalsOn) {
+    /** Start measuring once the tag or the site asks for vitals; harmless twice. */
+    function startVitals() {
+        if (vitalsOn || !flag("data-vitals")) return;
+        vitalsOn = true;
+        addEventListener("pagehide", () => sendVitals(lastUrl));
+        addEventListener("visibilitychange", () => document.visibilityState === "hidden" && sendVitals(lastUrl));
         observe("largest-contentful-paint", (entry) => (vitals.lcp = entry.startTime));
         observe("paint", (entry) => entry.name === "first-contentful-paint" && (vitals.fcp = entry.startTime));
         // CLS is the worst burst of shifts: a window closes after a second of calm
@@ -286,7 +305,7 @@
         send({ ...base("leave"), url: lastUrl || currentUrl(), durationMs: elapsed, scroll: Math.round(scrolled) }, true);
     }
 
-    function view(url) {
+    function view(url, props) {
         const next = url || currentUrl();
         // A framework that replaces the same URL should not count twice; a real
         // navigation always changes it.
@@ -302,6 +321,8 @@
         // and discards anyway.
         if (document.referrer) body.referrer = document.referrer;
         if (document.title) body.title = document.title.slice(0, 120);
+        const extra = { ...tagProps, ...(props && typeof props === "object" ? props : {}) };
+        if (Object.keys(extra).length) body.props = extra;
         send(body, false);
     }
 
@@ -348,6 +369,7 @@
                 const link = target.closest("a[href]");
                 if (!link) return;
                 const url = link.href.slice(0, 240);
+                const downloads = downloadList();
                 if (downloads.length && /^https?:$/.test(link.protocol)) {
                     const extension = /\.([a-z0-9]+)$/i.exec(link.pathname);
                     if (link.hasAttribute("download") || (extension && downloads.includes(extension[1].toLowerCase()))) {
@@ -373,35 +395,52 @@
 
     // A form sent, whatever framework handles it. Capture phase, like the clicks,
     // and before the page's own handler can navigate away.
-    if (flag("data-forms"))
-        addEventListener(
-            "submit",
-            (submitted) => {
-                try {
-                    const form = submitted.target instanceof HTMLFormElement ? submitted.target : null;
-                    if (!form || form.hasAttribute("data-polaris-event")) return;
-                    const props = { path: new URL(form.action || location.href, location.href).pathname.slice(0, 240) };
-                    if (form.id) props.id = form.id.slice(0, 240);
-                    event("form-submit", props);
-                } catch {
-                    /* ignore */
-                }
-            },
-            true
-        );
+    addEventListener(
+        "submit",
+        (submitted) => {
+            try {
+                if (!flag("data-forms")) return;
+                const form = submitted.target instanceof HTMLFormElement ? submitted.target : null;
+                if (!form || form.hasAttribute("data-polaris-event")) return;
+                const props = { path: new URL(form.action || location.href, location.href).pathname.slice(0, 240) };
+                if (form.id) props.id = form.id.slice(0, 240);
+                event("form-submit", props);
+            } catch {
+                /* ignore */
+            }
+        },
+        true
+    );
 
     // An error page says so on its own tag, and every view of it is a 404 for the
     // address that was asked for.
     if (flag("data-404")) whenIdle(() => event("404", { path: currentUrl().slice(0, 240) }));
 
-    if (vitalsOn) {
-        addEventListener("pagehide", () => sendVitals(lastUrl));
-        addEventListener("visibilitychange", () => document.visibilityState === "hidden" && sendVitals(lastUrl));
-    }
+    startVitals();
+
+    // The options set for the site in Polaris. Only switches are taken from the
+    // answer; anything else in it is ignored.
+    whenIdle(() => {
+        try {
+            fetch(`${endpoint}?key=${encodeURIComponent(key)}`, { mode: "cors", credentials: "omit", priority: "low" })
+                .then((answer) => (answer && answer.ok ? answer.json() : null))
+                .then((options) => {
+                    if (!options || typeof options !== "object") return;
+                    for (const name of ["data-outbound", "data-forms", "data-hash", "data-vitals", "data-downloads"])
+                        if (options[name] === true) remote[name] = true;
+                    startVitals();
+                })
+                .catch(() => {
+                    /* the tag's own attributes are all there is */
+                });
+        } catch {
+            /* ignore */
+        }
+    });
 
     if (!auto) return;
 
-    if (hashRouting) addEventListener("hashchange", () => view());
+    addEventListener("hashchange", () => flag("data-hash") && view());
 
     // Single-page navigation. history.pushState fires no event of its own, so the two
     // methods are wrapped - the one reliable way to see a route change without polling

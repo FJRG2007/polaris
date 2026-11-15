@@ -8484,6 +8484,8 @@ model AnalyticsSite {
     labFrequency String    @default("off")
     /// When the next scheduled audit is due; null while scheduled audits are off.
     labNextAt    DateTime?
+    /// The tracker's switches set here instead of on the tag (JSON, see lib/analytics-tracker-options).
+    trackerOptions String  @default("{}")
 
     @@unique([scopeType, scopeId])
 }

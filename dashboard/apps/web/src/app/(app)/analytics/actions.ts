@@ -35,6 +35,7 @@ import * as lists from "@/lib/analytics-lists";
 import * as alerts from "@/lib/analytics-alerts";
 import * as shareLinks from "@/lib/analytics-share";
 import * as lab from "@/lib/analytics-lab";
+import * as trackerOptions from "@/lib/analytics-tracker-options";
 import { externalSiteSchema } from "./site-input";
 import {
     createExternalSite,
@@ -740,6 +741,36 @@ export async function setAlertSettingsAction(input: {
     const parsed = alertSettingsSchema.safeParse(input.settings);
     if (!parsed.success) return { error: await say("alerts.invalid") };
     await alerts.writeAlertSettings(reached.access.site.id, reached.userId, parsed.data);
+    return {};
+}
+
+// --- tracker options ----------------------------------------------------------------
+
+export async function getTrackerOptionsAction(input: {
+    scopeType: string;
+    scopeId: string;
+}): Promise<{ error?: string; options?: trackerOptions.TrackerOptions }> {
+    const reached = await reach(input, "view");
+    if ("error" in reached) return reached;
+    return { options: await trackerOptions.readTrackerOptions(reached.access.site.id) };
+}
+
+export async function setTrackerOptionsAction(input: {
+    scopeType: string;
+    scopeId: string;
+    options: unknown;
+}): Promise<{ error?: string }> {
+    const reached = await reach(input, "edit");
+    if ("error" in reached) return reached;
+    const parsed = trackerOptions.trackerOptionsSchema.safeParse(input.options);
+    if (!parsed.success) return { error: await say("trackerOptions.invalid") };
+    await trackerOptions.writeTrackerOptions(reached.access.site.id, parsed.data);
+    await recordAudit({
+        actorId: reached.userId,
+        action: "analytics.site.tracker",
+        targetType: "analytics",
+        targetId: reached.access.site.id
+    });
     return {};
 }
 

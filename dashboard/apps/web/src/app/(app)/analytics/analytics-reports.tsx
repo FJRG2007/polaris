@@ -20,6 +20,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { IgnoredTraffic } from "./ignored-traffic";
 import { AlertSettingsCard } from "./alert-settings";
 import { ShareLinksCard } from "./share-links";
+import { TrackerOptionsCard } from "./tracker-options";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Download, Filter, Plus, Trash2, X } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useTransition } from "react";
@@ -1127,6 +1128,8 @@ function SitePanel(props: PanelProps) {
                     return null;
                 }}
             />
+
+            <TrackerOptionsCard scope={props.scope} siteId={props.siteId} canEdit={canEdit} />
 
             <AlertSettingsCard scope={props.scope} siteId={props.siteId} />
 
