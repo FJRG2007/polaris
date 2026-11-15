@@ -138,7 +138,9 @@ const SESSION_END: HookRegistration = { event: "SessionEnd", signal: "session-en
  * A tool that is not here is one of the three written in `agent-clis.ts`
  * (Codex, Gemini CLI, Copilot), one in `AGENT_HOOK_WRITERS`, or one pointed at
  * a file of the session's own (`museSessionHooks`, `codewhaleSessionConfig`).
- * Crush has none: Agent Orchestrator writes no activity hooks for it.
+ * Crush is the exception: Agent Orchestrator reads its terminal, and Polaris
+ * registers the hooks Crush itself documents instead (`docs/hooks` in
+ * charmbracelet/crush, the `hooks` key of its config schema).
  */
 export const AGENT_HOOK_FILES: Readonly<Record<string, HookFileSpec>> = {
     qwen: {
@@ -247,6 +249,25 @@ export const AGENT_HOOK_FILES: Readonly<Record<string, HookFileSpec>> = {
         events: [
             { event: "session_start", signal: "session-start" },
             { event: "pre_tool_use", signal: "pre-tool-use" }
+        ]
+    },
+    crush: {
+        // The project config Crush merges over its global one. No tool events
+        // before the tool runs: `PreToolUse` is a decision Crush waits on, and
+        // a hook that answers `{}` there only slows every call down.
+        file: w(".crush.json"),
+        layout: "flat",
+        timeout: 30,
+        events: [
+            { event: "SessionStart", signal: "session-start" },
+            { event: "TurnStart", signal: "user-prompt-submit" },
+            { event: "PostToolUse", signal: "post-tool-use" },
+            { event: "PostToolUseFailure", signal: "post-tool-use-failure" },
+            { event: "PermissionRequest", signal: "permission-request" },
+            { event: "PermissionResult", signal: "permission-resolved" },
+            { event: "TurnEnd", signal: "stop" },
+            { event: "StopFailure", signal: "stop-failure" },
+            { event: "SessionEnd", signal: "session-end" }
         ]
     },
     autohand: {
@@ -785,6 +806,31 @@ function clineAnswers(): AgentFirstRunAnswer[] {
     }));
 }
 
+/** Where Aider's `--notifications-command` points (see its `hookArgs`). */
+export const AIDER_NOTIFY_SCRIPT = ".polaris/hooks/aider-notify.sh";
+
+/**
+ * Aider's one callback: `--notifications-command`, run through a shell when a
+ * reply is finished and it waits for the next message (`InputOutput` in
+ * aider/io.py). Ported from adapters/agent/aider/aider.go. Aider passes no
+ * payload and leaves the command its own terminal as input, so the relay reads
+ * nothing rather than the keys somebody types next, and its `{}` goes nowhere.
+ */
+function aiderAnswers(): AgentFirstRunAnswer[] {
+    const body = `(${hookCommand("stop")}) </dev/null >/dev/null 2>&1`;
+    return [
+        {
+            file: w(AIDER_NOTIFY_SCRIPT),
+            text: `#!/bin/sh
+# Written by Polaris: reports this session's activity.
+${body}
+exit 0
+`,
+            executable: true
+        }
+    ];
+}
+
 const OPENCODE_EXPORT = "export const PolarisActivity = async () => hooks;";
 
 /**
@@ -795,6 +841,7 @@ const OPENCODE_EXPORT = "export const PolarisActivity = async () => hooks;";
  * since `hookArgs` loads them by path and one loaded twice reports twice.
  */
 export const AGENT_HOOK_WRITERS: Readonly<Record<string, () => AgentFirstRunAnswer[]>> = {
+    aider: aiderAnswers,
     auggie: auggieAnswers,
     kiro: kiroAnswers,
     cline: clineAnswers,

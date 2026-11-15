@@ -32,7 +32,7 @@
  * encoding a command line per vendor that would rot in a month.
  */
 
-import { AGENT_HOOK_RELAY, KIRO_AGENT_NAME, hookFileAnswers, hookGroup } from "./agent-hook-files.js";
+import { AGENT_HOOK_RELAY, AIDER_NOTIFY_SCRIPT, KIRO_AGENT_NAME, hookFileAnswers, hookGroup } from "./agent-hook-files.js";
 
 /** How Polaris can tell what a running session is doing. */
 export const AGENT_OBSERVATIONS = ["hooks", "output"] as const;
@@ -880,7 +880,10 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: [],
         autonomyEnv: {},
-        firstRun: []
+        // A finished reply, from its notification command; nothing says a turn
+        // started, so its terminal is read for that (`terminal-activity.ts`).
+        firstRun: hookFileAnswers("aider"),
+        hookArgs: ["--notifications", "--notifications-command", AIDER_NOTIFY_SCRIPT]
     },
     {
         id: "droid",
@@ -929,7 +932,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["crush"],
         install: "npm install -g @charmland/crush",
         home: ".config/crush",
-        observe: "output",
+        observe: "hooks",
         docs: "https://github.com/charmbracelet/crush",
         credentials: [
             {
@@ -949,7 +952,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: ["--yolo"],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("crush")
     },
     {
         id: "cline",

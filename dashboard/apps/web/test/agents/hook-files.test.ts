@@ -161,7 +161,9 @@ describe("hook file rendering, per tool", () => {
         }
         for (const id of Object.keys(core.AGENT_HOOK_WRITERS)) {
             expect(core.AGENT_HOOK_FILES[id], id).toBeUndefined();
-            expect(cli(id).observe, id).toBe("hooks");
+            // Aider's one callback says a reply finished, not that one began:
+            // it stays observed through its output.
+            expect(cli(id).observe, id).toBe(id === "aider" ? "output" : "hooks");
             expect(cli(id).firstRun, id).toEqual(core.AGENT_HOOK_WRITERS[id]!());
             expect(hasHookActivity(id), id).toBe(true);
         }
@@ -341,7 +343,7 @@ describe("hook event -> activity", () => {
     });
 
     it("says nothing for a tool without hooks or a payload that is not an object", () => {
-        expect(hookActivity("aider", stamped("Stop"))).toBeNull();
+        expect(hookActivity("openclaw", stamped("Stop"))).toBeNull();
         expect(hookActivity("qwen", null)).toBeNull();
         expect(hookActivity("qwen", ["Stop"])).toBeNull();
     });

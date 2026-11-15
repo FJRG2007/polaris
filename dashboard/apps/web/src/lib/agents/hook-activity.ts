@@ -203,6 +203,22 @@ const DERIVERS: Readonly<Record<string, Derive>> = {
         if (signal === "stop") return text(payload, "status") === "error" ? "waiting_input" : "idle";
         return null;
     },
+    // Crush's own hooks: a session it opens waits for a prompt, a permission
+    // prompt holds the turn and its result is reported, and a turn the
+    // provider failed hands it back to the person.
+    crush: (signal) => {
+        if (signal === "session-start" || signal === "stop") return "idle";
+        if (signal === "user-prompt-submit" || TOOL_TRAFFIC.has(signal) || signal === "permission-resolved")
+            return "active";
+        if (signal === "permission-request") return "blocked";
+        if (signal === "stop-failure") return "waiting_input";
+        if (signal === "session-end") return "exited";
+        return null;
+    },
+    // Aider's notification command: a reply finished and it waits for the next
+    // message (adapters/agent/aider/activity.go). The start of a turn is read
+    // from its terminal (`terminal-activity.ts`).
+    aider: (signal) => (signal === "stop" ? "waiting_input" : null),
     kiro: taskTool,
     cline: taskTool,
     muse: (signal) =>
