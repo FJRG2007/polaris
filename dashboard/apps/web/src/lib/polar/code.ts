@@ -34,6 +34,7 @@ import { agentFor } from "@/lib/polar/agents/store";
 import { agentTaskPrompt } from "@/lib/polar/agents/shared";
 import { codeComposerFor, type CodeComposer } from "@/lib/polar/agents/composer-agents";
 import { resolvedStart } from "@/lib/polar/agents/resolve-start";
+import { listComputers } from "@/lib/computers/computer-service";
 import { codeStartersSchema, starterPrompt, type StarterSkill } from "@/lib/polar/code-starters";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { userHasManage, type SessionUser } from "@/lib/session";
@@ -404,6 +405,21 @@ export async function polarCodeChoices(user: SessionUser): Promise<PolarCodeChoi
         skills: skills.map(({ name, description }) => ({ name, description })),
         code
     };
+}
+
+/** A paired computer as the composer's place picker shows it. */
+export interface PolarCodeComputer {
+    readonly id: string;
+    readonly name: string;
+    readonly online: boolean;
+}
+
+/** The person's own computers a session can be placed on. Empty for somebody
+ *  who could not start a session anyway. */
+export async function polarCodeComputers(user: SessionUser): Promise<PolarCodeComputer[]> {
+    if ((await accessOf(user)) !== "manage") return [];
+    const computers = await listComputers(user.id);
+    return computers.map(({ id, name, online }) => ({ id, name, online }));
 }
 
 /**

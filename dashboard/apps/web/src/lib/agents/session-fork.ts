@@ -53,6 +53,9 @@ export function forkTranscript(
     if (child.cli !== "claude" || parent.cli !== "claude") return "";
     if (child.place !== parent.place || child.sharedHome !== parent.sharedHome) return "";
     if (child.place === "host" && child.hostId !== parent.hostId) return "";
+    // A computer keeps its transcripts on itself, and the runner's start frame
+    // has no way to resume one.
+    if (child.place === "computer") return "";
     if (!child.sharedHome && (!child.ownerId || child.ownerId !== parent.ownerId)) return "";
     const path = parent.transcriptPath;
     if (!readableTranscriptPath(path) || !/^[A-Za-z0-9_./-]+$/.test(path)) return "";

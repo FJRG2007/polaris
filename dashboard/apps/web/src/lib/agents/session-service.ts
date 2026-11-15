@@ -120,6 +120,8 @@ export interface SessionView {
     readonly modelChoice: core.SessionModelChoice | null;
     readonly hostId: string | null;
     readonly hostName: string | null;
+    /** The paired computer, for a session placed on one. */
+    readonly runnerId: string | null;
     readonly state: core.AgentSessionState;
     readonly detail: string;
     readonly branch: string;
@@ -209,6 +211,7 @@ const VIEW_SELECT = {
     model: true,
     modelPayer: true,
     hostId: true,
+    runnerId: true,
     state: true,
     detail: true,
     branch: true,
@@ -254,6 +257,7 @@ type SessionRecord = {
     model: string | null;
     modelPayer: string | null;
     hostId: string | null;
+    runnerId: string | null;
     state: string;
     detail: string;
     branch: string;
@@ -317,6 +321,7 @@ function toView(record: SessionRecord): SessionView {
                 : null,
         hostId: record.hostId,
         hostName: record.host?.name ?? null,
+        runnerId: record.runnerId,
         state: readState(record.state),
         detail: record.detail,
         branch: record.branch,

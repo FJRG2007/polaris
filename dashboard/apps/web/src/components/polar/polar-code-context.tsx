@@ -15,7 +15,7 @@ import { settingsSection } from "@/lib/polar/settings-path";
 import type { PolarCodeChoices } from "@/lib/polar/code";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, type ReactNode } from "react";
-import type { PolarCodeBranches } from "@/lib/polar/code";
+import type { PolarCodeBranches, PolarCodeComputer } from "@/lib/polar/code";
 import { readPoll } from "@/lib/poll-fetch";
 import { MODEL_TRIGGER } from "@/components/polar/elements/model-selector";
 import { EffortPill } from "@/components/polar/elements/effort-pill";
@@ -26,6 +26,8 @@ import {
     ChevronDown,
     ExternalLink,
     FolderGit2,
+    Laptop,
+    Server,
     CircleDot,
     GitBranch,
     Plus,
@@ -597,6 +599,113 @@ export function CodeEffortPill({
             labelOf={(level) => t(`effort.levels.${level}`)}
             disabled={disabled}
         />
+    );
+}
+
+/** Where the picked place is kept (a computer's id, or empty for Polaris), so
+ *  the next task starts there. */
+export const CODE_PLACE_KEY = "polar.code.place";
+
+/** The computers last read, so the picker opens on them without a wait. */
+let computersCache: PolarCodeComputer[] | null = null;
+
+/** The person's computers: the last list at once, then a fresh read. */
+export function useCodeComputers(enabled: boolean): PolarCodeComputer[] | null {
+    const [computers, setComputers] = useState<PolarCodeComputer[] | null>(() => computersCache);
+    useEffect(() => {
+        if (!enabled) return;
+        const controller = new AbortController();
+        readPoll<PolarCodeComputer[]>("/api/polar/code/computers", {}, controller.signal)
+            .then((list) => {
+                computersCache = Array.isArray(list) ? list : [];
+                setComputers(computersCache);
+            })
+            .catch(() => undefined);
+        return () => controller.abort();
+    }, [enabled]);
+    return computers;
+}
+
+/**
+ * Where a new task runs: on Polaris, or on one of the person's own computers
+ * through its runner. Offline computers are listed, disabled, with why; a
+ * person with none is pointed at pairing one.
+ */
+export function CodePlacePicker({
+    computers,
+    value,
+    onChange,
+    disabled
+}: {
+    computers: PolarCodeComputer[] | null;
+    /** The picked computer's id, or null for Polaris. */
+    value: string | null;
+    onChange: (computerId: string | null) => void;
+    disabled: boolean;
+}) {
+    const t = useTranslations("polar");
+    const picked = value ? (computers?.find((computer) => computer.id === value) ?? null) : null;
+    const label = picked ? picked.name : t("code.place.polaris");
+    const Icon = picked ? Laptop : Server;
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild disabled={disabled}>
+                <button
+                    type="button"
+                    title={label}
+                    aria-label={`${t("code.place.label")}: ${label}`}
+                    className={cn(MODEL_TRIGGER, "max-w-48 disabled:opacity-60")}
+                >
+                    <Icon className="size-3.5 shrink-0" aria-hidden />
+                    <span className="min-w-0 truncate text-foreground">{label}</span>
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-2rem)]">
+                <DropdownMenuLabel>{t("code.place.label")}</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => onChange(null)} className="items-start">
+                    <Server className="mt-0.5 size-4 shrink-0" aria-hidden />
+                    <span className="flex min-w-0 flex-col">
+                        <span className="truncate">{t("code.place.polaris")}</span>
+                        <span className="text-xs text-muted-foreground">{t("code.place.polarisHint")}</span>
+                    </span>
+                    <Mark on={value === null} />
+                </DropdownMenuItem>
+                {computers === null ? (
+                    <div className="px-2 py-1.5" aria-hidden>
+                        <div className="h-8 animate-pulse rounded bg-muted" />
+                    </div>
+                ) : (
+                    computers.map((computer) => (
+                        <DropdownMenuItem
+                            key={computer.id}
+                            disabled={!computer.online}
+                            onSelect={() => onChange(computer.id)}
+                            className="items-start"
+                        >
+                            <Laptop className="mt-0.5 size-4 shrink-0" aria-hidden />
+                            <span className="flex min-w-0 flex-col">
+                                <span className="truncate" title={computer.name}>
+                                    {computer.name}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    {computer.online ? t("code.place.online") : t("code.place.offline")}
+                                </span>
+                            </span>
+                            <Mark on={computer.id === value} />
+                        </DropdownMenuItem>
+                    ))
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                    <Link href="/account/computers">
+                        <Plus className="size-4 shrink-0" aria-hidden />
+                        <span className="truncate">
+                            {computers && computers.length > 0 ? t("code.place.manage") : t("code.place.pair")}
+                        </span>
+                    </Link>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 

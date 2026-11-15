@@ -198,6 +198,9 @@ export async function startPlace(
         ? await sessions.getSession(caller.sessionId, caller.userId)
         : null;
     if (!parent) return { repoId: null, place: "local", hostId: null };
+    // Somebody's own computer is theirs to put work on, never a model's: a
+    // session on one hands off to the Polaris box.
+    if (parent.place === "computer") return { repoId: parent.repoId, place: "local", hostId: null };
     return {
         repoId: parent.repoId,
         place: parent.place,

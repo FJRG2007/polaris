@@ -102,6 +102,9 @@ import {
     CODE_EFFORT_KEY,
     CodeEffortPill,
     PERMISSION_MODE_KEY,
+    CODE_PLACE_KEY,
+    CodePlacePicker,
+    useCodeComputers,
     readCodeEffort,
     PermissionModePicker,
     readPermissionMode,
@@ -840,6 +843,19 @@ function CodeStart({
         setMode(next);
         writeStored(PERMISSION_MODE_KEY, next);
     };
+    // Where the task runs: Polaris, or one of the person's own computers. The
+    // stored pick counts only while that computer is still listed and online.
+    const computers = useCodeComputers(canStart);
+    const [placePick, setPlacePick] = useState<string | null>(null);
+    useEffect(() => setPlacePick(readStored(CODE_PLACE_KEY) || null), []);
+    const choosePlace = (next: string | null) => {
+        setPlacePick(next);
+        writeStored(CODE_PLACE_KEY, next ?? "");
+    };
+    const computerId =
+        placePick && computers?.some((computer) => computer.id === placePick && computer.online)
+            ? placePick
+            : null;
     // How hard the tool thinks, for one with an effort flag: the level picked
     // last, read after mount for the same reason as the mode.
     const [effort, setEffort] = useState<core.AgentEffortLevel | null>(null);
@@ -1010,7 +1026,8 @@ function CodeStart({
                             // lead the task (`polarCodeStart`).
                             agentId: persona?.id ?? null,
                             attachments: parts.uploads.ids,
-                            place: "local",
+                            place: computerId ? "computer" : "local",
+                            runnerId: computerId,
                             sharedHome: false,
                             hostId: null,
                             baseRef: workspace ? "" : baseRef.trim(),
@@ -1102,6 +1119,14 @@ function CodeStart({
                                     value={mode}
                                     onChange={chooseMode}
                                     disabled={busy}
+                                />
+                            ) : null}
+                            {!polar ? (
+                                <CodePlacePicker
+                                    computers={computers}
+                                    value={computerId}
+                                    onChange={choosePlace}
+                                    disabled={busy || pending}
                                 />
                             ) : null}
                         </>

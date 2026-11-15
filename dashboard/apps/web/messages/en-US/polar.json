@@ -1542,7 +1542,16 @@
         "modeBusy": "Answer the agent first, then change the mode.",
         "modelFailed": "The model could not be changed. Try again.",
         "modelBusy": "Answer the agent first, then change the model.",
-        "goalFailed": "Couldn't set the goal on this session."
+        "goalFailed": "Couldn't set the goal on this session.",
+        "place": {
+            "label": "Runs on",
+            "polaris": "Polaris",
+            "polarisHint": "Its own machine on this server.",
+            "online": "Online",
+            "offline": "Offline",
+            "pair": "Pair a computer",
+            "manage": "Your computers"
+        }
     },
     "compare": {
         "open": "Ask several models",

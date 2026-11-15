@@ -396,6 +396,7 @@ export async function forkSessionAction(
         command: parent.command ?? undefined,
         place: parent.place,
         hostId: parent.hostId,
+        runnerId: parent.runnerId,
         sharedHome: parent.sharedHome,
         unattended: parent.unattended,
         permissionMode: parent.permissionMode,

@@ -1542,7 +1542,16 @@
         "modeBusy": "Responde al agente primero y luego cambia el modo.",
         "modelFailed": "No se pudo cambiar el modelo. Inténtalo de nuevo.",
         "modelBusy": "Responde al agente primero y luego cambia el modelo.",
-        "goalFailed": "No se pudo fijar el objetivo aquí."
+        "goalFailed": "No se pudo fijar el objetivo aquí.",
+        "place": {
+            "label": "Se ejecuta en",
+            "polaris": "Polaris",
+            "polarisHint": "Su propia máquina en este servidor.",
+            "online": "En línea",
+            "offline": "Sin conexión",
+            "pair": "Vincular un equipo",
+            "manage": "Tus equipos"
+        }
     },
     "compare": {
         "open": "Preguntar a varios",
