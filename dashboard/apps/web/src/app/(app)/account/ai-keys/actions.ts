@@ -13,6 +13,7 @@ import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import {
     canAssistSignin,
+    canSignout,
     answerSignin,
     beginSignin,
     captureSignin,
@@ -102,6 +103,31 @@ export async function beginAgentSigninAction(
             return { error: error.message };
         }
         console.error("[agent-signin] could not start:", error);
+        return { error: t("aiKeys.errors.couldNotStart") };
+    }
+}
+
+/**
+ * Run the vendor's own sign-out in this person's home, for a tool whose docs
+ * name one. The attempt is an ordinary sign-in attempt in every other way - the
+ * same bound, the same screen, the same end - so the dialog that shows a login
+ * shows this too. Nothing is captured from it.
+ */
+export async function beginAgentSignoutAction(
+    env: unknown
+): Promise<{ id?: string; error?: string }> {
+    const user = await requireUser();
+    const parsed = agentSigninEnvSchema.safeParse(env);
+    const t = await getTranslations("account");
+    if (!parsed.success || !canSignout(parsed.data)) return { error: t("aiKeys.errors.notAssisted") };
+    try {
+        const attempt = await beginSignin(user.id, parsed.data, "logout");
+        return { id: attempt.id };
+    } catch (error) {
+        if (error instanceof Error && error.message.startsWith("A sign-in is already open")) {
+            return { error: error.message };
+        }
+        console.error("[agent-signin] could not start a sign-out:", error);
         return { error: t("aiKeys.errors.couldNotStart") };
     }
 }

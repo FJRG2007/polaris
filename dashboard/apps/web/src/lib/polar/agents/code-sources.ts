@@ -59,6 +59,7 @@ export const SOURCE_RULES: Readonly<Record<string, SourceRule>> = {
     GEMINI_GOOGLE_AUTH: { id: "googleAccount", kind: "subscription", vendor: "Google", logo: "google-ai", engines: ["gemini"] },
     GEMINI_API_KEY: { id: "geminiKey", kind: "apiKey", vendor: "Google", logo: "google-ai", engines: ["gemini"] },
     CURSOR_API_KEY: { id: "cursorKey", kind: "apiKey", vendor: "Cursor", logo: null, engines: ["cursor"] },
+    AUGGIE_ACCOUNT_AUTH: { id: "augmentAccount", kind: "subscription", vendor: "Augment Code", logo: null, engines: ["auggie"] },
     AMP_API_KEY: { id: "ampKey", kind: "apiKey", vendor: "Amp", logo: null, engines: ["amp"] },
     FACTORY_API_KEY: { id: "factoryKey", kind: "apiKey", vendor: "Factory", logo: null, engines: ["droid"] },
     CLINE_API_KEY: { id: "clineKey", kind: "apiKey", vendor: "Cline", logo: null, engines: ["cline"] },

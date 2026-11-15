@@ -83,6 +83,12 @@ export interface LoginCommand {
     /** The install line, when it is not the catalogue's own. */
     readonly install?: string;
     readonly command: string;
+    /**
+     * The vendor's own sign-out, run in the same home, for a tool whose docs
+     * name one. Absent means unsupported: a logout is never inferred from the
+     * login, and Polaris never deletes a tool's credential file in its place.
+     */
+    readonly logout?: string;
     /** Asked once, after the login, in the same container: the only way a stored
      *  credential can say whose it is. */
     readonly whoami?: string;
@@ -117,6 +123,9 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
     CODEX_CHATGPT_AUTH: {
         cli: "codex",
         command: "codex -c 'cli_auth_credentials_store=\"file\"' login --device-auth",
+        // "run `codex logout` to clear the current credentials" (same page),
+        // against the same file store the login was pinned to.
+        logout: "codex -c 'cli_auth_credentials_store=\"file\"' logout",
         flow: "device"
     },
     // Gemini CLI has no login subcommand. Started with Google sign-in selected
@@ -146,8 +155,35 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         command: "copilot login --device-code",
         flow: "device",
         autoAnswers: [{ prompt: "Store token in plaintext config file? (y/N)", reply: "y" }]
+    },
+    // `auggie auth login`, with `--headless` "on machines without a browser",
+    // and `auggie auth logout` to remove the local token - both from
+    // docs.augmentcode.com/cli/setup-auggie/authentication. What the headless
+    // flow draws was never seen, so the terminal stays open for whatever it
+    // asks; the session file it writes is what is captured.
+    AUGGIE_ACCOUNT_AUTH: {
+        cli: "auggie",
+        command: "auggie auth login --headless",
+        logout: "auggie auth logout",
+        flow: "paste"
     }
 };
+
+/** What an attempt runs: the vendor's login, or its documented sign-out. */
+export type SigninMode = "login" | "logout";
+
+/** The command an attempt of this mode runs, or null when the vendor documents
+ *  none - which for a logout is most of them. */
+export function signinCommand(env: string, mode: SigninMode): string | null {
+    const login = LOGIN_COMMANDS[env];
+    if (!login) return null;
+    return mode === "login" ? login.command : (login.logout ?? null);
+}
+
+/** Whether Polaris can sign this one out of the home for somebody. */
+export function canSignout(env: string): boolean {
+    return signinCommand(env, "logout") !== null;
+}
 
 function cliOf(env: string): core.AgentCli | undefined {
     return core.AGENT_CLIS.find((one) => one.id === LOGIN_COMMANDS[env]?.cli);
@@ -278,6 +314,9 @@ const directAttempts = new Map<string, DirectAttempt>();
 /** Attempts whose direct rung failed, so the screen can say it fell back, and
  *  the container start still in flight for each. */
 const fellBack = new Set<string>();
+/** Attempts running a sign-out rather than a login. Never captured from: what
+ *  is left in the home after a logout is not a credential to keep. */
+const signingOut = new Set<string>();
 const starting = new Map<string, Promise<void>>();
 
 /** Every request the direct rung makes: the guarded fetch, public addresses
@@ -322,9 +361,13 @@ function failureName(error: unknown): string {
  * - installing the tool is a minute of somebody else's network, and the screen
  * shows that happening rather than holding a click open through it.
  */
-export async function beginSignin(userId: string, env: string): Promise<SigninAttempt> {
-    const login = LOGIN_COMMANDS[env];
-    if (!login) throw new Error("Polaris cannot run that sign-in for you.");
+export async function beginSignin(
+    userId: string,
+    env: string,
+    mode: SigninMode = "login"
+): Promise<SigninAttempt> {
+    const command = signinCommand(env, mode);
+    if (command === null) throw new Error("Polaris cannot run that sign-in for you.");
 
     await sweepExpired();
     const running = await prisma.agentSigninAttempt.count({ where: { userId, endedAt: null } });
@@ -336,6 +379,14 @@ export async function beginSignin(userId: string, env: string): Promise<SigninAt
         data: { userId, env },
         select: { id: true, env: true }
     });
+
+    // A sign-out has no direct rung and nothing to capture: it runs the
+    // vendor's command against the home and ends with that home signed out.
+    if (mode === "logout") {
+        signingOut.add(attempt.id);
+        await startContainer(userId, attempt, command);
+        return attempt;
+    }
 
     // The comfortable rung first: a code in a second, no machine to start.
     if (direct.hasDirectSignin(env)) {
@@ -355,14 +406,14 @@ export async function beginSignin(userId: string, env: string): Promise<SigninAt
             fellBack.add(attempt.id);
         }
     }
-    await startContainer(userId, attempt, login);
+    await startContainer(userId, attempt, command);
     return attempt;
 }
 
 /** The CLI rung: the vendor's own login in a container. Ends the attempt if the
  *  container cannot be started, since an attempt nobody can reach still counts
  *  against the per-account bound. */
-async function startContainer(userId: string, attempt: SigninAttempt, login: LoginCommand): Promise<void> {
+async function startContainer(userId: string, attempt: SigninAttempt, command: string): Promise<void> {
     try {
         const name = containerName(attempt.id);
         await upWithFreshImage((pullPolicy) =>
@@ -379,7 +430,7 @@ async function startContainer(userId: string, attempt: SigninAttempt, login: Log
                             POLARIS_ROWS: String(commands.SIGNIN_ROWS),
                             POLARIS_INSTALL: signinInstall(attempt.env),
                             POLARIS_FIRST_RUN: firstRunFor(attempt.env),
-                            POLARIS_LOGIN: login.command,
+                            POLARIS_LOGIN: command,
                             POLARIS_RUNAS: commands.CONTAINER_USER,
                             POLARIS_HOME: commands.AGENT_HOME
                         },
@@ -559,7 +610,7 @@ async function directView(id: string, env: string, pending: DirectAttempt): Prom
         if (login) {
             starting.set(
                 id,
-                startContainer(pending.userId, { id, env }, login)
+                startContainer(pending.userId, { id, env }, login.command)
                     .catch(() => undefined)
                     .finally(() => starting.delete(id))
             );
@@ -604,6 +655,7 @@ export async function endSignin(userId: string, id: string): Promise<void> {
     answered.delete(id);
     if (directAttempts.get(id)?.userId === userId) directAttempts.delete(id);
     fellBack.delete(id);
+    signingOut.delete(id);
     await prisma.agentSigninAttempt
         .updateMany({ where: { id, userId, endedAt: null }, data: { endedAt: new Date() } })
         .catch(() => undefined);
@@ -626,6 +678,7 @@ export async function sweepExpired(): Promise<number> {
     for (const attempt of stale) {
         directAttempts.delete(attempt.id);
         fellBack.delete(attempt.id);
+        signingOut.delete(attempt.id);
         answered.delete(attempt.id);
         await prisma.agentSigninAttempt
             .update({ where: { id: attempt.id }, data: { endedAt: new Date() } })
@@ -795,7 +848,7 @@ export function parseCredentialFile(output: string): string | null {
  * otherwise the file it wrote. Throws only when the attempt is not this person's.
  */
 export async function captureSignin(userId: string, id: string, env: string): Promise<string | null> {
-    if (!(env in LOGIN_COMMANDS)) return null;
+    if (!(env in LOGIN_COMMANDS) || signingOut.has(id)) return null;
     if (screens.hasScreenToken(env)) {
         const screen = await runIn(userId, id, signinCaptureCommand());
         return screens.screenTokenIn(env, screens.readSigninScreen(screen).screen);

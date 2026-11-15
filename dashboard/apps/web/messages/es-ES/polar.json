@@ -1467,6 +1467,7 @@
             "googleAccount": "Cuenta de Google",
             "geminiKey": "Clave de Gemini",
             "cursorKey": "Clave de Cursor",
+            "augmentAccount": "Cuenta de Augment",
             "ampKey": "Clave de Amp",
             "factoryKey": "Clave de Factory",
             "clineKey": "Clave de Cline",

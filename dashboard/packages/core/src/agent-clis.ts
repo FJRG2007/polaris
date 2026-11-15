@@ -1073,8 +1073,21 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         home: ".augment",
         observe: "output",
         docs: "https://docs.augmentcode.com/cli/overview",
-        // Signs in through its own login; no variable was sourced.
-        credentials: [],
+        credentials: [
+            // `auggie auth login --headless` signs the account in on a machine
+            // with no browser (docs.augmentcode.com/cli/setup-auggie/authentication)
+            // and keeps the session in ~/.augment/session.json, the file Agent
+            // Orchestrator's Auggie adapter reads as the login. Polaris keeps a
+            // copy of that file.
+            {
+                env: "AUGGIE_ACCOUNT_AUTH",
+                label: "Augment account",
+                url: "https://docs.augmentcode.com/cli/setup-auggie/authentication",
+                howto: null,
+                subscription: true,
+                file: ".augment/session.json"
+            }
+        ],
         autonomyArgs: [],
         autonomyEnv: {},
         firstRun: []

@@ -47,6 +47,7 @@ describe("the rule table", () => {
         FACTORY_API_KEY: "droid",
         CLINE_API_KEY: "cline",
         XAI_API_KEY: "grok",
+        AUGGIE_ACCOUNT_AUTH: "auggie",
         KIMI_API_KEY: "kimi",
         DEVIN_API_KEY: "devin",
         KIRO_API_KEY: "kiro",

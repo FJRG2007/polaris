@@ -1467,6 +1467,7 @@
             "googleAccount": "Google account",
             "geminiKey": "Gemini API key",
             "cursorKey": "Cursor API key",
+            "augmentAccount": "Augment account",
             "ampKey": "Amp API key",
             "factoryKey": "Factory API key",
             "clineKey": "Cline API key",
