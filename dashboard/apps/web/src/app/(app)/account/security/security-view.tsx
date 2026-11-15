@@ -28,6 +28,7 @@ import type { PasskeyView } from "@/lib/passkey-directory";
 import { Button, Card, CardBody, Select } from "@polaris/ui";
 import { RemovePinDialog, SetPinDialog } from "./pin-dialogs";
 import { TwoFactorMethodsCard } from "./two-factor-methods-card";
+import { TelegramLinkCard } from "./telegram-link-card";
 import { SuccessorCard, type SuccessorPerson } from "./successor-card";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
 import { Feedback, SettingCard, type SettingLock } from "./setting-card";
@@ -235,6 +236,11 @@ export function SecurityView({
                         twoFactorEnabled={twoFactorEnabled}
                         trustedDevices={trustedDevices}
                         approval={{ enabled: requireLoginApproval, hasPin, otherSessions }}
+                    />
+
+                    <TelegramLinkCard
+                        status={twoFactorMethods.find((status) => status.method === "telegram")}
+                        locked={locked}
                     />
 
                     {/* Ways in, next to the ones they stand beside: a link to the

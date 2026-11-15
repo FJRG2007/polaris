@@ -539,5 +539,16 @@
         "turnOffFailed": "No se ha podido desactivar. Revisa tu contraseña.",
         "turnOffTitle": "Desactivar el autenticador",
         "turnOffDescription": "Tu cuenta quedará protegida solo por su contraseña. Tus códigos de respaldo dejan de funcionar."
+    },
+    "telegram": {
+        "title": "Telegram para códigos",
+        "description": "Abre el bot de Polaris y pulsa Iniciar para que te envíe códigos.",
+        "linked": "Vinculado. Los códigos te llegan por Telegram.",
+        "link": "Vincular Telegram",
+        "unlink": "Quitar",
+        "open": "Abrir Telegram",
+        "waiting": "Esperando a que pulses Iniciar en Telegram...",
+        "expired": "Ese enlace ha caducado. Empieza de nuevo.",
+        "failed": "No se pudo empezar a vincular. Reinténtalo."
     }
 }

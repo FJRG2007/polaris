@@ -539,5 +539,16 @@
         "turnOffFailed": "Could not turn it off. Check your password.",
         "turnOffTitle": "Turn off the authenticator",
         "turnOffDescription": "Your account will be protected by its password alone. Your backup codes stop working."
+    },
+    "telegram": {
+        "title": "Telegram for codes",
+        "description": "Open the Polaris bot and press Start, so it can send you codes.",
+        "linked": "Linked. Codes can reach you on Telegram.",
+        "link": "Link Telegram",
+        "unlink": "Unlink",
+        "open": "Open Telegram",
+        "waiting": "Waiting for you to press Start in Telegram...",
+        "expired": "That link has expired. Start again.",
+        "failed": "Could not start linking. Try again."
     }
 }
