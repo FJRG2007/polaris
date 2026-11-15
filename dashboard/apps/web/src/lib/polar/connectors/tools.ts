@@ -19,6 +19,7 @@ import { z } from "zod";
 import type { SessionUser } from "@/lib/session";
 import { jsonSchema, tool, type ToolSet } from "ai";
 import type { PolarAccess } from "@/lib/polar/access";
+import type { SearchEntry } from "@/lib/polar/tool-relevance";
 import * as rules from "@/lib/polar/connectors/policy";
 import { hostAllowed } from "@/lib/polar/connectors/shared";
 import { connectorPolicy, ownConnectors, setToolPolicy } from "@/lib/polar/connectors/store";
@@ -30,9 +31,11 @@ export interface ConnectorToolSet {
         string,
         { title: string; writes: boolean; destructive: boolean; connector: string }
     >;
+    /** The same tools as `find_tools` searches them, under their connector's name. */
+    catalog: SearchEntry[];
 }
 
-const EMPTY = (): ConnectorToolSet => ({ tools: {}, approval: {}, described: {} });
+const EMPTY = (): ConnectorToolSet => ({ tools: {}, approval: {}, described: {}, catalog: [] });
 
 /** What a failed call answers, as the model reads it. */
 const FAILED: Record<string, string> = {
@@ -115,9 +118,34 @@ export async function polarConnectorTools(
                 destructive: entry.destructive,
                 connector: row.name
             };
+            result.catalog.push({
+                name,
+                description: [entry.title, entry.description].filter(Boolean).join(". "),
+                category: row.name.toLowerCase()
+            });
         }
     }
     return result;
+}
+
+/**
+ * The system prompt's line about the connectors a turn is offered, so a model
+ * asked about one of those services reaches for its tools instead of asking
+ * what the question means. Empty when none is offered. A connector's name is
+ * the person's own text: reduced to plain words and capped before it is sent.
+ */
+export function connectorsPrompt(
+    set: Pick<ConnectorToolSet, "described">,
+    offered: readonly string[]
+): string {
+    const names = new Set<string>();
+    for (const name of offered) {
+        const connector = set.described[name]?.connector;
+        const plain = connector?.replace(/[^\p{L}\p{N} ._-]/gu, "").trim().slice(0, 40);
+        if (plain) names.add(plain);
+    }
+    if (names.size === 0) return "";
+    return `The person connected these outside services to Polar: ${[...names].join(", ")}. Their tools are the ones named mcp_<service>__<tool> in your tool list. For any question about one of those services - its data, account, payments, issues or anything else it holds - call its tools to find the answer before replying, and never ask the person what they mean instead.`;
 }
 
 /**

@@ -36,7 +36,11 @@ import { polarTools } from "@/lib/polar/tools";
 import { polarAskTools } from "@/lib/polar/ask-tools";
 import { settleUnansweredAsks } from "@/lib/polar/ask";
 import { checkFormReply } from "@/lib/polar/forms";
-import { connectorStandIns, polarConnectorTools } from "@/lib/polar/connectors/tools";
+import {
+    connectorStandIns,
+    connectorsPrompt,
+    polarConnectorTools
+} from "@/lib/polar/connectors/tools";
 import { offWithServers } from "@/lib/polar/tool-servers";
 import {
     FIND_TOOLS,
@@ -278,6 +282,11 @@ export async function POST(request: Request): Promise<Response> {
         ...connectorSet.described
     });
     const catalog = toolset.catalog.filter((entry) => !off.has(entry.name));
+    // The connector tools this turn offers: always sent (`always` below), and
+    // found by find_tools too, so a search for the service lands on them.
+    const offeredConnectors = body.data.connectors
+        ? Object.keys(connectorSet.tools).filter((name) => !off.has(name))
+        : [];
     // Known to the check even while memory is off, so an older turn that used
     // them still reads as valid.
     const memoryTools = polarMemoryTools(user.id, body.data.threadId);
@@ -285,7 +294,10 @@ export async function POST(request: Request): Promise<Response> {
         ...currentViewTool(body.data.context, async (name, input) =>
             off.has(name) ? null : toolset.call(name, input)
         ),
-        ...findToolsTool(catalog)
+        ...findToolsTool([
+            ...catalog,
+            ...connectorSet.catalog.filter((entry) => offeredConnectors.includes(entry.name))
+        ])
     };
     const visualTools = polarVisualTools();
     const weatherTools = polarWeatherTools();
@@ -487,11 +499,7 @@ export async function POST(request: Request): Promise<Response> {
         ...(web ? weatherTools : {}),
         ...(web ? repoTools : {}),
         ...(web ? browserTools : {}),
-        ...(body.data.connectors
-            ? Object.fromEntries(
-                  Object.entries(connectorSet.tools).filter(([name]) => !off.has(name))
-              )
-            : {}),
+        ...Object.fromEntries(offeredConnectors.map((name) => [name, connectorSet.tools[name]!])),
         ...skillTools
     };
     // Subagents (`lib/polar/subagents`): a child run of this loop with a subset
@@ -561,9 +569,7 @@ export async function POST(request: Request): Promise<Response> {
         ...(repoOffered ? Object.keys(repoTools) : []),
         ...(browserOffered ? [BROWSER_TOOL] : []),
         // A connector is one the person added on purpose: its tools are always sent.
-        ...(body.data.connectors
-            ? Object.keys(connectorSet.tools).filter((name) => !off.has(name))
-            : []),
+        ...offeredConnectors,
         // Skills are listed in the system prompt, so the tool that reads them goes with it.
         ...(USE_SKILL in skillTools ? [USE_SKILL] : []),
         ...(TASK_TOOL in taskTools ? [TASK_TOOL] : []),
@@ -675,6 +681,7 @@ export async function POST(request: Request): Promise<Response> {
             content: [
                 polarSystemPrompt(user.name, instructions, memories, web),
                 agent ? agentPrompt(agent) : "",
+                connectorsPrompt(connectorSet, offeredConnectors),
                 codeTaskPrompt(body.data.code),
                 skillsPrompt(skills),
                 enigma ? enigmaPrompt(enigmaSkills) : "",

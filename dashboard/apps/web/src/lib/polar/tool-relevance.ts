@@ -21,10 +21,16 @@ import { fenceSite, fenceScreen, type PageContext } from "@/lib/polar/shared";
 export const READ_CURRENT_VIEW = "read_current_view";
 export const FIND_TOOLS = "find_tools";
 
-/** One tool as the relevance rules see it. */
-export interface CatalogEntry {
+/** One tool as `find_tools` searches it: a Polaris category, or the name of
+ *  the connector it comes from. */
+export interface SearchEntry {
     readonly name: string;
     readonly description: string;
+    readonly category: string;
+}
+
+/** One of Polaris's own tools as the relevance rules see it. */
+export interface CatalogEntry extends SearchEntry {
     readonly category: McpCategory;
 }
 
@@ -84,10 +90,8 @@ const AREA_SAMPLE = 6;
  * uses - so the next search, or the next call, lands instead of the model
  * concluding that Polaris cannot do it.
  */
-export function toolAreas(
-    catalog: readonly CatalogEntry[]
-): { area: McpCategory; tools: string[] }[] {
-    const areas = new Map<McpCategory, string[]>();
+export function toolAreas(catalog: readonly SearchEntry[]): { area: string; tools: string[] }[] {
+    const areas = new Map<string, string[]>();
     for (const entry of catalog) {
         const names = areas.get(entry.category) ?? [];
         if (names.length < AREA_SAMPLE) names.push(entry.name);
@@ -98,11 +102,11 @@ export function toolAreas(
 
 /** The catalog ranked against a query: name hits count most, then the
  *  description; ties keep catalog order. At most `limit`. */
-export function rankTools(
-    catalog: readonly CatalogEntry[],
+export function rankTools<T extends SearchEntry>(
+    catalog: readonly T[],
     query: string,
     limit = 8
-): CatalogEntry[] {
+): T[] {
     const asked = [...new Set(words(query))];
     if (asked.length === 0) return [];
     return catalog
@@ -186,8 +190,9 @@ export function usedInMessages(
 
 const findToolsInput = z.object({ query: z.string().min(1).max(200) });
 
-/** `find_tools`: searches every tool the person may use. Read-only. */
-export function findToolsTool(catalog: readonly CatalogEntry[]): ToolSet {
+/** `find_tools`: searches every tool the person may use, their connectors'
+ *  included. Read-only. */
+export function findToolsTool(catalog: readonly SearchEntry[]): ToolSet {
     return {
         [FIND_TOOLS]: tool({
             description:

@@ -47,7 +47,13 @@ const state = {
     unreadable: null as string | null,
     failWith: null as null | { statusCode: number; message: string },
     prompts: [] as unknown[],
-    goalsSet: [] as unknown[][]
+    goalsSet: [] as unknown[][],
+    /** The person's connectors, as the store answers them. */
+    connectors: [] as unknown[],
+    /** Whether the chosen model refuses, so the router hands the turn on. */
+    fallback: false,
+    /** Every model the router asked, the refusing one included. */
+    refused: [] as MockLanguageModelV4[]
 };
 
 vi.mock("@/lib/polar/skills/store", () => ({ enabledSkills: async () => [], agentSkills: async () => [] }));
@@ -78,7 +84,12 @@ vi.mock("@/lib/polar/router/store", async () => ({
 }));
 vi.mock("@/lib/polar/access", async () => ({
     ...(await (await import("./fixtures/open-polar-access")).openPolarAccess()),
-    polarAccessFor: async () => ({ use: true, spend: true, web: state.web })
+    polarAccessFor: async () => ({ use: true, spend: true, web: state.web, connectors: true })
+}));
+vi.mock("@/lib/polar/connectors/store", () => ({
+    ownConnectors: async () => state.connectors,
+    connectorPolicy: async () => ({ who: "everyone", hosts: [], privateNetwork: false }),
+    setToolPolicy: async () => true
 }));
 vi.mock("@/lib/polar/usage", () => ({
     routeRecord: () => ({ keyId: null, fellBack: null }),
@@ -168,6 +179,42 @@ function model() {
     return mock;
 }
 
+/**
+ * With `state.fallback`, the real router in front of `answering`: a chosen
+ * model that is overloaded, then `answering` standing in for it.
+ */
+async function routed(answering: MockLanguageModelV4) {
+    const { routeMiddleware } = await import("@/lib/polar/router/chain");
+    const { wrapLanguageModel } = await import("ai");
+    const overloaded = new MockLanguageModelV4({
+        doStream: async () => {
+            throw Object.assign(new Error("Overloaded"), {
+                statusCode: 529,
+                responseBody: JSON.stringify({
+                    type: "error",
+                    error: { type: "overloaded_error", message: "Overloaded" }
+                })
+            });
+        }
+    });
+    state.refused.push(overloaded);
+    const step = (target: MockLanguageModelV4, provider: string) => ({
+        model: () => target as never,
+        modelId: provider,
+        provider,
+        free: false,
+        reasoning: false,
+        routeReasoning: "inherit" as const
+    });
+    return wrapLanguageModel({
+        model: overloaded,
+        middleware: routeMiddleware(
+            [step(overloaded, "mistral"), step(answering, "openrouter")],
+            { sleep: async () => undefined }
+        )
+    });
+}
+
 const OPTION = {
     provider: "anthropic",
     providerName: "Anthropic",
@@ -200,7 +247,7 @@ vi.mock("@/lib/polar/models", () => ({
         if (state.resolved === "retired-then-ok" && choice.model === "retired")
             return "unknown_model";
         return {
-            model: model(),
+            model: state.fallback ? await routed(model()) : model(),
             option: OPTION,
             credential: {
                 source:
@@ -325,6 +372,9 @@ beforeEach(() => {
     state.failWith = null;
     state.prompts = [];
     state.goalsSet = [];
+    state.connectors = [];
+    state.fallback = false;
+    state.refused = [];
 });
 
 /** The messages a turn saved, from its savePolarMessages call. */
@@ -648,6 +698,84 @@ describe("tools", () => {
         const text = await (await post(body())).text();
         expect(text).toContain("tool-approval-request");
         expect(state.executed).toEqual([]);
+    });
+});
+
+describe("connector tools", () => {
+    const STRIPE = {
+        row: {
+            id: "0190a000-0000-7000-8000-000000000009",
+            ownerId: USER.id,
+            name: "Stripe",
+            url: "https://mcp.stripe.com",
+            enabled: true,
+            policies: {},
+            tools: [
+                {
+                    name: "stripe_api_search",
+                    title: "Search the Stripe API",
+                    description: "Find the API operation for an intent, such as listing payouts.",
+                    inputSchema: {
+                        type: "object",
+                        properties: { intent: { type: "string" } },
+                        required: ["intent"]
+                    },
+                    readOnly: true,
+                    destructive: false
+                }
+            ]
+        },
+        secret: null
+    };
+    const NAME = "mcp_stripe__stripe_api_search";
+
+    /** The tool names each model that was asked was offered on its first
+     *  call, in the order the router asked them. */
+    async function offeredBy(payload: Record<string, unknown>): Promise<string[][]> {
+        await (await post(payload)).text();
+        return [...state.refused, ...state.models]
+            .filter((model) => model.doStreamCalls.length > 0)
+            .map((model) => (model.doStreamCalls[0]!.tools ?? []).map((entry) => entry.name));
+    }
+
+    it("sends a connected connector's tools, and names the service in the prompt", async () => {
+        state.connectors = [STRIPE];
+        const [first] = await offeredBy(body());
+        expect(first).toContain(NAME);
+        const prompt = JSON.stringify(state.prompts.at(-1));
+        expect(prompt).toContain("outside services to Polar: Stripe.");
+    });
+
+    it("keeps them when the chosen model refuses and another answers the turn", async () => {
+        state.connectors = [STRIPE];
+        state.fallback = true;
+        const asked = await offeredBy(body());
+        expect(asked).toHaveLength(2);
+        const [refused, standIn] = asked;
+        expect(refused).toContain(NAME);
+        // The model that actually answered was offered them too.
+        expect(standIn).toContain(NAME);
+    });
+
+    it("lets find_tools turn them up by the service's name", async () => {
+        state.connectors = [STRIPE];
+        state.parts = calls("find_tools", { query: "stripe payouts" });
+        const text = await (await post(body())).text();
+        expect(text).toContain(NAME);
+    });
+
+    it("sends none, and says nothing of them, while the person left connectors off", async () => {
+        state.connectors = [STRIPE];
+        const [first] = await offeredBy(body({ connectors: false }));
+        expect(first).not.toContain(NAME);
+        const prompt = JSON.stringify(state.prompts.at(-1));
+        expect(prompt).not.toContain("outside services");
+    });
+
+    it("leaves out a connector the person switched off as a server", async () => {
+        state.connectors = [STRIPE];
+        const [first] = await offeredBy(body({ serversOff: ["connector:Stripe"] }));
+        expect(first).not.toContain(NAME);
     });
 });
 
