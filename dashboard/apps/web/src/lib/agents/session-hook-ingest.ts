@@ -5,7 +5,9 @@
  * (`/api/agents/sessions/:id/events` and `/permission`); a session on
  * somebody's own computer can relay the same payload through its runner's
  * socket (`lib/runners/runner-inbound.ts`). Both land here, so a hook means the
- * same thing however it travelled. Callers have already authenticated the
+ * same thing however it travelled. The routes that translate a tool's own
+ * webhook into the same payload (`codewhale`) land here too, so they cannot
+ * drift on what an event means. Callers have already authenticated the
  * session; nothing here checks who is asking.
  *
  * Called inside a request: the follow-up work is scheduled with `after()`.
@@ -129,4 +131,11 @@ export async function decidePermissionHook(
         console.error(`[agent-session] ${id}: permission prompt could not be relayed:`, error);
         return {};
     }
+}
+
+/** The bearer token a hook request carries, or empty. */
+export function hookBearer(request: Request): string {
+    const header = request.headers.get("authorization") ?? "";
+    const [scheme, ...rest] = header.trim().split(/\s+/);
+    return scheme?.toLowerCase() === "bearer" ? rest.join("") : "";
 }

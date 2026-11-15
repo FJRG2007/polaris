@@ -32,7 +32,7 @@
  * encoding a command line per vendor that would rot in a month.
  */
 
-import { AGENT_HOOK_RELAY, hookFileAnswers, hookGroup } from "./agent-hook-files.js";
+import { AGENT_HOOK_RELAY, KIRO_AGENT_NAME, hookFileAnswers, hookGroup } from "./agent-hook-files.js";
 
 /** How Polaris can tell what a running session is doing. */
 export const AGENT_OBSERVATIONS = ["hooks", "output"] as const;
@@ -397,6 +397,18 @@ export interface AgentCli {
      * only where the first run is written (not on somebody's own server).
      */
     readonly hookArgs?: readonly string[];
+    /**
+     * A flag the boot looks for in the tool's `--help` before it adds
+     * `hookArgs`, for a tool some builds of which refuse them: a build whose
+     * help does not list it starts without its activity hook rather than not
+     * at all. An unreadable help keeps them.
+     */
+    readonly hookProbe?: string;
+    /**
+     * The subcommand the tool's interactive session starts with, first on
+     * every launch line whatever else is added (Kiro's `chat`).
+     */
+    readonly launchArgs?: readonly string[];
     /**
      * The flags that run one turn without the tool's full-screen interface:
      * the prompt on standard input, the answer printed, the process gone. A
@@ -947,7 +959,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         install: "npm install -g cline",
         // Where Agent Orchestrator reads its sessions from.
         home: ".cline",
-        observe: "output",
+        observe: "hooks",
         docs: "https://github.com/cline/cline",
         credentials: [
             apiKey("CLINE_API_KEY", "Cline API key", "https://github.com/cline/cline"),
@@ -968,7 +980,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: ["--yolo"],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("cline")
     },
     {
         id: "openhands",
@@ -1066,7 +1078,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         autonomyArgs: [],
         autonomyEnv: {},
         firstRun: hookFileAnswers("pi"),
-        hookArgs: ["--extension", ".polaris/hooks/pi-activity.ts"]
+        hookArgs: ["--extension", ".polaris/hooks/pi-activity.ts"],
+        hookProbe: "--extension"
     },
     {
         id: "auggie",
@@ -1131,13 +1144,16 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["kiro-cli"],
         install: "curl -fsSL https://cli.kiro.dev/install | bash",
         home: null,
-        observe: "output",
+        observe: "hooks",
         docs: "https://kiro.dev/docs/getting-started/installation/",
         credentials: [apiKey("KIRO_API_KEY", "Kiro API key", "https://kiro.dev/docs/getting-started/installation/")],
-        // Agent Orchestrator starts its `chat` subcommand and trusts every tool.
-        autonomyArgs: ["chat", "--trust-all-tools"],
+        // Agent Orchestrator starts its `chat` subcommand, with the custom agent
+        // that holds the hooks, and trusts every tool.
+        launchArgs: ["chat"],
+        autonomyArgs: ["--trust-all-tools"],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("kiro"),
+        hookArgs: ["--agent", KIRO_AGENT_NAME]
     },
     {
         id: "kilocode",
@@ -1179,7 +1195,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["muse"],
         install: "curl -fsSL https://dev.meta.ai/install.sh | bash",
         home: ".config/muse",
-        observe: "output",
+        // Through a file of the session's own (`museSessionHooks`).
+        observe: "hooks",
         docs: "https://ai.meta.com/llama/",
         credentials: [apiKey("META_API_KEY", "Meta API key", "https://ai.meta.com/llama/")],
         autonomyArgs: ["--trust-workspace", "--yolo"],
@@ -1256,7 +1273,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         autonomyArgs: [],
         autonomyEnv: {},
         firstRun: hookFileAnswers("prime-agent"),
-        hookArgs: ["--extension", ".polaris/hooks/prime-agent-activity.ts"]
+        hookArgs: ["--extension", ".polaris/hooks/prime-agent-activity.ts"],
+        hookProbe: "--extension"
     },
     {
         id: "omp",
@@ -1272,6 +1290,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         autonomyEnv: {},
         firstRun: hookFileAnswers("omp"),
         hookArgs: ["--extension", ".polaris/hooks/omp-activity.ts"],
+        hookProbe: "--extension",
         acp: ["acp"]
     },
     {
@@ -1297,7 +1316,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         // instructions are not one command.
         install: null,
         home: ".codewhale",
-        observe: "output",
+        // Through its lifecycle webhook (`codewhaleSessionConfig`).
+        observe: "hooks",
         docs: "https://github.com/Hmbown/Codewhale",
         credentials: [],
         autonomyArgs: ["--yolo"],
@@ -1372,7 +1392,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["memcode"],
         install: "curl -fsSL https://memcode.ai/install.sh | sh",
         home: ".config/memcode",
-        observe: "output",
+        observe: "hooks",
         docs: "https://github.com/memcode-ai/memcode/releases",
         credentials: [
             apiKey("MEMCODE_API_TOKEN", "memcode API token", "https://github.com/memcode-ai/memcode/releases"),
@@ -1381,7 +1401,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: ["--allow-all"],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("memcode")
     },
     {
         id: "hermes",

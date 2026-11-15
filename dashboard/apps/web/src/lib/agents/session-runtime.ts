@@ -141,6 +141,17 @@ interface Bootstrap {
     readonly agentHeadless: string;
     /** The parent's transcript a fork reopens, or empty. See `forkTranscript`. */
     readonly agentFork: string;
+    /** The arguments that load the activity hook the first run wrote, added by
+     *  the launch script unless the boot found the build refuses them. Empty
+     *  where nothing was written. See `AgentCli.hookArgs`. */
+    readonly agentHookArgs: string;
+    /** The flag the boot checks the tool's help for first, or empty to add
+     *  them unchecked. See `AgentCli.hookProbe`. */
+    readonly agentHookProbe: string;
+    /** A hook configuration of the session's own, written into the state
+     *  directory at boot, and the variable that points the tool at it. Null
+     *  for every tool but the ones that read one. See `sessionHookConfig`. */
+    readonly agentHookConfig: { readonly path: string; readonly env: string; readonly contents: string } | null;
     /** The whole of what installing Enigma means, base64 so it survives the
      *  daemon's rule about control characters. Empty when Enigma is off. */
     readonly enigmaSetup: string;
@@ -249,15 +260,13 @@ function agentCommandFor(
     // The effort picked for this session, on the flag the tool documents; only
     // a level that tool lists ever reaches the line.
     const effortArgs = core.agentEffortArgs(cli.id, session.effort);
-    // The extension that reports this session's activity, for a tool that only
-    // loads one it is pointed at. Only where the first run wrote it: on
-    // somebody's own server it was never written, and a missing extension is
-    // an agent that will not start.
-    const hookArgs = session.place === "host" ? [] : (cli.hookArgs ?? []);
+    // The subcommand its interactive session starts with, first whatever else
+    // is on the line.
+    const launchArgs = cli.launchArgs ?? [];
     return {
         cli,
         binary,
-        command: [binary, ...args, ...modelArgs, ...effortArgs, ...hookArgs].join(" "),
+        command: [binary, ...launchArgs, ...args, ...modelArgs, ...effortArgs].join(" "),
         install: cli.install ?? "",
         launcher
     };
@@ -335,6 +344,18 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         agentResume: core.agentResumeStyle(agent.cli.id),
         agentHeadless: headless,
         agentFork: await forkTranscriptFor(session, agent.cli.id),
+        // The extension or agent that reports this session's activity, for a
+        // tool that only loads one it is pointed at. Only where the first run
+        // wrote it: on somebody's own server it was never written, and a
+        // missing extension is an agent that will not start.
+        agentHookArgs: session.place === "host" ? "" : (agent.cli.hookArgs ?? []).join(" "),
+        agentHookProbe: session.place === "host" ? "" : (agent.cli.hookProbe ?? ""),
+        agentHookConfig:
+            session.place === "host"
+                ? null
+                : sessionHookConfig(agent.cli.id, stateDirFor(session), {
+                      webhook: `${base}/api/agents/sessions/${session.id}/codewhale?token=${encodeURIComponent(token)}`
+                  }),
         // Empty when Enigma is off, which is what the boot script tests for.
         // One script rather than an argv and a second script: it installs the
         // package globally so the agent can invoke `enigma`, then makes the
@@ -666,6 +687,12 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_AGENT_RESUME: boot.agentResume,
         POLARIS_AGENT_HEADLESS: boot.agentHeadless,
         POLARIS_AGENT_FORK: boot.agentFork,
+        POLARIS_AGENT_HOOK_ARGS: boot.agentHookArgs,
+        POLARIS_AGENT_HOOK_PROBE: boot.agentHookProbe,
+        // Base64 like every other file here; the boot writes it to the path
+        // named, which must be inside the state directory.
+        POLARIS_AGENT_HOOK_FILE: boot.agentHookConfig ? asFile(boot.agentHookConfig.contents) : "",
+        POLARIS_AGENT_HOOK_PATH: boot.agentHookConfig?.path ?? "",
         POLARIS_ENIGMA_SETUP: boot.enigmaSetup,
         POLARIS_ENIGMA_CONFIGURE: boot.enigmaConfigure,
         POLARIS_FIRST_RUN: boot.firstRun,
@@ -681,8 +708,31 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         // started under it (see PREVIEW_PROMPT).
         POLARIS_PREVIEW_BASE: boot.previewBase,
         ...boot.autonomyEnv,
+        // The tool's own variable naming that file. Before the credentials, so
+        // nothing Polaris sets for its hooks can take a credential's place.
+        ...(boot.agentHookConfig ? { [boot.agentHookConfig.env]: boot.agentHookConfig.path } : {}),
         ...boot.credentials
     });
+}
+
+/**
+ * The hook configuration of a session's own for a tool pointed at one through
+ * a variable (`museSessionHooks`, `codewhaleSessionConfig`), at its path in
+ * the state directory. Null for any other tool. Only where Polaris owns the
+ * machine, which is also where the state directory is a fixed absolute path.
+ */
+export function sessionHookConfig(
+    cliId: string,
+    stateDir: string,
+    { webhook }: { webhook: string }
+): { path: string; env: string; contents: string } | null {
+    const config =
+        cliId === "muse"
+            ? core.museSessionHooks(`${stateDir}/hook.sh`)
+            : cliId === "codewhale"
+              ? core.codewhaleSessionConfig(`${stateDir}/codewhale-lifecycle.jsonl`, webhook)
+              : null;
+    return config ? { path: `${stateDir}/${config.name}`, env: config.env, contents: config.contents } : null;
 }
 
 /**

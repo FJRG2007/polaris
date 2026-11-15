@@ -18,9 +18,9 @@
  */
 
 import { sessionForToken } from "@/lib/agents/session-service";
-import { ingestHookPayload } from "@/lib/agents/session-hook-ingest";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { parseHookSequence } from "@polaris/core";
+import { hookBearer, ingestHookPayload } from "@/lib/agents/session-hook-ingest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,12 +29,6 @@ export const dynamic = "force-dynamic";
  *  whole file, and a limit here is what stops one agent's Write call being the
  *  instance's memory problem. */
 const MAX_BODY = 256 * 1024;
-
-function bearer(request: Request): string {
-    const header = request.headers.get("authorization") ?? "";
-    const [scheme, ...rest] = header.trim().split(/\s+/);
-    return scheme?.toLowerCase() === "bearer" ? rest.join("") : "";
-}
 
 /** A fresh response every time: a Response body is a single-use stream, so one
  *  shared object would serve the first hook and throw for every hook after it. */
@@ -47,7 +41,7 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
     const { id } = await params;
-    const session = await sessionForToken(bearer(request));
+    const session = await sessionForToken(hookBearer(request));
     // The token names a session; the URL names one too. They have to be the same
     // one, or a token would be a way to write into any session on the instance.
     if (!session || session.id !== id)

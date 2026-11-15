@@ -113,6 +113,18 @@ const pi: Derive = (signal) => {
     return null;
 };
 
+/**
+ * Kiro and Cline: every event they report is work going on, a permission ask
+ * included - neither carries a decision still pending - and only the end of a
+ * task is idle.
+ */
+const taskTool: Derive = (signal) => {
+    if (signal === "stop") return "idle";
+    if (signal === "session-start" || signal === "user-prompt-submit" || TOOL_TRAFFIC.has(signal)) return "active";
+    if (signal === "permission-request" || signal === "permission-resolved") return "active";
+    return null;
+};
+
 const DERIVERS: Readonly<Record<string, Derive>> = {
     claude,
     codex: (signal) =>
@@ -191,6 +203,28 @@ const DERIVERS: Readonly<Record<string, Derive>> = {
         if (signal === "stop") return text(payload, "status") === "error" ? "waiting_input" : "idle";
         return null;
     },
+    kiro: taskTool,
+    cline: taskTool,
+    muse: (signal) =>
+        signal === "user-prompt-submit"
+            ? "active"
+            : signal === "permission-request"
+              ? "blocked"
+              : signal === "stop"
+                ? "idle"
+                : null,
+    // memcode's only activity hook; its turn's end is not one.
+    memcode: (signal) => (signal === "pre-tool-use" ? "active" : null),
+    // Its lifecycle webhook (`api/agents/sessions/[id]/codewhale`): any end of
+    // a turn, failed or not, hands it back to the person.
+    codewhale: (signal) =>
+        signal === "user-prompt-submit"
+            ? "active"
+            : signal === "stop"
+              ? "waiting_input"
+              : signal === "session-end"
+                ? "exited"
+                : null,
     pi,
     "prime-agent": pi,
     omp: (signal, payload) => {

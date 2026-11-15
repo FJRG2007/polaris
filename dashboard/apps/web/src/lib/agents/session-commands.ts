@@ -374,6 +374,16 @@ const PREPARE_WORKTREE = [
     '  printf %s "$POLARIS_MEMORY_SYNC" | base64 -d > "$POLARIS_STATE_DIR/memory-sync.sh"',
     '  chmod 0700 "$POLARIS_STATE_DIR/memory-sync.sh"',
     "fi",
+    // A hook configuration of the session's own, for a tool pointed at one
+    // through a variable (`sessionHookConfig`). Private like the hook script:
+    // Codewhale's names the session's address, token and all. Only ever inside
+    // the state directory, whatever the path says.
+    'if [ -n "$POLARIS_AGENT_HOOK_FILE" ]; then',
+    '  case "$POLARIS_AGENT_HOOK_PATH" in',
+    '    "$POLARIS_STATE_DIR"/*/*|*..*) ;;',
+    '    "$POLARIS_STATE_DIR"/?*) printf %s "$POLARIS_AGENT_HOOK_FILE" | base64 -d > "$POLARIS_AGENT_HOOK_PATH" && chmod 0600 "$POLARIS_AGENT_HOOK_PATH" || true ;;',
+    "  esac",
+    "fi",
     // Made as root because the image starts as root; owned by the agent, because
     // the agent is who edits it.
     //
@@ -876,6 +886,9 @@ export function writeCredentialsCommand(stateDir: string, part: string, body: st
  * exited for any reason must not take the window, and every word explaining why,
  * with it.
  */
+/** Beside the checkout when the boot found the tool refuses its `hookArgs`. */
+export const HOOK_ARGS_REFUSED_FILE = "hook-args-refused";
+
 export const LAUNCH_SCRIPT = [
     "#!/bin/sh",
     "# Written by Polaris. Starts this session's agent; an argument reopens that conversation.",
@@ -901,6 +914,9 @@ export const LAUNCH_SCRIPT = [
     '    *) id="" ;;',
     "  esac",
     "fi",
+    // The extension or agent that reports this session's activity, unless the
+    // boot found this build refuses it (see the probe before the launch).
+    `if [ -n "$POLARIS_AGENT_HOOK_ARGS" ] && [ ! -e "$POLARIS_STATE_DIR/${HOOK_ARGS_REFUSED_FILE}" ]; then line="$line $POLARIS_AGENT_HOOK_ARGS"; fi`,
     // A fork's first start reopens its parent's conversation as a new one of its
     // own. Once: the marker is beside the checkout, so a later start - after the
     // agent exited - is this session's own conversation rather than a second fork.
@@ -1024,7 +1040,7 @@ const RUNNER_SCRIPT_BASE64 = Buffer.from(RUNNER_SCRIPT, "utf8").toString("base64
 export const INTERFACE_SCRIPT = [
     "#!/bin/sh",
     "# Written by Polaris. Opens the agent's own interface on this session's conversation.",
-    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP",
+    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_AGENT_HOOK_FILE",
     'for pair in $POLARIS_CREDENTIAL_FILES; do unset "$(printf %s "$pair" | cut -d= -f1)"; done',
     'id="$(head -c 128 "$POLARIS_STATE_DIR/agent-session-id" 2>/dev/null || true)"',
     'case "$id" in *[!A-Za-z0-9_-]*) id="" ;; esac',
@@ -1282,7 +1298,7 @@ const START_AGENT = [
     '  as_agent "sh \\"$POLARIS_STATE_DIR/memory-sync.sh\\" restore" || true',
     "fi",
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP",
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_AGENT_HOOK_FILE",
     // Said once, in the terminal the person is looking at, because on a machine
     // they cannot see "please sign in" with no way to and no reason given is the
     // whole of what was wrong with this. Only when Polaris is carrying no
@@ -1305,6 +1321,21 @@ const START_AGENT = [
     // The launch is a script beside the checkout rather than a line here, so a
     // later relaunch runs exactly what the boot ran. Exported, because the shell
     // left in the window after the agent exits is the one that runs it then.
+    // A build that refuses the arguments loading the activity hook exits the
+    // moment it is handed them (Prime Agent 0.10 and `--extension`), so where
+    // the catalogue names a flag to look for, its help is read first and a
+    // build that does not list it starts without them. Ported from
+    // `acceptsExtension` in Agent Orchestrator's primeagent adapter: an
+    // unreadable help keeps them. Bounded: ten seconds, 256 KiB.
+    `rm -f "$POLARIS_STATE_DIR/${HOOK_ARGS_REFUSED_FILE}"`,
+    'if [ -n "$POLARIS_AGENT_HOOK_ARGS" ] && [ -n "$POLARIS_AGENT_HOOK_PROBE" ] && command -v timeout >/dev/null 2>&1; then',
+    '  help="$(cd "$POLARIS_WORKDIR" && as_agent "timeout 10 \\"$POLARIS_AGENT_BINARY\\" --help" </dev/null 2>&1 | head -c 262144)"',
+    '  if [ -n "$help" ] && ! printf %s "$help" | grep -qF -e "$POLARIS_AGENT_HOOK_PROBE"; then',
+    `    : > "$POLARIS_STATE_DIR/${HOOK_ARGS_REFUSED_FILE}"`,
+    '    echo "polaris: this $POLARIS_AGENT_BINARY does not take $POLARIS_AGENT_HOOK_PROBE, so it starts without reporting what it is doing"',
+    "  fi",
+    "  unset help",
+    "fi",
     "export POLARIS_AS_ROOT POLARIS_WORKDIR POLARIS_STATE_DIR",
     `printf %s ${LAUNCH_SCRIPT_BASE64} | base64 -d > "$POLARIS_STATE_DIR/launch.sh"`,
     'chmod 0755 "$POLARIS_STATE_DIR/launch.sh"',

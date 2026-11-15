@@ -94,8 +94,10 @@ export function hookSignalOf(event: string): HookSignal | null {
  *   (Antigravity's `.agents/hooks.json`).
  * - `list`: `{ hooks: { enabled: true, hooks: [{ event, command, ... }] } }`
  *   (Autohand's `config.json`).
+ * - `flat`: `{ hooks: { <event>: [{ command, timeout }] } }`, no matcher groups
+ *   (memcode's `.memcode/hooks.json`, `hooksjson.Manager{Flat: true}`).
  */
-export type HookFileLayout = "matcher" | "cursor" | "named" | "list";
+export type HookFileLayout = "matcher" | "cursor" | "named" | "list" | "flat";
 
 export interface HookRegistration {
     /** The tool's own name for the event. */
@@ -115,6 +117,9 @@ export interface HookFileSpec {
     /** In the tool's own unit, which is not always seconds. */
     readonly timeout: number;
     readonly events: readonly HookRegistration[];
+    /** The hook prints nothing: for a tool that adds a hook's output to the
+     *  model's context (memcode's `session_start`). */
+    readonly quiet?: boolean;
 }
 
 const w = (path: string): string => `${HOOK_FILE_WORKDIR}${path}`;
@@ -130,9 +135,10 @@ const SESSION_END: HookRegistration = { event: "SessionEnd", signal: "session-en
  * Files, events, matchers and timeouts as Agent Orchestrator registers them for
  * the same tool (`adapters/agent/<name>/hooks.go`), including where the file
  * lives: in the checkout where it writes one there, in the home where it does.
- * A tool that is not here is either one of the three written in `agent-clis.ts`
- * (Codex, Gemini CLI, Copilot) or one whose hooks are not a JSON file Polaris
- * can write yet - see `U3-PLAN.md`.
+ * A tool that is not here is one of the three written in `agent-clis.ts`
+ * (Codex, Gemini CLI, Copilot), one in `AGENT_HOOK_WRITERS`, or one pointed at
+ * a file of the session's own (`museSessionHooks`, `codewhaleSessionConfig`).
+ * Crush has none: Agent Orchestrator writes no activity hooks for it.
  */
 export const AGENT_HOOK_FILES: Readonly<Record<string, HookFileSpec>> = {
     qwen: {
@@ -229,6 +235,20 @@ export const AGENT_HOOK_FILES: Readonly<Record<string, HookFileSpec>> = {
             STOP
         ]
     },
+    memcode: {
+        // Ported from adapters/agent/memcode/hooks.go. Its other `session_start`
+        // entries carry Agent Orchestrator's standing instructions, which are
+        // not Polaris's; what memcode prints from a hook becomes context, so
+        // these print nothing.
+        file: w(".memcode/hooks.json"),
+        layout: "flat",
+        timeout: 30,
+        quiet: true,
+        events: [
+            { event: "session_start", signal: "session-start" },
+            { event: "pre_tool_use", signal: "pre-tool-use" }
+        ]
+    },
     autohand: {
         // Autohand reads hooks from its home configuration only.
         file: ".autohand/config.json",
@@ -249,6 +269,17 @@ export function hookCommand(signal: HookSignal): string {
 }
 
 /**
+ * The same command with its output thrown away, for a tool that reads what a
+ * hook prints as something of its own: context for the model (memcode, Kiro's
+ * `agentSpawn` and `userPromptSubmit`), or a decision (Cline). A subshell,
+ * so the relay's `exec` replaces it rather than the script around it, and
+ * whatever follows - Cline's answer - still runs.
+ */
+export function quietHookCommand(signal: HookSignal): string {
+    return `(${hookCommand(signal)}) >/dev/null 2>&1`;
+}
+
+/**
  * One matcher group, the unit of Claude Code's hook shape: shared by Claude
  * Code's own settings, Codex, Gemini CLI and every `matcher` file above.
  */
@@ -264,6 +295,7 @@ export function hookGroup(
 
 /** The keys a tool's hook file has to hold, by its layout. */
 export function renderHookFile(spec: HookFileSpec): Record<string, AgentFirstRunValue> {
+    const command = (signal: HookSignal): string => (spec.quiet ? quietHookCommand(signal) : hookCommand(signal));
     const byEvent = new Map<string, HookRegistration[]>();
     for (const registration of spec.events) {
         byEvent.set(registration.event, [...(byEvent.get(registration.event) ?? []), registration]);
@@ -273,7 +305,7 @@ export function renderHookFile(spec: HookFileSpec): Record<string, AgentFirstRun
             const hooks: Record<string, AgentFirstRunValue> = {};
             for (const [event, registrations] of byEvent) {
                 hooks[event] = registrations.map((r) =>
-                    hookGroup(hookCommand(r.signal), spec.timeout, { matcher: r.matcher })
+                    hookGroup(command(r.signal), spec.timeout, { matcher: r.matcher })
                 );
             }
             return { hooks };
@@ -281,7 +313,7 @@ export function renderHookFile(spec: HookFileSpec): Record<string, AgentFirstRun
         case "cursor": {
             const hooks: Record<string, AgentFirstRunValue> = {};
             for (const [event, registrations] of byEvent) {
-                hooks[event] = registrations.map((r) => ({ command: hookCommand(r.signal) }));
+                hooks[event] = registrations.map((r) => ({ command: command(r.signal) }));
             }
             return { hooks };
         }
@@ -289,7 +321,7 @@ export function renderHookFile(spec: HookFileSpec): Record<string, AgentFirstRun
             const named: Record<string, AgentFirstRunValue> = {};
             for (const [event, registrations] of byEvent) {
                 named[event] = registrations.map((r) => {
-                    const entry = { type: "command", command: hookCommand(r.signal), timeout: spec.timeout };
+                    const entry = { type: "command", command: command(r.signal), timeout: spec.timeout };
                     return r.grouped ? { ...(r.matcher ? { matcher: r.matcher } : {}), hooks: [entry] } : entry;
                 });
             }
@@ -301,13 +333,20 @@ export function renderHookFile(spec: HookFileSpec): Record<string, AgentFirstRun
                     enabled: true,
                     hooks: spec.events.map((r) => ({
                         event: r.event,
-                        command: hookCommand(r.signal),
+                        command: command(r.signal),
                         description: "Polaris session status",
                         enabled: true,
                         timeout: spec.timeout
                     }))
                 }
             };
+        case "flat": {
+            const hooks: Record<string, AgentFirstRunValue> = {};
+            for (const [event, registrations] of byEvent) {
+                hooks[event] = registrations.map((r) => ({ command: command(r.signal), timeout: spec.timeout }));
+            }
+            return { hooks };
+        }
     }
 }
 
@@ -359,8 +398,11 @@ export function tomlHookTable(fields: ReadonlyArray<readonly [string, string | n
  * The relay as a script of its own, for a tool that runs a hook by path rather
  * than as a shell command (Auggie).
  */
-export function hookRelayScript(signal: HookSignal): string {
-    return `#!/bin/sh\n# Written by Polaris: reports this session's activity.\n${hookCommand(signal)}\nexit 0\n`;
+export function hookRelayScript(signal: HookSignal, answer?: string): string {
+    // With an answer, the relay's own `{}` is dropped and the answer printed
+    // instead: Cline reads a hook's output as its decision.
+    const body = answer === undefined ? hookCommand(signal) : `${quietHookCommand(signal)}\nprintf '%s\\n' '${answer}'`;
+    return `#!/bin/sh\n# Written by Polaris: reports this session's activity.\n${body}\nexit 0\n`;
 }
 
 const AUGGIE_HOOKS_DIR = ".augment/polaris-hooks/";
@@ -680,6 +722,69 @@ export default function (amp: any) {
 `;
 }
 
+/** The custom agent Kiro is started with (`--agent`, see `hookArgs`). */
+export const KIRO_AGENT_NAME = "polaris";
+
+/**
+ * Kiro's hooks live in a custom agent, `.kiro/agents/<name>.json` in the
+ * checkout, which applies only when the CLI starts with that agent selected.
+ * Ported from adapters/agent/kiro/hooks.go (`kiroManagedHooks`,
+ * `setKiroAgentDefaults`): the same four events, `preToolUse` as tool traffic
+ * rather than a permission ask (it fires for trusted tools too), and the
+ * defaults filled in only where the file has none. Quiet, because Kiro adds
+ * what `agentSpawn` and `userPromptSubmit` print to the model's context.
+ */
+function kiroAnswers(): AgentFirstRunAnswer[] {
+    const events: ReadonlyArray<readonly [string, HookSignal]> = [
+        ["agentSpawn", "session-start"],
+        ["userPromptSubmit", "user-prompt-submit"],
+        ["preToolUse", "pre-tool-use"],
+        ["stop", "stop"]
+    ];
+    const hooks: Record<string, AgentFirstRunValue> = {};
+    for (const [event, signal] of events) hooks[event] = [{ command: quietHookCommand(signal) }];
+    return [
+        {
+            file: w(`.kiro/agents/${KIRO_AGENT_NAME}.json`),
+            assert: { name: KIRO_AGENT_NAME, hooks },
+            json: {
+                description: "Polaris session",
+                mcpServers: {},
+                tools: ["*"],
+                toolAliases: {},
+                allowedTools: [],
+                resources: [],
+                toolsSettings: {},
+                includeMcpJson: true
+            }
+        }
+    ];
+}
+
+/**
+ * Cline runs every executable in `.clinerules/hooks/` named after an event,
+ * with the payload on its standard input, and reads a JSON answer from its
+ * output. Ported from adapters/agent/cline/hooks.go (`clineManagedHooks`): the
+ * Unix form, an extensionless script per event, answering `{"cancel": false}`
+ * so a hook never stops the agent. `PreToolUse` fires after a tool was
+ * approved (cline/cline#7446), so it is reported as the approval resolving.
+ */
+function clineAnswers(): AgentFirstRunAnswer[] {
+    const events: ReadonlyArray<readonly [string, HookSignal]> = [
+        ["TaskStart", "session-start"],
+        ["TaskResume", "session-start"],
+        ["UserPromptSubmit", "user-prompt-submit"],
+        ["PreToolUse", "permission-resolved"],
+        ["TaskComplete", "stop"],
+        ["TaskCancel", "stop"]
+    ];
+    return events.map(([event, signal]) => ({
+        file: w(`.clinerules/hooks/${event}`),
+        text: hookRelayScript(signal, '{"cancel": false}'),
+        executable: true
+    }));
+}
+
 const OPENCODE_EXPORT = "export const PolarisActivity = async () => hooks;";
 
 /**
@@ -691,6 +796,8 @@ const OPENCODE_EXPORT = "export const PolarisActivity = async () => hooks;";
  */
 export const AGENT_HOOK_WRITERS: Readonly<Record<string, () => AgentFirstRunAnswer[]>> = {
     auggie: auggieAnswers,
+    kiro: kiroAnswers,
+    cline: clineAnswers,
     kimi: kimiAnswers,
     vibe: vibeAnswers,
     opencode: () => [{ file: w(".opencode/plugins/polaris-activity.ts"), text: opencodeActivityPlugin(OPENCODE_EXPORT) }],
@@ -703,3 +810,64 @@ export const AGENT_HOOK_WRITERS: Readonly<Record<string, () => AgentFirstRunAnsw
     omp: () => [{ file: w(".polaris/hooks/omp-activity.ts"), text: piActivityExtension(true) }],
     "prime-agent": () => [{ file: w(".polaris/hooks/prime-agent-activity.ts"), text: piActivityExtension(false) }]
 };
+
+/**
+ * A hook configuration written beside the session's own files at boot rather
+ * than into the agent's home or checkout, for a tool that is pointed at one
+ * through a variable: it names this session's hook script, or its address, so
+ * it cannot live in a home every session of that account shares.
+ */
+export interface SessionHookConfig {
+    /** The file name inside the session's state directory. */
+    readonly name: string;
+    /** The variable the tool reads the file's path from. */
+    readonly env: string;
+    readonly contents: string;
+}
+
+/**
+ * Muse Code's managed hooks, from `TBH_MANAGED_HOOKS_PATH`. Ported from
+ * adapters/agent/muse/hooks.go (`museManagedHooks`): the top-level turn only,
+ * since its background subagents' tool hooks fire after the turn's Stop. Muse
+ * strips variables from a hook's environment, so each command names the
+ * session's hook script by its path and the event on its own line.
+ */
+export function museSessionHooks(hookScript: string): SessionHookConfig {
+    const events: ReadonlyArray<readonly [string, HookSignal]> = [
+        ["SessionStart", "session-start"],
+        ["UserPromptSubmit", "user-prompt-submit"],
+        ["PermissionRequest", "permission-request"],
+        ["Stop", "stop"]
+    ];
+    const hooks: Record<string, AgentFirstRunValue> = {};
+    for (const [event, signal] of events) {
+        hooks[event] = [hookGroup(`POLARIS_HOOK_EVENT=${HOOK_SIGNAL_EVENTS[signal]} sh ${shellWord(hookScript)}`, 5)];
+    }
+    return { name: "muse-hooks.json", env: "TBH_MANAGED_HOOKS_PATH", contents: `${JSON.stringify({ hooks }, null, 2)}\n` };
+}
+
+/**
+ * Codewhale's managed configuration, from `CODEWHALE_MANAGED_CONFIG_PATH`: its
+ * lifecycle outbox, which it also posts to a webhook. Ported from
+ * `PrepareRuntimeLaunch` in adapters/agent/codewhale/hooks.go. The webhook is
+ * the session's own Codewhale route, its token in the address because the
+ * configuration takes nothing but a URL.
+ */
+export function codewhaleSessionConfig(outbox: string, webhookUrl: string): SessionHookConfig {
+    return {
+        name: "codewhale-managed.toml",
+        env: "CODEWHALE_MANAGED_CONFIG_PATH",
+        contents: [
+            "# Written by Polaris: reports this session's activity. Codewhale's own config and hooks still apply.",
+            "[lifecycle_outbox]",
+            `path = ${tomlString(outbox)}`,
+            `webhook_url = ${tomlString(webhookUrl)}`,
+            ""
+        ].join("\n")
+    };
+}
+
+/** A path as one shell word. */
+function shellWord(value: string): string {
+    return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
