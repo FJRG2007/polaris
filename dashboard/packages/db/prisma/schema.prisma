@@ -16379,6 +16379,7 @@ model PolarThread {
     messages    PolarMessage[]
     attachments PolarAttachment[]
     share       PolarThreadShare?
+    subagentRuns PolarSubagentRun[]
 
     @@index([userId, updatedAt(sort: Desc)])
     @@index([userId, archivedAt, pinnedAt])
@@ -16485,6 +16486,48 @@ model PolarAgent {
 
     @@unique([ownerId, name])
 }
+
+// A subagent a Polar chat turn started (`lib/polar/subagents`): a child run of
+// the same loop with its own context, tools and model. Kept so its card, its
+// transcript and its result survive a reload and show on every device.
+model PolarSubagentRun {
+    id           String      @id @default(uuid(7)) @db.Uuid
+    userId       String      @db.Uuid
+    threadId     String      @db.Uuid
+    thread       PolarThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+    // The parent's tool call that started it, when one did.
+    toolCallId   String?
+    // The earlier run this one continues ("resume"), if any.
+    resumedFrom  String?     @db.Uuid
+    // "general", "explore", or "agent" for one of the person's custom agents.
+    kind         String
+    agentId      String?     @db.Uuid
+    name         String
+    description  String
+    prompt       String
+    provider     String      @default("")
+    model        String      @default("")
+    background   Boolean     @default(false)
+    // running, done, failed, stopped, budget, interrupted
+    status       String      @default("running")
+    // A failure's kind (`provider-failure.ts`), never the provider's words.
+    failure      String?
+    summary      String      @default("")
+    // The tool steps it took, as the card lists them: [{ tool, state, at }].
+    steps        Json?
+    // Its own conversation, as model messages: the transcript and a resume.
+    messages     Json?
+    inputTokens  Int         @default(0)
+    outputTokens Int         @default(0)
+    // A background run's result already handed to the parent's next turn.
+    delivered    Boolean     @default(false)
+    startedAt    DateTime    @default(now())
+    endedAt      DateTime?
+
+    @@index([threadId, startedAt])
+    @@index([userId, status])
+}
+
 
 // A person's settings for one of the agents that come with Polaris (Polar
 // itself, Claude Code, Codex, ...): the account and the models it uses. No
