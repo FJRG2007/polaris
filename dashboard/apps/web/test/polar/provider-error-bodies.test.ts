@@ -21,6 +21,19 @@ function refusal(status: number, body: unknown) {
 }
 
 const ROWS: Row[] = [
+    // Coarena: coarena.ai/docs, the daily-limit 429 (message wording representative).
+    [
+        "coarena daily limit",
+        429,
+        {
+            error: {
+                message: "Today's free usage is used up. It resets at 00:00 UTC.",
+                type: "insufficient_quota",
+                code: "insufficient_quota"
+            }
+        },
+        "credit"
+    ],
     // OpenAI: developers.openai.com/api/docs/guides/error-codes
     [
         "openai quota",

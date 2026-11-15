@@ -83,6 +83,23 @@ describe("what a refusal cools, and for whom", () => {
         expect(health.coolingOf({ ...subject, model: "free" }, true, now + 1)).toBeNull();
     });
 
+    it("keeps a used-up daily allowance out until 00:00 UTC, free models too", async () => {
+        const daily = { provider: "coarena", model: "free-one", keyId: "c1" };
+        const midnight = Date.parse("2026-11-11T00:00:00Z");
+        expect(health.coolingMs("credit", null, "coarena", now)).toBe(midnight - now);
+        expect(health.coolingMs("credit", null, "groq", now)).toBe(health.COOLING_MS.credit);
+        expect(health.coolingMs("rate", null, "coarena", now)).toBe(health.COOLING_MS.rate);
+        await health.noteRefusal(daily, "credit", new Error("x"), now);
+        expect(health.coolingOf(daily, true, now + 1)?.until).toBe(midnight);
+        expect(health.coolingOf(daily, false, midnight - 1)?.kind).toBe("credit");
+        expect(health.coolingOf(daily, true, midnight)).toBeNull();
+    });
+
+    it("counts a day from 00:00 UTC whatever the hour", () => {
+        expect(health.untilUtcMidnight(Date.parse("2026-11-10T23:59:59Z"))).toBe(1_000);
+        expect(health.untilUtcMidnight(Date.parse("2026-12-31T00:00:00Z"))).toBe(86_400_000);
+    });
+
     it("reads a cool-down written on the row by another process", () => {
         const row = { ...subject, coolingUntil: new Date(now + 60_000), coolingReason: "key" };
         expect(health.coolingOf(row, true, now)?.kind).toBe("key");
