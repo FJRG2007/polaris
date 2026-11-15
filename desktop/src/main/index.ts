@@ -49,14 +49,15 @@ import * as settings from "./settings";
 import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpdateAttempted, updateAttempted } from "./settings";
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, type LocalSheet } from "./windows";
-import { app, autoUpdater, BrowserWindow, dialog, net, screen, session, shell } from "electron";
-import { describeNetError, finishedLoad, isCertificateError, netErrorCode } from "./reachability";
+import { app, autoUpdater, BrowserWindow, dialog, net, powerMonitor, screen, session, shell } from "electron";
+import { describeNetError, describeOfflinePage, errorText, finishedLoad, isCertificateError, netErrorCode, RECONNECTS_WORDS } from "./reachability";
+import { createReconnector, RECONNECT_PROBE_MS } from "./reconnect";
 import { sameInstanceAs } from "./same-instance";
 import { addressWords, failoverFor, instanceRecordFor } from "./polaris-api";
 import { AUTHORITY_INVALID, USE_CHROMIUM, pinScope, verifyDecision } from "./local-ca-pin";
 import { activeOrigin, backStep, failedLoadStep, samePlaceOn, titleWith } from "./window-failover";
 import { DEFAULT_HOLD_MS, UNTRUSTED_WORDS } from "../../../dashboard/packages/core/src/instance-fallback";
-import { createServerCheck, describeVerdict, type ServerVerdict } from "@/shared/server-identity";
+import { createServerCheck, describeVerdict, probeServer, type ServerVerdict } from "@/shared/server-identity";
 
 /** Where the dashboard opens, the same as the installable app's start page. */
 const START = "/home";
@@ -355,11 +356,12 @@ function openMain(url: string): void {
 
     /** Say why in the servers window, in place of this one. */
     const giveUp = (error: string) => {
-        loadError = error;
+        loadError = `${error} ${RECONNECTS_WORDS}`;
         dropAlternate();
         if (main === window) main = null;
         window.close();
         openConnect();
+        reconnect();
     };
 
     window.webContents.on("did-fail-load", (_event, code, description, failedUrl, isMainFrame) => {
@@ -386,6 +388,13 @@ function openMain(url: string): void {
         const load = finishedLoad(window.webContents.getTitle(), offline);
         offline = load === "offline";
         if (load === "recovered") loadError = null;
+        // A Polaris page on the usual address: whatever said it was not
+        // answering is out of date, whoever reloaded it.
+        if (!offline && !alternate && reconnectingTo === current) {
+            stopReconnecting();
+            loadError = null;
+            closeConnect();
+        }
         if (!offline) {
             // Online on the usual address: learn, or refresh, where else it answers,
             // so the next outage - or a start without internet - can use it.
@@ -398,9 +407,12 @@ function openMain(url: string): void {
         void failOver(window, window.webContents.getURL()).then((outcome) => {
             failingOver = false;
             if (outcome === "moved" || window.isDestroyed()) return;
-            loadError = describeNetError(null, host);
+            // The worker answered for the server, so the address is right and
+            // something is there: most often it is restarting for an update.
+            loadError = describeOfflinePage(host);
             if (outcome === "untrusted") loadError = `${loadError} ${UNTRUSTED_WORDS}`;
             openConnect();
+            reconnect();
         });
     });
     // The page's own title, with the words while on the alternate: the quiet sign of it.
@@ -451,8 +463,64 @@ function closeConnect(): void {
     connect?.close();
 }
 
+/**
+ * `net.fetch` - the window's own session, so the same proxy and the same trust -
+ * with a failure's whole text kept (`errorText`): the code a wrapped error keeps
+ * on its cause is what says why, and losing it left only "Could not reach".
+ */
+function windowFetch(input: string, init?: RequestInit): Promise<Response> {
+    return net.fetch(input, init).catch((caught: unknown) => {
+        if (caught instanceof Error && caught.name === "AbortError") throw caught;
+        throw new Error(errorText(caught));
+    });
+}
+
 /** Every answer about an address, kept briefly so typing it again asks nothing. */
-const serverCheck = createServerCheck((input, init) => net.fetch(input, init));
+const serverCheck = createServerCheck(windowFetch);
+
+/** The usual address being asked again, while the window is on the worker's
+ *  offline page or the servers window says why it is not open; else null. */
+let reconnectingTo: string | null = null;
+const reconnector = createReconnector({
+    answers: async () => {
+        const origin = reconnectingTo;
+        if (!origin || origin !== current) return false;
+        const verdict = await probeServer(origin, undefined, windowFetch, RECONNECT_PROBE_MS);
+        return verdict.kind === "polaris";
+    },
+    back: () => backOnline()
+});
+
+/** Ask the usual address again on a backoff until it answers. One failed load or
+ *  check is never the last word. */
+function reconnect(): void {
+    if (!current) return;
+    if (reconnectingTo !== current) reconnector.stop();
+    reconnectingTo = current;
+    reconnector.start();
+}
+
+function stopReconnecting(): void {
+    reconnectingTo = null;
+    reconnector.stop();
+}
+
+/** The usual address answers again: Polaris back in its window, the error gone. */
+function backOnline(): void {
+    const origin = reconnectingTo;
+    reconnectingTo = null;
+    if (!origin || origin !== current) return;
+    loadError = null;
+    if (main && !main.isDestroyed()) {
+        closeConnect();
+        // A window on a proven alternate is fine where it is; its own recheck brings it back.
+        if (!alternate) moveTo(main, null);
+        return;
+    }
+    // The window first, then the list goes: closing the last window quits the app.
+    showPolaris();
+    closeConnect();
+}
 /** The one live check in flight; a newer address cancels it. */
 let checking: AbortController | null = null;
 
@@ -481,7 +549,10 @@ async function alreadyListed(origin: string, verdict: ServerVerdict): Promise<st
 
 /** Whether an address is a Polaris that can be opened now, and if not, why. */
 async function probe(origin: string): Promise<string | null> {
-    const verdict = await serverCheck.check(origin);
+    let verdict = await serverCheck.check(origin);
+    // Not reached once is often a blip - a restart, a network waking up - so it
+    // is asked once more, uncached, before it is said.
+    if (verdict.kind === "unreachable") verdict = await probeServer(origin, undefined, windowFetch);
     const listed = await alreadyListed(origin, verdict);
     if (listed) return listed;
     return verdict.kind === "polaris" ? null : verdictWords(verdict, origin);
@@ -537,6 +608,7 @@ async function connectSubmit(raw: unknown, typedName = ""): Promise<Outcome> {
 /** Put the windows on a server already kept as the one in use. */
 function openServer(origin: string): void {
     if (origin !== current) leaveServer();
+    stopReconnecting();
     dropAlternate();
     current = origin;
     loadError = null;
@@ -572,6 +644,7 @@ async function editServer(origin: string, typed: string, typedName: string): Pro
 /** Every window on the instance in use goes: none of them may stay open on an
  *  origin the navigation rules no longer allow. */
 function leaveServer(): void {
+    stopReconnecting();
     sheet?.close();
     main = null;
     for (const window of BrowserWindow.getAllWindows()) if (window !== connect) window.close();
@@ -667,6 +740,11 @@ function start(): void {
     });
 
     app.whenReady().then(() => {
+        // Something that may mean the server can be reached now: ask at once rather
+        // than waiting out the backoff.
+        powerMonitor.on("resume", () => reconnector.nudge());
+        powerMonitor.on("unlock-screen", () => reconnector.nudge());
+        app.on("browser-window-focus", () => reconnector.nudge());
         if (process.platform === "win32" && !app.isPackaged) app.setAppUserModelId(process.execPath);
         // Every start: the app's folder moves with each version, and the setting has
         // to reach installs from before it existed.

@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { app, net } from "electron";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { describeNetError, netErrorCode } from "./reachability";
+import { describeNetError, errorText, netErrorCode } from "./reachability";
 import { markCertificateFailure } from "./window-failover";
 import { RELEARN_MS, readStoredInstance, writeStoredInstance } from "./instance-store";
 
@@ -142,7 +142,7 @@ function refusal(status: number, body: unknown): ApiFailure {
 }
 
 function unreachable(caught: unknown, caller: Caller): ApiFailure {
-    return new ApiFailure(0, describeNetError(netErrorCode(String(caught)), new URL(caller.server).host));
+    return new ApiFailure(0, describeNetError(netErrorCode(errorText(caught)), new URL(caller.server).host));
 }
 
 /**

@@ -13,6 +13,33 @@ export function netErrorCode(text: string): string | null {
     return /ERR_[A-Z0-9_]+/.exec(text)?.[0] ?? null;
 }
 
+/**
+ * Everything a thrown network error says, its causes included: a wrapped error
+ * ("fetch failed") keeps Chromium's or Node's code on its `cause`, and reading
+ * only the outer message loses the reason.
+ */
+export function errorText(caught: unknown): string {
+    const parts: string[] = [];
+    let at: unknown = caught;
+    for (let depth = 0; at !== undefined && at !== null && depth < 4; depth += 1) {
+        parts.push(String(at));
+        if (typeof at !== "object") break;
+        const code = (at as { code?: unknown; }).code;
+        if (typeof code === "string") parts.push(code);
+        at = (at as { cause?: unknown; }).cause;
+    }
+    return parts.join(" ");
+}
+
+/** Said whenever the app is already asking again by itself. */
+export const RECONNECTS_WORDS = "This app reconnects by itself as soon as it answers.";
+
+/** The window ended on the worker's offline page: the server is up somewhere but
+ *  not answering yet - most often restarting for an update. Not a wrong address. */
+export function describeOfflinePage(host: string): string {
+    return `Polaris at ${host} is restarting or not answering yet. ${RECONNECTS_WORDS}`;
+}
+
 /** The titles of the page Polaris's service worker answers with when the server is
  *  gone. The load succeeds, so no failure event ever reports it. */
 const OFFLINE_TITLES: ReadonlySet<string> = new Set([
