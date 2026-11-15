@@ -375,9 +375,16 @@ export function NoticeDeliveryFields({
                             if (!on) set({ messaging: null });
                         }}
                         hint={
-                            channels && messagingChannels.length === 0
-                                ? t("delivery.messagingNone")
-                                : undefined
+                            channels && messagingChannels.length === 0 ? (
+                                <>
+                                    {t("delivery.messagingNone")}{" "}
+                                    {channels.canSetUpMail ? (
+                                        <Link className="underline" href="/admin/integrations/messaging">
+                                            {t("delivery.messagingSetUp")}
+                                        </Link>
+                                    ) : null}
+                                </>
+                            ) : undefined
                         }
                     >
                         {(messagingOpen || delivery.messaging) && messagingChannels.length > 0 ? (

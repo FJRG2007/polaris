@@ -973,6 +973,7 @@
         "projectWebhookGone": "A chosen webhook was deleted or is no longer yours.",
         "messaging": "A messaging channel I connected",
         "messagingNone": "You have no connected messaging channels.",
+        "messagingSetUp": "Connect one",
         "messagingOption": "{name} ({platform})",
         "messagingPick": "Pick the channel",
         "messagingPeer": "Who to message on it",
