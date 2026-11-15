@@ -1169,6 +1169,22 @@ const ADMIN_AREAS: AppSubapp[] = [
                 ]
             },
             {
+                label: "Messaging", // i18n-ignore
+                href: "/admin/integrations/messaging",
+                adminOnly: true,
+                icon: MessageCircle,
+                keywords: [
+                    "whatsapp",
+                    "telegram",
+                    "discord",
+                    "slack",
+                    "channels",
+                    "verification codes",
+                    "twilio",
+                    "360dialog"
+                ]
+            },
+            {
                 label: "Agent defaults", // i18n-ignore
                 href: "/admin/agents",
                 adminOnly: true,

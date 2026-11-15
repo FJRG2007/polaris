@@ -30,6 +30,7 @@ const PREVIOUS: Record<string, string[]> = {
         "/admin/security",
         "/admin/sso",
         "/admin/integrations/email",
+        "/admin/integrations/messaging",
         "/admin/apps/chat/settings",
         "/admin/safety",
         "/admin/consumption",

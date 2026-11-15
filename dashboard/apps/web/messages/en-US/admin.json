@@ -1571,6 +1571,84 @@
             "retry": "Try again"
         }
     },
+    "messaging": {
+        "title": "Messaging",
+        "description": "WhatsApp, Telegram, Discord and Slack channels, and which ones send verification codes.",
+        "channels": {
+            "title": "Channels",
+            "add": "Add channel",
+            "empty": "No channels yet. Add one to send alerts, notices and codes.",
+            "ready": "Ready to send"
+        },
+        "status": {
+            "connected": "Connected",
+            "connecting": "Connecting",
+            "error": "Error",
+            "disconnected": "Disconnected"
+        },
+        "providers": {
+            "banRiskName": "{name} (unofficial, may be banned)",
+            "banRisk": "Unofficial: WhatsApp may ban a number driven through WhatsApp Web. Prefer an official API option."
+        },
+        "add": {
+            "title": "Add a channel",
+            "description": "Pick the service, then paste what it gives you.",
+            "provider": "Service",
+            "name": "Name",
+            "optional": "(optional)",
+            "keepSecret": "Leave empty to keep the current one",
+            "connect": "Connect",
+            "close": "Close",
+            "templateHint": "WhatsApp only lets a business start a chat with an approved template, so codes need an authentication template's name and language.",
+            "twilioTemplateHint": "WhatsApp only lets a business start a chat with an approved template, so codes need your authentication template's Content SID."
+        },
+        "secret": {
+            "botToken": "Bot token",
+            "webhookUrl": "Webhook URL",
+            "accessToken": "Access token",
+            "authToken": "Auth token",
+            "apiKey": "API key"
+        },
+        "fields": {
+            "phoneNumberId": "Phone number ID",
+            "accountSid": "Account SID",
+            "from": "WhatsApp number",
+            "contentSid": "Code template Content SID",
+            "codeTemplate": "Code template name",
+            "codeTemplateLanguage": "Template language"
+        },
+        "manage": {
+            "title": "Manage {name}",
+            "remove": "Remove channel",
+            "reconnect": "Reconnect",
+            "removeTitle": "Remove {name}?",
+            "removeDescription": "Alerts and codes sent through it stop."
+        },
+        "qr": {
+            "title": "Link WhatsApp Web",
+            "steps": "On the phone, open WhatsApp > Linked devices > Link a device, and scan this code.",
+            "alt": "WhatsApp link code",
+            "waiting": "Waiting for the scan...",
+            "connected": "Linked.",
+            "failed": "Linking failed. Close and try again."
+        },
+        "codes": {
+            "title": "Verification codes",
+            "hint": "The channel that sends sign-in and confirmation codes. People only add their number or link Telegram.",
+            "none": "Not sent",
+            "notConnected": "{name} (not connected)",
+            "whatsapp": "WhatsApp codes",
+            "telegram": "Telegram codes",
+            "whatsappEmpty": "Add a WhatsApp channel to send codes there.",
+            "telegramEmpty": "Add a Telegram bot to send codes there."
+        },
+        "errors": {
+            "checkForm": "Check the form and try again.",
+            "connectFailed": "Could not connect the channel.",
+            "removeFailed": "Could not remove the channel.",
+            "unknownChannel": "That channel is not one of this platform's."
+        }
+    },
     "evidence": {
         "title": "Evidence",
         "description": "The controls in force on this Polaris, read from its settings, with where each is set and who last changed it.",
@@ -2532,6 +2610,10 @@
             "email": {
                 "title": "Email & SMS",
                 "description": "The senders for mail and texts, and the one that carries sign-in messages."
+            },
+            "messaging": {
+                "title": "Messaging",
+                "description": "WhatsApp, Telegram, Discord and Slack channels, and codes."
             },
             "domains": {
                 "title": "Domains",

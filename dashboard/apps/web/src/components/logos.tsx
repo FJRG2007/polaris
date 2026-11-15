@@ -4,6 +4,7 @@
  * a new mark here when adding an integration.
  */
 
+import { MESSAGING_MARKS } from "@/components/messaging-logos";
 import { cn } from "@polaris/ui";
 import { initialsInk, tintFor } from "@polaris/core";
 import { Blocks, Mails, Server } from "lucide-react";
@@ -153,7 +154,9 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     mailjet: email.MailjetMark,
     ses: email.SesMark,
     smtp: Server,
-    "polaris-mail": Mails
+    "polaris-mail": Mails,
+    // Messaging channels (Integrations > Messaging), drawn as their platform.
+    ...MESSAGING_MARKS
 };
 
 /**

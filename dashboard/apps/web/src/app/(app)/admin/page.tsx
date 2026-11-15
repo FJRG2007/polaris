@@ -21,6 +21,7 @@ import {
     HardDrive,
     IdCard,
     Mail,
+    MessageCircle,
     MessageSquare,
     Scale,
     ScanSearch,
@@ -90,6 +91,7 @@ const GROUPS = [
             { key: "integrations", href: "/admin/integrations", icon: Blocks },
             { key: "integrationsModels", href: "/admin/integrations/models", icon: Sparkles },
             { key: "email", href: "/admin/integrations/email", icon: Mail },
+            { key: "messaging", href: "/admin/integrations/messaging", icon: MessageCircle },
             { key: "agents", href: "/admin/agents", icon: Bot }
         ]
     },
