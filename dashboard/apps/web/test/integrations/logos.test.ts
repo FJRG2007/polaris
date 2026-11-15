@@ -24,7 +24,9 @@ import { DEVICE_CONNECTIONS } from "@polaris-app/places/src/lib/device-connectio
 
 describe("integration logos", () => {
     it("covers every entry in the catalogue", () => {
-        const missing = INTEGRATIONS.filter((entry) => !hasIntegrationLogo(entry.slug)).map(
+        const missing = INTEGRATIONS.filter(
+            (entry) => !hasIntegrationLogo(entry.slug, entry.category === "Models" ? entry.name : undefined)
+        ).map(
             (entry) => entry.slug
         );
         expect(missing).toEqual([]);
@@ -55,6 +57,7 @@ describe("integration logos", () => {
  * stops being wired - or one added without leaving this list - fails here.
  */
 const MONOGRAM_PROVIDERS = [
+    "coarena",
     "venice",
     "sarvam",
     "chutes",
@@ -85,8 +88,8 @@ function isMonogram(markup: string): boolean {
 }
 
 describe("provider and agent logos", () => {
-    it.each(MODEL_PROVIDER_SEEDS.map((seed) => seed.slug))("provider %s", (slug) => {
-        const markup = renderToStaticMarkup(createElement(IntegrationLogo, { slug }));
+    it.each(MODEL_PROVIDER_SEEDS.map((seed) => [seed.slug, seed.name]))("provider %s", (slug, name) => {
+        const markup = renderToStaticMarkup(createElement(IntegrationLogo, { slug, name }));
         expect(isMonogram(markup)).toBe(MONOGRAM_PROVIDERS.includes(slug));
     });
 

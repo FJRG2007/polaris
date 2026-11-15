@@ -709,7 +709,7 @@ function KeyRow({
             <td className="px-3 py-2">
                 {/* Capped, so one long vendor name cannot push the table sideways. */}
                 <div className="flex max-w-40 items-center gap-2">
-                    <IntegrationLogo slug={row.provider} className="size-4 shrink-0" />
+                    <IntegrationLogo slug={row.provider} name={label} className="size-4 shrink-0" />
                     <span className="min-w-0 truncate whitespace-nowrap" title={label}>
                         {label}
                     </span>

@@ -20,6 +20,16 @@
  * only written down when the page answers, and a check endpoint only when asking
  * it without a key is actually refused - a provider whose model list is public
  * would "verify" every string ever pasted.
+ *
+ * This table is now the seed of a stored catalogue (`provider-catalog.ts`), not
+ * the catalogue itself: it is written into the database on every boot, beside
+ * the providers the public index adds and the ones an operator adds by hand,
+ * and the readers read that store. A row here is the curated description of a
+ * provider; the store is how there can be thousands of them.
+ *
+ * The one exception to "the slug is its id in the public index" is a provider
+ * the index does not carry (`outsideIndex`, e.g. Coarena): it names its own
+ * OpenAI- or Anthropic-compatible endpoint, and the runtimes are handed that.
  */
 
 import type { IntegrationCatalogEntry } from "@/lib/integrations/registry";
@@ -43,8 +53,10 @@ export interface FreeTier {
     note: string;
 }
 
-/** What a provider is, which is what its description is built out of. */
-type ProviderKind = "lab" | "host" | "gateway";
+/** What a provider is, which is what its description is built out of. `listed`
+ *  is a provider the public index carries and nothing more is known about, so
+ *  its description claims nothing about whose models it serves. */
+export type ProviderKind = "lab" | "host" | "gateway" | "listed";
 
 /** One provider, as the three lists that read this need it. */
 export interface ModelProviderSeed {
@@ -68,6 +80,21 @@ export interface ModelProviderSeed {
     /** What a repository runs on when this is the provider picked. */
     defaultModel: { label: string; slug: string };
     free?: FreeTier;
+    /**
+     * The exception to "the slug is its id in the public index": a provider the
+     * index does not carry, which no agent runtime can resolve by name. It is
+     * reached by its endpoint instead - `baseUrl` speaking `wire` - and the
+     * runtimes are handed that endpoint the way they are handed the gateway's
+     * (`opencode-model.ts`, `polar/models.ts`). Every operator-added provider is
+     * one of these; a seeded one names its endpoint from the provider's docs.
+     */
+    outsideIndex?: boolean;
+    /** The OpenAI- or Anthropic-compatible endpoint a chat is sent to. */
+    baseUrl?: string;
+    wire?: "openai" | "anthropic";
+    /** Where an Anthropic-compatible client is pointed, when the provider serves
+     *  one beside its OpenAI-compatible endpoint. */
+    anthropicBaseUrl?: string;
 }
 
 /**
@@ -727,6 +754,26 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://docs.cline.bot/getting-started/clinepass",
         keyUrl: "https://app.cline.bot/",
         defaultModel: { label: "Kimi K3 (ClinePass)", slug: "cline-pass/cline-pass/kimi-k3" } // i18n-ignore
+    },
+    {
+        // Not in the public index, so this is the documented exception: reached
+        // by its endpoint rather than by name. Every fact below is from its own
+        // docs (https://coarena.ai/docs); its model list answers without a key,
+        // which is why the check asks /limits instead.
+        slug: "coarena",
+        name: "Coarena",
+        kind: "gateway",
+        envVar: "COARENA_API_KEY",
+        summary: "Frontier models behind one key, some of them free every day.",
+        docsUrl: "https://coarena.ai/docs",
+        keyUrl: "https://coarena.ai/account/api",
+        probe: "https://coarena.ai/api/v1/limits",
+        outsideIndex: true,
+        baseUrl: "https://coarena.ai/api/v1",
+        wire: "openai",
+        anthropicBaseUrl: "https://coarena.ai/api",
+        defaultModel: { label: "Claude Sonnet 5.5 (Coarena)", slug: "coarena/claude-sonnet-5-5" }, // i18n-ignore
+        free: { kind: "free", note: "Some models are free every day, with no card needed." }
     }
 ];
 
@@ -737,7 +784,8 @@ const KIND_SENTENCE: Record<ProviderKind, (name: string) => string> = {
     host: (name) =>
         `Connects ${name}, which serves open models on its own hardware rather than training them.`,
     gateway: (name) =>
-        `Routes agent runs through ${name}, which serves models from several providers behind one credential.`
+        `Routes agent runs through ${name}, which serves models from several providers behind one credential.`,
+    listed: (name) => `Connects ${name} so agents can run on the models it serves.`
 };
 
 /** The line every one of them ends on, since it is true of every one of them. */
@@ -745,7 +793,7 @@ const HANDLING =
     "The key is held here and handed to a run over an authenticated call, never copied into your repositories.";
 
 /** One provider's description, assembled rather than written out. */
-function describe(seed: ModelProviderSeed): string {
+export function describe(seed: ModelProviderSeed): string {
     const billing =
         seed.kind === "gateway"
             ? `Usage is billed by ${seed.name} directly.`

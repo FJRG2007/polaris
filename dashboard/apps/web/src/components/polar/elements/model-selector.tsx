@@ -261,7 +261,7 @@ export function ModelSelector({
                     className={triggerClassName ?? MODEL_TRIGGER}
                 >
                     {!triggerContent && provider && !automatic ? (
-                        <IntegrationLogo slug={provider.provider} className="size-3.5 shrink-0" />
+                        <IntegrationLogo slug={provider.provider} name={provider.name} className="size-3.5 shrink-0" />
                     ) : null}
                     {triggerContent ?? (
                         <span className="min-w-0 truncate text-foreground">
@@ -335,7 +335,7 @@ export function ModelSelector({
                                     })
                                 }
                             >
-                                <IntegrationLogo slug={owner.provider} className="size-3.5 shrink-0" />
+                                <IntegrationLogo slug={owner.provider} name={owner.name} className="size-3.5 shrink-0" />
                                 <span className="min-w-0 truncate" title={`${option.name} - ${owner.name}`}>
                                     {option.name}
                                 </span>
@@ -371,7 +371,7 @@ export function ModelSelector({
                 {(ordering ? [] : shown).map((entry) => (
                     <div key={entry.provider}>
                         <DropdownMenuLabel className="flex min-w-0 items-center gap-1.5">
-                            <IntegrationLogo slug={entry.provider} className="size-3.5 shrink-0" />
+                            <IntegrationLogo slug={entry.provider} name={entry.name} className="size-3.5 shrink-0" />
                             <span className="min-w-0 truncate">{entry.name}</span>
                         </DropdownMenuLabel>
                         {entry.models.map((option) => (

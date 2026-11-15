@@ -200,7 +200,7 @@ function ModelName({
     const shown = modelLabel(target, providers);
     return (
         <span className="flex min-w-0 items-center gap-2">
-            <IntegrationLogo slug={target.provider} className="size-4 shrink-0" />
+            <IntegrationLogo slug={target.provider} name={providers?.find((p) => p.provider === target.provider)?.name} className="size-4 shrink-0" />
             <span
                 className={cn(
                     "min-w-0 truncate text-sm",

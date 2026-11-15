@@ -69,7 +69,7 @@ export const ProviderSelect = memo(function ProviderSelect({
                             ) : null}
                         </span>
                     ),
-                    icon: <IntegrationLogo slug={option.slug} className="size-4 shrink-0" />,
+                    icon: <IntegrationLogo slug={option.slug} name={option.name} className="size-4 shrink-0" />,
                     keywords: [
                         option.name,
                         ...option.aliases,

@@ -12,7 +12,6 @@ import * as brand from "./brand-icons";
 import type { ComponentType } from "react";
 import { AGENT_CLIS } from "@polaris/core";
 import { SIGNIN_PREFIX } from "@/lib/agents/agent-signins";
-import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
 import { SPEECH_PROVIDER_SEEDS } from "@/lib/integrations/speech-providers";
 import * as models from "./model-marks";
 import * as email from "./email-marks";
@@ -250,22 +249,31 @@ function ProviderMonogram({
 
 /** Whether this slug has a logo of its own, which is what the catalogue test
  *  asks so a new integration cannot ship drawing the generic block. A model
- *  provider from the seeded table counts: it is drawn as its own monogram. */
-export function hasIntegrationLogo(slug: string): boolean {
+ *  provider from the catalogue is drawn as its own monogram from its name,
+ *  which the caller passes (`IntegrationLogo`'s `name`), so the browser is never
+ *  shipped the catalogue to look it up. */
+export function hasIntegrationLogo(slug: string, name?: string): boolean {
     return (
+        Boolean(name) ||
         slug === "virustotal" ||
         slug in SERVICE_IMAGES ||
         slug in SERVICE_MARKS ||
         slug in MODEL_MARKS ||
-        SEEDED_SLUGS.has(slug) ||
         SPEECH_PROVIDER_SEEDS.some((seed) => seed.slug === slug)
     );
 }
 
-const SEEDED_SLUGS = new Set(MODEL_PROVIDER_SEEDS.map((seed) => seed.slug));
-
-/** The logo for a marketplace integration slug (a neutral fallback otherwise). */
-export function IntegrationLogo({ slug, className }: { slug: string; className?: string }) {
+/** The logo for a marketplace integration slug: its own mark, a monogram from
+ *  `name` for a catalogue provider without one, a neutral block otherwise. */
+export function IntegrationLogo({
+    slug,
+    name,
+    className
+}: {
+    slug: string;
+    name?: string;
+    className?: string;
+}) {
     if (slug === "virustotal") return <VirusTotalLogo className={className} brand />;
     // An agent sign-in listed in the keys table. Drawn as the tool it signs in,
     // which is the thing anybody scanning the column recognises - the credential's
@@ -279,8 +287,7 @@ export function IntegrationLogo({ slug, className }: { slug: string; className?:
         return <img src={image} alt="" className={cn("shrink-0 object-contain", className)} />;
     const Mark = SERVICE_MARKS[slug] ?? MODEL_MARKS[slug];
     if (Mark) return <Mark className={className} />;
-    const seeded = MODEL_PROVIDER_SEEDS.find((seed) => seed.slug === slug);
-    if (seeded) return <ProviderMonogram slug={slug} name={seeded.name} className={className} />;
+    if (name) return <ProviderMonogram slug={slug} name={name} className={className} />;
     const speech = SPEECH_PROVIDER_SEEDS.find((seed) => seed.slug === slug);
     if (speech) return <ProviderMonogram slug={slug} name={speech.name} className={className} />;
     return <Blocks className={className} />;
