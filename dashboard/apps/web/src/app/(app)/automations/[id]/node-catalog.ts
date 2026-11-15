@@ -19,6 +19,7 @@ export type CatalogGroupId =
     | "polaris"
     | "automations"
     | "places"
+    | "crm"
     | core.AppEventApp
     | "logic"
     | "timing"
@@ -144,6 +145,23 @@ const PLACES_STEPS = [
     ...["device", "wait", "notify", "run", "privacy"].map((kind) => `${PLACES_APP}.action.${kind}`)
 ];
 
+const CRM_APP = "crm";
+const CRM_TRIGGERS = [`${CRM_APP}.trigger.record`];
+const CRM_STEPS = [
+    `${CRM_APP}.condition.match`,
+    ...[
+        "updateRecord",
+        "createRecord",
+        "createTask",
+        "notify",
+        "sendEmail",
+        "sendChat",
+        "httpRequest",
+        "forEach",
+        "waitFor"
+    ].map((kind) => `${CRM_APP}.action.${kind}`)
+];
+
 /**
  * The groups the picker shows. `triggers` is false where only a step fits
  * (inserting on a connection), `steps` false where only a trigger does (the
@@ -155,6 +173,7 @@ export function catalogGroups(options: {
     readonly apps: readonly string[];
 }): CatalogGroup[] {
     const places = options.apps.includes(PLACES_APP);
+    const crm = options.apps.includes(CRM_APP);
     const groups: CatalogGroup[] = [];
     if (options.triggers) {
         groups.push(
@@ -195,6 +214,7 @@ export function catalogGroups(options: {
             }
         );
         if (places) groups.push({ id: "places", items: PLACES_TRIGGERS.map(plain) });
+        if (crm) groups.push({ id: "crm", items: CRM_TRIGGERS.map(plain) });
         // An app's events only where the app is here to send them.
         for (const app of core.APP_EVENT_APPS)
             if (options.apps.includes(app))
@@ -225,6 +245,7 @@ export function catalogGroups(options: {
         { id: "automations", items: ["core.run", "core.announce"].map(plain) }
     );
     if (places) groups.push({ id: "places", items: PLACES_STEPS.map(plain) });
+    if (crm) groups.push({ id: "crm", items: CRM_STEPS.map(plain) });
     // An app's steps only where the app is here to do them; merged into its events' group.
     for (const app of core.APP_EVENT_APPS) {
         const steps = APP_STEPS[app];

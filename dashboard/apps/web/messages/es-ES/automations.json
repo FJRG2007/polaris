@@ -20,7 +20,18 @@
         "runs": "Historial",
         "runOff": "Actívala primero",
         "share": "Dar acceso",
-        "sharedWithYou": "Compartida contigo"
+        "sharedWithYou": "Compartida contigo",
+        "apps": "Origen",
+        "origins": {
+            "crm": "CRM",
+            "home": "Lugares"
+        },
+        "crmObjects": {
+            "companies": "Empresas",
+            "people": "Personas",
+            "opportunities": "Oportunidades"
+        },
+        "showApp": "Mostrar solo las automatizaciones de {name}"
     },
     "modes": {
         "single": "De uno en uno",
@@ -407,7 +418,10 @@
         "alertForbidden": "La cuenta con la que corre no puede usar direcciones de alerta",
         "alertTopicGone": "Esa dirección de alertas ya no existe o no está a tu alcance",
         "alertInvalid": "La alerta quedó vacía o es demasiado larga",
-        "alertTopicOff": "La automatización de esa dirección está apagada o sin publicar"
+        "alertTopicOff": "La automatización de esa dirección está apagada o sin publicar",
+        "crmRunner": "La cuenta con la que se ejecuta ya no puede usar el CRM",
+        "crmForbidden": "La cuenta con la que se ejecuta no puede cambiar esos registros",
+        "crmActionFailed": "El CRM no lo hizo"
     },
     "secrets": {
         "title": "Secretos",
@@ -914,7 +928,18 @@
         "missing": "Necesita una app que aquí no está instalada: no se puede cambiar ni ejecutar.",
         "install": "Instalar la app",
         "gameServerPower": "Juegos: arrancar, parar o reiniciar",
-        "gameServerCommand": "Juegos: enviar comando"
+        "gameServerCommand": "Juegos: enviar comando",
+        "crmRecord": "Si cambia un registro del CRM",
+        "crmMatch": "Si el registro del CRM coincide",
+        "crmUpdateRecord": "Actualizar registro del CRM",
+        "crmCreateRecord": "Crear registro del CRM",
+        "crmCreateTask": "Crear una tarea del registro",
+        "crmNotify": "Avisar sobre el registro",
+        "crmSendEmail": "Correo sobre el registro",
+        "crmSendChat": "Publicar sobre el registro",
+        "crmHttpRequest": "Enviar el registro a una dirección",
+        "crmForEach": "Por cada registro coincidente",
+        "crmWaitFor": "Esperar a que el registro coincida"
     },
     "filter": {
         "label": "Filtros",
@@ -1057,7 +1082,8 @@
             "mail": "Correo",
             "drive": "Drive",
             "calendar": "Calendario",
-            "code": "Code"
+            "code": "Code",
+            "crm": "CRM"
         },
         "presets": {
             "publicIpChanged": "Cambió la IP pública",

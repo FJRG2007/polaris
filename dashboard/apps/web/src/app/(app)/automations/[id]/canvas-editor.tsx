@@ -20,6 +20,7 @@ import {
     Server,
     Workflow,
     Gamepad2,
+    Contact,
     ListChecks,
     MessagesSquare,
     Rocket,
@@ -814,6 +815,7 @@ const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
     polaris: Server,
     automations: Workflow,
     places: House,
+    crm: Contact,
     "game-servers": Gamepad2,
     deploy: Rocket,
     chat: MessagesSquare,
@@ -835,6 +837,7 @@ const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
 const GROUP_APP_LOGOS: Partial<Record<catalog.CatalogGroupId, string>> = {
     automations: "automations",
     places: catalog.PLACES_APP,
+    crm: "crm",
     "game-servers": "games",
     // The deploy group is the Apps app, as the sidebar names and draws it.
     deploy: "apps",

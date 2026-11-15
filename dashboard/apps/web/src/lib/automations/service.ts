@@ -50,6 +50,9 @@ export interface AutomationRow {
     readonly runnable?: boolean;
     /** Somebody else's automation, shared with this reader to look at. */
     readonly shared?: boolean;
+    /** The app that made it and the thing of that app it acts on; absent on a list cached before. */
+    readonly origin?: string | null;
+    readonly originRef?: string | null;
 }
 
 /** The app an automation came from, and the thing of that app it belongs to - a place. */
@@ -93,7 +96,9 @@ export async function listAutomations(
             folderId: true,
             tags: true,
             orgId: true,
-            userId: true
+            userId: true,
+            origin: true,
+            originRef: true
         }
     });
     const own = (row: { orgId: string | null; userId: string | null }) =>
@@ -127,6 +132,8 @@ export async function listAutomations(
             // A shared one is not filed in this reader's folders.
             folderId: own(row) ? row.folderId : null,
             tags: row.tags ?? [],
+            origin: row.origin ?? null,
+            originRef: row.originRef ?? null,
             ...(own(row) ? {} : { shared: true }),
             runnable:
                 row.enabled &&

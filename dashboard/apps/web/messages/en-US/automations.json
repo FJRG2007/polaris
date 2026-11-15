@@ -20,7 +20,18 @@
         "switchLabel": "Run {name} when triggered",
         "notPublished": "Publish it first to switch it on",
         "runs": "Run history",
-        "runOff": "Switch it on first"
+        "runOff": "Switch it on first",
+        "apps": "Made by",
+        "origins": {
+            "crm": "CRM",
+            "home": "Places"
+        },
+        "crmObjects": {
+            "companies": "Companies",
+            "people": "People",
+            "opportunities": "Opportunities"
+        },
+        "showApp": "Show only automations made by {name}"
     },
     "modes": {
         "single": "One at a time",
@@ -407,7 +418,10 @@
         "alertForbidden": "The account it runs as cannot use alert addresses",
         "alertTopicGone": "That alert address is gone or out of reach",
         "alertInvalid": "The alert came out empty or too long",
-        "alertTopicOff": "The automation behind that address is off or unpublished"
+        "alertTopicOff": "The automation behind that address is off or unpublished",
+        "crmRunner": "The account it runs as can no longer use the CRM",
+        "crmForbidden": "The account it runs as cannot change those records",
+        "crmActionFailed": "The CRM did not do it"
     },
     "secrets": {
         "title": "Secrets",
@@ -914,7 +928,18 @@
         "missing": "Needs an app that is not installed here, so it cannot be changed or run.",
         "install": "Install the app",
         "gameServerPower": "Game servers: start, stop or restart",
-        "gameServerCommand": "Game servers: send a command"
+        "gameServerCommand": "Game servers: send a command",
+        "crmRecord": "When a CRM record changes",
+        "crmMatch": "If the CRM record matches",
+        "crmUpdateRecord": "Update the CRM record",
+        "crmCreateRecord": "Create a CRM record",
+        "crmCreateTask": "Create a task for the record",
+        "crmNotify": "Notify about the record",
+        "crmSendEmail": "Email about the record",
+        "crmSendChat": "Post about the record",
+        "crmHttpRequest": "Send the record to an address",
+        "crmForEach": "For each matching record",
+        "crmWaitFor": "Wait until the record matches"
     },
     "filter": {
         "label": "Filters",
@@ -1057,7 +1082,8 @@
             "mail": "Mail",
             "drive": "Drive",
             "calendar": "Calendar",
-            "code": "Code"
+            "code": "Code",
+            "crm": "CRM"
         },
         "presets": {
             "publicIpChanged": "Public IP changed",

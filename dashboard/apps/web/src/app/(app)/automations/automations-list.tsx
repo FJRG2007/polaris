@@ -84,6 +84,17 @@ const NONE = "none";
  * offers no blank one of its own there: `actions` is what the app offers
  * instead, in the toolbar, and `after` what it draws under the list.
  */
+/** The apps whose automations the list can name and narrow to. */
+const ORIGIN_APPS = ["crm", "home"] as const;
+type OriginApp = (typeof ORIGIN_APPS)[number];
+
+/** The kinds of CRM record an automation made from the CRM acts on. */
+const CRM_OBJECTS = ["companies", "people", "opportunities"] as const;
+
+function isCrmObject(ref: string | null | undefined): ref is (typeof CRM_OBJECTS)[number] {
+    return (CRM_OBJECTS as readonly (string | null | undefined)[]).includes(ref);
+}
+
 export function AutomationsList({
     from,
     actions,
@@ -136,6 +147,16 @@ export function AutomationsList({
         [data?.rows]
     );
     const allTags = useMemo(() => [...new Set(rows.flatMap((row) => row.tags))].sort(), [rows]);
+    // The apps that made some of these, each a chip that narrows the list to theirs.
+    const madeBy = useMemo(
+        () =>
+            origin
+                ? []
+                : [...new Set(rows.flatMap((row) => (row.origin ? [row.origin] : [])))].filter(
+                      (app): app is OriginApp => (ORIGIN_APPS as readonly string[]).includes(app)
+                  ),
+        [rows, origin]
+    );
     // A filter on a folder or tag that no longer exists shows everything rather than nothing.
     const folderFilter = folder === ALL || folder === NONE || folderName.has(folder) ? folder : ALL;
     const tagFilter = tag && allTags.includes(tag) ? tag : null;
@@ -256,6 +277,25 @@ export function AutomationsList({
                     ) : null}
                 </div>
             </div>
+            {madeBy.length > 0 ? (
+                <div
+                    className="flex flex-wrap items-center gap-1"
+                    role="group"
+                    aria-label={t("list.apps")}
+                >
+                    <span className="text-xs text-muted-foreground">{t("list.apps")}</span>
+                    {madeBy.map((app) => (
+                        <Button key={app} asChild variant="ghost" size="sm" className="h-7 px-2">
+                            <Link
+                                href={core.automationsListHref(app)}
+                                title={t("list.showApp", { name: t(`list.origins.${app}`) })}
+                            >
+                                {t(`list.origins.${app}`)}
+                            </Link>
+                        </Button>
+                    ))}
+                </div>
+            ) : null}
             {allTags.length > 0 ? (
                 <div
                     className="flex flex-wrap items-center gap-1"
@@ -335,6 +375,14 @@ export function AutomationsList({
                                         `modes.${(core.AUTOMATION_MODES as readonly string[]).includes(row.mode) ? (row.mode as core.AutomationMode) : "single"}`
                                     )}
                                     {" - "}
+                                    {row.origin === "crm" && isCrmObject(row.originRef) ? (
+                                        <>
+                                            {t("list.origins.crm")}
+                                            {": "}
+                                            {t(`list.crmObjects.${row.originRef}`)}
+                                            {" - "}
+                                        </>
+                                    ) : null}
                                     {row.lastRunAt
                                         ? t("list.lastRun", { when: when(row.lastRunAt, locale) })
                                         : t("list.never")}
