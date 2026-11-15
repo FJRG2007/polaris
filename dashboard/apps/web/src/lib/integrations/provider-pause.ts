@@ -257,11 +257,16 @@ export async function whileServing<T>(
         const needsOperator = reason === "credits" || reason === "key";
         const wait = needsOperator ? NEEDS_OPERATOR_MS : PASSES_ON_ITS_OWN_MS;
         // The provider's own word on when it can be asked again - credits renewing,
-        // a window resetting - beats a guess, so nothing is sent before then.
+        // a window resetting - beats a guess, so nothing is sent before then. It only
+        // ever lengthens a pause that needs the operator: a reset header on a 402
+        // describes a rate window, not a top-up, and taking a minute at its word
+        // asked an empty account again every minute.
         const said = reason === "key" ? null : saidUntil(caught);
-        const until = said ?? Date.now() + wait;
+        const until = needsOperator
+            ? Math.max(said ?? 0, Date.now() + wait)
+            : (said ?? Date.now() + wait);
         console.error(
-            `polaris: ${name} paused (${reason}) until ${new Date(until).toISOString()}${said ? " as it said" : ""}:`,
+            `polaris: ${name} paused (${reason}) until ${new Date(until).toISOString()}${said === until ? " as it said" : ""}:`,
             describe(caught)
         );
         await setSetting(

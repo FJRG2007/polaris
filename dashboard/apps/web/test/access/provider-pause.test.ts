@@ -262,6 +262,30 @@ describe("when the provider says it can be asked again", () => {
         expect(ask).toHaveBeenCalledTimes(1);
     });
 
+    it("keeps the hour when an empty account says to come back in a minute", async () => {
+        const ask = vi.fn(async () => {
+            throw refusal(402, { "retry-after": "60" });
+        });
+        const before = Date.now();
+        await expect(whileServing("dymo", "Dymo", ask)).rejects.toThrow();
+        const stored = JSON.parse(settings.get("integration.pause.dymo")!) as { until: number };
+        expect(stored.until - before).toBeGreaterThanOrEqual(60 * 60 * 1000);
+        vi.useFakeTimers({ now: Date.now() + 2 * 60_000, toFake: ["Date"] });
+        await expect(whileServing("dymo", "Dymo", ask)).rejects.toBeInstanceOf(ProviderPaused);
+        expect(ask).toHaveBeenCalledTimes(1);
+        expect(recorded).toHaveLength(1);
+    });
+
+    it("still takes a busy provider's own short wait", async () => {
+        const ask = vi.fn(async () => {
+            throw refusal(429, { "retry-after": "60" });
+        });
+        const before = Date.now();
+        await expect(whileServing("dymo", "Dymo", ask)).rejects.toThrow();
+        const stored = JSON.parse(settings.get("integration.pause.dymo")!) as { until: number };
+        expect(stored.until - before).toBeLessThan(2 * 60_000);
+    });
+
     it("keeps the hour when it does not say", async () => {
         const ask = vi.fn(async () => {
             throw refusal(402, {});
