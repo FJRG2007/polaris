@@ -8,7 +8,8 @@
  * for the MCP traffic and for every OAuth request alike. The token is sent
  * in the `Authorization` header and nowhere else, as the spec requires (a
  * server that asks for its own headers instead gets the stored ones), and
- * an OAuth token close to its end is refreshed first and stored again.
+ * an OAuth token close to its end - or one the server turns away - is refreshed
+ * first and stored again.
  *
  * Server-only. Anything a person sees from here is a code
  * (`ConnectorFailure`), never the server's own words: an error message from
@@ -92,19 +93,34 @@ async function bearerFor(
 /** Refreshes in flight, by connector: one refresh token is spent once. */
 const refreshing = new Map<string, Promise<string>>();
 
-function refreshOnce(row: store.ConnectorRow, policy: PolarConnectorPolicy): Promise<string> {
+/**
+ * `rejected` is an access token the server just answered 401 to: it is
+ * refreshed whatever its stored expiry says - a server that gave none, a
+ * token revoked early, a clock that disagrees - unless another call has
+ * already replaced it.
+ */
+function refreshOnce(
+    row: store.ConnectorRow,
+    policy: PolarConnectorPolicy,
+    rejected: string | null = null
+): Promise<string> {
     const running = refreshing.get(row.id);
     if (running) return running;
-    const started = refresh(row, policy).finally(() => refreshing.delete(row.id));
+    const started = refresh(row, policy, rejected).finally(() => refreshing.delete(row.id));
     refreshing.set(row.id, started);
     return started;
 }
 
-async function refresh(row: store.ConnectorRow, policy: PolarConnectorPolicy): Promise<string> {
+async function refresh(
+    row: store.ConnectorRow,
+    policy: PolarConnectorPolicy,
+    rejected: string | null
+): Promise<string> {
     // Read again: another call may have refreshed since this one read it.
     const secret = (await store.ownConnector(row.ownerId, row.id))?.secret;
     if (!secret?.tokens || !secret.client) throw new ConnectorError("sign_in");
-    if (!oauth.tokenExpiring(secret.tokens)) return secret.tokens.accessToken;
+    const stale = rejected !== null && secret.tokens.accessToken === rejected;
+    if (!stale && !oauth.tokenExpiring(secret.tokens)) return secret.tokens.accessToken;
     const spent = secret.tokens.refreshToken;
     if (!spent) throw new ConnectorError("sign_in");
     let tokens: oauth.ConnectorTokens;
@@ -133,6 +149,29 @@ async function withClient<T>(
     // hosts since this connector was added.
     if (!hostAllowed(found.row.url, policy.hosts)) throw new ConnectorError("host");
     const token = await bearerFor(found, policy);
+    try {
+        return await openAndRun(found, policy, token, run);
+    } catch (error) {
+        // An OAuth token the server turned away is refreshed once and the
+        // request made again, before the person is asked to sign in.
+        const refreshable =
+            error instanceof ConnectorError &&
+            error.code === "sign_in" &&
+            found.row.auth === "oauth" &&
+            token !== null &&
+            Boolean(found.secret?.tokens?.refreshToken);
+        if (!refreshable) throw error;
+        const fresh = await refreshOnce(found.row, policy, token);
+        return openAndRun(found, policy, fresh, run);
+    }
+}
+
+async function openAndRun<T>(
+    found: { row: store.ConnectorRow; secret: store.ConnectorSecret | null },
+    policy: PolarConnectorPolicy,
+    token: string | null,
+    run: (client: Client) => Promise<T>
+): Promise<T> {
     const url = new URL(found.row.url);
     const headers = connectorRequestHeaders(found.row.auth, {
         bearer: token,

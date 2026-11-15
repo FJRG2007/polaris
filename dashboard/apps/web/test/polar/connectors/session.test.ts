@@ -17,7 +17,9 @@ const state = vi.hoisted(() => ({
     refreshes: [] as string[],
     finishes: 0,
     bearers: [] as string[],
-    duringRefresh: null as null | (() => void)
+    duringRefresh: null as null | (() => void),
+    /** An access token the server answers 401 to. */
+    rejects: null as string | null
 }));
 
 vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.example.test" }));
@@ -83,6 +85,9 @@ vi.mock("@modelcontextprotocol/sdk/client/index.js", () => ({
         async connect() {}
         async close() {}
         async callTool() {
+            if (state.rejects && state.bearers.at(-1) === `Bearer ${state.rejects}`) {
+                throw Object.assign(new Error("Unauthorized"), { code: 401 });
+            }
             return { content: [] };
         }
         async listTools() {
@@ -119,6 +124,48 @@ beforeEach(() => {
     state.finishes = 0;
     state.bearers = [];
     state.duringRefresh = null;
+    state.rejects = null;
+});
+
+describe("a token the server turns away", () => {
+    const call = () => session.callConnectorTool(OWNER, ID, "search", {});
+
+    it("is refreshed and the call made again, whatever its stored expiry said", async () => {
+        state.secret = {
+            client: CLIENT,
+            tokens: { accessToken: "old", refreshToken: "r1", expiresAt: null }
+        };
+        state.rejects = "old";
+        await expect(call()).resolves.toEqual({ content: [] });
+        expect(state.refreshes).toEqual(["r1"]);
+        expect(state.bearers).toEqual(["Bearer old", "Bearer fresh"]);
+        expect((state.secret as { tokens: { accessToken: string } }).tokens.accessToken).toBe(
+            "fresh"
+        );
+    });
+
+    it("asks for a sign-in when there is no refresh token to spend", async () => {
+        state.secret = {
+            client: CLIENT,
+            tokens: { accessToken: "old", refreshToken: null, expiresAt: null }
+        };
+        state.rejects = "old";
+        await expect(call()).rejects.toMatchObject({ code: "sign_in" });
+        expect(state.refreshes).toEqual([]);
+    });
+
+    it("asks for a sign-in when the refreshed token is turned away too, refreshing once", async () => {
+        state.secret = {
+            client: CLIENT,
+            tokens: { accessToken: "old", refreshToken: "r1", expiresAt: null }
+        };
+        state.rejects = "old";
+        state.duringRefresh = () => {
+            state.rejects = "fresh";
+        };
+        await expect(call()).rejects.toMatchObject({ code: "sign_in" });
+        expect(state.refreshes).toEqual(["r1"]);
+    });
 });
 
 describe("refreshing an OAuth token", () => {
