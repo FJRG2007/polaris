@@ -2,7 +2,9 @@
 
 /**
  * How a panel looks on the wall: its theme, accent, density, background, and
- * how long the wall waits without a touch before the screensaver. Saved only
+ * how long the wall waits without a touch before the screensaver, and for the
+ * tablet it hangs on: how large its text is, how big a card is at the least,
+ * and which way up it is read. Saved only
  * when something differs from what is saved.
  */
 
@@ -21,10 +23,14 @@ import { usePlacesT } from "../use-places-t";
 import {
     PANEL_ACCENTS,
     PANEL_BACKGROUNDS,
+    PANEL_CARD_SIZES,
     PANEL_DENSITIES,
+    PANEL_ORIENTATIONS,
+    PANEL_TEXT_SCALES,
     PANEL_THEMES,
     SCREENSAVER_MINUTES,
     type PanelStyle,
+    type PanelTextScale,
     type ScreensaverMinutes
 } from "../../lib/panel-layout";
 
@@ -110,6 +116,42 @@ export function PanelStyleDialog({
                             options={PANEL_BACKGROUNDS.map((value) => ({
                                 value,
                                 label: t(`panelStyle.backgrounds.${value}`)
+                            }))}
+                        />
+                    </Field>
+                    <Field label={t("panelStyle.textScale")}>
+                        <Select
+                            value={String(draft.textScale)}
+                            onValueChange={(value) =>
+                                set("textScale", Number(value) as PanelTextScale)
+                            }
+                            options={PANEL_TEXT_SCALES.map((scale) => ({
+                                value: String(scale),
+                                label: t("panelStyle.textScaleValue", { percent: scale })
+                            }))}
+                        />
+                    </Field>
+                    <Field label={t("panelStyle.cardSize")}>
+                        <Select
+                            value={draft.cardSize}
+                            onValueChange={(value) =>
+                                set("cardSize", value as PanelStyle["cardSize"])
+                            }
+                            options={PANEL_CARD_SIZES.map((value) => ({
+                                value,
+                                label: t(`panelStyle.cardSizes.${value}`)
+                            }))}
+                        />
+                    </Field>
+                    <Field label={t("panelStyle.orientation")}>
+                        <Select
+                            value={draft.orientation}
+                            onValueChange={(value) =>
+                                set("orientation", value as PanelStyle["orientation"])
+                            }
+                            options={PANEL_ORIENTATIONS.map((value) => ({
+                                value,
+                                label: t(`panelStyle.orientations.${value}`)
                             }))}
                         />
                     </Field>

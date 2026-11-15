@@ -130,6 +130,34 @@ function useWallTheme(theme: PanelTheme, nightDark: boolean): void {
     }, [theme, nightDark]);
 }
 
+/** Whether the screen is taller than it is wide, followed as it turns. */
+function usePortrait(): boolean {
+    const [portrait, setPortrait] = useState(false);
+    useEffect(() => {
+        const query = window.matchMedia("(orientation: portrait)");
+        const sync = () => setPortrait(query.matches);
+        sync();
+        query.addEventListener("change", sync);
+        return () => query.removeEventListener("change", sync);
+    }, []);
+    return portrait;
+}
+
+/** The wall turned a quarter, when its orientation is locked and the tablet
+ *  is held the other way: a kiosk screen fixed to the wall reads one way up. */
+function turnedStyle(lock: PanelStyle["orientation"], portrait: boolean): CSSProperties {
+    if (lock === "auto" || (lock === "portrait") === portrait) return {};
+    return {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100dvh",
+        height: "100dvw",
+        transform: "rotate(90deg) translateY(-100%)",
+        transformOrigin: "top left"
+    };
+}
+
 function readView(id: string): "grid" | "list" {
     try {
         return localStorage.getItem(VIEW_KEY + id) === "list" ? "list" : "grid";
@@ -183,6 +211,8 @@ export function PanelWall({
     const [full, setFull] = useState(false);
     const [error, setError] = useState("");
     const [view, setView] = useState<"grid" | "list">("grid");
+    const portrait = usePortrait();
+    const turned = turnedStyle(style.orientation, portrait);
     useEffect(() => {
         setNight(readNight());
         setView(readView(id));
@@ -238,8 +268,12 @@ export function PanelWall({
 
     return (
         <div
-            className="flex min-h-dvh flex-col gap-4 bg-background p-3 text-foreground sm:p-5"
-            style={wallSurface(style) as CSSProperties}
+            className={cn(
+                "flex flex-col gap-4 bg-background p-3 text-foreground sm:p-5",
+                // The grid fits the screen; only the list may run long.
+                view === "grid" ? "h-dvh overflow-hidden" : "min-h-dvh"
+            )}
+            style={{ ...(wallSurface(style) as CSSProperties), ...turned }}
         >
             <header className="flex min-w-0 items-center gap-2">
                 <h1 className="min-w-0 flex-1 truncate text-xl font-semibold" title={name}>
@@ -339,6 +373,7 @@ export function PanelWall({
                     density={style.density}
                     weather={weather}
                     roomLabels={roomLabels}
+                    fitStyle={style}
                 />
             )}
             {idle ? <PanelScreensaver weather={weather} onWake={wake} /> : null}

@@ -124,6 +124,13 @@ export const PANEL_THEMES = ["auto", "light", "dark"] as const;
 export const PANEL_ACCENTS = ["default", "blue", "teal", "green", "amber", "rose"] as const;
 export const PANEL_DENSITIES = ["comfortable", "compact"] as const;
 export const PANEL_BACKGROUNDS = ["plain", "tinted", "gradient"] as const;
+/** How large the wall draws its text and controls, in percent of normal. */
+export const PANEL_TEXT_SCALES = [90, 100, 110, 125, 150] as const;
+/** How big a card is at the least: a small card still clears a fingertip. */
+export const PANEL_CARD_SIZES = ["small", "medium", "large"] as const;
+/** Which way the wall is read. Locked, a tablet held the other way draws the
+ *  panel turned, as a kiosk screen fixed to the wall would be. */
+export const PANEL_ORIENTATIONS = ["auto", "landscape", "portrait"] as const;
 /** Minutes without a touch before the screensaver starts; 0 is never. */
 export const SCREENSAVER_MINUTES = [0, 1, 5, 10, 30] as const;
 
@@ -132,6 +139,17 @@ export type PanelAccent = (typeof PANEL_ACCENTS)[number];
 export type PanelDensity = (typeof PANEL_DENSITIES)[number];
 export type PanelBackground = (typeof PANEL_BACKGROUNDS)[number];
 export type ScreensaverMinutes = (typeof SCREENSAVER_MINUTES)[number];
+export type PanelTextScale = (typeof PANEL_TEXT_SCALES)[number];
+export type PanelCardSize = (typeof PANEL_CARD_SIZES)[number];
+export type PanelOrientation = (typeof PANEL_ORIENTATIONS)[number];
+
+const textScaleField = z.union([
+    z.literal(90),
+    z.literal(100),
+    z.literal(110),
+    z.literal(125),
+    z.literal(150)
+]);
 
 const screensaverField = z.union([
     z.literal(0),
@@ -147,7 +165,10 @@ export const panelStyleSchema = z.object({
     accent: z.enum(PANEL_ACCENTS),
     density: z.enum(PANEL_DENSITIES),
     background: z.enum(PANEL_BACKGROUNDS),
-    screensaver: screensaverField
+    screensaver: screensaverField,
+    textScale: textScaleField,
+    cardSize: z.enum(PANEL_CARD_SIZES),
+    orientation: z.enum(PANEL_ORIENTATIONS)
 });
 export type PanelStyle = z.infer<typeof panelStyleSchema>;
 
@@ -159,7 +180,10 @@ export const DEFAULT_PANEL_STYLE: PanelStyle = {
     accent: "default",
     density: "comfortable",
     background: "plain",
-    screensaver: 0
+    screensaver: 0,
+    textScale: 100,
+    cardSize: "medium",
+    orientation: "auto"
 };
 
 const storedStyleSchema = z.object({
@@ -167,7 +191,10 @@ const storedStyleSchema = z.object({
     accent: z.enum(PANEL_ACCENTS).catch(DEFAULT_PANEL_STYLE.accent),
     density: z.enum(PANEL_DENSITIES).catch(DEFAULT_PANEL_STYLE.density),
     background: z.enum(PANEL_BACKGROUNDS).catch(DEFAULT_PANEL_STYLE.background),
-    screensaver: screensaverField.catch(DEFAULT_PANEL_STYLE.screensaver)
+    screensaver: screensaverField.catch(DEFAULT_PANEL_STYLE.screensaver),
+    textScale: textScaleField.catch(DEFAULT_PANEL_STYLE.textScale),
+    cardSize: z.enum(PANEL_CARD_SIZES).catch(DEFAULT_PANEL_STYLE.cardSize),
+    orientation: z.enum(PANEL_ORIENTATIONS).catch(DEFAULT_PANEL_STYLE.orientation)
 });
 
 /** A stored style, read back field by field: one missing or unknown (an older

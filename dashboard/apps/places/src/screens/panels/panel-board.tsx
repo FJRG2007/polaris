@@ -23,7 +23,8 @@ import { whereNow } from "@polaris/core";
 import { PanelGrid } from "./panel-grid";
 import { useRouter } from "next/navigation";
 import { usePlacesT } from "../use-places-t";
-import type { PanelCard, PanelDensity } from "../../lib/panel-layout";
+import { stackOrder, type PanelCard, type PanelDensity, type PanelStyle } from "../../lib/panel-layout";
+import { PanelFitGrid } from "./panel-fit-grid";
 import type { ListRoom } from "../../lib/panel-list";
 import { PanelDeviceList } from "./panel-list";
 import type { WeatherState } from "./panel-weather";
@@ -190,7 +191,9 @@ export function PanelBoard({
     view = "grid",
     density = "comfortable",
     weather = { state: "loading" },
-    roomLabels
+    roomLabels,
+    fitStyle,
+    fitClassName
 }: {
     placeId: string;
     cards: readonly PanelCard[];
@@ -211,6 +214,10 @@ export function PanelBoard({
     weather?: WeatherState;
     /** The room and floor of each device, for the list's headings. */
     roomLabels?: readonly ListRoom[];
+    /** Fit the cards to the box they are in, as the wall does, instead of the
+     *  arranged 12-column grid. Ignored while arranging. */
+    fitStyle?: Pick<PanelStyle, "density" | "cardSize" | "textScale">;
+    fitClassName?: string;
 }) {
     const t = usePlacesT();
     const router = useRouter();
@@ -374,10 +381,33 @@ export function PanelBoard({
         return <RoomCard name={room.name} devices={inRoom} acts={acts} />;
     };
 
+    const kindOf = (card: PanelCard) =>
+        card.type === "device" || card.type === "sensor" ? byId.get(card.deviceId)?.kind : undefined;
+
     if (view === "list" && !editing)
         return (
             <LentActionsProvider lent={lent}>
                 <PanelDeviceList devices={devices} rooms={listRooms} acts={acts} />
+            </LentActionsProvider>
+        );
+
+    if (fitStyle && !editing)
+        return (
+            <LentActionsProvider lent={lent}>
+                <PanelFitGrid
+                    cards={stackOrder(cards)}
+                    style={fitStyle}
+                    kindOf={kindOf}
+                    render={render}
+                    className={fitClassName}
+                />
+                {viewed && access.kind === "session" ? (
+                    <CameraViewer
+                        camera={viewed}
+                        canControl={access.canControl}
+                        onClose={() => setViewing(null)}
+                    />
+                ) : null}
             </LentActionsProvider>
         );
 
