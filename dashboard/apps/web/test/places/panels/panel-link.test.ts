@@ -39,6 +39,7 @@ vi.mock("@polaris-app/places/src/lib/panels", () => ({
     panelHolds,
     panelHoldsAutomation,
     panelPlaceId: async () => "place-1",
+    markPanelOpened: async () => undefined,
     panelContents: async () => contents
 }));
 vi.mock("@polaris-app/places/src/lib/automations", () => ({ runAutomationNow }));

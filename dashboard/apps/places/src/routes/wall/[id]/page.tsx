@@ -6,7 +6,7 @@
 
 import { notFound } from "next/navigation";
 import { addressesFor } from "../../../lib/cameras";
-import { panelContents } from "../../../lib/panels";
+import { markPanelOpened, panelContents } from "../../../lib/panels";
 import { requireHomeUser } from "../../../lib/access";
 import { PanelWall } from "../../../screens/panels/panel-wall";
 
@@ -22,6 +22,8 @@ export default async function WallPanelPage({
     const { install, canControl, canManage } = await requireHomeUser("home.read");
     const contents = await panelContents(install.id, id).catch(() => null);
     if (!contents) notFound();
+    // The panels table says when a wall last opened it. Never in the way of the wall.
+    await markPanelOpened(install.id, contents.panel.id).catch(() => undefined);
     return (
         <PanelWall
             id={contents.panel.id}

@@ -93,6 +93,7 @@ export const SCREEN_RECORDS: readonly ScreenRecord[] = [
     { route: "/office/p/[id]", kind: "office presentation", id: "id" },
     { route: "/office/s/[id]", kind: "office sheet", id: "id" },
     { route: "/places/devices/automations/[id]", kind: "places automation", id: "id" },
+    { route: "/places/panels/[id]", kind: "places panel", id: "id" },
     { route: "/places/[[...path]]", kind: null },
     { route: "/polar/shared/[id]", kind: "shared polar chat", id: "id" },
     { route: "/status-pages/[[...path]]", kind: null },

@@ -15,6 +15,7 @@ import { currentPlace } from "../../lib/current-place";
 import { placesT } from "../../lib/i18n";
 import { placesRefusalText } from "../../lib/refusal-text";
 import {
+    PANEL_NAME_MAX,
     normalizePanelName,
     panelCardsSchema,
     panelNameSchema,
@@ -47,6 +48,32 @@ export async function createPanelAction(
         targetType: "placePanel",
         targetId: result.value.id,
         metadata: { name: parsed.data }
+    });
+    revalidatePath(PATH);
+    return { panel: result.value };
+}
+
+/** A copy of a panel, named "<name> (copy)" in the reader's language, cut to
+ *  the longest name a panel takes. */
+export async function duplicatePanelAction(
+    id: string
+): Promise<{ panel?: PanelView; error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const t = await placesT();
+    const result = await guard(async () => {
+        const source = await panels.requirePanel(install.id, String(id));
+        const name = normalizePanelName(
+            t("panels.duplicateName", { name: source.name }).slice(0, PANEL_NAME_MAX)
+        );
+        return panels.duplicatePanel(install.id, source.id, name);
+    });
+    if (result.error || !result.value) return { error: result.error };
+    await host.auditService.recordAudit({
+        actorId: user.id,
+        action: "places.panel.duplicate",
+        targetType: "placePanel",
+        targetId: result.value.id,
+        metadata: { from: String(id) }
     });
     revalidatePath(PATH);
     return { panel: result.value };

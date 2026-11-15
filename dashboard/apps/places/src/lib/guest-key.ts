@@ -23,6 +23,7 @@ import { getCamera } from "./cameras";
 import { randomUUID } from "node:crypto";
 import { runAutomationNow } from "./automations";
 import {
+    markPanelOpened,
     panelContents,
     panelHolds,
     panelHoldsAutomation,
@@ -186,6 +187,8 @@ export async function guestPanel(token: string): Promise<GuestPanel | null> {
     if (!install) return null;
     const contents = await panelContents(install.id, reached.subjectId).catch(() => null);
     if (!contents) return null;
+    // The link was opened: the panels table says when. Never in the way of the wall.
+    await markPanelOpened(install.id, contents.panel.id).catch(() => undefined);
     const watches = reached.grant.actions.includes("watch");
     const runs =
         core.atLeast("place.panel", reached.grant.capability, "control") &&

@@ -35,7 +35,18 @@ import {
     type PanelView
 } from "./panel-layout";
 
-const FIELDS = { id: true, placeId: true, name: true, cards: true, style: true } as const;
+const FIELDS = {
+    id: true,
+    placeId: true,
+    name: true,
+    cards: true,
+    style: true,
+    openedAt: true
+} as const;
+
+/** How often opening a wall writes down that it was opened: a tablet that
+ *  reloads all day costs one write in this time, not one per load. */
+export const OPENED_EVERY_MS = 10 * 60_000;
 
 function toView(row: {
     id: string;
@@ -43,13 +54,15 @@ function toView(row: {
     name: string;
     cards: unknown;
     style?: unknown;
+    openedAt?: Date | null;
 }): PanelView {
     return {
         id: row.id,
         placeId: row.placeId,
         name: row.name,
         cards: storedCards(row.cards),
-        style: storedStyle(row.style)
+        style: storedStyle(row.style),
+        openedAt: row.openedAt ? row.openedAt.toISOString() : null
     };
 }
 
@@ -90,6 +103,54 @@ export async function createPanel(
         select: FIELDS
     });
     return toView(row);
+}
+
+/**
+ * A copy of a panel at its own place: the same cards in the same boxes and the
+ * same look, under a new name. Shares and links are not copied - a copy is
+ * nobody's key until it is handed out.
+ */
+export async function duplicatePanel(
+    installedAppId: string,
+    id: string,
+    name: string
+): Promise<PanelView> {
+    const source = await requirePanel(installedAppId, id);
+    const count = await prisma.placePanel.count({
+        where: { installedAppId, placeId: source.placeId }
+    });
+    if (count >= PANELS_PER_PLACE) throw new HomeError("A place holds up to 20 panels");
+    const row = await prisma.placePanel.create({
+        data: {
+            installedAppId,
+            placeId: source.placeId,
+            name,
+            cards: source.cards.map((card) => ({ ...card })),
+            style: { ...source.style }
+        },
+        select: FIELDS
+    });
+    return toView(row);
+}
+
+/**
+ * Write down that a wall opened the panel now, unless that was already written
+ * in the last ten minutes. One conditional update: nothing is read first, and
+ * a reload loop on a tablet writes once per window.
+ */
+export async function markPanelOpened(
+    installedAppId: string,
+    id: string,
+    now = new Date()
+): Promise<void> {
+    await prisma.placePanel.updateMany({
+        where: {
+            id,
+            installedAppId,
+            OR: [{ openedAt: null }, { openedAt: { lt: new Date(now.getTime() - OPENED_EVERY_MS) } }]
+        },
+        data: { openedAt: now }
+    });
 }
 
 export async function renamePanel(

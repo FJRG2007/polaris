@@ -1,38 +1,24 @@
 /**
- * A place's wall panels: built and arranged here, opened full screen at
- * /wall/<id>, or handed to a wall tablet as a link.
+ * A place's wall panels as a table. Each row opens the panel's own page
+ * (`/places/panels/<id>`), where it is arranged and previewed.
  */
 
 import { PageHeader } from "@polaris/ui";
 import { placesT } from "../../../lib/i18n";
-import { automationChoices, listPanels } from "../../../lib/panels";
-import { addressesFor, listCameras } from "../../../lib/cameras";
-import { listRooms } from "../../../lib/rooms";
-import { listDevices } from "../../../lib/devices";
+import { listPanels } from "../../../lib/panels";
 import { requireHomeUser } from "../../../lib/access";
 import { currentPlace } from "../../../lib/current-place";
 import { PlaceSwitcher } from "../../../screens/place-switcher";
-import { PanelsView } from "../../../screens/panels/panels-view";
+import { PanelsTable } from "../../../screens/panels/panels-table";
 
 export const dynamic = "force-dynamic";
 
 export default async function PanelsPage() {
     const t = await placesT();
-    const { install, canControl, canManage } = await requireHomeUser("home.read");
+    const { install, canManage } = await requireHomeUser("home.read");
     const place = await currentPlace(install.id);
     const placeId = place.current.id;
-    const [panels, devices, rooms, cameras, automations] = await Promise.all([
-        listPanels(install.id, placeId),
-        listDevices(install.id, placeId),
-        listRooms(install.id, placeId),
-        listCameras(install.id, placeId),
-        automationChoices(install.id, placeId)
-    ]);
-    const boardRooms = rooms.map((room) => ({
-        id: room.id,
-        name: room.name,
-        deviceIds: devices.filter((device) => device.roomId === room.id).map((d) => d.id)
-    }));
+    const panels = await listPanels(install.id, placeId);
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -43,15 +29,10 @@ export default async function PanelsPage() {
                     canManage={canManage}
                 />
             </div>
-            <PanelsView
+            <PanelsTable
                 key={placeId}
-                placeId={placeId}
                 panels={panels}
-                devices={devices}
-                rooms={boardRooms}
-                cameras={addressesFor(cameras, canManage)}
-                automations={automations}
-                canControl={canControl}
+                placeName={place.current.name}
                 canManage={canManage}
             />
         </div>

@@ -211,6 +211,9 @@ export interface PanelView {
     readonly name: string;
     readonly cards: readonly PanelCard[];
     readonly style: PanelStyle;
+    /** When a wall last opened it, ISO 8601; null for never. Absent where it is
+     *  not read (a wall, a link). */
+    readonly openedAt?: string | null;
 }
 
 /** The devices a panel shows: its device cards, and every device in its rooms.
@@ -352,4 +355,14 @@ export function stackOrder(cards: readonly PanelCard[]): PanelCard[] {
 /** How many rows the panel's cards reach down to. */
 export function panelHeight(cards: readonly PanelCard[]): number {
     return cards.reduce((rows, card) => Math.max(rows, card.y + card.h), 0);
+}
+
+/** Panels whose name holds every word of the search, in any case. */
+export function matchPanels<T extends { name: string }>(panels: readonly T[], query: string): T[] {
+    const words = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return [...panels];
+    return panels.filter((panel) => {
+        const name = panel.name.toLocaleLowerCase();
+        return words.every((word) => name.includes(word));
+    });
 }

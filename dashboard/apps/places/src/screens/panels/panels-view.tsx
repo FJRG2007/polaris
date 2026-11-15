@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * A place's wall panels: pick one, arrange its cards, hand it to a wall
- * tablet as a link, or open it full screen. Arranging is `home.manage`; the
+ * One wall panel: arrange its cards, preview it as a tablet shows it, hand it
+ * to a wall tablet as a link, or open it full screen. Arranging is `home.manage`; the
  * rest of the house sees the panels and opens them.
  *
  * Every change to the cards is saved as it is made - the card moves at once
@@ -35,11 +35,9 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
     EmptyState,
-    Input,
     cn
 } from "@polaris/ui";
 import * as actions from "./actions";
@@ -49,11 +47,9 @@ import { DeviceIcon } from "../devices/device-panel";
 import { PanelBoard, type BoardRoom } from "./panel-board";
 import { usePanelWeather } from "./panel-weather";
 import { PanelStyleDialog } from "./panel-style-dialog";
+import { NameDialog } from "./panel-name-dialog";
 import {
-    PANEL_NAME_MAX,
     addCard,
-    normalizePanelName,
-    panelNameSchema,
     type NewCard,
     type PanelCard,
     type PanelStyle,
@@ -67,93 +63,6 @@ const { ShareDialog } = hostUi.accessShareDialog;
 /** A card's id: short, unique on its panel, made in the browser. */
 function cardId(): string {
     return Math.random().toString(36).slice(2, 10);
-}
-
-/** The name dialog, for a new panel and a rename. Checked as it is typed. */
-function NameDialog({
-    open,
-    title,
-    initial,
-    confirm,
-    onClose,
-    onSubmit
-}: {
-    open: boolean;
-    title: string;
-    initial: string;
-    confirm: string;
-    onClose: () => void;
-    onSubmit: (name: string) => Promise<string | null>;
-}) {
-    const t = usePlacesT();
-    const [name, setName] = useState(initial);
-    const [error, setError] = useState("");
-    const [busy, setBusy] = useState(false);
-    const normalized = normalizePanelName(name);
-    const check = panelNameSchema.safeParse(normalized);
-    const issue = normalized.length > 0 && !check.success ? check.error.issues[0]?.message : "";
-    const unchanged = normalized === normalizePanelName(initial);
-    const submit = async () => {
-        if (!check.success || unchanged) return;
-        setBusy(true);
-        const refused = await onSubmit(check.data);
-        setBusy(false);
-        if (refused) setError(refused);
-        else onClose();
-    };
-    return (
-        <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
-                </DialogHeader>
-                <form
-                    className="flex flex-col gap-2"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        void submit();
-                    }}
-                >
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span>
-                            {t("panels.name")} <span aria-hidden>*</span>
-                        </span>
-                        <Input
-                            autoFocus
-                            value={name}
-                            maxLength={PANEL_NAME_MAX + 20}
-                            placeholder={t("panels.namePlaceholder")}
-                            aria-invalid={Boolean(issue)}
-                            onChange={(event) => {
-                                setName(event.target.value);
-                                setError("");
-                            }}
-                        />
-                    </label>
-                    {issue || error ? (
-                        <p role="alert" className="text-sm text-danger">
-                            {error ||
-                                (issue === "That name is too long"
-                                    ? t("refusals.panelNameLong")
-                                    : t("refusals.panelName"))}
-                        </p>
-                    ) : null}
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose}>
-                            {t("panels.cancel")}
-                        </Button>
-                        <Button
-                            type="submit"
-                            aria-disabled={!check.success || unchanged || busy}
-                            disabled={busy}
-                        >
-                            {confirm}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
 }
 
 /** What can be put on a panel: a clock, a device, a room, a camera, an
@@ -340,9 +249,9 @@ function AddCardDialog({
     );
 }
 
-export function PanelsView({
+export function PanelDetail({
     placeId,
-    panels: initial,
+    panel: initial,
     devices,
     rooms,
     cameras,
@@ -351,7 +260,7 @@ export function PanelsView({
     canManage
 }: {
     placeId: string;
-    panels: readonly PanelView[];
+    panel: PanelView;
     devices: readonly DeviceView[];
     rooms: readonly BoardRoom[];
     cameras: readonly CameraView[];
@@ -361,37 +270,30 @@ export function PanelsView({
 }) {
     const t = usePlacesT();
     const router = useRouter();
-    const [panels, setPanels] = useState<PanelView[]>([...initial]);
-    const [selectedId, setSelectedId] = useState<string | null>(initial[0]?.id ?? null);
+    const [selected, setSelected] = useState<PanelView>(initial);
     const [editing, setEditing] = useState(false);
-    const [naming, setNaming] = useState<"new" | "rename" | null>(null);
+    const [naming, setNaming] = useState(false);
     const [adding, setAdding] = useState(false);
     const [sharing, setSharing] = useState(false);
     const [removing, setRemoving] = useState(false);
     const [styling, setStyling] = useState(false);
     const [error, setError] = useState("");
-    const selected = panels.find((panel) => panel.id === selectedId) ?? null;
     const weather = usePanelWeather(
-        selected ? `/api/home/panels/${encodeURIComponent(selected.id)}/weather` : null,
-        Boolean(selected?.cards.some((card) => card.type === "weather"))
+        `/api/home/panels/${encodeURIComponent(selected.id)}/weather`,
+        selected.cards.some((card) => card.type === "weather")
     );
-
-    const replace = (next: PanelView) =>
-        setPanels((list) => list.map((panel) => (panel.id === next.id ? next : panel)));
 
     /** Save cards at once on the screen, and put the old ones back if refused. */
     const saveCards = async (cards: PanelCard[]) => {
-        if (!selected) return;
         const before = selected;
-        const pressed = { ...selected, cards };
-        replace(pressed);
+        setSelected({ ...before, cards });
         setError("");
         const result = await runAction(
             () => actions.savePanelCardsAction(before.id, cards),
             setError
         );
         if (!result || result.error || !result.panel) {
-            setPanels((list) => list.map((panel) => (panel === pressed ? before : panel)));
+            setSelected(before);
             if (result?.error) setError(result.error);
             return;
         }
@@ -400,10 +302,8 @@ export function PanelsView({
 
     /** Save how the panel looks at once, and put the old look back if refused. */
     const saveStyle = async (style: PanelStyle) => {
-        if (!selected) return;
         const before = selected;
-        const pressed = { ...selected, style };
-        replace(pressed);
+        setSelected({ ...before, style });
         setStyling(false);
         setError("");
         const result = await runAction(
@@ -411,41 +311,28 @@ export function PanelsView({
             setError
         );
         if (!result || result.error || !result.panel) {
-            setPanels((list) => list.map((panel) => (panel === pressed ? before : panel)));
+            setSelected(before);
             if (result?.error) setError(result.error);
         }
     };
 
-    const create = async (name: string): Promise<string | null> => {
-        const result = await runAction(() => actions.createPanelAction(name), setError);
-        if (!result || result.error || !result.panel) return result?.error ?? t("panels.notSaved");
-        setPanels((list) => [...list, result.panel!].sort((a, b) => a.name.localeCompare(b.name)));
-        setSelectedId(result.panel.id);
-        setEditing(true);
-        return null;
-    };
     const rename = async (name: string): Promise<string | null> => {
-        if (!selected) return null;
         const result = await runAction(
             () => actions.renamePanelAction(selected.id, name),
             setError
         );
         if (!result || result.error || !result.panel) return result?.error ?? t("panels.notSaved");
-        replace(result.panel);
+        setSelected((now) => ({ ...now, name: result.panel!.name }));
         return null;
     };
     const remove = async () => {
-        if (!selected) return;
-        const gone = selected;
         setRemoving(false);
-        setPanels((list) => list.filter((panel) => panel.id !== gone.id));
-        setSelectedId(panels.find((panel) => panel.id !== gone.id)?.id ?? null);
-        const result = await runAction(() => actions.deletePanelAction(gone.id), setError);
+        const result = await runAction(() => actions.deletePanelAction(selected.id), setError);
         if (!result || result.error) {
-            setPanels((list) => [...list, gone].sort((a, b) => a.name.localeCompare(b.name)));
-            setSelectedId(gone.id);
             if (result?.error) setError(result.error);
+            return;
         }
+        router.push("/places/panels");
     };
 
     const access = useMemo(
@@ -455,163 +342,146 @@ export function PanelsView({
 
     return (
         <div className="flex flex-col gap-4">
-            {panels.length === 0 ? (
-                <EmptyState
-                    icon={<LayoutGrid />}
-                    title={t("panels.empty")}
-                    description={t("panels.emptyHint")}
-                    action={
-                        canManage ? (
-                            <Button onClick={() => setNaming("new")}>
-                                <Plus className="size-4" />
-                                {t("panels.add")}
-                            </Button>
-                        ) : undefined
-                    }
-                />
-            ) : (
-                <div
-                    className="flex min-w-0 flex-wrap items-center gap-2"
-                    aria-label={t("panels.panelsAt")}
-                >
-                    {panels.map((panel) => (
-                        <Button
-                            key={panel.id}
-                            variant={panel.id === selectedId ? "primary" : "outline"}
-                            size="sm"
-                            aria-pressed={panel.id === selectedId}
-                            onClick={() => {
-                                setSelectedId(panel.id);
-                                setEditing(false);
-                            }}
-                            className="max-w-[16rem]"
-                        >
-                            <span className="truncate" title={panel.name}>
-                                {panel.name}
-                            </span>
-                        </Button>
-                    ))}
+            <section className="flex flex-col gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <h2
+                        className="min-w-0 flex-1 truncate text-base font-medium"
+                        title={selected.name}
+                    >
+                        {selected.name}
+                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                            {t("panels.cards", { count: selected.cards.length })}
+                        </span>
+                    </h2>
                     {canManage ? (
-                        <Button variant="ghost" size="sm" onClick={() => setNaming("new")}>
-                            <Plus className="size-4" />
-                            {t("panels.add")}
-                        </Button>
+                        <>
+                            <Button
+                                size="sm"
+                                variant={editing ? "primary" : "outline"}
+                                onClick={() => setEditing(!editing)}
+                            >
+                                {editing ? t("panels.done") : t("panels.edit")}
+                            </Button>
+                            {editing ? (
+                                <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+                                    <Plus className="size-4" />
+                                    {t("panels.addCard")}
+                                </Button>
+                            ) : null}
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="size-9 p-0"
+                                aria-label={t("panels.rename", { name: selected.name })}
+                                title={t("panels.rename", { name: selected.name })}
+                                onClick={() => setNaming(true)}
+                            >
+                                <Pencil className="size-4" />
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="size-9 p-0"
+                                aria-label={t("panels.style", { name: selected.name })}
+                                title={t("panels.style", { name: selected.name })}
+                                onClick={() => setStyling(true)}
+                            >
+                                <Palette className="size-4" />
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="size-9 p-0"
+                                aria-label={t("panels.share", { name: selected.name })}
+                                title={t("panels.share", { name: selected.name })}
+                                onClick={() => setSharing(true)}
+                            >
+                                <Share2 className="size-4" />
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="size-9 p-0"
+                                aria-label={t("panels.remove", { name: selected.name })}
+                                title={t("panels.remove", { name: selected.name })}
+                                onClick={() => setRemoving(true)}
+                            >
+                                <Trash2 className="size-4" />
+                            </Button>
+                        </>
                     ) : null}
+                    <Button asChild size="sm" variant="outline">
+                        <a href={`/wall/${selected.id}`} target="_blank" rel="noopener">
+                            <ExternalLink className="size-4" />
+                            {t("panels.open")}
+                        </a>
+                    </Button>
                 </div>
-            )}
-
-            {selected ? (
-                <section className="flex flex-col gap-3">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <h2
-                            className="min-w-0 flex-1 truncate text-base font-medium"
-                            title={selected.name}
-                        >
-                            {selected.name}
-                            <span className="ml-2 text-sm font-normal text-muted-foreground">
-                                {t("panels.cards", { count: selected.cards.length })}
-                            </span>
-                        </h2>
-                        {canManage ? (
-                            <>
+                {editing ? (
+                    <p className="text-xs text-muted-foreground">{t("panels.arrangeHint")}</p>
+                ) : null}
+                {error ? (
+                    <p
+                        role="alert"
+                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                    >
+                        {error}
+                    </p>
+                ) : null}
+                {selected.cards.length === 0 ? (
+                    <EmptyState
+                        icon={<LayoutGrid />}
+                        title={t("panels.noCards")}
+                        description={canManage ? t("panels.noCardsHint") : undefined}
+                        action={
+                            canManage ? (
                                 <Button
-                                    size="sm"
-                                    variant={editing ? "primary" : "outline"}
-                                    onClick={() => setEditing(!editing)}
+                                    onClick={() => {
+                                        setEditing(true);
+                                        setAdding(true);
+                                    }}
                                 >
-                                    {editing ? t("panels.done") : t("panels.edit")}
+                                    <Plus className="size-4" />
+                                    {t("panels.addCard")}
                                 </Button>
-                                {editing ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setAdding(true)}
-                                    >
-                                        <Plus className="size-4" />
-                                        {t("panels.addCard")}
-                                    </Button>
-                                ) : null}
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="size-9 p-0"
-                                    aria-label={t("panels.rename", { name: selected.name })}
-                                    title={t("panels.rename", { name: selected.name })}
-                                    onClick={() => setNaming("rename")}
-                                >
-                                    <Pencil className="size-4" />
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="size-9 p-0"
-                                    aria-label={t("panels.style", { name: selected.name })}
-                                    title={t("panels.style", { name: selected.name })}
-                                    onClick={() => setStyling(true)}
-                                >
-                                    <Palette className="size-4" />
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="size-9 p-0"
-                                    aria-label={t("panels.share", { name: selected.name })}
-                                    title={t("panels.share", { name: selected.name })}
-                                    onClick={() => setSharing(true)}
-                                >
-                                    <Share2 className="size-4" />
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="size-9 p-0"
-                                    aria-label={t("panels.remove", { name: selected.name })}
-                                    title={t("panels.remove", { name: selected.name })}
-                                    onClick={() => setRemoving(true)}
-                                >
-                                    <Trash2 className="size-4" />
-                                </Button>
-                            </>
-                        ) : null}
-                        <Button asChild size="sm" variant="outline">
-                            <a href={`/wall/${selected.id}`} target="_blank" rel="noopener">
-                                <ExternalLink className="size-4" />
-                                {t("panels.open")}
-                            </a>
-                        </Button>
-                    </div>
-                    {editing ? (
-                        <p className="text-xs text-muted-foreground">{t("panels.arrangeHint")}</p>
-                    ) : null}
-                    {error ? (
-                        <p
-                            role="alert"
-                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                        >
-                            {error}
-                        </p>
-                    ) : null}
-                    {selected.cards.length === 0 ? (
-                        <EmptyState
-                            icon={<LayoutGrid />}
-                            title={t("panels.noCards")}
-                            description={canManage ? t("panels.noCardsHint") : undefined}
-                            action={
-                                canManage ? (
-                                    <Button
-                                        onClick={() => {
-                                            setEditing(true);
-                                            setAdding(true);
-                                        }}
-                                    >
-                                        <Plus className="size-4" />
-                                        {t("panels.addCard")}
-                                    </Button>
-                                ) : undefined
-                            }
+                            ) : undefined
+                        }
+                    />
+                ) : editing ? (
+                    <div className="rounded-xl bg-muted/40 p-2">
+                        <PanelBoard
+                            placeId={placeId}
+                            cards={selected.cards}
+                            devices={devices}
+                            rooms={rooms}
+                            cameras={cameras}
+                            automations={automations}
+                            access={access}
+                            editing
+                            onCardsChange={(cards) => void saveCards(cards)}
+                            onError={setError}
+                            density={selected.style.density}
+                            weather={weather}
                         />
-                    ) : editing ? (
-                        <div className="rounded-xl bg-muted/40 p-2">
+                    </div>
+                ) : (
+                    <section className="flex flex-col gap-2" aria-label={t("panels.preview")}>
+                        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                            <h3 className="text-sm font-medium">{t("panels.preview")}</h3>
+                            <p className="min-w-0 text-xs text-muted-foreground">
+                                {t("panels.previewHint")}
+                            </p>
+                        </div>
+                        {/* The tablet: its shape follows the panel's orientation, and the
+                            cards are fitted to it exactly as the wall fits them. */}
+                        <div
+                            className={cn(
+                                "flex w-full flex-col overflow-hidden rounded-[1.5rem] border-[10px] border-foreground/80 bg-background p-3 shadow-sm",
+                                selected.style.orientation === "portrait"
+                                    ? "aspect-[10/16] max-w-sm"
+                                    : "aspect-[16/10] max-w-4xl"
+                            )}
+                        >
                             <PanelBoard
                                 placeId={placeId}
                                 cards={selected.cards}
@@ -620,58 +490,24 @@ export function PanelsView({
                                 cameras={cameras}
                                 automations={automations}
                                 access={access}
-                                editing
-                                onCardsChange={(cards) => void saveCards(cards)}
                                 onError={setError}
                                 density={selected.style.density}
                                 weather={weather}
+                                fitStyle={selected.style}
                             />
                         </div>
-                    ) : (
-                        <section className="flex flex-col gap-2" aria-label={t("panels.preview")}>
-                            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                                <h3 className="text-sm font-medium">{t("panels.preview")}</h3>
-                                <p className="min-w-0 text-xs text-muted-foreground">
-                                    {t("panels.previewHint")}
-                                </p>
-                            </div>
-                            {/* The tablet: its shape follows the panel's orientation, and the
-                                cards are fitted to it exactly as the wall fits them. */}
-                            <div
-                                className={cn(
-                                    "flex w-full flex-col overflow-hidden rounded-[1.5rem] border-[10px] border-foreground/80 bg-background p-3 shadow-sm",
-                                    selected.style.orientation === "portrait"
-                                        ? "aspect-[10/16] max-w-sm"
-                                        : "aspect-[16/10] max-w-4xl"
-                                )}
-                            >
-                                <PanelBoard
-                                    placeId={placeId}
-                                    cards={selected.cards}
-                                    devices={devices}
-                                    rooms={rooms}
-                                    cameras={cameras}
-                                    automations={automations}
-                                    access={access}
-                                    onError={setError}
-                                    density={selected.style.density}
-                                    weather={weather}
-                                    fitStyle={selected.style}
-                                />
-                            </div>
-                        </section>
-                    )}
-                </section>
-            ) : null}
+                    </section>
+                )}
+            </section>
 
             {naming ? (
                 <NameDialog
                     open
-                    title={naming === "new" ? t("panels.add") : t("panels.renameTitle")}
-                    initial={naming === "rename" ? (selected?.name ?? "") : ""}
-                    confirm={naming === "new" ? t("panels.create") : t("panels.save")}
-                    onClose={() => setNaming(null)}
-                    onSubmit={naming === "new" ? create : rename}
+                    title={t("panels.renameTitle")}
+                    initial={selected.name}
+                    confirm={t("panels.save")}
+                    onClose={() => setNaming(false)}
+                    onSubmit={rename}
                 />
             ) : null}
             <AddCardDialog
@@ -683,21 +519,18 @@ export function PanelsView({
                 onClose={() => setAdding(false)}
                 onPick={(card) => {
                     setAdding(false);
-                    if (!selected) return;
                     const next = addCard(selected.cards, card, cardId());
                     if (next.length === selected.cards.length) setError(t("panels.full"));
                     else void saveCards(next);
                 }}
             />
-            {selected ? (
-                <PanelStyleDialog
-                    open={styling}
-                    style={selected.style}
-                    onClose={() => setStyling(false)}
-                    onSave={(style) => void saveStyle(style)}
-                />
-            ) : null}
-            {selected && sharing ? (
+            <PanelStyleDialog
+                open={styling}
+                style={selected.style}
+                onClose={() => setStyling(false)}
+                onSave={(style) => void saveStyle(style)}
+            />
+            {sharing ? (
                 <ShareDialog
                     open
                     onOpenChange={(next: boolean) => (next ? undefined : setSharing(false))}
@@ -710,11 +543,11 @@ export function PanelsView({
             <ConfirmDeleteDialog
                 open={removing}
                 onOpenChange={(next) => (next ? undefined : setRemoving(false))}
-                name={selected?.name ?? ""}
+                name={selected.name}
                 kind="panel"
                 requireTyping={false}
                 title={t("panels.removeTitle")}
-                question={t("panels.removeQuestion", { name: selected?.name ?? "" })}
+                question={t("panels.removeQuestion", { name: selected.name })}
                 description={t("panels.removeBody")}
                 confirmLabel={t("panels.removeConfirm")}
                 onConfirm={() => void remove()}

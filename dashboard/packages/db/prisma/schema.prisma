@@ -11607,6 +11607,9 @@ model PlacePanel {
     /// screensaver starts. Read through `storedStyle` in Places, so a field it
     /// does not know reads as its default.
     style          Json   @default("{}")
+    /// When a wall last opened it, written at most every ten minutes. Null for
+    /// one never opened.
+    openedAt       DateTime?
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
