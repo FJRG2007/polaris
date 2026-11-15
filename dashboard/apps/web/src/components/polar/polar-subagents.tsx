@@ -155,7 +155,10 @@ export function SubagentCard({
                     ) : null}
                 </span>
                 {output.background ? (
-                    <span className="hidden shrink-0 text-xs text-foreground-muted sm:inline">
+                    <span
+                        className="hidden min-w-0 max-w-[30%] truncate text-xs text-foreground-muted sm:inline"
+                        title={t("subagents.background")}
+                    >
                         {t("subagents.background")}
                     </span>
                 ) : null}
@@ -475,7 +478,10 @@ export function SubagentBar({
                                         <span className="text-foreground-muted"> - {entry.description}</span>
                                     </span>
                                     {entry.background ? (
-                                        <span className="hidden shrink-0 text-xs text-foreground-muted sm:inline">
+                                        <span
+                                            className="hidden min-w-0 max-w-[30%] truncate text-xs text-foreground-muted sm:inline"
+                                            title={t("subagents.background")}
+                                        >
                                             {t("subagents.background")}
                                         </span>
                                     ) : null}
