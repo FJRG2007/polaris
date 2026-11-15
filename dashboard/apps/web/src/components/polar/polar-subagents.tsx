@@ -140,7 +140,7 @@ export function SubagentCard({
                 type="button"
                 onClick={() => setOpen((value) => !value)}
                 aria-expanded={open}
-                className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left"
+                className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-start"
             >
                 <ChevronRight
                     aria-hidden
@@ -309,7 +309,7 @@ export function SubagentDialog({
                 className="flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-2xl flex-col gap-3"
             >
                 <DialogHeader>
-                    <DialogTitle className="min-w-0 truncate pr-6">
+                    <DialogTitle className="min-w-0 truncate pe-6">
                         {detail
                             ? t("subagents.transcriptTitle", {
                                   name: detail.name,
@@ -470,7 +470,7 @@ export function SubagentBar({
                                         setOpen(false);
                                         onOpen(entry.id);
                                     }}
-                                    className="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
+                                    className="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-start text-sm hover:bg-muted"
                                 >
                                     <StatusMark status={entry.status} />
                                     <span className="min-w-0 flex-1 truncate" title={entry.description}>

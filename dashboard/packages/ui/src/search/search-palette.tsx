@@ -37,7 +37,7 @@ export const SearchTrigger = forwardRef<
         )}
     >
         <Search className="size-4 shrink-0" aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate text-left text-sm" data-search-label="">
+        <span className="min-w-0 flex-1 truncate text-start text-sm" data-search-label="">
             {label}
         </span>
         {hint ? (
@@ -194,7 +194,7 @@ export function SearchGroup({
 /** The highlight a row wears when the arrow keys or the pointer are on it. */
 export function searchOptionClass(selected: boolean): string {
     return cn(
-        "flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-left transition-colors",
+        "flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-start transition-colors",
         selected ? "bg-option-hover" : "hover:bg-option-hover/60"
     );
 }

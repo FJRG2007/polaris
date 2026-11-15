@@ -96,7 +96,7 @@ export function OrchestrationView({ overview }: { overview: RunsOverview }) {
             <section className="space-y-2">
                 <h2 className="text-sm font-medium">
                     {t("orchestration.needsYou")}
-                    {needCount > 0 ? <Badge className="ml-2">{needCount}</Badge> : null}
+                    {needCount > 0 ? <Badge className="ms-2">{needCount}</Badge> : null}
                 </h2>
                 {needCount === 0 ? (
                     <p className="text-sm text-muted-foreground">{t("orchestration.nothingNeeded")}</p>

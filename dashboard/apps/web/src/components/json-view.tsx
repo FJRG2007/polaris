@@ -102,7 +102,7 @@ export function CodeView({
                 <CopyButton
                     value={value}
                     label={label}
-                    className="absolute right-2 top-2 z-10 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                    className="absolute end-2 top-2 z-10 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
                 />
             ) : null}
             <div className="min-h-0 flex-1 overflow-auto overscroll-contain">

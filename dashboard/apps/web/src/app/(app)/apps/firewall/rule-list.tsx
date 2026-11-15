@@ -114,7 +114,7 @@ export function RuleList({
                 <div className="overflow-x-auto border-t border-border">
                     <table className="w-full min-w-[48rem] text-sm">
                         <thead>
-                            <tr className="text-left text-xs text-muted-foreground">
+                            <tr className="text-start text-xs text-muted-foreground">
                                 <th className="w-8 px-2 py-2.5" aria-label={t("list.columns.reorder")} />
                                 <th className="w-14 px-2 py-2.5 font-medium">{t("list.columns.order")}</th>
                                 <th className="px-4 py-2.5 font-medium">{t("list.columns.name")}</th>
@@ -289,11 +289,11 @@ function RuleRow({
                 />
             </td>
             <td className="px-2 py-3.5 align-top tabular-nums text-muted-foreground">{index + 1}</td>
-            <td className="min-w-[10rem] px-4 py-3.5 pr-6 align-top">
+            <td className="min-w-[10rem] px-4 py-3.5 pe-6 align-top">
                 <button
                     type="button"
                     onClick={onEdit}
-                    className="rounded text-left font-medium underline-offset-2 hover:underline "
+                    className="rounded text-start font-medium underline-offset-2 hover:underline "
                 >
                     {rule.name}
                 </button>
@@ -325,7 +325,7 @@ function RuleRow({
                     </span>
                 </div>
             </td>
-            <td className="px-2 py-3.5 align-top text-right">
+            <td className="px-2 py-3.5 align-top text-end">
                 <DropdownMenu>
                     <DropdownMenuTrigger
                         aria-label={t("list.actionsFor", { name: rule.name })}

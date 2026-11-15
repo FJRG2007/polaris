@@ -177,7 +177,7 @@ function ChatColumns({ children }: { children: ReactNode }) {
                     ref={measure}
                     data-tour="chat.conversations"
                     style={{ "--chat-list": `${drawn}px` } as CSSProperties}
-                    className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-r border-border md:w-[var(--chat-list)] md:flex-none`}
+                    className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-e border-border md:w-[var(--chat-list)] md:flex-none`}
                 >
                     <ChatSidebar
                         onListView={(view) => {

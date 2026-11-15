@@ -110,7 +110,7 @@ export function ImageVulnerabilitiesPanel({ applicationId }: { applicationId: st
                     <Button
                         size="xs"
                         variant="outline"
-                        className="ml-auto shrink-0"
+                        className="ms-auto shrink-0"
                         disabled={!mayScan || pending || scanning || !image}
                         title={
                             !mayScan ? t("noScanRight") : !image ? t("notRunningHint") : undefined

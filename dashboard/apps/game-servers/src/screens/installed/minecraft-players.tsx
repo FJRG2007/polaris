@@ -747,7 +747,7 @@ export function MinecraftPlayers({
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="ml-auto"
+                                            className="ms-auto"
                                             disabled={pending}
                                             aria-label={t("playersTab.dismissRefusal")}
                                             title={t("playersTab.dismissRefusal")}

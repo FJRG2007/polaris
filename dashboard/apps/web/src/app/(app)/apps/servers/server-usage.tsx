@@ -149,7 +149,7 @@ function ConsumerRow({ consumer }: { consumer: ServerConsumer }) {
             <span className="tabular-nums text-muted-foreground">
                 {consumer.cpuPercent === null ? "-" : `${consumer.cpuPercent.toFixed(1)}%`}
             </span>
-            <span className="w-16 text-right tabular-nums text-muted-foreground">{size(consumer.memoryBytes)}</span>
+            <span className="w-16 text-end tabular-nums text-muted-foreground">{size(consumer.memoryBytes)}</span>
         </div>
     );
 }

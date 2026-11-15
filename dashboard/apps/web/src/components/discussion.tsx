@@ -99,7 +99,7 @@ export function Discussion({
                                             title={t("discussion.delete")}
                                             aria-label={t("discussion.delete")}
                                             onClick={() => void onDelete(comment.id)}
-                                            className="ml-auto text-foreground-subtle opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"
+                                            className="ms-auto text-foreground-subtle opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"
                                         >
                                             <Trash2 className="size-3.5" />
                                         </button>

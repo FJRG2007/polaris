@@ -262,13 +262,13 @@ export function InviteDialog({
                 ) : (
                     <div className="flex min-h-0 flex-1 flex-col gap-3">
                         <div className="relative">
-                            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Search className="pointer-events-none absolute top-1/2 start-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
                                 placeholder={t("invite.searchFriends")}
                                 aria-label={t("invite.searchFriends")}
-                                className="pl-8"
+                                className="ps-8"
                             />
                         </div>
 

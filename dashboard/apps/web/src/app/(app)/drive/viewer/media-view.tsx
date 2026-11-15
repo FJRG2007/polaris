@@ -58,7 +58,7 @@ export function MediaView({
                     onClick={look.reset}
                     aria-label={t("media.fitTheVideoAgain")}
                     title={t("media.fitTheVideoAgain")}
-                    className="absolute right-3 top-3 rounded bg-background/80 px-1.5 py-1 text-[0.6875rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
+                    className="absolute end-3 top-3 rounded bg-background/80 px-1.5 py-1 text-[0.6875rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
                 >
                     {look.zoom.scale.toFixed(1)}x
                 </button>

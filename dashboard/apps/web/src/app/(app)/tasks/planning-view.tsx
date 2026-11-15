@@ -177,7 +177,7 @@ export function SprintsView({
                                         <div className="min-w-0 flex-1 basis-64">
                                             <p className="truncate font-medium">
                                                 {sprint.name}
-                                                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                                <span className="ms-2 text-xs font-normal text-muted-foreground">
                                                     {sprint.spaceName}
                                                 </span>
                                             </p>
@@ -531,7 +531,7 @@ export function GoalsView({
                                                     className="h-7 w-20 rounded-md border border-border bg-field px-2 text-xs"
                                                 />
                                             )}
-                                            <span className="w-10 text-right text-muted-foreground">
+                                            <span className="w-10 text-end text-muted-foreground">
                                                 {target.percent}%
                                             </span>
                                             {canEdit && (

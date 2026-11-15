@@ -52,7 +52,7 @@ function TitleBar({ children }: { children?: ReactNode }) {
             <span className="size-2 shrink-0 rounded-full bg-rose-400" />
             <span className="size-2 shrink-0 rounded-full bg-amber-400" />
             <span className="size-2 shrink-0 rounded-full bg-emerald-400" />
-            <div className="ml-2 min-w-0 flex-1">{children}</div>
+            <div className="ms-2 min-w-0 flex-1">{children}</div>
         </div>
     );
 }
@@ -169,7 +169,7 @@ export function AssistantPreview() {
     return (
         <Frame>
             <div className="flex flex-col gap-2 p-3 text-[11px]">
-                <p className="ml-auto max-w-[80%] rounded-lg rounded-br-sm bg-primary/80 px-2.5 py-1.5 text-primary-foreground">
+                <p className="ms-auto max-w-[80%] rounded-lg rounded-ee-sm bg-primary/80 px-2.5 py-1.5 text-primary-foreground">
                     {t("downloads.preview.ask")}
                 </p>
                 <span className="flex w-fit max-w-full items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-foreground-subtle">
@@ -177,7 +177,7 @@ export function AssistantPreview() {
                     {/* i18n-ignore the product's name */}
                     <span className="truncate">Polaris</span>
                 </span>
-                <p className="max-w-[85%] rounded-lg rounded-bl-sm bg-muted px-2.5 py-1.5 text-foreground">
+                <p className="max-w-[85%] rounded-lg rounded-es-sm bg-muted px-2.5 py-1.5 text-foreground">
                     {t("downloads.preview.answer")}
                 </p>
             </div>

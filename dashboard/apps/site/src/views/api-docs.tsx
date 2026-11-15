@@ -213,7 +213,7 @@ function Table({
         <div className="min-w-0 overflow-x-auto rounded-md border border-border">
             <table
                 className={cn(
-                    "api-table w-full table-fixed text-left text-sm",
+                    "api-table w-full table-fixed text-start text-sm",
                     head.length > 2 && "sm:min-w-[34rem]"
                 )}
             >

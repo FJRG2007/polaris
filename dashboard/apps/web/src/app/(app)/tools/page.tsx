@@ -49,7 +49,7 @@ export default async function ToolsPage() {
                                 />
                                 <span className="font-medium">{word(`groups.${group.id}.name`)}</span>
                                 {group.soon ? (
-                                    <span className="ml-auto rounded border border-border px-1.5 py-0.5 text-xs text-foreground-subtle">
+                                    <span className="ms-auto rounded border border-border px-1.5 py-0.5 text-xs text-foreground-subtle">
                                         {t("page.coming")}
                                     </span>
                                 ) : null}

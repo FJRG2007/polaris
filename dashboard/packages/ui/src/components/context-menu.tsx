@@ -208,7 +208,7 @@ export function MenuShortcut({
     const apple = useSyncExternalStore(subscribeNothing, applePlatform, () => false);
     const names = useKeyNames();
     return (
-        <span className={cn("ml-auto pl-6 text-[0.6875rem] text-foreground-subtle", className)}>
+        <span className={cn("ms-auto ps-6 text-[0.6875rem] text-foreground-subtle", className)}>
             {keys ? formatShortcut(keys, apple, names) : children}
         </span>
     );
@@ -270,7 +270,7 @@ export const ContextMenuSubTrigger = forwardRef<
             }}
         >
             {children}
-            <ChevronRight className="ml-auto size-4" />
+            <ChevronRight className="ms-auto size-4" />
         </RadixMenu.SubTrigger>
     );
 });

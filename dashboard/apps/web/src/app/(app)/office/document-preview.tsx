@@ -111,8 +111,8 @@ function Drawn({ preview }: { preview: OfficePreview }) {
                             block.kind.startsWith("h")
                                 ? "mb-0.5 text-[9px] font-semibold text-foreground"
                                 : "text-[7px]",
-                            (block.kind === "li" || block.kind === "oli") && "pl-2",
-                            block.kind === "quote" && "border-l border-border pl-1.5 italic"
+                            (block.kind === "li" || block.kind === "oli") && "ps-2",
+                            block.kind === "quote" && "border-s border-border ps-1.5 italic"
                         )}
                     >
                         {block.kind === "li" ? "- " : null}

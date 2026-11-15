@@ -74,7 +74,7 @@ export function MailSearch() {
         <div className="relative">
             <div className="relative">
                 <Search
-                    className="pointer-events-none absolute left-2 top-1/2 size-3.5 shrink-0 -translate-y-1/2 text-foreground-subtle"
+                    className="pointer-events-none absolute start-2 top-1/2 size-3.5 shrink-0 -translate-y-1/2 text-foreground-subtle"
                     aria-hidden
                 />
                 <Input
@@ -88,9 +88,9 @@ export function MailSearch() {
                     // What the list's keyboard looks for to hand "/" to the search.
                     data-mail-search=""
                     aria-label={t("searchBox.placeholder")}
-                    className="h-8 pl-7 pr-14 text-[13px]"
+                    className="h-8 ps-7 pe-14 text-[13px]"
                 />
-                <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center">
+                <div className="absolute end-1 top-1/2 flex -translate-y-1/2 items-center">
                     {typed ? (
                         <button
                             type="button"
@@ -187,7 +187,7 @@ function SearchFilters({
     return (
         <div
             ref={panel}
-            className="absolute left-0 right-0 top-full z-30 mt-1 rounded-md border border-border bg-surface p-3 shadow-lg"
+            className="absolute start-0 end-0 top-full z-30 mt-1 rounded-md border border-border bg-surface p-3 shadow-lg"
         >
             <div className="grid grid-cols-2 gap-2">
                 <AddressField

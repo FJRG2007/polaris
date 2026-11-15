@@ -79,7 +79,7 @@ export function SecurityInventory() {
                             >
                                 <button
                                     type="button"
-                                    className="hover:bg-muted/50 flex w-full min-w-0 flex-wrap items-center gap-2 px-3 py-2.5 text-left"
+                                    className="hover:bg-muted/50 flex w-full min-w-0 flex-wrap items-center gap-2 px-3 py-2.5 text-start"
                                     aria-expanded={expanded}
                                     aria-label={t(expanded ? "admin.hide" : "admin.show", {
                                         domain: entry.domain
@@ -101,7 +101,7 @@ export function SecurityInventory() {
                                         {entry.domain}
                                     </span>
                                     {/* Under the name on a phone, beside it on a wider screen. */}
-                                    <span className="flex w-full flex-wrap items-center gap-1 pl-6 sm:w-auto sm:pl-0">
+                                    <span className="flex w-full flex-wrap items-center gap-1 ps-6 sm:w-auto sm:ps-0">
                                         {entry.sources.map((source) => (
                                             <Badge key={source} variant="neutral">
                                                 {t(`admin.sources.${source as "instance"}`)}

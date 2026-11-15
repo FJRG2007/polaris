@@ -242,7 +242,7 @@ export function ServerStorage({
                                 disabled={off}
                                 title={option.off ?? disabledReason ?? undefined}
                                 onClick={() => setMode(option.value)}
-                                className={`flex flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                                className={`flex flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-start transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                                     selected
                                         ? "border-primary bg-primary/5"
                                         : "border-border hover:bg-muted/50"

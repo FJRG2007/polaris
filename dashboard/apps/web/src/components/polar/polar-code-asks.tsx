@@ -32,11 +32,11 @@ export function CodeTodos({ todos }: { todos: readonly SessionTodo[] }) {
                 onClick={() => setOpen((value) => !value)}
                 aria-expanded={open}
                 aria-label={open ? t("code.todos.hide") : t("code.todos.show")}
-                className="flex min-w-0 items-center gap-1.5 text-left text-sm font-medium"
+                className="flex min-w-0 items-center gap-1.5 text-start text-sm font-medium"
             >
                 <ListChecks className="size-4 shrink-0 text-primary" aria-hidden />
                 <span className="truncate">{t("code.todos.title")}</span>
-                <span className="ml-auto min-w-0 max-w-full shrink-0 truncate text-xs font-normal text-muted-foreground" title={t("code.todos.done", { done, total: todos.length })}>
+                <span className="ms-auto min-w-0 max-w-full shrink-0 truncate text-xs font-normal text-muted-foreground" title={t("code.todos.done", { done, total: todos.length })}>
                     {t("code.todos.done", { done, total: todos.length })}
                 </span>
                 <ChevronDown className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} aria-hidden />
@@ -206,7 +206,7 @@ export function AskCard({
                 <MessageCircleQuestion className="size-4 shrink-0 text-primary" aria-hidden />
                 <span className="min-w-0 truncate">{question.header || title}</span>
                 {questions.length > 1 ? (
-                    <span className="ml-auto flex shrink-0 items-center gap-1 text-xs font-normal text-muted-foreground">
+                    <span className="ms-auto flex shrink-0 items-center gap-1 text-xs font-normal text-muted-foreground">
                         <button
                             type="button"
                             onClick={() => setIndex(index - 1)}
@@ -242,7 +242,7 @@ export function AskCard({
                             onClick={() => pick(at)}
                             disabled={busy}
                             className={cn(
-                                "flex min-w-0 items-start gap-2 rounded-md border px-2 py-1.5 text-left text-sm transition-colors hover:bg-card-hover disabled:opacity-60",
+                                "flex min-w-0 items-start gap-2 rounded-md border px-2 py-1.5 text-start text-sm transition-colors hover:bg-card-hover disabled:opacity-60",
                                 on ? "border-primary" : "border-border"
                             )}
                         >
@@ -257,7 +257,7 @@ export function AskCard({
                                     </span>
                                 ) : null}
                             </span>
-                            {on ? <Check className="ml-auto mt-0.5 size-4 shrink-0 text-primary" aria-hidden /> : null}
+                            {on ? <Check className="ms-auto mt-0.5 size-4 shrink-0 text-primary" aria-hidden /> : null}
                         </button>
                     );
                 })}
@@ -266,7 +266,7 @@ export function AskCard({
                         type="button"
                         onClick={() => update({ labels: question.multiSelect ? mine.labels : [], other: "" })}
                         disabled={busy}
-                        className="rounded-md border border-dashed border-border px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-card-hover"
+                        className="rounded-md border border-dashed border-border px-2 py-1.5 text-start text-sm text-muted-foreground hover:bg-card-hover"
                     >
                         {t("code.ask.other")}
                     </button>

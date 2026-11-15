@@ -772,10 +772,10 @@ export function MailShell({
             <div className={cn(PAGE_BLEED, "flex min-h-0 overflow-hidden")}>
                 <aside
                     className={cn(
-                        "w-60 shrink-0 flex-col border-r border-border bg-surface",
+                        "w-60 shrink-0 flex-col border-e border-border bg-surface",
                         // The rail is a drawer on a phone: a 15rem rail beside a
                         // 4rem list helps nobody.
-                        railOpen ? "absolute inset-y-0 left-0 z-30 flex" : "hidden md:flex"
+                        railOpen ? "absolute inset-y-0 start-0 z-30 flex" : "hidden md:flex"
                     )}
                 >
                     <div className="flex items-center gap-2 px-3 py-3">

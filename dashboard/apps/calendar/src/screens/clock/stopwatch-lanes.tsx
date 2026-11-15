@@ -103,7 +103,7 @@ function LaneName({
         return (
             <button
                 type="button"
-                className="min-w-0 max-w-full truncate rounded-sm text-left text-[0.875rem] font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="min-w-0 max-w-full truncate rounded-sm text-start text-[0.875rem] font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 title={t("time.lanes.rename", { name })}
                 onClick={() => {
                     setDraft(lane.label);
@@ -276,7 +276,7 @@ export function StopwatchLanes({ clock }: { clock: ClockRead }) {
                                     <div className="flex min-w-0 flex-1 basis-40 items-center gap-2">
                                         {ranked ? (
                                             <span
-                                                className="w-6 shrink-0 text-right text-xs tabular-nums text-muted-foreground"
+                                                className="w-6 shrink-0 text-end text-xs tabular-nums text-muted-foreground"
                                                 aria-label={t("time.lanes.position", {
                                                     position: position + 1
                                                 })}
@@ -391,16 +391,16 @@ export function StopwatchLanes({ clock }: { clock: ClockRead }) {
                                     </div>
                                 </div>
                                 {expanded && lane.laps.length > 0 ? (
-                                    <ol className="flex flex-col gap-0.5 pl-6 text-xs tabular-nums text-muted-foreground">
+                                    <ol className="flex flex-col gap-0.5 ps-6 text-xs tabular-nums text-muted-foreground">
                                         {lane.laps.map((total, lap) => (
                                             <li key={lap} className="flex gap-3">
                                                 <span className="min-w-10 shrink-0">
                                                     {t("time.lanes.lapNumber", { lap: lap + 1 })}
                                                 </span>
-                                                <span className="w-20 shrink-0 text-right">
+                                                <span className="w-20 shrink-0 text-end">
                                                     {hundredths(splits[lap]!)}
                                                 </span>
-                                                <span className="min-w-0 truncate text-right">
+                                                <span className="min-w-0 truncate text-end">
                                                     {hundredths(total)}
                                                 </span>
                                             </li>

@@ -54,7 +54,7 @@ export function ListingError({
                     ) : null}
                 </div>
             </div>
-            <div className="flex flex-wrap gap-2 pl-[1.625rem]">
+            <div className="flex flex-wrap gap-2 ps-[1.625rem]">
                 {upHref ? (
                     <Button size="sm" variant="secondary" asChild>
                         <Link href={upHref}>
@@ -83,7 +83,7 @@ export function ListingError({
                 ) : null}
             </div>
             {error.detail ? (
-                <details className="pl-[1.625rem] text-xs text-muted-foreground">
+                <details className="ps-[1.625rem] text-xs text-muted-foreground">
                     <summary className="cursor-pointer select-none">
                         {t("filesView.listingError.details")}
                     </summary>

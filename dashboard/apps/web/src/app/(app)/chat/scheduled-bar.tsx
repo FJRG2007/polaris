@@ -70,7 +70,7 @@ export function ScheduledBar({
             <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="flex w-full items-center gap-2 border-t border-border bg-muted/30 px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                className="flex w-full items-center gap-2 border-t border-border bg-muted/30 px-3 py-1.5 text-start text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
             >
                 <CalendarClock
                     className={failed.length > 0 ? "size-3.5 text-danger" : "size-3.5"}
@@ -88,7 +88,7 @@ export function ScheduledBar({
                             : t("scheduledBar.scheduledMany", { count: scheduled.length, date: format.dateTime(next.sendAt) })}
                     </span>
                 )}
-                <span className="ml-auto underline-offset-2 hover:underline">{t("scheduledBar.seeThem")}</span>
+                <span className="ms-auto underline-offset-2 hover:underline">{t("scheduledBar.seeThem")}</span>
             </button>
 
             <Dialog open={open} onOpenChange={setOpen}>
@@ -118,7 +118,7 @@ export function ScheduledBar({
                                     >
                                         {entry.failure ?? t("scheduledBar.sends", { date: format.dateTime(entry.sendAt) })}
                                     </span>
-                                    <span className="ml-auto flex items-center gap-1">
+                                    <span className="ms-auto flex items-center gap-1">
                                         <Button
                                             size="xs"
                                             variant="ghost"

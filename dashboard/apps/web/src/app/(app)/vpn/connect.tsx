@@ -230,7 +230,7 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                                     aria-checked={node.id === selected}
                                     onClick={() => setPicked(node.id)}
                                     className={ui.cn(
-                                        "flex min-w-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm",
+                                        "flex min-w-0 items-center gap-2 rounded-md px-3 py-2 text-start text-sm",
                                         node.id === selected ? "bg-muted" : "hover:bg-muted/60"
                                     )}
                                 >

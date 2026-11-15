@@ -259,7 +259,7 @@ export function ChatModerationSection({
                                 hint={t("moderation.chat.advertisingHint")}
                             />
                             {rules.advertising ? (
-                                <label className="ml-7 flex flex-col gap-1">
+                                <label className="ms-7 flex flex-col gap-1">
                                     <span className="text-xs font-medium">
                                         {t("moderation.chat.allowedDomains")}
                                     </span>
@@ -431,7 +431,7 @@ function Rule({
                     <span className="text-xs text-muted-foreground">{hint}</span>
                 </span>
             </label>
-            {checked && children ? <div className="ml-7">{children}</div> : null}
+            {checked && children ? <div className="ms-7">{children}</div> : null}
         </div>
     );
 }
@@ -482,19 +482,19 @@ function ChatLog({ state }: { state: ChatModerationState | null }) {
                     <p className="text-xs text-muted-foreground">{t("moderation.chat.logEmpty")}</p>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
+                        <table className="w-full text-start text-xs">
                             <thead className="text-muted-foreground">
                                 <tr>
-                                    <th className="py-1 pr-3 font-medium">
+                                    <th className="py-1 pe-3 font-medium">
                                         {t("moderation.chat.when")}
                                     </th>
-                                    <th className="py-1 pr-3 font-medium">
+                                    <th className="py-1 pe-3 font-medium">
                                         {t("moderation.chat.player")}
                                     </th>
-                                    <th className="py-1 pr-3 font-medium">
+                                    <th className="py-1 pe-3 font-medium">
                                         {t("moderation.chat.reason")}
                                     </th>
-                                    <th className="py-1 pr-3 font-medium">
+                                    <th className="py-1 pe-3 font-medium">
                                         {t("moderation.chat.line")}
                                     </th>
                                     <th className="py-1 font-medium">
@@ -505,13 +505,13 @@ function ChatLog({ state }: { state: ChatModerationState | null }) {
                             <tbody className="divide-y divide-border/60">
                                 {state.log.map((entry) => (
                                     <tr key={entry.id} className="align-top">
-                                        <td className="whitespace-nowrap py-1.5 pr-3 text-muted-foreground">
+                                        <td className="whitespace-nowrap py-1.5 pe-3 text-muted-foreground">
                                             <RelativeTime iso={entry.at} />
                                         </td>
-                                        <td className="whitespace-nowrap py-1.5 pr-3">
+                                        <td className="whitespace-nowrap py-1.5 pe-3">
                                             {entry.player}
                                         </td>
-                                        <td className="whitespace-nowrap py-1.5 pr-3">
+                                        <td className="whitespace-nowrap py-1.5 pe-3">
                                             {BLOCK_REASONS.includes(entry.reason as BlockReason)
                                                 ? t(REASON_WORD[entry.reason as BlockReason])
                                                 : entry.reason}
@@ -524,7 +524,7 @@ function ChatLog({ state }: { state: ChatModerationState | null }) {
                                                 </span>
                                             ) : null}
                                         </td>
-                                        <td className="max-w-80 py-1.5 pr-3">
+                                        <td className="max-w-80 py-1.5 pe-3">
                                             <span
                                                 className="line-clamp-2 break-words"
                                                 title={entry.text}

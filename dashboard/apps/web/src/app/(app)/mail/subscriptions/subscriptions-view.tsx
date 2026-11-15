@@ -84,7 +84,7 @@ export function SubscriptionsView({
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                         <div className="relative min-w-0 flex-1">
                             <Search
-                                className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 shrink-0 -translate-y-1/2 text-foreground-subtle"
+                                className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 shrink-0 -translate-y-1/2 text-foreground-subtle"
                                 aria-hidden
                             />
                             <Input
@@ -92,7 +92,7 @@ export function SubscriptionsView({
                                 onChange={(event) => setQuery(event.target.value)}
                                 placeholder={t("subscriptions.find")}
                                 aria-label={t("subscriptions.find")}
-                                className="pl-8"
+                                className="ps-8"
                             />
                         </div>
                         {ignored > 0 ? (

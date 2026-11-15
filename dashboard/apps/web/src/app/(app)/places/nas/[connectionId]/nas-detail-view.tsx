@@ -525,7 +525,7 @@ function NasBays({ disks }: { disks: nasView.NasDisk[] | null }) {
             </div>
             <div className="overflow-x-auto rounded-md border">
                 <table className="w-full text-sm">
-                    <thead className="text-left text-xs text-muted-foreground">
+                    <thead className="text-start text-xs text-muted-foreground">
                         <tr>
                             <th className="px-3 py-2 font-medium">{t("nas.bays.bay")}</th>
                             <th className="px-3 py-2 font-medium">{t("nas.bays.drive")}</th>

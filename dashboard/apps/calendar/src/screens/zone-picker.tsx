@@ -137,7 +137,7 @@ export function ZonePicker({
             <div className="relative">
                 <Globe
                     aria-hidden
-                    className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
+                    className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
                 />
                 <Input
                     ref={input}
@@ -151,7 +151,7 @@ export function ZonePicker({
                         open && matches[active] ? `${listId}-${active}` : undefined
                     }
                     disabled={disabled}
-                    className="pl-8"
+                    className="ps-8"
                     value={open ? query : shownValue}
                     placeholder={placeholder ?? t("zonePicker.search")}
                     title={shownValue}

@@ -294,7 +294,7 @@ export function BadgesDialog({
                             )}
                         </section>
                     </div>
-                    <div className="min-w-0 border-t border-border pt-3 md:border-l md:border-t-0 md:pl-4 md:pt-0">
+                    <div className="min-w-0 border-t border-border pt-3 md:border-s md:border-t-0 md:ps-4 md:pt-0">
                         {picked ? (
                             <BadgeDetail badge={picked} hidden={hidden.includes(picked.key)} />
                         ) : (

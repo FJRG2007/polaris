@@ -423,7 +423,7 @@ export function DomainReadingView({ reading }: { reading: DomainReading | undefi
     const tailnet = reading.tailnet ?? null;
     if (!dns && !cert && !tailnet) return null;
     return (
-        <div className="ml-4 flex min-w-0 flex-col gap-2 pb-1 text-xs">
+        <div className="ms-4 flex min-w-0 flex-col gap-2 pb-1 text-xs">
             {dns && (
                 <p
                     className={cn(

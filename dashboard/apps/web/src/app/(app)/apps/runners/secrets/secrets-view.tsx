@@ -137,9 +137,9 @@ function SecretRow({ secret }: { secret: RunnerSecretView }) {
                     /* Wraps rather than clips: the only reason to press Show is
                        to read or copy the whole secret, and a token has no word
                        boundaries to break on - so it breaks anywhere. */
-                    <code className="break-all pl-5 text-xs text-muted-foreground">{shown}</code>
+                    <code className="break-all ps-5 text-xs text-muted-foreground">{shown}</code>
                 ) : null}
-                {error ? <span className="pl-5 text-xs text-danger">{error}</span> : null}
+                {error ? <span className="ps-5 text-xs text-danger">{error}</span> : null}
             </span>
             <span className="flex shrink-0 items-center gap-1">
                 <Button

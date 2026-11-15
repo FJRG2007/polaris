@@ -469,7 +469,7 @@ export function UploadedSourceSection({
             }
             footer={
                 <>
-                    {error && <p className="mr-auto min-w-0 text-xs text-danger-ink">{error}</p>}
+                    {error && <p className="me-auto min-w-0 text-xs text-danger-ink">{error}</p>}
                     <Button
                         size="sm"
                         onClick={() => {

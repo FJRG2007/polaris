@@ -151,7 +151,7 @@ export function ActivityStream({
     const repliesOf = (id: string) => comments.filter((comment) => comment.parentId === id);
 
     const bubble = (comment: CommentView, nested: boolean) => (
-        <div key={comment.id} className={cn("flex gap-2", nested && "ml-8")}>
+        <div key={comment.id} className={cn("flex gap-2", nested && "ms-8")}>
             {comment.author ? (
                 <Avatar person={comment.author} size={28} />
             ) : (

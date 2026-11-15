@@ -249,7 +249,7 @@ function Who({
     const rest = shown.length - first.length;
 
     return (
-        <div className="flex w-full flex-wrap items-center gap-1.5 pl-0 sm:pl-1">
+        <div className="flex w-full flex-wrap items-center gap-1.5 ps-0 sm:ps-1">
             <Users className="size-3.5 shrink-0 text-foreground-subtle" />
             {shown.length === 0 ? (
                 <span className="text-[0.6875rem] text-warning">

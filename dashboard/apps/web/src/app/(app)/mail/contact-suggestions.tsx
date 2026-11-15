@@ -205,7 +205,7 @@ export function ContactSuggestionList({
                         type="button"
                         tabIndex={-1}
                         className={cn(
-                            "flex w-full min-w-0 items-baseline gap-2 px-2 py-1.5 text-left text-[13px]",
+                            "flex w-full min-w-0 items-baseline gap-2 px-2 py-1.5 text-start text-[13px]",
                             index === highlight
                                 ? "bg-option-hover text-foreground"
                                 : "text-muted-foreground"

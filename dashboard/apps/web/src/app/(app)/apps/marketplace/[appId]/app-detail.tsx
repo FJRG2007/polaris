@@ -164,7 +164,7 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
 
             <section className="flex min-w-0 flex-col gap-2">
                 <h2 className="text-sm font-medium">{t("detail.needs")}</h2>
-                <ul className="text-muted-foreground flex list-disc flex-col gap-1 pl-5 text-sm">
+                <ul className="text-muted-foreground flex list-disc flex-col gap-1 ps-5 text-sm">
                     {appNeeds(t, app).map((line) => (
                         <li key={line} className="break-words">
                             {line}

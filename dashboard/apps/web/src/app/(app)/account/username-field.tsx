@@ -142,13 +142,13 @@ export function UsernameField({
                     disabled={locked}
                     aria-describedby="username-hint"
                     aria-invalid={taken || undefined}
-                    className={cn("pr-9", taken && "border-danger")}
+                    className={cn("pe-9", taken && "border-danger")}
                     onChange={(event) => onChange(event.target.value)}
                 />
                 {/* Inside the field, where the answer is about what is in it.
                     Nothing at all while there is no question, so a field nobody
                     has touched is not wearing a mark. */}
-                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2">
+                <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2">
                     {verdict.kind === "asking" ? (
                         <Loader2 className="size-4 animate-spin text-muted-foreground" />
                     ) : verdict.kind === "free" ? (

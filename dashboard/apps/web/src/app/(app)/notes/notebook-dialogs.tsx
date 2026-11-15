@@ -274,7 +274,7 @@ export function NotebookPeopleDialog({
                                                 as="button"
                                                 personId={person.id}
                                                 type="button"
-                                                className="w-full rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
+                                                className="w-full rounded px-2 py-1.5 text-start text-sm transition-colors hover:bg-muted"
                                                 onClick={() => {
                                                     setQuery("");
                                                     setFound([]);
@@ -309,7 +309,7 @@ export function NotebookPeopleDialog({
                                 >
                                     <PersonName id={person.userId} name={person.name}>
                                         {person.owner && (
-                                            <span className="ml-1 text-xs text-muted-foreground">
+                                            <span className="ms-1 text-xs text-muted-foreground">
                                                 {t("notebook.owner")}
                                             </span>
                                         )}

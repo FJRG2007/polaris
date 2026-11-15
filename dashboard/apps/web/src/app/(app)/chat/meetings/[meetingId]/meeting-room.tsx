@@ -245,7 +245,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                     <Link
                         href="/chat"
                         aria-label={t("channelHeader.backToConversations")}
-                        className="-ml-1.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+                        className="-ms-1.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
                     >
                         <ArrowLeft className="size-4" />
                     </Link>
@@ -407,7 +407,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                     label={t("meetingRoom.meetingChatWidth")}
                     // Under the room on a phone, held to a third of the screen
                     // so the call keeps the rest; it scrolls inside that.
-                    className="max-h-[33dvh] border-t border-border lg:max-h-none lg:border-l lg:border-t-0"
+                    className="max-h-[33dvh] border-t border-border lg:max-h-none lg:border-s lg:border-t-0"
                 >
                     <MeetingChat meetingId={meetingId} call={call} className="flex-1" />
                 </SidePane>

@@ -34,7 +34,7 @@ export function SharedMessages({
                     key={message.id}
                     className={cn(
                         "flex min-w-0 flex-col gap-2",
-                        message.role === "user" && "ml-auto max-w-[85%] items-end"
+                        message.role === "user" && "ms-auto max-w-[85%] items-end"
                     )}
                 >
                     <span className="sr-only">

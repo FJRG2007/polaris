@@ -184,10 +184,10 @@ export function TrashView() {
                     <table className="w-full min-w-[32rem] text-[0.8125rem]">
                         <thead>
                             <tr className="border-b border-border">
-                                <th className="px-3 py-2 text-left">{t("trashPage.item")}</th>
-                                <th className="px-3 py-2 text-left">{t("trashPage.deletedAt")}</th>
-                                <th className="px-3 py-2 text-left">{t("trashPage.goesAt")}</th>
-                                <th className="px-3 py-2 text-right">
+                                <th className="px-3 py-2 text-start">{t("trashPage.item")}</th>
+                                <th className="px-3 py-2 text-start">{t("trashPage.deletedAt")}</th>
+                                <th className="px-3 py-2 text-start">{t("trashPage.goesAt")}</th>
+                                <th className="px-3 py-2 text-end">
                                     <span className="sr-only">{t("trashPage.actions")}</span>
                                 </th>
                             </tr>
@@ -226,7 +226,7 @@ export function TrashView() {
                                                 dateStyle: "medium"
                                             })}
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-2 text-right">
+                                        <td className="whitespace-nowrap px-3 py-2 text-end">
                                             <Button
                                                 size="icon-sm"
                                                 variant="ghost"

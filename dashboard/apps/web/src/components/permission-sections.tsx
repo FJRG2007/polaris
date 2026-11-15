@@ -117,11 +117,11 @@ export function PermissionSections<T extends SectionItem>({
                 <div className="relative min-w-0 flex-1">
                     <Search
                         aria-hidden
-                        className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                        className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                     />
                     <Input
                         type="search"
-                        className="pl-9"
+                        className="ps-9"
                         placeholder={tc("permissionSections.search")}
                         aria-label={tc("permissionSections.search")}
                         value={query}
@@ -168,7 +168,7 @@ export function PermissionSections<T extends SectionItem>({
                                         onClick={() =>
                                             remember({ ...chosen, [section.id]: !expanded })
                                         }
-                                        className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+                                        className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-start text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
                                     >
                                         <PolarisAppIcon appId={app} label={section.label} size={18} />
                                         <span
@@ -272,7 +272,7 @@ export function HeldPermissionSections<Id extends string>({
                 );
             }}
             renderItems={(section) => (
-                <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 pl-6 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 ps-6 sm:grid-cols-2">
                     {section.items.map(({ id, label }) => (
                         <label
                             key={id}

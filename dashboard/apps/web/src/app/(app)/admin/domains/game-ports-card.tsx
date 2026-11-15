@@ -167,11 +167,11 @@ export function GamePortsCard({ onKnown }: { onKnown?: (shown: boolean) => void 
 
             <div className="flex flex-wrap items-center gap-2">
                 <div className="relative min-w-48 flex-1">
-                    <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute top-1/2 start-2.5 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={typed}
                         maxLength={GAME_PORTS_SEARCH_MAX}
-                        className="h-9 pl-8"
+                        className="h-9 ps-8"
                         placeholder={t("domainsPorts.list.search")}
                         aria-label={t("domainsPorts.list.search")}
                         onChange={(event) => setTyped(event.target.value)}

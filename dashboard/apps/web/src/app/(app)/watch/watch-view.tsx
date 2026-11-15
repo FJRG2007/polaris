@@ -245,7 +245,7 @@ export function WatchView({
                                 <span className="truncate text-muted-foreground">
                                     {event.detail ? watchText(t, event.detail) : null}
                                 </span>
-                                <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                                <span className="ms-auto shrink-0 text-xs text-muted-foreground">
                                     {format.dateTime(event.createdAt)}
                                 </span>
                             </div>

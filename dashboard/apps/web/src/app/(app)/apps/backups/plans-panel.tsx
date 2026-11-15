@@ -166,7 +166,7 @@ export function PlansPanel({
                                             {name}
                                         </Badge>
                                     ))}
-                                    <span className="ml-auto text-xs text-muted-foreground">
+                                    <span className="ms-auto text-xs text-muted-foreground">
                                         {t("plans.usedBy", { count: plan.usedBy })}
                                     </span>
                                 </div>

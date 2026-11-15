@@ -32,7 +32,7 @@ export function SiteShell({ locale, children }: { locale: SiteLocale; children: 
             <body className="min-h-screen bg-background text-foreground antialiased">
                 <a
                     href="#main"
-                    className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4"
+                    className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4"
                 >
                     {t.nav.skip}
                 </a>
@@ -40,7 +40,7 @@ export function SiteShell({ locale, children }: { locale: SiteLocale; children: 
                     <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-1 px-4 py-3 text-sm">
                         <Link
                             href={href(locale)}
-                            className="mr-3 flex shrink-0 items-center gap-2 font-semibold"
+                            className="me-3 flex shrink-0 items-center gap-2 font-semibold"
                         >
                             Polaris
                         </Link>

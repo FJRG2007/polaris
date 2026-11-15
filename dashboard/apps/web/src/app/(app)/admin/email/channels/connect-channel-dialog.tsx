@@ -246,7 +246,7 @@ export function ConnectChannelDialog({
                                         key={item.platform}
                                         type="button"
                                         onClick={() => pickPlatform(item)}
-                                        className="flex items-start gap-3 rounded-md border border-border p-3 text-left transition-colors hover:border-foreground/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="flex items-start gap-3 rounded-md border border-border p-3 text-start transition-colors hover:border-foreground/30 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         <div
                                             className="grid size-10 shrink-0 place-items-center rounded-md"
@@ -303,7 +303,7 @@ export function ConnectChannelDialog({
                                         key={item.kind}
                                         type="button"
                                         onClick={() => pick(item.kind)}
-                                        className="flex items-start gap-3 rounded-md border border-border p-3 text-left transition-colors hover:border-foreground/30"
+                                        className="flex items-start gap-3 rounded-md border border-border p-3 text-start transition-colors hover:border-foreground/30"
                                     >
                                         <div
                                             className="grid size-10 shrink-0 place-items-center rounded-md"

@@ -141,7 +141,7 @@ export function WebhooksView({
                                             <button
                                                 type="button"
                                                 onClick={() => setOpen({ kind: "log", hook })}
-                                                className="block max-w-full truncate text-left text-sm font-medium hover:underline"
+                                                className="block max-w-full truncate text-start text-sm font-medium hover:underline"
                                                 title={hook.name}
                                             >
                                                 {hook.name}

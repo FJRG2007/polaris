@@ -104,7 +104,7 @@ export function OwnVpns(props: OwnVpnsProps) {
                                 role="radio"
                                 aria-checked={profile.id === selected}
                                 onClick={() => onSelect(profile.id)}
-                                className="flex min-w-0 flex-1 flex-col px-3 py-2 text-left text-sm"
+                                className="flex min-w-0 flex-1 flex-col px-3 py-2 text-start text-sm"
                             >
                                 <span className="truncate font-medium" title={profile.name}>
                                     {profile.name}

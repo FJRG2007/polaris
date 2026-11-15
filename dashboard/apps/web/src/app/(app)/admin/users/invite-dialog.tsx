@@ -197,7 +197,7 @@ export function InviteDialog({
                                 type="button"
                                 onClick={() => setAdvanced((open) => !open)}
                                 aria-expanded={advanced}
-                                className="flex items-center gap-1 text-left text-sm text-muted-foreground hover:text-foreground"
+                                className="flex items-center gap-1 text-start text-sm text-muted-foreground hover:text-foreground"
                             >
                                 <ChevronDown
                                     className={cn(

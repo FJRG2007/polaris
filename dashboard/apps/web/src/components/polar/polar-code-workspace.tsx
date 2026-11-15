@@ -69,7 +69,7 @@ export function PolarCodeWorkspace({
         <ui.Dialog open={open} onOpenChange={onOpenChange}>
             <ui.SheetContent className="sm:w-[min(72rem,calc(100vw-1rem))]">
                 <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
-                    <ui.DialogHeader className="pr-10">
+                    <ui.DialogHeader className="pe-10">
                         <ui.DialogTitle className="truncate" title={session.title}>
                             {session.title}
                         </ui.DialogTitle>
@@ -251,13 +251,13 @@ function FilesPane({ sessionId, live }: { sessionId: string; live: boolean }) {
             <div className="flex min-h-0 w-full shrink-0 flex-col gap-2 md:w-72">
                 <div className="flex items-center gap-2">
                     <div className="relative min-w-0 flex-1">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <ui.Input
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={t("code.pane.search")}
                             aria-label={t("code.pane.search")}
-                            className="pl-8"
+                            className="ps-8"
                         />
                     </div>
                     <ui.Button
@@ -296,7 +296,7 @@ function FilesPane({ sessionId, live }: { sessionId: string; live: boolean }) {
                                         onClick={() => setPicked(path)}
                                         title={path}
                                         className={ui.cn(
-                                            "flex w-full min-w-0 items-center gap-1.5 px-2 py-1 text-left text-xs hover:bg-card-hover",
+                                            "flex w-full min-w-0 items-center gap-1.5 px-2 py-1 text-start text-xs hover:bg-card-hover",
                                             picked === path && "bg-card-hover font-medium"
                                         )}
                                     >

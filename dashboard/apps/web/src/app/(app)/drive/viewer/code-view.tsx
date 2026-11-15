@@ -96,7 +96,7 @@ export function CodeView({
                 {editing ? (
                     <>
                         <span className="text-xs font-medium text-muted-foreground">{t("code.editing")}</span>
-                        <div className="ml-auto flex items-center gap-2">
+                        <div className="ms-auto flex items-center gap-2">
                             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
                                 {t("code.cancel")}
                             </Button>
@@ -113,7 +113,7 @@ export function CodeView({
                         <span className="text-xs font-medium text-muted-foreground">
                             {blocked ?? language?.label ?? t("code.code")}
                         </span>
-                        <div className="ml-auto flex items-center gap-3">
+                        <div className="ms-auto flex items-center gap-3">
                             {/* Nothing to copy honestly from a binary file, and a
                                 truncated one would hand over half of itself. */}
                             {blocked === null ? (

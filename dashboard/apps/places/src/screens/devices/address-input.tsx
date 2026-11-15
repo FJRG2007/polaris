@@ -143,7 +143,7 @@ export function AddressInput({
                     inputMode={mode === "mac" ? "text" : "url"}
                     placeholder={mode === "mac" ? t("connect.address.macPlaceholder") : placeholder}
                     maxLength={mode === "mac" ? 17 : undefined}
-                    className={mode === "mac" ? "pr-24 font-mono uppercase" : undefined}
+                    className={mode === "mac" ? "pe-24 font-mono uppercase" : undefined}
                     aria-label={label}
                     onFocus={() => onFocusChange?.(true)}
                     onBlur={() => onFocusChange?.(false)}
@@ -170,7 +170,7 @@ export function AddressInput({
                 {mode === "mac" && digits > 0 && digits < 12 && (
                     <span
                         aria-hidden="true"
-                        className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-foreground-subtle tabular-nums"
+                        className="pointer-events-none absolute top-1/2 end-3 -translate-y-1/2 text-xs text-foreground-subtle tabular-nums"
                     >
                         {t("connect.address.digits", { count: digits })}
                     </span>

@@ -340,7 +340,7 @@ export function FormattedTextField({
                         id={listId}
                         role="listbox"
                         aria-label={t("textField.variables")}
-                        className="absolute left-0 top-full z-50 mt-1 max-h-60 w-72 max-w-full overflow-y-auto overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 shadow-popover"
+                        className="absolute start-0 top-full z-50 mt-1 max-h-60 w-72 max-w-full overflow-y-auto overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 shadow-popover"
                     >
                         {offered.map((option, index) => (
                             <li

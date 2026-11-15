@@ -1267,7 +1267,7 @@ function MessageCard({
                 <button
                     type="button"
                     className={cn(
-                        "flex min-w-0 flex-1 items-baseline gap-2 px-3 text-left",
+                        "flex min-w-0 flex-1 items-baseline gap-2 px-3 text-start",
                         open ? "items-start py-2" : "py-1.5"
                     )}
                     aria-expanded={open}
@@ -1344,7 +1344,7 @@ function MessageCard({
                             having gone missing. */}
                             {files.length > 0 ? (
                                 <span
-                                    className="flex shrink-0 items-center gap-0.5 pl-2 text-[11px] text-foreground-subtle"
+                                    className="flex shrink-0 items-center gap-0.5 ps-2 text-[11px] text-foreground-subtle"
                                     title={files.map((file) => file.name).join(", ")}
                                     aria-label={
                                         files.length === 1
@@ -1358,7 +1358,7 @@ function MessageCard({
                             ) : null}
                         </>
                     )}
-                    <span className="ml-auto shrink-0 pl-2 text-[11px] text-foreground-subtle">
+                    <span className="ms-auto shrink-0 ps-2 text-[11px] text-foreground-subtle">
                         {open
                             ? format.dateTime(new Date(message.sentAt))
                             : shortWhen(message.sentAt, format)}
@@ -1376,7 +1376,7 @@ function MessageCard({
                 at the newest one, which is what the conversation's own
                 buttons answer. */}
                 {open ? (
-                    <div className="flex shrink-0 items-center gap-0.5 py-1.5 pr-2">
+                    <div className="flex shrink-0 items-center gap-0.5 py-1.5 pe-2">
                         <Button
                             variant="ghost"
                             size="icon-sm"
@@ -1536,7 +1536,7 @@ function MessageCard({
                                             not enough to decide on. */}
                                         {message.folderRole === "junk" &&
                                         message.spamReasons.length > 1 ? (
-                                            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-foreground-subtle">
+                                            <ul className="mt-1 list-disc space-y-0.5 ps-4 text-foreground-subtle">
                                                 {message.spamReasons.slice(1).map((said) => (
                                                     <li key={said}>{spamReasonText(t, said)}</li>
                                                 ))}
@@ -1590,7 +1590,7 @@ function MessageCard({
                                     {files.map((file) => (
                                         <li
                                             key={file.id}
-                                            className="flex items-center gap-1 rounded-md border border-border pr-1 text-[12px]"
+                                            className="flex items-center gap-1 rounded-md border border-border pe-1 text-[12px]"
                                         >
                                             {/* Openable ones open. A receipt,
                                                 a spreadsheet, a scan - the

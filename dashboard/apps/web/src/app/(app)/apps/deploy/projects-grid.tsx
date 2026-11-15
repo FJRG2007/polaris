@@ -231,12 +231,12 @@ export function ProjectsGrid({
 
             <div data-tour="deploy.search" className="flex items-center justify-between gap-2">
                 <div className="relative max-w-xs flex-1">
-                    <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
                         placeholder={t("projects.search", { count })}
-                        className="h-8 pl-8"
+                        className="h-8 ps-8"
                     />
                 </div>
                 <div className="flex shrink-0 items-center gap-3">

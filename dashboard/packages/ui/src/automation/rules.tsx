@@ -100,7 +100,7 @@ export function RuleRow({
             <span className="truncate text-[0.6875rem] text-foreground-subtle">{summary}</span>
         </>
     );
-    const bodyClass = "flex min-w-0 flex-1 flex-col gap-0.5 text-left";
+    const bodyClass = "flex min-w-0 flex-1 flex-col gap-0.5 text-start";
     return (
         <li className="flex flex-col gap-1 rounded-lg border border-border bg-card px-4 py-3">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -199,7 +199,7 @@ export function RunRow({
                 type="button"
                 aria-expanded={expanded}
                 onClick={onToggle}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-start"
             >
                 <OutcomeBadge outcome={outcome} />
                 <span

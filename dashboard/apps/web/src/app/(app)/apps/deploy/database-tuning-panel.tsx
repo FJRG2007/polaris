@@ -107,7 +107,7 @@ export function TuningSection({
                 <>
                     <div className="max-h-96 overflow-auto overscroll-contain rounded-lg border border-border">
                         <table className="w-full text-sm">
-                            <thead className="text-left text-xs text-muted-foreground">
+                            <thead className="text-start text-xs text-muted-foreground">
                                 <tr>
                                     <th className="p-2 font-medium">
                                         {t("database.tuning.setting")}

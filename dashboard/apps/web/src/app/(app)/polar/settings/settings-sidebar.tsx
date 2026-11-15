@@ -195,7 +195,7 @@ export function SettingsWithSidebar({
     return (
         <>
             {!hidden ? (
-                <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-surface md:flex">
+                <aside className="hidden w-56 shrink-0 flex-col border-e border-border bg-surface md:flex">
                     <SettingsNav
                         sections={sections}
                         close={{

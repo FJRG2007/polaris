@@ -280,7 +280,7 @@ export function BookingPageEditor({
                     {t("bookingPage.allPages")}
                 </Link>
                 {pageId && slug ? (
-                    <span className="ml-auto flex items-center gap-1">
+                    <span className="ms-auto flex items-center gap-1">
                         {base ? (
                             <CopyButton
                                 value={bookingUrl(base, slug)}
@@ -709,7 +709,7 @@ export function BookingPageEditor({
                     {shared === "view" ? null : (
                         <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background/95 py-3">
                             {attempted && !valid ? (
-                                <span className="mr-auto text-xs text-danger">
+                                <span className="me-auto text-xs text-danger">
                                     {t("bookingPage.fixFirst")}
                                 </span>
                             ) : null}

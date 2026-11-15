@@ -184,7 +184,7 @@ export function EditGroupDialog({
                         />
                         <span
                             aria-hidden
-                            className="absolute right-0 top-0 grid size-7 place-items-center rounded-full bg-foreground text-background ring-4 ring-elevated transition-transform group-hover:scale-105 group-disabled:opacity-60"
+                            className="absolute end-0 top-0 grid size-7 place-items-center rounded-full bg-foreground text-background ring-4 ring-elevated transition-transform group-hover:scale-105 group-disabled:opacity-60"
                         >
                             <Pencil className="size-3.5 shrink-0" />
                         </span>

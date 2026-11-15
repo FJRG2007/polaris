@@ -140,7 +140,7 @@ export function ReminderPresetItems({
                     <Item key={preset} disabled={busy} onSelect={() => onPick(moment)}>
                         <span className="min-w-0 truncate">{t(PRESET_LABELS[preset])}</span>
                         {clock && (
-                            <span className="ml-auto shrink-0 pl-4 text-xs text-foreground-subtle">
+                            <span className="ms-auto shrink-0 ps-4 text-xs text-foreground-subtle">
                                 {format.time(moment)}
                             </span>
                         )}
@@ -220,7 +220,7 @@ export function TaskReminderButton({ taskId }: { taskId: string }) {
                                     }}
                                 >
                                     <span className="min-w-0 truncate">{due(row)}</span>
-                                    <X className="ml-auto size-3.5 shrink-0" />
+                                    <X className="ms-auto size-3.5 shrink-0" />
                                 </DropdownMenuItem>
                             ))}
                             <DropdownMenuSeparator />

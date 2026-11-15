@@ -561,13 +561,13 @@ function ShareLogsDialog({
                         </p>
                     ) : (
                         <table className="w-full text-sm">
-                            <thead className="text-left text-xs text-muted-foreground">
+                            <thead className="text-start text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="py-1 pr-3 font-medium">
+                                    <th className="py-1 pe-3 font-medium">
                                         {t("sharedLinks.when")}
                                     </th>
-                                    <th className="py-1 pr-3 font-medium">{t("sharedLinks.ip")}</th>
-                                    <th className="py-1 pr-3 font-medium">
+                                    <th className="py-1 pe-3 font-medium">{t("sharedLinks.ip")}</th>
+                                    <th className="py-1 pe-3 font-medium">
                                         {t("linkVisitor.who")}
                                     </th>
                                     <th className="py-1 font-medium">{t("sharedLinks.action")}</th>
@@ -576,13 +576,13 @@ function ShareLogsDialog({
                             <tbody>
                                 {logs.map((row) => (
                                     <tr key={row.id} className="hover:bg-card-hover">
-                                        <td className="py-1 pr-3 text-muted-foreground">
+                                        <td className="py-1 pe-3 text-muted-foreground">
                                             {format.dateTime(row.at)}
                                         </td>
-                                        <td className="py-1 pr-3 font-mono text-xs">
+                                        <td className="py-1 pe-3 font-mono text-xs">
                                             {row.ip ?? "-"}
                                         </td>
-                                        <td className="py-1 pr-3">
+                                        <td className="py-1 pe-3">
                                             <LinkVisitorCell visitor={row.visitor} />
                                         </td>
                                         <td className="py-1">

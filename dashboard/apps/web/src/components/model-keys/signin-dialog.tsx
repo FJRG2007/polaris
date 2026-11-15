@@ -503,7 +503,7 @@ function PasteSteps({
         <ol className="bg-elevated flex flex-col gap-4 rounded-md border border-border p-4">
             <li className="flex min-w-0 flex-col gap-2">
                 <span className="text-sm">
-                    <span className="text-muted-foreground mr-2 font-mono">1</span>
+                    <span className="text-muted-foreground me-2 font-mono">1</span>
                     {t("signinDialog.pasteStepOpen")}
                 </span>
                 {url ? (
@@ -522,7 +522,7 @@ function PasteSteps({
             </li>
             <li className="flex min-w-0 flex-col gap-2">
                 <span className="text-sm">
-                    <span className="text-muted-foreground mr-2 font-mono">2</span>
+                    <span className="text-muted-foreground me-2 font-mono">2</span>
                     {t("signinDialog.pasteStepCode")}
                 </span>
                 {field ? (
@@ -596,7 +596,7 @@ function DeviceSteps({
         <ol className="bg-elevated flex flex-col gap-4 rounded-md border border-border p-4">
             <li className="flex min-w-0 flex-col gap-2">
                 <span className="text-sm">
-                    <span className="text-muted-foreground mr-2 font-mono">1</span>
+                    <span className="text-muted-foreground me-2 font-mono">1</span>
                     {t("signinDialog.deviceStepOpen")}
                 </span>
                 {url ? (
@@ -612,7 +612,7 @@ function DeviceSteps({
             </li>
             <li className="flex min-w-0 flex-col gap-2">
                 <span className="text-sm">
-                    <span className="text-muted-foreground mr-2 font-mono">2</span>
+                    <span className="text-muted-foreground me-2 font-mono">2</span>
                     {t("signinDialog.deviceStepCode")}
                 </span>
                 <div className="flex flex-wrap items-center gap-3">

@@ -1187,7 +1187,7 @@ function ConnectCard({
                             <p className="font-medium text-foreground">{reach.title}</p>
                             <p className="text-muted-foreground">{reach.detail}</p>
                             {reach.steps.length > 0 && (
-                                <ul className="ml-4 list-disc text-muted-foreground">
+                                <ul className="ms-4 list-disc text-muted-foreground">
                                     {reach.steps.map((step) => (
                                         <li key={step}>{step}</li>
                                     ))}
@@ -1462,7 +1462,7 @@ function OverviewTab({
                                     className="flex items-baseline justify-between gap-3"
                                 >
                                     <dt className="text-muted-foreground">{setting.label}</dt>
-                                    <dd className="truncate text-right" title={value}>
+                                    <dd className="truncate text-end" title={value}>
                                         {value}
                                     </dd>
                                 </div>

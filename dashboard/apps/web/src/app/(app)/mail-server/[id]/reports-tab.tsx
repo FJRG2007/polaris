@@ -166,25 +166,25 @@ export function ReportsTab({ serverId }: { serverId: string }) {
                 <div className="overflow-x-auto">
                     <table className="w-full text-[0.8125rem]">
                         <thead>
-                            <tr className="text-left">
-                                <th className="py-1.5 pr-3">{t("reports.columns.source")}</th>
-                                <th className="py-1.5 pr-3">{t("reports.columns.messages")}</th>
-                                <th className="py-1.5 pr-3">{t("reports.columns.passed")}</th>
-                                <th className="py-1.5 pr-3">{t("reports.columns.failed")}</th>
-                                <th className="py-1.5 pr-3">{t("reports.columns.reporters")}</th>
+                            <tr className="text-start">
+                                <th className="py-1.5 pe-3">{t("reports.columns.source")}</th>
+                                <th className="py-1.5 pe-3">{t("reports.columns.messages")}</th>
+                                <th className="py-1.5 pe-3">{t("reports.columns.passed")}</th>
+                                <th className="py-1.5 pe-3">{t("reports.columns.failed")}</th>
+                                <th className="py-1.5 pe-3">{t("reports.columns.reporters")}</th>
                                 <th className="py-1.5">{t("reports.columns.verdict")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                             {overview.sources.map((source) => (
                                 <tr key={source.sourceIp}>
-                                    <td className="py-2 pr-3">
+                                    <td className="py-2 pe-3">
                                         <Mono>{source.sourceIp}</Mono>
                                     </td>
-                                    <td className="py-2 pr-3">{source.messages}</td>
-                                    <td className="py-2 pr-3 text-success">{source.passed}</td>
-                                    <td className="py-2 pr-3 text-danger">{source.failed}</td>
-                                    <td className="py-2 pr-3 text-xs text-muted-foreground">
+                                    <td className="py-2 pe-3">{source.messages}</td>
+                                    <td className="py-2 pe-3 text-success">{source.passed}</td>
+                                    <td className="py-2 pe-3 text-danger">{source.failed}</td>
+                                    <td className="py-2 pe-3 text-xs text-muted-foreground">
                                         {source.reporters.join(", ")}
                                     </td>
                                     <td className="py-2">
@@ -222,7 +222,7 @@ export function ReportsTab({ serverId }: { serverId: string }) {
                                 <span className="text-xs text-foreground-subtle">
                                     {format.date(report.beginAt)} - {format.date(report.endAt)}
                                 </span>
-                                <span className="ml-auto text-xs text-muted-foreground">
+                                <span className="ms-auto text-xs text-muted-foreground">
                                     {t("reports.reportLine", {
                                         messages: report.messages,
                                         failed: report.failed

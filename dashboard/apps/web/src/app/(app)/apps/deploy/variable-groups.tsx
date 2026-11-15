@@ -158,7 +158,7 @@ export function VariableGroupsManager() {
                             <button
                                 type="button"
                                 onClick={() => setSelected(one.id)}
-                                className="flex w-full min-w-0 items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted/60"
+                                className="flex w-full min-w-0 items-center justify-between gap-3 px-3 py-2 text-start hover:bg-muted/60"
                             >
                                 <span className="min-w-0">
                                     <span
@@ -258,7 +258,7 @@ function GroupDetail({
                     {group.canEdit && (
                         <DropdownMenu>
                             <DropdownMenuTrigger
-                                className={`ml-auto ${ICON_BUTTON}`}
+                                className={`ms-auto ${ICON_BUTTON}`}
                                 aria-label={t("groups.more")}
                                 title={t("groups.more")}
                             >
@@ -574,7 +574,7 @@ export function ResolutionOrder({
             </p>
             <div className="overflow-x-auto rounded-md border border-border">
                 <table className="w-full text-xs">
-                    <thead className="text-left text-muted-foreground">
+                    <thead className="text-start text-muted-foreground">
                         <tr>
                             <th className="px-3 py-1.5 font-medium">{t("groups.colKey")}</th>
                             <th className="px-3 py-1.5 font-medium">{t("groups.colFrom")}</th>

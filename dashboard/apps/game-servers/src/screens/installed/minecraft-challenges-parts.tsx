@@ -311,14 +311,14 @@ export function PlayersTable({
         <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
                 <thead>
-                    <tr className="text-left">
-                        <th className="py-1 pr-3">{t("players.name")}</th>
-                        <th className="py-1 pr-3">{t("players.daily")}</th>
-                        <th className="py-1 pr-3">{t("players.weekly")}</th>
-                        <th className="py-1 pr-3">{t("players.bingo")}</th>
-                        <th className="py-1 pr-3">{t("players.pass")}</th>
-                        <th className="py-1 pr-3">{t("players.streak")}</th>
-                        <th className="py-1 pr-3">{t("players.lastSeen")}</th>
+                    <tr className="text-start">
+                        <th className="py-1 pe-3">{t("players.name")}</th>
+                        <th className="py-1 pe-3">{t("players.daily")}</th>
+                        <th className="py-1 pe-3">{t("players.weekly")}</th>
+                        <th className="py-1 pe-3">{t("players.bingo")}</th>
+                        <th className="py-1 pe-3">{t("players.pass")}</th>
+                        <th className="py-1 pe-3">{t("players.streak")}</th>
+                        <th className="py-1 pe-3">{t("players.lastSeen")}</th>
                         <th className="py-1" />
                     </tr>
                 </thead>
@@ -367,10 +367,10 @@ function PlayerLine({
     return (
         <>
             <tr>
-                <td className="py-1.5 pr-3">
+                <td className="py-1.5 pe-3">
                     <button
                         type="button"
-                        className="flex items-center gap-1 text-left font-medium hover:underline"
+                        className="flex items-center gap-1 text-start font-medium hover:underline"
                         aria-expanded={open}
                         onClick={onToggle}
                     >
@@ -389,7 +389,7 @@ function PlayerLine({
                         </p>
                     )}
                 </td>
-                <td className="py-1.5 pr-3">
+                <td className="py-1.5 pe-3">
                     <InstanceBars instances={row.daily} t={t} language={language} />
                     {row.backlog.length > 0 && (
                         <span className="text-xs text-muted-foreground">
@@ -397,20 +397,20 @@ function PlayerLine({
                         </span>
                     )}
                 </td>
-                <td className="py-1.5 pr-3">
+                <td className="py-1.5 pe-3">
                     <InstanceBars instances={row.weekly} t={t} language={language} />
                 </td>
-                <td className="py-1.5 pr-3 tabular-nums">
+                <td className="py-1.5 pe-3 tabular-nums">
                     {t("players.cardDone", { done: row.cardDone, total: 9 })}
                 </td>
-                <td className="py-1.5 pr-3 tabular-nums">
+                <td className="py-1.5 pe-3 tabular-nums">
                     {t("season.tierPoints", { tier: row.tier, points: row.points })}
                 </td>
-                <td className="py-1.5 pr-3 tabular-nums">{row.streak}</td>
-                <td className="py-1.5 pr-3 text-xs text-muted-foreground">
+                <td className="py-1.5 pe-3 tabular-nums">{row.streak}</td>
+                <td className="py-1.5 pe-3 text-xs text-muted-foreground">
                     {row.lastSeenAt ? dateTime(row.lastSeenAt) : t("players.never")}
                 </td>
-                <td className="py-1.5 text-right">
+                <td className="py-1.5 text-end">
                     <ui.Button
                         variant="ghost"
                         size="icon-sm"
@@ -522,7 +522,7 @@ export function CatalogueCard({
                                 <div className="flex flex-wrap items-center gap-3">
                                     <button
                                         type="button"
-                                        className="flex min-w-0 flex-1 items-center gap-1 text-left text-sm font-medium"
+                                        className="flex min-w-0 flex-1 items-center gap-1 text-start text-sm font-medium"
                                         aria-expanded={open}
                                         onClick={() => setOpenCategory(open ? null : category)}
                                     >

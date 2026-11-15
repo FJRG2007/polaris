@@ -144,7 +144,7 @@ export function RunsView({
                         <p className="px-4 py-10 text-sm text-muted-foreground">{t("runs.none")}</p>
                     ) : (
                         <table className="w-full text-sm">
-                            <thead className="text-left text-xs text-muted-foreground">
+                            <thead className="text-start text-xs text-muted-foreground">
                                 <tr className="border-b border-white/5">
                                     <th className="w-full max-w-0 px-4 py-2 font-medium">
                                         {t("sessions.form.repository")}
@@ -213,7 +213,7 @@ export function RunsView({
                                         <td className="whitespace-nowrap px-4 py-3">
                                             <RunState state={run.state} />
                                         </td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                                        <td className="whitespace-nowrap px-4 py-3 text-end">
                                             {isTerminalRunState(run.state) ? null : (
                                                 <Button
                                                     variant="ghost"

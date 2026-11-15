@@ -189,7 +189,7 @@ export function CompaniesCard({
                     {done && !error ? <p className="text-success text-sm">{t("appearance.saved")}</p> : null}
                     <Button
                         type="button"
-                        className="ml-auto"
+                        className="ms-auto"
                         disabled={busy || !changed}
                         onClick={async () => {
                             setBusy(true);

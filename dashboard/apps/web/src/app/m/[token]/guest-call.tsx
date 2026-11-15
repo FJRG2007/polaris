@@ -212,7 +212,7 @@ function GuestRoom({
                 {/* The same column an account gets. A guest is in the same room, not
                     a lesser copy of it - and they are the person most likely to be
                     sent an address in it. */}
-                <aside className="flex min-h-0 w-full shrink-0 flex-col border-t border-border lg:w-80 lg:border-l lg:border-t-0">
+                <aside className="flex min-h-0 w-full shrink-0 flex-col border-t border-border lg:w-80 lg:border-s lg:border-t-0">
                     <MeetingChat meetingId={meetingId} call={call} className="flex-1" />
                 </aside>
             </div>

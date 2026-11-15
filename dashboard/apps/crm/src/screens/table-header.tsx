@@ -63,7 +63,7 @@ export function HeaderCell({
             style={{ width: column.width, left: sticky }}
             aria-sort={sort ? (sort.direction === "asc" ? "ascending" : "descending") : undefined}
             className={cn(
-                "relative h-9 border-b border-r border-border bg-card p-0 text-left font-normal",
+                "relative h-9 border-b border-e border-border bg-card p-0 text-start font-normal",
                 sticky ? "sticky top-0 z-20" : "sticky top-0 z-10",
                 over && "shadow-[inset_2px_0_0_hsl(var(--primary))]"
             )}
@@ -133,7 +133,7 @@ export function HeaderCell({
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
-            <span className="absolute inset-y-0 -right-0.5 z-10 flex">
+            <span className="absolute inset-y-0 -end-0.5 z-10 flex">
                 <ResizeHandle
                     axis="x"
                     size={column.width}

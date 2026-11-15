@@ -75,7 +75,7 @@ export function ConversationNote({
                 <span className="flex w-9 shrink-0 justify-center">{toast.icon}</span>
             ) : null}
             <span className="min-w-0 flex-1">
-                <span className="flex min-w-0 items-baseline gap-1.5 pr-7">
+                <span className="flex min-w-0 items-baseline gap-1.5 pe-7">
                     <span
                         className="min-w-0 truncate text-sm font-semibold text-foreground"
                         title={conversation.sender}
@@ -92,7 +92,7 @@ export function ConversationNote({
                     ) : null}
                     {count > 1 ? (
                         <span
-                            className="ml-auto shrink-0 rounded-full bg-primary/15 px-1.5 text-[11px] font-semibold leading-4 text-primary tabular-nums"
+                            className="ms-auto shrink-0 rounded-full bg-primary/15 px-1.5 text-[11px] font-semibold leading-4 text-primary tabular-nums"
                             title={conversation.countLabel}
                         >
                             <span aria-hidden="true">{count}</span>
@@ -176,7 +176,7 @@ export function ConversationNote({
                     <button
                         type="button"
                         onClick={open}
-                        className="-m-1 flex w-[calc(100%+0.5rem)] min-w-0 items-start gap-3 rounded-md p-1 text-left transition-colors hover:bg-card-hover"
+                        className="-m-1 flex w-[calc(100%+0.5rem)] min-w-0 items-start gap-3 rounded-md p-1 text-start transition-colors hover:bg-card-hover"
                     >
                         {content}
                     </button>
@@ -188,12 +188,12 @@ export function ConversationNote({
                     aria-label={words.dismiss}
                     title={words.dismiss}
                     onClick={onDismiss}
-                    className="absolute right-1.5 top-1.5 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
+                    className="absolute end-1.5 top-1.5 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
                 >
                     <X className="size-3.5" />
                 </button>
                 {hasFooter ? (
-                    <div className={cn("mt-1.5", toast.icon && "pl-12")}>
+                    <div className={cn("mt-1.5", toast.icon && "ps-12")}>
                         {sent ? (
                             <span className="flex items-center gap-1 py-1.5 text-xs text-muted-foreground">
                                 <Check className="size-3.5" />
@@ -248,7 +248,7 @@ export function ConversationNote({
                                 </button>
                             </span>
                         ) : (
-                            <span className="-ml-1.5 flex flex-wrap items-center gap-0.5">
+                            <span className="-ms-1.5 flex flex-wrap items-center gap-0.5">
                                 {toast.reply ? (
                                     <button
                                         type="button"
@@ -338,7 +338,7 @@ function Choices({
     const chip =
         "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground disabled:opacity-50";
     return (
-        <span className="-ml-1.5 flex flex-wrap items-center gap-1">
+        <span className="-ms-1.5 flex flex-wrap items-center gap-1">
             <span className="inline-flex min-w-0 items-center gap-1 px-1.5 py-1 text-xs font-medium text-foreground">
                 {action.icon}
                 <span className="truncate" title={action.label}>

@@ -81,9 +81,9 @@ export function DeployStepper({ steps }: { steps: readonly DeployStep[] }) {
         <ol className="relative flex items-start justify-between gap-1 px-1 pb-1 pt-1" aria-label={t("steps.progress")}>
             {/* The track, behind the circles; each circle carries a ring the colour
                 of the card so the line stops cleanly at its edge. */}
-            <span className="absolute left-4 right-4 top-[0.9rem] h-0.5 rounded-full bg-border" aria-hidden />
+            <span className="absolute start-4 end-4 top-[0.9rem] h-0.5 rounded-full bg-border" aria-hidden />
             <span
-                className="absolute left-4 top-[0.9rem] h-0.5 rounded-full bg-primary transition-[width] duration"
+                className="absolute start-4 top-[0.9rem] h-0.5 rounded-full bg-primary transition-[width] duration"
                 style={{ width: `calc((100% - 2rem) * ${progress / 100})` }}
                 aria-hidden
             />

@@ -286,9 +286,9 @@ export function SoundSettingsEditor({
 
     const saveBar = (
         <div className="flex flex-wrap items-center justify-end gap-3">
-            {note ? <p className="mr-auto text-xs text-muted-foreground">{note}</p> : null}
+            {note ? <p className="me-auto text-xs text-muted-foreground">{note}</p> : null}
             {error ? (
-                <p role="alert" className="mr-auto text-xs text-danger">
+                <p role="alert" className="me-auto text-xs text-danger">
                     {error}
                 </p>
             ) : null}

@@ -112,11 +112,11 @@ export function DnsReputationCard() {
                 ) : null}
                 <div className="relative min-w-0">
                     <Search
-                        className="pointer-events-none absolute left-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground"
+                        className="pointer-events-none absolute start-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground"
                         aria-hidden
                     />
                     <Input
-                        className="pl-8"
+                        className="ps-8"
                         value={search}
                         placeholder={t("reputation.search")}
                         aria-label={t("reputation.search")}

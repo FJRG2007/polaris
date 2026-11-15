@@ -348,7 +348,7 @@ export function PrintView({ view, date }: { view: string | null; date: string | 
                                                     .map((name) => (
                                                         <th
                                                             key={name}
-                                                            className="border border-border px-1 py-0.5 text-left"
+                                                            className="border border-border px-1 py-0.5 text-start"
                                                         >
                                                             {name}
                                                         </th>

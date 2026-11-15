@@ -1271,7 +1271,7 @@ export function DisconnectLabel({
     const t = useGameText("minecraft");
     const said = reason.raw ? t("disconnect.serverSaid", { raw: reason.raw }) : undefined;
     return (
-        <span className="ml-1.5 text-xs text-muted-foreground" title={said}>
+        <span className="ms-1.5 text-xs text-muted-foreground" title={said}>
             - {t(`disconnect.reasons.${reason.kind}`)}
             {said && detailed ? (
                 <span className="block break-words [overflow-wrap:anywhere]">{said}</span>

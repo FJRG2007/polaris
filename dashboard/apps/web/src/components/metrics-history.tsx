@@ -318,7 +318,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
                     {t("metrics.custom")}
                 </button>
                 {!loading && (
-                    <span className="ml-auto text-xs text-muted-foreground">
+                    <span className="ms-auto text-xs text-muted-foreground">
                         {points && points.length > 0
                             ? t(
                                   pushed && window.kind === "preset"
@@ -332,7 +332,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
                     </span>
                 )}
                 {loading && (
-                    <Loader2 className="ml-auto size-3.5 animate-spin text-muted-foreground" />
+                    <Loader2 className="ms-auto size-3.5 animate-spin text-muted-foreground" />
                 )}
             </div>
 

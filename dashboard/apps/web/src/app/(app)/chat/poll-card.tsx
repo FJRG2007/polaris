@@ -158,7 +158,7 @@ export function PollCard({
                                 aria-pressed={option.mine}
                                 onClick={() => void pick(option.id)}
                                 className={cn(
-                                    "relative flex w-full items-center gap-2 overflow-hidden rounded-md border px-2 py-1.5 text-left text-sm transition-colors",
+                                    "relative flex w-full items-center gap-2 overflow-hidden rounded-md border px-2 py-1.5 text-start text-sm transition-colors",
                                     option.mine ? "border-primary" : "border-border",
                                     mayVote ? "hover:bg-card-hover" : "cursor-default"
                                 )}
@@ -172,7 +172,7 @@ export function PollCard({
                                         aria-hidden="true"
                                         style={{ width: `${Math.min(100, share)}%` }}
                                         className={cn(
-                                            "absolute inset-y-0 left-0 transition-[width] duration-300",
+                                            "absolute inset-y-0 start-0 transition-[width] duration-300",
                                             won ? "bg-primary/25" : "bg-primary/10"
                                         )}
                                     />
@@ -233,7 +233,7 @@ export function PollCard({
                         variant="ghost"
                         disabled={ending}
                         onClick={() => void end()}
-                        className="ml-auto"
+                        className="ms-auto"
                     >
                         <CircleSlash />
                         {ending ? t("pollCard.closing") : t("pollCard.endPoll")}

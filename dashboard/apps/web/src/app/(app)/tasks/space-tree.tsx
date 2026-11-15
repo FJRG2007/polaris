@@ -301,7 +301,7 @@ function TreeRow({
         <>
             {expander}
             {icon}
-            <span className="flex-1 truncate text-left">{label}</span>
+            <span className="flex-1 truncate text-start">{label}</span>
             {badge && <span className="text-[0.6875rem] opacity-70">{badge}</span>}
         </>
     );
@@ -389,7 +389,7 @@ function TreeRow({
                 <span
                     aria-hidden
                     className={cn(
-                        "pointer-events-none absolute left-0 z-10 h-0.5 w-full rounded bg-primary",
+                        "pointer-events-none absolute start-0 z-10 h-0.5 w-full rounded bg-primary",
                         over === "before" ? "-top-px" : "-bottom-px"
                     )}
                 />
@@ -398,7 +398,7 @@ function TreeRow({
                 <ContextMenuTrigger asChild>
                     <div
                         className={cn(
-                            "group flex items-center gap-1.5 rounded-md pr-1 transition-colors",
+                            "group flex items-center gap-1.5 rounded-md pe-1 transition-colors",
                             over === "into" && "bg-primary/10 ring-1 ring-primary/40",
                             active ? "bg-muted" : "hover:bg-muted"
                         )}
@@ -1095,7 +1095,7 @@ function SpaceSection({
                                 event.preventDefault();
                                 onToggle(folder.id);
                             }}
-                            className="-ml-1 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                            className="-ms-1 rounded p-0.5 text-muted-foreground hover:text-foreground"
                         >
                             {folderOpen ? (
                                 <ChevronDown className="size-3.5" />
@@ -1280,7 +1280,7 @@ function SpaceSection({
 
             {open && (
                 <div
-                    className="ml-2 flex flex-col gap-0.5"
+                    className="ms-2 flex flex-col gap-0.5"
                     onDragOver={(event) => {
                         if (accepts(null) && !space.partial) event.preventDefault();
                     }}

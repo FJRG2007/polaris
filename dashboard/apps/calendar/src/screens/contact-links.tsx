@@ -187,7 +187,7 @@ function LinkMenu({
                 </ContextMenuContent>
             </ContextMenu>
             {said ? (
-                <span role="status" className="ml-1.5 text-xs text-muted-foreground">
+                <span role="status" className="ms-1.5 text-xs text-muted-foreground">
                     {said}
                 </span>
             ) : null}

@@ -256,7 +256,7 @@ function TaskLine({
                     "group relative flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-2 py-1.5 transition-colors duration-fast hover:bg-card-hover md:flex-nowrap",
                     selected && "bg-primary/5",
                     cursor &&
-                        "bg-card-hover before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary"
+                        "bg-card-hover before:absolute before:inset-y-0 before:start-0 before:w-0.5 before:bg-primary"
                 )}
                 style={{ paddingLeft: `${0.5 + depth * 1.5}rem` }}
             >
@@ -267,7 +267,7 @@ function TaskLine({
                     <span
                         aria-hidden
                         className={cn(
-                            "pointer-events-none absolute left-0 z-10 h-0.5 w-full rounded bg-primary",
+                            "pointer-events-none absolute start-0 z-10 h-0.5 w-full rounded bg-primary",
                             over === "before" ? "top-0" : "bottom-0"
                         )}
                     />
@@ -327,7 +327,7 @@ function TaskLine({
                                 if (mode) onSelect(mode);
                                 else onOpen();
                             }}
-                            className="flex min-w-0 items-center gap-2 text-left"
+                            className="flex min-w-0 items-center gap-2 text-start"
                         >
                             <span className="hidden shrink-0 font-mono text-[0.6875rem] text-muted-foreground sm:inline">
                                 {task.reference}
@@ -395,7 +395,7 @@ function TaskLine({
                 )}
                 {/* On a phone the cells take a line of their own under the name,
                     lined up with it, rather than squeezing it to nothing. */}
-                <span className="flex w-full min-w-0 items-center gap-2 pl-12 md:w-auto md:gap-0 md:pl-0">
+                <span className="flex w-full min-w-0 items-center gap-2 ps-12 md:w-auto md:gap-0 md:ps-0">
                     {columns.map((column) => (
                         <ListCell key={column} column={column} commands={commands} />
                     ))}
@@ -478,7 +478,7 @@ function TaskComposer({
                 }}
                 className="min-w-0 flex-1 basis-40 bg-transparent py-0.5 text-sm outline-none placeholder:text-muted-foreground"
             />
-            <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
+            <span className="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
                 <AssigneePicker
                     people={context.people}
                     selected={assigneeIds}
@@ -570,7 +570,7 @@ function AddTaskRow({
                 type="button"
                 onClick={onClick}
                 aria-label={label}
-                className="flex w-full items-center gap-2 py-1.5 pr-2 text-left text-xs text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
+                className="flex w-full items-center gap-2 py-1.5 pe-2 text-start text-xs text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
                 style={{ paddingLeft: `${2.25 + depth * 1.5}rem` }}
             >
                 <Plus className="size-3.5" />
@@ -935,7 +935,7 @@ export function ListView(props: ViewProps) {
                                 {/* What each column is, over the values under it.
                                     A phone folds the values under the name, where
                                     there is nothing for a heading to stand over. */}
-                                <li className="hidden items-center gap-2 border-b border-border py-1 pl-[3.75rem] pr-2 text-[0.6875rem] text-muted-foreground md:flex">
+                                <li className="hidden items-center gap-2 border-b border-border py-1 ps-[3.75rem] pe-2 text-[0.6875rem] text-muted-foreground md:flex">
                                     <span className="min-w-0 flex-1 truncate">
                                         {t("list.columnName")}
                                     </span>
@@ -1182,8 +1182,8 @@ export function TableView(props: ViewProps) {
         <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full min-w-[52rem] border-collapse text-sm">
                 <thead className="sticky top-0 z-10">
-                    <tr className="border-b border-border bg-surface text-left text-xs text-muted-foreground">
-                        <th className="w-8 py-2 pl-3 pr-1">
+                    <tr className="border-b border-border bg-surface text-start text-xs text-muted-foreground">
+                        <th className="w-8 py-2 ps-3 pe-1">
                             {props.onReplaceSelection && (
                                 <Checkbox
                                     checked={allChosen}
@@ -1209,7 +1209,7 @@ export function TableView(props: ViewProps) {
                                 {field.name}
                             </th>
                         ))}
-                        <th className="w-8 px-1 py-1 text-right">
+                        <th className="w-8 px-1 py-1 text-end">
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <button
@@ -1279,7 +1279,7 @@ export function TableView(props: ViewProps) {
                                             "bg-card-hover shadow-[inset_2px_0_0_0_hsl(var(--primary))]"
                                     )}
                                 >
-                                    <td className="py-1.5 pl-3 pr-1">
+                                    <td className="py-1.5 ps-3 pe-1">
                                         <Checkbox
                                             checked={isSelected}
                                             aria-label={t("table.selectRow", { name: task.name })}
@@ -1307,7 +1307,7 @@ export function TableView(props: ViewProps) {
                                                 if (mode) onSelect(task.id, mode, rendered);
                                                 else onOpen(task.id);
                                             }}
-                                            className="flex w-full items-center gap-2 text-left"
+                                            className="flex w-full items-center gap-2 text-start"
                                         >
                                             <span className="shrink-0 whitespace-nowrap font-mono text-[0.6875rem] text-muted-foreground">
                                                 {task.reference}

@@ -148,7 +148,7 @@ export function DeviceLabelsField({
             {carried.length > 0 && (
                 <div className="flex min-w-0 flex-wrap gap-1">
                     {carried.map((label) => (
-                        <Badge key={label.id} className="min-w-0 max-w-full shrink py-0 pr-0">
+                        <Badge key={label.id} className="min-w-0 max-w-full shrink py-0 pe-0">
                             <span className="min-w-0 truncate" title={label.name}>
                                 {label.name}
                             </span>

@@ -379,7 +379,7 @@ export function TaskCard({
                     <span
                         aria-hidden
                         className={cn(
-                            "pointer-events-none absolute left-0 z-10 h-0.5 w-full rounded bg-primary animate-in fade-in-0 duration-fast",
+                            "pointer-events-none absolute start-0 z-10 h-0.5 w-full rounded bg-primary animate-in fade-in-0 duration-fast",
                             over === "before" ? "-top-1" : "-bottom-1"
                         )}
                     />
@@ -400,7 +400,7 @@ export function TaskCard({
                         }
                     }}
                     className={cn(
-                        "group flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-card p-3 text-left transition-[border-color,background-color,opacity] duration-fast hover:border-border-strong active:bg-card-hover",
+                        "group flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-card p-3 text-start transition-[border-color,background-color,opacity] duration-fast hover:border-border-strong active:bg-card-hover",
                         landed && "border-border-strong bg-card-hover",
                         lifted && "border-dashed opacity-40",
                         selected && "border-primary ring-1 ring-primary"
@@ -593,7 +593,7 @@ function SubtaskCard({
                         }
                     }}
                     className={cn(
-                        "flex min-w-0 cursor-pointer flex-col gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-left transition-colors duration-fast hover:border-border-strong active:bg-card-hover",
+                        "flex min-w-0 cursor-pointer flex-col gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-start transition-colors duration-fast hover:border-border-strong active:bg-card-hover",
                         selected && "border-primary ring-1 ring-primary"
                     )}
                 >

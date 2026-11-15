@@ -40,7 +40,7 @@ export function ScopeDialog({
     return (
         <Dialog open={question !== null} onOpenChange={(open) => !open && onAnswer(null)}>
             <DialogContent className="max-w-sm">
-                <DialogHeader className="pr-8">
+                <DialogHeader className="pe-8">
                     <DialogTitle>{t(`scope.title.${action}`)}</DialogTitle>
                     <DialogDescription>{t("scope.description")}</DialogDescription>
                 </DialogHeader>

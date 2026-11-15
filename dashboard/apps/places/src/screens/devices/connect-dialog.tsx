@@ -801,12 +801,12 @@ export function ConnectDialog({
                             {choosing && (
                                 <div className="flex flex-col gap-2">
                                     <div className="relative">
-                                        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                                        <Search className="pointer-events-none absolute top-1/2 start-3 size-4 -translate-y-1/2 text-muted-foreground" />
                                         <Input
                                             autoFocus
                                             type="search"
                                             value={query}
-                                            className="pl-9"
+                                            className="ps-9"
                                             spellCheck={false}
                                             autoComplete="off"
                                             placeholder={t("connect.search")}
@@ -833,7 +833,7 @@ export function ConnectDialog({
                                                     <button
                                                         type="button"
                                                         onClick={() => pickBrand(entry.brand)}
-                                                        className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors duration-fast hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+                                                        className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-start transition-colors duration-fast hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
                                                     >
                                                         <IntegrationLogo
                                                             slug={entry.logo}
@@ -916,7 +916,7 @@ export function ConnectDialog({
                                                 onClick={() => pickConnection(entry.id)}
                                                 aria-pressed={entry.id === chosen}
                                                 className={cn(
-                                                    "flex items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors duration-fast",
+                                                    "flex items-start gap-2 rounded-lg border px-3 py-2 text-start transition-colors duration-fast",
                                                     entry.id === chosen
                                                         ? "border-accent bg-accent/10"
                                                         : "border-border bg-card hover:border-border-strong"
@@ -985,7 +985,7 @@ export function ConnectDialog({
                             )}
 
                             {!pairing && said && said.steps.length > 0 && (
-                                <ol className="flex list-decimal flex-col gap-1 pl-4 text-xs text-muted-foreground">
+                                <ol className="flex list-decimal flex-col gap-1 ps-4 text-xs text-muted-foreground">
                                     {said.steps.map((step, index) => (
                                         <li key={step}>
                                             {index === 0 &&

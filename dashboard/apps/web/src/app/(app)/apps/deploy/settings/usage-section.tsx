@@ -115,12 +115,12 @@ export function UsageSection({ projectId }: { projectId: string }) {
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[32rem] text-sm">
                         <thead>
-                            <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
+                            <tr className="border-b border-border/60 text-start text-xs text-muted-foreground">
                                 <th className="px-2 py-1.5 font-medium">{t("usage.service")}</th>
                                 <th className="px-2 py-1.5 font-medium">{t("usage.environment")}</th>
-                                <th className="px-2 py-1.5 text-right font-medium">{t("usage.cpu")}</th>
-                                <th className="px-2 py-1.5 text-right font-medium">{t("usage.memory")}</th>
-                                <th className="px-2 py-1.5 text-right font-medium">{t("usage.volumes")}</th>
+                                <th className="px-2 py-1.5 text-end font-medium">{t("usage.cpu")}</th>
+                                <th className="px-2 py-1.5 text-end font-medium">{t("usage.memory")}</th>
+                                <th className="px-2 py-1.5 text-end font-medium">{t("usage.volumes")}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -141,13 +141,13 @@ export function UsageSection({ projectId }: { projectId: string }) {
                                         </span>
                                     </td>
                                     <td className="px-2 py-2 text-muted-foreground">{service.environmentName}</td>
-                                    <td className="px-2 py-2 text-right tabular-nums">
+                                    <td className="px-2 py-2 text-end tabular-nums">
                                         {service.cpuPercent == null ? "-" : `${service.cpuPercent}%`}
                                     </td>
-                                    <td className="px-2 py-2 text-right tabular-nums">
+                                    <td className="px-2 py-2 text-end tabular-nums">
                                         {formatBytes(service.memUsedBytes)}
                                     </td>
-                                    <td className="px-2 py-2 text-right tabular-nums">
+                                    <td className="px-2 py-2 text-end tabular-nums">
                                         {service.volumeCount === 0 ? "-" : formatBytes(service.volumeBytes)}
                                     </td>
                                 </tr>

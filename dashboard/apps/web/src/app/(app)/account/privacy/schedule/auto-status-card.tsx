@@ -206,7 +206,7 @@ export function AutoStatusCard({
                                         return (
                                             <label
                                                 key={calendar.id}
-                                                className="flex min-w-0 items-center gap-2 pl-6"
+                                                className="flex min-w-0 items-center gap-2 ps-6"
                                             >
                                                 <Checkbox
                                                     checked={isPicked}
@@ -241,7 +241,7 @@ export function AutoStatusCard({
                                 )}
                                 {meeting.calendars !== null &&
                                 calendars.length > MAX_AUTO_PRESENCE_CALENDARS ? (
-                                    <p className="pl-6 text-xs text-muted-foreground">
+                                    <p className="ps-6 text-xs text-muted-foreground">
                                         {t("auto.calendarLimit", {
                                             count: MAX_AUTO_PRESENCE_CALENDARS
                                         })}

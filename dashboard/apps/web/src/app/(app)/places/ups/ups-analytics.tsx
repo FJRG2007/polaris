@@ -74,22 +74,22 @@ export function UpsAnalytics() {
             ) : (
                 <div className="overflow-x-auto rounded-md border">
                     <table className="w-full min-w-[36rem] text-sm">
-                        <thead className="text-left text-xs text-muted-foreground">
+                        <thead className="text-start text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-3 py-2 font-normal">{t("ups.analytics.ups")}</th>
-                                <th className="px-3 py-2 text-right font-normal">
+                                <th className="px-3 py-2 text-end font-normal">
                                     {t("ups.energy.kwh")}
                                 </th>
-                                <th className="px-3 py-2 text-right font-normal">
+                                <th className="px-3 py-2 text-end font-normal">
                                     {t("ups.energy.cost")}
                                 </th>
-                                <th className="px-3 py-2 text-right font-normal">
+                                <th className="px-3 py-2 text-end font-normal">
                                     {t("ups.analytics.outages")}
                                 </th>
-                                <th className="px-3 py-2 text-right font-normal">
+                                <th className="px-3 py-2 text-end font-normal">
                                     {t("ups.analytics.events")}
                                 </th>
-                                <th className="px-3 py-2 text-right font-normal">
+                                <th className="px-3 py-2 text-end font-normal">
                                     {t("ups.analytics.load")}
                                 </th>
                             </tr>
@@ -106,19 +106,19 @@ export function UpsAnalytics() {
                                             {row.name}
                                         </Link>
                                     </td>
-                                    <td className="px-3 py-2 text-right tabular-nums">
+                                    <td className="px-3 py-2 text-end tabular-nums">
                                         {row.kwh.toFixed(2)}
                                     </td>
-                                    <td className="px-3 py-2 text-right tabular-nums">
+                                    <td className="px-3 py-2 text-end tabular-nums">
                                         {row.costs
                                             .filter((one) => one.cost > 0)
                                             .map((one) => formatMoney(one.cost, one.currency))
                                             .join(" + ") || "-"}
                                     </td>
-                                    <td className="px-3 py-2 text-right tabular-nums">
+                                    <td className="px-3 py-2 text-end tabular-nums">
                                         {row.outages}
                                     </td>
-                                    <td className="px-3 py-2 text-right tabular-nums">
+                                    <td className="px-3 py-2 text-end tabular-nums">
                                         <Link
                                             href={`/places/ups/${row.upsId}?tab=events`}
                                             className="hover:underline"
@@ -126,7 +126,7 @@ export function UpsAnalytics() {
                                             {row.events}
                                         </Link>
                                     </td>
-                                    <td className="px-3 py-2 text-right tabular-nums">
+                                    <td className="px-3 py-2 text-end tabular-nums">
                                         {row.avgLoad === null
                                             ? "-"
                                             : t("ups.analytics.loadValue", {

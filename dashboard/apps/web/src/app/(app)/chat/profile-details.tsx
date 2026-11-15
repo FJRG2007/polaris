@@ -136,7 +136,7 @@ export function ProfileDetails({
                     className={cn("shrink-0", full ? "h-28" : panel ? "h-24" : "h-16")}
                 />
                 {bannerActions ? (
-                    <div className="absolute right-2 top-2 flex items-center gap-1">
+                    <div className="absolute end-2 top-2 flex items-center gap-1">
                         {bannerActions}
                     </div>
                 ) : null}
@@ -261,7 +261,7 @@ export function ProfileDetails({
                 {full ? null : <ActivityCards personId={person.id} />}
 
                 {profile?.description && (
-                    <div className="w-full text-left">
+                    <div className="w-full text-start">
                         <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                             {t("profileDetails.about")}
                         </p>
@@ -301,7 +301,7 @@ export function ProfileDetails({
                 ) : null}
 
                 {profile?.restricted ? (
-                    <p className="flex w-full items-center gap-1.5 text-left text-xs text-muted-foreground">
+                    <p className="flex w-full items-center gap-1.5 text-start text-xs text-muted-foreground">
                         <Lock className="size-3.5 shrink-0" />
                         {t("profileDetails.restricted")}
                     </p>
@@ -317,7 +317,7 @@ export function ProfileDetails({
 function SinceRow({ label, iso, large }: { label: string; iso: string; large: boolean }) {
     const locale = useLocale();
     return (
-        <div className="w-full text-left">
+        <div className="w-full text-start">
             <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                 {label}
             </p>
@@ -409,13 +409,13 @@ export function MutualLine({
     const spaces = mutual.spaces.total;
     if (friends === 0 && spaces === 0) return null;
     const link =
-        "flex min-w-0 items-center gap-1.5 rounded text-left hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+        "flex min-w-0 items-center gap-1.5 rounded text-start hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
     return (
         <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
             {friends > 0 ? (
                 <button type="button" onClick={() => onOpen("friends")} className={link}>
-                    <span aria-hidden className="flex shrink-0 -space-x-1">
+                    <span aria-hidden className="flex shrink-0 -space-x-1 rtl:space-x-reverse">
                         {mutual.friends.people.slice(0, 3).map((person) => (
                             <Avatar
                                 key={person.id}
@@ -490,7 +490,7 @@ export function SpaceRows({ spaces }: { spaces: Shared["spaces"]["spaces"] }) {
                     <button
                         type="button"
                         onClick={() => openSpace(space.id)}
-                        className="flex w-full min-w-0 items-center gap-2 rounded px-1.5 py-1 text-left text-sm transition-colors hover:bg-muted"
+                        className="flex w-full min-w-0 items-center gap-2 rounded px-1.5 py-1 text-start text-sm transition-colors hover:bg-muted"
                     >
                         <span
                             aria-hidden

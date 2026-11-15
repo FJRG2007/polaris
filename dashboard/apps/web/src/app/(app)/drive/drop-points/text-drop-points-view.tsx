@@ -205,7 +205,7 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
                 aria-label={t("textList.tableLabel")}
             >
                 <table className="w-full min-w-[32rem] text-sm">
-                    <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                         <tr>
                             <th className="w-10 px-3 py-2">
                                 <Checkbox

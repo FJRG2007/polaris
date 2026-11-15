@@ -230,7 +230,7 @@ export function ArchiveDialog({
                                                     onClick={() =>
                                                         setCwd(cwd ? `${cwd}/${folder}` : folder)
                                                     }
-                                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-muted"
+                                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-start hover:bg-muted"
                                                 >
                                                     <Folder className="size-4 shrink-0 text-muted-foreground" />
                                                     <span className="truncate">{folder}</span>

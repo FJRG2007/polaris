@@ -65,8 +65,8 @@ function Row({
                 />
                 <span className="min-w-0 break-words">{label}</span>
             </label>
-            {hint ? <p className="ml-6 text-xs text-muted-foreground">{hint}</p> : null}
-            {children ? <div className="ml-6 min-w-0 space-y-1">{children}</div> : null}
+            {hint ? <p className="ms-6 text-xs text-muted-foreground">{hint}</p> : null}
+            {children ? <div className="ms-6 min-w-0 space-y-1">{children}</div> : null}
         </div>
     );
 }

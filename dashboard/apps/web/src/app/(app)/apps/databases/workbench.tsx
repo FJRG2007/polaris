@@ -399,9 +399,9 @@ function Bench({
                     )}
 
                     <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                            className="pl-9"
+                            className="ps-9"
                             placeholder={t("bench.findTable")}
                             aria-label={t("bench.findTable")}
                             value={find}
@@ -465,7 +465,7 @@ function Bench({
                                                 )
                                             }
                                             className={cn(
-                                                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-card-hover",
+                                                "flex w-full items-center gap-2 px-3 py-1.5 text-start text-sm transition-colors hover:bg-card-hover",
                                                 // What is in front, rather than
                                                 // everything open: a sidebar with
                                                 // six names lit says nothing about
@@ -954,9 +954,9 @@ function RowsPanel({
                         setApplied(filter);
                     }}
                 >
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                        className="pl-9"
+                        className="ps-9"
                         placeholder={cursorPaged ? t("bench.matchKeys") : t("bench.findRows")}
                         aria-label={t("bench.filterRows")}
                         value={filter}
@@ -1066,7 +1066,7 @@ function RowsPanel({
                     </div>
                 ) : (
                     <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-surface/95 text-left text-xs text-muted-foreground backdrop-blur">
+                        <thead className="sticky top-0 bg-surface/95 text-start text-xs text-muted-foreground backdrop-blur">
                             <tr>
                                 {columns.map((column) => (
                                     <SortableHeader
@@ -1523,7 +1523,7 @@ function QueryPanel({
                         {result.rows.length > 0 && (
                             <div className="max-h-72 overflow-auto overscroll-contain">
                                 <table className="w-full text-xs">
-                                    <thead className="bg-surface/60 text-left text-muted-foreground">
+                                    <thead className="bg-surface/60 text-start text-muted-foreground">
                                         <tr>
                                             {result.columns.map((column) => (
                                                 <th

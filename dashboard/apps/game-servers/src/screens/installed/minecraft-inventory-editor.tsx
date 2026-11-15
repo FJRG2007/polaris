@@ -459,7 +459,7 @@ export function InventoryEditor({
                             {t("inventoryEditor.readingTheirBag")}
                         </span>
                     )}
-                    <div className="ml-auto flex items-center gap-2">
+                    <div className="ms-auto flex items-center gap-2">
                         {reading ? (
                             <InventoryExportMenu
                                 installedAppId={installedAppId}
@@ -669,7 +669,7 @@ export function InventoryEditor({
                     <button
                         type="button"
                         aria-expanded={enchantOpen}
-                        className="flex items-center justify-between gap-2 text-left text-xs"
+                        className="flex items-center justify-between gap-2 text-start text-xs"
                         onClick={() => setEnchantOpen((open) => !open)}
                     >
                         <span className="flex min-w-0 items-center gap-1.5">

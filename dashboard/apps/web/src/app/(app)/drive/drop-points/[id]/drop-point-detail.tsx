@@ -557,7 +557,7 @@ function FilesTab({
             <CardBody className="p-0">
                 <div className="max-h-[55vh] overflow-auto overscroll-contain">
                     <table className="w-full min-w-[42rem] text-sm">
-                        <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
+                        <thead className="sticky top-0 bg-card text-start text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-4 py-2 font-medium">{t("detail.files.file")}</th>
                                 <th className="px-4 py-2 font-medium">{t("detail.files.size")}</th>
@@ -594,7 +594,7 @@ function FilesTab({
                                     >
                                         {row.status}
                                     </td>
-                                    <td className="px-4 py-2 text-right">
+                                    <td className="px-4 py-2 text-end">
                                         <button
                                             type="button"
                                             onClick={() => onDelete(row)}
@@ -635,7 +635,7 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
             <CardBody className="p-0">
                 <div className="max-h-[55vh] overflow-auto overscroll-contain">
                     <table className="w-full min-w-[42rem] text-sm">
-                        <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
+                        <thead className="sticky top-0 bg-card text-start text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-4 py-2 font-medium">{t("detail.visitors.ip")}</th>
                                 <th className="px-4 py-2 font-medium">

@@ -60,7 +60,7 @@ export function AnnouncementMarkdown({
         <div className={className}>
             {blocks.map((block, index) =>
                 block.kind === "list" ? (
-                    <ul key={index} className="ml-4 list-disc">
+                    <ul key={index} className="ms-4 list-disc">
                         {block.items.map((item, at) => (
                             <li key={at}>
                                 <InlineText parts={item} />

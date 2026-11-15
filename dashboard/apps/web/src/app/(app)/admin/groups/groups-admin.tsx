@@ -132,9 +132,9 @@ export function GroupsAdmin({ groups }: { groups: GroupRow[] }) {
         <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="relative flex-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                        className="pl-9"
+                        className="ps-9"
                         placeholder={t("groups.search.placeholder")}
                         aria-label={t("groups.search.label")}
                         value={query}
@@ -149,7 +149,7 @@ export function GroupsAdmin({ groups }: { groups: GroupRow[] }) {
 
             <div className="overflow-hidden rounded-lg border border-border">
                 <table className="w-full text-sm">
-                    <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">{t("groups.table.group")}</th>
                             <th className="hidden px-3 py-2 font-medium sm:table-cell">
@@ -374,7 +374,7 @@ function GroupDialog({
                 <DialogHeader>
                     {/* Padded on the right so a long name does not run under the
                         dialog's own close button. */}
-                    <DialogTitle className="flex items-center gap-2 pr-6">
+                    <DialogTitle className="flex items-center gap-2 pe-6">
                         <span className="truncate" title={group.name}>
                             {group.name}
                         </span>

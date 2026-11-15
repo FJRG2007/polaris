@@ -115,7 +115,7 @@ export function EnvironmentDialog({
                                 type="button"
                                 onClick={() => pick(environment)}
                                 disabled={pending !== null}
-                                className={`flex flex-col gap-1 rounded-md border p-3 text-left transition-colors disabled:opacity-60 ${
+                                className={`flex flex-col gap-1 rounded-md border p-3 text-start transition-colors disabled:opacity-60 ${
                                     selected
                                         ? "border-primary bg-primary/5"
                                         : "border-border hover:border-primary/40 hover:bg-card-hover"

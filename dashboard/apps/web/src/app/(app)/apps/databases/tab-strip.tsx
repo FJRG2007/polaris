@@ -98,7 +98,7 @@ export function TabStrip({
                                         onClick={() => onFocus(tab.id)}
                                         aria-current={active ? "true" : undefined}
                                         title={tabSubtitle(tab) || title}
-                                        className="flex max-w-[12rem] items-center gap-1.5 py-1.5 pl-2.5 pr-1 text-[0.8125rem]"
+                                        className="flex max-w-[12rem] items-center gap-1.5 py-1.5 ps-2.5 pe-1 text-[0.8125rem]"
                                     >
                                         <TabIcon tab={tab} />
                                         <span className="truncate">{title}</span>
@@ -108,7 +108,7 @@ export function TabStrip({
                                         onClick={() => onClose(tab.id)}
                                         aria-label={t("tabs.closeNamed", { name: title })}
                                         className={cn(
-                                            "mr-1 rounded p-0.5 text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
+                                            "me-1 rounded p-0.5 text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
                                             active ? "opacity-100" : "opacity-0"
                                         )}
                                     >
@@ -135,7 +135,7 @@ export function TabStrip({
             {/* Kept out of the scrolling half: these two are how anything gets
                 opened that is not a table, and a control that scrolls out of
                 reach once nine tabs are open is a control that is gone. */}
-            <div className="flex shrink-0 items-center gap-0.5 pb-1 pl-1">
+            <div className="flex shrink-0 items-center gap-0.5 pb-1 ps-1">
                 <Button size="sm" variant="ghost" onClick={onNewQuery}>
                     <Plus className="size-4 shrink-0" />
                     {shape === "sql" ? "SQL" : words.command}{/* i18n-ignore the language's name */}

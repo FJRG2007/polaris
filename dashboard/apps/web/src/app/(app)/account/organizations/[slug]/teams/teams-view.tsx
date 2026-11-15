@@ -71,7 +71,7 @@ export function TeamsView({
                 <CardHeader className="flex-row items-center justify-between">
                     <CardTitle>
                         {t("teams.title")}
-                        <span className="text-muted-foreground ml-2 text-xs font-normal">
+                        <span className="text-muted-foreground ms-2 text-xs font-normal">
                             {teamLimit > 0 ? t("form.ofLimit", { count: teams.length, limit: teamLimit }) : teams.length}
                         </span>
                     </CardTitle>
@@ -93,7 +93,7 @@ export function TeamsView({
                         of those a search rather than a glance. */}
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
-                            <thead className="bg-surface/60 text-muted-foreground text-left text-xs">
+                            <thead className="bg-surface/60 text-muted-foreground text-start text-xs">
                                 <tr>
                                     <th className="px-3 py-2 font-medium">{t("teams.columns.team")}</th>
                                     <th className="px-3 py-2 font-medium">{t("teams.columns.people")}</th>
@@ -120,7 +120,7 @@ export function TeamsView({
                                 <td className="px-3 py-2">
                                     <button
                                         type="button"
-                                        className="min-w-0 text-left"
+                                        className="min-w-0 text-start"
                                         onClick={() => setOpen(team)}
                                     >
                                         <span className="flex min-w-0 flex-col leading-tight">
@@ -141,7 +141,7 @@ export function TeamsView({
                                         ? t("teams.noGrants")
                                         : t("teams.grants", { count: team.spaceCount + team.folderCount })}
                                 </td>
-                                <td className="px-3 py-2 text-right">
+                                <td className="px-3 py-2 text-end">
                                     {canManage && (
                                         <button
                                             type="button"

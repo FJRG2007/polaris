@@ -79,7 +79,7 @@ export function FindBar({
                             total: `${total}${total === MOST_MATCHES ? "+" : ""}`
                         })}
             </span>
-            <div className="ml-auto flex items-center gap-1">
+            <div className="ms-auto flex items-center gap-1">
                 <Button
                     size="sm"
                     variant="ghost"

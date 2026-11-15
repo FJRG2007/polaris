@@ -89,7 +89,7 @@ function AddCardDialog({
     const [askFirst, setAskFirst] = useState(false);
     const sensors = devices.filter((device) => Boolean(device.reading?.value));
     const row =
-        "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted";
+        "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-md px-3 py-2 text-start text-sm hover:bg-muted";
     return (
         <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="flex max-h-[85dvh] flex-col">
@@ -361,7 +361,7 @@ export function PanelDetail({
                         title={selected.name}
                     >
                         {selected.name}
-                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                        <span className="ms-2 text-sm font-normal text-muted-foreground">
                             {t("panels.cards", { count: selected.cards.length })}
                         </span>
                     </h2>

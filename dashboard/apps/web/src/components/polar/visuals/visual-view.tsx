@@ -89,7 +89,7 @@ export function PolarVisualView({ visual }: { visual: PolarVisual }) {
 
     return (
         <figure className="flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-lg border border-border bg-card">
-            <figcaption className="flex min-w-0 items-center gap-2 border-b border-border py-1 pl-3 pr-1">
+            <figcaption className="flex min-w-0 items-center gap-2 border-b border-border py-1 ps-3 pe-1">
                 <span
                     className="min-w-0 flex-1 truncate text-sm font-medium text-foreground"
                     title={name}
@@ -300,7 +300,7 @@ function Grid({
     rows: readonly (readonly (string | number | null)[])[];
     highlight?: number;
 }) {
-    const side = (index: number) => (align[index] === "end" ? "text-right" : "text-left");
+    const side = (index: number) => (align[index] === "end" ? "text-end" : "text-start");
     return (
         <div className="-mx-3 -my-3 min-w-0 overflow-x-auto overscroll-x-contain">
             <table className="w-full min-w-max border-collapse text-sm" aria-label={label}>

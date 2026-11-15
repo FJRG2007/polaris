@@ -55,17 +55,17 @@ export function PolarSpendCard() {
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[28rem] text-sm">
                             <thead>
-                                <tr className="text-left">
-                                    <th className="w-full max-w-0 py-1 pr-3">
+                                <tr className="text-start">
+                                    <th className="w-full max-w-0 py-1 pe-3">
                                         {t("consumption.polar.person")}
                                     </th>
-                                    <th className="py-1 pr-3 text-right">
+                                    <th className="py-1 pe-3 text-end">
                                         {t("consumption.polar.answers")}
                                     </th>
-                                    <th className="py-1 pr-3 text-right">
+                                    <th className="py-1 pe-3 text-end">
                                         {t("consumption.polar.tokens")}
                                     </th>
-                                    <th className="py-1 text-right">
+                                    <th className="py-1 text-end">
                                         {t("consumption.polar.cost")}
                                     </th>
                                 </tr>
@@ -73,7 +73,7 @@ export function PolarSpendCard() {
                             <tbody>
                                 {data.people.map((person) => (
                                     <tr key={person.userId} className="border-t border-border">
-                                        <td className="max-w-0 py-1 pr-3">
+                                        <td className="max-w-0 py-1 pe-3">
                                             <Link
                                                 href={`/admin/users/${person.userId}`}
                                                 className="block truncate hover:underline"
@@ -82,13 +82,13 @@ export function PolarSpendCard() {
                                                 {person.name}
                                             </Link>
                                         </td>
-                                        <td className="py-1 pr-3 text-right tabular-nums">
+                                        <td className="py-1 pe-3 text-end tabular-nums">
                                             {person.answers}
                                         </td>
-                                        <td className="py-1 pr-3 text-right tabular-nums">
+                                        <td className="py-1 pe-3 text-end tabular-nums">
                                             {formatTokens(person.tokens, locale)}
                                         </td>
-                                        <td className="py-1 text-right tabular-nums">
+                                        <td className="py-1 text-end tabular-nums">
                                             {formatUsd(person.costUsd, locale)}
                                         </td>
                                     </tr>

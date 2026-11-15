@@ -190,7 +190,7 @@ export function FolderTree({
             <div key={node.path}>
                 <div
                     className={cn(
-                        "flex items-center gap-1 rounded-md pr-2 transition-colors",
+                        "flex items-center gap-1 rounded-md pe-2 transition-colors",
                         value === node.path ? "bg-primary/10 text-primary" : "hover:bg-muted"
                     )}
                     style={{ paddingLeft: `${depth * 1.1}rem` }}
@@ -213,7 +213,7 @@ export function FolderTree({
                         type="button"
                         onClick={() => onChange(node.path)}
                         onDoubleClick={() => toggle(node.path)}
-                        className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left text-sm"
+                        className="flex min-w-0 flex-1 items-center gap-2 py-1 text-start text-sm"
                     >
                         {expanded.has(node.path) ? (
                             <FolderOpen className="size-4 shrink-0 text-primary" />
@@ -240,7 +240,7 @@ export function FolderTree({
         >
             <div
                 className={cn(
-                    "flex items-center gap-1 rounded-md pr-2 transition-colors",
+                    "flex items-center gap-1 rounded-md pe-2 transition-colors",
                     value === root ? "bg-primary/10 text-primary" : "hover:bg-muted"
                 )}
             >
@@ -260,7 +260,7 @@ export function FolderTree({
                 <button
                     type="button"
                     onClick={() => onChange(root)}
-                    className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left text-sm"
+                    className="flex min-w-0 flex-1 items-center gap-2 py-1 text-start text-sm"
                 >
                     <FolderOpen className="size-4 shrink-0 text-primary" />
                     <span className="truncate">

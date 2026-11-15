@@ -83,7 +83,7 @@ export function ChooseFilesDialog({
         return (
             <Dialog open onOpenChange={(next) => (next ? undefined : stop())}>
                 <DialogContent className="max-w-sm">
-                    <div role="status" className="flex items-center gap-2 pr-8 text-[13px]">
+                    <div role="status" className="flex items-center gap-2 pe-8 text-[13px]">
                         <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
                         <span className="min-w-0 truncate">{t("files.fetching")}</span>
                     </div>

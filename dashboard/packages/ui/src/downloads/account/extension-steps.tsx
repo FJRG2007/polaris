@@ -171,7 +171,7 @@ function Pointer({ pressing }: { pressing: boolean }) {
         <MousePointer2
             aria-hidden
             className={cn(
-                "absolute -bottom-2 -right-2 size-3.5 shrink-0 fill-foreground text-background transition-transform duration-300",
+                "absolute -bottom-2 -end-2 size-3.5 shrink-0 fill-foreground text-background transition-transform duration-300",
                 pressing ? "scale-90" : "translate-x-1 translate-y-1"
             )}
         />
@@ -256,7 +256,7 @@ function StepScene({ kind, guide }: { kind: StepKind; guide: BrowserGuide }) {
                 </span>
                 <span className="min-w-0 flex-1 truncate rounded bg-field px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
                     {kind === "open" ? guide.page.slice(0, phase + 1) : kind === "private" && guide.id === "firefox" ? "about:addons" : guide.page}
-                    {kind === "open" ? <span className="ml-px inline-block w-px animate-pulse bg-foreground">&nbsp;</span> : null}
+                    {kind === "open" ? <span className="ms-px inline-block w-px animate-pulse bg-foreground">&nbsp;</span> : null}
                 </span>
             </div>
             <div className="flex min-h-16 items-center justify-center px-3 py-3">{body}</div>
@@ -304,7 +304,7 @@ function GuidedSteps({
                                     setFinished(false);
                                     setCurrent(index);
                                 }}
-                                className="flex w-full min-w-0 items-start gap-3 px-3 py-2 text-left text-sm"
+                                className="flex w-full min-w-0 items-start gap-3 px-3 py-2 text-start text-sm"
                             >
                                 <span
                                     className={cn(
@@ -329,7 +329,7 @@ function GuidedSteps({
                             </button>
                             {kind === "open" ? (
                                 // Always in reach, and outside the step's own button: the copy is a button of its own.
-                                <div className="px-3 pb-1 pl-11 text-sm">
+                                <div className="px-3 pb-1 ps-11 text-sm">
                                     <AddressToPaste text={guide.page} />
                                 </div>
                             ) : null}
@@ -337,9 +337,9 @@ function GuidedSteps({
                                 narrow card the picture and the buttons, both fixed,
                                 stood side by side past its padding. */}
                             {open ? (
-                                <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 px-3 pb-3 pl-11">
+                                <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 px-3 pb-3 ps-11">
                                     <StepScene kind={kind} guide={guide} />
-                                    <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+                                    <div className="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
                                         <span className="text-xs text-muted-foreground">
                                             {t("downloads.steps.stepOf", { step: index + 1, total: kinds.length })}
                                         </span>

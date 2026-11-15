@@ -107,7 +107,7 @@ export function QrSignInPanel() {
     // Hidden by CSS rather than left unrendered, so the two-column layout is the
     // same on the first frame as it is once the media query has been read.
     return (
-        <div className="hidden flex-col items-center justify-center gap-3 border-l border-border pl-6 text-center sm:flex">
+        <div className="hidden flex-col items-center justify-center gap-3 border-s border-border ps-6 text-center sm:flex">
             <h2 className="text-sm font-medium">{t("qr.title")}</h2>
             <div className="relative rounded-lg bg-white p-3">
                 {code ? (

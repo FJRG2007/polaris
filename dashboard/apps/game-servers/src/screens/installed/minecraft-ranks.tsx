@@ -459,7 +459,7 @@ export function MinecraftRanks({ installedAppId }: { installedAppId: string }) {
 
             {!bedrock && draft && (dirty || pending) && (
                 <div className="sticky bottom-2 z-10 flex flex-wrap items-center justify-end gap-2 rounded-lg border bg-background/95 p-2 shadow-sm">
-                    <span className="mr-auto min-w-0 text-sm text-muted-foreground">
+                    <span className="me-auto min-w-0 text-sm text-muted-foreground">
                         {valid || pending ? t("ranks.unsaved") : t("ranks.invalid")}
                     </span>
                     <ui.Button
@@ -752,7 +752,7 @@ function RankEditor({
                         {rank.players.map((player) => (
                             <li
                                 key={player}
-                                className="flex min-w-0 items-center gap-1 rounded-md bg-muted py-0.5 pl-2 pr-0.5 text-sm"
+                                className="flex min-w-0 items-center gap-1 rounded-md bg-muted py-0.5 ps-2 pe-0.5 text-sm"
                             >
                                 <span className="truncate font-mono" title={player}>
                                     {player}

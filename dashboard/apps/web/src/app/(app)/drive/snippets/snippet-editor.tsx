@@ -348,7 +348,7 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                             aria-label={t("snippetEditor.language")}
                             className="max-w-[12rem]"
                         />
-                        <span className="ml-auto text-xs text-muted-foreground">
+                        <span className="ms-auto text-xs text-muted-foreground">
                             {used.toLocaleString()} / {MAX_SNIPPET_TOTAL_CHARS.toLocaleString()}
                         </span>
                     </div>

@@ -675,7 +675,7 @@ function AccessDialog({
                             environments.map((environment) => (
                                 <label
                                     key={environment.id}
-                                    className={`flex items-center gap-2 text-xs${everyEnvironment ? " pl-5" : ""}`}
+                                    className={`flex items-center gap-2 text-xs${everyEnvironment ? " ps-5" : ""}`}
                                 >
                                     <Checkbox
                                         checked={draft.environmentIds.includes(environment.id)}

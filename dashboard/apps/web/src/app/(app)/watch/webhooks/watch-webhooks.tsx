@@ -27,7 +27,7 @@ export function WatchWebhooks({ projects }: { projects: { id: string; name: stri
                                 onClick={() => setSelected(project.id)}
                                 aria-current={selected === project.id ? "true" : undefined}
                                 className={cn(
-                                    "flex w-full items-center justify-between gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-muted",
+                                    "flex w-full items-center justify-between gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-start text-sm transition-colors hover:bg-muted",
                                     selected === project.id
                                         ? "bg-muted font-medium text-foreground"
                                         : "text-muted-foreground"

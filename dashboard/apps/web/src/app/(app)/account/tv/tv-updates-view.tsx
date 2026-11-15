@@ -357,7 +357,7 @@ function TvUpdateRow({
                     </Badge>
                 ) : !tvTakesUpdates(row.versionCode) ? (
                     <span
-                        className="min-w-0 max-w-[45%] shrink truncate text-right text-xs text-muted-foreground"
+                        className="min-w-0 max-w-[45%] shrink truncate text-end text-xs text-muted-foreground"
                         title={t("tv.updates.updateOnTv")}
                     >
                         {t("tv.updates.updateOnTv")}
@@ -383,7 +383,7 @@ function TvUpdateRow({
                     </Button>
                 )}
             </div>
-            <div className="flex min-w-0 flex-col gap-3 pl-7">
+            <div className="flex min-w-0 flex-col gap-3 ps-7">
                 <TvPreferences row={row} reach={reach} onBlocking={onBlocking} />
                 <TvCatalogPicker
                     row={row}

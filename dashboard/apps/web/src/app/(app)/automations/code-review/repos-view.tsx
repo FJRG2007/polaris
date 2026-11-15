@@ -59,7 +59,7 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                 <Card>
                     <CardBody className="p-0">
                         <table className="w-full text-sm">
-                            <thead className="text-left text-xs text-muted-foreground">
+                            <thead className="text-start text-xs text-muted-foreground">
                                 <tr className="border-b border-white/5">
                                     <th className="w-full max-w-0 px-4 py-2 font-medium">
                                         {t("sessions.form.repository")}
@@ -87,7 +87,7 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                                     {repo.repoFullName}
                                                 </a>
                                                 {repo.isPrivate ? (
-                                                    <Badge variant="neutral" className="ml-2">
+                                                    <Badge variant="neutral" className="ms-2">
                                                         {t("repos.private")}
                                                     </Badge>
                                                 ) : null}
@@ -104,7 +104,7 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                         >
                                             {agentWord(t, "execution", repo.execution)}
                                             {repo.poolName ? (
-                                                <span className="ml-1 text-xs">
+                                                <span className="ms-1 text-xs">
                                                     ({repo.poolName})
                                                 </span>
                                             ) : null}

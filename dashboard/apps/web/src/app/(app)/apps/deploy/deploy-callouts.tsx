@@ -119,7 +119,7 @@ function Callout({
                 <p className="text-sm font-medium text-foreground">{title}</p>
                 {detail && <div className="mt-0.5 text-xs text-muted-foreground">{detail}</div>}
             </div>
-            {children && <div className="ml-auto flex shrink-0 items-center gap-2">{children}</div>}
+            {children && <div className="ms-auto flex shrink-0 items-center gap-2">{children}</div>}
         </div>
     );
 }

@@ -573,7 +573,7 @@ export function LockShelfEntries({
     const { state, openSettings } = useChatLock();
     const [asking, setAsking] = useState(false);
     const entry =
-        "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm transition-colors hover:bg-card-hover";
+        "flex w-full items-center gap-2 rounded-md px-2 py-1 text-start text-sm transition-colors hover:bg-card-hover";
 
     if (shelf !== "all")
         return (

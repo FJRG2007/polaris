@@ -127,7 +127,7 @@ function LineNumbers({ count }: { count: number }) {
     return (
         <pre
             aria-hidden
-            className="sticky left-0 select-none border-r border-border bg-surface py-4 pl-4 pr-3 text-right font-mono text-xs leading-relaxed text-muted-foreground"
+            className="sticky start-0 select-none border-e border-border bg-surface py-4 ps-4 pe-3 text-end font-mono text-xs leading-relaxed text-muted-foreground"
         >
             {numbers.join("\n")}
         </pre>

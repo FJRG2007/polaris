@@ -155,7 +155,7 @@ function ExposureRow({
                 </span>
             )}
             {/* Beside the name when there is room, on a line of their own when not. */}
-            <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            <div className="ms-auto flex shrink-0 items-center gap-1.5">
                 {href && (
                     <CopyButton
                         value={href.replace(/^https?:\/\//, "")}
@@ -1873,7 +1873,7 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                                             {domain.hostname}
                                         </span>
                                     )}
-                                    <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                                    <div className="ms-auto flex shrink-0 items-center gap-1.5">
                                         <CopyButton
                                             value={domain.hostname}
                                             className={cn("shrink-0 rounded p-1", revealOnHover)}
@@ -2041,7 +2041,7 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                     learnMore={t("settings.addADomainIntro")}
                     footer={
                         <>
-                            <p className="mr-auto min-w-0 text-xs" role="status" aria-live="polite">
+                            <p className="me-auto min-w-0 text-xs" role="status" aria-live="polite">
                                 {error ? (
                                     <span className="text-danger-ink">{error}</span>
                                 ) : added ? (

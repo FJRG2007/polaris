@@ -60,7 +60,7 @@ export function GameServerCard({
         : t("gameServerCard.gameServer");
 
     return (
-        <div className="py-1 pl-14 pr-4">
+        <div className="py-1 ps-14 pe-4">
             <div className="flex min-w-0 max-w-md flex-col gap-2 rounded-md border bg-card p-3">
                 <div className="flex min-w-0 items-center gap-3">
                     {definition ? (

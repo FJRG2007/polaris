@@ -212,7 +212,7 @@ export function SlideList({
             ref={list}
             role="listbox"
             aria-label={t("slides.slideList")}
-            className="flex shrink-0 gap-2 overscroll-contain p-2 max-sm:order-last max-sm:h-24 max-sm:overflow-x-auto max-sm:border-t max-sm:border-border sm:w-44 sm:flex-col sm:overflow-y-auto sm:border-r sm:border-border"
+            className="flex shrink-0 gap-2 overscroll-contain p-2 max-sm:order-last max-sm:h-24 max-sm:overflow-x-auto max-sm:border-t max-sm:border-border sm:w-44 sm:flex-col sm:overflow-y-auto sm:border-e sm:border-border"
         >
             {slides.map((one, index) => {
                 const thumb = (
@@ -235,14 +235,14 @@ export function SlideList({
                         }}
                         onKeyDown={(event) => onKey(event, index)}
                         className={cn(
-                            "relative aspect-video shrink-0 overflow-hidden rounded-md border bg-white text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring max-sm:h-full sm:w-full",
+                            "relative aspect-video shrink-0 overflow-hidden rounded-md border bg-white text-start outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring max-sm:h-full sm:w-full",
                             index === at
                                 ? "border-primary ring-1 ring-primary"
                                 : "border-border hover:border-border-strong"
                         )}
                     >
                         <SlideDrawing boxes={bySlide.get(one.id) ?? []} slideId={one.id} />
-                        <span className="absolute bottom-1 left-1 rounded bg-background/80 px-1 text-[10px] text-muted-foreground">
+                        <span className="absolute bottom-1 start-1 rounded bg-background/80 px-1 text-[10px] text-muted-foreground">
                             {index + 1}
                         </span>
                     </button>
@@ -272,7 +272,7 @@ export function SlideList({
                                             aria-label={t("slides.slideMenu")}
                                             title={t("slides.slideMenu")}
                                             className={cn(
-                                                "absolute right-1 top-1 size-6 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100",
+                                                "absolute end-1 top-1 size-6 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100",
                                                 index === at && "opacity-100"
                                             )}
                                         >

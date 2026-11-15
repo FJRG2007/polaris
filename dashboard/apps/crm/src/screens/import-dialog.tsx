@@ -270,11 +270,11 @@ export function ImportDialog(props: ImportDialogProps) {
                 <div className="max-h-72 min-h-0 overflow-y-auto overscroll-contain">
                     <table className="w-full table-fixed text-[0.8125rem]">
                         <thead>
-                            <tr className="text-left text-muted-foreground">
-                                <th className="w-1/3 py-1 pr-2 font-medium">
+                            <tr className="text-start text-muted-foreground">
+                                <th className="w-1/3 py-1 pe-2 font-medium">
                                     {t("import.column")}
                                 </th>
-                                <th className="hidden w-1/3 py-1 pr-2 font-medium sm:table-cell">
+                                <th className="hidden w-1/3 py-1 pe-2 font-medium sm:table-cell">
                                     {t("import.sample")}
                                 </th>
                                 <th className="py-1 font-medium">{t("import.field")}</th>
@@ -283,11 +283,11 @@ export function ImportDialog(props: ImportDialogProps) {
                         <tbody>
                             {loaded.header.map((name, index) => (
                                 <tr key={index}>
-                                    <td className="truncate py-1 pr-2" title={name}>
+                                    <td className="truncate py-1 pe-2" title={name}>
                                         {name || "-"}
                                     </td>
                                     <td
-                                        className="hidden truncate py-1 pr-2 text-muted-foreground sm:table-cell"
+                                        className="hidden truncate py-1 pe-2 text-muted-foreground sm:table-cell"
                                         title={loaded.rows[0]?.[index] ?? ""}
                                     >
                                         {loaded.rows[0]?.[index] ?? ""}

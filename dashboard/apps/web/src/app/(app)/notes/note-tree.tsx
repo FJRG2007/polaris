@@ -300,7 +300,7 @@ export function NoteTree({
                                     type="button"
                                     onClick={() => open(hit.id)}
                                     className={cn(
-                                        "flex w-full min-w-0 flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted",
+                                        "flex w-full min-w-0 flex-col gap-0.5 rounded-md px-2 py-1.5 text-start transition-colors hover:bg-muted",
                                         activeNoteId === hit.id && "bg-muted"
                                     )}
                                 >
@@ -515,13 +515,13 @@ function TreeSearch({
     return (
         <div className="flex items-center gap-2">
             <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <input
                     value={query}
                     onChange={(event) => onQuery(event.target.value)}
                     placeholder={t("tree.find")}
                     aria-label={t("tree.find")}
-                    className="h-8 w-full rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
+                    className="h-8 w-full rounded-md border border-border bg-field ps-7 pe-2 text-xs hover:border-border-strong focus:border-border-strong"
                 />
             </div>
             <button
@@ -685,7 +685,7 @@ function ShelfRow({
                             aria-label={t("tree.newNoteIn", { name })}
                             title={t("tree.newNote")}
                             onClick={onNewNote}
-                            className="ml-auto rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                            className="ms-auto rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                         >
                             <Plus className="size-3.5" />
                         </button>
@@ -862,7 +862,7 @@ function Branch({
                                         onDrop({ spaceId, folderId: folder.id });
                                     }}
                                     className={cn(
-                                        "group flex items-center gap-1 rounded-md pr-1 transition-colors hover:bg-muted",
+                                        "group flex items-center gap-1 rounded-md pe-1 transition-colors hover:bg-muted",
                                         over === key && "bg-primary/10 ring-1 ring-primary/40"
                                     )}
                                     style={{ paddingLeft: `${depth * 0.75}rem` }}
@@ -908,7 +908,7 @@ function Branch({
                                             onClick={() =>
                                                 onCreateNote({ spaceId, folderId: folder.id })
                                             }
-                                            className="ml-auto rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                                            className="ms-auto rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                                         >
                                             <Plus className="size-3.5" />
                                         </button>
@@ -1090,7 +1090,7 @@ function NoteBranch({
                         onDragStart={() => onDragStart({ kind: "note", id: note.id, spaceId })}
                         onDragEnd={onDragEnd}
                         className={cn(
-                            "group flex items-center gap-0.5 rounded-md pr-1 transition-colors hover:bg-muted",
+                            "group flex items-center gap-0.5 rounded-md pe-1 transition-colors hover:bg-muted",
                             activeNoteId === note.id && "bg-muted"
                         )}
                         style={{ paddingLeft: `${depth * 0.75}rem` }}
@@ -1129,7 +1129,7 @@ function NoteBranch({
                             <button
                                 type="button"
                                 onClick={() => onOpen(note.id)}
-                                className="flex min-w-0 flex-1 flex-col gap-0.5 py-1.5 pr-1 text-left"
+                                className="flex min-w-0 flex-1 flex-col gap-0.5 py-1.5 pe-1 text-start"
                             >
                                 <span className="flex min-w-0 items-center gap-1.5">
                                     {note.pinned && (

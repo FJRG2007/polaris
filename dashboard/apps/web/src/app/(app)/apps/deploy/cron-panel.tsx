@@ -234,7 +234,7 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
                                     onClick={() =>
                                         setOpenRuns((open) => (open === cron.id ? null : cron.id))
                                     }
-                                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                                    className="flex min-w-0 flex-1 items-center gap-2 text-start"
                                     aria-expanded={openRuns === cron.id}
                                 >
                                     <ChevronRight
@@ -646,7 +646,7 @@ function CronRuns({ applicationId, cronId }: { applicationId: string; cronId: st
                         <button
                             type="button"
                             onClick={() => setOpen((held) => (held === run.id ? null : run.id))}
-                            className="flex w-full items-center gap-2 text-left text-xs"
+                            className="flex w-full items-center gap-2 text-start text-xs"
                             aria-expanded={open === run.id}
                         >
                             <StatusChip status={run.status} />

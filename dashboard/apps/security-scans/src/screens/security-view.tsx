@@ -824,7 +824,7 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
                                                     </span>
                                                     {f.layer ? (
                                                         <span
-                                                            className="ml-2 font-mono text-xs text-muted-foreground"
+                                                            className="ms-2 font-mono text-xs text-muted-foreground"
                                                             title={f.layer}
                                                         >
                                                             {t("images.layer", {

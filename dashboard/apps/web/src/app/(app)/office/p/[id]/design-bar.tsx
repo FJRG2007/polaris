@@ -214,7 +214,7 @@ function FontSub({
                 <span className="min-w-0 flex-1 truncate" title={label}>
                     {label}
                 </span>
-                <span className="ml-3 shrink-0 text-muted-foreground">{current}</span>
+                <span className="ms-3 shrink-0 text-muted-foreground">{current}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
                 {deck.SLIDE_FONTS.map((font) => (

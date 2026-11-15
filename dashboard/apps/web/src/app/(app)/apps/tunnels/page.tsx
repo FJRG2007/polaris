@@ -34,7 +34,7 @@ async function TunnelList() {
 function ListSkeleton() {
     return (
         <div className="flex flex-col gap-3" aria-hidden>
-            <Skeleton className="ml-auto h-7 w-28" />
+            <Skeleton className="ms-auto h-7 w-28" />
             <Skeleton className="h-32" />
             <Skeleton className="h-32" />
         </div>

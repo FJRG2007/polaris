@@ -607,7 +607,7 @@ export function EmojiPicker({
                             tab === "saved" && "hidden"
                         )}
                     >
-                        <Search className="pointer-events-none absolute left-4 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute start-4 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                         <input
                             autoFocus
                             value={query}
@@ -626,7 +626,7 @@ export function EmojiPicker({
                                       ? t("emojiPicker.searchStickers")
                                       : t("emojiPicker.searchGifs")
                             }
-                            className="h-7 w-full rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
+                            className="h-7 w-full rounded-md border border-border bg-field ps-7 pe-2 text-xs hover:border-border-strong focus:border-border-strong"
                         />
                     </div>
 
@@ -957,7 +957,7 @@ function Tile({
                     onKeep(!kept);
                 }}
                 className={cn(
-                    "absolute right-1 top-1 rounded-md border border-border bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/pic:opacity-100",
+                    "absolute end-1 top-1 rounded-md border border-border bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/pic:opacity-100",
                     kept && "text-primary opacity-100"
                 )}
             >

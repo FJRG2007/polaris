@@ -56,7 +56,7 @@ export function SendButton({
                 title={t("sendButton.send")}
                 className={cn(
                     "rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40",
-                    menu && "rounded-r-none pr-1"
+                    menu && "rounded-e-none pe-1"
                 )}
             >
                 <SendHorizontal className="size-4" />
@@ -69,7 +69,7 @@ export function SendButton({
                             disabled={disabled}
                             aria-label={t("sendButton.moreWaysToSend")}
                             title={t("sendButton.moreWaysToSend")}
-                            className="rounded rounded-l-none py-1.5 pl-0.5 pr-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+                            className="rounded rounded-s-none py-1.5 ps-0.5 pe-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
                         >
                             <ChevronDown className="size-3" />
                         </button>

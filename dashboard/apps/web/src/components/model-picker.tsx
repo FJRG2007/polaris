@@ -149,7 +149,7 @@ export function ModelPicker({
                 onClick={() => setOpen((was) => !was)}
                 className="border-border bg-field flex h-9 w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
-                <span className="min-w-0 truncate text-left">
+                <span className="min-w-0 truncate text-start">
                     {chosen ? chosen.name : (value ?? inheritLabel ?? placeholder)}
                 </span>
                 {chosen ? (
@@ -243,7 +243,7 @@ function Row({
             type="button"
             variant="ghost"
             onClick={onSelect}
-            className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-left font-normal"
+            className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-start font-normal"
         >
             <Check className={`size-4 shrink-0 ${selected ? "opacity-100" : "opacity-0"}`} />
             <span className="min-w-0 flex-1">

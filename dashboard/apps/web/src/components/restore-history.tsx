@@ -203,7 +203,7 @@ function HistoryList({
                                         {change.fields.map((field) => (
                                             <div
                                                 key={field.field}
-                                                className="ml-3 break-all text-muted-foreground"
+                                                className="ms-3 break-all text-muted-foreground"
                                             >
                                                 {field.field}:{" "}
                                                 {field.after ?? t("history.empty_value")}

@@ -178,7 +178,7 @@ export function VirtualKeyboard({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="ml-auto"
+                                className="ms-auto"
                                 aria-label={labels.close}
                                 title={labels.close}
                             >

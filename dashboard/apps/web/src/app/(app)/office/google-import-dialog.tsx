@@ -240,11 +240,11 @@ export function GoogleImportDialog({
                             )}
                             <div className="relative min-w-0 flex-1">
                                 <Search
-                                    className="pointer-events-none absolute left-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-foreground-subtle"
+                                    className="pointer-events-none absolute start-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-foreground-subtle"
                                     aria-hidden
                                 />
                                 <Input
-                                    className="pl-8"
+                                    className="ps-8"
                                     value={search}
                                     placeholder={t("google.search")}
                                     aria-label={t("google.search")}
@@ -300,7 +300,7 @@ export function GoogleImportDialog({
                                         <li key={file.id}>
                                             <button
                                                 type="button"
-                                                className="flex w-full min-w-0 items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-option-hover disabled:cursor-not-allowed disabled:opacity-60"
+                                                className="flex w-full min-w-0 items-center gap-3 rounded-md px-2 py-2 text-start hover:bg-option-hover disabled:cursor-not-allowed disabled:opacity-60"
                                                 disabled={!file.importable || opening !== null}
                                                 title={
                                                     file.importable

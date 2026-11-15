@@ -153,7 +153,7 @@ export const DropdownMenuSubTrigger = forwardRef<
             }}
         >
             {children}
-            <ChevronRight className="ml-auto size-4" />
+            <ChevronRight className="ms-auto size-4" />
         </RadixMenu.SubTrigger>
     );
 });

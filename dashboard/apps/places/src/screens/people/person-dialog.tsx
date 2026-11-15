@@ -161,7 +161,7 @@ export function PersonDialog({
                                             type="button"
                                             onClick={() => drop(index)}
                                             aria-label={t("people.removePhoto")}
-                                            className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-border bg-elevated text-foreground-subtle hover:text-foreground"
+                                            className="absolute -end-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-border bg-elevated text-foreground-subtle hover:text-foreground"
                                         >
                                             <X className="size-3 shrink-0" />
                                         </button>

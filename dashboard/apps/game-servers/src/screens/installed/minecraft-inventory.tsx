@@ -328,7 +328,7 @@ function Slot({
                 {pending.count > 1 && (
                     <span
                         style={COUNT_OUTLINE}
-                        className="pointer-events-none absolute bottom-0 right-0.5 text-[0.625rem] font-bold leading-none tabular-nums"
+                        className="pointer-events-none absolute bottom-0 end-0.5 text-[0.625rem] font-bold leading-none tabular-nums"
                     >
                         {pending.count}
                     </span>
@@ -342,7 +342,7 @@ function Slot({
                         title={t("inventory.callBack", { what })}
                         aria-label={t("inventory.callBackFrom", { what, where })}
                         onClick={() => onCancelPending(pending.id)}
-                        className="absolute -right-1 -top-1 rounded-full border border-border bg-surface p-0.5 text-muted-foreground transition-colors hover:text-danger"
+                        className="absolute -end-1 -top-1 rounded-full border border-border bg-surface p-0.5 text-muted-foreground transition-colors hover:text-danger"
                     >
                         <X className="size-2.5" />
                     </button>
@@ -419,7 +419,7 @@ function Slot({
             {item.count > 1 && (
                 <span
                     style={COUNT_OUTLINE}
-                    className="pointer-events-none absolute bottom-0 right-0.5 text-[0.625rem] font-bold leading-none tabular-nums"
+                    className="pointer-events-none absolute bottom-0 end-0.5 text-[0.625rem] font-bold leading-none tabular-nums"
                 >
                     {item.count}
                 </span>

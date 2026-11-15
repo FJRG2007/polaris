@@ -551,12 +551,12 @@ export function VaultApp() {
                 <Card className="lg:sticky lg:top-4">
                     <CardBody className="flex flex-col gap-2 p-2">
                         <div className="relative">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
                                 placeholder={t("app.search")}
-                                className="pl-9"
+                                className="ps-9"
                             />
                         </div>
                         <div className="flex items-center gap-2">
@@ -615,7 +615,7 @@ export function VaultApp() {
                                 {items.length === 0 ? t("app.empty") : t("app.noMatch")}
                             </p>
                         ) : (
-                            <ul className="-mr-1 flex max-h-[calc(100dvh-16rem-var(--notice-height))] flex-col gap-0.5 overflow-y-auto overscroll-contain pr-1">
+                            <ul className="-me-1 flex max-h-[calc(100dvh-16rem-var(--notice-height))] flex-col gap-0.5 overflow-y-auto overscroll-contain pe-1">
                                 {visible.map((item) => {
                                     const Icon = TYPE_ICON[itemKind(item)] ?? KeyRound;
                                     return (
@@ -639,7 +639,7 @@ export function VaultApp() {
                                                             setRevealed(false);
                                                         }}
                                                         onKeyDown={(event) => onRowKey(event, item)}
-                                                        className={`flex w-full items-center gap-3 rounded-md border p-2.5 text-left transition-colors ${
+                                                        className={`flex w-full items-center gap-3 rounded-md border p-2.5 text-start transition-colors ${
                                                             item.id === selected
                                                                 ? "border-primary/40 bg-primary/5"
                                                                 : "border-transparent hover:bg-card-hover"

@@ -358,7 +358,7 @@ export function ForwardDialog({
                                         <button
                                             type="button"
                                             onClick={() => setInside(space.id)}
-                                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                                            className="flex w-full items-center gap-2 px-3 py-2 text-start text-sm transition-colors hover:bg-muted"
                                         >
                                             <Server className="size-3.5 shrink-0 text-muted-foreground" />
                                             <span
@@ -408,7 +408,7 @@ export function ForwardDialog({
                                             onClick={() => pick(target.id)}
                                             aria-pressed={chosen.includes(target.id)}
                                             className={cn(
-                                                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
+                                                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-start text-sm transition-colors hover:bg-muted",
                                                 chosen.includes(target.id) && "bg-card-hover"
                                             )}
                                         >

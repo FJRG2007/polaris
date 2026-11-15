@@ -285,7 +285,7 @@ export function PresenterView({
                 <span className="text-[13px] tabular-nums text-muted-foreground" aria-live="polite">
                     {t("slides.counter", { at: Math.min(at + 1, total), total })}
                 </span>
-                <div className="ml-auto flex items-center gap-1">
+                <div className="ms-auto flex items-center gap-1">
                     {canAudience ? (
                         <Button variant="secondary" size="sm" onClick={openAudience}>
                             <MonitorUp className="size-4 shrink-0" aria-hidden />

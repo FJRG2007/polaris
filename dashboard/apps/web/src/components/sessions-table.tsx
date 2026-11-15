@@ -289,7 +289,7 @@ export function SessionsTable({
     return (
         <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-sm">
-                <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                     {/* Nothing arrives at md: the navigation rail appears there, so the
                         content area is narrower than it was a breakpoint earlier and a
                         column added then only scrolls the table sideways. */}

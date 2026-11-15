@@ -184,7 +184,7 @@ function AccountRow({
                         : t("account.switcher.switchTo", { name: account.name })
                 }
                 className={cn(
-                    "flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors",
+                    "flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-2 text-start transition-colors",
                     account.active ? "cursor-default" : "hover:bg-muted/60 disabled:opacity-60",
                     busy && "animate-pulse"
                 )}

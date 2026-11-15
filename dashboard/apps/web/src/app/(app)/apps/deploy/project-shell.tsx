@@ -233,7 +233,7 @@ function ProjectNav({
                                 {section.path === "" && attention > 0 && (
                                     <TabAttentionDot
                                         label={t("shell.attention", { count: attention })}
-                                        className="ml-auto"
+                                        className="ms-auto"
                                     />
                                 )}
                             </Link>

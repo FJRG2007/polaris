@@ -259,14 +259,14 @@ function PeopleDialog({
                     </DialogTitle>
 
                     <div className="relative">
-                        <Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2" />
+                        <Search className="text-muted-foreground pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2" />
                         <Input
                             autoFocus
                             value={typed}
                             onChange={(event) => setTyped(event.target.value)}
                             placeholder={t("profile.searchPlaceholder")}
                             aria-label={t("profile.searchLabel")}
-                            className="pl-8"
+                            className="ps-8"
                         />
                     </div>
 

@@ -326,7 +326,7 @@ export function ConnectGuides({ urls }: { urls: ServerUrls }) {
                         <p className="font-medium">{t("pick")}</p>
                         <span className="relative">
                             <Search
-                                className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                                className="pointer-events-none absolute start-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                                 aria-hidden
                             />
                             <Input
@@ -337,7 +337,7 @@ export function ConnectGuides({ urls }: { urls: ServerUrls }) {
                                 placeholder={t("search")}
                                 aria-label={t("search")}
                                 autoComplete="off"
-                                className="pl-8"
+                                className="ps-8"
                             />
                         </span>
                         {shown.length === 0 ? (
@@ -358,7 +358,7 @@ export function ConnectGuides({ urls }: { urls: ServerUrls }) {
                                     <button
                                         type="button"
                                         onClick={() => choose(item.id)}
-                                        className="flex w-full min-w-0 items-center gap-2.5 rounded-lg border border-border p-2 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        className="flex w-full min-w-0 items-center gap-2.5 rounded-lg border border-border p-2 text-start transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
                                         <LogoTile logo={item.logo} className="size-8" />
                                         <span

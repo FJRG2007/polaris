@@ -562,7 +562,7 @@ function Loaded({
                         </Link>
                     ) : null}
                     <SegmentedControl
-                        className="ml-auto"
+                        className="ms-auto"
                         size="sm"
                         value={view}
                         onValueChange={choose}
@@ -1427,7 +1427,7 @@ function NodeCard({
                 </fieldset>
             ) : null}
             {step.branches ? (
-                <div className="space-y-3 border-t border-border p-3 pl-4 sm:pl-6">
+                <div className="space-y-3 border-t border-border p-3 ps-4 sm:ps-6">
                     {core.nodePorts(step.node.type, step.node).map((port, at) => (
                         <div key={port} className="space-y-2">
                             <p className="text-xs font-semibold uppercase text-muted-foreground">
@@ -1459,7 +1459,7 @@ function NodeCard({
                 </div>
             ) : null}
             {step.body ? (
-                <div className="space-y-2 border-t border-border p-3 pl-4 sm:pl-6">
+                <div className="space-y-2 border-t border-border p-3 ps-4 sm:ps-6">
                     <p className="text-xs font-semibold uppercase text-muted-foreground">
                         {portLabel(t, step.node, core.bodyPort(step.node.type) ?? "each")}
                     </p>
@@ -1476,7 +1476,7 @@ function NodeCard({
                 </div>
             ) : null}
             {step.node.type === "core.try" ? (
-                <div className="space-y-3 border-t border-border p-3 pl-4 sm:pl-6">
+                <div className="space-y-3 border-t border-border p-3 ps-4 sm:ps-6">
                     <p className="text-xs font-semibold uppercase text-muted-foreground">
                         {portLabel(t, step.node, "catch")}
                     </p>
@@ -1507,7 +1507,7 @@ function NodeCard({
                 </div>
             ) : null}
             {step.node.type === "core.if" ? (
-                <div className="space-y-3 border-t border-border p-3 pl-4 sm:pl-6">
+                <div className="space-y-3 border-t border-border p-3 ps-4 sm:ps-6">
                     <p className="text-xs font-semibold uppercase text-muted-foreground">
                         {t("editor.then")}
                     </p>

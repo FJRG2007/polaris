@@ -435,7 +435,7 @@ export function FormattingToolbar({
             </div>
 
             {/* Everything, for a screen too narrow for the row. */}
-            <div className="ml-auto lg:hidden">
+            <div className="ms-auto lg:hidden">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild disabled={inert}>
                         <button

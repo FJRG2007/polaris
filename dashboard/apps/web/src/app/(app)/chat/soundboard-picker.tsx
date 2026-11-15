@@ -552,7 +552,7 @@ export function SoundboardPanel({
             <div className="flex min-h-0 flex-1">
                 <nav
                     aria-label={t("soundboard.sections")}
-                    className="flex w-11 shrink-0 flex-col items-center gap-1 overflow-y-auto overscroll-contain border-r border-border py-2 no-scrollbar"
+                    className="flex w-11 shrink-0 flex-col items-center gap-1 overflow-y-auto overscroll-contain border-e border-border py-2 no-scrollbar"
                 >
                     {sections.map((section) => (
                         <button
@@ -629,7 +629,7 @@ export function SoundboardPanel({
                                                 onClick={() => void previewSound(tile.ref, volume)}
                                                 aria-label={t("soundboard.preview", { name })}
                                                 title={t("soundboard.preview", { name })}
-                                                className="absolute left-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-background/60 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                                                className="absolute start-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-background/60 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                                             >
                                                 <Volume2 className="size-3.5" />
                                             </button>
@@ -648,7 +648,7 @@ export function SoundboardPanel({
                                                         : t("soundboard.favorite", { name })
                                                 }
                                                 className={cn(
-                                                    "absolute right-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background/60 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
+                                                    "absolute end-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background/60 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
                                                     starred
                                                         ? "text-warning opacity-100"
                                                         : "text-muted-foreground opacity-0"
@@ -712,7 +712,7 @@ export function SoundboardPanel({
                     title={t("soundboard.volume")}
                     className="h-1.5 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                 />
-                <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                <span className="w-9 shrink-0 text-end text-xs tabular-nums text-muted-foreground">
                     {Math.round(volume * 100)}%
                 </span>
                 {board?.manageSpaceId && (

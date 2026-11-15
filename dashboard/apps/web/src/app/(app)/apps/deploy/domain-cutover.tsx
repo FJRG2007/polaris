@@ -221,7 +221,7 @@ export function DomainCutoverButton({
                                     <Button
                                         size="sm"
                                         variant="secondary"
-                                        className="ml-auto"
+                                        className="ms-auto"
                                         onClick={() => show(true)}
                                     >
                                         {t("cutover.retry")}
@@ -626,7 +626,7 @@ function CutoverState({
                 mode === "manual" ? (
                     <div className="flex min-w-0 flex-col gap-2 text-sm">
                         <p>{t("cutover.manualIntro")}</p>
-                        <ol className="flex list-decimal flex-col gap-2 pl-5">
+                        <ol className="flex list-decimal flex-col gap-2 ps-5">
                             <li>
                                 {cutover.oldTtl !== null && cutover.oldTtl > LOWERED_TTL
                                     ? t("cutover.manualLower", {

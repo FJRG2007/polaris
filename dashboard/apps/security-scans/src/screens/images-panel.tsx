@@ -118,17 +118,17 @@ export function ImagesPanel({
                             <tr>
                                 <th
                                     scope="col"
-                                    className="w-full max-w-0 px-2 py-1.5 text-left font-medium"
+                                    className="w-full max-w-0 px-2 py-1.5 text-start font-medium"
                                 >
                                     {t("images.image")}
                                 </th>
                                 <th
                                     scope="col"
-                                    className="hidden px-2 py-1.5 text-left font-medium lg:table-cell"
+                                    className="hidden px-2 py-1.5 text-start font-medium lg:table-cell"
                                 >
                                     {t("images.who")}
                                 </th>
-                                <th scope="col" className="px-2 py-1.5 text-left font-medium">
+                                <th scope="col" className="px-2 py-1.5 text-start font-medium">
                                     {t("images.lastScan")}
                                 </th>
                                 <th scope="col" className="px-2 py-1.5">
@@ -270,7 +270,7 @@ export function ImagesPanel({
                                                       </TagList>
                                                   )}
                                               </td>
-                                              <td className="whitespace-nowrap px-2 py-1.5 text-right">
+                                              <td className="whitespace-nowrap px-2 py-1.5 text-end">
                                                   {image.home ? (
                                                       <Button asChild size="xs" variant="ghost">
                                                           <a

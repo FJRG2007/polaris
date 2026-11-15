@@ -303,7 +303,7 @@ export function RunCommandDialog({
                                 {declared.initial.length === 0 && !declared.optional && (
                                     <span aria-hidden="true"> *</span>
                                 )}
-                                <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
+                                <span className="ms-2 font-mono text-xs font-normal text-muted-foreground">
                                     {`{${declared.name}}`}
                                 </span>
                             </span>

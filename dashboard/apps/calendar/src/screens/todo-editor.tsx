@@ -168,7 +168,7 @@ export function TodoEditor({
     return (
         <Dialog open={objectId !== null} onOpenChange={(open) => !open && !busy && onClose()}>
             <DialogContent className="max-w-md" aria-describedby={undefined}>
-                <DialogHeader className="pr-8">
+                <DialogHeader className="pe-8">
                     <DialogTitle>
                         {writable ? t("todo.editTitle") : t("todo.viewTitle")}
                     </DialogTitle>

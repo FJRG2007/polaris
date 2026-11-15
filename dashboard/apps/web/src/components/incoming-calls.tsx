@@ -686,7 +686,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                     {index === 0 && standing === "askable" ? (
                         <button
                             type="button"
-                            className="text-left text-xs text-primary hover:underline"
+                            className="text-start text-xs text-primary hover:underline"
                             onClick={() =>
                                 void mayNotify().finally(() => setStanding(noticeStanding()))
                             }

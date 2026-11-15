@@ -170,7 +170,7 @@ export function ThreadPanel({
             <aside
                 ref={measure}
                 style={{ "--thread-pane": `${drawn}px` } as CSSProperties}
-                className="flex w-full shrink-0 flex-col border-l border-border md:w-[var(--thread-pane)]"
+                className="flex w-full shrink-0 flex-col border-s border-border md:w-[var(--thread-pane)]"
             >
                 <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-3">
                     <span className="text-sm font-semibold">{t("thread.thread")}</span>

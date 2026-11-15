@@ -105,7 +105,7 @@ export function FolderRoleDialog({
                                     aria-pressed={chosen === folder.id}
                                     onClick={() => setChosen(folder.id)}
                                     className={cn(
-                                        "w-full rounded-md border px-3 py-2 text-left text-[13px]",
+                                        "w-full rounded-md border px-3 py-2 text-start text-[13px]",
                                         chosen === folder.id
                                             ? "border-primary bg-card text-foreground"
                                             : "border-border text-muted-foreground hover:bg-card hover:text-foreground"

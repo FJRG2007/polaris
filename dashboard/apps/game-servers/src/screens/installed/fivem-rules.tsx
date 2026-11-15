@@ -161,7 +161,7 @@ export function FivemRules({
                 <Button
                     size="icon"
                     variant="ghost"
-                    className="ml-auto"
+                    className="ms-auto"
                     aria-label={t("rules.readTheConfigAgain")}
                     title={t("rules.readTheConfigAgain")}
                     disabled={loading}
@@ -201,13 +201,13 @@ export function FivemRules({
                 are drawn at once; only what the config says waits for the
                 container. */}
             <label className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder={t("rules.findASettingByWhat")}
                     aria-label={t("rules.findASetting")}
-                    className="pl-8"
+                    className="ps-8"
                 />
             </label>
 

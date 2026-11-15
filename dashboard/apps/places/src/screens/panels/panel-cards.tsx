@@ -360,7 +360,7 @@ export function GuestCameraCard({
                 aria-label={t("panels.cameraFull", { name: camera.name })}
                 title={t("panels.cameraFull", { name: camera.name })}
                 onClick={toggle}
-                className="absolute right-3 top-3 size-14 bg-background/90 p-0"
+                className="absolute end-3 top-3 size-14 bg-background/90 p-0"
             >
                 <Maximize2 className="size-7" />
             </Button>
@@ -423,7 +423,7 @@ export function ActionCard({
                 aria-disabled={!canRun || state === "busy" || undefined}
                 title={canRun ? automation.name : t("panels.runNotAllowed")}
                 className={cn(
-                    "flex h-full min-h-16 w-full min-w-0 items-center gap-4 rounded-xl border border-border bg-card px-4 text-left transition-colors",
+                    "flex h-full min-h-16 w-full min-w-0 items-center gap-4 rounded-xl border border-border bg-card px-4 text-start transition-colors",
                     canRun ? "hover:bg-muted active:bg-muted" : "cursor-not-allowed opacity-60"
                 )}
             >

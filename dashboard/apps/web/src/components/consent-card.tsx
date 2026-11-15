@@ -158,7 +158,7 @@ export function ConsentFacts({
                     ) : null}
                     <dt className="shrink-0 text-muted-foreground">{fact.label}</dt>
                     <dd
-                        className="ml-auto min-w-0 truncate text-right font-medium"
+                        className="ms-auto min-w-0 truncate text-end font-medium"
                         title={fact.value}
                     >
                         {fact.value}

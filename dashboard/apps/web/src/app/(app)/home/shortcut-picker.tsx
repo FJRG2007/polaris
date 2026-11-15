@@ -124,7 +124,7 @@ export function ShortcutPicker({
                                     disabled={held}
                                     onClick={() => pick(entry)}
                                     className={cn(
-                                        "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors",
+                                        "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-start transition-colors",
                                         held ? "cursor-default opacity-60" : "hover:bg-muted"
                                     )}
                                 >

@@ -42,7 +42,7 @@ export function StepsDialog({
                 </Button>
             </DialogTrigger>
             <DialogContent className="w-[calc(100%-2rem)] max-w-2xl">
-                <DialogHeader className="pr-8">
+                <DialogHeader className="pe-8">
                     <DialogTitle>{title}</DialogTitle>
                     {description ? <DialogDescription>{description}</DialogDescription> : null}
                 </DialogHeader>

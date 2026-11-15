@@ -261,7 +261,7 @@ export function ServiceDetail({
                             {t("panel.removalPending")}
                         </span>
                     )}
-                    <div className="ml-auto mr-8 flex shrink-0 items-center gap-1">
+                    <div className="ms-auto me-8 flex shrink-0 items-center gap-1">
                         <DesktopServiceActions
                             projectId={project.id}
                             projectName={project.name}
@@ -302,7 +302,7 @@ export function ServiceDetail({
                             {dots[name] && (
                                 <TabAttentionDot
                                     label={dots[name]}
-                                    className="mb-0.5 ml-1.5 align-middle"
+                                    className="mb-0.5 ms-1.5 align-middle"
                                 />
                             )}
                         </button>
@@ -902,14 +902,14 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             href={app.ipUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex min-w-0 items-center gap-1.5 truncate pl-[1.375rem] text-xs text-muted-foreground hover:text-primary hover:underline"
+                            className="inline-flex min-w-0 items-center gap-1.5 truncate ps-[1.375rem] text-xs text-muted-foreground hover:text-primary hover:underline"
                             title={t("deployments.ipTitle")}
                         >
                             {app.ipUrl.replace(/^https?:\/\//, "")}
                         </a>
                     )}
                 </div>
-                <div className="ml-auto hidden items-center gap-4 text-xs text-muted-foreground sm:flex">
+                <div className="ms-auto hidden items-center gap-4 text-xs text-muted-foreground sm:flex">
                     <span className="inline-flex items-center gap-1">
                         <MapPin className="size-3.5" /> {region}
                     </span>
@@ -1001,7 +1001,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                       : t("deployments.status", { status: active.status })}
                                 <ChevronDown
                                     className={cn(
-                                        "ml-auto size-3.5 transition-transform",
+                                        "ms-auto size-3.5 transition-transform",
                                         successOpen && "rotate-180"
                                     )}
                                 />
@@ -1415,7 +1415,7 @@ function DeploymentLogsView({
                 {deployment && <StateBadge deployment={deployment} />}
                 {deployment && <SecurityChip deployment={deployment} />}
                 {deployment && (
-                    <span className="ml-auto text-xs text-muted-foreground">
+                    <span className="ms-auto text-xs text-muted-foreground">
                         {format.dateTime(deployment.createdAt)}
                     </span>
                 )}
@@ -1930,12 +1930,12 @@ function HttpLogsView({
         <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
                 <div className="relative min-w-0 flex-1">
-                    <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
                         placeholder={t("http.filterPlaceholder")}
-                        className="pl-8 text-xs"
+                        className="ps-8 text-xs"
                     />
                 </div>
                 <Button
@@ -2034,7 +2034,7 @@ function HttpLogsView({
                                 type="button"
                                 onClick={() => setIpFilter(null)}
                                 aria-label={t("http.clearIp")}
-                                className="ml-0.5 rounded-full p-0.5 hover:bg-card-hover"
+                                className="ms-0.5 rounded-full p-0.5 hover:bg-card-hover"
                             >
                                 <X className="size-3" />
                             </button>
@@ -2045,7 +2045,7 @@ function HttpLogsView({
 
             {entries === null && !error ? (
                 <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-                    <Loader2 className="mr-2 size-4 animate-spin" /> {t("http.reading")}
+                    <Loader2 className="me-2 size-4 animate-spin" /> {t("http.reading")}
                 </div>
             ) : error ? (
                 <Empty text={error} />
@@ -2076,7 +2076,7 @@ function HttpLogsView({
                 <div className="max-h-[26rem] overflow-auto overscroll-contain rounded-md border border-border">
                     <table className="w-full text-xs">
                         <thead className="sticky top-0 bg-card text-muted-foreground">
-                            <tr className="border-b border-border text-left">
+                            <tr className="border-b border-border text-start">
                                 <th className="whitespace-nowrap px-3 py-2 font-medium">
                                     {t("http.time")}
                                 </th>
@@ -2340,7 +2340,7 @@ function Meter({
                 <span className="font-medium">{label}</span>
                 <span className="text-muted-foreground">
                     {display}
-                    {text ? <span className="ml-2 text-xs">{text}</span> : null}
+                    {text ? <span className="ms-2 text-xs">{text}</span> : null}
                 </span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">

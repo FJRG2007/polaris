@@ -598,7 +598,7 @@ function RotatingDialog({
                     </span>
                 </div>
                 <ul
-                    className="grid grid-cols-1 max-h-72 select-none gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2"
+                    className="grid grid-cols-1 max-h-72 select-none gap-1.5 overflow-y-auto pe-1 sm:grid-cols-2"
                     onKeyDown={selection.onKeyDown}
                     aria-label={t("sidebar.leaderboards")}
                 >

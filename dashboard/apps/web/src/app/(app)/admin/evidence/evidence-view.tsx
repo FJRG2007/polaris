@@ -123,7 +123,7 @@ export function EvidenceView() {
                         <Card>
                             <CardBody className="flex flex-col gap-2 text-sm">
                                 <h2 className="text-[0.8125rem] font-semibold tracking-tight">{t("evidence.outside")}</h2>
-                                <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                                <ul className="list-disc space-y-1 ps-5 text-muted-foreground">
                                     {data.outsidePolaris.map((item) => (
                                         <li key={item}>{item}</li>
                                     ))}

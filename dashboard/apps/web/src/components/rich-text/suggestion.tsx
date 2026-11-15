@@ -88,7 +88,7 @@ export function mountPopup(
 
 /** One row of either popup. */
 export const POPUP_ITEM_CLASS =
-    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm";
+    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm";
 
 /**
  * The two mentions that name the room rather than a person.

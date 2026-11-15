@@ -142,19 +142,19 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
                 <div className="overflow-x-auto">
                     <table className="w-full text-[0.8125rem]">
                         <thead>
-                            <tr className="text-left">
-                                <th className="w-full max-w-0 py-1.5 pr-3">
+                            <tr className="text-start">
+                                <th className="w-full max-w-0 py-1.5 pe-3">
                                     {t("boxes.columns.address")}
                                 </th>
-                                <th className="py-1.5 pr-3">{t("boxes.columns.quota")}</th>
-                                <th className="py-1.5 pr-3">{t("boxes.columns.aliases")}</th>
+                                <th className="py-1.5 pe-3">{t("boxes.columns.quota")}</th>
+                                <th className="py-1.5 pe-3">{t("boxes.columns.aliases")}</th>
                                 <th className="py-1.5" />
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                             {mailboxes.map((mailbox) => (
                                 <tr key={mailbox.id}>
-                                    <td className="w-full max-w-0 py-2 pr-3">
+                                    <td className="w-full max-w-0 py-2 pe-3">
                                         <div className="flex min-w-0 items-center gap-2">
                                             <span
                                                 className="truncate text-foreground"
@@ -178,10 +178,10 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
                                             </p>
                                         ) : null}
                                     </td>
-                                    <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">
+                                    <td className="whitespace-nowrap py-2 pe-3 text-muted-foreground">
                                         {quotaLabel(mailbox.quotaMb, t)}
                                     </td>
-                                    <td className="py-2 pr-3 text-xs text-muted-foreground">
+                                    <td className="py-2 pe-3 text-xs text-muted-foreground">
                                         {mailbox.aliases.length === 0
                                             ? "-"
                                             : mailbox.aliases
@@ -191,7 +191,7 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
                                                   )
                                                   .join(", ")}
                                     </td>
-                                    <td className="whitespace-nowrap py-2 text-right">
+                                    <td className="whitespace-nowrap py-2 text-end">
                                         <Button
                                             size="icon"
                                             variant="ghost"

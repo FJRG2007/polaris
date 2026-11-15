@@ -208,11 +208,11 @@ export function DatabaseManageDialog({
                     onClick={() => setFull((value) => !value)}
                     title={full ? t("database.exitFullScreen") : t("database.fullScreen")}
                     aria-label={full ? t("database.exitFullScreen") : t("database.fullScreen")}
-                    className="absolute right-12 top-4 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="absolute end-12 top-4 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     {full ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
                 </button>
-                <DialogHeader className="pr-20">
+                <DialogHeader className="pe-20">
                     <DialogTitle className="flex items-center gap-2">
                         <DbEngineIcon engine={database.engine} className="size-6" />
                         <span className="truncate" title={database.name}>
@@ -1551,7 +1551,7 @@ function BucketCard({
                             <Button
                                 size="icon"
                                 variant="ghost"
-                                className="ml-auto"
+                                className="ms-auto"
                                 aria-label={t("database.buckets.revokeNamed", { name: key.name })}
                                 title={t("database.buckets.revokeKey")}
                                 onClick={() =>
@@ -1651,7 +1651,7 @@ function BucketCard({
                             <Button
                                 size="icon"
                                 variant="ghost"
-                                className="ml-auto"
+                                className="ms-auto"
                                 aria-label={t("database.buckets.removeRule")}
                                 title={t("database.buckets.removeRule")}
                                 disabled={pending}
@@ -1921,7 +1921,7 @@ function ActivityList({ overview, compact }: { overview: Overview; compact: bool
                                   ? t("database.failed")
                                   : t("database.done")}
                         </Badge>
-                        <span className="ml-auto text-muted-foreground">
+                        <span className="ms-auto text-muted-foreground">
                             {format.dateTime(operation.startedAt)}
                         </span>
                     </div>

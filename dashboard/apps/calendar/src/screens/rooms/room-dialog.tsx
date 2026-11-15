@@ -215,7 +215,7 @@ export function RoomDialog({
                                 {draft.features.map((entry) => (
                                     <span
                                         key={entry}
-                                        className="inline-flex items-center gap-1 rounded border border-border bg-field py-0.5 pl-2 pr-0.5 text-xs"
+                                        className="inline-flex items-center gap-1 rounded border border-border bg-field py-0.5 ps-2 pe-0.5 text-xs"
                                     >
                                         {entry}
                                         <button

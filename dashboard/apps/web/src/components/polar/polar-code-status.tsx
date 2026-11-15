@@ -140,7 +140,7 @@ export function CodeContextCard({
                             {rows.map(([label, value]) => (
                                 <div key={label} className="contents">
                                     <dt className="min-w-0 truncate text-muted-foreground" title={label}>{label}</dt>
-                                    <dd className="text-right tabular-nums">{formatTokens(value, locale)}</dd>
+                                    <dd className="text-end tabular-nums">{formatTokens(value, locale)}</dd>
                                 </div>
                             ))}
                         </dl>

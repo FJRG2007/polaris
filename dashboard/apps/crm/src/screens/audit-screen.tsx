@@ -157,7 +157,7 @@ export function AuditScreen() {
                     <span className="min-w-0 max-w-full shrink-0 truncate text-[0.75rem] text-muted-foreground" title={t(`objects.${event.object}.plural`)}>
                         {t(`objects.${event.object}.plural`)}
                     </span>
-                    <span className="ml-auto flex min-w-0 items-baseline gap-2 text-[0.75rem] text-muted-foreground">
+                    <span className="ms-auto flex min-w-0 items-baseline gap-2 text-[0.75rem] text-muted-foreground">
                         <span
                             className="min-w-0 truncate"
                             title={event.actor?.name || t("audit.someone")}
@@ -282,7 +282,7 @@ export function AuditScreen() {
             data-crm-ready
         >
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <h1 className="mr-auto text-[1.0625rem] font-semibold leading-tight tracking-tight">
+                <h1 className="me-auto text-[1.0625rem] font-semibold leading-tight tracking-tight">
                     {t("audit.title")}
                 </h1>
                 <Button

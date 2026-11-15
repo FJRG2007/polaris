@@ -104,7 +104,7 @@ export function UpsBatteryPanel({
                     )}
                 </div>
                 {health && health.reasons.length > 0 ? (
-                    <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                    <ul className="list-disc ps-5 text-sm text-muted-foreground">
                         {health.reasons.map((reason) => (
                             <li key={reason}>{t(`ups.battery.reasons.${reason}`)}</li>
                         ))}

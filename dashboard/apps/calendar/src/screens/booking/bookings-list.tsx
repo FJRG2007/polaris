@@ -143,7 +143,7 @@ export function BookingsList({
                                     {booking.name}
                                 </span>
                                 <StatusChip status={booking.status} />
-                                <span className="ml-auto flex items-center gap-1">
+                                <span className="ms-auto flex items-center gap-1">
                                     {!shared &&
                                     booking.objectId &&
                                     booking.status === "confirmed" ? (

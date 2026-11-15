@@ -106,14 +106,14 @@ export function CodeView() {
                         { value: "all", label: t("list.all") }
                     ]}
                 />
-                <div className="relative ml-auto min-w-[12rem] flex-1 sm:max-w-xs">
-                    <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <div className="relative ms-auto min-w-[12rem] flex-1 sm:max-w-xs">
+                    <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                     <input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder={t("list.narrowPlaceholder")}
                         aria-label={t("list.narrow")}
-                        className="h-8 w-full rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
+                        className="h-8 w-full rounded-md border border-border bg-field ps-7 pe-2 text-xs hover:border-border-strong focus:border-border-strong"
                     />
                 </div>
             </div>

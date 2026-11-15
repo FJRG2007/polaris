@@ -65,7 +65,7 @@ export function NotificationBell() {
             >
                 <Bell className="size-4" />
                 {badge ? (
-                    <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] font-medium leading-4 text-white">
+                    <span className="absolute -end-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] font-medium leading-4 text-white">
                         {badge}
                     </span>
                 ) : null}

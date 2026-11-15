@@ -126,7 +126,7 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
                                 )
                         })}
                     </span>
-                    <div className="ml-auto flex items-center gap-2">
+                    <div className="ms-auto flex items-center gap-2">
                         {detail?.projectId ? (
                             <Button asChild size="sm" variant="outline">
                                 <Link href={`/apps/deploy/${detail.projectId}`}>
@@ -380,12 +380,12 @@ function HealthSection({ serverId }: { serverId: string }) {
                         <div className="overflow-x-auto">
                             <table className="w-full text-[0.8125rem]">
                                 <thead>
-                                    <tr className="text-left">
-                                        <th className="py-1.5 pr-3">{t("health.columns.port")}</th>
-                                        <th className="py-1.5 pr-3">
+                                    <tr className="text-start">
+                                        <th className="py-1.5 pe-3">{t("health.columns.port")}</th>
+                                        <th className="py-1.5 pe-3">
                                             {t("health.columns.usedFor")}
                                         </th>
-                                        <th className="py-1.5 pr-3">
+                                        <th className="py-1.5 pe-3">
                                             {t("health.columns.result")}
                                         </th>
                                     </tr>
@@ -393,16 +393,16 @@ function HealthSection({ serverId }: { serverId: string }) {
                                 <tbody className="divide-y divide-border">
                                     {ports.results.map((result) => (
                                         <tr key={result.port}>
-                                            <td className="py-2 pr-3 font-mono text-xs">
+                                            <td className="py-2 pe-3 font-mono text-xs">
                                                 {result.port}{" "}
                                                 <span className="text-muted-foreground">
                                                     {portWords(t, result).label}
                                                 </span>
                                             </td>
-                                            <td className="py-2 pr-3 text-muted-foreground">
+                                            <td className="py-2 pe-3 text-muted-foreground">
                                                 {portWords(t, result).purpose}
                                             </td>
-                                            <td className="py-2 pr-3">
+                                            <td className="py-2 pe-3">
                                                 <div className="flex flex-col gap-1">
                                                     <VerdictBadge verdict={result.verdict} />
                                                     {result.note ? (

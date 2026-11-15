@@ -355,7 +355,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                         the corner, and the column takes no clicks of its
                                         own - only the cards in it do. */}
                                                                                 <OverlayPortal>
-                                                                                    <div className="pointer-events-none fixed bottom-4 right-4 z-[200] flex flex-col items-end gap-2">
+                                                                                    <div className="pointer-events-none fixed bottom-4 end-4 z-[200] flex flex-col items-end gap-2">
                                                                                         {/* An update landing under an open tab, said out
                                             loud before a click is refused by a server that
                                             no longer knows this bundle. */}

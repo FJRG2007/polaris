@@ -288,7 +288,7 @@ export function ShareDialog({
                                             as="span"
                                             key={person.id}
                                             personId={person.id}
-                                            className="inline-flex items-center gap-1 rounded-full bg-muted py-0.5 pl-0.5 pr-2 text-xs"
+                                            className="inline-flex items-center gap-1 rounded-full bg-muted py-0.5 ps-0.5 pe-2 text-xs"
                                         >
                                             <Avatar person={person} size={18} />
                                             <PersonName id={person.id} name={person.name} />
@@ -424,7 +424,7 @@ export function ShareDialog({
                                     <span className="text-sm">
                                         {share ? t("share.public.on") : t("share.public.off")}
                                         {share && share.views > 0 && (
-                                            <span className="ml-2 text-xs text-muted-foreground">
+                                            <span className="ms-2 text-xs text-muted-foreground">
                                                 {t("share.public.opened", { count: share.views })}
                                             </span>
                                         )}

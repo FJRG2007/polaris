@@ -79,7 +79,7 @@ export function AppShell({
                     // being handed on to the page.
                     <aside
                         data-tour="shell.sidebar"
-                        className="hidden w-56 shrink-0 overflow-y-auto overscroll-contain border-r border-border bg-surface p-2 empty:hidden md:block"
+                        className="hidden w-56 shrink-0 overflow-y-auto overscroll-contain border-e border-border bg-surface p-2 empty:hidden md:block"
                     >
                         {sidebar}
                     </aside>

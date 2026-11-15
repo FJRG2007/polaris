@@ -272,7 +272,7 @@ export function Stage({
             {!last && (
                 <span
                     aria-hidden="true"
-                    className="absolute bottom-0 left-[0.9375rem] top-8 w-px bg-border"
+                    className="absolute bottom-0 start-[0.9375rem] top-8 w-px bg-border"
                 />
             )}
             <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">

@@ -67,7 +67,7 @@ export function Tool({
                 aria-expanded={open}
                 aria-controls={id}
                 onClick={() => setOpen(!open)}
-                className="flex w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-left"
+                className="flex w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-start"
             >
                 <Wrench className="h-3.5 w-3.5 shrink-0 text-foreground-subtle" />
                 <span className="min-w-0 flex-1 truncate font-medium text-foreground" title={title}>

@@ -929,7 +929,7 @@ function FilesTab({
                                         <Folder className="size-4 shrink-0 text-muted-foreground" />
                                         <button
                                             type="button"
-                                            className="flex-1 truncate text-left hover:underline"
+                                            className="flex-1 truncate text-start hover:underline"
                                             onClick={() => setPath(full)}
                                             title={entry.name}
                                         >

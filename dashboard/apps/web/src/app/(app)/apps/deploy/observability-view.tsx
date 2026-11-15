@@ -201,7 +201,7 @@ function ServicePanel({
                 type="button"
                 onClick={onToggle}
                 aria-expanded={open}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                className="flex w-full items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-muted/40"
             >
                 <Layers className="size-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{service.name}</span>

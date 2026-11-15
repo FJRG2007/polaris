@@ -94,8 +94,8 @@ export function EffortPill<T extends string>({
                             aria-hidden
                             className={
                                 level === value
-                                    ? "ml-auto size-3.5 shrink-0 text-primary"
-                                    : "ml-auto size-3.5 shrink-0 opacity-0"
+                                    ? "ms-auto size-3.5 shrink-0 text-primary"
+                                    : "ms-auto size-3.5 shrink-0 opacity-0"
                             }
                         />
                     </DropdownMenuItem>

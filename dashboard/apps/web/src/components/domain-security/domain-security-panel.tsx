@@ -250,7 +250,7 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
                 <Button
                     size="icon-sm"
                     variant="ghost"
-                    className="ml-auto"
+                    className="ms-auto"
                     disabled={checking}
                     aria-label={t("recheckNamed", { domain })}
                     title={t("recheck")}
@@ -298,7 +298,7 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
                             <Button
                                 size="sm"
                                 variant="secondary"
-                                className="ml-auto"
+                                className="ms-auto"
                                 onClick={() => setFixing(true)}
                             >
                                 <Wrench className="size-4 shrink-0" aria-hidden /> {t("fix.review")}

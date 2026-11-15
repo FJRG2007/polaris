@@ -43,7 +43,7 @@ export function WidgetCard({
         <Card className="group/card flex h-full min-w-0 flex-col">
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
                 {grip ? (
-                    <span className="opacity-0 transition-opacity group-hover/card:opacity-100 focus-within:opacity-100 -ml-1.5">
+                    <span className="opacity-0 transition-opacity group-hover/card:opacity-100 focus-within:opacity-100 -ms-1.5">
                         {grip}
                     </span>
                 ) : null}

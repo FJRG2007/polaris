@@ -195,13 +195,13 @@ export function UpsEnergyPanel({ ups, reading }: { ups: UpsView; reading: UpsRea
             {answer && answer.buckets.length > 0 ? (
                 <div className="max-h-64 overflow-auto overscroll-contain rounded-md border">
                     <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-background text-left text-xs text-muted-foreground">
+                        <thead className="sticky top-0 bg-background text-start text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-3 py-2 font-normal">{t("ups.energy.when")}</th>
-                                <th className="px-3 py-2 text-right font-normal">
+                                <th className="px-3 py-2 text-end font-normal">
                                     {t("ups.energy.kwh")}
                                 </th>
-                                <th className="px-3 py-2 text-right font-normal">
+                                <th className="px-3 py-2 text-end font-normal">
                                     {t("ups.energy.cost")}
                                 </th>
                             </tr>
@@ -219,10 +219,10 @@ export function UpsEnergyPanel({ ups, reading }: { ups: UpsView; reading: UpsRea
                                                   : { year: "numeric", month: "long" }
                                         )}
                                     </td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums">
+                                    <td className="px-3 py-1.5 text-end tabular-nums">
                                         {one.kwh.toFixed(3)}
                                     </td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums">
+                                    <td className="px-3 py-1.5 text-end tabular-nums">
                                         {formatMoney(one.cost, one.currency)}
                                     </td>
                                 </tr>

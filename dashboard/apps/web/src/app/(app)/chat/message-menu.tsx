@@ -397,7 +397,7 @@ export function MessageMenu({
                                         >
                                             {t(choice.label)}
                                             {choice.format === "original" && (
-                                                <span className="ml-auto pl-4 text-[0.6875rem] uppercase text-foreground-subtle">
+                                                <span className="ms-auto ps-4 text-[0.6875rem] uppercase text-foreground-subtle">
                                                     {extensionOf(recording.name)}
                                                 </span>
                                             )}
@@ -589,7 +589,7 @@ export function MessageMenu({
                                                 {t(PRESET_LABELS[preset])}
                                             </span>
                                             {clock && (
-                                                <span className="ml-auto shrink-0 pl-4 text-xs text-foreground-subtle">
+                                                <span className="ms-auto shrink-0 ps-4 text-xs text-foreground-subtle">
                                                     {format.time(moment)}
                                                 </span>
                                             )}

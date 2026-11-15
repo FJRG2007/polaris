@@ -599,7 +599,7 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                     onClick={() => openSearch("chat")}
                     aria-label={t("sidebar.findOrStartAConversation")}
                     aria-keyshortcuts="Control+K Meta+K"
-                    className="flex h-8 w-full items-center gap-2 rounded-md border border-border bg-field px-2 text-left text-sm text-foreground-subtle transition-colors hover:border-border-strong hover:text-muted-foreground"
+                    className="flex h-8 w-full items-center gap-2 rounded-md border border-border bg-field px-2 text-start text-sm text-foreground-subtle transition-colors hover:border-border-strong hover:text-muted-foreground"
                 >
                     <Search className="size-3.5 shrink-0" aria-hidden="true" />
                     <span className="min-w-0 flex-1 truncate">
@@ -1200,7 +1200,7 @@ function ChannelRows({
                             // Each person on a row of their own, indented under
                             // the channel's name the way Discord draws a voice
                             // room - never squeezed against the row above.
-                            <ul className="mb-1 ml-6 mt-0.5 flex flex-col gap-0.5">
+                            <ul className="mb-1 ms-6 mt-0.5 flex flex-col gap-0.5">
                                 {inside.map((person) => (
                                     <VoicePerson
                                         key={person.id}
@@ -1285,7 +1285,7 @@ function Section({
                 type="button"
                 onClick={onToggle}
                 aria-expanded={!folded}
-                className="flex min-w-0 flex-1 items-center gap-1 rounded px-1 py-1 text-left text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle transition-colors hover:text-foreground"
+                className="flex min-w-0 flex-1 items-center gap-1 rounded px-1 py-1 text-start text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle transition-colors hover:text-foreground"
             >
                 <ChevronDown
                     className={cn("size-3 shrink-0 transition-transform", folded && "-rotate-90")}
@@ -1566,7 +1566,7 @@ function Row({
                 aria-label={t("sidebar.editChannelNamed", { name: label })}
                 title={t("sidebar.editChannel")}
                 className={cn(
-                    "absolute right-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded bg-card-hover text-muted-foreground transition-opacity hover:text-foreground focus-visible:opacity-100",
+                    "absolute end-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded bg-card-hover text-muted-foreground transition-opacity hover:text-foreground focus-visible:opacity-100",
                     active ? "opacity-100" : "opacity-0 group-hover/row:opacity-100"
                 )}
             >

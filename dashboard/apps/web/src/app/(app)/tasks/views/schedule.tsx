@@ -97,7 +97,7 @@ export function GanttView(props: ViewProps) {
                                     <button
                                         type="button"
                                         onClick={() => onOpen(task.id)}
-                                        className="flex w-56 shrink-0 items-center gap-2 px-3 py-2 text-left"
+                                        className="flex w-56 shrink-0 items-center gap-2 px-3 py-2 text-start"
                                     >
                                         <StatusIcon color={task.statusColor} type={task.statusType} size={14} />
                                         <span className="truncate text-xs">{task.name}</span>

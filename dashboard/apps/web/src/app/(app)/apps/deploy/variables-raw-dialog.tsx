@@ -310,7 +310,7 @@ export function VariablesRawDialog({
                     )}
                 </div>
                 <DialogFooter className="flex-wrap gap-2">
-                    <div className="flex flex-wrap gap-2 sm:mr-auto">
+                    <div className="flex flex-wrap gap-2 sm:me-auto">
                         <Button
                             variant="outline"
                             disabled={values === null}

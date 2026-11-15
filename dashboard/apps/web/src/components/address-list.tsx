@@ -144,7 +144,7 @@ function AddressRow({
                         {t("addresses.notAnswering")}
                     </span>
                 ) : null}
-                <div className="ml-auto flex shrink-0 items-center gap-1">
+                <div className="ms-auto flex shrink-0 items-center gap-1">
                     <CopyButton value={address.url} label={address.host} />
                     {manageHref && address.kind === "domain" ? (
                         <Link

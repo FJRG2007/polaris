@@ -229,9 +229,9 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
         <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="relative flex-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                        className="pl-9"
+                        className="ps-9"
                         value={filters.search}
                         onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
                         placeholder={t("editor.searchPlaceholder")}

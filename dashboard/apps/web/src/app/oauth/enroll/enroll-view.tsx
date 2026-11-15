@@ -135,7 +135,7 @@ export function EnrollView({
                                 key={option.factor}
                                 type="button"
                                 onClick={() => setFactor(option.factor)}
-                                className="group flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary hover:bg-primary/5"
+                                className="group flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-start transition-colors hover:border-primary hover:bg-primary/5"
                             >
                                 <span className="grid size-9 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary">
                                     <Icon className="size-5" />

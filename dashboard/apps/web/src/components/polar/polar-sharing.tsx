@@ -540,7 +540,7 @@ export function SharedLinksDialog({
                                         type="button"
                                         title={t("sharing.open")}
                                         onClick={() => onOpen(share.threadId)}
-                                        className="flex min-w-0 flex-1 flex-col px-2 py-1.5 text-left"
+                                        className="flex min-w-0 flex-1 flex-col px-2 py-1.5 text-start"
                                     >
                                         <span
                                             className="min-w-0 truncate text-sm text-foreground"

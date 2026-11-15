@@ -212,7 +212,7 @@ export function MicSlot({
                 if (!handheld) onMenuOpenChange(true);
             }}
             className={cn(
-                "relative touch-none select-none rounded rounded-r-none p-1.5 pr-1 transition-colors [-webkit-touch-callout:none] disabled:opacity-50",
+                "relative touch-none select-none rounded rounded-e-none p-1.5 pe-1 transition-colors [-webkit-touch-callout:none] disabled:opacity-50",
                 dictating
                     ? "bg-danger-soft text-danger"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -239,7 +239,7 @@ export function MicSlot({
     );
 
     const chevron =
-        "rounded rounded-l-none py-1.5 pl-0.5 pr-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50";
+        "rounded rounded-s-none py-1.5 ps-0.5 pe-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50";
 
     const body = (
         <MicMenuBody
@@ -258,7 +258,7 @@ export function MicSlot({
             {hint && (
                 <span
                     role="status"
-                    className="absolute bottom-full right-0 z-10 mb-2 flex w-max max-w-[min(16rem,calc(100vw-2rem))] items-start gap-2 rounded-md border border-border-strong bg-elevated px-2.5 py-1.5 text-xs shadow-modal"
+                    className="absolute bottom-full end-0 z-10 mb-2 flex w-max max-w-[min(16rem,calc(100vw-2rem))] items-start gap-2 rounded-md border border-border-strong bg-elevated px-2.5 py-1.5 text-xs shadow-modal"
                 >
                     <span className="min-w-0">
                         {handheld ? t("dictation.hintPhone") : t("dictation.hintComputer")}
@@ -275,7 +275,7 @@ export function MicSlot({
             {holding && (
                 <span
                     role="status"
-                    className="absolute bottom-full right-0 z-10 mb-2 w-max max-w-[calc(100vw-2rem)] rounded-md bg-elevated px-2.5 py-1.5 text-xs shadow-modal"
+                    className="absolute bottom-full end-0 z-10 mb-2 w-max max-w-[calc(100vw-2rem)] rounded-md bg-elevated px-2.5 py-1.5 text-xs shadow-modal"
                 >
                     {t("dictation.slideHint")}
                 </span>
@@ -355,7 +355,7 @@ function MicMenuBody({
             <button
                 type="button"
                 onClick={onVoice}
-                className="flex min-h-12 w-full items-center gap-3 rounded-md px-1 text-left text-sm hover:bg-muted"
+                className="flex min-h-12 w-full items-center gap-3 rounded-md px-1 text-start text-sm hover:bg-muted"
             >
                 <Mic className="size-5 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 truncate">{t("dictation.voiceMessage")}</span>

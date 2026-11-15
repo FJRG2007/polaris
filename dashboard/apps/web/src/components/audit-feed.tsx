@@ -309,7 +309,7 @@ export function AuditFeed({
                 />
                 <label className="relative w-full sm:w-52">
                     <Search
-                        className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
+                        className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
                         aria-hidden
                     />
                     <Input
@@ -318,7 +318,7 @@ export function AuditFeed({
                         placeholder={t("auditFeed.search")}
                         aria-label={t("auditFeed.search")}
                         maxLength={200}
-                        className="h-8 pl-8"
+                        className="h-8 ps-8"
                     />
                 </label>
                 <DateInput
@@ -343,7 +343,7 @@ export function AuditFeed({
                         {t("auditFeed.clear")}
                     </Button>
                 ) : null}
-                <div className="ml-auto flex items-center gap-1">
+                <div className="ms-auto flex items-center gap-1">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button

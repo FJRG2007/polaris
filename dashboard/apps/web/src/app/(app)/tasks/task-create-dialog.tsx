@@ -401,7 +401,7 @@ export function TaskCreateDialog({
                 {/* Both widths are set: DialogContent's own max-w-lg would otherwise
                 cap this at a third of what the rows were laid out for. */}
                 <DialogContent className="flex max-h-[92vh] w-[min(56rem,96vw)] max-w-[min(56rem,96vw)] flex-col gap-0 overflow-hidden p-0">
-                    <header className="flex flex-wrap items-center gap-2 border-b border-border py-3 pl-5 pr-14">
+                    <header className="flex flex-wrap items-center gap-2 border-b border-border py-3 ps-5 pe-14">
                         <DialogTitle className="text-sm font-medium">{t("create.title")}</DialogTitle>
                         <span className="text-xs text-muted-foreground">{t("create.in")}</span>
                         <Select
@@ -490,7 +490,7 @@ export function TaskCreateDialog({
 
                     <footer className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
                         {restored && (
-                            <span className="mr-auto text-xs text-muted-foreground">
+                            <span className="me-auto text-xs text-muted-foreground">
                                 {t("create.restored")}{" "}
                                 <button
                                     type="button"

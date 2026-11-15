@@ -343,7 +343,7 @@ export function FilePickerDialog({
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="max-w-3xl">
                 <div className="flex h-[30rem] min-h-0 flex-col">
-                    <h2 className="mb-3 shrink-0 pr-8 text-[15px] font-semibold tracking-tight">
+                    <h2 className="mb-3 shrink-0 pe-8 text-[15px] font-semibold tracking-tight">
                         {heading}
                     </h2>
 
@@ -362,7 +362,7 @@ export function FilePickerDialog({
                                     key={entry.id}
                                     type="button"
                                     className={cn(
-                                        "flex shrink-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] sm:w-full",
+                                        "flex shrink-0 items-center gap-2 rounded-md px-2 py-1.5 text-start text-[13px] sm:w-full",
                                         tab === entry.id
                                             ? "bg-card text-foreground"
                                             : "text-muted-foreground hover:bg-card/60 hover:text-foreground"
@@ -407,14 +407,14 @@ export function FilePickerDialog({
                                         ) : null}
                                         <div className="relative min-w-0 flex-1 basis-32">
                                             <Search
-                                                className="pointer-events-none absolute left-2 top-1/2 size-3.5 shrink-0 -translate-y-1/2 text-foreground-subtle"
+                                                className="pointer-events-none absolute start-2 top-1/2 size-3.5 shrink-0 -translate-y-1/2 text-foreground-subtle"
                                                 aria-hidden
                                             />
                                             <Input
                                                 value={query}
                                                 placeholder={t("files.search")}
                                                 aria-label={t("files.search")}
-                                                className="h-7 pl-7 text-[12px]"
+                                                className="h-7 ps-7 text-[12px]"
                                                 onChange={(event) => setQuery(event.target.value)}
                                             />
                                         </div>
@@ -441,7 +441,7 @@ export function FilePickerDialog({
                                     {path && tab === "mine" && !query.trim() ? (
                                         <button
                                             type="button"
-                                            className="flex shrink-0 items-center gap-1.5 border-b border-border px-3 py-1.5 text-left text-[12px] text-muted-foreground hover:text-foreground"
+                                            className="flex shrink-0 items-center gap-1.5 border-b border-border px-3 py-1.5 text-start text-[12px] text-muted-foreground hover:text-foreground"
                                             onClick={() =>
                                                 setPath(path.split("/").slice(0, -1).join("/"))
                                             }
@@ -535,7 +535,7 @@ export function FilePickerDialog({
                                                                 </span>
                                                                 {isChosen ? (
                                                                     <Check
-                                                                        className="absolute right-1.5 top-1.5 size-3.5 shrink-0 text-primary"
+                                                                        className="absolute end-1.5 top-1.5 size-3.5 shrink-0 text-primary"
                                                                         aria-hidden
                                                                     />
                                                                 ) : null}
@@ -548,7 +548,7 @@ export function FilePickerDialog({
                                                         <button
                                                             {...press}
                                                             className={cn(
-                                                                "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[13px]",
+                                                                "flex w-full items-center gap-2 rounded px-2 py-1.5 text-start text-[13px]",
                                                                 isChosen
                                                                     ? "bg-card text-foreground"
                                                                     : "hover:bg-card/60"

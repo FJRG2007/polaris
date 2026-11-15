@@ -258,7 +258,7 @@ function DeviceRow({
                 <ui.Badge variant={device.online ? "success" : "neutral"}>
                     {device.online ? t("devices.online") : t("devices.offline")}
                 </ui.Badge>
-                <div className="ml-auto flex items-center gap-1">
+                <div className="ms-auto flex items-center gap-1">
                     {editing === null ? (
                         <ui.Button
                             size="icon"

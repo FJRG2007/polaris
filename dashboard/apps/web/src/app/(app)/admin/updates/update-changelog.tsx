@@ -343,7 +343,7 @@ export function UpdateChangelog({
                         <div key={group} className={cn("min-w-0", security && "bg-danger-soft")}>
                             <button
                                 type="button"
-                                className="flex h-8 w-full min-w-0 items-center gap-1.5 px-2.5 text-left text-[0.6875rem] font-medium uppercase tracking-wide text-foreground-subtle transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                className="flex h-8 w-full min-w-0 items-center gap-1.5 px-2.5 text-start text-[0.6875rem] font-medium uppercase tracking-wide text-foreground-subtle transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 aria-expanded={isOpen}
                                 aria-controls={listId}
                                 onClick={() => setExpanded((prev) => ({ ...prev, [group]: !isOpen }))}
@@ -374,7 +374,7 @@ export function UpdateChangelog({
                                     {entries.length > FOLDED ? (
                                         <button
                                             type="button"
-                                            className="ml-3 mt-0.5 sm:ml-8 text-xs text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            className="ms-3 mt-0.5 sm:ms-8 text-xs text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                             onClick={() => setShowAll((prev) => ({ ...prev, [group]: !all }))}
                                         >
                                             {all
@@ -416,7 +416,7 @@ export function UpdateChangelog({
 function ChangeRow({ entry, repo }: { entry: ChangelogEntry; repo: string }) {
     const t = useTranslations("admin");
     return (
-        <li className="flex h-7 min-w-0 items-center gap-2 pl-3 pr-2.5 sm:pl-8 text-[0.8125rem]">
+        <li className="flex h-7 min-w-0 items-center gap-2 ps-3 pe-2.5 sm:ps-8 text-[0.8125rem]">
             {entry.security ? (
                 <Badge variant={SEVERITY_BADGE[entry.security.severity]}>
                     {t(`settings.security.severity.${entry.security.severity}`)}

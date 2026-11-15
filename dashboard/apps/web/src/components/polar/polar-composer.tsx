@@ -323,7 +323,7 @@ function VoiceNoticeLine({
             ) : null}
             <button
                 type="button"
-                className="ml-auto text-muted-foreground hover:text-foreground"
+                className="ms-auto text-muted-foreground hover:text-foreground"
                 aria-label={t("voice.dismiss")}
                 title={t("voice.dismiss")}
                 onClick={onDismiss}

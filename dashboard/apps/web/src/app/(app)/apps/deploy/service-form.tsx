@@ -150,7 +150,7 @@ export function NewTemplateForm({
                                 setPicked(template);
                                 setName(template.name);
                             }}
-                            className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
+                            className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-start transition-colors hover:bg-muted"
                         >
                             <span className="min-w-0 flex-1">
                                 <span className="block text-sm font-medium text-foreground">
@@ -159,7 +159,7 @@ export function NewTemplateForm({
                                         const extra = templateExtra(template);
                                         if (!extra) return null;
                                         return (
-                                            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                            <span className="ms-1.5 text-xs font-normal text-muted-foreground">
                                                 {"engine" in extra
                                                     ? t("view.template.withEngine", {
                                                           engine: extra.engine
@@ -221,7 +221,7 @@ export function NewTemplateForm({
                 {!initial && (
                     <Button
                         variant="ghost"
-                        className="mr-auto"
+                        className="me-auto"
                         onClick={() => setPicked(null)}
                         disabled={pending}
                     >

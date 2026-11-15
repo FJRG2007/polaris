@@ -199,7 +199,7 @@ export function Sidebar({
                 >
                     <Button size="sm" variant="outline" className="w-full justify-start">
                         <Plus />
-                        <span className="min-w-0 flex-1 truncate text-left">
+                        <span className="min-w-0 flex-1 truncate text-start">
                             {t("sidebar.add")}
                         </span>
                         <ChevronDown className="text-foreground-subtle" />
@@ -210,7 +210,7 @@ export function Sidebar({
             <Button asChild size="sm" variant="ghost" className="-mt-2 w-full justify-start">
                 <Link href="/calendar/time">
                     <AlarmClock />
-                    <span className="min-w-0 flex-1 truncate text-left">{t("sidebar.time")}</span>
+                    <span className="min-w-0 flex-1 truncate text-start">{t("sidebar.time")}</span>
                 </Link>
             </Button>
 
@@ -300,7 +300,7 @@ function Section({
                 aria-expanded={!collapsed}
                 aria-controls={bodyId}
                 onClick={onToggle}
-                className="flex items-center gap-1 rounded text-left"
+                className="flex items-center gap-1 rounded text-start"
             >
                 <ChevronDown
                     aria-hidden
@@ -763,7 +763,7 @@ function UnscheduledTasks({
                             title={task.listName ? `${task.title} - ${task.listName}` : task.title}
                         >
                             {task.reference ? (
-                                <span className="mr-1 text-xs text-foreground-subtle tabular-nums">
+                                <span className="me-1 text-xs text-foreground-subtle tabular-nums">
                                     {task.reference}
                                 </span>
                             ) : null}

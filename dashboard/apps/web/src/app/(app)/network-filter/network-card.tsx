@@ -95,15 +95,15 @@ export function DnsNetworkCard({ onName }: { onName: (address: string) => void }
                 {devices && devices.length > 0 ? (
                     <div className="max-h-[28rem] overflow-auto overscroll-contain">
                         <table className="w-full min-w-[40rem] text-sm">
-                            <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
+                            <thead className="sticky top-0 bg-card text-start text-xs text-muted-foreground">
                                 <tr>
                                     <th className="p-1 font-medium">{t("network.device")}</th>
                                     <th className="p-1 font-medium">{t("network.firstSeen")}</th>
                                     <th className="p-1 font-medium">{t("network.lastSeen")}</th>
-                                    <th className="p-1 text-right font-medium">
+                                    <th className="p-1 text-end font-medium">
                                         {t("network.queries")}
                                     </th>
-                                    <th className="p-1 text-right font-medium">
+                                    <th className="p-1 text-end font-medium">
                                         {t("network.blocked")}
                                     </th>
                                     <th className="p-1 font-medium">{t("network.groups")}</th>
@@ -147,10 +147,10 @@ export function DnsNetworkCard({ onName }: { onName: (address: string) => void }
                                             <td className="whitespace-nowrap p-1 align-top text-xs">
                                                 {when(device.last)}
                                             </td>
-                                            <td className="p-1 text-right align-top tabular-nums">
+                                            <td className="p-1 text-end align-top tabular-nums">
                                                 {device.queries.toLocaleString()}
                                             </td>
-                                            <td className="whitespace-nowrap p-1 text-right align-top tabular-nums">
+                                            <td className="whitespace-nowrap p-1 text-end align-top tabular-nums">
                                                 {device.blocked.toLocaleString()} ({share}%)
                                             </td>
                                             <td
@@ -159,7 +159,7 @@ export function DnsNetworkCard({ onName }: { onName: (address: string) => void }
                                             >
                                                 {groups}
                                             </td>
-                                            <td className="p-1 text-right align-top">
+                                            <td className="p-1 text-end align-top">
                                                 {device.ownName ? null : (
                                                     <Button
                                                         variant="ghost"

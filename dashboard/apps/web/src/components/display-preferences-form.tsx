@@ -373,7 +373,7 @@ export function DisplayPreferencesForm({
                     <div className="flex items-center justify-between gap-2">
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         {done && !error ? <p className="text-sm text-success">{t("display.saved")}</p> : null}
-                        <Button type="submit" disabled={busy || !changed || !valid} className="ml-auto">
+                        <Button type="submit" disabled={busy || !changed || !valid} className="ms-auto">
                             {busy ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>

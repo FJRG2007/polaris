@@ -50,7 +50,7 @@ export function AiRewriting({
                     {marked ? null : <div aria-hidden className="ai-rewriting-veil" />}
                     <span
                         role="status"
-                        className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium text-foreground shadow-sm"
+                        className="absolute end-2 top-2 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium text-foreground shadow-sm"
                     >
                         <Sparkles className="size-3.5 shrink-0 text-primary" aria-hidden />
                         {t("improve.rewriting")}

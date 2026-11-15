@@ -352,7 +352,7 @@ export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
                             {job.result.warnings.length > 0 && (
                                 <div className="rounded-lg border border-warning-edge bg-warning-soft px-3 py-2 text-warning-ink">
                                     <p className="font-medium">{t("importSite.warnings")}</p>
-                                    <ul className="mt-1 list-disc pl-5">
+                                    <ul className="mt-1 list-disc ps-5">
                                         {job.result.warnings.map((warning, index) => (
                                             <li
                                                 key={`${warning.code}-${warning.name ?? index}`}

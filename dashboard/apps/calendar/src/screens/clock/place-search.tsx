@@ -136,7 +136,7 @@ export function PlaceSearch({ onPick }: { onPick: (place: PickedPlace) => void }
             <div className="relative">
                 <Globe
                     aria-hidden
-                    className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
+                    className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
                 />
                 <Input
                     ref={input}
@@ -146,7 +146,7 @@ export function PlaceSearch({ onPick }: { onPick: (place: PickedPlace) => void }
                     aria-controls={listId}
                     aria-autocomplete="list"
                     aria-activedescendant={rows[active] ? `${listId}-${active}` : undefined}
-                    className="pl-8"
+                    className="ps-8"
                     value={query}
                     maxLength={80}
                     placeholder={t("time.world.searchHint")}

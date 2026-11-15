@@ -58,7 +58,7 @@ export function PanelDeviceList({
             <div className="flex min-w-0 items-center gap-3">
                 <div className="relative min-w-0 flex-1 sm:max-w-sm">
                     <Search
-                        className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                        className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                         aria-hidden
                     />
                     <Input
@@ -67,7 +67,7 @@ export function PanelDeviceList({
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder={t("panelList.search")}
                         aria-label={t("panelList.search")}
-                        className="h-11 pl-9"
+                        className="h-11 ps-9"
                     />
                 </div>
                 <span className="min-w-0 max-w-full shrink-0 truncate text-sm text-muted-foreground" title={t("panelList.count", { count: shown })} role="status">

@@ -130,12 +130,12 @@ export function PeopleView({
                         </CardTitle>
                         {members.length >= SEARCH_FROM && (
                             <label className="relative w-full sm:w-56">
-                                <Search className="text-muted-foreground pointer-events-none absolute left-2 top-1/2 size-3.5 shrink-0 -translate-y-1/2" />
+                                <Search className="text-muted-foreground pointer-events-none absolute start-2 top-1/2 size-3.5 shrink-0 -translate-y-1/2" />
                                 <Input
                                     value={query}
                                     placeholder={t("people.search")}
                                     aria-label={t("people.search")}
-                                    className="h-8 pl-7 text-xs"
+                                    className="h-8 ps-7 text-xs"
                                     onChange={(event) => setQuery(event.target.value)}
                                 />
                             </label>
@@ -149,7 +149,7 @@ export function PeopleView({
                             search instead of a glance. */}
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
-                                <thead className="bg-surface/60 text-muted-foreground text-left text-xs">
+                                <thead className="bg-surface/60 text-muted-foreground text-start text-xs">
                                     <tr>
                                         <th className="px-3 py-2 font-medium">{t("people.columns.person")}</th>
                                         <th className="hidden px-3 py-2 font-medium sm:table-cell">
@@ -253,7 +253,7 @@ export function PeopleView({
                                                             />
                                                         )}
                                                     </td>
-                                                    <td className="px-3 py-2 text-right">
+                                                    <td className="px-3 py-2 text-end">
                                                         {!owner && (canManage || self) && (
                                                             <button
                                                                 type="button"

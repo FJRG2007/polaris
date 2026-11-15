@@ -80,7 +80,7 @@ type WriteMode = "picker" | "typing" | "typed";
 function PanelSkeleton({ label }: { label: string }) {
     return (
         <div role="status" aria-label={label} className="flex flex-col gap-6 p-5">
-            <div className="flex items-center gap-2 pr-10">
+            <div className="flex items-center gap-2 pe-10">
                 <Skeleton className="h-4 w-16" />
                 <Skeleton className="h-4 w-4" />
                 <span className="flex-1" />
@@ -474,7 +474,7 @@ export function TaskPanel({
 
                 {task && (
                     <>
-                        <header className="flex flex-wrap items-center gap-2 border-b border-border py-3 pl-5 pr-14">
+                        <header className="flex flex-wrap items-center gap-2 border-b border-border py-3 ps-5 pe-14">
                             <span className="font-mono text-xs text-muted-foreground">
                                 {task.reference}
                             </span>
@@ -495,7 +495,7 @@ export function TaskPanel({
                                 spacer and a run of siblings: on a phone the row
                                 wraps, and a spacer that wrapped with them left them
                                 floating in the middle of the second line. */}
-                            <div className="ml-auto flex items-center gap-2">
+                            <div className="ms-auto flex items-center gap-2">
                                 {/* Somebody who typed something and reached for the close
                                     button is owed an answer about where it went, and this
                                     is also what the panel is waiting on before it goes. */}
@@ -803,7 +803,7 @@ export function TaskPanel({
                                 />
                             </div>
 
-                            <aside className="flex min-h-0 flex-col border-t border-border md:border-l md:border-t-0">
+                            <aside className="flex min-h-0 flex-col border-t border-border md:border-s md:border-t-0">
                                 <ActivityStream
                                     taskId={task.id}
                                     comments={view?.comments ?? []}

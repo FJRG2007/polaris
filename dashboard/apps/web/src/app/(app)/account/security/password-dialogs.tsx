@@ -84,7 +84,7 @@ export function ChangePasswordDialog({
                 {done ? (
                     <div className="flex flex-col gap-3">
                         <Feedback ok={done} />
-                        <Button onClick={() => onOpenChange(false)} className="ml-auto">
+                        <Button onClick={() => onOpenChange(false)} className="ms-auto">
                             {t("dialog.done")}
                         </Button>
                     </div>
@@ -191,7 +191,7 @@ export function RecoverPasswordDialog({
                 ) : done ? (
                     <div className="flex flex-col gap-3">
                         <Feedback ok={done} />
-                        <Button onClick={() => onOpenChange(false)} className="ml-auto">
+                        <Button onClick={() => onOpenChange(false)} className="ms-auto">
                             {t("dialog.done")}
                         </Button>
                     </div>

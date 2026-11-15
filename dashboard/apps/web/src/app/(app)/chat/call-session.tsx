@@ -322,7 +322,7 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
 
     return (
         <div className="pointer-events-none fixed inset-x-0 top-2 z-50 flex justify-center px-2">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border-strong bg-elevated py-1 pl-3 pr-1.5 shadow-modal">
+            <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border-strong bg-elevated py-1 ps-3 pe-1.5 shadow-modal">
                 <span
                     aria-hidden="true"
                     className={cn(

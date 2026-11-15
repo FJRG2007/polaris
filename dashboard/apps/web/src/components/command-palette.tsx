@@ -775,7 +775,7 @@ export function CommandPalette({
                 className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:size-9 sm:border sm:border-border sm:bg-surface lg:w-full lg:max-w-sm lg:justify-start lg:gap-2 lg:px-3"
             >
                 <Search className="size-4 shrink-0" aria-hidden="true" />
-                <span className="hidden flex-1 truncate text-left text-sm lg:block">
+                <span className="hidden flex-1 truncate text-start text-sm lg:block">
                     {t("search.button")}
                 </span>
                 {hint ? (
@@ -802,7 +802,7 @@ export function CommandPalette({
                 listRef={listRef}
                 lead={
                     scope && ScopeIcon ? (
-                        <span className="flex shrink-0 items-center gap-1 rounded-md bg-muted py-1 pl-2 pr-1 text-xs font-medium">
+                        <span className="flex shrink-0 items-center gap-1 rounded-md bg-muted py-1 ps-2 pe-1 text-xs font-medium">
                             <ScopeIcon className="size-3.5" aria-hidden="true" />
                             {scopeWords(t, scope.id).label}
                             <button

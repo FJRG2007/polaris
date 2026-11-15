@@ -228,7 +228,7 @@ export function DetailsCard({
                     {done && !error ? <p className="text-success text-sm">{t("appearance.saved")}</p> : null}
                     <Button
                         type="button"
-                        className="ml-auto"
+                        className="ms-auto"
                         aria-disabled={busy || !changed || broken}
                         disabled={busy || !changed || broken}
                         onClick={async () => {

@@ -374,7 +374,7 @@ export function SecurityView({
                                 <Button
                                     onClick={() => void saveLimits()}
                                     disabled={locked || limitsBusy || !limitsChanged}
-                                    className="ml-auto"
+                                    className="ms-auto"
                                 >
                                     {limitsBusy ? tc("actions.saving") : tc("actions.save")}
                                 </Button>

@@ -962,7 +962,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
         <CustomFieldsProvider value={custom}>
             <div data-crm-ready className="flex h-full min-h-0 flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2">
-                    <div className="mr-auto flex min-w-0 items-baseline gap-2">
+                    <div className="me-auto flex min-w-0 items-baseline gap-2">
                         <h1
                             className="truncate text-[1.0625rem] font-semibold leading-tight tracking-tight"
                             title={title}
@@ -984,7 +984,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                         ) : null}
                     </div>
                     <div className="relative w-full min-w-0 sm:w-56">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             value={typed}
                             maxLength={200}
@@ -994,7 +994,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                             }}
                             placeholder={t("list.search", { object: title })}
                             aria-label={t("list.search", { object: title })}
-                            className="h-8 pl-8"
+                            className="h-8 ps-8"
                             disabled={!readable}
                         />
                     </div>
@@ -1011,7 +1011,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                    <div className="mr-auto flex min-w-0 max-w-full items-center">
+                    <div className="me-auto flex min-w-0 max-w-full items-center">
                         <ViewPicker
                             object={object}
                             views={allViews}

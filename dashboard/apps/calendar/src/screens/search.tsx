@@ -199,7 +199,7 @@ export function CalendarSearch({
             <div className={cn("relative", expanded ? "block" : "hidden sm:block")}>
                 <SearchIcon
                     aria-hidden
-                    className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
+                    className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
                 />
                 <Input
                     ref={input}
@@ -212,7 +212,7 @@ export function CalendarSearch({
                         showList && results[active] ? `${listId}-${active}` : undefined
                     }
                     placeholder={t("search.placeholder")}
-                    className="h-7 w-full pl-8 pr-7 sm:w-56"
+                    className="h-7 w-full ps-8 pe-7 sm:w-56"
                     value={query}
                     onChange={(event) => {
                         setQuery(event.target.value);
@@ -228,7 +228,7 @@ export function CalendarSearch({
                         type="button"
                         aria-label={t("search.clear")}
                         title={t("search.clear")}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground"
+                        className="absolute end-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground"
                         onClick={() => setQuery("")}
                     >
                         <X className="size-3.5" />
@@ -236,7 +236,7 @@ export function CalendarSearch({
                 ) : null}
             </div>
             {showList ? (
-                <div className="absolute right-0 top-full z-40 mt-1 w-[min(24rem,calc(100vw-1.5rem))] rounded-lg border border-border-strong bg-elevated p-1 shadow-popover">
+                <div className="absolute end-0 top-full z-40 mt-1 w-[min(24rem,calc(100vw-1.5rem))] rounded-lg border border-border-strong bg-elevated p-1 shadow-popover">
                     <ul
                         id={listId}
                         role="listbox"

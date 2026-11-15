@@ -91,24 +91,24 @@ export function StageFlowPanel({ mine }: { mine: boolean }) {
                 <div className="overflow-x-auto rounded-lg border border-border bg-card">
                     <table className="w-full min-w-[30rem] text-[0.8125rem]">
                         <caption className="sr-only">{t("forecast.flow.title")}</caption>
-                        <thead className="text-left text-muted-foreground">
+                        <thead className="text-start text-muted-foreground">
                             <tr className="border-b border-border">
                                 <th
                                     scope="col"
-                                    className="sticky left-0 bg-card px-3 py-2 font-medium"
+                                    className="sticky start-0 bg-card px-3 py-2 font-medium"
                                 >
                                     {t("forecast.flow.stage")}
                                 </th>
-                                <th scope="col" className="px-3 py-2 text-right font-medium">
+                                <th scope="col" className="px-3 py-2 text-end font-medium">
                                     {t("forecast.flow.reached")}
                                 </th>
-                                <th scope="col" className="px-3 py-2 text-right font-medium">
+                                <th scope="col" className="px-3 py-2 text-end font-medium">
                                     {t("forecast.flow.now")}
                                 </th>
-                                <th scope="col" className="px-3 py-2 text-right font-medium">
+                                <th scope="col" className="px-3 py-2 text-end font-medium">
                                     {t("forecast.flow.stay")}
                                 </th>
-                                <th scope="col" className="px-3 py-2 text-right font-medium">
+                                <th scope="col" className="px-3 py-2 text-end font-medium">
                                     {t("forecast.flow.converted")}
                                 </th>
                             </tr>
@@ -124,7 +124,7 @@ export function StageFlowPanel({ mine }: { mine: boolean }) {
                                           >
                                               <th
                                                   scope="row"
-                                                  className="sticky left-0 bg-card px-3 py-2 text-left font-normal"
+                                                  className="sticky start-0 bg-card px-3 py-2 text-start font-normal"
                                               >
                                                   {optionLabel(
                                                       t,
@@ -133,16 +133,16 @@ export function StageFlowPanel({ mine }: { mine: boolean }) {
                                                       step.stage
                                                   )}
                                               </th>
-                                              <td className="px-3 py-2 text-right tabular-nums">
+                                              <td className="px-3 py-2 text-end tabular-nums">
                                                   {step.reached}
                                               </td>
-                                              <td className="px-3 py-2 text-right tabular-nums">
+                                              <td className="px-3 py-2 text-end tabular-nums">
                                                   {step.now}
                                               </td>
-                                              <td className="px-3 py-2 text-right tabular-nums">
+                                              <td className="px-3 py-2 text-end tabular-nums">
                                                   {days(step.averageDays)}
                                               </td>
-                                              <td className="px-3 py-2 text-right tabular-nums">
+                                              <td className="px-3 py-2 text-end tabular-nums">
                                                   {rate === null ? "-" : `${rate}%`}
                                               </td>
                                           </tr>

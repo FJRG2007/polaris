@@ -160,13 +160,13 @@ export function NotificationsView() {
                     resolved to a box a few characters across. The filters wrap
                     underneath, where they fit. */}
                 <label className="relative w-full">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={query}
                         onChange={(changed) => setQuery(changed.target.value)}
                         placeholder={t("history.search")}
                         aria-label={t("history.search")}
-                        className="pl-8"
+                        className="ps-8"
                     />
                 </label>
                 {/* Event names run long ("Someone locked out of their account"),

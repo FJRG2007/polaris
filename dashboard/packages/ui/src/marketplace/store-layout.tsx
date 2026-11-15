@@ -55,13 +55,13 @@ export function StoreFilters<S extends string, C extends string>({
         <div className="flex min-w-0 flex-col gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <div className="relative min-w-0 flex-1 basis-60 sm:max-w-md">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={query}
                         onChange={(event) => onQueryChange(event.target.value)}
                         placeholder={words.search}
                         aria-label={words.search}
-                        className="pl-8"
+                        className="ps-8"
                     />
                 </div>
                 <Select

@@ -449,7 +449,7 @@ export function PersonProfileDialog({
                         }
                     />
                 </div>
-                <div className="min-w-0 border-t border-border p-5 md:flex md:min-h-0 md:flex-col md:overflow-hidden md:border-l md:border-t-0">
+                <div className="min-w-0 border-t border-border p-5 md:flex md:min-h-0 md:flex-col md:overflow-hidden md:border-s md:border-t-0">
                     <ProfileActivityPane
                         personId={person.id}
                         name={profile?.name || person.name}

@@ -46,7 +46,7 @@ export function MicSettings({ className }: { className?: string }) {
                             key={device.id}
                             type="button"
                             onClick={() => choose(device.id)}
-                            className="flex items-center gap-2 rounded px-1 py-1 text-left transition-colors hover:bg-muted"
+                            className="flex items-center gap-2 rounded px-1 py-1 text-start transition-colors hover:bg-muted"
                         >
                             <Check
                                 className={cn(
@@ -72,7 +72,7 @@ export function MicSettings({ className }: { className?: string }) {
                         type="button"
                         onClick={() => setCleanup(level.value)}
                         title={t(level.help)}
-                        className="flex items-center gap-2 rounded px-1 py-1 text-left transition-colors hover:bg-muted"
+                        className="flex items-center gap-2 rounded px-1 py-1 text-start transition-colors hover:bg-muted"
                     >
                         <Check
                             className={cn(

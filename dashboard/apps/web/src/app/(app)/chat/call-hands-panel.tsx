@@ -95,7 +95,7 @@ export function HandStrip({ call }: { call: CallState }) {
                         {hands.map((person, index) => (
                             <li
                                 key={person.id}
-                                className="flex shrink-0 items-center gap-1 rounded-full bg-background/70 py-0.5 pl-1 pr-2"
+                                className="flex shrink-0 items-center gap-1 rounded-full bg-background/70 py-0.5 ps-1 pe-2"
                             >
                                 <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-warning text-[0.625rem] font-semibold text-warning-foreground">
                                     {index + 1}

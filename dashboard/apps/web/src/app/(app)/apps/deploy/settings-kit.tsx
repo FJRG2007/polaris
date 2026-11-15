@@ -277,7 +277,7 @@ export function SettingsLayout({
                                     onClick={() => jump(section.id)}
                                     aria-current={active ? "true" : undefined}
                                     className={cn(
-                                        "flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-left text-[0.8125rem] transition-colors duration-fast",
+                                        "flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-start text-[0.8125rem] transition-colors duration-fast",
                                         active
                                             ? "bg-muted font-medium text-foreground"
                                             : "text-muted-foreground hover:bg-card-hover hover:text-foreground"
@@ -306,7 +306,7 @@ export function SettingsLayout({
                     <div className="-mb-6 flex flex-col gap-3">
                         <div className="relative">
                             <Search
-                                className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
+                                className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
                                 aria-hidden
                             />
                             <Input
@@ -323,10 +323,10 @@ export function SettingsLayout({
                                 placeholder={t("kit.filterPlaceholder")}
                                 aria-label={t("kit.filterLabel")}
                                 aria-keyshortcuts="/"
-                                className="pl-8 pr-9"
+                                className="ps-8 pe-9"
                             />
                             <kbd
-                                className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-border px-1.5 font-mono text-[0.6875rem] text-foreground-subtle sm:block"
+                                className="pointer-events-none absolute end-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-border px-1.5 font-mono text-[0.6875rem] text-foreground-subtle sm:block"
                                 aria-hidden
                             >
                                 /
@@ -512,7 +512,7 @@ export function LearnMore({ children }: { children: ReactNode }) {
                 />
                 {t("kit.learnMore")}
             </summary>
-            <div className="mt-1.5 flex flex-col gap-1.5 pl-[1.125rem] text-muted-foreground">
+            <div className="mt-1.5 flex flex-col gap-1.5 ps-[1.125rem] text-muted-foreground">
                 {children}
             </div>
         </details>
@@ -551,7 +551,7 @@ export function SaveBar({
     const blocked = !dirty || Boolean(invalid) || pending || Boolean(busy);
     return (
         <>
-            <p className="mr-auto min-w-0 text-xs" role="status" aria-live="polite">
+            <p className="me-auto min-w-0 text-xs" role="status" aria-live="polite">
                 {error ? (
                     <span className="text-danger-ink">{error}</span>
                 ) : dirty && invalid ? (

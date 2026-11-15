@@ -187,7 +187,7 @@ export function SnippetReader({
                                     {file.name}
                                 </Button>
                             ))}
-                            <div className="ml-auto flex items-center gap-1">
+                            <div className="ms-auto flex items-center gap-1">
                                 <Button
                                     size="sm"
                                     variant="ghost"

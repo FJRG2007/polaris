@@ -218,7 +218,7 @@ export function HostField({ words, className }: { words: HostFieldWords; classNa
                     ) : (
                         <Plus className="size-4 shrink-0" aria-hidden="true" />
                     )}
-                    <span className="ml-1.5">{state.hosts.length ? words.manage : words.add}</span>
+                    <span className="ms-1.5">{state.hosts.length ? words.manage : words.add}</span>
                 </Button>
             </div>
             <p className="text-xs text-muted-foreground">{words.hint}</p>
@@ -400,7 +400,7 @@ function AddHostForm({ state, words }: { state: HostState; words: HostFieldWords
                 </p>
                 <Button type="submit" size="sm" aria-disabled={!ready} className="shrink-0">
                     <Plus className="size-3.5 shrink-0" aria-hidden="true" />
-                    <span className="ml-1">{words.add}</span>
+                    <span className="ms-1">{words.add}</span>
                 </Button>
             </div>
         </form>

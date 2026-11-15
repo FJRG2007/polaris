@@ -156,7 +156,7 @@ export function DeckInstallSteps({
             {host === "streamdeck" ? (
                 <>
                     <DeckCommand repo={repo} />
-                    <ol className="ml-5 flex list-decimal flex-col gap-4 text-sm leading-relaxed marker:text-muted-foreground">
+                    <ol className="ms-5 flex list-decimal flex-col gap-4 text-sm leading-relaxed marker:text-muted-foreground">
                         <li className="flex flex-col gap-2">
                             {t("downloads.streamdeck.install.orFile")}
                             {pluginFile}
@@ -174,7 +174,7 @@ export function DeckInstallSteps({
             ) : null}
 
             {host === "opendeck" ? (
-                <ol className="ml-5 flex list-decimal flex-col gap-4 text-sm leading-relaxed marker:text-muted-foreground">
+                <ol className="ms-5 flex list-decimal flex-col gap-4 text-sm leading-relaxed marker:text-muted-foreground">
                     <li>
                         {t.rich("downloads.streamdeck.install.node", {
                             link: (chunks) => (
@@ -200,7 +200,7 @@ export function DeckInstallSteps({
             ) : null}
 
             {host === "companion" ? (
-                <ol className="ml-5 flex list-decimal flex-col gap-4 text-sm leading-relaxed marker:text-muted-foreground">
+                <ol className="ms-5 flex list-decimal flex-col gap-4 text-sm leading-relaxed marker:text-muted-foreground">
                     <li className="flex flex-col gap-2">
                         {t("downloads.streamdeck.install.downloadModule")}
                         {moduleFile}

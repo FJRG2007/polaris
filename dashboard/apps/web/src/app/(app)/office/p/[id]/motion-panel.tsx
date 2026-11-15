@@ -120,7 +120,7 @@ export function MotionPanel({
             aria-labelledby={titleId}
             // A phone keeps the slide in sight above it, so Play is seen; a
             // tablet lays it over the right; a wide screen sets it beside.
-            className="absolute inset-x-0 bottom-0 z-20 flex h-[55%] flex-col border-t border-border bg-card shadow-lg sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-sm sm:border-l sm:border-t-0 lg:static lg:z-auto lg:w-80 lg:max-w-none lg:shadow-none"
+            className="absolute inset-x-0 bottom-0 z-20 flex h-[55%] flex-col border-t border-border bg-card shadow-lg sm:inset-x-auto sm:inset-y-0 sm:end-0 sm:h-auto sm:w-full sm:max-w-sm sm:border-s sm:border-t-0 lg:static lg:z-auto lg:w-80 lg:max-w-none lg:shadow-none"
         >
             <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
                 <h2 id={titleId} className="min-w-0 flex-1 truncate text-[13px] font-medium">
@@ -255,7 +255,7 @@ export function MotionPanel({
                                             />
                                             <button
                                                 type="button"
-                                                className="min-w-0 flex-1 truncate rounded px-1 text-left text-[13px] hover:bg-muted"
+                                                className="min-w-0 flex-1 truncate rounded px-1 text-start text-[13px] hover:bg-muted"
                                                 title={nameOfTarget(one.target)}
                                                 onClick={() =>
                                                     onChoose(members.map((box) => box.id))

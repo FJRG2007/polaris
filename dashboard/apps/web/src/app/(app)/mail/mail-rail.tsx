@@ -262,7 +262,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                 />
                             </div>
                             {open ? (
-                                <ul className="ml-6 space-y-0.5 border-l border-border pl-2">
+                                <ul className="ms-6 space-y-0.5 border-s border-border ps-2">
                                     {own.length === 0 ? (
                                         <li className="px-2 py-1.5 text-[12px] text-foreground-subtle">
                                             {t("rail.nothingSynced")}

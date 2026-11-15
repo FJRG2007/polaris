@@ -217,7 +217,7 @@ export function VpnDeviceKeys() {
                                 <ui.Button
                                     size="sm"
                                     variant="outline"
-                                    className="ml-auto"
+                                    className="ms-auto"
                                     disabled={busy !== null}
                                     onClick={() => void revoke(key)}
                                 >

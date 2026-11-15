@@ -212,7 +212,7 @@ export function AppSidebar({
                     type="button"
                     data-closes-nav=""
                     onClick={openLauncher}
-                    className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
+                    className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
                 >
                     <LayoutGrid
                         className="size-4 shrink-0 text-foreground-subtle"
@@ -330,7 +330,7 @@ function RailLink({
                     aria-label={waitingLabel(appId, unread, t)}
                     title={waitingLabel(appId, unread, t)}
                     className={cn(
-                        "ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-medium leading-4 text-primary-foreground",
+                        "ms-auto shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-medium leading-4 text-primary-foreground",
                         // The mark takes the badge's place while it is offered.
                         markRead &&
                             "[@media(hover:hover)]:group-focus-within/rail:invisible [@media(hover:hover)]:group-hover/rail:invisible"
@@ -354,7 +354,7 @@ function RailLink({
                 title={markRead.label}
                 data-rail-mark={appId}
                 onClick={markRead.onSelect}
-                className="absolute right-1 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-muted-foreground opacity-0 transition-opacity duration-fast hover:bg-card-hover hover:text-foreground focus-visible:opacity-100 group-focus-within/rail:opacity-100 group-hover/rail:opacity-100 [@media(hover:none)]:hidden [&_svg]:size-3.5 [&_svg]:shrink-0"
+                className="absolute end-1 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-muted-foreground opacity-0 transition-opacity duration-fast hover:bg-card-hover hover:text-foreground focus-visible:opacity-100 group-focus-within/rail:opacity-100 group-hover/rail:opacity-100 [@media(hover:none)]:hidden [&_svg]:size-3.5 [&_svg]:shrink-0"
             >
                 {markRead.icon}
             </button>

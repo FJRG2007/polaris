@@ -433,16 +433,16 @@ export function MinecraftClientMods({
                 )}
 
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                        className="pl-9"
+                        className="ps-9"
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder={t("clientMods.searchModsThePlayersInstall")}
                         aria-label={t("clientMods.searchModrinthForAClient")}
                     />
                     {searching && (
-                        <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                        <Loader2 className="absolute end-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
                     )}
                 </div>
 

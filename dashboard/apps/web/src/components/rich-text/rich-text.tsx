@@ -283,9 +283,9 @@ function Block({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
 }
 
 const ALIGN: Record<string, string> = {
-    left: "text-left",
+    left: "text-start",
     center: "text-center",
-    right: "text-right"
+    right: "text-end"
 };
 
 /**
@@ -304,7 +304,7 @@ function Table({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
                 className={cn(
                     "border-b border-border px-3 py-1.5 align-top [overflow-wrap:normal]",
                     Tag === "th" && "whitespace-nowrap bg-muted font-semibold",
-                    ALIGN[String(align[index] ?? "")] ?? "text-left"
+                    ALIGN[String(align[index] ?? "")] ?? "text-start"
                 )}
             >
                 {inline(cell.content, scope)}

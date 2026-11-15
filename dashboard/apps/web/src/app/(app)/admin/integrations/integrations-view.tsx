@@ -266,13 +266,13 @@ export function IntegrationsView({
             <div className="flex flex-col gap-5">
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="relative min-w-0 flex-1">
-                        <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 shrink-0 -translate-y-1/2" />
+                        <Search className="text-muted-foreground pointer-events-none absolute start-3 top-1/2 size-4 shrink-0 -translate-y-1/2" />
                         <Input
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={t("integrations.grid.search")}
                             aria-label={t("integrations.grid.search")}
-                            className="pl-9"
+                            className="ps-9"
                         />
                     </div>
                     <p className="text-muted-foreground whitespace-nowrap text-xs tabular-nums">
@@ -293,7 +293,7 @@ export function IntegrationsView({
                                 <div>
                                     <h2 className="text-sm font-medium">
                                         {section.name}
-                                        <span className="text-muted-foreground ml-2 text-xs font-normal tabular-nums">
+                                        <span className="text-muted-foreground ms-2 text-xs font-normal tabular-nums">
                                             {section.cards.length}
                                         </span>
                                     </h2>
@@ -353,7 +353,7 @@ export function IntegrationsView({
                                                     href={card.docsUrl}
                                                     target="_blank"
                                                     rel="noreferrer noopener"
-                                                    className="text-muted-foreground hover:text-foreground mr-auto inline-flex items-center gap-1 text-xs"
+                                                    className="text-muted-foreground hover:text-foreground me-auto inline-flex items-center gap-1 text-xs"
                                                 >
                                                     {t("integrations.grid.docs")}
                                                     <ExternalLink className="size-3 shrink-0" />
@@ -768,7 +768,7 @@ function AttentionBadge({ slug, name, seen }: { slug: string; name: string; seen
                 )}
             </span>
             {error ? (
-                <span role="alert" className="text-danger max-w-40 text-right text-xs">
+                <span role="alert" className="text-danger max-w-40 text-end text-xs">
                     {error}
                 </span>
             ) : null}
@@ -2013,7 +2013,7 @@ function CloudflareCapability({
                     )}
                     {label}
                 </span>
-                <span className="truncate pl-5.5 text-xs text-muted-foreground">
+                <span className="truncate ps-5.5 text-xs text-muted-foreground">
                     {connected ? detail : t("integrations.cloudflare.notConnected", { detail })}
                 </span>
             </span>
@@ -2833,7 +2833,7 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                                     type="button"
                                     onClick={() => setOnDetection(action.value)}
                                     className={cn(
-                                        "flex items-start gap-2 rounded-md border p-2.5 text-left text-sm transition-colors",
+                                        "flex items-start gap-2 rounded-md border p-2.5 text-start text-sm transition-colors",
                                         onDetection === action.value
                                             ? "border-primary bg-primary/5"
                                             : "border-border hover:bg-muted"

@@ -202,7 +202,7 @@ export function SheetContextMenu({ engine }: { engine: SheetMenuEngine }) {
                 <span
                     ref={trigger}
                     aria-hidden
-                    className="pointer-events-none fixed left-0 top-0 size-0"
+                    className="pointer-events-none fixed start-0 top-0 size-0"
                 />
             </ContextMenuTrigger>
             <MenuContext.Provider value={{ engine, session, choose }}>
@@ -291,7 +291,7 @@ function Item({ node }: { node: menu.MenuNode }) {
                 >
                     <ItemFace item={item} value={value} />
                 </ContextMenuLabel>
-                <div className="pl-3">
+                <div className="ps-3">
                     <InheritedDisabled.Provider value={disabled}>
                         <Groups nodes={children} />
                     </InheritedDisabled.Provider>
@@ -437,7 +437,7 @@ function Choices({
                 >
                     <ItemFace item={item} value={value} />
                 </ContextMenuLabel>
-                <div className="pl-3">{body}</div>
+                <div className="ps-3">{body}</div>
             </ContextMenuGroup>
         );
     }

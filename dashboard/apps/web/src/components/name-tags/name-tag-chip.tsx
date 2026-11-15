@@ -125,7 +125,7 @@ export function NameTagButton({ tag, personId }: { tag: core.NameTagView; person
                 onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") void open(event);
                 }}
-                className="focus-visible:ring-ring ml-1 inline-flex shrink-0 cursor-pointer rounded-[5px] align-middle focus-visible:ring-2 focus-visible:outline-none"
+                className="focus-visible:ring-ring ms-1 inline-flex shrink-0 cursor-pointer rounded-[5px] align-middle focus-visible:ring-2 focus-visible:outline-none"
             >
                 <NameTagLabel tag={tag} />
             </span>

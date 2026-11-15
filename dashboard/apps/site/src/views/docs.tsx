@@ -230,7 +230,7 @@ export function SideSection({
                     {label}
                 </span>
             </summary>
-            <ul className="mt-0.5 flex flex-col gap-0.5 pl-3">{children}</ul>
+            <ul className="mt-0.5 flex flex-col gap-0.5 ps-3">{children}</ul>
         </details>
     );
 }
@@ -376,7 +376,7 @@ export function NeighborLink({
         <Link
             href={to}
             rel={next ? "next" : "prev"}
-            className={`flex min-w-0 flex-col gap-0.5 rounded-xl border border-border p-3 hover:border-foreground/30 ${next ? "items-end text-right sm:col-start-2" : ""}`}
+            className={`flex min-w-0 flex-col gap-0.5 rounded-xl border border-border p-3 hover:border-foreground/30 ${next ? "items-end text-end sm:col-start-2" : ""}`}
         >
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 {next ? null : <ArrowLeft className="size-3.5 shrink-0" aria-hidden="true" />}

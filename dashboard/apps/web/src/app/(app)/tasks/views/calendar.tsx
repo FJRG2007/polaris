@@ -590,7 +590,7 @@ function MoreEntries({
                     type="button"
                     onClick={(event) => event.stopPropagation()}
                     onDoubleClick={(event) => event.stopPropagation()}
-                    className="flex h-5 w-full items-center rounded px-1 text-left text-[0.6875rem] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="flex h-5 w-full items-center rounded px-1 text-start text-[0.6875rem] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     {t("calendar.more", { count: hidden })}
                 </button>
@@ -840,13 +840,13 @@ function ScheduleRow({
         </>
     );
     const rowClass =
-        "flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded px-1.5 text-left text-sm transition-colors hover:bg-muted";
+        "flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded px-1.5 text-start text-sm transition-colors hover:bg-muted";
 
     if (!entry.task) {
         return (
             <li className={cn("flex items-center gap-1.5", entry.settled && "opacity-60")}>
                 <span
-                    className="ml-0.5 size-2.5 shrink-0 rounded-[2px]"
+                    className="ms-0.5 size-2.5 shrink-0 rounded-[2px]"
                     style={{ backgroundColor: entry.color }}
                 />
                 <a
@@ -954,13 +954,13 @@ function TimeGrid({
 
                     {columns.some((column) => column.allDay.length > 0) && (
                         <div className="flex border-b border-border">
-                            <div className="w-12 shrink-0 hyphens-auto break-words px-1 py-1 text-right text-[0.625rem] text-muted-foreground sm:w-14">
+                            <div className="w-12 shrink-0 hyphens-auto break-words px-1 py-1 text-end text-[0.625rem] text-muted-foreground sm:w-14">
                                 {t("calendar.allDay")}
                             </div>
                             {columns.map((column) => (
                                 <ul
                                     key={column.day.toISOString()}
-                                    className="flex min-w-0 flex-1 flex-col gap-0.5 border-l border-border p-1"
+                                    className="flex min-w-0 flex-1 flex-col gap-0.5 border-s border-border p-1"
                                 >
                                     {column.allDay.map((entry) => (
                                         <EntryChip key={entry.key} entry={entry} props={props} />
@@ -985,9 +985,9 @@ function TimeGrid({
                             <div
                                 key={hour}
                                 style={{ height: HOUR_HEIGHT }}
-                                className="relative pr-1 text-right text-[0.625rem] text-muted-foreground"
+                                className="relative pe-1 text-end text-[0.625rem] text-muted-foreground"
                             >
-                                <span className="absolute -top-1.5 right-1">
+                                <span className="absolute -top-1.5 end-1">
                                     {hourLabel(hour, format)}
                                 </span>
                             </div>
@@ -996,7 +996,7 @@ function TimeGrid({
                     {columns.map((column) => (
                         <div
                             key={column.day.toISOString()}
-                            className="relative min-w-0 flex-1 border-l border-border"
+                            className="relative min-w-0 flex-1 border-s border-border"
                         >
                             {HOURS.map((hour) => (
                                 <div
@@ -1075,12 +1075,12 @@ function TimedEntry({
         borderLeftColor: entry.color
     };
     const box = cn(
-        "absolute z-[5] overflow-hidden rounded border border-l-2 border-border bg-card/95 px-1 py-0.5",
+        "absolute z-[5] overflow-hidden rounded border border-s-2 border-border bg-card/95 px-1 py-0.5",
         entry.settled && "opacity-60"
     );
 
     const body = (
-        <span className="flex min-w-0 flex-col overflow-hidden text-left">
+        <span className="flex min-w-0 flex-col overflow-hidden text-start">
             <span
                 className={cn(
                     "shrink-0 truncate text-[0.6875rem] font-medium leading-tight",
@@ -1120,7 +1120,7 @@ function TimedEntry({
                     type="button"
                     onClick={() => props.onOpen(task.id)}
                     title={entry.title}
-                    className="flex min-w-0 flex-1 self-stretch rounded-sm text-left transition-colors hover:bg-muted"
+                    className="flex min-w-0 flex-1 self-stretch rounded-sm text-start transition-colors hover:bg-muted"
                 >
                     {body}
                 </button>
@@ -1223,7 +1223,7 @@ function EntryChip({ entry, props }: { entry: CalendarEntry; props: ViewProps })
                         props.onOpen(task.id);
                     }}
                     title={task.name}
-                    className="flex h-full min-w-0 flex-1 items-center text-left text-[0.6875rem]"
+                    className="flex h-full min-w-0 flex-1 items-center text-start text-[0.6875rem]"
                 >
                     {title}
                 </button>
@@ -1262,7 +1262,7 @@ function DayList({
                             <button
                                 type="button"
                                 onClick={() => (entry.task ? onOpen(entry.task.id) : undefined)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                                className="flex w-full items-center gap-2 px-3 py-2 text-start text-sm transition-colors hover:bg-muted"
                             >
                                 {entry.task ? (
                                     <TaskMark task={entry.task} />

@@ -115,7 +115,7 @@ export function EventCard({
             anchor={anchor}
             title={title}
         >
-            <div className="flex flex-col gap-3 pr-1">
+            <div className="flex flex-col gap-3 pe-1">
                 <div className="flex items-start gap-2">
                     <ColorDot
                         color={occurrence.color ?? calendar?.color ?? "#7f7f7f"}
@@ -175,7 +175,7 @@ export function EventCard({
                             {occurrence.editable ? t("popover.edit") : t("popover.open")}
                         </Button>
                     ) : null}
-                    <span className="ml-auto flex items-center gap-1">
+                    <span className="ms-auto flex items-center gap-1">
                         {occurrence.editable ? (
                             <Button
                                 size="icon-sm"

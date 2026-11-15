@@ -620,7 +620,7 @@ function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Pa
         <Card>
             <CardHeader className="pb-2">
                 <ScrollRow className="no-scrollbar -mx-1 flex items-center gap-1 px-1">
-                    {Icon ? <Icon className="mr-1 size-4 shrink-0 text-muted-foreground" /> : null}
+                    {Icon ? <Icon className="me-1 size-4 shrink-0 text-muted-foreground" /> : null}
                     {panels.map((entry, index) => (
                         <button
                             key={entry.label}
@@ -659,7 +659,7 @@ function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Pa
                             >
                                 <span
                                     aria-hidden
-                                    className="absolute inset-y-0.5 left-0 rounded bg-primary/10"
+                                    className="absolute inset-y-0.5 start-0 rounded bg-primary/10"
                                     style={{
                                         width: `${top > 0 ? Math.max(2, (row.visitors / top) * 100) : 0}%`
                                     }}
@@ -667,7 +667,7 @@ function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Pa
                                 {pick && narrow ? (
                                     <button
                                         type="button"
-                                        className="relative min-w-0 flex-1 truncate pl-2 text-left hover:underline"
+                                        className="relative min-w-0 flex-1 truncate ps-2 text-start hover:underline"
                                         title={t("filters.narrowTo", { value: row.key })}
                                         onClick={() => pick(narrow, row.key)}
                                     >
@@ -675,13 +675,13 @@ function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Pa
                                     </button>
                                 ) : (
                                     <span
-                                        className="relative min-w-0 flex-1 truncate pl-2"
+                                        className="relative min-w-0 flex-1 truncate ps-2"
                                         title={row.key}
                                     >
                                         {panel.render ? panel.render(row.key) : row.key}
                                     </span>
                                 )}
-                                <span className="relative shrink-0 pr-2 tabular-nums">
+                                <span className="relative shrink-0 pe-2 tabular-nums">
                                     {grouped(row.visitors)}
                                 </span>
                             </li>
@@ -863,7 +863,7 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
                 ) : (
                     <div className="-mx-2 overflow-x-auto">
                         <table className="w-full min-w-[40rem] text-sm">
-                            <thead className="text-left text-xs text-muted-foreground">
+                            <thead className="text-start text-xs text-muted-foreground">
                                 <tr className="border-b border-border/60">
                                     <th className="px-2 py-1.5 font-medium">
                                         {t("recent.lastSeen")}
@@ -880,10 +880,10 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
                                     <th className="px-2 py-1.5 font-medium">
                                         {t("recent.client")}
                                     </th>
-                                    <th className="px-2 py-1.5 text-right font-medium">
+                                    <th className="px-2 py-1.5 text-end font-medium">
                                         {t("breakdowns.pages")}
                                     </th>
-                                    <th className="px-2 py-1.5 text-right font-medium">
+                                    <th className="px-2 py-1.5 text-end font-medium">
                                         {t("recent.time")}
                                     </th>
                                 </tr>
@@ -913,10 +913,10 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
                                                 os: visit.os
                                             })}
                                         </td>
-                                        <td className="px-2 py-1.5 text-right tabular-nums">
+                                        <td className="px-2 py-1.5 text-end tabular-nums">
                                             {grouped(visit.views)}
                                         </td>
-                                        <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
+                                        <td className="px-2 py-1.5 text-end tabular-nums text-muted-foreground">
                                             {visit.durationSec > 0
                                                 ? duration(visit.durationSec)
                                                 : "-"}

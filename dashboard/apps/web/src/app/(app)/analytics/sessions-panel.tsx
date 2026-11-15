@@ -378,18 +378,18 @@ function SessionsTable(props: PanelProps & { hrefFor: (id: string | null) => str
         <div className="flex min-w-0 flex-col gap-2">
             <div className="-mx-1 overflow-x-auto px-1">
                 <table className="w-full text-sm">
-                    <thead className="text-left text-xs text-muted-foreground">
+                    <thead className="text-start text-xs text-muted-foreground">
                         <tr className="border-b border-border">
                             <th className="w-full max-w-0 px-2 py-2 font-medium">{t("sessions.colSession")}</th>
-                            <th className="hidden px-2 py-2 text-right font-medium lg:table-cell">{t("sessions.statVisits")}</th>
-                            <th className="hidden px-2 py-2 text-right font-medium lg:table-cell">{t("sessions.statViews")}</th>
-                            <th className="hidden px-2 py-2 text-right font-medium lg:table-cell">{t("sessions.statEvents")}</th>
+                            <th className="hidden px-2 py-2 text-end font-medium lg:table-cell">{t("sessions.statVisits")}</th>
+                            <th className="hidden px-2 py-2 text-end font-medium lg:table-cell">{t("sessions.statViews")}</th>
+                            <th className="hidden px-2 py-2 text-end font-medium lg:table-cell">{t("sessions.statEvents")}</th>
                             <th className="hidden px-2 py-2 font-medium lg:table-cell">{t("sessions.colLocation")}</th>
                             <th className="hidden px-2 py-2 font-medium xl:table-cell">{t("sessions.colBrowser")}</th>
                             <th className="hidden px-2 py-2 font-medium xl:table-cell">{t("sessions.colOs")}</th>
                             <th className="hidden px-2 py-2 font-medium xl:table-cell">{t("sessions.colDevice")}</th>
                             <th className="hidden px-2 py-2 font-medium 2xl:table-cell">{t("sessions.colAddress")}</th>
-                            <th className="px-2 py-2 text-right font-medium">{t("sessions.colLastSeen")}</th>
+                            <th className="px-2 py-2 text-end font-medium">{t("sessions.colLastSeen")}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -425,9 +425,9 @@ function SessionsTable(props: PanelProps & { hrefFor: (id: string | null) => str
                                             </span>
                                         </Link>
                                     </td>
-                                    <td className="hidden px-2 py-2 text-right tabular-nums lg:table-cell">{grouped(row.visits)}</td>
-                                    <td className="hidden px-2 py-2 text-right tabular-nums lg:table-cell">{grouped(row.views)}</td>
-                                    <td className="hidden px-2 py-2 text-right tabular-nums lg:table-cell">{grouped(row.events)}</td>
+                                    <td className="hidden px-2 py-2 text-end tabular-nums lg:table-cell">{grouped(row.visits)}</td>
+                                    <td className="hidden px-2 py-2 text-end tabular-nums lg:table-cell">{grouped(row.views)}</td>
+                                    <td className="hidden px-2 py-2 text-end tabular-nums lg:table-cell">{grouped(row.events)}</td>
                                     <td className="hidden max-w-[12rem] px-2 py-2 lg:table-cell">
                                         <Labelled icon={<Flag code={row.country} />} title={place}>
                                             {place}
@@ -449,7 +449,7 @@ function SessionsTable(props: PanelProps & { hrefFor: (id: string | null) => str
                                     <td className="hidden max-w-[12rem] truncate px-2 py-2 font-mono text-xs 2xl:table-cell" title={row.ip ?? ""}>
                                         {row.ip ?? "-"}
                                     </td>
-                                    <td className="whitespace-nowrap px-2 py-2 text-right text-xs text-muted-foreground">
+                                    <td className="whitespace-nowrap px-2 py-2 text-end text-xs text-muted-foreground">
                                         <RelativeTime iso={row.lastSeenAt} formatStyle="narrow" />
                                     </td>
                                 </tr>
@@ -519,7 +519,7 @@ function SessionProperties(props: PanelProps) {
                             label: (
                                 <button
                                     type="button"
-                                    className={cn("max-w-full truncate text-left font-mono text-xs hover:underline", chosen === row.key && "font-semibold")}
+                                    className={cn("max-w-full truncate text-start font-mono text-xs hover:underline", chosen === row.key && "font-semibold")}
                                     aria-pressed={chosen === row.key}
                                     title={row.key}
                                     onClick={() => setChosen(row.key)}
@@ -580,7 +580,7 @@ function SessionProfile(
                 ) : !session ? (
                     <Empty>{t("sessions.gone")}</Empty>
                 ) : (
-                    <div className="flex min-h-0 flex-col gap-5 overflow-y-auto overscroll-contain pr-1">
+                    <div className="flex min-h-0 flex-col gap-5 overflow-y-auto overscroll-contain pe-1">
                         <div className="flex flex-col items-center gap-4 sm:flex-row">
                             <SessionAvatar id={session.id} size={96} />
                             <div className="flex w-full min-w-0 flex-col gap-1">
@@ -731,7 +731,7 @@ function ProfileInfo({
                         {t("sessions.ofAddress")}
                     </Button>
                 ) : null}
-                <span className="ml-auto">
+                <span className="ms-auto">
                     <GeoCredit />
                 </span>
             </div>

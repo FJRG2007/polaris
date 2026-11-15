@@ -72,7 +72,7 @@ export function Reasoning({
                 />
             </button>
             {open ? (
-                <div id={id} className="mt-1 whitespace-pre-wrap border-l border-border pl-3">
+                <div id={id} className="mt-1 whitespace-pre-wrap border-s border-border ps-3">
                     {children}
                 </div>
             ) : null}

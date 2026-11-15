@@ -180,7 +180,7 @@ export function ServerRail() {
     }, [channels]);
 
     return (
-        <div className="flex h-full w-14 shrink-0 flex-col items-center gap-1.5 border-r border-border bg-surface py-2">
+        <div className="flex h-full w-14 shrink-0 flex-col items-center gap-1.5 border-e border-border bg-surface py-2">
             <Pill
                 label={t("serverRail.directMessages")}
                 active={activeSpaceId === null}
@@ -366,7 +366,7 @@ const Pill = forwardRef<
             <span
                 aria-hidden="true"
                 className={cn(
-                    "absolute -left-2 w-1 rounded-r-full bg-foreground transition-all duration-fast",
+                    "absolute -start-2 w-1 rounded-e-full bg-foreground transition-all duration-fast",
                     active ? "h-6" : unread > 0 ? "h-2" : "h-0"
                 )}
             />
@@ -400,7 +400,7 @@ const Pill = forwardRef<
                 {children}
             </button>
             {unread > 0 && (
-                <span className="pointer-events-none absolute -bottom-0.5 -right-1 rounded-full bg-primary px-1 text-[0.625rem] font-medium leading-4 text-primary-foreground">
+                <span className="pointer-events-none absolute -bottom-0.5 -end-1 rounded-full bg-primary px-1 text-[0.625rem] font-medium leading-4 text-primary-foreground">
                     {unread > 98 ? "99+" : unread}
                 </span>
             )}

@@ -236,7 +236,7 @@ export function RecordTable(props: TableProps) {
                 tabIndex={canEdit && !field.readOnly ? 0 : -1}
                 aria-label={fieldLabel(t, object, field)}
                 className={cn(
-                    "relative h-9 border-b border-r border-border p-0 text-[0.8125rem]",
+                    "relative h-9 border-b border-e border-border p-0 text-[0.8125rem]",
                     field.primary &&
                         "sticky z-[5] bg-card font-medium group-hover/row:bg-card-hover",
                     canEdit &&
@@ -269,7 +269,7 @@ export function RecordTable(props: TableProps) {
                             }}
                             aria-label={t("record.open")}
                             title={t("record.open")}
-                            className="ml-auto grid size-6 shrink-0 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:opacity-100 md:opacity-0 md:group-hover/row:opacity-100"
+                            className="ms-auto grid size-6 shrink-0 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:opacity-100 md:opacity-0 md:group-hover/row:opacity-100"
                         >
                             <ArrowUpRight className="size-3.5" />
                         </Link>
@@ -317,7 +317,7 @@ export function RecordTable(props: TableProps) {
                     pending && "pointer-events-none opacity-60"
                 )}
             >
-                <td className="sticky left-0 z-[5] h-9 border-b border-r border-border bg-card p-0 group-hover/row:bg-card-hover">
+                <td className="sticky start-0 z-[5] h-9 border-b border-e border-border bg-card p-0 group-hover/row:bg-card-hover">
                     <span className="flex h-9 items-center justify-center">
                         <Checkbox
                             checked={chosen}
@@ -387,7 +387,7 @@ export function RecordTable(props: TableProps) {
                     <tr>
                         <th
                             scope="col"
-                            className="sticky left-0 top-0 z-20 h-9 border-b border-r border-border bg-card p-0"
+                            className="sticky start-0 top-0 z-20 h-9 border-b border-e border-border bg-card p-0"
                         >
                             <span className="flex h-9 items-center justify-center">
                                 <Checkbox
@@ -419,10 +419,10 @@ export function RecordTable(props: TableProps) {
                 <tbody>
                     {props.draft && DraftEditor ? (
                         <tr>
-                            <td className="sticky left-0 z-[5] h-9 border-b border-r border-border bg-card" />
+                            <td className="sticky start-0 z-[5] h-9 border-b border-e border-border bg-card" />
                             <td
                                 style={{ left: `${BOX_WIDTH}px` }}
-                                className="sticky z-30 h-9 border-b border-r border-border bg-card p-0"
+                                className="sticky z-30 h-9 border-b border-e border-border bg-card p-0"
                             >
                                 <DraftEditor
                                     field={primary}
@@ -459,7 +459,7 @@ export function RecordTable(props: TableProps) {
                                                           return next;
                                                       })
                                                   }
-                                                  className="sticky left-0 flex h-9 max-w-[min(100%,24rem)] items-center gap-2 px-2.5 text-[0.8125rem]"
+                                                  className="sticky start-0 flex h-9 max-w-[min(100%,24rem)] items-center gap-2 px-2.5 text-[0.8125rem]"
                                               >
                                                   <ChevronRight
                                                       className={cn(
@@ -491,7 +491,7 @@ export function RecordTable(props: TableProps) {
                                                       onClick={() =>
                                                           grouping.onLoadMore(group.value)
                                                       }
-                                                      className="sticky left-0 flex h-9 items-center px-3 text-[0.8125rem] text-muted-foreground hover:text-foreground disabled:opacity-60"
+                                                      className="sticky start-0 flex h-9 items-center px-3 text-[0.8125rem] text-muted-foreground hover:text-foreground disabled:opacity-60"
                                                   >
                                                       {grouping.loadingGroup === group.value
                                                           ? t("list.loadingMore")
@@ -521,7 +521,7 @@ export function RecordTable(props: TableProps) {
                 </tbody>
                 <tfoot className="group/foot">
                     <tr>
-                        <td className="sticky bottom-0 left-0 z-20 border-r border-t border-border bg-card" />
+                        <td className="sticky bottom-0 start-0 z-20 border-e border-t border-border bg-card" />
                         {fields.map(({ column, field }) => (
                             <TotalCell
                                 key={column.key}

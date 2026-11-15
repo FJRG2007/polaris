@@ -99,7 +99,7 @@ export function DocView({
                 {editing && target ? (
                     <>
                         <span className="text-xs font-medium text-muted-foreground">{t("doc.editing")}</span>
-                        <div className="ml-auto flex items-center gap-2">
+                        <div className="ms-auto flex items-center gap-2">
                             <Button
                                 size="sm"
                                 variant="ghost"
@@ -142,7 +142,7 @@ export function DocView({
                             <Button
                                 size="sm"
                                 variant="ghost"
-                                className="ml-auto"
+                                className="ms-auto"
                                 onClick={() => setEditing(true)}
                             >
                                 <Pencil className="size-4" />

@@ -47,11 +47,11 @@ export function CodeSubagents({
                 onClick={() => setOpen((value) => !value)}
                 aria-expanded={open}
                 aria-label={open ? t("code.subagents.hide") : t("code.subagents.show")}
-                className="flex min-w-0 items-center gap-1.5 text-left text-sm font-medium"
+                className="flex min-w-0 items-center gap-1.5 text-start text-sm font-medium"
             >
                 <Bot className="size-4 shrink-0 text-primary" aria-hidden />
                 <span className="truncate">{t("subagents.title")}</span>
-                <span className="ml-auto min-w-0 max-w-full shrink-0 truncate text-xs font-normal text-muted-foreground" title={summary}>
+                <span className="ms-auto min-w-0 max-w-full shrink-0 truncate text-xs font-normal text-muted-foreground" title={summary}>
                     {summary}
                 </span>
                 <ChevronRight className={cn("size-4 shrink-0 transition-transform", open && "rotate-90")} aria-hidden />
@@ -102,7 +102,7 @@ function SubagentRow({
                     type="button"
                     onClick={() => setOpen((value) => !value)}
                     aria-expanded={open}
-                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-card-hover [@media(pointer:coarse)]:min-h-11"
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-start hover:bg-card-hover [@media(pointer:coarse)]:min-h-11"
                 >
                     <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} aria-hidden />
                     <StatusMark status={node.status} />
@@ -113,7 +113,7 @@ function SubagentRow({
                     <span className="max-w-[40%] shrink-0 truncate rounded bg-muted px-1.5 text-xs text-muted-foreground" title={node.type}>
                         {node.type}
                     </span>
-                    <span className="ml-auto flex shrink-0 gap-2 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                    <span className="ms-auto flex shrink-0 gap-2 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
                         {duration ? <span>{duration}</span> : null}
                         <span>{t("subagents.steps", { count: node.steps.length })}</span>
                     </span>
@@ -150,9 +150,9 @@ function SubagentRow({
             </div>
             {open ? (
                 node.steps.length === 0 ? (
-                    <p className="ml-7 py-1 text-xs text-muted-foreground">{t("code.subagents.noSteps")}</p>
+                    <p className="ms-7 py-1 text-xs text-muted-foreground">{t("code.subagents.noSteps")}</p>
                 ) : (
-                    <ol className="ml-7 flex min-w-0 flex-col gap-0.5 border-l border-border pl-2 text-xs">
+                    <ol className="ms-7 flex min-w-0 flex-col gap-0.5 border-s border-border ps-2 text-xs">
                         {node.steps.map((step, index) => (
                             <li key={step.id ?? index} className="flex min-w-0 items-center gap-2">
                                 <StatusMark status={step.status} />
@@ -161,7 +161,7 @@ function SubagentRow({
                                     {step.tool}
                                 </span>
                                 {step.startedAt !== null && step.endedAt !== null ? (
-                                    <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
+                                    <span className="ms-auto shrink-0 tabular-nums text-muted-foreground">
                                         {durationOf(t, step.startedAt, step.endedAt, now)}
                                     </span>
                                 ) : null}
@@ -216,7 +216,7 @@ function SubagentTranscript({
                 className="flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-2xl flex-col gap-3"
             >
                 <DialogHeader>
-                    <DialogTitle className="min-w-0 truncate pr-6" title={description}>
+                    <DialogTitle className="min-w-0 truncate pe-6" title={description}>
                         {t("subagents.transcriptTitle", { name: node.type, description })}
                     </DialogTitle>
                 </DialogHeader>

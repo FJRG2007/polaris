@@ -572,11 +572,11 @@ export function Composer() {
         posture === "full"
             ? "inset-4 md:inset-10 rounded-lg border-b"
             : posture === "minimized"
-              ? "bottom-0 right-6 w-[22rem]"
+              ? "bottom-0 end-6 w-[22rem]"
               : // Taller and wider than it was. A composer whose body is three
                 // lines is one people write three lines in, and the message
                 // being written is the whole point of the screen it covers.
-                "inset-x-0 bottom-0 mx-auto flex w-full max-w-3xl md:inset-x-auto md:right-6 md:mx-0 md:h-[38rem] md:max-h-[85vh] md:w-[40rem]";
+                "inset-x-0 bottom-0 mx-auto flex w-full max-w-3xl md:inset-x-auto md:end-6 md:mx-0 md:h-[38rem] md:max-h-[85vh] md:w-[40rem]";
 
     return (
         <>
@@ -603,7 +603,7 @@ export function Composer() {
                 <header className="flex items-center gap-1 border-b border-border px-3 py-2">
                     <button
                         type="button"
-                        className="min-w-0 flex-1 truncate text-left text-[13px] font-medium"
+                        className="min-w-0 flex-1 truncate text-start text-[13px] font-medium"
                         onClick={() => setPosture(posture === "minimized" ? "docked" : "minimized")}
                     >
                         {subject.trim() || t("compose.title")}
@@ -729,7 +729,7 @@ export function Composer() {
                                 ) : (
                                     <button
                                         type="button"
-                                        className="pl-12 text-[12px] text-muted-foreground hover:text-foreground"
+                                        className="ps-12 text-[12px] text-muted-foreground hover:text-foreground"
                                         onClick={() => setShowCopies(true)}
                                     >
                                         {t("compose.addCopies")}
@@ -772,7 +772,7 @@ export function Composer() {
                                     after={
                                         trimmed ? (
                                             <TrimmedPill
-                                                className="ml-0.5 mt-1"
+                                                className="ms-0.5 mt-1"
                                                 label={tm("body.showTrimmed")}
                                                 onToggle={showTrimmed}
                                             />
@@ -847,7 +847,7 @@ export function Composer() {
                         <footer className="flex flex-wrap items-center gap-1 border-t border-border px-3 py-2">
                             <div className="flex items-stretch">
                                 <Button
-                                    className="rounded-r-none"
+                                    className="rounded-e-none"
                                     onClick={() => send(sendAt)}
                                     disabled={sending || to.length === 0 || !accountId}
                                 >
@@ -1062,7 +1062,7 @@ function SendLaterMenu({
                 <DropdownMenuTrigger asChild>
                     <Button
                         size="icon"
-                        className="rounded-l-none border-l border-black/20"
+                        className="rounded-s-none border-s border-black/20"
                         disabled={disabled}
                         aria-label={t("compose.sendLater")}
                         title={t("compose.sendLater")}
@@ -1205,7 +1205,7 @@ function QueuedPill({
         <div
             ref={pill}
             className={cn(
-                "fixed inset-x-4 bottom-4 z-[42] flex items-center gap-1 rounded-full border border-border bg-elevated py-1 pl-4 pr-1 shadow-modal md:inset-x-auto md:right-6",
+                "fixed inset-x-4 bottom-4 z-[42] flex items-center gap-1 rounded-full border border-border bg-elevated py-1 ps-4 pe-1 shadow-modal md:inset-x-auto md:end-6",
                 "animate-in fade-in slide-in-from-bottom-2 zoom-in-95 duration-300 motion-reduce:animate-none"
             )}
         >

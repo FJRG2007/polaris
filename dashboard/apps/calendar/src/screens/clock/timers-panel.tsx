@@ -356,7 +356,7 @@ function TimerCard({
                 aria-valuenow={Math.round((total - left) / 1000)}
             >
                 <div
-                    className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-200"
+                    className="absolute inset-y-0 start-0 rounded-full bg-primary transition-[width] duration-200"
                     style={{ width: `${total > 0 ? ((total - left) / total) * 100 : 100}%` }}
                 />
             </div>

@@ -166,7 +166,7 @@ function Operation({
                 ) : null}
             </div>
             <p className="min-w-0 break-all font-mono text-xs">
-                <span className={cn("mr-2 font-semibold", METHOD_TONE[entry.method])}>
+                <span className={cn("me-2 font-semibold", METHOD_TONE[entry.method])}>
                     {entry.method}
                 </span>
                 {entry.path}
@@ -181,25 +181,25 @@ function Operation({
                         {t("apiKeys.reference.parameters")}
                     </h4>
                     <div className="overflow-x-auto overscroll-x-contain">
-                        <table className="w-full text-left text-xs">
+                        <table className="w-full text-start text-xs">
                             <tbody>
                                 {entry.parameters.map((parameter) => (
                                     <tr
                                         key={`${parameter.where}:${parameter.name}`}
                                         className="border-b border-border/60 align-top"
                                     >
-                                        <td className="whitespace-nowrap py-1.5 pr-3 font-mono">
+                                        <td className="whitespace-nowrap py-1.5 pe-3 font-mono">
                                             {parameter.name}
                                             {parameter.required ? (
-                                                <span className="ml-1 text-[0.6875rem] text-muted-foreground">
+                                                <span className="ms-1 text-[0.6875rem] text-muted-foreground">
                                                     {t("apiKeys.reference.required")}
                                                 </span>
                                             ) : null}
                                         </td>
-                                        <td className="whitespace-nowrap py-1.5 pr-3 text-muted-foreground">
+                                        <td className="whitespace-nowrap py-1.5 pe-3 text-muted-foreground">
                                             {t(`apiKeys.reference.where.${parameter.where}`)}
                                         </td>
-                                        <td className="whitespace-nowrap py-1.5 pr-3 font-mono text-muted-foreground">
+                                        <td className="whitespace-nowrap py-1.5 pe-3 font-mono text-muted-foreground">
                                             {parameter.type}
                                         </td>
                                         <td className="w-full py-1.5 text-muted-foreground">
@@ -235,12 +235,12 @@ function Operation({
                     response.schema ? (
                         <details key={response.status}>
                             <summary className="cursor-pointer text-xs">
-                                <span className="mr-2 font-mono font-semibold">
+                                <span className="me-2 font-mono font-semibold">
                                     {response.status}
                                 </span>
                                 {response.description}
                                 {response.text ? (
-                                    <span className="ml-2 text-muted-foreground">
+                                    <span className="ms-2 text-muted-foreground">
                                         ({t("apiKeys.reference.textToo")})
                                     </span>
                                 ) : null}
@@ -249,7 +249,7 @@ function Operation({
                         </details>
                     ) : (
                         <p key={response.status} className="text-xs">
-                            <span className="mr-2 font-mono font-semibold">{response.status}</span>
+                            <span className="me-2 font-mono font-semibold">{response.status}</span>
                             {response.description}
                         </p>
                     )

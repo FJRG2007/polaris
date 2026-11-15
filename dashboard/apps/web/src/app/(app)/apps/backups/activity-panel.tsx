@@ -72,12 +72,12 @@ export function ActivityPanel() {
         <Card>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                    <thead className="border-b border-border text-left text-xs text-muted-foreground">
+                    <thead className="border-b border-border text-start text-xs text-muted-foreground">
                         <tr>
                             <th className="px-3 py-2 font-medium">{t("activity.columns.what")}</th>
                             <th className="px-3 py-2 font-medium">{t("activity.columns.started")}</th>
                             <th className="px-3 py-2 font-medium">{t("activity.columns.took")}</th>
-                            <th className="px-3 py-2 text-right font-medium">{t("table.columns.size")}</th>
+                            <th className="px-3 py-2 text-end font-medium">{t("table.columns.size")}</th>
                             <th className="px-3 py-2 font-medium">{t("activity.columns.result")}</th>
                         </tr>
                     </thead>
@@ -96,7 +96,7 @@ export function ActivityPanel() {
                                     ) : (
                                         <span className="font-medium">{job.resourceName ?? t("activity.removed")}</span>
                                     )}
-                                    <span className="ml-2 text-xs text-muted-foreground">
+                                    <span className="ms-2 text-xs text-muted-foreground">
                                         {job.trigger === "scheduled"
                                             ? t("activity.triggers.scheduled")
                                             : job.trigger === "pre-restore"
@@ -115,7 +115,7 @@ export function ActivityPanel() {
                                         ? formatElapsed(job.startedAt, job.finishedAt, t)
                                         : t("activity.stillRunning")}
                                 </td>
-                                <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                                <td className="px-3 py-2.5 text-end tabular-nums text-muted-foreground">
                                     {job.bytes ? formatBytes(BigInt(job.bytes)) : "-"}
                                 </td>
                                 <td className="px-3 py-2.5">

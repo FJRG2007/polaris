@@ -179,7 +179,7 @@ function Frame({ frame }: { frame: StackFrame }) {
                                 row.threw && "bg-danger-soft font-medium text-foreground"
                             )}
                         >
-                            <span className="w-10 shrink-0 select-none text-right text-muted-foreground">
+                            <span className="w-10 shrink-0 select-none text-end text-muted-foreground">
                                 {row.at}
                             </span>
                             <Line
@@ -429,7 +429,7 @@ export function EventPanel({ event, kept }: { event: EventDetail; kept: number }
                                     </span>
                                 </div>
                                 {crumb.data.length > 0 && (
-                                    <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 pl-[5.5rem] font-mono text-[0.6875rem] text-muted-foreground">
+                                    <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 ps-[5.5rem] font-mono text-[0.6875rem] text-muted-foreground">
                                         {crumb.data.map((field) => (
                                             <span key={field.key} className="break-all">
                                                 {field.key}:{" "}

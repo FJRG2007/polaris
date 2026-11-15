@@ -76,7 +76,7 @@ export function ListField({
                     {value.map((entry, index) => (
                         <li
                             key={`${entry}-${index}`}
-                            className="flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border bg-muted/40 py-0.5 pl-2 pr-0.5 text-xs"
+                            className="flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border bg-muted/40 py-0.5 ps-2 pe-0.5 text-xs"
                         >
                             <span className="min-w-0 truncate" title={entry}>
                                 {entry}

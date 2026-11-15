@@ -486,7 +486,7 @@ function ServerRow({
                     aria-expanded={open}
                     aria-controls={listId}
                     onClick={() => (searching ? setFolded(!folded) : setOpen(!opened))}
-                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-start hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <ChevronRight
                         aria-hidden
@@ -504,7 +504,7 @@ function ServerRow({
                             {t("settings.tools.builtIn")}
                         </span>
                     ) : null}
-                    <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                    <span className="ms-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
                         {on
                             ? t("settings.tools.count", { on: chosen, total })
                             : t("settings.tools.serverOff")}
@@ -517,7 +517,7 @@ function ServerRow({
                 />
             </div>
             {open ? (
-                <div id={listId} className="pl-6">
+                <div id={listId} className="ps-6">
                     {!on ? (
                         <p className="pt-1 text-xs text-muted-foreground">
                             {t("settings.tools.offNote", { server: name })}
@@ -592,14 +592,14 @@ export function ToolSettings({
             <div className="relative min-w-0">
                 <Search
                     aria-hidden
-                    className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
+                    className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
                 />
                 <Input
                     type="search"
                     value={query}
                     aria-label={t("settings.tools.search")}
                     placeholder={t("settings.tools.search")}
-                    className="pl-8"
+                    className="ps-8"
                     onChange={(event) => setQuery(event.target.value)}
                 />
             </div>

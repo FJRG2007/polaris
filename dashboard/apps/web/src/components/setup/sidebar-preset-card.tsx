@@ -96,7 +96,7 @@ export function SidebarPresetCard() {
                                 }
                                 onClick={() => pick(id)}
                                 className={cn(
-                                    "flex min-w-0 items-start gap-2 rounded-md border px-3 py-2 text-left transition-colors",
+                                    "flex min-w-0 items-start gap-2 rounded-md border px-3 py-2 text-start transition-colors",
                                     chosen
                                         ? "border-primary bg-primary/5"
                                         : "border-border hover:bg-muted/50 focus-visible:bg-muted/50"

@@ -252,7 +252,7 @@ export function CellDisplay({
         case "money":
         case "currency":
             return (
-                <span className="ml-auto truncate tabular-nums">
+                <span className="ms-auto truncate tabular-nums">
                     {plainText(field, value, format, locale)}
                 </span>
             );

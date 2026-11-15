@@ -40,7 +40,7 @@ function TreeBranch({
                         onClick={() => onOpen(node.id)}
                         style={{ paddingLeft: `${0.5 + depth * 0.75}rem` }}
                         className={cn(
-                            "flex w-full items-center gap-2 rounded-md py-1 pr-2 text-left text-sm transition-colors hover:bg-muted",
+                            "flex w-full items-center gap-2 rounded-md py-1 pe-2 text-start text-sm transition-colors hover:bg-muted",
                             activeId === node.id ? "bg-muted font-medium" : "text-muted-foreground"
                         )}
                     >
@@ -152,13 +152,13 @@ export function DocsView({
                 </div>
 
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                     <input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder={t("docs.find")}
                         aria-label={t("docs.find")}
-                        className="h-8 w-full rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
+                        className="h-8 w-full rounded-md border border-border bg-field ps-7 pe-2 text-xs hover:border-border-strong focus:border-border-strong"
                     />
                 </div>
 

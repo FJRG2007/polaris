@@ -113,7 +113,7 @@ export function RunsView({
                         ...OUTCOMES.map((entry) => ({ value: entry, label: outcomeLabel(t, entry) }))
                     ]}
                 />
-                <span className="ml-auto text-xs text-muted-foreground">
+                <span className="ms-auto text-xs text-muted-foreground">
                     {shown.length === runs.length
                         ? t("runs.count", { count: runs.length })
                         : t("runs.countOf", { shown: shown.length, total: runs.length })}

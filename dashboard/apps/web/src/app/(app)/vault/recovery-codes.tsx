@@ -175,7 +175,7 @@ export function RecoveryCodes({
                                     type="button"
                                     onClick={() => void copyCode(index)}
                                     className={cn(
-                                        "flex-1 truncate rounded-md border border-border px-2 py-1 text-left font-mono text-xs transition-colors hover:bg-card-hover",
+                                        "flex-1 truncate rounded-md border border-border px-2 py-1 text-start font-mono text-xs transition-colors hover:bg-card-hover",
                                         codeUsed(line) && "text-muted-foreground line-through"
                                     )}
                                     title={

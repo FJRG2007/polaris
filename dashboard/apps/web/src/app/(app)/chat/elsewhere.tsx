@@ -72,7 +72,7 @@ export function Elsewhere({
                     disabled={pending}
                     onClick={() => go(chat.orgId)}
                     className={cn(
-                        "hover:bg-card-hover flex items-center gap-2 rounded-md px-2 py-1 text-left text-sm transition-colors",
+                        "hover:bg-card-hover flex items-center gap-2 rounded-md px-2 py-1 text-start text-sm transition-colors",
                         "text-muted-foreground disabled:opacity-60"
                     )}
                 >

@@ -493,7 +493,7 @@ export function MinecraftAnnounce({
                                                         name: template.name
                                                     })}
                                                     disabled={!templatesHeard}
-                                                    className="border-l border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                                    className="border-s border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                                 >
                                                     <MoreHorizontal className="size-3.5" />
                                                 </button>
@@ -1085,7 +1085,7 @@ function AnnouncementPreview({
                     </div>
 
                     {chat.some((spans) => spans.length > 0) && (
-                        <div className="absolute bottom-[14%] left-1 flex max-w-[60%] flex-col text-[10px] leading-snug">
+                        <div className="absolute bottom-[14%] start-1 flex max-w-[60%] flex-col text-[10px] leading-snug">
                             {chat.map((spans, index) => (
                                 <p key={index} className="whitespace-pre-wrap bg-black/40 px-1">
                                     {index === 0 && tagged && (

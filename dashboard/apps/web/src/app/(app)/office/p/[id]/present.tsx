@@ -240,7 +240,7 @@ export function Present({
                 // a press on the slide.
                 onClick={(event) => event.stopPropagation()}
                 className={cn(
-                    "absolute bottom-3 left-3 flex items-center gap-1 rounded-lg bg-black/70 p-1 transition-opacity",
+                    "absolute bottom-3 start-3 flex items-center gap-1 rounded-lg bg-black/70 p-1 transition-opacity",
                     controls ? "opacity-100" : "pointer-events-none opacity-0"
                 )}
             >

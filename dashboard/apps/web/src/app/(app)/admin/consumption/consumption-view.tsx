@@ -221,7 +221,7 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                             </dt>
                             <dd className="text-sm font-medium tabular-nums">
                                 {formatBytes(group.memUsedBytes)}
-                                <span className="ml-1.5 text-xs font-normal text-muted-foreground tabular-nums">
+                                <span className="ms-1.5 text-xs font-normal text-muted-foreground tabular-nums">
                                     {t("consumption.cpu", { percent: group.cpuPercent })}
                                 </span>
                             </dd>
@@ -286,15 +286,15 @@ export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[34rem] text-sm">
                             <thead>
-                                <tr className="text-left">
-                                    <th className="w-full max-w-0 py-1 pr-3">
+                                <tr className="text-start">
+                                    <th className="w-full max-w-0 py-1 pe-3">
                                         {t("consumption.columns.name")}
                                     </th>
-                                    <th className="py-1 pr-3">{t("consumption.columns.owner")}</th>
-                                    <th className="py-1 pr-3 text-right">
+                                    <th className="py-1 pe-3">{t("consumption.columns.owner")}</th>
+                                    <th className="py-1 pe-3 text-end">
                                         {t("consumption.columns.cpu")}
                                     </th>
-                                    <th className="py-1 text-right">
+                                    <th className="py-1 text-end">
                                         {t("consumption.columns.memory")}
                                     </th>
                                 </tr>
@@ -359,7 +359,7 @@ function Row({
 
     return (
         <tr className={cn("align-top", inside ? "bg-surface/40" : "border-t border-border")}>
-            <td className={cn("w-full max-w-0 py-2 pr-3", inside && "pl-6")}>
+            <td className={cn("w-full max-w-0 py-2 pe-3", inside && "ps-6")}>
                 <div className="flex items-center gap-2">
                     {onToggle ? (
                         <button
@@ -390,11 +390,11 @@ function Row({
                         : ""}
                 </div>
             </td>
-            <td className="py-2 pr-3 text-xs text-muted-foreground">{row.owner ?? "-"}</td>
-            <td className="py-2 pr-3 text-right text-muted-foreground tabular-nums">
+            <td className="py-2 pe-3 text-xs text-muted-foreground">{row.owner ?? "-"}</td>
+            <td className="py-2 pe-3 text-end text-muted-foreground tabular-nums">
                 {row.cpuPercent === null ? "-" : `${row.cpuPercent}%`}
             </td>
-            <td className="py-2 text-right text-muted-foreground tabular-nums">
+            <td className="py-2 text-end text-muted-foreground tabular-nums">
                 {row.memUsedBytes === null ? "-" : formatBytes(row.memUsedBytes)}
             </td>
         </tr>

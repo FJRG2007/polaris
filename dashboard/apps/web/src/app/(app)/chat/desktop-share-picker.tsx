@@ -320,7 +320,7 @@ function Picker({ request }: { request: Request }) {
                                             onClick={() => setSelected(tile.id)}
                                             onDoubleClick={() => share(tile.id)}
                                             className={cn(
-                                                "flex w-full min-w-0 flex-col gap-1.5 rounded-lg border p-1.5 text-left",
+                                                "flex w-full min-w-0 flex-col gap-1.5 rounded-lg border p-1.5 text-start",
                                                 chosen === tile.id
                                                     ? "border-primary ring-2 ring-primary/40"
                                                     : "border-border hover:border-muted-foreground/40"

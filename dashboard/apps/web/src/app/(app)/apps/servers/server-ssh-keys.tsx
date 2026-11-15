@@ -112,7 +112,7 @@ export function ServerSshKeys({ hostId }: { hostId: string }) {
                         }))}
                     />
                 </label>
-                <div className="ml-auto flex flex-wrap gap-2">
+                <div className="ms-auto flex flex-wrap gap-2">
                     <Button
                         size="icon"
                         variant="ghost"

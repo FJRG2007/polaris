@@ -166,7 +166,7 @@ export function PanelGrid({
                                         title={t("panels.moveCard", { name: label })}
                                         onPointerDown={(event) => begin(event, card, "move")}
                                         onKeyDown={(event) => nudge(event, card)}
-                                        className="absolute left-2 top-2 flex size-9 cursor-grab touch-none items-center justify-center rounded-md border border-border bg-background/90 text-muted-foreground active:cursor-grabbing"
+                                        className="absolute start-2 top-2 flex size-9 cursor-grab touch-none items-center justify-center rounded-md border border-border bg-background/90 text-muted-foreground active:cursor-grabbing"
                                     >
                                         <GripVertical className="size-4" />
                                     </button>
@@ -179,7 +179,7 @@ export function PanelGrid({
                                         onClick={() =>
                                             onChange(cards.filter((entry) => entry.id !== card.id))
                                         }
-                                        className="absolute right-2 top-2 size-9 bg-background/90 p-0"
+                                        className="absolute end-2 top-2 size-9 bg-background/90 p-0"
                                     >
                                         <X className="size-4" />
                                     </Button>
@@ -194,12 +194,12 @@ export function PanelGrid({
                                                 card
                                             )
                                         }
-                                        className="absolute bottom-2 right-2 flex size-9 cursor-nwse-resize touch-none items-center justify-center rounded-md border border-border bg-background/90 text-muted-foreground"
+                                        className="absolute bottom-2 end-2 flex size-9 cursor-nwse-resize touch-none items-center justify-center rounded-md border border-border bg-background/90 text-muted-foreground"
                                     >
                                         <MoveDiagonal2 className="size-4" />
                                     </button>
                                     {extra ? (
-                                        <div className="absolute bottom-2 left-2">
+                                        <div className="absolute bottom-2 start-2">
                                             {extra(card)}
                                         </div>
                                     ) : null}

@@ -443,7 +443,7 @@ function Poll({
                         onClick={() => void vote(option.id)}
                         aria-pressed={option.mine}
                         className={cn(
-                            "relative overflow-hidden rounded px-2 py-1 text-left text-xs transition-colors",
+                            "relative overflow-hidden rounded px-2 py-1 text-start text-xs transition-colors",
                             option.mine ? "bg-primary/15 font-medium" : "hover:bg-muted",
                             (busy || poll.closed) && "cursor-default"
                         )}
@@ -455,7 +455,7 @@ function Poll({
                             <span
                                 aria-hidden
                                 style={{ width: `${share}%` }}
-                                className="absolute inset-y-0 left-0 bg-primary/10"
+                                className="absolute inset-y-0 start-0 bg-primary/10"
                             />
                         )}
                         <span className="relative flex items-center gap-2">

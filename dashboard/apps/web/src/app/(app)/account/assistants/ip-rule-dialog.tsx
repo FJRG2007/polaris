@@ -92,7 +92,7 @@ export function IpRuleDialog({
         <Dialog open onOpenChange={(open) => !open && onCancel()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle className="break-words pr-6 [overflow-wrap:anywhere]">
+                    <DialogTitle className="break-words pe-6 [overflow-wrap:anywhere]">
                         {t("connectedApps.ip.title", { app: name })}
                     </DialogTitle>
                     <DialogDescription>{t("connectedApps.ip.hint")}</DialogDescription>

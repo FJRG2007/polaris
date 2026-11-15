@@ -318,7 +318,7 @@ function StepItem({
         >
             <button
                 type="button"
-                className="flex w-full min-w-0 items-center gap-2 p-3 text-left"
+                className="flex w-full min-w-0 items-center gap-2 p-3 text-start"
                 aria-expanded={open}
                 onClick={() => setOpen(!open)}
             >

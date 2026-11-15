@@ -122,7 +122,7 @@ export function GamePortsLive({
                     <p className="font-medium text-foreground">{advice.title}</p>
                     <p className="text-muted-foreground">{advice.detail}</p>
                     {advice.steps.length > 0 && (
-                        <ul className="ml-4 list-disc text-muted-foreground">
+                        <ul className="ms-4 list-disc text-muted-foreground">
                             {advice.steps.map((step) => (
                                 <li key={step}>{step}</li>
                             ))}

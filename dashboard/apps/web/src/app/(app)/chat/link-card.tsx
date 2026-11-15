@@ -133,7 +133,7 @@ function SteamCard({
         <div
             data-card="steam"
             style={edge}
-            className="mt-1 flex max-w-lg flex-col gap-2 rounded-md border border-border border-l-2 border-l-primary bg-card p-3"
+            className="mt-1 flex max-w-lg flex-col gap-2 rounded-md border border-border border-s-2 border-s-primary bg-card p-3"
         >
             <span className="flex min-w-0 flex-col gap-1">
                 <span className="truncate text-[0.6875rem] text-muted-foreground">
@@ -310,7 +310,7 @@ function PageCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]
             <div
                 style={edge}
                 className={cn(
-                    "mt-1 flex flex-col gap-2 rounded-md border border-border border-l-2 border-l-primary bg-card p-2",
+                    "mt-1 flex flex-col gap-2 rounded-md border border-border border-s-2 border-s-primary bg-card p-2",
                     CARD_WIDTHS[embed.shape]
                 )}
             >
@@ -386,7 +386,7 @@ function PageCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]
             style={edge}
             target="_blank"
             rel="noreferrer noopener"
-            className="mt-1 flex max-w-lg gap-3 rounded-md border border-border border-l-2 border-l-primary bg-card p-2 transition-colors hover:bg-card-hover"
+            className="mt-1 flex max-w-lg gap-3 rounded-md border border-border border-s-2 border-s-primary bg-card p-2 transition-colors hover:bg-card-hover"
         >
             {preview.hasImage && (
                 // eslint-disable-next-line @next/next/no-img-element -- one thumbnail, fetched through Polaris, no loader wanted

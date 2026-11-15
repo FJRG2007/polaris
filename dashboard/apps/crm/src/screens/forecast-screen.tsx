@@ -212,24 +212,24 @@ export function ForecastScreen() {
                 <div className="overflow-x-auto rounded-lg border border-border bg-card">
                     <table className="w-full min-w-[34rem] text-[0.8125rem]">
                         <caption className="sr-only">{t("forecast.tableLabel")}</caption>
-                        <thead className="text-left text-muted-foreground">
+                        <thead className="text-start text-muted-foreground">
                             <tr className="border-b border-border">
                                 <th
                                     scope="col"
-                                    className="sticky left-0 bg-card px-3 py-2 font-medium"
+                                    className="sticky start-0 bg-card px-3 py-2 font-medium"
                                 >
                                     {t("forecast.period")}
                                 </th>
-                                <th scope="col" className="px-3 py-2 text-right font-medium">
+                                <th scope="col" className="px-3 py-2 text-end font-medium">
                                     {t("forecast.deals")}
                                 </th>
-                                <th scope="col" className="px-3 py-2 text-right font-medium">
+                                <th scope="col" className="px-3 py-2 text-end font-medium">
                                     {t("forecast.won")}
                                 </th>
-                                <th scope="col" className="px-3 py-2 text-right font-medium">
+                                <th scope="col" className="px-3 py-2 text-end font-medium">
                                     {t("forecast.open")}
                                 </th>
-                                <th scope="col" className="px-3 py-2 text-right font-medium">
+                                <th scope="col" className="px-3 py-2 text-end font-medium">
                                     {t("forecast.expected")}
                                 </th>
                                 <th scope="col" className="w-[28%] px-3 py-2">
@@ -252,18 +252,18 @@ export function ForecastScreen() {
                             <tr className="border-t border-border font-semibold">
                                 <th
                                     scope="row"
-                                    className="sticky left-0 bg-card px-3 py-2 text-left"
+                                    className="sticky start-0 bg-card px-3 py-2 text-start"
                                 >
                                     {t("forecast.total")}
                                 </th>
-                                <td className="px-3 py-2 text-right tabular-nums">{due}</td>
-                                <td className="px-3 py-2 text-right tabular-nums">
+                                <td className="px-3 py-2 text-end tabular-nums">{due}</td>
+                                <td className="px-3 py-2 text-end tabular-nums">
                                     {money(total.won)}
                                 </td>
-                                <td className="px-3 py-2 text-right tabular-nums">
+                                <td className="px-3 py-2 text-end tabular-nums">
                                     {money(total.open)}
                                 </td>
-                                <td className="px-3 py-2 text-right tabular-nums">
+                                <td className="px-3 py-2 text-end tabular-nums">
                                     {money(total.expected)}
                                 </td>
                                 <td />
@@ -312,7 +312,7 @@ export function ForecastScreen() {
         >
             <ChartColors />
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <h1 className="mr-auto text-[1.0625rem] font-semibold leading-tight tracking-tight">
+                <h1 className="me-auto text-[1.0625rem] font-semibold leading-tight tracking-tight">
                     {t("forecast.title")}
                 </h1>
                 <SegmentedControl
@@ -421,21 +421,21 @@ function PeriodRow({
         >
             <th
                 scope="row"
-                className="sticky left-0 whitespace-nowrap bg-card px-3 py-2 text-left font-normal"
+                className="sticky start-0 whitespace-nowrap bg-card px-3 py-2 text-start font-normal"
             >
                 {name}
             </th>
-            <td className="px-3 py-2 text-right tabular-nums">
+            <td className="px-3 py-2 text-end tabular-nums">
                 {period.deals}
                 {period.wonDeals > 0 ? (
-                    <span className="ml-1 text-muted-foreground">
+                    <span className="ms-1 text-muted-foreground">
                         ({t("forecast.wonCount", { count: period.wonDeals })})
                     </span>
                 ) : null}
             </td>
-            <td className="px-3 py-2 text-right tabular-nums">{money(amounts.won)}</td>
-            <td className="px-3 py-2 text-right tabular-nums">{money(amounts.open)}</td>
-            <td className="px-3 py-2 text-right tabular-nums">{money(amounts.expected)}</td>
+            <td className="px-3 py-2 text-end tabular-nums">{money(amounts.won)}</td>
+            <td className="px-3 py-2 text-end tabular-nums">{money(amounts.open)}</td>
+            <td className="px-3 py-2 text-end tabular-nums">{money(amounts.expected)}</td>
             <td className="px-3 py-2">
                 {peak > 0 ? (
                     <span

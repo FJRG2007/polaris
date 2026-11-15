@@ -30,7 +30,7 @@ export function DeliveryLog({ deliveries }: { deliveries: DeliveryView[] }) {
                     type="button"
                     onClick={() => setOpen((current) => !current)}
                     aria-expanded={open}
-                    className="flex w-full items-center gap-2 p-4 text-left"
+                    className="flex w-full items-center gap-2 p-4 text-start"
                 >
                     {open ? (
                         <ChevronDown className="size-4 text-muted-foreground" />
@@ -63,7 +63,7 @@ export function DeliveryLog({ deliveries }: { deliveries: DeliveryView[] }) {
                                             {KIND_KEYS.has(row.kind) ? t(`deliveries.kinds.${row.kind}` as "deliveries.kinds.inapp") : row.kind}
                                             {row.destinationHint ? ` - ${row.destinationHint}` : ""}
                                         </span>
-                                        <span className="ml-auto text-muted-foreground/70">
+                                        <span className="ms-auto text-muted-foreground/70">
                                             <RelativeTime iso={row.createdAt} />
                                         </span>
                                     </div>

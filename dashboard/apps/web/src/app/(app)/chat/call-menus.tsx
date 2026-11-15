@@ -430,7 +430,7 @@ export function StreamVolumeControl({
           : t("callMenus.muteStream");
 
     return (
-        <span className="flex min-w-0 items-center gap-1 rounded bg-background/80 pr-1.5">
+        <span className="flex min-w-0 items-center gap-1 rounded bg-background/80 pe-1.5">
             <button
                 type="button"
                 onClick={() => setMuted(!muted)}

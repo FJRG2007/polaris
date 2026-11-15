@@ -55,7 +55,7 @@ export function DnsRecordTable({ records, className }: { records: readonly DnsRe
     return (
         <div className={cn("min-w-0 overflow-x-auto rounded-lg border border-border bg-card", className)}>
             <table className="w-full min-w-[32rem] text-sm">
-                <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                     <tr>
                         <th scope="col" className="w-16 px-3 py-2 font-medium">
                             {words.type}

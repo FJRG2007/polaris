@@ -119,7 +119,7 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
 
                 <div className="overflow-x-auto rounded-lg border border-border">
                     <table className="w-full text-sm">
-                        <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                        <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                             {/* Each column waits for the width that holds it, and nothing
                                 arrives at md: that is where the navigation rail appears, so
                                 the content area is narrower there than a breakpoint
@@ -178,7 +178,7 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                         <p className="flex flex-wrap items-center gap-1.5">
                                                             <button
                                                                 type="button"
-                                                                className="min-w-0 truncate text-left hover:underline"
+                                                                className="min-w-0 truncate text-start hover:underline"
                                                                 onClick={() => setOpened(device)}
                                                             >
                                                                 {named

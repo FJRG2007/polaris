@@ -59,7 +59,7 @@ export function DnsRecordsTable({
         // six unreadable ones.
         <div className="overflow-x-auto rounded-lg border border-border bg-card">
             <table className="w-full min-w-[46rem] text-sm">
-                <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                     <tr>
                         <th scope="col" className="w-20 px-3 py-2 font-medium">
                             {t("table.type")}
@@ -76,7 +76,7 @@ export function DnsRecordsTable({
                         <th scope="col" className="px-3 py-2 font-medium">
                             {t("table.ttl")}
                         </th>
-                        <th scope="col" className="px-3 py-2 text-right font-medium">
+                        <th scope="col" className="px-3 py-2 text-end font-medium">
                             <span className="sr-only">{t("table.actions")}</span>
                         </th>
                     </tr>
@@ -101,7 +101,7 @@ export function DnsRecordsTable({
                                     <Skeleton className="h-4 w-10" />
                                 </td>
                                 <td className="px-3 py-2.5">
-                                    <Skeleton className="ml-auto h-4 w-20" />
+                                    <Skeleton className="ms-auto h-4 w-20" />
                                 </td>
                             </tr>
                         ))

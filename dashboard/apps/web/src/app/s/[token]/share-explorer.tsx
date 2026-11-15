@@ -1011,13 +1011,13 @@ export function ShareExplorer({
             {/* Search + sort + view + filters toolbar */}
             <div className="mb-3 flex flex-wrap items-center gap-2">
                 <div className="relative min-w-[12rem] flex-1">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder={td("filesView.search.placeholder")}
                         title={td("filesView.search.help")}
-                        className={cn("pl-8 pr-9", searchError && "border-danger")}
+                        className={cn("ps-8 pe-9", searchError && "border-danger")}
                     />
                     <button
                         type="button"
@@ -1031,7 +1031,7 @@ export function ShareExplorer({
                                 : td("filesView.search.current")
                         }
                         className={cn(
-                            "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted",
+                            "absolute end-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted",
                             searchScope === "recursive" ? "text-primary" : "text-muted-foreground"
                         )}
                     >
@@ -1210,7 +1210,7 @@ export function ShareExplorer({
                         <span className="font-medium">
                             {t("share.selected", { count: selectedEntries.length })}
                         </span>
-                        <div className="ml-auto flex items-center gap-1">
+                        <div className="ms-auto flex items-center gap-1">
                             {allowDownload ? (
                                 <Button
                                     size="sm"
@@ -1295,7 +1295,7 @@ export function ShareExplorer({
             >
                 {dragUpload ? (
                     <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-md border-2 border-dashed border-primary bg-primary/5 text-sm font-medium text-primary">
-                        <Upload className="mr-2 size-4" />
+                        <Upload className="me-2 size-4" />
                         {td("filesView.dropHere")}
                     </div>
                 ) : null}
@@ -1410,7 +1410,7 @@ export function ShareExplorer({
                             <span className="hidden w-40 sm:block">
                                 {td("filesView.details.modified")}
                             </span>
-                            <span className="w-20 text-right">{td("filesView.details.size")}</span>
+                            <span className="w-20 text-end">{td("filesView.details.size")}</span>
                             <span className="w-16" />
                         </div>
                         <div
@@ -1475,7 +1475,7 @@ export function ShareExplorer({
                                                     <span className="hidden w-40 text-xs text-muted-foreground sm:block">
                                                         <RelativeTime iso={entry.modifiedAt} />
                                                     </span>
-                                                    <span className="w-20 text-right text-xs text-muted-foreground">
+                                                    <span className="w-20 text-end text-xs text-muted-foreground">
                                                         {entry.kind === "dir"
                                                             ? "-"
                                                             : formatBytes(BigInt(entry.size))}
@@ -1591,7 +1591,7 @@ export function ShareExplorer({
 
             {/* Background upload indicator */}
             {uploading ? (
-                <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-border-strong bg-elevated p-3 text-sm shadow-popover">
+                <div className="fixed bottom-4 end-4 z-50 flex items-center gap-2 rounded-lg border border-border-strong bg-elevated p-3 text-sm shadow-popover">
                     <Loader2 className="size-4 animate-spin text-primary" />
                     {td("filesView.toolbar.uploading")}
                 </div>
@@ -1599,7 +1599,7 @@ export function ShareExplorer({
 
             {/* Error toast for a failed write */}
             {opError ? (
-                <div className="fixed bottom-4 right-4 z-50 flex w-80 items-start gap-2 rounded-lg border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink shadow-popover">
+                <div className="fixed bottom-4 end-4 z-50 flex w-80 items-start gap-2 rounded-lg border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink shadow-popover">
                     <Info className="mt-0.5 size-4 shrink-0" />
                     <span className="min-w-0 flex-1 break-words">{opError}</span>
                     <button

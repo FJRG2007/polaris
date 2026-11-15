@@ -348,7 +348,7 @@ export function DirectProfile({
             pane="profile"
             bounds={PROFILE_PANE}
             label={t("directProfile.profileWidth")}
-            className="border-l border-border"
+            className="border-s border-border"
         >
             {search ? (
                 <div className="flex h-header shrink-0 items-center border-b border-border px-3">

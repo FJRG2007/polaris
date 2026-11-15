@@ -167,12 +167,12 @@ export function ReportView(props: ReportViewProps) {
                                 ) : (
                                     <table className="w-full table-fixed text-[12px]">
                                         <thead>
-                                            <tr className="border-b border-[#dddddd] text-left text-[#555555]">
+                                            <tr className="border-b border-[#dddddd] text-start text-[#555555]">
                                                 <th className="py-1 font-normal" />
-                                                <th className="w-20 py-1 text-right font-normal">
+                                                <th className="w-20 py-1 text-end font-normal">
                                                     {t("cards.visitors")}
                                                 </th>
-                                                <th className="w-20 py-1 text-right font-normal">
+                                                <th className="w-20 py-1 text-end font-normal">
                                                     {t("cards.pageviews")}
                                                 </th>
                                             </tr>
@@ -180,13 +180,13 @@ export function ReportView(props: ReportViewProps) {
                                         <tbody>
                                             {rows.map((row) => (
                                                 <tr key={row.key} className="border-b border-[#eeeeee]">
-                                                    <td className="truncate py-1 pr-2" title={row.key}>
+                                                    <td className="truncate py-1 pe-2" title={row.key}>
                                                         {rowLabel(dimension, row.key)}
                                                     </td>
-                                                    <td className="py-1 text-right tabular-nums">
+                                                    <td className="py-1 text-end tabular-nums">
                                                         {grouped(row.visitors)}
                                                     </td>
-                                                    <td className="py-1 text-right tabular-nums">
+                                                    <td className="py-1 text-end tabular-nums">
                                                         {grouped(row.views)}
                                                     </td>
                                                 </tr>

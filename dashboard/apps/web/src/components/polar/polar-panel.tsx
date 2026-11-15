@@ -562,13 +562,13 @@ function PolarAsideOpen() {
             data-state={presence.state}
             onAnimationEnd={presence.onAnimationEnd}
             style={{ ["--polar-width" as string]: `${width}px` }}
-            className="polar-aside fixed inset-0 top-[var(--window-controls-height)] z-50 flex flex-col overflow-hidden bg-card sm:inset-auto sm:bottom-0 sm:right-0 sm:top-header sm:w-[var(--polar-width)] sm:border-l sm:border-border sm:shadow-popover xl:static xl:z-auto xl:h-auto xl:shrink-0 xl:shadow-none"
+            className="polar-aside fixed inset-0 top-[var(--window-controls-height)] z-50 flex flex-col overflow-hidden bg-card sm:inset-auto sm:bottom-0 sm:end-0 sm:top-header sm:w-[var(--polar-width)] sm:border-s sm:border-border sm:shadow-popover xl:static xl:z-auto xl:h-auto xl:shrink-0 xl:shadow-none"
         >
             <div
                 role="separator"
                 aria-orientation="vertical"
                 onPointerDown={startResize}
-                className="absolute inset-y-0 left-0 hidden w-1.5 cursor-col-resize hover:bg-primary/30 sm:block"
+                className="absolute inset-y-0 start-0 hidden w-1.5 cursor-col-resize hover:bg-primary/30 sm:block"
             />
             {/* Its own width from xl, so growing the panel uncovers it instead of
                 squeezing it. */}
@@ -2635,7 +2635,7 @@ export function PolarChat({
             {sidebarShown ? (
                 // The app rail's own width and surface: on this page it is the
                 // only sidebar, so it reads as the one every other app has.
-                <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-surface md:flex">
+                <aside className="hidden w-56 shrink-0 flex-col border-e border-border bg-surface md:flex">
                     {threadList({
                         label: t("history.hide"),
                         icon: PanelLeftClose,

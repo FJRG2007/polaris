@@ -354,7 +354,7 @@ export function HomeView({
                         )}
                     >
                         {optionLabel(t, "dueBucket", group.bucket)}
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        <span className="ms-2 text-xs font-normal text-muted-foreground">
                             {group.tasks.length}
                         </span>
                     </h2>
@@ -382,7 +382,7 @@ export function HomeView({
                                         <button
                                             type="button"
                                             onClick={() => setOpenTaskId(task.id)}
-                                            className="flex min-w-0 items-center gap-2 text-left"
+                                            className="flex min-w-0 items-center gap-2 text-start"
                                         >
                                             <span className="hidden font-mono text-[0.6875rem] text-muted-foreground sm:inline">
                                                 {task.reference}

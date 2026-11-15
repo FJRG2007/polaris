@@ -66,10 +66,10 @@ export function DiffReview({
                 return (
                     <div key={index}>
                         <div className={cn("group flex min-w-max items-start", LINE_TONE[line.kind])}>
-                            <span className="w-10 shrink-0 select-none px-1 text-right text-muted-foreground">
+                            <span className="w-10 shrink-0 select-none px-1 text-end text-muted-foreground">
                                 {line.oldLine ?? ""}
                             </span>
-                            <span className="w-10 shrink-0 select-none px-1 text-right text-muted-foreground">
+                            <span className="w-10 shrink-0 select-none px-1 text-end text-muted-foreground">
                                 {line.newLine ?? ""}
                             </span>
                             <span className="flex w-6 shrink-0 justify-center">
@@ -88,7 +88,7 @@ export function DiffReview({
                                     </button>
                                 ) : null}
                             </span>
-                            <span className="whitespace-pre pr-4">{line.text || " "}</span>
+                            <span className="whitespace-pre pe-4">{line.text || " "}</span>
                         </div>
                         {left && open !== key ? (
                             <div className="flex min-w-0 items-start gap-2 border-y border-border bg-card px-3 py-2 font-sans text-sm">

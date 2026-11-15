@@ -276,7 +276,7 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                     <h2 className="text-sm font-semibold">{t("apiKeys.usage.byRoute")}</h2>
                     <div className="overflow-x-auto rounded-lg border border-border">
                         <table className="w-full min-w-[34rem] text-sm">
-                            <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                            <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                                 <tr>
                                     <th
                                         scope="col"
@@ -284,16 +284,16 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                                     >
                                         {t("apiKeys.usage.route")}
                                     </th>
-                                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                                    <th scope="col" className="px-3 py-2 text-end font-medium">
                                         {t("apiKeys.usage.calls")}
                                     </th>
-                                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                                    <th scope="col" className="px-3 py-2 text-end font-medium">
                                         {t("apiKeys.usage.errors")}
                                     </th>
-                                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                                    <th scope="col" className="px-3 py-2 text-end font-medium">
                                         {t("apiKeys.usage.p50")}
                                     </th>
-                                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                                    <th scope="col" className="px-3 py-2 text-end font-medium">
                                         {t("apiKeys.usage.p95")}
                                     </th>
                                 </tr>
@@ -327,12 +327,12 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                            <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums">
                                                 {number(row.calls)}
                                             </td>
                                             <td
                                                 className={cn(
-                                                    "whitespace-nowrap px-3 py-2 text-right tabular-nums",
+                                                    "whitespace-nowrap px-3 py-2 text-end tabular-nums",
                                                     row.errors > 0
                                                         ? "text-danger"
                                                         : "text-muted-foreground"
@@ -340,10 +340,10 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                                             >
                                                 {number(row.errors)}
                                             </td>
-                                            <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
+                                            <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums text-muted-foreground">
                                                 {latency(row.p50, t, number)}
                                             </td>
-                                            <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
+                                            <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums text-muted-foreground">
                                                 {latency(row.p95, t, number)}
                                             </td>
                                         </tr>
@@ -354,7 +354,7 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                                         <td className="px-3 py-2 text-xs">
                                             {t("apiKeys.usage.other")}
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                        <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums">
                                             {number(rest)}
                                         </td>
                                         <td colSpan={3} />
@@ -369,15 +369,15 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                     <h2 className="text-sm font-semibold">{t("apiKeys.usage.byStatus")}</h2>
                     <div className="overflow-x-auto rounded-lg border border-border">
                         <table className="w-full text-sm">
-                            <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                            <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                                 <tr>
                                     <th scope="col" className="px-3 py-2 font-medium">
                                         {t("apiKeys.usage.status")}
                                     </th>
-                                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                                    <th scope="col" className="px-3 py-2 text-end font-medium">
                                         {t("apiKeys.usage.calls")}
                                     </th>
-                                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                                    <th scope="col" className="px-3 py-2 text-end font-medium">
                                         {t("apiKeys.usage.share")}
                                     </th>
                                 </tr>
@@ -395,10 +395,10 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                                                 {row.status}
                                             </Badge>
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                        <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums">
                                             {number(row.calls)}
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
+                                        <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums text-muted-foreground">
                                             {share(row.calls)}
                                         </td>
                                     </tr>

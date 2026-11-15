@@ -100,7 +100,7 @@ export function GpuBody({
                             <span className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("gpu.onCards", { list: row.gpuIndexes.join(", ") })}>
                                 {t("gpu.onCards", { list: row.gpuIndexes.join(", ") })}
                             </span>
-                            <span className="w-16 shrink-0 text-right tabular-nums text-muted-foreground">
+                            <span className="w-16 shrink-0 text-end tabular-nums text-muted-foreground">
                                 {formatBytes(row.memoryUsedBytes)}
                             </span>
                         </div>

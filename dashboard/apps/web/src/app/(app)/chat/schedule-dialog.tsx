@@ -186,7 +186,7 @@ export function ScheduleDialog({
                             />
                         </label>
                         <Button
-                            className="ml-auto"
+                            className="ms-auto"
                             disabled={busy || refusal !== null}
                             onClick={() => at && take(at)}
                         >

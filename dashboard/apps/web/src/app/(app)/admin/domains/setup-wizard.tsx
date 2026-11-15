@@ -502,7 +502,7 @@ function EnvironmentStep({
                             key={option}
                             type="button"
                             onClick={() => onSelect(option)}
-                            className={`flex flex-col gap-1 rounded-md border p-3 text-left transition-colors ${
+                            className={`flex flex-col gap-1 rounded-md border p-3 text-start transition-colors ${
                                 selected === option
                                     ? "border-primary bg-primary/5"
                                     : "border-border/60 hover:bg-muted/40"
@@ -590,7 +590,7 @@ function StrategyStep({
                                 // strategy picked below it: the card is worth
                                 // re-reading, and doing so must not undo a choice.
                                 onClick={() => !active && onSelect(option.best)}
-                                className={`flex flex-col gap-2 rounded-md border p-3 text-left transition-colors ${
+                                className={`flex flex-col gap-2 rounded-md border p-3 text-start transition-colors ${
                                     active
                                         ? "border-primary bg-primary/5"
                                         : "border-border/60 hover:bg-muted/40"
@@ -686,7 +686,7 @@ function StrategyStep({
                                 type="button"
                                 disabled={!option.available}
                                 onClick={() => onSelect(option.id)}
-                                className={`flex flex-col gap-1 rounded-md border p-3 text-left transition-colors ${
+                                className={`flex flex-col gap-1 rounded-md border p-3 text-start transition-colors ${
                                     active
                                         ? "border-primary bg-primary/5"
                                         : "border-border/60 hover:bg-muted/40"
@@ -1260,7 +1260,7 @@ function DnsStep({
                         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                         {t("domainsSetup.dns.conflicts")}
                     </span>
-                    <ul className="flex flex-col gap-0.5 pl-5 text-muted-foreground">
+                    <ul className="flex flex-col gap-0.5 ps-5 text-muted-foreground">
                         {conflicts.map((conflict) => (
                             <li key={conflict.name}>
                                 <code>{conflict.name}</code> -{" "}
@@ -1537,7 +1537,7 @@ function RouterAdviceNote({
                 <p className="font-medium text-foreground">{advice.title}</p>
                 <p>{advice.detail}</p>
                 {advice.steps.length > 0 && (
-                    <ol className="ml-4 list-decimal">
+                    <ol className="ms-4 list-decimal">
                         {advice.steps.map((step) => (
                             <li key={step}>{step}</li>
                         ))}

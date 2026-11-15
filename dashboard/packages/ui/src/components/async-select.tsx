@@ -207,7 +207,7 @@ function AsyncPicker<T>({
                 if (multiple) event.preventDefault();
                 toggle(value, item);
             }}
-            className="h-8 pr-8"
+            className="h-8 pe-8"
         >
             {item !== null && itemIcon ? (
                 <span className="flex shrink-0 items-center">{itemIcon(item)}</span>
@@ -223,7 +223,7 @@ function AsyncPicker<T>({
                     {detail}
                 </span>
             ) : null}
-            {chosen.has(value) && <Check className="absolute right-2 text-primary" />}
+            {chosen.has(value) && <Check className="absolute end-2 text-primary" />}
         </DropdownMenuItem>
     );
 
@@ -240,7 +240,7 @@ function AsyncPicker<T>({
                 disabled={disabled}
                 aria-label={ariaLabel}
                 className={cn(
-                    "group flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-field px-2.5 text-left text-[0.8125rem] transition-colors duration-fast hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:border-border-strong",
+                    "group flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-field px-2.5 text-start text-[0.8125rem] transition-colors duration-fast hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:border-border-strong",
                     className
                 )}
             >

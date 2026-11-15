@@ -52,7 +52,7 @@ export function ServerWorkload({ connectionId }: { connectionId: string }) {
                 <h2 className="text-sm font-medium">
                     {t("workload.title")}
                     {data ? (
-                        <span className="ml-1.5 text-muted-foreground">
+                        <span className="ms-1.5 text-muted-foreground">
                             {t("workload.running", { running: running.length, total: containers.length })}
                         </span>
                     ) : null}
@@ -151,7 +151,7 @@ function ContainerLine({
                 {container.state === "running" ? null : (
                     <Badge variant="neutral">{containerStateLabel(tc, container.state)}</Badge>
                 )}
-                <span className="w-14 shrink-0 text-right tabular-nums text-muted-foreground">
+                <span className="w-14 shrink-0 text-end tabular-nums text-muted-foreground">
                     {container.cpuPercent === null ? "-" : `${container.cpuPercent}%`}
                 </span>
                 <span className="flex w-24 shrink-0 flex-col items-end gap-1">

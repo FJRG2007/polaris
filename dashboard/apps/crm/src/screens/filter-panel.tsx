@@ -111,7 +111,7 @@ export function FilterButton({
                         {filter.rules.length > 0 ? (
                             <Button
                                 variant="ghost"
-                                className="mr-auto"
+                                className="me-auto"
                                 onClick={() => onChange(filters.EMPTY_FILTER)}
                             >
                                 {t("filters.clearAll")}
@@ -260,7 +260,7 @@ function GroupEditor({
                 />
                 <button
                     type="button"
-                    className="ml-auto grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                    className="ms-auto grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground"
                     aria-label={t("filters.removeGroup")}
                     title={t("filters.removeGroup")}
                     onClick={() => onChange(null)}

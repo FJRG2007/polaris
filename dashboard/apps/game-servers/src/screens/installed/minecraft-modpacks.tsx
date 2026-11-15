@@ -85,7 +85,7 @@ export function ModpacksCard({
                         <Button
                             size="sm"
                             variant="ghost"
-                            className="ml-auto"
+                            className="ms-auto"
                             disabled={pending}
                             onClick={() => apply("")}
                         >
@@ -95,12 +95,12 @@ export function ModpacksCard({
                 )}
 
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder={t("modpacks.searchModpacks")}
-                        className="pl-8"
+                        className="ps-8"
                     />
                 </div>
 
@@ -139,7 +139,7 @@ export function ModpacksCard({
                                             className="text-sm font-medium hover:underline"
                                         >
                                             {pack.title}
-                                            <ExternalLink className="ml-1 inline size-3 shrink-0" />
+                                            <ExternalLink className="ms-1 inline size-3 shrink-0" />
                                         </a>
                                         {pack.slug === modpack && (
                                             <Badge variant="success">

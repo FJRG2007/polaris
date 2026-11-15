@@ -149,7 +149,7 @@ export function AlarmsPanel({
                             >
                                 <button
                                     type="button"
-                                    className="flex min-w-0 flex-1 flex-col items-start text-left"
+                                    className="flex min-w-0 flex-1 flex-col items-start text-start"
                                     onClick={() => setDraft({ ...alarm })}
                                     aria-label={t("time.alarms.editOne", {
                                         time: words.wallTimeText(alarm.time, locale, hour12)

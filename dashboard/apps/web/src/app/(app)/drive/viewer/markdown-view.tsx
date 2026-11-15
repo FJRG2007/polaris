@@ -30,12 +30,12 @@ const MARKDOWN_PROSE = cn(
     "[&_h1]:mt-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mt-2 [&_h2]:text-xl [&_h2]:font-semibold",
     "[&_h3]:text-lg [&_h3]:font-semibold [&_h4]:font-semibold",
     "[&_p]:leading-relaxed [&_a]:text-primary [&_a]:underline",
-    "[&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5",
+    "[&_ul]:list-disc [&_ul]:ps-6 [&_ol]:list-decimal [&_ol]:ps-6 [&_li]:my-0.5",
     "[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs",
     "[&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0",
-    "[&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
+    "[&_blockquote]:border-s-2 [&_blockquote]:border-border [&_blockquote]:ps-3 [&_blockquote]:text-muted-foreground",
     "[&_hr]:my-4 [&_hr]:border-border [&_img]:max-w-full [&_img]:rounded",
-    "[&_table]:w-full [&_table]:text-left [&_th]:border-b [&_th]:border-border [&_th]:p-2 [&_td]:border-b [&_td]:border-border [&_td]:p-2",
+    "[&_table]:w-full [&_table]:text-start [&_th]:border-b [&_th]:border-border [&_th]:p-2 [&_td]:border-b [&_td]:border-border [&_td]:p-2",
     "[&_.code-block]:relative [&_.copy-host]:opacity-0 [&_.code-block:hover_.copy-host]:opacity-100",
     "[&_.copy-host:focus-within]:opacity-100",
     "[&_.copy-inline]:cursor-pointer [&_.copy-inline:hover]:bg-primary/20"
@@ -110,7 +110,7 @@ export function MarkdownView({
                         <span className="text-xs font-medium text-muted-foreground">
                             {t("markdown.editing")}
                         </span>
-                        <div className="ml-auto flex items-center gap-2">
+                        <div className="ms-auto flex items-center gap-2">
                             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
                                 {t("markdown.cancel")}
                             </Button>
@@ -161,7 +161,7 @@ export function MarkdownView({
                             <Button
                                 size="sm"
                                 variant="ghost"
-                                className="ml-auto"
+                                className="ms-auto"
                                 onClick={() => {
                                     setDraft(file.text);
                                     setEditing(true);
@@ -171,7 +171,7 @@ export function MarkdownView({
                                 {t("markdown.edit")}
                             </Button>
                         ) : readOnly ? null : (
-                            <span className="ml-auto text-xs text-muted-foreground">{blocked}</span>
+                            <span className="ms-auto text-xs text-muted-foreground">{blocked}</span>
                         )}
                     </>
                 )}

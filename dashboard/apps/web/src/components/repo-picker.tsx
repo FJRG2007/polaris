@@ -180,7 +180,7 @@ export function RepoPicker({
         <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
                 <div className="relative flex-1">
-                    <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         autoFocus={autoFocus}
                         value={query}
@@ -191,10 +191,10 @@ export function RepoPicker({
                         spellCheck={false}
                         inputMode="url"
                         aria-label={t("repoPicker.repository")}
-                        className="pl-8 pr-8"
+                        className="ps-8 pe-8"
                     />
                     {searching && (
-                        <Loader2 className="absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                        <Loader2 className="absolute end-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
                     )}
                 </div>
                 {connected && (
@@ -219,7 +219,7 @@ export function RepoPicker({
                     <button
                         type="button"
                         onClick={() => onPickUrl(external)}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-start text-sm transition-colors hover:bg-muted"
                     >
                         <Globe
                             className="size-4 shrink-0 text-muted-foreground"
@@ -295,7 +295,7 @@ function RepoGroup({
                     type="button"
                     onClick={() => onPick(repo)}
                     aria-pressed={selected.includes(repo.fullName)}
-                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted ${
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-start text-sm transition-colors hover:bg-muted ${
                         selected.includes(repo.fullName) ? "bg-muted/60" : ""
                     }`}
                 >
@@ -303,7 +303,7 @@ function RepoGroup({
                     <span className="min-w-0 flex-1 truncate" title={repo.fullName}>
                         {repo.fullName}
                     </span>
-                    <span className="flex shrink-0 items-center gap-2 pl-2 text-xs text-muted-foreground">
+                    <span className="flex shrink-0 items-center gap-2 ps-2 text-xs text-muted-foreground">
                         {repo.private && <Lock className="size-3.5" />}
                         {repo.defaultBranch}
                     </span>

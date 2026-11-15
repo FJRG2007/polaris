@@ -441,12 +441,12 @@ export function GamesView({
                 <>
                     <div data-tour="games.filters" className="flex flex-wrap items-center gap-2">
                         <div className="relative min-w-48 flex-1">
-                            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
                                 placeholder={t("list.searchServersAddressesMachinesOr")}
-                                className="pl-8"
+                                className="ps-8"
                                 aria-label={t("list.searchServers")}
                             />
                         </div>
@@ -496,7 +496,7 @@ export function GamesView({
                         className="overflow-x-auto rounded-lg border border-border"
                     >
                         <table className="w-full min-w-[52rem] text-sm">
-                            <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                            <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                                 <tr>
                                     <th className="px-3 py-2 font-medium">{t("list.server")}</th>
                                     <SortHeader
@@ -983,7 +983,7 @@ function ServerRow({
                         // tooltip nobody can reach.
                         <ContextMenuItem disabled>
                             <FolderOpen className="size-4" /> {t("list.files")}
-                            <span className="ml-auto pl-3 text-xs">
+                            <span className="ms-auto ps-3 text-xs">
                                 {t("list.filesNeedDeploy")}
                             </span>
                         </ContextMenuItem>
@@ -1048,7 +1048,7 @@ function ServerRow({
                     // written on the item rather than kept in a tooltip.
                     <ContextMenuItem disabled>
                         <CopyPlus className="size-4" /> {t("duplicate.duplicate")}
-                        <span className="ml-auto min-w-0 max-w-48 truncate pl-3 text-xs">
+                        <span className="ms-auto min-w-0 max-w-48 truncate ps-3 text-xs">
                             {server.copy && !failedCopy
                                 ? t("duplicate.stillCopying")
                                 : duplicateReason}

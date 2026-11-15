@@ -247,7 +247,7 @@ export function Board(props: BoardProps) {
                             {canAdd ? (
                                 <button
                                     type="button"
-                                    className="ml-auto grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                                    className="ms-auto grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground"
                                     aria-label={t("board.add", { column: label(group.value) })}
                                     title={t("board.add", { column: label(group.value) })}
                                     onClick={() => setDrafting(group.value)}

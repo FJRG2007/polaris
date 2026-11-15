@@ -143,7 +143,7 @@ export function UpsListView({ places }: { places: { id: string; name: string }[]
                 ) : (
                     <div className="rounded-lg border border-border">
                         <table className="w-full table-auto text-sm">
-                            <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                            <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                                 <tr>
                                     <th className="w-full max-w-0 px-3 py-2 font-medium">
                                         {t("ups.columns.name")}
@@ -151,13 +151,13 @@ export function UpsListView({ places }: { places: { id: string; name: string }[]
                                     <th className="px-3 py-2 font-medium">
                                         {t("ups.columns.status")}
                                     </th>
-                                    <th className="px-3 py-2 text-right font-medium">
+                                    <th className="px-3 py-2 text-end font-medium">
                                         {t("ups.columns.charge")}
                                     </th>
-                                    <th className="hidden px-3 py-2 text-right font-medium lg:table-cell">
+                                    <th className="hidden px-3 py-2 text-end font-medium lg:table-cell">
                                         {t("ups.columns.load")}
                                     </th>
-                                    <th className="hidden px-3 py-2 text-right font-medium lg:table-cell">
+                                    <th className="hidden px-3 py-2 text-end font-medium lg:table-cell">
                                         {t("ups.columns.runtime")}
                                     </th>
                                     <th className="hidden px-3 py-2 font-medium xl:table-cell">
@@ -261,15 +261,15 @@ export function UpsListView({ places }: { places: { id: string; name: string }[]
                                                         {t(`ups.status.${status.key}`)}
                                                     </Badge>
                                                 </td>
-                                                <td className="px-3 py-2.5 text-right tabular-nums">
+                                                <td className="px-3 py-2.5 text-end tabular-nums">
                                                     {charge === null
                                                         ? "-"
                                                         : t("ups.units.percent", { value: charge })}
                                                 </td>
-                                                <td className="hidden px-3 py-2.5 text-right tabular-nums lg:table-cell">
+                                                <td className="hidden px-3 py-2.5 text-end tabular-nums lg:table-cell">
                                                     {loadText}
                                                 </td>
-                                                <td className="hidden whitespace-nowrap px-3 py-2.5 text-right tabular-nums lg:table-cell">
+                                                <td className="hidden whitespace-nowrap px-3 py-2.5 text-end tabular-nums lg:table-cell">
                                                     {runtimeText}
                                                 </td>
                                                 <td

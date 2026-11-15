@@ -168,10 +168,10 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
             <Card>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                        <thead className="border-b border-border text-left text-xs text-muted-foreground">
+                        <thead className="border-b border-border text-start text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-3 py-2 font-medium">{t("detail.columns.taken")}</th>
-                                <th className="px-3 py-2 text-right font-medium">{t("table.columns.size")}</th>
+                                <th className="px-3 py-2 text-end font-medium">{t("table.columns.size")}</th>
                                 <th className="px-3 py-2 font-medium">{t("detail.columns.where")}</th>
                                 <th className="px-3 py-2 font-medium">{t("detail.columns.expires")}</th>
                                 <th className="px-3 py-2" />
@@ -198,7 +198,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                         <td className="px-3 py-2.5">
                                             {format.dateTime(point.takenAt)}
                                             {point.status === "partial" ? (
-                                                <Badge variant="warning" className="ml-2">
+                                                <Badge variant="warning" className="ms-2">
                                                     {t("detail.partialBadge")}
                                                 </Badge>
                                             ) : null}
@@ -206,7 +206,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                                 <p className="text-xs text-danger">{point.error}</p>
                                             ) : null}
                                         </td>
-                                        <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                                        <td className="px-3 py-2.5 text-end tabular-nums text-muted-foreground">
                                             {formatBytes(BigInt(point.sizeBytes))}
                                         </td>
                                         <td className="px-3 py-2.5">

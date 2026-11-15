@@ -311,7 +311,7 @@ function TrafficPanel({
                         onClick={onRefresh}
                         aria-label={t("panels.refresh")}
                         title={t("panels.refresh")}
-                        className="ml-1 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className="ms-1 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
                     </button>
@@ -800,7 +800,7 @@ function BansPanel({
                     <div className="-mx-2 overflow-x-auto">
                         <table className="w-full min-w-[36rem] text-sm">
                             <thead>
-                                <tr className="text-left text-xs text-muted-foreground">
+                                <tr className="text-start text-xs text-muted-foreground">
                                     <th className="px-2 pb-2 font-medium">
                                         {t("bans.columns.address")}
                                     </th>
@@ -825,13 +825,13 @@ function BansPanel({
                                                 onInspect={onInspect}
                                             />
                                             {ban.offences > 1 ? (
-                                                <span className="ml-2 text-muted-foreground">
+                                                <span className="ms-2 text-muted-foreground">
                                                     {t("bans.offences", { count: ban.offences })}
                                                 </span>
                                             ) : null}
                                             {ban.challenge ? (
                                                 <span
-                                                    className="ml-2"
+                                                    className="ms-2"
                                                     title={t("bans.challengeHint")}
                                                 >
                                                     <Badge>{t("bans.challenge")}</Badge>
@@ -853,7 +853,7 @@ function BansPanel({
                                                 </Badge>
                                             )}
                                         </td>
-                                        <td className="px-2 py-2 text-right">
+                                        <td className="px-2 py-2 text-end">
                                             <button
                                                 type="button"
                                                 aria-label={t("bans.liftNamed", { ip: ban.ip })}
@@ -1286,7 +1286,7 @@ function AddressDecision({
     return (
         <div className="mb-4 flex flex-col gap-2 rounded-md border border-border p-3">
             <div className="flex flex-wrap items-center gap-2">
-                <p className="mr-auto text-sm font-medium">{t("decide.title")}</p>
+                <p className="me-auto text-sm font-medium">{t("decide.title")}</p>
                 <CopyButton value={ip} label={t("decide.copy")} />
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1391,7 +1391,7 @@ function AddressDialog({
     return (
         <Dialog open={ip !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="max-w-3xl">
-                <DialogHeader className="pr-8">
+                <DialogHeader className="pe-8">
                     <DialogTitle className="font-mono">{ip}</DialogTitle>
                     <DialogDescription>
                         {t("address.intro", { window: windowLabel })}
@@ -1474,7 +1474,7 @@ function AddressDialog({
                                         <span className={statusTone(Number(entry.value))}>
                                             {entry.value}
                                         </span>
-                                        <span className="ml-1.5 text-muted-foreground">
+                                        <span className="ms-1.5 text-muted-foreground">
                                             {grouped(entry.count)}
                                         </span>
                                     </span>
@@ -1531,7 +1531,7 @@ function AddressDialog({
                         <div className="max-h-80 overflow-auto overscroll-contain rounded-md border border-border">
                             <table className="w-full min-w-[34rem] text-xs">
                                 <thead className="sticky top-0 bg-card">
-                                    <tr className="text-left text-muted-foreground">
+                                    <tr className="text-start text-muted-foreground">
                                         <th className="px-2 py-1.5 font-medium">
                                             {t("address.columns.when")}
                                         </th>

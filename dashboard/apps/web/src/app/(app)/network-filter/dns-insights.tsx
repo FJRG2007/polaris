@@ -867,7 +867,7 @@ export function ShareList({
                                         <button
                                             type="button"
                                             title={hint}
-                                            className="min-w-0 flex-1 break-all text-left hover:underline"
+                                            className="min-w-0 flex-1 break-all text-start hover:underline"
                                             onClick={() => onPick(item.name)}
                                         >
                                             {name}
@@ -932,7 +932,7 @@ export function TopList({
                                     <button
                                         type="button"
                                         title={`${shown} - ${hint}`}
-                                        className="min-w-0 flex-1 break-all text-left hover:underline"
+                                        className="min-w-0 flex-1 break-all text-start hover:underline"
                                         onClick={() => onPick(item.name)}
                                     >
                                         {shown}
@@ -987,9 +987,9 @@ function QueryRows({
     return (
         <div className="max-h-[28rem] overflow-auto overscroll-contain rounded-md border border-border">
             <table className="w-full table-fixed text-sm">
-                <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
+                <thead className="sticky top-0 bg-card text-start text-xs text-muted-foreground">
                     <tr>
-                        <th className="w-20 p-2 pl-3 font-medium sm:w-32">{t("insights.time")}</th>
+                        <th className="w-20 p-2 ps-3 font-medium sm:w-32">{t("insights.time")}</th>
                         <th className="p-2 font-medium">{t("insights.domain")}</th>
                         <th className="hidden w-14 p-2 font-medium sm:table-cell">
                             {t("insights.type")}
@@ -1022,13 +1022,13 @@ function QueryRows({
                                 className="border-t border-border"
                             >
                                 <td
-                                    className="relative break-words p-2 pl-3 align-top tabular-nums text-muted-foreground"
+                                    className="relative break-words p-2 ps-3 align-top tabular-nums text-muted-foreground"
                                     title={`${full} - ${outcome}`}
                                 >
                                     <span
                                         aria-hidden
                                         data-outcome={row.outcome}
-                                        className={`absolute inset-y-0 left-0 w-1 ${blocked ? "bg-danger" : "bg-success"}`}
+                                        className={`absolute inset-y-0 start-0 w-1 ${blocked ? "bg-danger" : "bg-success"}`}
                                     />
                                     {at}
                                 </td>
@@ -1036,7 +1036,7 @@ function QueryRows({
                                     <button
                                         type="button"
                                         title={`${row.domain} - ${outcome}`}
-                                        className={`block w-full break-all text-left hover:underline ${blocked ? "text-danger-ink line-through" : ""}`}
+                                        className={`block w-full break-all text-start hover:underline ${blocked ? "text-danger-ink line-through" : ""}`}
                                         onClick={() => onDomain(row.domain)}
                                     >
                                         <span className="sr-only">{outcome}: </span>
@@ -1053,7 +1053,7 @@ function QueryRows({
                                     <button
                                         type="button"
                                         title={`${row.clientName ? `${row.clientName} (${row.client})` : row.client} - ${t("insights.filterClient")}`}
-                                        className="block w-full truncate text-left hover:underline"
+                                        className="block w-full truncate text-start hover:underline"
                                         onClick={() => onClient(row.client)}
                                     >
                                         {row.clientName || row.client}
@@ -1075,7 +1075,7 @@ function QueryRows({
                                               )
                                             : row.via}
                                 </td>
-                                <td className="p-1 text-right align-top">
+                                <td className="p-1 text-end align-top">
                                     <Button
                                         variant="ghost"
                                         size="icon"

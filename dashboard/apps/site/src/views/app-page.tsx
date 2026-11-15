@@ -200,7 +200,7 @@ export function AppPageView({
 
             {store ? (
                 <Section title={t.needs}>
-                    <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted-foreground">
+                    <ul className="flex list-disc flex-col gap-1 ps-5 text-sm text-muted-foreground">
                         {needs.map((line) => (
                             <li key={line} className="break-words">
                                 {line}

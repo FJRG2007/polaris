@@ -89,9 +89,9 @@ export function EvidenceSectionCard({
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-border">
-                                        <th className="px-3 py-2 text-left">{t("evidence.name")}</th>
+                                        <th className="px-3 py-2 text-start">{t("evidence.name")}</th>
                                         {columns.map((column) => (
-                                            <th key={column} className="px-3 py-2 text-left">
+                                            <th key={column} className="px-3 py-2 text-start">
                                                 {column}
                                             </th>
                                         ))}

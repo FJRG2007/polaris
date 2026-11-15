@@ -112,7 +112,7 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                                 {entry.email}
                             </span>
                         </div>
-                        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                        <div className="ms-auto flex shrink-0 items-center gap-1.5">
                             {entry.primary ? <Badge variant="primary">{t("emails.primary")}</Badge> : null}
                             {entry.recovery ? <Badge>{t("emails.recovery")}</Badge> : null}
                             {entry.verified ? (

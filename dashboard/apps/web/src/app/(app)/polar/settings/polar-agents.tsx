@@ -237,7 +237,7 @@ export function PolarAgents({
                         {builtIns.length > COLLAPSED_TOOLS ? (
                             <button
                                 type="button"
-                                className="px-4 py-2 text-left text-xs text-muted-foreground hover:text-foreground"
+                                className="px-4 py-2 text-start text-xs text-muted-foreground hover:text-foreground"
                                 aria-expanded={allTools}
                                 onClick={() => setAllTools((current) => !current)}
                             >
@@ -453,7 +453,7 @@ function WorkEditor({
                     <DialogDescription>{t("settings.agents.work.body")}</DialogDescription>
                 </DialogHeader>
                 <form
-                    className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto overscroll-contain pr-1"
+                    className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto overscroll-contain pe-1"
                     onSubmit={(event) => void submit(event)}
                 >
                     {values ? (
@@ -609,7 +609,7 @@ function AgentEditor({
                     <DialogDescription>{t("settings.agents.editor.body")}</DialogDescription>
                 </DialogHeader>
                 <form
-                    className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto overscroll-contain pr-1"
+                    className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto overscroll-contain pe-1"
                     onSubmit={(event) => void submit(event)}
                 >
                     {text.map((field) => {

@@ -203,7 +203,7 @@ function RuleRow({
                 <button
                     type="button"
                     onClick={onEdit}
-                    className="min-w-0 truncate text-left text-sm font-medium hover:underline"
+                    className="min-w-0 truncate text-start text-sm font-medium hover:underline"
                     title={rule.name}
                 >
                     {rule.name}

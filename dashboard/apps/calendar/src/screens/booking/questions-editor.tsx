@@ -86,7 +86,7 @@ export function QuestionsEditor({
                         </Button>
                     </div>
                     {question.kind === "choice" ? (
-                        <div className="flex flex-col gap-1.5 pl-0 sm:pl-4">
+                        <div className="flex flex-col gap-1.5 ps-0 sm:ps-4">
                             {question.options.map((option, at) => (
                                 <div key={at} className="flex items-center gap-1.5">
                                     <Input

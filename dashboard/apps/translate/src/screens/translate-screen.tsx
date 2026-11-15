@@ -820,7 +820,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 />
                 {usable.length > 1 ? (
                     <Select
-                        className="w-full min-w-0 sm:ml-auto sm:w-48"
+                        className="w-full min-w-0 sm:ms-auto sm:w-48"
                         aria-label={t("engine.label")}
                         value={chosen ?? "auto"}
                         onValueChange={(value) =>
@@ -837,7 +837,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                         {t(INPUT_KEY[input.kind])}
                         {"file" in input ? (
                             <span
-                                className="ml-2 font-normal text-muted-foreground"
+                                className="ms-2 font-normal text-muted-foreground"
                                 title={input.file.name}
                             >
                                 {input.file.name}
@@ -1031,14 +1031,14 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                         {charLimit !== null ? (
                             <span
                                 className={cn(
-                                    "ml-auto text-xs tabular-nums text-muted-foreground",
+                                    "ms-auto text-xs tabular-nums text-muted-foreground",
                                     overLimit && "text-destructive"
                                 )}
                             >
                                 {t("pane.count", { count: source.length, max: charLimit })}
                             </span>
                         ) : (
-                            <span className="ml-auto" />
+                            <span className="ms-auto" />
                         )}
                         <Button
                             variant="ghost"
@@ -1131,7 +1131,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                                     type="button"
                                     onClick={() => open(entry)}
                                     title={t("history.open")}
-                                    className="min-w-0 flex-1 text-left"
+                                    className="min-w-0 flex-1 text-start"
                                 >
                                     <span className="block text-xs text-muted-foreground">
                                         {languageName(entry.fromLang, locale)} {"->"}{" "}
@@ -1185,7 +1185,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
 function GlossaryMark({ label }: { label: string }) {
     return (
         <span
-            className="ml-2 inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
+            className="ms-2 inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
             title={label}
         >
             <BookA className="size-3.5 shrink-0" aria-hidden />

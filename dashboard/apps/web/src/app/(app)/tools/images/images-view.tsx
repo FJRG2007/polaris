@@ -202,7 +202,7 @@ export function ImagesView() {
                                 />
                             )}
                             {working && made ? (
-                                <span className="absolute right-2 top-2 rounded bg-background/80 px-2 py-1 text-xs text-foreground-subtle">
+                                <span className="absolute end-2 top-2 rounded bg-background/80 px-2 py-1 text-xs text-foreground-subtle">
                                     {t("images.working")}
                                 </span>
                             ) : null}

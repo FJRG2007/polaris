@@ -131,7 +131,7 @@ export function CustomizeDialog({
                                         setDragged(null);
                                         setOver(null);
                                     }}
-                                    className="-ml-1 grid size-5 shrink-0 cursor-grab place-items-center text-muted-foreground/50 transition-colors hover:text-foreground active:cursor-grabbing"
+                                    className="-ms-1 grid size-5 shrink-0 cursor-grab place-items-center text-muted-foreground/50 transition-colors hover:text-foreground active:cursor-grabbing"
                                 >
                                     <GripVertical className="size-4" aria-hidden="true" />
                                 </span>

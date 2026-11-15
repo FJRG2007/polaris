@@ -294,7 +294,7 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                 // Polaris is drawn as - servers, containers, game servers.
                 <div className="overflow-x-auto rounded-lg border border-border">
                     <table className="w-full min-w-[62rem] text-sm">
-                        <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                        <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                             <tr>
                                 <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
                                     {t("apiKeys.list.columns.name")}
@@ -317,7 +317,7 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                                 <th scope="col" className="px-3 py-2 font-medium">
                                     {t("apiKeys.list.columns.lastUsed")}
                                 </th>
-                                <th scope="col" className="px-3 py-2 text-right font-medium">
+                                <th scope="col" className="px-3 py-2 text-end font-medium">
                                     {t("apiKeys.list.columns.callsToday")}
                                 </th>
                                 <th scope="col" className="px-3 py-2 font-medium">
@@ -395,7 +395,7 @@ function KeyRow({
                 <span className="flex min-w-0 items-center gap-2">
                     <Link
                         href={href}
-                        className="min-w-0 truncate text-left font-medium no-underline hover:underline"
+                        className="min-w-0 truncate text-start font-medium no-underline hover:underline"
                         title={t("apiKeys.list.editNamed", { name: entry.name })}
                     >
                         {entry.name}
@@ -479,7 +479,7 @@ function KeyRow({
                 )}
             </td>
             <td
-                className="whitespace-nowrap px-3 py-2 text-right align-top tabular-nums"
+                className="whitespace-nowrap px-3 py-2 text-end align-top tabular-nums"
                 title={t("apiKeys.list.callsRecently", { count: entry.usedRecently })}
             >
                 {entry.usedToday === 0 ? (
@@ -496,7 +496,7 @@ function KeyRow({
                     {/* Gone for a revoked key: that one is over, and a switch
                         would promise it could come back. */}
                     {state === "revoked" ? null : (
-                        <span className="mr-1 inline-flex" title={t("apiKeys.list.offHint")}>
+                        <span className="me-1 inline-flex" title={t("apiKeys.list.offHint")}>
                             <Switch
                                 checked={entry.enabled}
                                 onChange={onToggle}

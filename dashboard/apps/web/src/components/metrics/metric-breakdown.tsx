@@ -284,7 +284,7 @@ function Rows({
                                 <span className="shrink-0 tabular-nums">
                                     {format(sum(section.name))}
                                 </span>
-                                <span className="w-9 shrink-0 text-right tabular-nums">
+                                <span className="w-9 shrink-0 text-end tabular-nums">
                                     {total !== null && total > 0
                                         ? shareText(sum(section.name) / total)
                                         : ""}
@@ -352,7 +352,7 @@ function Row({ row, format }: { row: BreakdownRow; format: (value: number) => st
                         {row.label}
                     </span>
                     <span className="shrink-0 tabular-nums text-sm">{format(row.value)}</span>
-                    <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                    <span className="w-9 shrink-0 text-end text-xs tabular-nums text-muted-foreground">
                         {row.share === null ? "" : shareText(row.share)}
                     </span>
                 </div>

@@ -75,7 +75,7 @@ export function UserAccessView({
             <div className="flex flex-wrap items-center gap-2">
                 <Link
                     href={`/admin/users?user=${userId}`}
-                    className="ml-auto text-sm text-primary hover:underline"
+                    className="ms-auto text-sm text-primary hover:underline"
                 >
                     {t("usersDetail.accessView.sessionsLink")}
                 </Link>

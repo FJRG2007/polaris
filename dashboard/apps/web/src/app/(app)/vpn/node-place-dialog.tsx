@@ -186,7 +186,7 @@ export function NodePlaceDialog({
                                         <button
                                             type="button"
                                             disabled={busy}
-                                            className="w-full min-w-0 truncate rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                                            className="w-full min-w-0 truncate rounded-md px-2 py-1.5 text-start text-sm hover:bg-muted"
                                             title={label}
                                             onClick={() => pick(match)}
                                         >

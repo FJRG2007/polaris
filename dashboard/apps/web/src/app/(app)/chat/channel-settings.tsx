@@ -248,7 +248,7 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
         <nav
             aria-label={t("channelSettings.sections.label")}
             className={cn(
-                "min-h-0 w-full flex-col gap-0.5 overflow-y-auto overscroll-contain border-border bg-card/40 p-3 md:flex md:w-56 md:shrink-0 md:border-r",
+                "min-h-0 w-full flex-col gap-0.5 overflow-y-auto overscroll-contain border-border bg-card/40 p-3 md:flex md:w-56 md:shrink-0 md:border-e",
                 section ? "hidden" : "flex"
             )}
         >
@@ -310,7 +310,7 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
                 type="button"
                 disabled={!channel}
                 onClick={() => setConfirmDelete(true)}
-                className="flex items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-danger transition-colors hover:bg-danger-soft md:py-1.5"
+                className="flex items-center gap-2 rounded-md px-2 py-2 text-start text-sm text-danger transition-colors hover:bg-danger-soft md:py-1.5"
             >
                 <Trash2 className="size-4 shrink-0" />
                 <span className="min-w-0 flex-1 truncate">
@@ -335,7 +335,7 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
                         href={base}
                         aria-label={t("channelSettings.back")}
                         title={t("channelSettings.back")}
-                        className="-ml-2 flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-card-hover hover:text-foreground md:hidden"
+                        className="-ms-2 flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-card-hover hover:text-foreground md:hidden"
                     >
                         <ArrowLeft className="size-4 shrink-0" />
                     </Link>

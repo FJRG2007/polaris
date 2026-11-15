@@ -203,7 +203,7 @@ export function FindATime({
                     <span className="text-[13px] font-medium">
                         {formatDay(day, locale, { weekday: "long", day: "numeric", month: "long" })}
                     </span>
-                    <span className="ml-auto flex items-center gap-3 text-xs text-foreground-subtle">
+                    <span className="ms-auto flex items-center gap-3 text-xs text-foreground-subtle">
                         <span className="flex items-center gap-1">
                             <span
                                 aria-hidden

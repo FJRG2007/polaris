@@ -91,9 +91,9 @@ export function PlayersTable({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     {onSearch && (
                         <div className="relative flex-1">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
-                                className="pl-9"
+                                className="ps-9"
                                 placeholder={searchPlaceholder ?? t("playersTable.searchPlayers")}
                                 aria-label={t("playersTable.searchPlayers")}
                                 value={search ?? ""}
@@ -121,7 +121,7 @@ export function PlayersTable({
 
             <div className="overflow-x-auto rounded-lg border border-border" onKeyDown={onKeyDown}>
                 <table className="w-full text-sm" style={{ minWidth }}>
-                    <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                         <tr>
                             {selection && (
                                 <th className="w-10 px-3 py-2">

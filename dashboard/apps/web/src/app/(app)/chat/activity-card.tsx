@@ -82,7 +82,7 @@ export function ActivityCard({
     };
 
     return (
-        <div className="py-1 pl-14 pr-4">
+        <div className="py-1 ps-14 pe-4">
             <div className="flex min-w-0 max-w-md flex-wrap items-center gap-3 rounded-md border bg-card p-3">
                 <Joystick className="size-5 shrink-0 text-muted-foreground" aria-hidden />
                 <div className="min-w-0 flex-1">
@@ -107,7 +107,7 @@ export function ActivityCard({
                     )}
                     {view && !view.ended && view.players.length > 0 && (
                         <ul
-                            className="mt-1.5 flex min-w-0 -space-x-1.5"
+                            className="mt-1.5 flex min-w-0 -space-x-1.5 rtl:space-x-reverse"
                             aria-label={t("activityCard.whoIsPlaying")}
                         >
                             {view.players.map((player) => (
@@ -142,7 +142,7 @@ export function ActivityCard({
                                 : t("callGames.join")}
                         </Button>
                         {reason && (
-                            <span className="max-w-48 text-right text-xs text-muted-foreground">
+                            <span className="max-w-48 text-end text-xs text-muted-foreground">
                                 {reason}
                             </span>
                         )}

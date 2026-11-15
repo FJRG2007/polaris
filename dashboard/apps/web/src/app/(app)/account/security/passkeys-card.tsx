@@ -162,7 +162,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
 
                 <div className="overflow-x-auto rounded-lg border border-border">
                     <table className="w-full text-sm">
-                        <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                        <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                             {/* Each column waits for the width that actually holds it, and
                                 nothing arrives at md: that is where the navigation rail
                                 appears, so the content area is narrower there than it was

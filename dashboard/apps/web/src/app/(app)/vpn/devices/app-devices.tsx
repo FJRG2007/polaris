@@ -130,7 +130,7 @@ export function AppDevicesSection({ isAdmin }: { isAdmin: boolean }) {
                                 <ui.Button
                                     size="icon"
                                     variant="ghost"
-                                    className="ml-auto"
+                                    className="ms-auto"
                                     aria-label={t("connect.remove")}
                                     title={t("connect.remove")}
                                     disabled={pending}

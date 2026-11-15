@@ -174,7 +174,7 @@ export const MODEL_TRIGGER =
 function Mark({ on }: { on: boolean }) {
     return (
         <Check
-            className={on ? "ml-auto h-3.5 w-3.5 text-primary" : "ml-auto h-3.5 w-3.5 opacity-0"}
+            className={on ? "ms-auto h-3.5 w-3.5 text-primary" : "ms-auto h-3.5 w-3.5 opacity-0"}
         />
     );
 }

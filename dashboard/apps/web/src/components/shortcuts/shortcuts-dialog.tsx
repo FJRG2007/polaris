@@ -34,7 +34,7 @@ export function ShortcutsDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="w-[min(60rem,95vw)] max-w-[min(60rem,95vw)]">
-                <DialogHeader className="pr-10">
+                <DialogHeader className="pe-10">
                     <DialogTitle>{t("title")}</DialogTitle>
                     <DialogDescription>{t("description")}</DialogDescription>
                 </DialogHeader>

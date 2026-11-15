@@ -163,7 +163,7 @@ export function DictationButton({
             label={refusal ?? (available ? t("voice.dictate") : t("voice.unavailable"))}
             aria-disabled={!usable || undefined}
             disabled={disabled}
-            className={cn((!available || refusal) && "opacity-50", available && "rounded-r-none")}
+            className={cn((!available || refusal) && "opacity-50", available && "rounded-e-none")}
             onClick={() => {
                 if (refusal) return;
                 if (!available) return onNotice("unavailable");
@@ -245,7 +245,7 @@ export function DictationMenu({
                     disabled={disabled}
                     aria-label={t("voice.menu.open")}
                     title={t("voice.menu.open")}
-                    className="w-5 rounded-l-none"
+                    className="w-5 rounded-s-none"
                 >
                     <ChevronDown className="size-3" />
                 </Button>
@@ -1004,7 +1004,7 @@ export function VoiceCall(props: VoiceCallProps) {
                     affects={affectedBy(part.input)}
                     destructive={props.tools[name]?.destructive ?? !isWebTool(name)}
                     input={part.input}
-                    className="w-full min-w-0 text-left"
+                    className="w-full min-w-0 text-start"
                     onApprove={() => {
                         dispatch({ type: "approved" });
                         props.onApprove(part.approval!.id, true);

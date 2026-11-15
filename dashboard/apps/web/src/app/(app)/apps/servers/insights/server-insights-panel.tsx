@@ -90,7 +90,7 @@ function ForecastCard({
                 {insight.diskWarning ? (
                     <Badge
                         variant={forecast.kind === "full" ? "danger" : "warning"}
-                        className="ml-auto shrink-0"
+                        className="ms-auto shrink-0"
                     >
                         {t("insights.forecast.warn")}
                     </Badge>
@@ -280,7 +280,7 @@ export function ServerInsightsPanel({
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="ml-auto max-w-full min-w-0"
+                                    className="ms-auto max-w-full min-w-0"
                                     aria-label={t("insights.anomalies.filter")}
                                     title={t("insights.anomalies.filter")}
                                 >

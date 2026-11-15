@@ -280,7 +280,7 @@ export function LogViewer({
                 {searchable && (
                     <div className="flex min-w-[12rem] flex-1 items-center gap-1">
                         <div className="relative min-w-0 flex-1">
-                            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Search className="absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
@@ -291,7 +291,7 @@ export function LogViewer({
                                 }}
                                 placeholder={t("logViewer.search")}
                                 aria-label={t("logViewer.search")}
-                                className="pl-8 font-mono text-xs"
+                                className="ps-8 font-mono text-xs"
                             />
                         </div>
                         {query && (
@@ -345,7 +345,7 @@ export function LogViewer({
                         )}
                     </div>
                 )}
-                <div className="ml-auto flex shrink-0 items-center gap-2">
+                <div className="ms-auto flex shrink-0 items-center gap-2">
                     <Button
                         type="button"
                         variant="outline"
@@ -409,7 +409,7 @@ export function LogViewer({
                     onClick={() => updateView({ collapse: !view.collapse })}
                     aria-pressed={view.collapse}
                     title={t("logViewer.collapseHint")}
-                    className={cn(CHIP_CLASS, "ml-auto", view.collapse ? CHIP_ON : CHIP_OFF)}
+                    className={cn(CHIP_CLASS, "ms-auto", view.collapse ? CHIP_ON : CHIP_OFF)}
                 >
                     <ListCollapse className="size-3.5" />
                     {t("logViewer.collapse")}
@@ -533,15 +533,15 @@ const LogRow = memo(function LogRow({
         <div
             data-row={index}
             className={cn(
-                "group relative flex gap-2 px-3 pr-9 hover:bg-white/5",
-                repeated && "border-l-2 border-zinc-600 pl-2.5",
+                "group relative flex gap-2 px-3 pe-9 hover:bg-white/5",
+                repeated && "border-s-2 border-zinc-600 ps-2.5",
                 active && "bg-warning-soft"
             )}
         >
             {gutter && (
                 <span
                     className={cn(
-                        "shrink-0 select-none border-r border-white/10 pr-2 text-zinc-500 tabular-nums",
+                        "shrink-0 select-none border-e border-white/10 pe-2 text-zinc-500 tabular-nums",
                         withDates ? "w-[9.5rem]" : "w-[4.25rem]"
                     )}
                 >
@@ -554,7 +554,7 @@ const LogRow = memo(function LogRow({
                 {text ? <Highlighted text={text} query={query} /> : " "}
                 {badge && (
                     <span
-                        className="ml-2 inline-block rounded bg-zinc-700/80 px-1 align-baseline text-[0.6875rem] tabular-nums text-zinc-200"
+                        className="ms-2 inline-block rounded bg-zinc-700/80 px-1 align-baseline text-[0.6875rem] tabular-nums text-zinc-200"
                         title={t("logViewer.repeatedTitle", { count: repeat, lines: span })}
                     >
                         {t("logViewer.repeat", { count: repeat })}
@@ -565,7 +565,7 @@ const LogRow = memo(function LogRow({
                 type="button"
                 onClick={copy}
                 aria-label={t("logViewer.copyEntry")}
-                className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100 group-hover:block"
+                className="absolute end-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100 group-hover:block"
             >
                 {copied ? (
                     <Check className="size-3.5 text-success" />

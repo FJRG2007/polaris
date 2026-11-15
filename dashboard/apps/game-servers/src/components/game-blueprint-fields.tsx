@@ -362,7 +362,7 @@ export function BlueprintFields({
                 </button>
 
                 {advanced && (
-                    <div className="flex flex-col gap-3 border-l border-border pl-3">
+                    <div className="flex flex-col gap-3 border-s border-border ps-3">
                         <div className="grid grid-cols-1 gap-3">
                             {edition === "java" && (
                                 <SoftwarePicker
@@ -635,15 +635,15 @@ function SoftwarePicker({
             {open && !pinnedBy && (
                 <div className="flex flex-col gap-2">
                     <div className="relative">
-                        <Search className="pointer-events-none absolute left-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute start-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={t("blueprint.searchSoftware")}
-                            className="pl-8"
+                            className="ps-8"
                         />
                     </div>
-                    <div className="flex max-h-72 flex-col gap-3 overflow-y-auto pr-1">
+                    <div className="flex max-h-72 flex-col gap-3 overflow-y-auto pe-1">
                         {shelves.map((shelf) => (
                             <div key={shelf.id} className="flex flex-col gap-2">
                                 <span className="text-xs font-medium text-muted-foreground">
@@ -712,7 +712,7 @@ export function Choice({
             type="button"
             onClick={onSelect}
             className={cn(
-                "rounded-md border p-3 text-left transition-colors",
+                "rounded-md border p-3 text-start transition-colors",
                 selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
             )}
         >

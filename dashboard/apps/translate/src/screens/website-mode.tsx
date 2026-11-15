@@ -48,7 +48,7 @@ function Block({ block, text }: { block: PageBlock; text: string }) {
                 <p
                     className={cn(
                         base,
-                        "relative pl-5 before:absolute before:left-1.5 before:content-['-']"
+                        "relative ps-5 before:absolute before:start-1.5 before:content-['-']"
                     )}
                 >
                     {body}
@@ -57,7 +57,7 @@ function Block({ block, text }: { block: PageBlock; text: string }) {
         case "quote":
             return (
                 <blockquote
-                    className={cn(base, "border-l-2 border-border pl-3 text-muted-foreground")}
+                    className={cn(base, "border-s-2 border-border ps-3 text-muted-foreground")}
                 >
                     {body}
                 </blockquote>

@@ -372,7 +372,7 @@ export function RichTextEditor({
                     // The placeholder is drawn by the Placeholder extension as a
                     // pseudo-element on the first empty block.
                     "[&_p.is-editor-empty:first-child::before]:pointer-events-none",
-                    "[&_p.is-editor-empty:first-child::before]:float-left",
+                    "[&_p.is-editor-empty:first-child::before]:float-start",
                     "[&_p.is-editor-empty:first-child::before]:h-0",
                     "[&_p.is-editor-empty:first-child::before]:text-muted-foreground",
                     "[&_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]"

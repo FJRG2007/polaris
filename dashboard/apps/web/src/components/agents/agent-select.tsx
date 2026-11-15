@@ -125,7 +125,7 @@ export function AgentSelect({
                     />
                 ) : null}
                 <span
-                    className="min-w-0 flex-1 truncate text-left"
+                    className="min-w-0 flex-1 truncate text-start"
                     title={chosen ? labelOf(t, chosen) : undefined}
                 >
                     {chosen ? labelOf(t, chosen) : t("agentSelect.pick")}
@@ -184,7 +184,7 @@ export function AgentSelect({
                                         setQuery("");
                                         setOpen(false);
                                     }}
-                                    className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-left font-normal hover:bg-option-hover"
+                                    className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-start font-normal hover:bg-option-hover"
                                 >
                                     <Check
                                         className={`size-4 shrink-0 ${option.key === value ? "opacity-100" : "opacity-0"}`}

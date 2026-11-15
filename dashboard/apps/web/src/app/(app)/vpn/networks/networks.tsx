@@ -273,7 +273,7 @@ function NetworkCard({
                         </ui.Badge>
                     ) : null}
                     {isAdmin ? (
-                        <div className="ml-auto flex shrink-0 items-center gap-1">
+                        <div className="ms-auto flex shrink-0 items-center gap-1">
                             <IconButton label={t("networks.refresh")} onClick={onRefresh}>
                                 <RefreshCw />
                             </IconButton>
@@ -413,7 +413,7 @@ function RouterSetup({
                 </p>
                 <div className="min-w-0">
                     <h4 className="text-sm font-medium">{t("networks.ruleTitle")}</h4>
-                    <ul className="mt-1 list-disc pl-5 text-sm text-muted-foreground">
+                    <ul className="mt-1 list-disc ps-5 text-sm text-muted-foreground">
                         <li>{t("networks.ruleLan", { server, cidr: network.cidr })}</li>
                         <li>{t("networks.ruleDevices", { cidr: network.cidr })}</li>
                         <li>

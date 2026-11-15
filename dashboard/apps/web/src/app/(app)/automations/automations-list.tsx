@@ -267,7 +267,7 @@ export function AutomationsList({
                         {t("folders.manage")}
                     </Button>
                 ) : null}
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ms-auto flex items-center gap-2">
                     {actions}
                     {mayCreate ? (
                         <Button onClick={createNew}>
@@ -740,7 +740,7 @@ function FoldersDialog({
                                         title={folder.name}
                                     >
                                         {folder.name}
-                                        <span className="ml-2 text-xs text-muted-foreground">
+                                        <span className="ms-2 text-xs text-muted-foreground">
                                             {t("folders.count", { count: counts(folder.id) })}
                                         </span>
                                     </span>
@@ -1075,7 +1075,7 @@ function StartOption({
                 type="button"
                 disabled={disabled}
                 onClick={onPick}
-                className="flex w-full min-w-0 items-start gap-3 rounded-md border border-border px-3 py-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                className="flex w-full min-w-0 items-start gap-3 rounded-md border border-border px-3 py-2 text-start hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
             >
                 <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">
                     {icon}

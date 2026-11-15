@@ -50,7 +50,7 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="flex items-start justify-between gap-3 border-t border-border py-1.5 first:border-t-0">
             <span className="shrink-0 text-muted-foreground">{label}</span>
-            <span className="min-w-0 text-right">{children}</span>
+            <span className="min-w-0 text-end">{children}</span>
         </div>
     );
 }

@@ -59,15 +59,15 @@ export function SendingSources({
             </div>
             <div className="min-w-0 overflow-x-auto rounded-lg border border-border">
                 <table className="w-full min-w-[36rem] text-xs">
-                    <thead className="bg-surface/60 text-muted-foreground text-left">
+                    <thead className="bg-surface/60 text-muted-foreground text-start">
                         <tr>
                             <th scope="col" className="px-3 py-2 font-medium">
                                 {t("reports.source")}
                             </th>
-                            <th scope="col" className="px-3 py-2 text-right font-medium">
+                            <th scope="col" className="px-3 py-2 text-end font-medium">
                                 {t("reports.messages")}
                             </th>
-                            <th scope="col" className="px-3 py-2 text-right font-medium">
+                            <th scope="col" className="px-3 py-2 text-end font-medium">
                                 {t("reports.passed")}
                             </th>
                             <th scope="col" className="px-3 py-2 font-medium">
@@ -104,10 +104,10 @@ export function SendingSources({
                                             </span>
                                         )}
                                     </td>
-                                    <td className="px-3 py-2 text-right tabular-nums">
+                                    <td className="px-3 py-2 text-end tabular-nums">
                                         {format.format(source.messages)}
                                     </td>
-                                    <td className="px-3 py-2 text-right tabular-nums">
+                                    <td className="px-3 py-2 text-end tabular-nums">
                                         {format.format(source.passed)}
                                     </td>
                                     <td className="break-all px-3 py-2">

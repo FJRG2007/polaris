@@ -98,7 +98,7 @@ export default async function AnnouncementDetailsPage({
             {item.updates.length > 0 ? (
                 <section className="flex flex-col gap-3">
                     <h2 className="text-sm font-semibold">{t("details.updates")}</h2>
-                    <ol className="flex flex-col gap-4 border-l pl-4">
+                    <ol className="flex flex-col gap-4 border-s ps-4">
                         {item.updates.map((update) => (
                             <li key={update.id} className="flex min-w-0 flex-col gap-1">
                                 <time

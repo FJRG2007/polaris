@@ -85,7 +85,7 @@ export function AccessibilityForm({
                         <span className="text-sm tabular-nums text-muted-foreground">
                             {t("accessibility.pixelsShort", { size })}
                             {size === standard ? (
-                                <span className="pl-1.5 text-xs">{t("accessibility.default")}</span>
+                                <span className="ps-1.5 text-xs">{t("accessibility.default")}</span>
                             ) : null}
                         </span>
                     </div>
@@ -171,7 +171,7 @@ export function AccessibilityForm({
                     {done && !error ? <p className="text-sm text-success">{t("accessibility.saved")}</p> : null}
                     <Button
                         type="button"
-                        className="ml-auto"
+                        className="ms-auto"
                         disabled={busy || !changed}
                         onClick={async () => {
                             setBusy(true);

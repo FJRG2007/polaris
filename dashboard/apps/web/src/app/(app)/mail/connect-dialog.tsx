@@ -603,7 +603,7 @@ export function ConnectMailboxDialog({
                                 />
                                 {looking ? (
                                     <Loader2
-                                        className="absolute right-2 top-1/2 size-4 shrink-0 -translate-y-1/2 animate-spin text-foreground-subtle"
+                                        className="absolute end-2 top-1/2 size-4 shrink-0 -translate-y-1/2 animate-spin text-foreground-subtle"
                                         aria-hidden
                                     />
                                 ) : null}
@@ -871,7 +871,7 @@ export function ConnectMailboxDialog({
                                 <div className="rounded-md border border-border">
                                     <button
                                         type="button"
-                                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-muted-foreground"
+                                        className="flex w-full items-center gap-2 px-3 py-2 text-start text-[12px] text-muted-foreground"
                                         aria-expanded={showServers}
                                         onClick={() => setShowServers((held) => !held)}
                                     >
@@ -883,7 +883,7 @@ export function ConnectMailboxDialog({
                                             aria-hidden
                                         />
                                         {t("connect.servers")}
-                                        <span className="ml-auto truncate text-foreground-subtle">
+                                        <span className="ms-auto truncate text-foreground-subtle">
                                             {servers.imapHost || t("connect.notWorkedOut")}
                                         </span>
                                     </button>

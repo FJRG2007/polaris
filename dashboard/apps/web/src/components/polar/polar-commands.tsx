@@ -282,8 +282,8 @@ export function CommandForm({
                         <p
                             className={
                                 prompt.length > polarShared.POLAR_COMMAND_PROMPT_MAX
-                                    ? "text-right text-xs text-danger-ink"
-                                    : "text-right text-xs text-foreground-subtle"
+                                    ? "text-end text-xs text-danger-ink"
+                                    : "text-end text-xs text-foreground-subtle"
                             }
                         >
                             {prompt.length}/{polarShared.POLAR_COMMAND_PROMPT_MAX}
@@ -355,7 +355,7 @@ export function CommandsDialog({
                         >
                             <button
                                 type="button"
-                                className="flex min-w-0 flex-1 flex-col text-left"
+                                className="flex min-w-0 flex-1 flex-col text-start"
                                 onClick={() => onEdit(row)}
                             >
                                 <span className="truncate font-mono text-sm text-foreground">

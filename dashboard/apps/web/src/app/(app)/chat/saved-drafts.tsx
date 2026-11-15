@@ -97,7 +97,7 @@ export function SavedDraftsBar({
             <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="mb-2 flex w-full items-center gap-2 rounded-md bg-muted/30 px-2 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                className="mb-2 flex w-full items-center gap-2 rounded-md bg-muted/30 px-2 py-1 text-start text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
             >
                 <FilePen className="size-3.5 shrink-0" />
                 <span className="min-w-0 truncate">
@@ -105,7 +105,7 @@ export function SavedDraftsBar({
                         ? t("savedDrafts.one", { excerpt: plainExcerpt(drafts[0]!.body, 80) })
                         : t("savedDrafts.many", { count: drafts.length })}
                 </span>
-                <span className="ml-auto min-w-0 max-w-full shrink-0 truncate underline-offset-2 hover:underline" title={t("savedDrafts.see", { count: drafts.length })}>
+                <span className="ms-auto min-w-0 max-w-full shrink-0 truncate underline-offset-2 hover:underline" title={t("savedDrafts.see", { count: drafts.length })}>
                     {t("savedDrafts.see", { count: drafts.length })}
                 </span>
             </button>
@@ -131,7 +131,7 @@ export function SavedDraftsBar({
                                     <span className="text-xs text-muted-foreground">
                                         {t("savedDrafts.savedAt", { date: format.dateTime(new Date(draft.at).toISOString()) })}
                                     </span>
-                                    <span className="ml-auto flex items-center gap-1">
+                                    <span className="ms-auto flex items-center gap-1">
                                         <Button
                                             size="xs"
                                             variant="ghost"

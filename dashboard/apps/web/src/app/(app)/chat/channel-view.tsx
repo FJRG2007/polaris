@@ -2817,7 +2817,7 @@ export function ChannelView({
                     beside="lg"
                     label={t("channelView.voiceChannelChatWidth")}
                     className={cn(
-                        "border-t border-border lg:border-l lg:border-t-0",
+                        "border-t border-border lg:border-s lg:border-t-0",
                         (thread || searching) && "hidden md:flex"
                     )}
                 >

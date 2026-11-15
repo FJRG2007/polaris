@@ -256,7 +256,7 @@ export function GlossaryManager() {
                             >
                                 <button
                                     type="button"
-                                    className="flex min-w-0 flex-1 flex-col items-start text-left"
+                                    className="flex min-w-0 flex-1 flex-col items-start text-start"
                                     onClick={() => void edit(glossary)}
                                     disabled={opening === glossary.id}
                                 >
@@ -608,7 +608,7 @@ function GlossaryEditor({
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <span className="min-w-0 flex-1 text-sm font-medium">
                             {t("glossary.terms")}
-                            <span className="ml-2 font-normal text-muted-foreground">
+                            <span className="ms-2 font-normal text-muted-foreground">
                                 {t("glossary.termsCount", {
                                     count: filled.length,
                                     max: ENTRIES_MAX

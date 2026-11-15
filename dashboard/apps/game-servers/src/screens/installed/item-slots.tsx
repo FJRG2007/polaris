@@ -446,7 +446,7 @@ function FilledSlot({
                         {itemName(item.id)}
                     </span>
                 )}
-                <span className="absolute bottom-0.5 right-1 font-mono text-xs font-semibold tabular-nums text-foreground">
+                <span className="absolute bottom-0.5 end-1 font-mono text-xs font-semibold tabular-nums text-foreground">
                     {count}
                 </span>
             </button>
@@ -457,7 +457,7 @@ function FilledSlot({
                     aria-hidden
                     title={t("itemSlots.remove", { item: name })}
                     onClick={onRemove}
-                    className="absolute -right-1 -top-1 hidden size-4 items-center justify-center rounded-full border border-border bg-elevated text-muted-foreground hover:text-foreground group-hover:flex"
+                    className="absolute -end-1 -top-1 hidden size-4 items-center justify-center rounded-full border border-border bg-elevated text-muted-foreground hover:text-foreground group-hover:flex"
                 >
                     <X className="size-3" />
                 </button>

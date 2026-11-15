@@ -288,7 +288,7 @@ export function BookingFlow({ page }: { page: PublicBookingPage }) {
                     </FieldRow>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                         {attempted && !valid ? (
-                            <span className="mr-auto text-xs text-danger">
+                            <span className="me-auto text-xs text-danger">
                                 {t("booking.fixFirst")}
                             </span>
                         ) : null}

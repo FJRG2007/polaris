@@ -131,7 +131,7 @@ export function IssueSearchBar({
                 }}
             >
                 <div className="relative min-w-0 flex-1">
-                    <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                     <input
                         value={draft}
                         onChange={(event) => setDraft(event.target.value)}
@@ -141,7 +141,7 @@ export function IssueSearchBar({
                         maxLength={500}
                         placeholder={t("search.placeholder")}
                         aria-label={t("search.label")}
-                        className="h-8 w-full rounded-md border border-border bg-field pl-7 pr-2 font-mono text-xs hover:border-border-strong focus:border-border-strong"
+                        className="h-8 w-full rounded-md border border-border bg-field ps-7 pe-2 font-mono text-xs hover:border-border-strong focus:border-border-strong"
                     />
                 </div>
                 <div className="flex flex-wrap items-center gap-1">
@@ -245,7 +245,7 @@ export function IssueSearchBar({
                 <ul className="flex flex-wrap gap-1" aria-label={t("search.active")}>
                     {chips.map((chip) => (
                         <li key={chip.key} className="min-w-0">
-                            <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-muted py-0.5 pl-2 pr-1 text-xs">
+                            <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-muted py-0.5 ps-2 pe-1 text-xs">
                                 <span className="truncate" title={chip.label}>
                                     {chip.label}
                                 </span>

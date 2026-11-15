@@ -165,7 +165,7 @@ export function SavedView() {
                 </Link>
                 <Star className="size-4 shrink-0 text-primary" />
                 <span className="min-w-0 truncate text-sm font-semibold">{t("saved.saved")}</span>
-                <span className="ml-auto flex min-w-0 items-center gap-2">
+                <span className="ms-auto flex min-w-0 items-center gap-2">
                     <Select
                         value={only ?? EVERYWHERE}
                         onValueChange={(value) =>
@@ -294,7 +294,7 @@ export function SavedView() {
                                             iso={message.createdAt}
                                             className="shrink-0 whitespace-nowrap"
                                         />
-                                        <span className="ml-auto flex items-center gap-1">
+                                        <span className="ms-auto flex items-center gap-1">
                                             {channel && (
                                                 <Link
                                                     href={`/chat/c/${message.channelId}`}

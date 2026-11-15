@@ -40,7 +40,7 @@ export function MobileNav({ children }: { children: ReactNode }) {
                 data-tour="shell.menu"
                 onClick={() => setOpen(true)}
                 aria-label={words.openNavigation}
-                className="-ml-1 grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+                className="-ms-1 grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
             >
                 <Menu className="size-5" />
             </button>

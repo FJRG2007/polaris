@@ -322,7 +322,7 @@ export function SessionChanges({ session }: { session: SessionView }) {
                                         onClick={() => void open(file.path)}
                                         title={file.path}
                                         className={cn(
-                                            "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-muted",
+                                            "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-start text-xs hover:bg-muted",
                                             selected === file.path && "bg-muted"
                                         )}
                                     >

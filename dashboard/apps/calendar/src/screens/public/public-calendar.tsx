@@ -158,7 +158,7 @@ export function PublicCalendar({
             {range.loading || (range.data && range.stale) ? (
                 <Loader2 className="size-3.5 animate-spin text-foreground-subtle" aria-hidden />
             ) : null}
-            <div className="ml-auto flex items-center gap-1">
+            <div className="ms-auto flex items-center gap-1">
                 <SegmentedControl<PublicView>
                     size="sm"
                     value={view}

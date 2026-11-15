@@ -165,7 +165,7 @@ export function RouterDnsSteps({ brand, address }: { brand: RouterBrand; address
         setting.save ? <> {t.rich("routerGuide.save", { button: setting.save, b: bold })}</> : null;
 
     return dns === null ? (
-        <ol className="flex list-decimal flex-col gap-1 pl-5">
+        <ol className="flex list-decimal flex-col gap-1 ps-5">
             <li>{t("router.step1")}</li>
             <li>{t("router.step2", { address: address ?? "-" })}</li>
             <li>{t("router.step3")}</li>
@@ -173,7 +173,7 @@ export function RouterDnsSteps({ brand, address }: { brand: RouterBrand; address
         </ol>
     ) : (
         <>
-            <ol className="flex list-decimal flex-col gap-2 pl-5">
+            <ol className="flex list-decimal flex-col gap-2 ps-5">
                 <li>{t("routerGuide.signIn")}</li>
                 <li>
                     {t.rich(dns.mode === "relay" ? "routerGuide.relay" : "routerGuide.lan", {

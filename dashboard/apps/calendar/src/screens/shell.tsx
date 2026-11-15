@@ -37,7 +37,7 @@ export function CalendarShell({ words }: { words: ShellWords }) {
                     {words.today}
                 </span>
                 <Block className="h-5 w-40" />
-                <span className="ml-auto inline-flex h-7 items-center rounded-md bg-primary px-2.5 text-[0.8125rem] font-medium text-primary-foreground opacity-60">
+                <span className="ms-auto inline-flex h-7 items-center rounded-md bg-primary px-2.5 text-[0.8125rem] font-medium text-primary-foreground opacity-60">
                     {words.newEvent}
                 </span>
                 <Link
@@ -58,7 +58,7 @@ export function CalendarShell({ words }: { words: ShellWords }) {
                 </Link>
             </div>
             <div className="flex min-h-0 flex-1">
-                <div className="hidden w-64 shrink-0 flex-col gap-3 border-r border-border bg-surface p-3 lg:flex">
+                <div className="hidden w-64 shrink-0 flex-col gap-3 border-e border-border bg-surface p-3 lg:flex">
                     <Block className="h-40 w-full" />
                     {/* Opens a menu once the screen is up; until then it is
                         drawn where it will be, not as a block. */}

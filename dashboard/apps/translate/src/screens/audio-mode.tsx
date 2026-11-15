@@ -331,7 +331,7 @@ export function AudioMode({
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="ml-auto"
+                        className="ms-auto"
                         onClick={() => setTurns([])}
                         aria-label={t("audio.clear")}
                         title={t("audio.clear")}

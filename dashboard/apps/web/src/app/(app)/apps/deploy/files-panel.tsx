@@ -106,7 +106,7 @@ export function FilesPanel({
                     <ArrowUp className="size-4" />
                 </Button>
                 <span className="truncate text-xs text-muted-foreground">{path}</span>
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ms-auto flex items-center gap-2">
                     <Button asChild variant="ghost" title={t("files.openInDrive")}>
                         <Link
                             href={`/drive?c=container:${applicationId}&p=${encodeURIComponent(path.replace(/^\/+|\/+$/g, ""))}`}

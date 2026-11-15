@@ -165,18 +165,18 @@ export function DomainSection({
                     </div>
                     {status.state !== "ready" && status.ip ? (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
+                            <table className="w-full text-start text-xs">
                                 <thead className="text-muted-foreground">
                                     <tr>
-                                        <th className="pr-4 font-normal">{t("domain.type")}</th>
-                                        <th className="pr-4 font-normal">{t("domain.name")}</th>
+                                        <th className="pe-4 font-normal">{t("domain.type")}</th>
+                                        <th className="pe-4 font-normal">{t("domain.name")}</th>
                                         <th className="font-normal">{t("domain.value")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="font-mono">
                                     <tr>
-                                        <td className="pr-4">A</td>
-                                        <td className="break-all pr-4">{status.domain}</td>
+                                        <td className="pe-4">A</td>
+                                        <td className="break-all pe-4">{status.domain}</td>
                                         <td>
                                             <span className="inline-flex items-center gap-1">
                                                 {status.ip}

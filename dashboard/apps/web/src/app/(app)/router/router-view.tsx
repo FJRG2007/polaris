@@ -146,7 +146,7 @@ export function RouterSection() {
             <div className="flex min-w-0 flex-col gap-1">
                 <p className="min-w-0 text-sm text-muted-foreground">{t("intro")}</p>
                 <HelpNote title={t("modelTitle")}>
-                    <ul className="flex list-disc flex-col gap-1 pl-4">
+                    <ul className="flex list-disc flex-col gap-1 ps-4">
                         <li>{t("modelLines")}</li>
                         <li>{t("modelNetworks")}</li>
                         <li>{t("modelVlans")}</li>
@@ -372,11 +372,11 @@ function RouterEditor({
                     <Table head={[t("orderCol"), t("port"), t("vlanTag"), t("lineMode"), ""]}>
                         {plan.wans.map((wan, at) => (
                             <tr key={at} className="border-t border-border align-top">
-                                <td className="py-2 pr-3 text-muted-foreground">{at + 1}</td>
-                                <td className="py-2 pr-3">
+                                <td className="py-2 pe-3 text-muted-foreground">{at + 1}</td>
+                                <td className="py-2 pe-3">
                                     <span className="font-mono">{wan.interface}</span>
                                     {reading?.activeWan === lineDevice(wan) ? (
-                                        <ui.Badge variant="success" className="ml-2">
+                                        <ui.Badge variant="success" className="ms-2">
                                             {t("inUse")}
                                         </ui.Badge>
                                     ) : null}
@@ -385,11 +385,11 @@ function RouterEditor({
                                         problem={linkProblem(wan, saved?.wans, reading, true)}
                                     />
                                 </td>
-                                <td className="py-2 pr-3">
+                                <td className="py-2 pe-3">
                                     <VlanChip t={t} vlan={wan.vlan} />
                                 </td>
-                                <td className="py-2 pr-3">{t(`lineModes.${modeOf(wan)}`)}</td>
-                                <td className="py-2 text-right whitespace-nowrap">
+                                <td className="py-2 pe-3">{t(`lineModes.${modeOf(wan)}`)}</td>
+                                <td className="py-2 text-end whitespace-nowrap">
                                     <IconButton
                                         label={t("editLine")}
                                         onClick={() => setEditingLine({ at, wan, isNew: false })}
@@ -465,10 +465,10 @@ function RouterEditor({
                                 ).length ?? null;
                             return (
                                 <tr key={lan.id} className="border-t border-border align-top">
-                                    <td className="max-w-0 py-2 pr-3">
+                                    <td className="max-w-0 py-2 pe-3">
                                         <button
                                             type="button"
-                                            className="block max-w-full truncate text-left font-medium hover:underline"
+                                            className="block max-w-full truncate text-start font-medium hover:underline"
                                             title={lan.name}
                                             onClick={() => setEditingLan(lan)}
                                         >
@@ -499,24 +499,24 @@ function RouterEditor({
                                             problem={networkProblem(lan, saved?.lans, reading)}
                                         />
                                     </td>
-                                    <td className="py-2 pr-3 whitespace-nowrap">
+                                    <td className="py-2 pe-3 whitespace-nowrap">
                                         <span className="font-mono">{lan.interface}</span>{" "}
                                         <VlanChip t={t} vlan={lan.vlan} />
                                     </td>
-                                    <td className="py-2 pr-3 font-mono whitespace-nowrap">
+                                    <td className="py-2 pe-3 font-mono whitespace-nowrap">
                                         {lan.cidr}
                                         <p className="font-sans text-xs text-muted-foreground">
                                             {t("subnetRoom", { count: hostCount(lan.cidr) ?? 0 })}
                                         </p>
                                     </td>
-                                    <td className="py-2 pr-3 font-mono">{lan.address}</td>
-                                    <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap">
+                                    <td className="py-2 pe-3 font-mono">{lan.address}</td>
+                                    <td className="py-2 pe-3 font-mono text-xs whitespace-nowrap">
                                         {pool.first}
                                         <br />
                                         {pool.last}
                                     </td>
-                                    <td className="py-2 pr-3">{devices ?? "-"}</td>
-                                    <td className="py-2 text-right whitespace-nowrap">
+                                    <td className="py-2 pe-3">{devices ?? "-"}</td>
+                                    <td className="py-2 text-end whitespace-nowrap">
                                         <IconButton
                                             label={t("edit")}
                                             onClick={() => setEditingLan(lan)}
@@ -573,17 +573,17 @@ function RouterEditor({
                     >
                         {plan.forwards.map((forward, at) => (
                             <tr key={at} className="border-t border-border">
-                                <td className="py-2 pr-3 uppercase">{forward.protocol}</td>
-                                <td className="py-2 pr-3 font-mono">{forward.port}</td>
-                                <td className="py-2 pr-3 font-mono">{forward.address}</td>
-                                <td className="py-2 pr-3 font-mono">{forward.toPort}</td>
+                                <td className="py-2 pe-3 uppercase">{forward.protocol}</td>
+                                <td className="py-2 pe-3 font-mono">{forward.port}</td>
+                                <td className="py-2 pe-3 font-mono">{forward.address}</td>
+                                <td className="py-2 pe-3 font-mono">{forward.toPort}</td>
                                 <td
-                                    className="max-w-0 truncate py-2 pr-3"
+                                    className="max-w-0 truncate py-2 pe-3"
                                     title={networkOf(plan.lans, forward.address)?.name}
                                 >
                                     {networkOf(plan.lans, forward.address)?.name ?? "-"}
                                 </td>
-                                <td className="py-2 text-right">
+                                <td className="py-2 text-end">
                                     <IconButton
                                         label={t("remove")}
                                         onClick={() =>
@@ -623,7 +623,7 @@ function RouterEditor({
                     </p>
                 ) : null}
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                    <p className="mr-auto min-w-0 text-xs text-muted-foreground">
+                    <p className="me-auto min-w-0 text-xs text-muted-foreground">
                         {changed ? t("unsaved") : t("rollbackNote", { seconds: ROLLBACK_SECONDS })}
                     </p>
                     {saved ? (
@@ -756,11 +756,11 @@ function Table({
 }) {
     return (
         <div className="min-w-0 overflow-x-auto">
-            <table className={`w-full ${minWidth} text-left text-sm`}>
+            <table className={`w-full ${minWidth} text-start text-sm`}>
                 <thead>
                     <tr>
                         {head.map((label, at) => (
-                            <th key={at} className="pb-1 pr-3 font-normal">
+                            <th key={at} className="pb-1 pe-3 font-normal">
                                 {label}
                             </th>
                         ))}
@@ -801,25 +801,25 @@ function PortTable({
                     .sort((a, b) => (a.vlan ?? 0) - (b.vlan ?? 0));
                 return (
                     <tr key={port.name} className="border-t border-border align-top">
-                        <td className="py-2 pr-3 font-mono">
+                        <td className="py-2 pe-3 font-mono">
                             {port.name}
                             {port.wireless ? (
-                                <span className="ml-2 font-sans text-xs text-muted-foreground">
+                                <span className="ms-2 font-sans text-xs text-muted-foreground">
                                     {t("radio")}
                                 </span>
                             ) : null}
                         </td>
-                        <td className="py-2 pr-3">
+                        <td className="py-2 pe-3">
                             <ui.Badge variant={port.up ? "success" : "neutral"}>
                                 {port.up ? t("connected") : t("noCable")}
                             </ui.Badge>
                         </td>
-                        <td className="max-w-0 py-2 pr-3 font-mono text-xs">
+                        <td className="max-w-0 py-2 pe-3 font-mono text-xs">
                             <span className="block truncate" title={port.addresses.join(", ")}>
                                 {port.addresses.join(", ") || "-"}
                             </span>
                         </td>
-                        <td className="py-2 pr-3">
+                        <td className="py-2 pe-3">
                             {riding.length === 0 ? (
                                 <span className="text-xs text-muted-foreground">
                                     {t("carriesNothing")}
@@ -845,7 +845,7 @@ function PortTable({
                                 </ul>
                             )}
                         </td>
-                        <td className="py-2 pr-3 text-xs whitespace-nowrap text-muted-foreground">
+                        <td className="py-2 pe-3 text-xs whitespace-nowrap text-muted-foreground">
                             {t("traffic", {
                                 received: formatBytes(port.received),
                                 sent: formatBytes(port.sent)
@@ -983,20 +983,20 @@ function ClientList({
             >
                 {found.slice(0, CLIENTS_SHOWN).map((client) => (
                     <tr key={`${client.mac}-${client.address}`} className="border-t border-border">
-                        <td className="py-1.5 pr-3 font-mono">{client.address}</td>
-                        <td className="max-w-0 py-1.5 pr-3">
+                        <td className="py-1.5 pe-3 font-mono">{client.address}</td>
+                        <td className="max-w-0 py-1.5 pe-3">
                             <span className="block truncate" title={client.name ?? undefined}>
                                 {client.name ?? t("unnamed")}
                             </span>
                         </td>
-                        <td className="py-1.5 pr-3 font-mono text-xs">{client.mac}</td>
+                        <td className="py-1.5 pe-3 font-mono text-xs">{client.mac}</td>
                         <td
-                            className="max-w-0 truncate py-1.5 pr-3"
+                            className="max-w-0 truncate py-1.5 pe-3"
                             title={networkOf(lans, client.address)?.name}
                         >
                             {networkOf(lans, client.address)?.name ?? "-"}
                         </td>
-                        <td className="py-1.5 pr-3 text-xs whitespace-nowrap text-muted-foreground">
+                        <td className="py-1.5 pe-3 text-xs whitespace-nowrap text-muted-foreground">
                             {client.expires === 0
                                 ? t("leaseFixed")
                                 : format.dateTime(new Date(client.expires * 1000))}
@@ -1064,7 +1064,7 @@ function Status({
                 {reading?.rolledBack ? (
                     <ui.Badge variant="warning">{t("wentBack")}</ui.Badge>
                 ) : null}
-                <span className="ml-auto">
+                <span className="ms-auto">
                     <IconButton label={t("refresh")} onClick={onRefresh}>
                         <RefreshCw />
                     </IconButton>

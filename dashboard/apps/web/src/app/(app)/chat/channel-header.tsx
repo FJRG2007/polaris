@@ -286,7 +286,7 @@ export function ChannelHeader({
                     </>
                 )}
 
-                <div className="ml-auto flex min-w-0 shrink-0 items-center gap-0.5">
+                <div className="ms-auto flex min-w-0 shrink-0 items-center gap-0.5">
                     {/* Discord's row, in Discord's order: the call, what is
                         pinned, more people, and who this is. Below `sm` all of
                         it moves into the three dots, where the same items wait
@@ -799,11 +799,11 @@ function SearchBox({
                 placeholder={placeholder}
                 title={placeholder}
                 onChange={(event) => setTerm(event.target.value)}
-                className="h-7 w-full min-w-0 truncate rounded-md border border-border bg-muted/40 pl-2 pr-7 text-xs text-foreground placeholder:text-foreground-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-7 w-full min-w-0 truncate rounded-md border border-border bg-muted/40 ps-2 pe-7 text-xs text-foreground placeholder:text-foreground-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <Search
                 aria-hidden
-                className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
+                className="pointer-events-none absolute end-2 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
             />
         </form>
     );
@@ -828,7 +828,7 @@ function HeaderSearch({
     return (
         <>
             <SearchBox
-                className="ml-1 hidden w-40 min-w-0 md:block lg:w-48"
+                className="ms-1 hidden w-40 min-w-0 md:block lg:w-48"
                 placeholder={placeholder}
                 label={label}
                 onSearch={onSearch}

@@ -132,7 +132,7 @@ export function GeoPicker({
                         }}
                     />
                     {open && suggestions.length > 0 ? (
-                        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-auto overscroll-contain rounded-md border border-border-strong bg-surface py-1 shadow-popover">
+                        <ul className="absolute start-0 end-0 top-full z-20 mt-1 max-h-56 overflow-auto overscroll-contain rounded-md border border-border-strong bg-surface py-1 shadow-popover">
                             {suggestions.map((option) => (
                                 <li key={option.code}>
                                     <button
@@ -142,7 +142,7 @@ export function GeoPicker({
                                             event.preventDefault();
                                             addCountry(option.name);
                                         }}
-                                        className="flex w-full items-center px-3 py-1.5 text-left text-sm hover:bg-muted"
+                                        className="flex w-full items-center px-3 py-1.5 text-start text-sm hover:bg-muted"
                                     >
                                         {option.name}
                                     </button>

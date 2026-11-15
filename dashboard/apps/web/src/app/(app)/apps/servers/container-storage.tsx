@@ -115,7 +115,7 @@ export function ContainerStorage() {
                                 disabled={freeing}
                                 aria-label={t("space.deleteCache")}
                                 title={t("space.deleteCache")}
-                                className="-mr-1 -mt-0.5 shrink-0 rounded p-1 text-foreground-subtle hover:text-danger disabled:opacity-50"
+                                className="-me-1 -mt-0.5 shrink-0 rounded p-1 text-foreground-subtle hover:text-danger disabled:opacity-50"
                                 onClick={() =>
                                     void confirm({
                                         title: t("space.deleteCacheTitle", { size: size(row.value) }),

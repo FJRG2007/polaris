@@ -601,7 +601,7 @@ function PathsCompared({ view }: { view: BackupView }) {
                     <li key={path} className="min-w-0 break-words">
                         <span className="font-medium">{t(`domains.backup.paths.${path}`)}</span>
                         {view.recommended === path ? (
-                            <span className="ml-2 text-success">
+                            <span className="ms-2 text-success">
                                 {t("domains.backup.compare.recommended")}
                             </span>
                         ) : null}

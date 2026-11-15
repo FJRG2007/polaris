@@ -609,7 +609,7 @@ function AttentionCard({
                         <button
                             type="button"
                             onClick={() => onOpen(device)}
-                            className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-muted"
+                            className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-start transition-colors hover:bg-muted"
                         >
                             {reason === "battery" ? (
                                 <BatteryLow
@@ -682,7 +682,7 @@ function RoomCard({
                         <button
                             type="button"
                             onClick={() => onOpen(device)}
-                            className="flex min-w-[8rem] flex-1 items-center gap-2.5 text-left"
+                            className="flex min-w-[8rem] flex-1 items-center gap-2.5 text-start"
                         >
                             <DeviceIcon
                                 kind={device.kind}
@@ -844,7 +844,7 @@ function CameraThumb({
         <button
             type="button"
             onClick={() => onWatch(camera)}
-            className="group relative aspect-video w-full min-w-0 overflow-hidden rounded-md border border-border bg-muted text-left"
+            className="group relative aspect-video w-full min-w-0 overflow-hidden rounded-md border border-border bg-muted text-start"
             aria-label={t("placeOverview.cameras.watch", { name: camera.name })}
             title={camera.name}
         >

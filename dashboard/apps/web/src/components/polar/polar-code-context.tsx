@@ -292,7 +292,7 @@ function RepoItems({
                                 {t("code.addReposHint")}
                             </span>
                         </span>
-                        <ExternalLink className="ml-auto mt-0.5 size-3.5 shrink-0" />
+                        <ExternalLink className="ms-auto mt-0.5 size-3.5 shrink-0" />
                     </a>
                 </DropdownMenuItem>
             ) : (
@@ -563,7 +563,7 @@ export function CodeWhereChip({
 }
 
 function Mark({ on }: { on: boolean }) {
-    return <Check className={cn("ml-auto size-3.5 shrink-0 text-primary", !on && "opacity-0")} />;
+    return <Check className={cn("ms-auto size-3.5 shrink-0 text-primary", !on && "opacity-0")} />;
 }
 
 /** Where the picked effort is kept, so the next task starts on it. */

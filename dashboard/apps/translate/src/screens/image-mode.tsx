@@ -171,7 +171,7 @@ export function ImageMode({
                                 ]}
                             />
                         ) : null}
-                        <Button variant="outline" size="sm" className="ml-auto" onClick={pick}>
+                        <Button variant="outline" size="sm" className="ms-auto" onClick={pick}>
                             {t("image.choose")}
                         </Button>
                         <Button

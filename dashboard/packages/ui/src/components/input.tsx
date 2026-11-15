@@ -50,7 +50,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             <input
                 ref={ref}
                 type={isPassword && revealed ? "text" : type}
-                className={cn(baseClass, bare && bareClass, isPassword && "pr-9", className)}
+                className={cn(baseClass, bare && bareClass, isPassword && "pe-9", className)}
                 {...props}
             />
         );
@@ -64,7 +64,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                     type="button"
                     tabIndex={-1}
                     onClick={() => setRevealed((value) => !value)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground "
+                    className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground "
                     aria-label={revealed ? words.hidePassword : words.showPassword}
                     title={revealed ? words.hidePassword : words.showPassword}
                 >

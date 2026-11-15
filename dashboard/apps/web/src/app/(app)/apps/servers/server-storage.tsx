@@ -254,7 +254,7 @@ export function ServerStorage() {
                 ) : (
                     <div className="overflow-x-auto rounded-lg border border-border">
                         <table className="w-full text-sm">
-                            <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                            <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                                 <tr>
                                     <th className="w-full max-w-0 px-3 py-2 font-medium">
                                         {t("storage.columns.volume")}
@@ -296,7 +296,7 @@ export function ServerStorage() {
                                                         >
                                                             {move.phase === "waiting" ? null : (
                                                                 <Loader2
-                                                                    className="mr-1 size-3 shrink-0 animate-spin"
+                                                                    className="me-1 size-3 shrink-0 animate-spin"
                                                                     aria-hidden
                                                                 />
                                                             )}
@@ -395,7 +395,7 @@ export function ServerStorage() {
                                             <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 md:table-cell">
                                                 {age(volume.createdAt, t) ?? t("storage.unknown")}
                                             </td>
-                                            <td className="px-3 py-2 text-right">
+                                            <td className="px-3 py-2 text-end">
                                                 <span className="flex items-center justify-end gap-0.5">
                                                     {/* The way in is the app that mounts
                                                     it, at the path it mounts it on:
@@ -668,7 +668,7 @@ function StrayContainers() {
 
             <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full text-sm">
-                    <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">
                                 {t("storage.columns.leftover")}
@@ -713,7 +713,7 @@ function StrayContainers() {
                                         ? (age(row.container.createdAt, t) ?? t("storage.unknown"))
                                         : null}
                                 </td>
-                                <td className="px-3 py-2 text-right">
+                                <td className="px-3 py-2 text-end">
                                     {row.container ? (
                                         <Button
                                             variant="ghost"

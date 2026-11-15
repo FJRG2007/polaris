@@ -404,7 +404,7 @@ export function AppSwitcher({
                     {alert ? (
                         <span
                             aria-hidden="true"
-                            className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-primary ring-2 ring-surface"
+                            className="absolute -end-0.5 -top-0.5 size-2 rounded-full bg-primary ring-2 ring-surface"
                         />
                     ) : null}
                 </span>
@@ -621,12 +621,12 @@ function AppTile({
                     >
                         <AppLogo appId={app.id} size={34} fallback={<Icon className="!size-5" />} />
                         {app.badge ? (
-                            <span className="absolute -right-2 -top-1.5 min-w-4 rounded-full bg-primary px-1 text-center text-[0.625rem] font-medium leading-4 text-primary-foreground ring-2 ring-elevated">
+                            <span className="absolute -end-2 -top-1.5 min-w-4 rounded-full bg-primary px-1 text-center text-[0.625rem] font-medium leading-4 text-primary-foreground ring-2 ring-elevated">
                                 {app.badge}
                             </span>
                         ) : null}
                         {app.locked ? (
-                            <Lock className="absolute -bottom-1 -right-1 !size-3.5 rounded-full bg-elevated p-0.5 text-muted-foreground" />
+                            <Lock className="absolute -bottom-1 -end-1 !size-3.5 rounded-full bg-elevated p-0.5 text-muted-foreground" />
                         ) : null}
                         {app.muted ? (
                             <span
@@ -634,7 +634,7 @@ function AppTile({
                                 aria-label={app.muted}
                                 title={app.muted}
                                 data-app-muted=""
-                                className="absolute -bottom-1 -left-1 grid place-items-center rounded-full bg-elevated p-0.5 text-muted-foreground"
+                                className="absolute -bottom-1 -start-1 grid place-items-center rounded-full bg-elevated p-0.5 text-muted-foreground"
                             >
                                 <BellOff className="!size-2.5" aria-hidden="true" />
                             </span>
@@ -657,7 +657,7 @@ function AppTile({
                         event.preventDefault();
                         action.onSelect();
                     }}
-                    className="absolute left-0.5 top-0.5 size-6 justify-center rounded-full bg-elevated p-0 text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:text-foreground focus:text-foreground focus:opacity-100 group-hover/tile:opacity-100 [@media(hover:none)]:opacity-100 [&_svg]:!size-3.5"
+                    className="absolute start-0.5 top-0.5 size-6 justify-center rounded-full bg-elevated p-0 text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:text-foreground focus:text-foreground focus:opacity-100 group-hover/tile:opacity-100 [@media(hover:none)]:opacity-100 [&_svg]:!size-3.5"
                 >
                     {action.icon}
                 </DropdownMenuItem>

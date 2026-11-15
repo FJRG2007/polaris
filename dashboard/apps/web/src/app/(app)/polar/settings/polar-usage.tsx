@@ -187,16 +187,16 @@ function UsageTable({
             <h3 className="text-xs font-medium text-foreground">{caption}</h3>
             <div className="overflow-x-auto rounded-md border border-border">
                 <table className="w-full text-sm">
-                    <thead className="bg-surface/60 text-left">
+                    <thead className="bg-surface/60 text-start">
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">{first}</th>
-                            <th className="whitespace-nowrap px-3 py-2 text-right font-medium">
+                            <th className="whitespace-nowrap px-3 py-2 text-end font-medium">
                                 {t("routing.usage.requests")}
                             </th>
-                            <th className="whitespace-nowrap px-3 py-2 text-right font-medium">
+                            <th className="whitespace-nowrap px-3 py-2 text-end font-medium">
                                 {t("routing.usage.tokens")}
                             </th>
-                            <th className="hidden whitespace-nowrap px-3 py-2 text-right font-medium sm:table-cell">
+                            <th className="hidden whitespace-nowrap px-3 py-2 text-end font-medium sm:table-cell">
                                 {t("routing.usage.cost")}
                             </th>
                         </tr>
@@ -235,7 +235,7 @@ function UsageTable({
                                             <span
                                                 className={cn(
                                                     "block truncate text-xs text-muted-foreground",
-                                                    row.logo && "pl-6"
+                                                    row.logo && "ps-6"
                                                 )}
                                                 title={[row.detail, row.hint].filter(Boolean).join(" - ")}
                                             >
@@ -243,13 +243,13 @@ function UsageTable({
                                             </span>
                                         ) : null}
                                     </td>
-                                    <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                    <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums">
                                         {row.requests.toLocaleString(locale)}
                                     </td>
-                                    <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                    <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums">
                                         {row.tokens}
                                     </td>
-                                    <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums sm:table-cell">
+                                    <td className="hidden whitespace-nowrap px-3 py-2 text-end tabular-nums sm:table-cell">
                                         {row.cost}
                                     </td>
                                 </tr>

@@ -344,7 +344,7 @@ function StatsView({ databaseId, engine }: { databaseId: string; engine: string 
                 <Button
                     size="icon"
                     variant="ghost"
-                    className="ml-auto"
+                    className="ms-auto"
                     title={t("workspace.stats.refresh")}
                     aria-label={t("workspace.stats.refresh")}
                     onClick={() => void load(true)}
@@ -751,7 +751,7 @@ function Block({
         <section className="flex min-w-0 flex-col gap-2">
             <div className="flex items-center gap-2">
                 <h3 className="text-sm font-medium">{title}</h3>
-                {action ? <div className="ml-auto">{action}</div> : null}
+                {action ? <div className="ms-auto">{action}</div> : null}
             </div>
             {children}
         </section>
@@ -771,7 +771,7 @@ function Table({
     return (
         <div className="min-w-0 overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-sm">
-                <thead className="bg-surface text-left text-xs text-muted-foreground">
+                <thead className="bg-surface text-start text-xs text-muted-foreground">
                     <tr>
                         {head.map((label, index) => (
                             <th key={index} className="whitespace-nowrap px-3 py-2 font-medium">
@@ -790,7 +790,7 @@ function Table({
                                         "whitespace-nowrap px-3 py-1.5 tabular-nums",
                                         stickyLast &&
                                             column === row.length - 1 &&
-                                            "sticky right-0 bg-background"
+                                            "sticky end-0 bg-background"
                                     )}
                                 >
                                     {cell}
@@ -1072,9 +1072,9 @@ function ExtensionsBlock({
             ) : null}
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                    className="pl-9"
+                    className="ps-9"
                     value={find}
                     placeholder={t("workspace.config.findExtension")}
                     aria-label={t("workspace.config.findExtension")}
@@ -1323,7 +1323,7 @@ function ConnectView({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="ml-auto text-danger"
+                                        className="ms-auto text-danger"
                                         onClick={() => publish(null)}
                                     >
                                         {t("workspace.connect.close")}

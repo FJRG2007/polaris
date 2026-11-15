@@ -160,7 +160,7 @@ export function ArkMods({
                 <Button
                     size="icon"
                     variant="ghost"
-                    className="ml-auto"
+                    className="ms-auto"
                     aria-label={t("mods.readTheModsAgain")}
                     title={t("mods.readTheModsAgain")}
                     disabled={loading}
@@ -505,9 +505,9 @@ function AddMod({
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="relative min-w-56 flex-1">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                            className="pl-9"
+                            className="ps-9"
                             value={query}
                             aria-label={t("mods.aWorkshopLinkAnId")}
                             placeholder={t("mods.pasteAWorkshopLinkOr")}

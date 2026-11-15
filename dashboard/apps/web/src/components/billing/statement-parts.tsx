@@ -154,7 +154,7 @@ export function StatementToolbar({
                 onValueChange={go}
                 options={months.map((entry, index) => monthOption(entry, index === 0, locale, t))}
             />
-            <div className="ml-auto flex items-center gap-1">
+            <div className="ms-auto flex items-center gap-1">
                 {children}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -369,16 +369,16 @@ export function StatementTable({
     return (
         <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full min-w-[40rem] text-sm">
-                <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                     <tr>
                         <th className="w-full max-w-0 px-3 py-2 font-medium">{t("statement.project")}</th>
                         {showOwner ? <th className="px-3 py-2 font-medium">{t("statement.owner")}</th> : null}
                         {/* i18n-ignore unit symbols and the CPU abbreviation read the same in every language here */}
-                        <th className="px-3 py-2 font-medium text-right">CPU</th>
-                        <th className="px-3 py-2 font-medium text-right">{t("statement.memory")}</th>
-                        <th className="px-3 py-2 font-medium text-right">{t("statement.storage")}</th>
-                        <th className="px-3 py-2 font-medium text-right">{t("statement.networkOut")}</th>
-                        <th className="px-3 py-2 font-medium text-right">{t("statement.cost")}</th>
+                        <th className="px-3 py-2 font-medium text-end">CPU</th>
+                        <th className="px-3 py-2 font-medium text-end">{t("statement.memory")}</th>
+                        <th className="px-3 py-2 font-medium text-end">{t("statement.storage")}</th>
+                        <th className="px-3 py-2 font-medium text-end">{t("statement.networkOut")}</th>
+                        <th className="px-3 py-2 font-medium text-end">{t("statement.cost")}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -414,22 +414,22 @@ export function StatementTable({
                                         )}
                                     </td>
                                 ) : null}
-                                <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                                <td className="px-3 py-2 text-end tabular-nums whitespace-nowrap">
                                     {/* i18n-ignore unit symbols and the CPU abbreviation read the same in every language here */}
                                     {quantity(line.usage.cpuHours)} vCPU-h
                                 </td>
-                                <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                                <td className="px-3 py-2 text-end tabular-nums whitespace-nowrap">
                                     {/* i18n-ignore unit symbols and the CPU abbreviation read the same in every language here */}
                                     {quantity(line.usage.memoryGbHours)} GB-h
                                 </td>
-                                <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                                <td className="px-3 py-2 text-end tabular-nums whitespace-nowrap">
                                     {quantity(line.usage.storageGbHours / hours)} {t("statement.gbMo")}
                                 </td>
-                                <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                                <td className="px-3 py-2 text-end tabular-nums whitespace-nowrap">
                                     {/* i18n-ignore unit symbols and the CPU abbreviation read the same in every language here */}
                                     {quantity(line.usage.egressGb)} GB
                                 </td>
-                                <td className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap">
+                                <td className="px-3 py-2 text-end font-medium tabular-nums whitespace-nowrap">
                                     {line.cost ? format.currency(line.cost.total) : "-"}
                                 </td>
                             </tr>

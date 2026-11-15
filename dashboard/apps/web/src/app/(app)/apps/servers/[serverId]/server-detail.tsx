@@ -163,7 +163,7 @@ export function ServerDetail({
                     >
                         {reach}
                         {server.os ? (
-                            <span className="ml-1.5 border-l border-border pl-1.5">
+                            <span className="ms-1.5 border-s border-border ps-1.5">
                                 {server.os}
                             </span>
                         ) : null}
@@ -319,7 +319,7 @@ export function ServerDetail({
                             <h2 className="text-sm font-medium">{t("insights.heading")}</h2>
                             <Link
                                 href={`/apps/servers/compare?ids=${encodeURIComponent(server.id)}`}
-                                className="ml-auto text-xs text-primary hover:underline"
+                                className="ms-auto text-xs text-primary hover:underline"
                             >
                                 {t("compare.withOthers")}
                             </Link>

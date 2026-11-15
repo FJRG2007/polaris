@@ -304,7 +304,7 @@ function RewardEditor({
                 }}
             />
             <div className="flex flex-wrap items-center gap-2">
-                <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+                <label className="ms-auto flex items-center gap-2 text-xs text-muted-foreground">
                     {t("editor.levels")}
                     <Input
                         className="w-20"
@@ -1301,7 +1301,7 @@ export function EventEditor({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="w-[min(40rem,95vw)] max-w-[min(40rem,95vw)]">
                 <div className="flex flex-col gap-4">
-                    <DialogHeader className="pr-8">
+                    <DialogHeader className="pe-8">
                         <DialogTitle>{kindLabel(t, draft.kind)}</DialogTitle>
                         <DialogDescription>{kindSummary(t, draft.kind)}</DialogDescription>
                     </DialogHeader>
@@ -1477,7 +1477,7 @@ export function EventEditor({
 
                     <div className="flex items-center justify-end gap-2">
                         {!checked.success && issues[0] && (
-                            <Problem className="mr-auto" text={issues[0].message} />
+                            <Problem className="me-auto" text={issues[0].message} />
                         )}
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
                             {t("editor.cancel")}

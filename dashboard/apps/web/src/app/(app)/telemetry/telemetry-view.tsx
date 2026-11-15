@@ -111,14 +111,14 @@ export function ProjectsHome({ mayCreate }: { mayCreate: boolean }) {
     const action = mayCreate ? <NewProject onDone={async () => list.reload()} /> : null;
     const search = (
         <div className="relative w-full max-w-xs">
-            <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 maxLength={80}
                 placeholder={t("grid.search")}
                 aria-label={t("grid.search")}
-                className="h-8 pl-7 text-sm"
+                className="h-8 ps-7 text-sm"
             />
         </div>
     );
@@ -487,7 +487,7 @@ function SectionNav({
                                     {t(`sections.${section.key}.label` as NamespaceKey<"telemetry">)}
                                 </span>
                                 {section.key === "issues" && counts?.unresolved !== undefined && (
-                                    <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+                                    <span className="ms-auto text-xs tabular-nums text-muted-foreground">
                                         {counts.unresolved}
                                     </span>
                                 )}

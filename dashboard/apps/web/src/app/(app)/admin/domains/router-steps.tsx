@@ -158,7 +158,7 @@ export function RouterSteps({
             </button>
             {!open ? null : (
                 <div className="flex flex-col gap-3">
-                    <ol className="ml-4 flex list-decimal flex-col gap-2">
+                    <ol className="ms-4 flex list-decimal flex-col gap-2">
                         <li>
                             {guide.app
                                 ? t("domainsRouter.steps.openApp", { app: guide.app })
@@ -200,7 +200,7 @@ export function RouterSteps({
                                     t("domainsRouter.itsAddress")
                                 )
                             })}
-                            <ol className="ml-4 mt-1 flex list-decimal flex-col gap-1">
+                            <ol className="ms-4 mt-1 flex list-decimal flex-col gap-1">
                                 <li>
                                     {t.rich("domainsRouter.steps.goTo", {
                                         path: guide.reserve.path,
@@ -232,7 +232,7 @@ export function RouterSteps({
                                                 b: bold
                                             })}
                                             <div className="mt-1 overflow-x-auto">
-                                                <table className="w-full min-w-72 border-separate border-spacing-x-3 text-left">
+                                                <table className="w-full min-w-72 border-separate border-spacing-x-3 text-start">
                                                     <tbody className="align-top">
                                                         {guide.reserve.fields.map((field) => (
                                                             <tr key={field.label}>
@@ -299,7 +299,7 @@ export function RouterSteps({
                                       b: bold
                                   })}
                             <div className="mt-1 overflow-x-auto">
-                                <table className="w-full min-w-80 border-separate border-spacing-x-3 text-left">
+                                <table className="w-full min-w-80 border-separate border-spacing-x-3 text-start">
                                     <thead>
                                         <tr className="text-muted-foreground">
                                             <th className="font-normal">

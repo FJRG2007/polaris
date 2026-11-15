@@ -1573,8 +1573,8 @@ export function MailView({
                     // beside it; a phone gets the list and then the message.
                     layout === "split"
                         ? reading
-                            ? "hidden w-80 shrink-0 border-r border-border lg:flex"
-                            : "flex flex-1 lg:w-80 lg:flex-none lg:shrink-0 lg:border-r lg:border-border"
+                            ? "hidden w-80 shrink-0 border-e border-border lg:flex"
+                            : "flex flex-1 lg:w-80 lg:flex-none lg:shrink-0 lg:border-e lg:border-border"
                         : reading
                           ? "hidden"
                           : "flex flex-1"
@@ -1649,7 +1649,7 @@ export function MailView({
                             </>
                         ) : (
                             <div className="flex min-w-0 flex-1 items-center gap-1">
-                                <span className="mr-1 min-w-0 max-w-full shrink-0 truncate text-[12px] text-muted-foreground tabular-nums" title={t("list.picked", { count: selected.length })}>
+                                <span className="me-1 min-w-0 max-w-full shrink-0 truncate text-[12px] text-muted-foreground tabular-nums" title={t("list.picked", { count: selected.length })}>
                                     {t("list.picked", { count: selected.length })}
                                 </span>
                                 {context.canArchive ? (
@@ -2217,7 +2217,7 @@ function ThreadRowsSkeleton() {
         <ul aria-hidden>
             {widths.map((width, index) => (
                 <li key={index} className="border-b border-border/60">
-                    <div className="flex items-start gap-2 py-2 pl-3 pr-2">
+                    <div className="flex items-start gap-2 py-2 ps-3 pe-2">
                         <Skeleton className="mt-0.5 size-7 shrink-0 rounded-full" />
                         <Skeleton className="mt-1 size-4 shrink-0" />
                         <Skeleton className="mt-1 size-4 shrink-0" />
@@ -2695,12 +2695,12 @@ function ThreadRow({
         >
             {showColor ? (
                 <span
-                    className="absolute inset-y-0 left-0 w-0.5"
+                    className="absolute inset-y-0 start-0 w-0.5"
                     style={{ backgroundColor: color }}
                     aria-hidden
                 />
             ) : null}
-            <div className="flex items-start gap-2 py-2 pl-3 pr-2">
+            <div className="flex items-start gap-2 py-2 ps-3 pe-2">
                 {/* Who it is from, before the name is read. Drawn from the
                     first person who is not the reader, which in an inbox is the
                     sender and in Sent is who it went to. */}
@@ -2863,7 +2863,7 @@ function ThreadRow({
                     They sit ON TOP of the row rather than in its flow, so a row
                     does not change width when the pointer crosses it, which is
                     a list that shivers as you read down it. */}
-                <div className="pointer-events-none absolute inset-y-0 right-0 hidden items-center pr-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 sm:flex">
+                <div className="pointer-events-none absolute inset-y-0 end-0 hidden items-center pe-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 sm:flex">
                     <div className="pointer-events-auto flex items-center gap-0.5 rounded-md border border-border bg-surface px-0.5 py-0.5 shadow-sm">
                         {thread.unsubscribe && thread.unsubscribeKind ? (
                             <UnsubscribeButton

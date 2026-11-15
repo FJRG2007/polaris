@@ -100,7 +100,7 @@ export function NukiLocalDialog({
                         </div>
                     ) : (
                         <>
-                            <ol className="flex list-decimal flex-col gap-1.5 pl-5">
+                            <ol className="flex list-decimal flex-col gap-1.5 ps-5">
                                 <li>{t("nukiLocal.steps.s0")}</li>
                                 <li>{t("nukiLocal.steps.s1")}</li>
                                 <li>{t("nukiLocal.steps.s2")}</li>

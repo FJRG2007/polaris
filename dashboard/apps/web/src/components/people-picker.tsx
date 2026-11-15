@@ -124,7 +124,7 @@ export function PeoplePicker<P extends FoundPerson = FoundPerson>({
                                 <PersonRow
                                     as="span"
                                     personId={person.id}
-                                    className="flex items-center gap-1 rounded-full bg-muted py-0.5 pl-0.5 pr-1.5 text-xs"
+                                    className="flex items-center gap-1 rounded-full bg-muted py-0.5 ps-0.5 pe-1.5 text-xs"
                                 >
                                     <Avatar person={person} size={18} />
                                     <span className="max-w-[10rem] truncate" title={person.name}>
@@ -149,17 +149,17 @@ export function PeoplePicker<P extends FoundPerson = FoundPerson>({
                 )}
 
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                     <input
                         value={query}
                         disabled={full}
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder={full ? t("picker.full") : t("picker.placeholder")}
                         aria-label={label ?? t("picker.label")}
-                        className="h-8 w-full rounded-md border border-border bg-field pl-7 pr-7 text-sm hover:border-border-strong focus:border-border-strong disabled:opacity-60"
+                        className="h-8 w-full rounded-md border border-border bg-field ps-7 pe-7 text-sm hover:border-border-strong focus:border-border-strong disabled:opacity-60"
                     />
                     {searching && (
-                        <Loader2 className="absolute right-2 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
+                        <Loader2 className="absolute end-2 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
                     )}
                 </div>
 
@@ -231,7 +231,7 @@ export function PeoplePicker<P extends FoundPerson = FoundPerson>({
                                             ]);
                                         }}
                                         className={cn(
-                                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted disabled:opacity-60"
+                                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm transition-colors hover:bg-muted disabled:opacity-60"
                                         )}
                                     >
                                         <Avatar person={person} size={20} />

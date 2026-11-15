@@ -203,7 +203,7 @@ export function ImportExport({
                             })}
                         </p>
                         {outcome.problems.length > 0 ? (
-                            <ul className="list-disc pl-4 text-muted-foreground">
+                            <ul className="list-disc ps-4 text-muted-foreground">
                                 {outcome.problems.slice(0, 20).map((line, index) => (
                                     <li key={index}>{line}</li>
                                 ))}

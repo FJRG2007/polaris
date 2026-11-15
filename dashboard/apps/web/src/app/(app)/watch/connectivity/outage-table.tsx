@@ -220,12 +220,12 @@ export function OutageTable({
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[20rem] text-[0.8125rem]">
                     <thead>
-                        <tr className="border-b border-border text-left">
+                        <tr className="border-b border-border text-start">
                             <th className="px-4 py-2">{t("connectivity.list.started")}</th>
                             <th className="hidden px-4 py-2 lg:table-cell">
                                 {t("connectivity.list.ended")}
                             </th>
-                            <th className="px-4 py-2 text-right">
+                            <th className="px-4 py-2 text-end">
                                 {t("connectivity.list.duration")}
                             </th>
                             <th className="hidden px-4 py-2 sm:table-cell">
@@ -365,7 +365,7 @@ function OutageRow({
                     </span>
                 ) : null}
             </td>
-            <td className="whitespace-nowrap px-4 py-2 text-right tabular">
+            <td className="whitespace-nowrap px-4 py-2 text-end tabular">
                 {span(length)}
                 {ongoing ? (
                     <span className="block text-xs text-danger-ink lg:hidden">
@@ -414,7 +414,7 @@ function Chip({
     onRemove: () => void;
 }) {
     return (
-        <span className="inline-flex items-center gap-1 rounded border border-border bg-muted py-px pl-1.5 pr-0.5 text-xs">
+        <span className="inline-flex items-center gap-1 rounded border border-border bg-muted py-px ps-1.5 pe-0.5 text-xs">
             {label}
             <button
                 type="button"

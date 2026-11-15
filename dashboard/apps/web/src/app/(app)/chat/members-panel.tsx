@@ -427,7 +427,7 @@ export function MemberRow({
                             : onOpen()
                     }
                     className={cn(
-                        "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
+                        "flex w-full items-center gap-2 rounded-md px-2 py-1 text-start transition-colors",
                         you && !press
                             ? "cursor-default"
                             : "hover:bg-card-hover disabled:opacity-70",
@@ -493,7 +493,7 @@ export function MemberRow({
                         title={inVoice}
                         aria-label={inVoice}
                         className={cn(
-                            "absolute bottom-1 left-11 flex max-w-[calc(100%-3.25rem)] min-w-0 items-center gap-1 rounded-sm text-[0.6875rem] text-muted-foreground transition-colors hover:underline",
+                            "absolute bottom-1 start-11 flex max-w-[calc(100%-3.25rem)] min-w-0 items-center gap-1 rounded-sm text-[0.6875rem] text-muted-foreground transition-colors hover:underline",
                             plate ? "hover:text-[var(--plate-ink)]" : "hover:text-foreground",
                             away && "opacity-50"
                         )}
@@ -593,7 +593,7 @@ export function ChannelMembers({
             <aside
                 ref={measure}
                 style={{ "--members-pane": `${drawn}px` } as CSSProperties}
-                className="flex shrink-0 flex-col border-l border-border w-[var(--members-pane)]"
+                className="flex shrink-0 flex-col border-s border-border w-[var(--members-pane)]"
             >
                 {search ? (
                     <div className="flex h-header shrink-0 items-center border-b border-border px-3">

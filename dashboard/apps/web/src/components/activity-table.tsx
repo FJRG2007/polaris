@@ -60,7 +60,7 @@ export function ActivityTable({
     return (
         <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-sm">
-                <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                     <tr>
                         <th className="px-3 py-2 font-medium">{t("activityTable.when")}</th>
                         {/* Folded into the action cell until there is room for it:

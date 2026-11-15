@@ -102,7 +102,7 @@ export function TotalCell({
         <td
             style={{ left: sticky }}
             className={cn(
-                "sticky bottom-0 border-r border-t border-border bg-card p-0",
+                "sticky bottom-0 border-e border-t border-border bg-card p-0",
                 sticky ? "z-20" : "z-10"
             )}
         >

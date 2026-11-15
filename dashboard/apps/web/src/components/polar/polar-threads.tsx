@@ -346,7 +346,7 @@ export function PolarThreads({
 
     return (
         <nav aria-label={t("history.title")} className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div className="flex h-11 shrink-0 items-center gap-1 pl-4 pr-2">
+            <div className="flex h-11 shrink-0 items-center gap-1 ps-4 pe-2">
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
                     {t("page.title")}
                 </span>
@@ -436,7 +436,7 @@ export function PolarThreads({
                                             />
                                         </>
                                     ) : (
-                                        <p className="py-1.5 pl-9 pr-2 text-xs text-muted-foreground">
+                                        <p className="py-1.5 ps-9 pe-2 text-xs text-muted-foreground">
                                             {t("history.projectEmpty")}
                                         </p>
                                     )}
@@ -459,7 +459,7 @@ export function PolarThreads({
                                     writeFolded(!folded);
                                 }}
                                 className={cn(
-                                    "flex w-full items-center gap-1 rounded-md px-2 pb-1 text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                    "flex w-full items-center gap-1 rounded-md px-2 pb-1 text-start hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                     HEADING
                                 )}
                             >
@@ -624,7 +624,7 @@ function IconButton({
 
 /** A "shared with you" row: drawn like a chat's own row. */
 const SHARED_ROW =
-    "flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    "flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function NavRow({
     icon: Icon,
@@ -639,7 +639,7 @@ function NavRow({
         <button
             type="button"
             onClick={onClick}
-            className="flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
             <Icon className="size-4 shrink-0 text-foreground-subtle" />
             <span className="min-w-0 truncate">{children}</span>
@@ -785,7 +785,7 @@ function CodeList({
                     <div
                         role="toolbar"
                         aria-label={t("history.selectionActions")}
-                        className="mx-2 mb-1 flex min-w-0 shrink-0 items-center gap-0.5 rounded-md bg-primary/10 py-0.5 pl-2 pr-0.5"
+                        className="mx-2 mb-1 flex min-w-0 shrink-0 items-center gap-0.5 rounded-md bg-primary/10 py-0.5 ps-2 pe-0.5"
                     >
                         <span
                             className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-foreground"
@@ -851,7 +851,7 @@ function CodeList({
                     type="button"
                     onClick={loadMore}
                     disabled={loadingMore}
-                    className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50"
+                    className="mt-1 w-full rounded-md px-2 py-1.5 text-start text-[0.8125rem] leading-5 text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50"
                 >
                     {t("history.more")}
                 </button>
@@ -1040,7 +1040,7 @@ function CodeItem({
                                 and kept on screen once anything is picked. */}
                             <span
                                 className={cn(
-                                    "flex w-6 shrink-0 items-center justify-center pl-1 transition-opacity duration-fast [@media(pointer:coarse)]:w-10",
+                                    "flex w-6 shrink-0 items-center justify-center ps-1 transition-opacity duration-fast [@media(pointer:coarse)]:w-10",
                                     selecting
                                         ? "opacity-100"
                                         : "opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:hidden"
@@ -1070,7 +1070,7 @@ function CodeItem({
                                 aria-pressed={selecting ? chosen : undefined}
                                 title={`${row.title} (${row.stateLabel}, ${row.repo || t("code.workspace")})`}
                                 className={cn(
-                                    "min-w-0 flex-1 truncate py-1.5 pl-1 pr-2 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none [@media(hover:none)]:pl-2",
+                                    "min-w-0 flex-1 truncate py-1.5 ps-1 pe-2 text-start text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none [@media(hover:none)]:ps-2",
                                     active && "font-medium text-foreground"
                                 )}
                             >
@@ -1092,7 +1092,7 @@ function CodeItem({
                                     />
                                 </span>
                             ) : null}
-                            <span className="mr-1 flex shrink-0 items-center">
+                            <span className="me-1 flex shrink-0 items-center">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <button
@@ -1132,7 +1132,7 @@ function MoreButton({ sidebar, list }: { sidebar: PolarSidebar; list: string }) 
             type="button"
             onClick={() => sidebar.loadMore(list)}
             disabled={sidebar.isLoading(list)}
-            className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50"
+            className="mt-1 w-full rounded-md px-2 py-1.5 text-start text-[0.8125rem] leading-5 text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50"
         >
             {t("history.more")}
         </button>
@@ -1210,7 +1210,7 @@ function ProjectItem({
                     aria-expanded={open}
                     onClick={onToggle}
                     title={project.name}
-                    className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none"
+                    className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-start text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none"
                 >
                     <Icon className="size-4 shrink-0 text-foreground-subtle" />
                     <span className="min-w-0 truncate">{project.name}</span>
@@ -1227,7 +1227,7 @@ function ProjectItem({
                             type="button"
                             aria-label={t("history.projectOptions")}
                             title={t("history.projectOptions")}
-                            className={cn(ROW_ACTION, "mr-1")}
+                            className={cn(ROW_ACTION, "me-1")}
                         >
                             <MoreHorizontal className="size-4" />
                         </button>
@@ -1284,7 +1284,7 @@ function ProjectItem({
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
-            {open ? <div className="pl-4">{children}</div> : null}
+            {open ? <div className="ps-4">{children}</div> : null}
         </div>
     );
 }
@@ -1711,7 +1711,7 @@ function ThreadItem({
                     {renaming ? null : (
                         <span
                             className={cn(
-                                "flex w-6 shrink-0 items-center justify-center pl-1 transition-opacity duration-fast [@media(pointer:coarse)]:w-10",
+                                "flex w-6 shrink-0 items-center justify-center ps-1 transition-opacity duration-fast [@media(pointer:coarse)]:w-10",
                                 pick.selecting
                                     ? "opacity-100"
                                     : "opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:hidden"
@@ -1763,7 +1763,7 @@ function ThreadItem({
                             aria-pressed={pick.selecting ? pick.chosen : undefined}
                             title={row.title}
                             className={cn(
-                                "min-w-0 flex-1 truncate py-1.5 pl-1 pr-2 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none [@media(hover:none)]:pl-2",
+                                "min-w-0 flex-1 truncate py-1.5 ps-1 pe-2 text-start text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none [@media(hover:none)]:ps-2",
                                 active && "font-medium text-foreground"
                             )}
                         >
@@ -1772,7 +1772,7 @@ function ThreadItem({
                     )}
                     {renaming ? null : <RunMark run={run} active={active} />}
                     {renaming ? null : (
-                        <span className="mr-1 flex shrink-0 items-center">
+                        <span className="me-1 flex shrink-0 items-center">
                             <button
                                 type="button"
                                 aria-label={pinLabel}
@@ -1819,7 +1819,7 @@ function SelectionBar({ count, actions }: { count: number; actions: SelectionAct
         <div
             role="toolbar"
             aria-label={t("history.selectionActions")}
-            className="mx-2 mb-1 flex min-w-0 shrink-0 items-center gap-0.5 rounded-md bg-primary/10 py-0.5 pl-2 pr-0.5"
+            className="mx-2 mb-1 flex min-w-0 shrink-0 items-center gap-0.5 rounded-md bg-primary/10 py-0.5 ps-2 pe-0.5"
         >
             <span
                 className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-foreground"
@@ -2029,7 +2029,7 @@ function SearchDialog({
                                         type="button"
                                         title={row.title}
                                         onClick={() => onOpen(row)}
-                                        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm text-foreground"
+                                        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-start text-sm text-foreground"
                                     >
                                         <span className="min-w-0 truncate">{row.title}</span>
                                         {row.archivedAt && !archived ? (
@@ -2054,7 +2054,7 @@ function SearchDialog({
                         <button
                             type="button"
                             onClick={() => setPage(page + 1)}
-                            className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                            className="mt-1 w-full rounded-md px-2 py-1.5 text-start text-sm text-muted-foreground hover:bg-card-hover hover:text-foreground"
                         >
                             {t("history.more")}
                         </button>

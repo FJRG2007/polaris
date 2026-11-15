@@ -237,7 +237,7 @@ export function AgentWorkFields({
                                 providers={selectorProviders(free)}
                                 choice={null}
                                 forCode
-                                triggerClassName="inline-flex h-8 w-full min-w-0 items-center gap-2 rounded-md border border-border bg-background px-2 text-left text-sm text-muted-foreground"
+                                triggerClassName="inline-flex h-8 w-full min-w-0 items-center gap-2 rounded-md border border-border bg-background px-2 text-start text-sm text-muted-foreground"
                                 triggerContent={t("settings.agents.work.add")}
                                 onChoice={(picked) =>
                                     setModels([

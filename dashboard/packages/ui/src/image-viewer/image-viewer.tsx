@@ -445,7 +445,7 @@ export function ImageViewer({
                             setZoom(1);
                             setAt({ x: 0, y: 0 });
                         }}
-                        className="absolute right-3 top-3 rounded bg-background/80 px-1.5 py-1 text-[0.6875rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
+                        className="absolute end-3 top-3 rounded bg-background/80 px-1.5 py-1 text-[0.6875rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
                     >
                         {Math.round(zoom * 100)}%
                     </button>
@@ -550,7 +550,7 @@ export function ImageViewer({
                         aria-label={labels.previous}
                         title={labels.previous}
                         onClick={() => go(-1)}
-                        className="absolute left-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-border bg-card/90 text-foreground shadow-sm transition-colors hover:bg-muted"
+                        className="absolute start-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-border bg-card/90 text-foreground shadow-sm transition-colors hover:bg-muted"
                     >
                         <ChevronLeft className="size-5 shrink-0" aria-hidden="true" />
                     </button>
@@ -560,7 +560,7 @@ export function ImageViewer({
                         aria-label={labels.next}
                         title={labels.next}
                         onClick={() => go(1)}
-                        className="absolute right-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-border bg-card/90 text-foreground shadow-sm transition-colors hover:bg-muted"
+                        className="absolute end-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-border bg-card/90 text-foreground shadow-sm transition-colors hover:bg-muted"
                     >
                         <ChevronRight className="size-5 shrink-0" aria-hidden="true" />
                     </button>

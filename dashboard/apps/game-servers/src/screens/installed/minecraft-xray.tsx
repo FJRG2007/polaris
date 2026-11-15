@@ -603,7 +603,7 @@ export function MinecraftXray({
                                 <td className="hidden px-3 py-2 align-top text-xs text-muted-foreground md:table-cell">
                                     {suspect.lastAt ? display.dateTime(suspect.lastAt) : "-"}
                                 </td>
-                                <td className="px-3 py-2 text-right align-top">
+                                <td className="px-3 py-2 text-end align-top">
                                     {(suspect.hits > 0 ||
                                         suspect.flights + suspect.teleports > 0) && (
                                         <PlayerIconAction

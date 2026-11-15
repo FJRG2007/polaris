@@ -67,7 +67,7 @@ export function FlaggedAnchor({
             >
                 <TriangleAlert
                     aria-label={t("linkWarning.flaggedBy", { provider: name })}
-                    className="mr-0.5 inline size-[1em] shrink-0 align-[-0.125em]"
+                    className="me-0.5 inline size-[1em] shrink-0 align-[-0.125em]"
                 />
                 {children}
             </a>

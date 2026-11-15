@@ -161,7 +161,7 @@ export function PdfToolbar({
                 </span>
             </div>
 
-            <div className="ml-1 flex items-center gap-1">
+            <div className="ms-1 flex items-center gap-1">
                 <Button
                     size="icon-sm"
                     variant="ghost"
@@ -189,7 +189,7 @@ export function PdfToolbar({
                 </Button>
             </div>
 
-            <div className="ml-auto flex items-center gap-1">
+            <div className="ms-auto flex items-center gap-1">
                 <Button
                     size="icon-sm"
                     variant="ghost"

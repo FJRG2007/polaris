@@ -124,7 +124,7 @@ export function DraftsView({ drafts: initial }: { drafts: MailDraftView[] }) {
                                 <button
                                     type="button"
                                     className={cn(
-                                        "min-w-0 flex-1 text-left",
+                                        "min-w-0 flex-1 text-start",
                                         waiting && "cursor-default opacity-70"
                                     )}
                                     disabled={waiting}

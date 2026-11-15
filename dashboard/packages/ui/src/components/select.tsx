@@ -110,7 +110,7 @@ export const SelectItem = forwardRef<
             // a select item never does - Radix marks it highlighted instead - so
             // the row under the pointer was drawn exactly like the rows that were
             // not, which reads as a list that does not respond.
-            "relative flex w-full cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded py-1.5 pl-2 pr-8 text-[0.8125rem] outline-none transition-colors duration-fast focus:bg-option-hover data-[highlighted]:bg-option-hover data-[highlighted]:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:text-foreground",
+            "relative flex w-full cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded py-1.5 ps-2 pe-8 text-[0.8125rem] outline-none transition-colors duration-fast focus:bg-option-hover data-[highlighted]:bg-option-hover data-[highlighted]:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:text-foreground",
             className
         )}
         {...props}
@@ -118,7 +118,7 @@ export const SelectItem = forwardRef<
         {/* Icon as a flex sibling so it sits beside the label, never stacked above it. */}
         {icon != null && <span className="flex shrink-0 items-center">{icon}</span>}
         <RadixSelect.ItemText>{children}</RadixSelect.ItemText>
-        <RadixSelect.ItemIndicator className="absolute right-2 flex items-center">
+        <RadixSelect.ItemIndicator className="absolute end-2 flex items-center">
             <Check className="size-4 text-primary" />
         </RadixSelect.ItemIndicator>
     </RadixSelect.Item>

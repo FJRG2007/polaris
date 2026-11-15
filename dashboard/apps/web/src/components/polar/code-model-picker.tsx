@@ -74,7 +74,7 @@ export function SourceMark({ source, className }: { source: CodeSource; classNam
 }
 
 function Mark({ on }: { on: boolean }) {
-    return <Check className={cn("ml-auto size-3.5 shrink-0 text-primary", !on && "opacity-0")} />;
+    return <Check className={cn("ms-auto size-3.5 shrink-0 text-primary", !on && "opacity-0")} />;
 }
 
 interface Row {

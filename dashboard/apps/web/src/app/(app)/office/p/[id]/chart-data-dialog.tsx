@@ -172,7 +172,7 @@ export function ChartDataDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="w-[min(56rem,95vw)] max-w-[min(56rem,95vw)]">
-                <DialogHeader className="pr-8">
+                <DialogHeader className="pe-8">
                     <DialogTitle>{t("slides.chart.dataTitle")}</DialogTitle>
                     <DialogDescription>{t("slides.chart.dataHint")}</DialogDescription>
                 </DialogHeader>
@@ -212,11 +212,11 @@ export function ChartDataDialog({
                             <table className="w-max min-w-full border-collapse text-[13px]">
                                 <thead>
                                     <tr>
-                                        <th className="sticky left-0 z-10 bg-card p-1.5 text-left">
+                                        <th className="sticky start-0 z-10 bg-card p-1.5 text-start">
                                             {t("slides.chart.category")}
                                         </th>
                                         {sheet.names.map((name, s) => (
-                                            <th key={s} className="p-1.5 text-left">
+                                            <th key={s} className="p-1.5 text-start">
                                                 <div className="flex items-center gap-1">
                                                     <span
                                                         aria-hidden
@@ -275,7 +275,7 @@ export function ChartDataDialog({
                                 <tbody>
                                     {sheet.categories.map((category, c) => (
                                         <tr key={c}>
-                                            <td className="sticky left-0 z-10 bg-card p-1.5">
+                                            <td className="sticky start-0 z-10 bg-card p-1.5">
                                                 <div className="flex items-center gap-1">
                                                     <Button
                                                         variant="ghost"
@@ -331,7 +331,7 @@ export function ChartDataDialog({
                                                                 setValue(c, s, event.target.value)
                                                             }
                                                             className={cn(
-                                                                "w-28 text-right tabular-nums",
+                                                                "w-28 text-end tabular-nums",
                                                                 wrong && "border-danger"
                                                             )}
                                                         />
@@ -343,7 +343,7 @@ export function ChartDataDialog({
                                     ))}
                                 </tbody>
                             </table>
-                            <div className="sticky left-0 p-1.5">
+                            <div className="sticky start-0 p-1.5">
                                 <Button
                                     variant="ghost"
                                     size="sm"

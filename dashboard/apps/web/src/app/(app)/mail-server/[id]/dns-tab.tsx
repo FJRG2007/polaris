@@ -146,7 +146,7 @@ export function DnsTab({ serverId }: { serverId: string }) {
                             <h3 className="text-sm font-semibold text-foreground">{domain.name}</h3>
                             {domain.primary ? <Badge>{t("dns.firstDomain")}</Badge> : null}
                             {report ? <VerdictBadge verdict={report.verdict} /> : null}
-                            <div className="ml-auto flex flex-wrap items-center gap-2">
+                            <div className="ms-auto flex flex-wrap items-center gap-2">
                                 <Button
                                     size="sm"
                                     variant="outline"
@@ -225,10 +225,10 @@ function RecordTable({ domain, report }: { domain: Domain; report: Reports[numbe
         <div className="overflow-x-auto">
             <table className="w-full text-[0.8125rem]">
                 <thead>
-                    <tr className="text-left">
-                        <th className="py-1.5 pr-3">{t("dns.columns.record")}</th>
-                        <th className="py-1.5 pr-3">{t("dns.columns.nameValue")}</th>
-                        <th className="py-1.5 pr-3">{t("dns.columns.status")}</th>
+                    <tr className="text-start">
+                        <th className="py-1.5 pe-3">{t("dns.columns.record")}</th>
+                        <th className="py-1.5 pe-3">{t("dns.columns.nameValue")}</th>
+                        <th className="py-1.5 pe-3">{t("dns.columns.status")}</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -237,7 +237,7 @@ function RecordTable({ domain, report }: { domain: Domain; report: Reports[numbe
                             key={`${entry.record.type}-${entry.record.name}-${index}`}
                             className="align-top"
                         >
-                            <td className="py-2 pr-3">
+                            <td className="py-2 pe-3">
                                 <div className="flex flex-col">
                                     <span className="font-mono text-xs text-foreground">
                                         {entry.record.type}
@@ -247,7 +247,7 @@ function RecordTable({ domain, report }: { domain: Domain; report: Reports[numbe
                                     </span>
                                 </div>
                             </td>
-                            <td className="max-w-md py-2 pr-3">
+                            <td className="max-w-md py-2 pe-3">
                                 <div className="flex items-start gap-1">
                                     <Mono>{entry.record.name}</Mono>
                                     <CopyButton value={entry.record.name} />
@@ -262,7 +262,7 @@ function RecordTable({ domain, report }: { domain: Domain; report: Reports[numbe
                                     <CopyButton value={entry.record.value} />
                                 </div>
                             </td>
-                            <td className="py-2 pr-3">
+                            <td className="py-2 pe-3">
                                 <div className="flex flex-col gap-1">
                                     <VerdictBadge
                                         verdict={entry.checkable ? entry.verdict : "unverified"}
@@ -542,10 +542,10 @@ function PublishDialog({
                     <div className="max-h-[50vh] overflow-auto overscroll-contain">
                         <table className="w-full text-[0.8125rem]">
                             <thead>
-                                <tr className="text-left">
-                                    <th className="py-1.5 pr-3">{t("dns.columns.record")}</th>
-                                    <th className="py-1.5 pr-3">{t("dns.columns.value")}</th>
-                                    <th className="py-1.5 pr-3">{t("dns.columns.plan")}</th>
+                                <tr className="text-start">
+                                    <th className="py-1.5 pe-3">{t("dns.columns.record")}</th>
+                                    <th className="py-1.5 pe-3">{t("dns.columns.value")}</th>
+                                    <th className="py-1.5 pe-3">{t("dns.columns.plan")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
@@ -554,7 +554,7 @@ function PublishDialog({
                                         key={`${entry.record.type}-${entry.record.name}-${index}`}
                                         className="align-top"
                                     >
-                                        <td className="py-2 pr-3">
+                                        <td className="py-2 pe-3">
                                             <span className="font-mono text-xs">
                                                 {entry.record.type}
                                             </span>{" "}
@@ -562,7 +562,7 @@ function PublishDialog({
                                                 {entry.record.name}
                                             </Mono>
                                         </td>
-                                        <td className="max-w-xs py-2 pr-3">
+                                        <td className="max-w-xs py-2 pe-3">
                                             <Mono>{entry.value}</Mono>
                                             {entry.existing.length > 0 &&
                                             entry.action !== "unchanged" ? (
@@ -573,7 +573,7 @@ function PublishDialog({
                                                 </p>
                                             ) : null}
                                         </td>
-                                        <td className="py-2 pr-3">
+                                        <td className="py-2 pe-3">
                                             <Badge
                                                 variant={
                                                     entry.action === "conflict"
@@ -630,7 +630,7 @@ function PublishDialog({
                 ) : null}
                 <DialogFooter className="flex-wrap items-center gap-3">
                     {plan && !results && conflicts > 0 ? (
-                        <label className="mr-auto flex items-center gap-2 text-xs text-muted-foreground">
+                        <label className="me-auto flex items-center gap-2 text-xs text-muted-foreground">
                             <Checkbox
                                 checked={replace}
                                 onChange={(event) => setReplace(event.target.checked)}

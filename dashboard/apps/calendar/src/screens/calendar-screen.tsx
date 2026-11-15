@@ -1569,7 +1569,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                         <button
                             id="calendar-heading"
                             type="button"
-                            className="max-w-full truncate rounded px-1 text-left"
+                            className="max-w-full truncate rounded px-1 text-start"
                             aria-label={t("header.goTo", { label })}
                             title={t("header.goTo", { label })}
                             onClick={(event) =>
@@ -1675,7 +1675,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
             <div className="flex min-h-0 flex-1">
                 <aside
                     aria-label={t("header.calendars")}
-                    className="hidden w-64 shrink-0 overflow-y-auto overscroll-contain border-r border-border bg-surface lg:block"
+                    className="hidden w-64 shrink-0 overflow-y-auto overscroll-contain border-e border-border bg-surface lg:block"
                 >
                     {sidebar}
                 </aside>
@@ -1884,7 +1884,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                     aria-describedby={undefined}
                     className="left-0 top-0 h-[100dvh] max-h-none w-full max-w-none translate-x-0 translate-y-0 rounded-none p-0 sm:w-80"
                 >
-                    <DialogTitle className="border-b border-border px-4 py-3 pr-14">
+                    <DialogTitle className="border-b border-border px-4 py-3 pe-14">
                         {t("header.calendars")}
                     </DialogTitle>
                     {sidebar}

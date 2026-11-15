@@ -117,15 +117,15 @@ export function PolarisFootprintCard() {
                 {(footprint || loading) && (
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[38rem] text-sm">
-                            <thead className="text-left text-xs text-muted-foreground">
+                            <thead className="text-start text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="py-1 pr-3 font-medium">
+                                    <th className="py-1 pe-3 font-medium">
                                         {t("footprint.columns.part")}
                                     </th>
-                                    <th className="py-1 pr-3 font-medium">
+                                    <th className="py-1 pe-3 font-medium">
                                         {t("footprint.columns.cpu")}
                                     </th>
-                                    <th className="py-1 pr-3 font-medium">
+                                    <th className="py-1 pe-3 font-medium">
                                         {t("footprint.columns.memory")}
                                     </th>
                                     <th className="py-1 font-medium">
@@ -197,15 +197,15 @@ function Totals({ footprint }: { footprint: PolarisFootprint }) {
 function PartRowSkeleton() {
     return (
         <tr className="border-t border-border align-top">
-            <td className="py-2 pr-3">
+            <td className="py-2 pe-3">
                 <Skeleton className="h-4 w-28" />
                 <Skeleton className="mt-1 h-3 w-48" />
                 <Skeleton className="mt-1 h-3 w-24" />
             </td>
-            <td className="py-2 pr-3">
+            <td className="py-2 pe-3">
                 <Skeleton className="h-4 w-10" />
             </td>
-            <td className="py-2 pr-3">
+            <td className="py-2 pe-3">
                 <Skeleton className="h-4 w-14" />
             </td>
             <td className="py-2">
@@ -223,7 +223,7 @@ function PartRow({ part }: { part: FootprintPart }) {
     const words = partWords(t, part);
     return (
         <tr className="border-t border-border align-top">
-            <td className="py-2 pr-3">
+            <td className="py-2 pe-3">
                 <div className="font-medium">{words.label}</div>
                 {words.summary && (
                     <div className="text-xs text-muted-foreground">{words.summary}</div>
@@ -233,10 +233,10 @@ function PartRow({ part }: { part: FootprintPart }) {
                     {running ? "" : ` - ${part.state}`}
                 </div>
             </td>
-            <td className="py-2 pr-3 text-muted-foreground">
+            <td className="py-2 pe-3 text-muted-foreground">
                 {part.cpuPercent === null ? "-" : `${part.cpuPercent}%`}
             </td>
-            <td className="py-2 pr-3 text-muted-foreground">
+            <td className="py-2 pe-3 text-muted-foreground">
                 {part.memUsedBytes === null ? "-" : formatBytes(part.memUsedBytes)}
             </td>
             <td

@@ -110,7 +110,7 @@ function SentFile({
     const t = useTranslations("chat");
     const readable = previewableAs(file.name, file.contentType);
     const chip =
-        "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-left text-xs transition-colors hover:bg-card-hover";
+        "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-start text-xs transition-colors hover:bg-card-hover";
 
     if (!readable) {
         return (
@@ -473,7 +473,7 @@ export function MessageList({
                                 // in it, which is exactly what it is to them - and a
                                 // room where every mention of anybody was highlighted
                                 // for everybody would be a room of highlights.
-                                message.mentionsYou && "border-l-2 border-warning bg-warning-soft",
+                                message.mentionsYou && "border-s-2 border-warning bg-warning-soft",
                                 message.id === highlightId && "bg-primary/10"
                             )}
                         >
@@ -860,7 +860,7 @@ function Message({
         const server = gameServerIdIn(message.body);
         if (server) return <GameServerCard serverId={server} message={message} />;
         return (
-            <p className="py-1 pl-14 pr-4 text-xs text-muted-foreground">
+            <p className="py-1 ps-14 pe-4 text-xs text-muted-foreground">
                 <NoticeText message={message} /> <MessageTime iso={message.createdAt} />
             </p>
         );
@@ -873,7 +873,7 @@ function Message({
     // saying something happened here, not the thing itself.
     if (message.blocked && !revealed) {
         return (
-            <p className="flex items-baseline gap-2 py-1 pl-14 pr-4 text-xs text-muted-foreground">
+            <p className="flex items-baseline gap-2 py-1 ps-14 pe-4 text-xs text-muted-foreground">
                 <span>{t("messageList.blockedMessage")}</span>
                 <button
                     type="button"
@@ -897,7 +897,7 @@ function Message({
                     ref={swipe.cue}
                     aria-hidden
                     data-armed="false"
-                    className="pointer-events-none absolute left-4 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-muted-foreground opacity-0 data-[armed=true]:bg-primary data-[armed=true]:text-primary-foreground"
+                    className="pointer-events-none absolute start-4 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-muted-foreground opacity-0 data-[armed=true]:bg-primary data-[armed=true]:text-primary-foreground"
                 >
                     <CornerUpLeft className="size-4" />
                 </span>
@@ -1042,7 +1042,7 @@ function Message({
                                                     event.currentTarget
                                                 )
                                             }
-                                            className="rounded text-left text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
+                                            className="rounded text-start text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
                                         >
                                             <PersonName id={message.authorId} name={author} />
                                         </button>
@@ -1066,7 +1066,7 @@ function Message({
                                             disabled={direct.busy}
                                             title={t("messageList.messageNamed", { name: author })}
                                             onClick={() => void direct.open(writer)}
-                                            className="rounded text-left text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
+                                            className="rounded text-start text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
                                         >
                                             <PersonName id={message.authorId} name={author} />
                                         </button>
@@ -1140,7 +1140,7 @@ function Message({
                                         type="button"
                                         onClick={() => setShowingHistory(true)}
                                         title={t("messageList.seeWhatItSaidBefore")}
-                                        className="ml-1 rounded text-[0.6875rem] text-foreground-subtle underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+                                        className="ms-1 rounded text-[0.6875rem] text-foreground-subtle underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
                                     >
                                         (edited)
                                     </button>
@@ -1335,7 +1335,7 @@ function Message({
                     </div>
 
                     {canPost && !message.deleted && (
-                        <div className="absolute right-3 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border bg-elevated p-0.5 shadow-popover group-focus-within:flex group-hover:flex group-data-[state=open]:flex has-[[aria-expanded=true]]:flex">
+                        <div className="absolute end-3 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border bg-elevated p-0.5 shadow-popover group-focus-within:flex group-hover:flex group-data-[state=open]:flex has-[[aria-expanded=true]]:flex">
                             {quick.slice(0, QUICK_COUNT).map((choice) => {
                                 const ref = core.parseCustomEmojiToken(choice);
                                 const named = ref ? core.customEmojiFallback(ref) : choice;
@@ -1583,7 +1583,7 @@ function KeepableImage({
                 title={kept ? t("messageList.keptItIsInYour") : t("messageList.keepThis")}
                 onClick={() => void toggle()}
                 className={cn(
-                    "absolute right-1 top-1 rounded-md border border-border bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/pic:opacity-100",
+                    "absolute end-1 top-1 rounded-md border border-border bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/pic:opacity-100",
                     kept === true && "text-primary opacity-100"
                 )}
             >
@@ -1673,7 +1673,7 @@ function Ticks({
             aria-label={t("messageList.stateInfo", { label })}
             onClick={onOpen}
             className={cn(
-                "ml-1 inline-flex rounded align-middle transition-colors hover:text-foreground",
+                "ms-1 inline-flex rounded align-middle transition-colors hover:text-foreground",
                 receipt === "read" ? "text-primary" : "text-foreground-subtle"
             )}
         >
@@ -1961,7 +1961,7 @@ function QuotedMessageCard({
             channelId={reference.channelId}
             here={here?.channelId ?? null}
             onJumpTo={onJumpTo}
-            className="block max-w-md rounded-md border-l-2 border-primary bg-primary/5 px-3 py-2 no-underline transition-colors hover:bg-primary/10"
+            className="block max-w-md rounded-md border-s-2 border-primary bg-primary/5 px-3 py-2 no-underline transition-colors hover:bg-primary/10"
         >
             {from && (
                 <span className="mb-0.5 block truncate text-[0.6875rem] text-foreground-subtle">

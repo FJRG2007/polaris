@@ -683,7 +683,7 @@ export function CallGameOffer({ activity }: { activity: CallActivity }) {
                     {t("callGames.playing", { count: session.players.length })}
                 </span>
             </span>
-            <ul className="flex shrink-0 -space-x-1.5" aria-label={t("activityCard.whoIsPlaying")}>
+            <ul className="flex shrink-0 -space-x-1.5 rtl:space-x-reverse" aria-label={t("activityCard.whoIsPlaying")}>
                 {session.players.slice(0, 6).map((seat) => (
                     <li
                         key={seat}

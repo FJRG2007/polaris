@@ -136,12 +136,12 @@ export function SpigotPluginsCard({
                 </p>
 
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder={t("spigot.searchSpigotmc")}
-                        className="pl-8"
+                        className="ps-8"
                     />
                 </div>
 
@@ -236,7 +236,7 @@ function PluginRow({
                         className="text-sm font-medium hover:underline"
                     >
                         {plugin.name}
-                        <ExternalLink className="ml-1 inline size-3 shrink-0" />
+                        <ExternalLink className="ms-1 inline size-3 shrink-0" />
                     </a>
                     {newest && (
                         <Badge variant="neutral">{t("spigot.testedTo", { version: newest })}</Badge>

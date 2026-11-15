@@ -85,7 +85,7 @@ export function MeetingsView() {
                 <Link
                     href="/chat"
                     aria-label={t("channelHeader.backToConversations")}
-                    className="-ml-1.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+                    className="-ms-1.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
                 >
                     <ArrowLeft className="size-4" />
                 </Link>

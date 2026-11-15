@@ -458,14 +458,14 @@ export function VariablesEditor({
             </div>
             {list.length > 0 && (
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         type="search"
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder={t("variables.search")}
                         aria-label={t("variables.search")}
-                        className="h-8 pl-8 text-xs"
+                        className="h-8 ps-8 text-xs"
                     />
                 </div>
             )}
@@ -853,7 +853,7 @@ export function VariablesEditor({
             {canWrite && (count > 0 || draft.added.length > 0) && (
                 <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-border-strong bg-elevated px-3 py-2 shadow-popover">
                     <span className="text-sm">{t("variables.unsaved", { count })}</span>
-                    <div className="ml-auto flex flex-wrap items-center gap-2">
+                    <div className="ms-auto flex flex-wrap items-center gap-2">
                         <Button
                             variant="ghost"
                             size="sm"

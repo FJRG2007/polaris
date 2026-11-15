@@ -2151,7 +2151,7 @@ export function FilesView({
     return (
         <>
             {viewerTarget ? (
-                <div className="flex min-w-0 flex-1 flex-col lg:pr-72">
+                <div className="flex min-w-0 flex-1 flex-col lg:pe-72">
                     <div className="mb-3 flex items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-2">
                             <Button size="sm" variant="ghost" onClick={closeViewer}>
@@ -2216,7 +2216,7 @@ export function FilesView({
             <div
                 className={cn(
                     "flex min-w-0 flex-1 flex-col",
-                    !inTrash && selectedEntries.length === 1 && "lg:pr-72",
+                    !inTrash && selectedEntries.length === 1 && "lg:pe-72",
                     viewerTarget && "hidden"
                 )}
             >
@@ -2467,14 +2467,14 @@ export function FilesView({
 
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                     <div className="relative min-w-[12rem] flex-1">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             data-tour="drive.search"
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={t("filesView.search.placeholder")}
                             title={t("filesView.search.help")}
-                            className={cn("pl-8 pr-9", searchError && "border-danger")}
+                            className={cn("ps-8 pe-9", searchError && "border-danger")}
                         />
                         {inTrash ? null : (
                             <button
@@ -2491,7 +2491,7 @@ export function FilesView({
                                         : t("filesView.search.current")
                                 }
                                 className={cn(
-                                    "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted",
+                                    "absolute end-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted",
                                     searchScope === "recursive"
                                         ? "text-primary"
                                         : "text-muted-foreground"
@@ -2540,7 +2540,7 @@ export function FilesView({
                                     >
                                         {sortLabel(t, key)}
                                         {sortKey === key ? (
-                                            <span className="ml-auto pl-6 text-[0.6875rem] text-foreground-subtle">
+                                            <span className="ms-auto ps-6 text-[0.6875rem] text-foreground-subtle">
                                                 {sortDir === "asc"
                                                     ? t("filesView.sort.ascending")
                                                     : t("filesView.sort.descending")}
@@ -2723,7 +2723,7 @@ export function FilesView({
                             <span className="min-w-0 max-w-full shrink-0 truncate font-medium" title={t("filesView.tally.selected", { count: selectedEntries.length })}>
                                 {t("filesView.tally.selected", { count: selectedEntries.length })}
                             </span>
-                            <div className="ml-auto flex items-center gap-1">
+                            <div className="ms-auto flex items-center gap-1">
                                 {trash ? (
                                     <>
                                         {trash.onRestore ? (
@@ -2884,7 +2884,7 @@ export function FilesView({
                             ) : (
                                 <div>
                                     {viewMode === "list" ? (
-                                        <div className="flex h-9 items-center border-b border-border text-left text-xs font-medium text-muted-foreground">
+                                        <div className="flex h-9 items-center border-b border-border text-start text-xs font-medium text-muted-foreground">
                                             <div className="flex w-9 shrink-0 items-center justify-center">
                                                 <label className="flex cursor-pointer items-center">
                                                     <Checkbox
@@ -3177,7 +3177,7 @@ export function FilesView({
                                             >
                                                 {marqueeRect ? (
                                                     <div
-                                                        className="pointer-events-none absolute left-0 right-0 z-10 rounded-sm border border-primary/60 bg-primary/10"
+                                                        className="pointer-events-none absolute start-0 end-0 z-10 rounded-sm border border-primary/60 bg-primary/10"
                                                         style={{
                                                             top: `${marqueeRect.top}px`,
                                                             height: `${marqueeRect.height}px`
@@ -3671,7 +3671,7 @@ export function FilesView({
             {!inTrash && selectedEntries.length === 1 && selectedEntries[0] ? (
                 // Fixed to the viewport, not stuck inside the scrolling content:
                 // its top is the connection strip above the shell plus the header.
-                <aside className="fixed right-0 top-[calc(var(--connection-banner-height,0px)+var(--header-height))] bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto overscroll-contain border-l border-border bg-surface/40 p-4 lg:flex">
+                <aside className="fixed end-0 top-[calc(var(--connection-banner-height,0px)+var(--header-height))] bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto overscroll-contain border-s border-border bg-surface/40 p-4 lg:flex">
                     <div className="flex flex-col items-center gap-2 text-center">
                         {/* The file, not a mark standing for its type. This panel
                             exists to answer "which one is this", and for a
@@ -3699,7 +3699,7 @@ export function FilesView({
                     <dl className="flex flex-col gap-2 text-xs">
                         <div className="flex justify-between gap-2">
                             <dt className="text-muted-foreground">{t("filesView.panel.type")}</dt>
-                            <dd className="truncate text-right">
+                            <dd className="truncate text-end">
                                 {selectedEntries[0].kind === "dir"
                                     ? t("filesView.panel.folder")
                                     : extensionOf(selectedEntries[0].name)
@@ -3713,13 +3713,13 @@ export function FilesView({
                         </div>
                         <div className="flex justify-between gap-2">
                             <dt className="text-muted-foreground">{t("filesView.panel.size")}</dt>
-                            <dd className="text-right" title={sizeTitle(selectedEntries[0])}>
+                            <dd className="text-end" title={sizeTitle(selectedEntries[0])}>
                                 {sizeLabel(selectedEntries[0])}
                             </dd>
                         </div>
                         <div className="flex justify-between gap-2">
                             <dt className="text-muted-foreground">{t("filesView.panel.owner")}</dt>
-                            <dd className="truncate text-right">
+                            <dd className="truncate text-end">
                                 {selectedEntries[0].owner ?? t("filesView.panel.unknown")}
                             </dd>
                         </div>

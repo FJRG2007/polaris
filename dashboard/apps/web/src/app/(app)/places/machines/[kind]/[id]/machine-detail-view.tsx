@@ -277,7 +277,7 @@ function AlarmHistory({ history }: { history: { since: number; events: AlarmEven
             ) : (
                 <div className="overflow-x-auto rounded-md border border-border/60">
                     <table className="w-full text-sm">
-                        <thead className="text-left text-xs text-muted-foreground">
+                        <thead className="text-start text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-3 py-2 font-normal">{t("machines.alarm")}</th>
                                 <th className="px-3 py-2 font-normal">{t("machines.started")}</th>

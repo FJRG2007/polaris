@@ -63,7 +63,7 @@ export function VoiceStateIcons({ person, className }: { person: Seated; classNa
             ? t("roster.deafenedByModerator")
             : t("roster.mutedByModerator");
         return (
-            <span role="img" aria-label={words} title={words} className="ml-auto shrink-0">
+            <span role="img" aria-label={words} title={words} className="ms-auto shrink-0">
                 <Icon className={cn("size-3 text-danger", className)} />
             </span>
         );
@@ -73,7 +73,7 @@ export function VoiceStateIcons({ person, className }: { person: Seated; classNa
     const Icon = badge === "deafened" ? HeadphoneOff : MicOff;
     const words = badge === "deafened" ? t("roster.notListening") : t("roster.microphoneOff");
     return (
-        <span role="img" aria-label={words} title={words} className="ml-auto shrink-0">
+        <span role="img" aria-label={words} title={words} className="ms-auto shrink-0">
             <Icon className={cn("size-3 text-muted-foreground", className)} />
         </span>
     );

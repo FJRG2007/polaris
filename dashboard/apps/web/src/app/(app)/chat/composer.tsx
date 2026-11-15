@@ -1519,7 +1519,7 @@ export function Composer({
                         </>
                     )}
 
-                    <span className="ml-auto flex items-center gap-2">
+                    <span className="ms-auto flex items-center gap-2">
                         {typed > rules.maxMessageLength - COUNTER_WITHIN && (
                             <span
                                 className={cn(
@@ -1709,7 +1709,7 @@ function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => vo
                 title={t("composer.recordAVoiceMessage")}
                 className={cn(
                     "rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50",
-                    many && "rounded-r-none pr-1"
+                    many && "rounded-e-none pe-1"
                 )}
             >
                 <Mic className="size-4" />
@@ -1722,7 +1722,7 @@ function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => vo
                             disabled={disabled}
                             aria-label={t("composer.microphoneSettings")}
                             title={t("composer.microphoneSettings")}
-                            className="rounded rounded-l-none py-1.5 pl-0.5 pr-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                            className="rounded rounded-s-none py-1.5 ps-0.5 pe-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                         >
                             <ChevronDown className="size-3" />
                         </button>

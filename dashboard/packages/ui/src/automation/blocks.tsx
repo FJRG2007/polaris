@@ -173,7 +173,7 @@ export function BlockRow({
                 aria-pressed={selected ?? false}
                 onClick={onSelect}
                 onKeyDown={onKeyDown}
-                className="flex min-h-9 min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-1.5 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-h-9 min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-1.5 py-1 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 {icon && (
                     <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">
@@ -223,7 +223,7 @@ function Hint({ spec }: { spec: string }) {
     useEffect(() => setText(formatShortcut(spec, applePlatform())), [spec]);
     if (!text) return null;
     return (
-        <span className="ml-auto pl-4 text-[0.6875rem] tabular-nums text-muted-foreground [@media(pointer:coarse)]:hidden">
+        <span className="ms-auto ps-4 text-[0.6875rem] tabular-nums text-muted-foreground [@media(pointer:coarse)]:hidden">
             {text}
         </span>
     );
@@ -484,7 +484,7 @@ export function BlockPanel({
                         setWidth(null);
                         forgetSize(sizeKey);
                     }}
-                    className="absolute inset-y-0 left-0 z-10"
+                    className="absolute inset-y-0 start-0 z-10"
                 />
                 {heading}
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
@@ -601,7 +601,7 @@ export function BlockTextDialog({
                             <Button
                                 type="button"
                                 variant="ghost"
-                                className="sm:mr-auto"
+                                className="sm:me-auto"
                                 onClick={() => {
                                     onSave(undefined);
                                     onClose();
@@ -664,7 +664,7 @@ export function UnsavedChangesDialog({
                     <DialogDescription>{isNew ? strings.newBody : strings.body}</DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
-                    <Button variant="ghost" className="sm:mr-auto" onClick={onStay}>
+                    <Button variant="ghost" className="sm:me-auto" onClick={onStay}>
                         {strings.stay}
                     </Button>
                     <Button variant="outline" onClick={onDiscard}>

@@ -92,7 +92,7 @@ export function ShortcutsWidget({
                             onClick={() => onRemove(shortcut.href)}
                             title={t("shortcuts.unpin", { name: shortcut.label })}
                             aria-label={t("shortcuts.unpin", { name: shortcut.label })}
-                            className="absolute right-1 top-1 grid size-6 place-items-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                            className="absolute end-1 top-1 grid size-6 place-items-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                         >
                             <X className="size-3.5" aria-hidden="true" />
                         </button>

@@ -215,13 +215,13 @@ export function CreateTaskDialog({
                                 {t("task.list")}
                             </span>
                             <div className="relative">
-                                <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                                 <Input
                                     value={query}
                                     onChange={(event) => setQuery(event.target.value)}
                                     placeholder={t("task.findList")}
                                     aria-label={t("task.findList")}
-                                    className="pl-7"
+                                    className="ps-7"
                                 />
                             </div>
                             <ul
@@ -246,7 +246,7 @@ export function CreateTaskDialog({
                                                 aria-selected={list.id === listId}
                                                 onClick={() => setListId(list.id)}
                                                 className={cn(
-                                                    "flex w-full min-w-0 items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-muted",
+                                                    "flex w-full min-w-0 items-center gap-2 px-3 py-1.5 text-start text-sm transition-colors hover:bg-muted",
                                                     list.id === listId && "bg-muted"
                                                 )}
                                             >

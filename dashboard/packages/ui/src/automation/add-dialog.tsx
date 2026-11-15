@@ -126,7 +126,7 @@ function Option({
                 aria-current={selected || undefined}
                 onClick={onPick}
                 className={cn(
-                    "flex w-full min-w-0 items-start gap-3 rounded-md px-2.5 py-2 text-left outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex w-full min-w-0 items-start gap-3 rounded-md px-2.5 py-2 text-start outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
                     selected && "bg-muted"
                 )}
             >
@@ -397,14 +397,14 @@ export function AddBlockDialog({
                 </header>
                 <div className="flex flex-col gap-2 border-b border-border px-3 py-2">
                     <div className="relative">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             ref={searchRef}
                             type="search"
                             value={term}
                             placeholder={strings.search}
                             aria-label={strings.search}
-                            className="pl-8"
+                            className="ps-8"
                             onChange={(event) => setTerm(event.target.value)}
                             onKeyDown={onSearchKey}
                         />
@@ -456,7 +456,7 @@ export function AddBlockDialog({
                             onKeyDown={onListKey}
                             className={cn(
                                 "min-h-0 overflow-y-auto overscroll-contain p-1.5",
-                                wide ? "w-56 shrink-0 border-r border-border" : "flex-1"
+                                wide ? "w-56 shrink-0 border-e border-border" : "flex-1"
                             )}
                         >
                             {leftGroups.map((each, index) => (
@@ -480,7 +480,7 @@ export function AddBlockDialog({
                                             setTarget(null);
                                         }}
                                         className={cn(
-                                            "flex w-full min-w-0 items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                                            "flex w-full min-w-0 items-center gap-2 rounded-md px-2.5 py-1.5 text-start text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
                                             chosen?.id === each.id && "bg-muted font-medium"
                                         )}
                                     >

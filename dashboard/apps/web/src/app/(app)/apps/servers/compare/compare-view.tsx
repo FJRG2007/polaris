@@ -234,15 +234,15 @@ export function CompareView({
                         <div className="overflow-x-auto overscroll-x-contain">
                             <table className="w-full min-w-[22rem] text-sm">
                                 <thead>
-                                    <tr className="text-left text-xs text-muted-foreground">
-                                        <th scope="col" className="py-1.5 pr-3 font-medium">
+                                    <tr className="text-start text-xs text-muted-foreground">
+                                        <th scope="col" className="py-1.5 pe-3 font-medium">
                                             {t("compare.server")}
                                         </th>
                                         {METRICS.map((metric) => (
                                             <th
                                                 key={metric}
                                                 scope="col"
-                                                className="py-1.5 pr-3 text-right font-medium"
+                                                className="py-1.5 pe-3 text-end font-medium"
                                             >
                                                 {t(`metrics.${metric}`)}
                                             </th>
@@ -259,7 +259,7 @@ export function CompareView({
                                             <tr key={id}>
                                                 <th
                                                     scope="row"
-                                                    className="max-w-[10rem] py-2 pr-3 text-left font-normal"
+                                                    className="max-w-[10rem] py-2 pe-3 text-start font-normal"
                                                 >
                                                     <Link
                                                         href={`/apps/servers/${encodeURIComponent(id)}`}
@@ -275,11 +275,11 @@ export function CompareView({
                                                 {METRICS.map((metric) => (
                                                     <td
                                                         key={metric}
-                                                        className="py-2 pr-3 text-right tabular-nums"
+                                                        className="py-2 pe-3 text-end tabular-nums"
                                                     >
                                                         {points === null ? (
                                                             loading ? (
-                                                                <Skeleton className="ml-auto h-4 w-12" />
+                                                                <Skeleton className="ms-auto h-4 w-12" />
                                                             ) : null
                                                         ) : (
                                                             (formatMetric(

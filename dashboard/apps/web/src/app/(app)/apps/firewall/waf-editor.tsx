@@ -634,14 +634,14 @@ export function WafEditor({
             <div className="flex flex-wrap items-center gap-2">
                 <div className="relative min-w-0 flex-1 basis-64">
                     <Search
-                        className="pointer-events-none absolute left-2.5 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground"
+                        className="pointer-events-none absolute start-2.5 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground"
                         aria-hidden="true"
                     />
                     <Input
                         value={search}
                         aria-label={t("search.label")}
                         placeholder={t("search.label")}
-                        className="pl-8"
+                        className="ps-8"
                         onChange={(event) => setSearch(event.target.value)}
                     />
                 </div>

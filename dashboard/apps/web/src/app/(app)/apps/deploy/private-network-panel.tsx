@@ -545,7 +545,7 @@ function RenameForm({
                         aria-invalid={Boolean(message)}
                         className="min-w-0 flex-1 border-0 font-mono focus-visible:ring-0"
                     />
-                    <span className="shrink-0 pr-2 font-mono text-sm text-muted-foreground">
+                    <span className="shrink-0 pe-2 font-mono text-sm text-muted-foreground">
                         .polaris.internal
                     </span>
                 </div>

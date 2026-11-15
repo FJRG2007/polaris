@@ -78,7 +78,7 @@ export function FolderPicker({
                     </Button>
                     <span className="truncate text-xs text-muted-foreground">/{path}</span>
                     {busy && (
-                        <Loader2 className="ml-auto size-4 animate-spin text-muted-foreground" />
+                        <Loader2 className="ms-auto size-4 animate-spin text-muted-foreground" />
                     )}
                 </div>
                 {error && <p className="text-xs text-danger">{error}</p>}
@@ -91,7 +91,7 @@ export function FolderPicker({
                             key={name}
                             type="button"
                             onClick={() => void load(path ? `${path}/${name}` : name)}
-                            className="flex w-full items-center gap-2 border-b border-border/40 px-3 py-1.5 text-left text-sm transition-colors last:border-0 hover:bg-muted"
+                            className="flex w-full items-center gap-2 border-b border-border/40 px-3 py-1.5 text-start text-sm transition-colors last:border-0 hover:bg-muted"
                         >
                             <Folder className="size-4 shrink-0 text-sky-400" /> {name}
                         </button>

@@ -150,7 +150,7 @@ export function McpScopeChecklist({
                                         return next;
                                     })
                                 }
-                                className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm"
+                                className="flex min-w-0 flex-1 items-center gap-2 text-start text-sm"
                             >
                                 <PolarisAppIcon appId={CATEGORY_APPS[category]} label={label} />
                                 <span className="min-w-0 flex-1 truncate font-medium" title={label}>
@@ -174,7 +174,7 @@ export function McpScopeChecklist({
                             </button>
                         </div>
                         {expanded ? (
-                            <ul className="flex flex-col gap-1.5 px-3 pb-3 pl-9">
+                            <ul className="flex flex-col gap-1.5 px-3 pb-3 ps-9">
                                 {scopes.map((scope) => {
                                     const source = impliedSource(scope);
                                     const showing = abilities !== undefined && explained.has(scope);
@@ -249,7 +249,7 @@ export function McpScopeChecklist({
                                                 <ScopeAbilityList
                                                     scope={scope}
                                                     abilities={abilities?.[scope] ?? []}
-                                                    className="ml-6"
+                                                    className="ms-6"
                                                 />
                                             ) : null}
                                         </li>
@@ -296,7 +296,7 @@ export function ScopeAbilityList({
                 groups.map((group) => (
                     <div key={group.key} className="flex min-w-0 flex-col gap-1">
                         <span className="font-medium">{group.title}</span>
-                        <ul className="flex list-disc flex-col gap-0.5 pl-4 text-muted-foreground">
+                        <ul className="flex list-disc flex-col gap-0.5 ps-4 text-muted-foreground">
                             {group.items.map((ability) => (
                                 <li key={ability.name} className="break-words">
                                     {ability.label}

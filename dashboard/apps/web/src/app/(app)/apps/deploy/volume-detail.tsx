@@ -240,7 +240,7 @@ export function VolumeDetailDialog({
                         onClick={() => setFull((value) => !value)}
                         title={full ? t("volume.exitFullScreen") : t("volume.fullScreen")}
                         aria-label={full ? t("volume.exitFullScreen") : t("volume.fullScreen")}
-                        className="mr-8 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className="me-8 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         {full ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
                     </button>

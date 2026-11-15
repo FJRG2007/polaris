@@ -439,7 +439,7 @@ export function Avatar({
                     <span
                         aria-label={words}
                         title={words}
-                        className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-danger text-danger-foreground ring-2 ring-background"
+                        className="absolute -bottom-0.5 -end-0.5 grid place-items-center rounded-full bg-danger text-danger-foreground ring-2 ring-background"
                         style={{ width: dotSize(size) + 6, height: dotSize(size) + 6 }}
                     >
                         <Icon className="size-[62%]" />
@@ -482,7 +482,7 @@ export function Avatar({
                 <span
                     aria-label={t("avatar.onCall")}
                     title={t("avatar.onCall")}
-                    className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-background ring-1 ring-background"
+                    className="absolute -bottom-0.5 -end-0.5 grid place-items-center rounded-full bg-background ring-1 ring-background"
                     style={{ width: dotSize(size) + 3, height: dotSize(size) + 3 }}
                 >
                     <Volume2 className="size-full p-px text-success" />
@@ -492,7 +492,7 @@ export function Avatar({
                     aria-label={autoWord ?? t(`presence.${where.status}`)}
                     title={autoWord ?? t(`presence.${where.status}`)}
                     className={cn(
-                        "absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-background",
+                        "absolute -bottom-0.5 -end-0.5 rounded-full ring-2 ring-background",
                         PRESENCE_COLOURS[where.status]
                     )}
                     style={{ width: dotSize(size), height: dotSize(size) }}
@@ -576,7 +576,7 @@ export function AvatarStack({
         // and a row of faces that do not reads as a list. The ring is what keeps
         // it legible - without a stroke in the page's own colour between them,
         // three overlapping circles are one shape.
-        <span className={cn("flex items-center -space-x-2", className)}>
+        <span className={cn("flex items-center -space-x-2 rtl:space-x-reverse", className)}>
             {shown.map((person) => (
                 <span
                     key={person.id}

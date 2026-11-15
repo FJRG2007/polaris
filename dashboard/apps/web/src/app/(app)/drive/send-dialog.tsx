@@ -163,7 +163,7 @@ export function SendDialog({
                                         onClick={() => pick(one)}
                                         title={t("send.removeNamed", { name: one.name })}
                                         aria-label={t("send.removeNamed", { name: one.name })}
-                                        className="flex max-w-52 items-center gap-1.5 rounded-full bg-primary/10 py-1 pl-2.5 pr-2 text-xs hover:bg-primary/20"
+                                        className="flex max-w-52 items-center gap-1.5 rounded-full bg-primary/10 py-1 ps-2.5 pe-2 text-xs hover:bg-primary/20"
                                     >
                                         {one.isOrg ? (
                                             <Building2 className="size-3 shrink-0 text-muted-foreground" />
@@ -190,7 +190,7 @@ export function SendDialog({
                                     onClick={() => pick(candidate)}
                                     disabled={!candidate.allowed}
                                     aria-pressed={picked}
-                                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
+                                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm ${
                                         picked ? "bg-primary/10" : "hover:bg-muted"
                                     } ${candidate.allowed ? "" : "opacity-50"}`}
                                 >

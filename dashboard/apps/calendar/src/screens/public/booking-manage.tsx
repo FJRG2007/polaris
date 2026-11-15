@@ -241,7 +241,7 @@ export function BookingManage({ token, booking }: { token: string; booking: Mana
                             />
                             {picked ? (
                                 <div className="flex flex-wrap items-center justify-end gap-2">
-                                    <span className="mr-auto text-muted-foreground">
+                                    <span className="me-auto text-muted-foreground">
                                         {formatRange(picked.start, picked.end, zone, locale)}
                                     </span>
                                     <Button size="sm" disabled={busy} onClick={() => void move()}>

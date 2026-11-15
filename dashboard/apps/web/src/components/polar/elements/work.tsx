@@ -122,7 +122,7 @@ export function Work({
                 />
             </button>
             {open ? (
-                <div id={id} className="mt-1 flex flex-col gap-1.5 border-l border-border pl-3">
+                <div id={id} className="mt-1 flex flex-col gap-1.5 border-s border-border ps-3">
                     {children}
                 </div>
             ) : null}

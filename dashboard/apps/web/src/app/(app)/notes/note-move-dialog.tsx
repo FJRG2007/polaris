@@ -238,7 +238,7 @@ function Destination({
             disabled={busy || here}
             onClick={onSelect}
             style={{ paddingLeft: `${0.5 + depth * 0.75}rem` }}
-            className="flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
+            className="flex w-full items-center gap-2 rounded-md py-1.5 pe-2 text-start text-sm transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
         >
             {icon}
             <span className="flex min-w-0 flex-1 flex-col">

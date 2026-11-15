@@ -163,7 +163,7 @@ export function FivemResources({
                 <p className="text-sm text-muted-foreground">
                     {t("resources.whatThisServerRunsA")}
                 </p>
-                <div className="ml-auto flex items-center gap-1">
+                <div className="ms-auto flex items-center gap-1">
                     {applicationId && (
                         <Link href={`/drive?c=container:${applicationId}&p=/config/resources`}>
                             <Button size="sm" variant="secondary">

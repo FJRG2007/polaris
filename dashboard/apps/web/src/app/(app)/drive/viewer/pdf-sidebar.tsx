@@ -49,7 +49,7 @@ export function PdfSidebar({
         <aside
             aria-hidden={!open}
             className={cn(
-                "shrink-0 overflow-hidden border-r border-border bg-surface transition-[width] duration-200",
+                "shrink-0 overflow-hidden border-e border-border bg-surface transition-[width] duration-200",
                 open ? "w-[168px]" : "w-0"
             )}
         >
@@ -154,7 +154,7 @@ function OutlineTree({
     depth: number;
 }) {
     return (
-        <ul className={cn(depth > 0 && "ml-2 border-l border-border pl-2")}>
+        <ul className={cn(depth > 0 && "ms-2 border-s border-border ps-2")}>
             {items.map((item, index) => (
                 <li key={`${item.title}-${index}`}>
                     {item.url ? (
@@ -162,7 +162,7 @@ function OutlineTree({
                             href={item.url}
                             target="_blank"
                             rel="noopener noreferrer nofollow"
-                            className="block rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                            className="block rounded px-1.5 py-1 text-start text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground"
                         >
                             {item.title}
                         </a>
@@ -170,7 +170,7 @@ function OutlineTree({
                         <button
                             type="button"
                             onClick={() => pdfSlick?.linkService.goToDestination(item.dest)}
-                            className="block w-full rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                            className="block w-full rounded px-1.5 py-1 text-start text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground"
                         >
                             {item.title}
                         </button>

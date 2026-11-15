@@ -102,21 +102,21 @@ function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
             <h2 className="text-sm font-medium">{t("billing.owners.title")}</h2>
             <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full min-w-[32rem] text-sm">
-                    <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">
                                 {t("billing.owners.owner")}
                             </th>
-                            <th className="px-3 py-2 font-medium text-right">
+                            <th className="px-3 py-2 font-medium text-end">
                                 {t("billing.owners.projects")}
                             </th>
-                            <th className="px-3 py-2 font-medium text-right">
+                            <th className="px-3 py-2 font-medium text-end">
                                 {t("billing.owners.cpu")}
                             </th>
-                            <th className="px-3 py-2 font-medium text-right">
+                            <th className="px-3 py-2 font-medium text-end">
                                 {t("billing.owners.cost")}
                             </th>
-                            <th className="px-3 py-2 font-medium text-right">
+                            <th className="px-3 py-2 font-medium text-end">
                                 {t("billing.owners.budget")}
                             </th>
                         </tr>
@@ -146,19 +146,19 @@ function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
                                           <td className="w-full max-w-0 px-3 py-2">
                                               <OwnerName owner={entry.owner} />
                                           </td>
-                                          <td className="px-3 py-2 text-right tabular-nums">
+                                          <td className="px-3 py-2 text-end tabular-nums">
                                               {entry.projects}
                                           </td>
-                                          <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                                          <td className="px-3 py-2 text-end tabular-nums whitespace-nowrap">
                                               {t("billing.owners.cpuHours", {
                                                   hours: parts.quantity(entry.usage.cpuHours)
                                               })}
                                           </td>
-                                          <td className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap">
+                                          <td className="px-3 py-2 text-end font-medium tabular-nums whitespace-nowrap">
                                               {entry.cost ? format.currency(entry.cost.total) : "-"}
                                           </td>
                                           <td
-                                              className={`px-3 py-2 text-right tabular-nums whitespace-nowrap ${
+                                              className={`px-3 py-2 text-end tabular-nums whitespace-nowrap ${
                                                   level >= 100
                                                       ? "text-danger"
                                                       : level >= 80

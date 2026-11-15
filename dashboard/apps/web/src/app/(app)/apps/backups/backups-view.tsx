@@ -339,12 +339,12 @@ function ProtectedTable({
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
                 <div className="relative min-w-48 flex-1">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder={t("table.search")}
-                        className="pl-8"
+                        className="ps-8"
                         aria-label={t("table.search")}
                     />
                 </div>
@@ -373,7 +373,7 @@ function ProtectedTable({
             <Card>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                        <thead className="border-b border-border text-left text-xs text-muted-foreground">
+                        <thead className="border-b border-border text-start text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-3 py-2 font-medium">{t("table.columns.name")}</th>
                                 <th className="px-3 py-2 font-medium">{t("table.columns.type")}</th>
@@ -382,10 +382,10 @@ function ProtectedTable({
                                     {t("table.columns.lastCopy")}
                                 </th>
                                 <th className="px-3 py-2 font-medium">{t("table.columns.next")}</th>
-                                <th className="px-3 py-2 text-right font-medium">
+                                <th className="px-3 py-2 text-end font-medium">
                                     {t("summary.copies")}
                                 </th>
-                                <th className="px-3 py-2 text-right font-medium">
+                                <th className="px-3 py-2 text-end font-medium">
                                     {t("table.columns.size")}
                                 </th>
                                 <th className="px-3 py-2 font-medium">{t("tabs.destinations")}</th>
@@ -557,8 +557,8 @@ function ResourceLine({
                             <span className="text-xs">-</span>
                         )}
                     </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{row.copyCount}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                    <td className="px-3 py-2.5 text-end tabular-nums">{row.copyCount}</td>
+                    <td className="px-3 py-2.5 text-end tabular-nums text-muted-foreground">
                         {formatBytes(BigInt(row.sizeBytes))}
                     </td>
                     <td className="px-3 py-2.5 text-xs text-muted-foreground">

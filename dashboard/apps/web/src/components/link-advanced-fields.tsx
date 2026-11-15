@@ -292,7 +292,7 @@ export function LinkAdvancedFields({
                                     htmlFor={`${idPrefix}-password`}
                                 >
                                     <span className="text-xs text-muted-foreground">
-                                        <Lock className="mr-1 inline size-3" aria-hidden />
+                                        <Lock className="me-1 inline size-3" aria-hidden />
                                         {passwordSet
                                             ? t("linkAdvanced.replacePassword")
                                             : t("linkAdvanced.password")}

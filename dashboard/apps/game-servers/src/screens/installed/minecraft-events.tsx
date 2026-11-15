@@ -1151,7 +1151,7 @@ export function MinecraftEvents({
                                     className="flex items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-1.5"
                                 >
                                     <span className="min-w-0 truncate">
-                                        <span className="mr-2 tabular-nums text-muted-foreground">
+                                        <span className="me-2 tabular-nums text-muted-foreground">
                                             {index + 1}
                                         </span>
                                         {one.name}
@@ -1990,7 +1990,7 @@ export function MinecraftEvents({
                                                     <ui.Button
                                                         variant="ghost"
                                                         size="icon-sm"
-                                                        className="ml-auto"
+                                                        className="ms-auto"
                                                         aria-label={t("events.removeThisTime")}
                                                         title={t("events.removeThisTime")}
                                                         disabled={locked}

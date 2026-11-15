@@ -364,7 +364,7 @@ function Chip({
     remove: string;
 }) {
     return (
-        <Badge className="min-w-0 max-w-full shrink py-0 pr-0">
+        <Badge className="min-w-0 max-w-full shrink py-0 pe-0">
             <span className="min-w-0 truncate" title={label}>
                 {label}
             </span>

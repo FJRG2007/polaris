@@ -271,7 +271,7 @@ function ConditionGroupBlock({
                         onClick={onRemove}
                         aria-label={t("conditions.removeGroup")}
                         title={t("conditions.removeGroupTitle")}
-                        className="ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger "
+                        className="ms-auto inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger "
                     >
                         <X className="size-3.5 shrink-0" aria-hidden="true" />
                     </button>
@@ -349,7 +349,7 @@ function ConditionRow({
                     )}
                 </label>
 
-                <div className="mb-1 ml-auto flex shrink-0 items-center gap-1">
+                <div className="mb-1 ms-auto flex shrink-0 items-center gap-1">
                     <JoinButton
                         label={t("conditions.andButton")}
                         title={t("conditions.joinAnd")}

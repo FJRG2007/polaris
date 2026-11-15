@@ -604,7 +604,7 @@ function GameMark({ game, running }: { game: string | null; running: boolean }) 
             <GameLogo game={definition} className="size-6" />
             <span
                 className={cn(
-                    "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card",
+                    "absolute -bottom-0.5 -end-0.5 size-2 rounded-full ring-2 ring-card",
                     running ? "bg-success" : "bg-muted-foreground"
                 )}
                 aria-label={label}

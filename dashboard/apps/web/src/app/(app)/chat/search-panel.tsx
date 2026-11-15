@@ -138,7 +138,7 @@ export function SearchPanel({
             // The whole screen on a phone, where the conversation steps aside.
             beside="md"
             label={t("search.searchWidth")}
-            className="min-w-0 border-l border-border"
+            className="min-w-0 border-s border-border"
         >
             <div className="flex h-header shrink-0 items-center gap-2 border-b border-border px-3">
                 <Search className="size-4 shrink-0 text-muted-foreground" />
@@ -147,7 +147,7 @@ export function SearchPanel({
                     type="button"
                     aria-label={t("search.closeSearch")}
                     onClick={onClose}
-                    className="ml-auto rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="ms-auto rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <X className="size-4" />
                 </button>
@@ -249,7 +249,7 @@ export function SearchPanel({
                                 <button
                                     type="button"
                                     onClick={() => onOpen(hit)}
-                                    className="flex w-full flex-col gap-0.5 border-b border-border px-3 py-2 text-left transition-colors hover:bg-card-hover"
+                                    className="flex w-full flex-col gap-0.5 border-b border-border px-3 py-2 text-start transition-colors hover:bg-card-hover"
                                 >
                                     <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
                                         {hit.inSpace ? (

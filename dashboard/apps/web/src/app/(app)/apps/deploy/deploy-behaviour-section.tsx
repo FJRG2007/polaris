@@ -268,7 +268,7 @@ export function DeployBehaviourCards({
                     }
                 >
                     {strategy.mode === "restart" && (
-                        <ul className="flex list-disc flex-col gap-1 pl-5 text-xs text-muted-foreground">
+                        <ul className="flex list-disc flex-col gap-1 ps-5 text-xs text-muted-foreground">
                             {strategy.reasons.map((reason, index) => (
                                 <li key={index}>{reasonText(reason, t)}</li>
                             ))}

@@ -205,7 +205,7 @@ export function NameEditor({ field, value, onCommit, onCancel }: EditorProps) {
                     onKeyDown={(event) => keys(event, keep, onCancel)}
                 />
                 <input
-                    className={cn(FIELD_INPUT, "border-l border-border")}
+                    className={cn(FIELD_INPUT, "border-s border-border")}
                     value={name.last}
                     placeholder={t("placeholders.lastName")}
                     aria-label={t("placeholders.lastName")}

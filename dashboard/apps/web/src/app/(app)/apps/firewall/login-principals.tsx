@@ -420,7 +420,7 @@ function GrantRow({
                     </span>
                 ) : null}
 
-                <span className="ml-auto flex shrink-0 items-center gap-1">
+                <span className="ms-auto flex shrink-0 items-center gap-1">
                     <button
                         type="button"
                         disabled={disabled}
@@ -494,7 +494,7 @@ function GrantWindow({
     };
 
     return (
-        <div className="flex flex-wrap items-end gap-2 pl-5">
+        <div className="flex flex-wrap items-end gap-2 ps-5">
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                 {t("principals.starts")}
                 <DateInput

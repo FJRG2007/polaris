@@ -200,13 +200,13 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
     return (
         <div className="flex flex-col gap-3">
             <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder={t("list.searchDropPoints")}
                     aria-label={t("list.searchDropPoints")}
-                    className="pl-9"
+                    className="ps-9"
                 />
             </div>
 
@@ -235,7 +235,7 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                     aria-label={t("list.tableLabel")}
                 >
                     <table className="w-full min-w-[36rem] text-sm">
-                        <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                        <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                             <tr>
                                 <th className="w-10 px-3 py-2">
                                     <Checkbox

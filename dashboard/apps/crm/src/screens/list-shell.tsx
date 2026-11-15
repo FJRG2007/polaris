@@ -27,7 +27,7 @@ export function ListShell({ words }: { words: ListShellWords }) {
             aria-label={words.loading}
         >
             <div className="flex flex-wrap items-center gap-2">
-                <h1 className="mr-auto text-[1.0625rem] font-semibold leading-tight tracking-tight">
+                <h1 className="me-auto text-[1.0625rem] font-semibold leading-tight tracking-tight">
                     {words.title}
                 </h1>
                 <Block className="h-8 w-56" />

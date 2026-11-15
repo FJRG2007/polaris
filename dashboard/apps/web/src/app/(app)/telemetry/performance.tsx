@@ -107,7 +107,7 @@ export function PerformanceList({
                     ]}
                 />
                 {!readOnly && (
-                    <Button variant="outline" size="sm" className="ml-auto shrink-0" onClick={() => setTargeting(true)}>
+                    <Button variant="outline" size="sm" className="ms-auto shrink-0" onClick={() => setTargeting(true)}>
                         <Target aria-hidden="true" />
                         {projectTarget === null
                             ? t("performance.projectTargetDefault")
@@ -130,11 +130,11 @@ export function PerformanceList({
             ) : (
                 <div className="min-w-0 overflow-x-auto rounded-lg border border-border">
                     <table className="w-full min-w-[640px] text-sm">
-                        <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                        <thead className="bg-muted/50 text-start text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-3 py-2 font-medium">{t("performance.route")}</th>
                                 {SORTABLE.map((column) => (
-                                    <th key={column} className="w-20 px-2 py-2 text-right font-medium">
+                                    <th key={column} className="w-20 px-2 py-2 text-end font-medium">
                                         <button
                                             type="button"
                                             onClick={() => setSort(column)}
@@ -149,8 +149,8 @@ export function PerformanceList({
                                         </button>
                                     </th>
                                 ))}
-                                <th className="w-20 px-2 py-2 text-right font-medium">{t("performance.target")}</th>
-                                <th className="w-20 px-3 py-2 text-right font-medium">{t("performance.trend")}</th>
+                                <th className="w-20 px-2 py-2 text-end font-medium">{t("performance.target")}</th>
+                                <th className="w-20 px-3 py-2 text-end font-medium">{t("performance.trend")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -209,18 +209,18 @@ function RouteLine({ row, href }: { row: RouteRow; href: string }) {
                     </Badge>
                 </Link>
             </td>
-            <td className="px-2 py-2 text-right tabular-nums">{row.count.toLocaleString()}</td>
-            <td className="px-2 py-2 text-right tabular-nums">{perf.formatMetric(row.metric, row.p50)}</td>
-            <td className={cn("px-2 py-2 text-right tabular-nums", over && "font-medium text-danger")}>
+            <td className="px-2 py-2 text-end tabular-nums">{row.count.toLocaleString()}</td>
+            <td className="px-2 py-2 text-end tabular-nums">{perf.formatMetric(row.metric, row.p50)}</td>
+            <td className={cn("px-2 py-2 text-end tabular-nums", over && "font-medium text-danger")}>
                 {perf.formatMetric(row.metric, row.p75)}
             </td>
-            <td className="px-2 py-2 text-right tabular-nums">{perf.formatMetric(row.metric, row.p95)}</td>
-            <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
+            <td className="px-2 py-2 text-end tabular-nums">{perf.formatMetric(row.metric, row.p95)}</td>
+            <td className="px-2 py-2 text-end tabular-nums text-muted-foreground">
                 {perf.formatMetric(row.metric, row.target)}
             </td>
             <td
                 className={cn(
-                    "px-3 py-2 text-right tabular-nums",
+                    "px-3 py-2 text-end tabular-nums",
                     trend !== null && trend >= 50 ? "text-danger" : "text-muted-foreground"
                 )}
             >
@@ -393,7 +393,7 @@ export function RouteView({
                                         onClick={() => setPicked(one.id)}
                                         aria-pressed={sample?.id === one.id}
                                         className={cn(
-                                            "flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted",
+                                            "flex w-full min-w-0 items-center gap-2 px-3 py-2 text-start text-sm hover:bg-muted",
                                             sample?.id === one.id && "bg-muted"
                                         )}
                                     >

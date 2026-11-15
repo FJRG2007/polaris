@@ -118,7 +118,7 @@ export function ProviderPicker({
     return (
         <div className="flex min-w-0 flex-col gap-3">
             <label className="relative flex min-w-0 items-center">
-                <Search className="pointer-events-none absolute left-2.5 size-4 text-muted-foreground" aria-hidden />
+                <Search className="pointer-events-none absolute start-2.5 size-4 text-muted-foreground" aria-hidden />
                 <input
                     type="search"
                     value={query}
@@ -133,11 +133,11 @@ export function ProviderPicker({
                     }}
                     placeholder={t("connection.picker.search")}
                     aria-label={t("connection.picker.search")}
-                    className="h-9 w-full min-w-0 rounded-md border border-input bg-background pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="h-9 w-full min-w-0 rounded-md border border-input bg-background ps-8 pe-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
             </label>
 
-            <div className="flex max-h-[min(26rem,55vh)] min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain pr-0.5">
+            <div className="flex max-h-[min(26rem,55vh)] min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain pe-0.5">
                 {shown.length === 0 ? (
                     <p className="py-6 text-center text-sm text-muted-foreground">
                         {t("connection.picker.none")}
@@ -158,7 +158,7 @@ export function ProviderPicker({
                                             type="button"
                                             onClick={() => onChoose(entry.kind)}
                                             className={cn(
-                                                "flex min-w-0 items-center gap-3 rounded-md border p-2.5 text-left transition-colors hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                "flex min-w-0 items-center gap-3 rounded-md border p-2.5 text-start transition-colors hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                                 entry.kind === "unifi-unas" ? "border-primary/60 bg-primary/5" : "border-border"
                                             )}
                                         >

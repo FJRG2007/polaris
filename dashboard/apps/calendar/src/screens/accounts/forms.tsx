@@ -453,7 +453,7 @@ export function HolidayPicker({
         <div className="flex flex-col gap-2">
             <div className="relative">
                 <Search
-                    className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
+                    className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
                     aria-hidden
                 />
                 <Input
@@ -461,7 +461,7 @@ export function HolidayPicker({
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder={t("accounts.holidays.search")}
                     aria-label={t("accounts.holidays.search")}
-                    className="pl-8"
+                    className="ps-8"
                 />
             </div>
             {adder.error ? <StatusNote tone="danger">{adder.error}</StatusNote> : null}

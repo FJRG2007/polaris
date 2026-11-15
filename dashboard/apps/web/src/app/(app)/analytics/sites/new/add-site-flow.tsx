@@ -81,7 +81,7 @@ export function AddSiteFlow() {
                             key={choice.value}
                             type="button"
                             onClick={() => setRoad(choice.value)}
-                            className="flex min-w-0 flex-col gap-2 rounded-lg border border-border p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/30"
+                            className="flex min-w-0 flex-col gap-2 rounded-lg border border-border p-4 text-start transition-colors hover:border-primary/50 hover:bg-muted/30"
                         >
                             <choice.icon className="size-5 text-primary" aria-hidden />
                             <span className="font-medium">{choice.title}</span>
@@ -179,7 +179,7 @@ function PickService({ onPicked, onBack }: { onPicked: (site: Created) => void; 
                                             trackerEnabled: false
                                         })
                                     }
-                                    className="flex w-full min-w-0 flex-col gap-1 px-3 py-2 text-left text-sm hover:bg-muted/40"
+                                    className="flex w-full min-w-0 flex-col gap-1 px-3 py-2 text-start text-sm hover:bg-muted/40"
                                 >
                                     <span className="truncate font-medium" title={service.label}>
                                         {service.label}

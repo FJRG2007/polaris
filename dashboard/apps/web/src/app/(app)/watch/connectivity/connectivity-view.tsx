@@ -530,16 +530,16 @@ function OlderMonths({
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[28rem] text-[0.8125rem]">
                     <thead>
-                        <tr className="border-b border-border text-left">
+                        <tr className="border-b border-border text-start">
                             <th className="px-4 py-2">{t("connectivity.older.month")}</th>
                             <th className="px-4 py-2">{t("connectivity.list.kind")}</th>
-                            <th className="px-4 py-2 text-right">
+                            <th className="px-4 py-2 text-end">
                                 {t("connectivity.periods.outages")}
                             </th>
-                            <th className="px-4 py-2 text-right">
+                            <th className="px-4 py-2 text-end">
                                 {t("connectivity.periods.down")}
                             </th>
-                            <th className="px-4 py-2 text-right">
+                            <th className="px-4 py-2 text-end">
                                 {t("connectivity.periods.longest")}
                             </th>
                         </tr>
@@ -552,11 +552,11 @@ function OlderMonths({
                             >
                                 <td className="px-4 py-2 tabular">{month.month}</td>
                                 <td className="px-4 py-2">{kindLabel(t, month.kind)}</td>
-                                <td className="px-4 py-2 text-right tabular">{month.count}</td>
-                                <td className="px-4 py-2 text-right tabular">
+                                <td className="px-4 py-2 text-end tabular">{month.count}</td>
+                                <td className="px-4 py-2 text-end tabular">
                                     {span(month.downtimeSeconds * 1000)}
                                 </td>
-                                <td className="px-4 py-2 text-right tabular">
+                                <td className="px-4 py-2 text-end tabular">
                                     {span(month.longestSeconds * 1000)}
                                 </td>
                             </tr>

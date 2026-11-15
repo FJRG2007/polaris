@@ -270,7 +270,7 @@ function WatchSubjectCard({ card }: { card: WatchCard }) {
                         )}
                     >
                         {card.cpuPercent == null ? "-" : `${card.cpuPercent}%`}
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                        <span className="ms-1 text-xs font-normal text-muted-foreground">
                             {t("labels.metric.cpu")}
                         </span>
                     </p>

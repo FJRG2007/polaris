@@ -167,7 +167,7 @@ function PanelRow({ row, placeName }: { row: RowActions; placeName: string }) {
             <td className="hidden whitespace-nowrap px-3 py-2 text-muted-foreground sm:table-cell">
                 {panel.openedAt ? <RelativeTime iso={panel.openedAt} /> : t("panels.neverOpened")}
             </td>
-            <td className="w-12 px-1 py-1 text-right">
+            <td className="w-12 px-1 py-1 text-end">
                 {pending ? null : (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -277,7 +277,7 @@ export function PanelsTable({
                 <>
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <div className="relative min-w-0 flex-1 sm:max-w-xs">
-                            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
+                            <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
                             <Input
                                 type="search"
                                 value={query}
@@ -287,10 +287,10 @@ export function PanelsTable({
                                 }}
                                 placeholder={t("panels.search")}
                                 aria-label={t("panels.search")}
-                                className="pl-8"
+                                className="ps-8"
                             />
                         </div>
-                        <div className="ml-auto">{newButton}</div>
+                        <div className="ms-auto">{newButton}</div>
                     </div>
                     {error ? (
                         <p
@@ -305,7 +305,7 @@ export function PanelsTable({
                     ) : (
                         <div className="overflow-x-auto overscroll-contain rounded-lg border border-border">
                             <table className="w-full table-fixed text-sm" aria-label={t("panels.panelsAt")}>
-                                <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                                <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                                     <tr>
                                         <th className="px-3 py-2 font-medium">{t("panels.tableName")}</th>
                                         <th className="hidden px-3 py-2 font-medium md:table-cell">

@@ -310,7 +310,7 @@ export function ConnectedApps({
                 {apps.length > SEARCH_FROM ? (
                     <span className="relative">
                         <Search
-                            className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                            className="pointer-events-none absolute start-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                             aria-hidden
                         />
                         <Input
@@ -320,7 +320,7 @@ export function ConnectedApps({
                             placeholder={t("connectedApps.search")}
                             aria-label={t("connectedApps.search")}
                             autoComplete="off"
-                            className="pl-8"
+                            className="ps-8"
                         />
                     </span>
                 ) : null}
@@ -664,7 +664,7 @@ function ScopeGroups({
                                                 current === scope ? null : scope
                                             )
                                         }
-                                        className="min-w-0 max-w-full rounded-md text-left"
+                                        className="min-w-0 max-w-full rounded-md text-start"
                                     >
                                         <Badge
                                             variant={explained === scope ? "primary" : "neutral"}
@@ -742,7 +742,7 @@ function EditScopes({
         <Dialog open onOpenChange={(open) => !open && onCancel()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle className="break-words pr-6 [overflow-wrap:anywhere]">
+                    <DialogTitle className="break-words pe-6 [overflow-wrap:anywhere]">
                         {t("connectedApps.editTitle", { app: name })}
                     </DialogTitle>
                     <DialogDescription>{t("connectedApps.editHint")}</DialogDescription>

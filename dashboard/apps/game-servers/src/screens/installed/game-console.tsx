@@ -905,13 +905,13 @@ export function GameConsole({
                         // the caret has to measure text in a font it does not own,
                         // and being a few pixels wrong there is worse than being
                         // deliberately left-aligned here.
-                        <ul className="absolute bottom-full left-0 z-10 mb-1 max-h-48 w-full max-w-md overflow-y-auto overscroll-contain rounded-md border border-border-strong bg-surface py-1 shadow-popover">
+                        <ul className="absolute bottom-full start-0 z-10 mb-1 max-h-48 w-full max-w-md overflow-y-auto overscroll-contain rounded-md border border-border-strong bg-surface py-1 shadow-popover">
                             {suggestions.map((option, index) => (
                                 <li key={option}>
                                     <button
                                         type="button"
                                         className={cn(
-                                            "flex w-full px-3 py-1 text-left font-mono text-xs hover:bg-muted",
+                                            "flex w-full px-3 py-1 text-start font-mono text-xs hover:bg-muted",
                                             index === choice && "bg-muted"
                                         )}
                                         // The press has to not steal focus from the

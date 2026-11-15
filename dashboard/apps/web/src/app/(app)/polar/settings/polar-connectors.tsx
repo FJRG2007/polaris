@@ -248,7 +248,7 @@ export function PolarConnectors({
                         <div className="flex items-center gap-3">
                             <button
                                 type="button"
-                                className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                                className="flex min-w-0 flex-1 items-center gap-2 text-start"
                                 aria-expanded={open === row.id}
                                 onClick={() => setOpen(open === row.id ? null : row.id)}
                             >

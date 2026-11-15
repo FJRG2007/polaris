@@ -101,7 +101,7 @@ export function PlainTextEditor({
                 {editing ? (
                     <>
                         <span className="text-xs font-medium text-muted-foreground">{t("textEditor.editing")}</span>
-                        <div className="ml-auto flex items-center gap-2">
+                        <div className="ms-auto flex items-center gap-2">
                             <Button
                                 size="sm"
                                 variant="ghost"
@@ -127,7 +127,7 @@ export function PlainTextEditor({
                         <span className="text-xs font-medium text-muted-foreground">
                             {blocked ?? t("textEditor.plainText")}
                         </span>
-                        <div className="ml-auto flex items-center gap-2">
+                        <div className="ms-auto flex items-center gap-2">
                             <Button
                                 size="sm"
                                 variant="ghost"

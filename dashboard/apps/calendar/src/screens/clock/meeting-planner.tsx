@@ -159,7 +159,7 @@ export function MeetingPlanner({
                                     >
                                         <th
                                             scope="row"
-                                            className="sticky left-0 z-10 w-32 max-w-32 bg-card px-2 py-1.5 text-left normal-case tracking-normal"
+                                            className="sticky start-0 z-10 w-32 max-w-32 bg-card px-2 py-1.5 text-start normal-case tracking-normal"
                                         >
                                             <span
                                                 className="block truncate text-[0.8125rem] font-medium text-foreground"
@@ -261,7 +261,7 @@ export function MeetingPlanner({
                                                 timeZone: cityZone
                                             }).format(chosenAt)}
                                         </span>
-                                        <span className="w-20 text-right font-medium tabular-nums">
+                                        <span className="w-20 text-end font-medium tabular-nums">
                                             {words.instantTimeText(
                                                 chosenAt,
                                                 locale,

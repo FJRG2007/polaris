@@ -64,7 +64,7 @@ export function LocationSearch({
     return (
         <div className="flex min-w-0 flex-col gap-2">
             <div className="relative min-w-0">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
+                <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
                 <Input
                     type="search"
                     value={query}
@@ -74,7 +74,7 @@ export function LocationSearch({
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder={t("locationSearch.placeholder")}
                     aria-label={t("locationSearch.placeholder")}
-                    className="pl-8"
+                    className="ps-8"
                 />
             </div>
             {found.state === "searching" ? (
@@ -99,7 +99,7 @@ export function LocationSearch({
                                 type="button"
                                 disabled={disabled}
                                 onClick={() => onPick(place)}
-                                className="flex min-h-11 w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                                className="flex min-h-11 w-full min-w-0 items-center gap-2 px-3 py-2 text-start text-sm hover:bg-muted"
                             >
                                 <MapPin className="size-4 shrink-0 text-muted-foreground" />
                                 <span className="flex min-w-0 flex-col">

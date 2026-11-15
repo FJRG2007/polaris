@@ -49,7 +49,7 @@ export function AccountChooser({ accounts }: { accounts: DeviceAccountView[] }) 
                                 disabled={busy !== null}
                                 onClick={() => void choose(account)}
                                 aria-label={t("login.chooserContinue", { name: account.name })}
-                                className="flex w-full min-w-0 items-center gap-3 rounded-md border border-border px-3 py-2 text-left transition-colors hover:bg-muted/60 disabled:opacity-60"
+                                className="flex w-full min-w-0 items-center gap-3 rounded-md border border-border px-3 py-2 text-start transition-colors hover:bg-muted/60 disabled:opacity-60"
                             >
                                 <span
                                     aria-hidden

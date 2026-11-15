@@ -102,7 +102,7 @@ export function PublicForm({
                         <label key={field.id} className="flex flex-col gap-1 text-sm">
                             <span>
                                 {field.label}
-                                {field.required && <span className="ml-1 text-danger">*</span>}
+                                {field.required && <span className="ms-1 text-danger">*</span>}
                             </span>
                             {field.help && (
                                 <span className="text-xs text-muted-foreground">{field.help}</span>

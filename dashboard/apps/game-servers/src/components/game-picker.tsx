@@ -97,7 +97,7 @@ export function GamePicker({
                 aria-haspopup="listbox"
                 aria-expanded={open}
                 className={cn(
-                    "flex h-14 w-full items-center gap-3 rounded-md border border-border bg-surface px-3 text-left text-sm transition-colors",
+                    "flex h-14 w-full items-center gap-3 rounded-md border border-border bg-surface px-3 text-start text-sm transition-colors",
                     "hover:border-border ",
                     "disabled:cursor-not-allowed disabled:opacity-50"
                 )}
@@ -122,20 +122,20 @@ export function GamePicker({
                 )}
                 <ChevronDown
                     className={cn(
-                        "ml-auto size-4 shrink-0 text-muted-foreground transition-transform duration-150",
+                        "ms-auto size-4 shrink-0 text-muted-foreground transition-transform duration-150",
                         open && "rotate-180"
                     )}
                 />
             </button>
 
             {open && (
-                <div className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-50 flex max-h-80 flex-col overflow-hidden rounded-lg border border-border-strong bg-elevated shadow-popover">
+                <div className="absolute start-0 end-0 top-[calc(100%+0.25rem)] z-50 flex max-h-80 flex-col overflow-hidden rounded-lg border border-border-strong bg-elevated shadow-popover">
                     {searchable && (
                         <div className="relative border-b border-border/60 p-2">
-                            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Search className="pointer-events-none absolute start-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 autoFocus
-                                className="h-8 pl-8"
+                                className="h-8 ps-8"
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
                                 placeholder={t("picker.searchGames")}
@@ -160,7 +160,7 @@ export function GamePicker({
                                     aria-selected={game.id === value}
                                     onClick={() => choose(game)}
                                     className={cn(
-                                        "flex w-full items-center gap-3 rounded-md p-2 text-left text-sm transition-colors",
+                                        "flex w-full items-center gap-3 rounded-md p-2 text-start text-sm transition-colors",
                                         game.id === value
                                             ? "bg-option-hover"
                                             : "hover:bg-option-hover/60"
@@ -186,7 +186,7 @@ export function GamePicker({
                                         </span>
                                     </span>
                                     {game.id === value && (
-                                        <Check className="ml-auto size-4 shrink-0 text-primary" />
+                                        <Check className="ms-auto size-4 shrink-0 text-primary" />
                                     )}
                                 </button>
                             ))

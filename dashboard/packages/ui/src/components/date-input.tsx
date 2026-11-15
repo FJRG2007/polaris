@@ -59,7 +59,7 @@ export interface DateInputProps {
 }
 
 const FIELD =
-    "flex h-8 w-full min-w-0 items-center gap-1.5 rounded-md border border-border bg-field px-2.5 text-left text-[0.8125rem] text-foreground transition-colors duration-fast hover:border-border-strong focus-visible:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-danger";
+    "flex h-8 w-full min-w-0 items-center gap-1.5 rounded-md border border-border bg-field px-2.5 text-start text-[0.8125rem] text-foreground transition-colors duration-fast hover:border-border-strong focus-visible:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-danger";
 
 const TIME_FIELD =
     "h-8 min-w-0 rounded-md border border-border bg-field px-2.5 text-[0.8125rem] text-foreground [color-scheme:light] transition-colors duration-fast hover:border-border-strong focus:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 dark:[color-scheme:dark]";
@@ -249,7 +249,7 @@ export function DateInput({
                         autoFocus={autoFocus}
                         title={title}
                         aria-haspopup="dialog"
-                        className={cn(FIELD, canClear && "pr-8")}
+                        className={cn(FIELD, canClear && "pe-8")}
                         {...aria}
                     >
                         <CalendarDays
@@ -355,7 +355,7 @@ export function DateInput({
                     }}
                     aria-label={t("dateInput.clear")}
                     title={t("dateInput.clear")}
-                    className="absolute right-1 grid size-6 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                    className="absolute end-1 grid size-6 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                     <X className="size-3.5" aria-hidden="true" />
                 </button>

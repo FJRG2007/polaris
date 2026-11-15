@@ -163,7 +163,7 @@ export function PdfSearch({
             >
                 <ChevronDown className="size-4" />
             </Button>
-            <div className="ml-auto flex items-center gap-1">
+            <div className="ms-auto flex items-center gap-1">
                 <Toggle
                     pressed={highlightAll}
                     onPressedChange={setHighlightAll}

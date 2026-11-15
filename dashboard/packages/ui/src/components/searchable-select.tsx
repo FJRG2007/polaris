@@ -120,7 +120,7 @@ export function SearchableSelect({
                 className={cn(
                     // An icon that only keeps the menu's rows aligned
                     // (`data-icon-placeholder`) has nothing to say on the trigger.
-                    "group flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-field px-2.5 text-left text-[0.8125rem] transition-colors duration-fast hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:border-border-strong [&_[data-icon-placeholder]]:hidden",
+                    "group flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-field px-2.5 text-start text-[0.8125rem] transition-colors duration-fast hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:border-border-strong [&_[data-icon-placeholder]]:hidden",
                     className
                 )}
             >
@@ -170,7 +170,7 @@ export function SearchableSelect({
                             key={option.value}
                             disabled={option.disabled}
                             onSelect={() => onValueChange(option.value)}
-                            className="pr-8"
+                            className="pe-8"
                         >
                             {option.icon != null && (
                                 <span className="flex shrink-0 items-center">{option.icon}</span>
@@ -185,7 +185,7 @@ export function SearchableSelect({
                             </span>
                             {option.hint != null && (
                                 <span
-                                    className="min-w-0 max-w-[50%] shrink truncate text-right text-[0.75rem] text-muted-foreground"
+                                    className="min-w-0 max-w-[50%] shrink truncate text-end text-[0.75rem] text-muted-foreground"
                                     title={
                                         typeof option.hint === "string" ? option.hint : undefined
                                     }
@@ -194,7 +194,7 @@ export function SearchableSelect({
                                 </span>
                             )}
                             {option.value === value && (
-                                <Check className="absolute right-2 text-primary" />
+                                <Check className="absolute end-2 text-primary" />
                             )}
                         </DropdownMenuItem>
                     ))

@@ -309,7 +309,7 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
                                     <p className="font-medium text-foreground">
                                         {t("spaceEmoji.rulesTitle")}
                                     </p>
-                                    <ul className="mt-1 list-disc pl-4">
+                                    <ul className="mt-1 list-disc ps-4">
                                         <li>{t("spaceEmoji.ruleFiles")}</li>
                                         <li>{t("spaceEmoji.ruleNames")}</li>
                                         <li>

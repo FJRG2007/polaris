@@ -288,7 +288,7 @@ export function QuickSendView({
                                                 setPeople((current) => [...current, person]);
                                                 setQuery("");
                                             }}
-                                            className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-50"
+                                            className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-start text-sm hover:bg-muted disabled:opacity-50"
                                         >
                                             <User className="size-4 shrink-0" aria-hidden />
                                             <span className="min-w-0 flex-1 truncate" title={person.name}>{person.name}</span>

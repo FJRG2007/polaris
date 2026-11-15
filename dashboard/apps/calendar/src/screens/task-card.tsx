@@ -122,7 +122,7 @@ export function TaskCard({
             anchor={anchor}
             title={task.title}
         >
-            <div className="flex flex-col gap-3 pr-1">
+            <div className="flex flex-col gap-3 pe-1">
                 <div className="flex items-start gap-2">
                     <span className="mt-0.5">
                         <TaskMark
@@ -141,7 +141,7 @@ export function TaskCard({
                             }
                         >
                             {task.reference ? (
-                                <span className="mr-1 text-muted-foreground">{task.reference}</span>
+                                <span className="me-1 text-muted-foreground">{task.reference}</span>
                             ) : null}
                             {task.title}
                         </p>
@@ -172,7 +172,7 @@ export function TaskCard({
                             : t("todo.openInTasks")}
                     </Button>
                     {fromCalendar ? (
-                        <span className="ml-auto flex items-center gap-1">
+                        <span className="ms-auto flex items-center gap-1">
                             {task.editable ? (
                                 <Button
                                     size="icon-sm"

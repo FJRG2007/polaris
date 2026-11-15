@@ -92,9 +92,9 @@ function OrganizationList({ first }: { first: Page<OrgRow> }) {
     return (
         <div className="flex flex-col gap-4">
             <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                    className="pl-9"
+                    className="ps-9"
                     placeholder={t("organizations.search.placeholder")}
                     aria-label={t("organizations.search.label")}
                     value={query}
@@ -104,7 +104,7 @@ function OrganizationList({ first }: { first: Page<OrgRow> }) {
 
             <div className="overflow-hidden rounded-lg border border-border">
                 <table className="w-full text-sm">
-                    <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">
                                 {t("organizations.table.organization")}

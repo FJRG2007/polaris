@@ -139,7 +139,7 @@ export function ReporterRules({
                 type="button"
                 onClick={() => setOpen(!open)}
                 aria-expanded={open}
-                className="flex items-center gap-2 text-left"
+                className="flex items-center gap-2 text-start"
             >
                 {draft.reporters === "anywhere" && !draft.requireSecret ? (
                     <ShieldAlert className="size-4 shrink-0 text-warning" />

@@ -138,7 +138,7 @@ export function PtzPad({
 
     return (
         <div
-            className="absolute bottom-2 right-2 grid grid-cols-3 grid-rows-3 gap-1 rounded-lg bg-black/50 p-1 backdrop-blur-sm"
+            className="absolute bottom-2 end-2 grid grid-cols-3 grid-rows-3 gap-1 rounded-lg bg-black/50 p-1 backdrop-blur-sm"
             // The tile below opens and closes the stream on click; an arrow is
             // not that.
             onClick={(event) => event.stopPropagation()}

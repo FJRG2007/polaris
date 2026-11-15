@@ -120,7 +120,7 @@ export async function HomeView({ locale }: { locale: SiteLocale }) {
                     painted={painted}
                     labels={installWords}
                     requirementsHref={requirementsHref}
-                    className="max-w-3xl text-left"
+                    className="max-w-3xl text-start"
                 />
                 <p className="max-w-2xl text-pretty text-xs text-muted-foreground">
                     {t.installHint}{" "}
@@ -256,7 +256,7 @@ export async function HomeView({ locale }: { locale: SiteLocale }) {
                     painted={painted}
                     labels={installWords}
                     requirementsHref={requirementsHref}
-                    className="max-w-3xl text-left"
+                    className="max-w-3xl text-start"
                 />
                 <div className="flex flex-wrap justify-center gap-2">
                     <Link

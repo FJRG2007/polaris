@@ -120,7 +120,7 @@ function Sortable({
                 <span
                     aria-hidden
                     className={cn(
-                        "pointer-events-none absolute left-0 z-10 h-0.5 w-full rounded bg-primary",
+                        "pointer-events-none absolute start-0 z-10 h-0.5 w-full rounded bg-primary",
                         over === "before" ? "-top-px" : "-bottom-px"
                     )}
                 />
@@ -356,9 +356,9 @@ export function SubtaskSection({
                                 <button
                                     type="button"
                                     onClick={() => onOpen(subtask.id)}
-                                    className="flex-1 truncate text-left text-sm hover:underline"
+                                    className="flex-1 truncate text-start text-sm hover:underline"
                                 >
-                                    <span className="mr-2 font-mono text-[0.6875rem] text-muted-foreground">
+                                    <span className="me-2 font-mono text-[0.6875rem] text-muted-foreground">
                                         {subtask.reference}
                                     </span>
                                     <span
@@ -550,7 +550,7 @@ export function InlineName({
                     closed.current = false;
                     setDraft(name);
                 }}
-                className={cn("min-w-0 cursor-text truncate text-left hover:underline", className)}
+                className={cn("min-w-0 cursor-text truncate text-start hover:underline", className)}
             >
                 {name}
             </button>
@@ -1045,9 +1045,9 @@ export function DependencySection({
                     <button
                         type="button"
                         onClick={() => onOpen(edge.taskId)}
-                        className="min-w-0 flex-1 truncate text-left text-sm hover:underline"
+                        className="min-w-0 flex-1 truncate text-start text-sm hover:underline"
                     >
-                        <span className="mr-2 font-mono text-[0.6875rem] text-muted-foreground">
+                        <span className="me-2 font-mono text-[0.6875rem] text-muted-foreground">
                             {edge.reference}
                         </span>
                         {edge.name}
@@ -1156,7 +1156,7 @@ export function DependencySection({
                                             setQuery("");
                                             onChanged();
                                         }}
-                                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                                        className="flex w-full items-center gap-2 px-3 py-2 text-start text-sm transition-colors hover:bg-muted"
                                     >
                                         <Link2 className="size-3.5 text-muted-foreground" />
                                         <span className="font-mono text-[0.6875rem] text-muted-foreground">

@@ -321,7 +321,7 @@ export function FileViewer({
                 <DialogHeader className="flex flex-row items-center justify-between gap-3 px-4 py-3">
                     <DialogTitle className="min-w-0 truncate text-sm">{target?.name}</DialogTitle>
                     {target ? (
-                        <div className="mr-8 flex shrink-0 items-center gap-2">
+                        <div className="me-8 flex shrink-0 items-center gap-2">
                             {stepping ? (
                                 <StepControls
                                     index={stepping.index}
@@ -397,7 +397,7 @@ export function FileViewer({
                                 aria-hidden
                                 aria-label={t("viewer.previousFile")}
                                 title={t("viewer.previousFile")}
-                                className="absolute left-3 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-elevated/90 text-foreground shadow-modal hover:bg-elevated"
+                                className="absolute start-3 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-elevated/90 text-foreground shadow-modal hover:bg-elevated"
                                 onClick={() => stepping?.onStep(-1)}
                             >
                                 <ChevronLeft className="size-5 shrink-0" aria-hidden />
@@ -412,7 +412,7 @@ export function FileViewer({
                                 aria-hidden
                                 aria-label={t("viewer.nextFile")}
                                 title={t("viewer.nextFile")}
-                                className="absolute right-3 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-elevated/90 text-foreground shadow-modal hover:bg-elevated"
+                                className="absolute end-3 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-elevated/90 text-foreground shadow-modal hover:bg-elevated"
                                 onClick={() => stepping?.onStep(1)}
                             >
                                 <ChevronRight className="size-5 shrink-0" aria-hidden />
@@ -420,7 +420,7 @@ export function FileViewer({
                         ) : null}
                     </div>
                     {target ? (
-                        <aside className="hidden w-56 shrink-0 flex-col gap-2 border-l border-border p-4 text-sm md:flex">
+                        <aside className="hidden w-56 shrink-0 flex-col gap-2 border-s border-border p-4 text-sm md:flex">
                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                 {t("viewer.properties")}
                             </p>

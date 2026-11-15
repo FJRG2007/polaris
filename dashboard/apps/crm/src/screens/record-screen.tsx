@@ -149,9 +149,9 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
         </>
     );
     const titleClass =
-        "mr-auto min-w-0 truncate text-[1.0625rem] font-semibold leading-tight tracking-tight";
+        "me-auto min-w-0 truncate text-[1.0625rem] font-semibold leading-tight tracking-tight";
     const header = (
-        <div className={cn("flex min-w-0 flex-wrap items-center gap-2", panel && "pr-10")}>
+        <div className={cn("flex min-w-0 flex-wrap items-center gap-2", panel && "pe-10")}>
             {panel ? null : (
                 <Button variant="ghost" size="sm" asChild>
                     <Link href={`/crm/${object}`}>
@@ -261,7 +261,7 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
                 className="grid min-w-0 grid-cols-1 items-center border-b border-border last:border-b-0 sm:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] sm:gap-3"
             >
                 <span
-                    className="truncate pl-3 pt-2 text-[0.8125rem] text-muted-foreground sm:py-2"
+                    className="truncate ps-3 pt-2 text-[0.8125rem] text-muted-foreground sm:py-2"
                     title={fieldLabel(t, object, field)}
                 >
                     {fieldLabel(t, object, field)}

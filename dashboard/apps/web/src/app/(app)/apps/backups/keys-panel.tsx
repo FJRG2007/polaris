@@ -145,7 +145,7 @@ export function KeysPanel() {
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="ml-auto"
+                                        className="ms-auto"
                                         disabled={revealing !== null}
                                         onClick={() => void reveal(key.id)}
                                     >

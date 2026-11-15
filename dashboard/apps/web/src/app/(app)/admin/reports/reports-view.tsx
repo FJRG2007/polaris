@@ -91,7 +91,7 @@ export function ReportsView({
                             <span className="text-xs text-muted-foreground">
                                 {t("reports.reportedBy", { name: report.reporterName })}
                             </span>
-                            <span className="ml-auto text-xs text-muted-foreground">
+                            <span className="ms-auto text-xs text-muted-foreground">
                                 {format.dateTime(report.createdAt)}
                             </span>
                         </div>
@@ -100,7 +100,7 @@ export function ReportsView({
                             it. Quoted rather than rendered: this is a moderation
                             surface, and a report is not a place to run somebody
                             else's formatting. */}
-                        <blockquote className="whitespace-pre-wrap break-words border-l-2 border-border pl-3 text-sm">
+                        <blockquote className="whitespace-pre-wrap break-words border-s-2 border-border ps-3 text-sm">
                             {report.excerpt || (
                                 <span className="text-muted-foreground">
                                     {report.files.length > 0 ? t("reports.noTextSeeBelow") : t("reports.noText")}
@@ -168,7 +168,7 @@ export function ReportsView({
                             {report.live && report.messageId && (
                                 <Link
                                     href={`/chat/c/${report.channelId}/${report.messageId}`}
-                                    className="ml-auto flex items-center gap-1 text-xs text-muted-foreground no-underline hover:text-foreground"
+                                    className="ms-auto flex items-center gap-1 text-xs text-muted-foreground no-underline hover:text-foreground"
                                 >
                                     <MessageSquare className="size-3.5" />
                                     {t("reports.open")}

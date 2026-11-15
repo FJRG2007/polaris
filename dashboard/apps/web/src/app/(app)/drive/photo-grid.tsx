@@ -177,7 +177,7 @@ export function PhotoGrid({
                     return (
                         <div
                             key={item.key}
-                            className="absolute left-0 top-0 w-full"
+                            className="absolute start-0 top-0 w-full"
                             style={{ transform: `translateY(${item.start}px)`, height: item.size }}
                         >
                             {row.kind === "heading" ? (
@@ -276,7 +276,7 @@ function PhotoTile({
         >
             {face}
             {kind === "video" ? (
-                <span className="pointer-events-none absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-black/55 text-white">
+                <span className="pointer-events-none absolute end-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-black/55 text-white">
                     <Play className="size-3.5 shrink-0" aria-hidden />
                 </span>
             ) : null}

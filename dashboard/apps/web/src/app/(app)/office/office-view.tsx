@@ -384,11 +384,11 @@ export function OfficeView({
             <div className="flex flex-wrap items-center gap-2">
                 <div className="relative min-w-0 flex-1 basis-64">
                     <Search
-                        className="pointer-events-none absolute left-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-foreground-subtle"
+                        className="pointer-events-none absolute start-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-foreground-subtle"
                         aria-hidden
                     />
                     <Input
-                        className="pl-8"
+                        className="ps-8"
                         value={query}
                         placeholder={t("view.search")}
                         aria-label={t("view.searchLabel")}
@@ -638,12 +638,12 @@ function Tile({ row, ...actions }: EntryProps) {
                     </p>
                 </div>
             </div>
-            <div className="absolute right-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-elevated/90 opacity-0 shadow-sm ring-1 ring-border transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+            <div className="absolute end-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-elevated/90 opacity-0 shadow-sm ring-1 ring-border transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
                 <Actions row={row} {...actions} />
             </div>
             {row.starred && !row.trashed ? (
                 <Star
-                    className="pointer-events-none absolute left-2 top-2 size-4 shrink-0 fill-current text-warning"
+                    className="pointer-events-none absolute start-2 top-2 size-4 shrink-0 fill-current text-warning"
                     aria-hidden
                 />
             ) : null}

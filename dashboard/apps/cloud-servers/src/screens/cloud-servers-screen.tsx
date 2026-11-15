@@ -429,7 +429,7 @@ function ServerTable({
             </ul>
             <div className="hidden overflow-x-auto rounded-lg border border-border sm:block">
                 <table className="w-full min-w-[56rem] text-sm">
-                    <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                    <thead className="bg-muted/50 text-start text-xs text-muted-foreground">
                         <tr>
                             <th className="px-3 py-2 font-medium">{t("servers.name")}</th>
                             <th className="px-3 py-2 font-medium">{t("servers.provider")}</th>
@@ -474,7 +474,7 @@ function ServerTable({
                                 <td className="px-3 py-2">
                                     {money(server.sinceCreation, server.currency) ?? "-"}
                                 </td>
-                                <td className="px-3 py-2 text-right">{menu(server)}</td>
+                                <td className="px-3 py-2 text-end">{menu(server)}</td>
                             </tr>
                         ))}
                     </tbody>

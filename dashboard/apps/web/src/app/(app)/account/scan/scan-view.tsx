@@ -304,7 +304,7 @@ function DecideCard({
                     ) : null}
                     <div className="flex justify-between gap-3">
                         <dt className="text-muted-foreground">{t("scan.decide.asked")}</dt>
-                        <dd className="text-right">
+                        <dd className="text-end">
                             <RelativeTime iso={request.requestedAt} />
                         </dd>
                     </div>
@@ -368,7 +368,7 @@ function Detail({ label, value }: { label: string; value: string }) {
     return (
         <div className="flex justify-between gap-3">
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className="min-w-0 truncate text-right">{value}</dd>
+            <dd className="min-w-0 truncate text-end">{value}</dd>
         </div>
     );
 }

@@ -127,7 +127,7 @@ export function PdfTools({
                 <Button
                     size="sm"
                     variant="ghost"
-                    className="ml-auto"
+                    className="ms-auto"
                     onClick={() => onSelect("none")}
                 >
                     {t("pdfTools.done")}

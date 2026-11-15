@@ -106,7 +106,7 @@ export function NotesPanel({
                 type="button"
                 onClick={toggle}
                 aria-expanded={!folded}
-                className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-[12px] font-medium text-muted-foreground hover:text-foreground"
+                className="flex w-full items-center gap-1.5 px-3 py-1.5 text-start text-[12px] font-medium text-muted-foreground hover:text-foreground"
             >
                 {folded ? (
                     <ChevronUp className="size-3.5 shrink-0" aria-hidden />

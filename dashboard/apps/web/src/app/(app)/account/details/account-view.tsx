@@ -165,7 +165,7 @@ export function AccountView({
                     <div className="flex items-center justify-between gap-2">
                         {result?.error ? <p className="text-sm text-danger">{result.error}</p> : null}
                         {result?.ok ? <p className="text-sm text-success">{result.ok}</p> : null}
-                        <Button type="submit" disabled={busy || !changed} className="ml-auto">
+                        <Button type="submit" disabled={busy || !changed} className="ms-auto">
                             {busy ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>

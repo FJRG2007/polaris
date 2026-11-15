@@ -454,7 +454,7 @@ function WindowRow({
                 <Button
                     size="icon"
                     variant="ghost"
-                    className="ml-auto text-danger hover:text-danger"
+                    className="ms-auto text-danger hover:text-danger"
                     onClick={onRemove}
                     aria-label={t("schedule.removeThisWindow")}
                     title={t("schedule.removeThisWindow")}
@@ -493,7 +493,7 @@ function WindowRow({
                         </button>
                     );
                 })}
-                <span className="ml-1 text-xs text-muted-foreground">
+                <span className="ms-1 text-xs text-muted-foreground">
                     {[
                         window.days.length === 0 ? t("schedule.everyDay") : null,
                         wraps ? t("schedule.pastMidnight") : null
@@ -633,7 +633,7 @@ function RoutineRow({
                 <Button
                     size="sm"
                     variant="ghost"
-                    className="ml-auto"
+                    className="ms-auto"
                     onClick={onRemove}
                     aria-label={t("schedule.removeNamed", {
                         name: routine.name || t("schedule.thisRoutine")

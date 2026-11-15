@@ -216,7 +216,7 @@ export function NewTableDialog({
 
                     <div className="flex flex-col gap-2">
                         <span className="text-sm font-medium">{t("newTable.columns")}</span>
-                        <div className="flex max-h-[45vh] flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
+                        <div className="flex max-h-[45vh] flex-col gap-2 overflow-y-auto overscroll-contain pe-1">
                             {columns.map((column, index) => {
                                 const nameIssue = column.name.trim()
                                     ? issues.get(`columns.${index}.name`)
@@ -478,7 +478,7 @@ export function NewRowDialog({
                     className="flex min-w-0 flex-col gap-3"
                     onSubmit={(event) => void submit(event)}
                 >
-                    <div className="flex max-h-[55vh] flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
+                    <div className="flex max-h-[55vh] flex-col gap-3 overflow-y-auto overscroll-contain pe-1">
                         {columns.map((column) => {
                             const state = field(column.name);
                             return (

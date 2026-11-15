@@ -427,13 +427,13 @@ export function RulesView({
                             className="rounded-md border border-border bg-card px-3 py-2"
                         >
                             <div className="flex min-w-0 items-start gap-2">
-                                <span className="mt-0.5 w-5 shrink-0 text-right text-[11px] tabular-nums text-foreground-subtle">
+                                <span className="mt-0.5 w-5 shrink-0 text-end text-[11px] tabular-nums text-foreground-subtle">
                                     {index + 1}
                                 </span>
                                 <div className="min-w-0 flex-1">
                                     <button
                                         type="button"
-                                        className="flex max-w-full items-center gap-1.5 text-left text-[13px] font-medium hover:underline disabled:no-underline"
+                                        className="flex max-w-full items-center gap-1.5 text-start text-[13px] font-medium hover:underline disabled:no-underline"
                                         disabled={rule.saving}
                                         title={t("rules.list.editNamed", { name: rule.name })}
                                         onClick={() => open(rule)}

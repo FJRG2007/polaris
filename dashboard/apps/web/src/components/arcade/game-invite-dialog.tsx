@@ -227,7 +227,7 @@ export function GameInviteDialog({
                                                         setChannelId(picked ? null : target.id);
                                                     }}
                                                     className={cn(
-                                                        "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted",
+                                                        "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-muted",
                                                         picked && "bg-primary/10 text-primary"
                                                     )}
                                                 >

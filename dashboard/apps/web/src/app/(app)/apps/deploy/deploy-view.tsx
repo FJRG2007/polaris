@@ -377,7 +377,7 @@ function AppCard({
                     type="button"
                     onClick={onOpen}
                     disabled={!onOpen}
-                    className="group flex min-w-0 items-center gap-2.5 text-left"
+                    className="group flex min-w-0 items-center gap-2.5 text-start"
                 >
                     <span className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-surface text-foreground transition-colors group-enabled:group-hover:border-primary/40">
                         <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-3.5" />
@@ -442,7 +442,7 @@ function AppCard({
                             variant="secondary"
                             onClick={onDeploy}
                             disabled={busy}
-                            className="mr-auto"
+                            className="me-auto"
                         >
                             {busy ? (
                                 <Loader2 className="size-4 animate-spin" />
@@ -620,7 +620,7 @@ function DatabaseCard({
                             size="sm"
                             variant="secondary"
                             disabled={pending}
-                            className="mr-auto"
+                            className="me-auto"
                             onClick={() =>
                                 startTransition(async () => {
                                     await deployActions.deployDatabaseAction(database.id);
@@ -956,7 +956,7 @@ export function NewServiceDialog({
                             <button
                                 type="button"
                                 onClick={() => onViewChange("list")}
-                                className="-ml-1 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                className="-ms-1 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                 aria-label={t("view.back")}
                             >
                                 <ArrowLeft className="size-4" />
@@ -1031,7 +1031,7 @@ function ServiceTypeList({ onPick }: { onPick: (view: Exclude<ServiceView, "list
                     key={type.id}
                     type="button"
                     onClick={() => onPick(type.id)}
-                    className="group flex items-center gap-4 rounded-lg px-3 py-3 text-left text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="group flex items-center gap-4 rounded-lg px-3 py-3 text-start text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <span className="flex size-5 shrink-0 items-center justify-center">
                         {type.icon}

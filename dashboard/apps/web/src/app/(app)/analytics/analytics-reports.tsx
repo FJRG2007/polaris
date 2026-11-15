@@ -226,7 +226,7 @@ export function FilterBar({
                     filters.map((filter, index) => (
                         <span
                             key={`${filter.dimension}:${filter.value}:${index}`}
-                            className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border bg-muted/40 py-0.5 pl-2 pr-1 text-xs"
+                            className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border bg-muted/40 py-0.5 ps-2 pe-1 text-xs"
                         >
                             <span className="shrink-0 text-muted-foreground">
                                 {label(filter.dimension)} {filter.negate ? t("filters.isNot") : t("filters.is")}
@@ -436,14 +436,14 @@ export function BarList({ rows }: { rows: readonly { key: string; label: React.R
                 <li key={row.key} className="relative flex items-center gap-3 py-1.5 text-sm">
                     <span
                         aria-hidden
-                        className="absolute inset-y-0.5 left-0 rounded bg-primary/10"
+                        className="absolute inset-y-0.5 start-0 rounded bg-primary/10"
                         style={{ width: `${top > 0 ? Math.max(2, (row.value / top) * 100) : 0}%` }}
                     />
-                    <span className="relative min-w-0 flex-1 truncate pl-2">{row.label}</span>
+                    <span className="relative min-w-0 flex-1 truncate ps-2">{row.label}</span>
                     {row.note ? (
                         <span className="relative shrink-0 text-xs text-muted-foreground tabular-nums">{row.note}</span>
                     ) : null}
-                    <span className="relative shrink-0 pr-2 tabular-nums">{grouped(row.value)}</span>
+                    <span className="relative shrink-0 pe-2 tabular-nums">{grouped(row.value)}</span>
                 </li>
             ))}
         </ul>
@@ -595,7 +595,7 @@ function SavedList({
             <span className="text-xs font-medium text-muted-foreground">{t("reports.saved")}</span>
             <div className="flex flex-wrap gap-1.5">
                 {saved.map((report) => (
-                    <span key={report.id} className="inline-flex max-w-full items-center gap-1 rounded-md border border-border pl-2 pr-1 text-xs">
+                    <span key={report.id} className="inline-flex max-w-full items-center gap-1 rounded-md border border-border ps-2 pe-1 text-xs">
                         <button type="button" className="min-w-0 truncate py-1 hover:underline" title={report.name} onClick={() => onLoad(report.definition)}>
                             {report.name}
                         </button>
@@ -701,7 +701,7 @@ function FunnelsPanel(props: PanelProps) {
                 <ol className="flex flex-col gap-2">
                     {steps.map((step, index) => (
                         <li key={index} className="flex items-start gap-2">
-                            <span className="mt-1.5 w-5 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{index + 1}</span>
+                            <span className="mt-1.5 w-5 shrink-0 text-end text-xs text-muted-foreground tabular-nums">{index + 1}</span>
                             <MatchFields
                                 match={step}
                                 label={t("funnels.step", { n: String(index + 1) })}
@@ -735,7 +735,7 @@ function FunnelsPanel(props: PanelProps) {
                         />
                         <span className="text-muted-foreground">{t("funnels.minutes")}</span>
                     </label>
-                    <Button size="sm" className="sm:ml-auto" disabled={!definition.success} aria-disabled={!definition.success} onClick={() => definition.success && setAsked(definition.data)}>
+                    <Button size="sm" className="sm:ms-auto" disabled={!definition.success} aria-disabled={!definition.success} onClick={() => definition.success && setAsked(definition.data)}>
                         {t("reports.run")}
                     </Button>
                 </div>
@@ -754,7 +754,7 @@ function FunnelsPanel(props: PanelProps) {
                                             {step.step.value}
                                         </span>
                                         <span className="shrink-0 tabular-nums">{grouped(step.visitors)}</span>
-                                        <span className="w-14 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{share(step.visitors, first)}</span>
+                                        <span className="w-14 shrink-0 text-end text-xs text-muted-foreground tabular-nums">{share(step.visitors, first)}</span>
                                     </div>
                                     <div className="h-2 overflow-hidden rounded bg-muted">
                                         <div className="h-full rounded bg-primary" style={{ width: `${first > 0 ? (step.visitors / first) * 100 : 0}%` }} />
@@ -890,7 +890,7 @@ function GoalsPanel(props: PanelProps) {
                                     </span>
                                 </div>
                                 <span className="shrink-0 tabular-nums">{grouped(result.visitors)}</span>
-                                <span className="w-14 shrink-0 text-right text-xs font-medium tabular-nums">{share(result.visitors, answer.total)}</span>
+                                <span className="w-14 shrink-0 text-end text-xs font-medium tabular-nums">{share(result.visitors, answer.total)}</span>
                                 {canEdit ? (
                                     <Button
                                         size="icon-sm"
@@ -982,10 +982,10 @@ function RetentionPanel(props: PanelProps) {
                         <table className="w-max min-w-full border-separate border-spacing-0.5 text-xs">
                             <thead>
                                 <tr>
-                                    <th className="px-2 py-1 text-left font-medium text-muted-foreground">{t("retention.cohort")}</th>
-                                    <th className="px-2 py-1 text-right font-medium text-muted-foreground">{t("retention.people")}</th>
+                                    <th className="px-2 py-1 text-start font-medium text-muted-foreground">{t("retention.cohort")}</th>
+                                    <th className="px-2 py-1 text-end font-medium text-muted-foreground">{t("retention.people")}</th>
                                     {Array.from({ length: grid.width }, (_, day) => (
-                                        <th key={day} className="px-2 py-1 text-right font-medium text-muted-foreground">
+                                        <th key={day} className="px-2 py-1 text-end font-medium text-muted-foreground">
                                             {t("retention.day", { n: String(day) })}
                                         </th>
                                     ))}
@@ -997,14 +997,14 @@ function RetentionPanel(props: PanelProps) {
                                     return (
                                         <tr key={cohort}>
                                             <td className="whitespace-nowrap px-2 py-1">{format.date(cohort)}</td>
-                                            <td className="px-2 py-1 text-right tabular-nums">{grouped(size)}</td>
+                                            <td className="px-2 py-1 text-end tabular-nums">{grouped(size)}</td>
                                             {Array.from({ length: grid.width }, (_, day) => {
                                                 const value = row.get(day);
                                                 const ratio = value && size ? value / size : 0;
                                                 return (
                                                     <td
                                                         key={day}
-                                                        className="rounded px-2 py-1 text-right tabular-nums"
+                                                        className="rounded px-2 py-1 text-end tabular-nums"
                                                         style={{ background: value ? `color-mix(in oklab, var(--color-primary) ${Math.round(ratio * 60) + 8}%, transparent)` : undefined }}
                                                         title={value ? `${grouped(value)} (${share(value, size)})` : undefined}
                                                     >

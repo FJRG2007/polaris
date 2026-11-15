@@ -216,7 +216,7 @@ export function ActivityCard({
     return (
         <section
             aria-label={activityLine(activity, t)}
-            className="w-full rounded-md bg-muted/40 px-3 py-2.5 text-left"
+            className="w-full rounded-md bg-muted/40 px-3 py-2.5 text-start"
         >
             <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                 {heading(activity, t)}
@@ -245,7 +245,7 @@ export function ActivityCard({
                     {/* The game, small in the corner, when the big picture is
                         the server's own rather than the game's. */}
                     {picture && game ? (
-                        <span className="absolute -bottom-1 -right-1 flex size-6 items-center justify-center rounded-md bg-card p-0.5 shadow-sm ring-1 ring-border">
+                        <span className="absolute -bottom-1 -end-1 flex size-6 items-center justify-center rounded-md bg-card p-0.5 shadow-sm ring-1 ring-border">
                             <GameLogo game={game} className="size-full" />
                         </span>
                     ) : null}

@@ -107,7 +107,7 @@ export function ExecutionPicker({
                 .filter(([execution]) => execution !== value)
                 .map(([execution, reason]) => (
                     <p key={execution} className="text-xs text-muted-foreground">
-                        <Badge variant="neutral" className="mr-1.5">
+                        <Badge variant="neutral" className="me-1.5">
                             {agentWord(t, "execution", execution)}
                         </Badge>
                         {agentText(t, reason ?? "")} {fix(execution as AgentExecution, t)}

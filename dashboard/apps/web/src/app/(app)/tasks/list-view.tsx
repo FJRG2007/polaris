@@ -1188,7 +1188,7 @@ export function ListScreen({
                 )}
 
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                     <input
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
@@ -1203,7 +1203,7 @@ export function ListScreen({
                         }}
                         placeholder={t("toolbar.search")}
                         aria-label={t("toolbar.search")}
-                        className="h-8 w-44 rounded-md border border-border bg-field pl-7 pr-7 text-xs transition-colors duration-fast hover:border-border-strong focus:border-border-strong"
+                        className="h-8 w-44 rounded-md border border-border bg-field ps-7 pe-7 text-xs transition-colors duration-fast hover:border-border-strong focus:border-border-strong"
                     />
                     {search && (
                         <button
@@ -1211,7 +1211,7 @@ export function ListScreen({
                             aria-label={t("toolbar.clearSearch")}
                             title={t("toolbar.clearSearch")}
                             onClick={() => setSearch("")}
-                            className="absolute right-1 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors duration-fast hover:bg-card-hover hover:text-foreground"
+                            className="absolute end-1 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors duration-fast hover:bg-card-hover hover:text-foreground"
                         >
                             <X className="size-3.5" />
                         </button>

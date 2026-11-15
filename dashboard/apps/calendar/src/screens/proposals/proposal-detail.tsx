@@ -260,7 +260,7 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
                 <table className="w-full min-w-[32rem] text-[13px]">
                     <thead>
                         <tr className="border-b border-border">
-                            <th className="px-3 py-2 text-left">{t("proposals.person")}</th>
+                            <th className="px-3 py-2 text-start">{t("proposals.person")}</th>
                             {proposal.dates.map((date) => (
                                 <th
                                     key={date.id}

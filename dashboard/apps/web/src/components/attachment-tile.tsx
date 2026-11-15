@@ -41,7 +41,7 @@ export function AttachmentAction({ className, ...props }: ButtonHTMLAttributes<H
 /** The pill in a thumbnail's top-right corner that holds its actions. */
 export function AttachmentCorner({ children }: { children: ReactNode }) {
     return (
-        <span className="absolute -right-1.5 -top-1.5 flex items-center gap-0.5 rounded-full border border-border bg-elevated px-0.5 shadow-sm">
+        <span className="absolute -end-1.5 -top-1.5 flex items-center gap-0.5 rounded-full border border-border bg-elevated px-0.5 shadow-sm">
             {children}
         </span>
     );

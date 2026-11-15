@@ -571,8 +571,8 @@ function MoveRow({
                     <ArrowRight className="size-3.5 shrink-0" aria-label={t("storage.moves.to")} />
                     <span className="truncate">{serverName(move.targetLabel)}</span>
                 </span>
-                <Badge variant={tone} className="ml-auto">
-                    {working ? <Loader2 className="mr-1 size-3 animate-spin" aria-hidden /> : null}
+                <Badge variant={tone} className="ms-auto">
+                    {working ? <Loader2 className="me-1 size-3 animate-spin" aria-hidden /> : null}
                     {stateLabel(t, move.state)}
                 </Badge>
             </div>

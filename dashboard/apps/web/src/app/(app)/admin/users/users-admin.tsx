@@ -350,9 +350,9 @@ export function UsersAdmin({
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="relative flex-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                        className="pl-9"
+                        className="ps-9"
                         placeholder={t("users.directory.searchPlaceholder")}
                         aria-label={t("users.directory.searchLabel")}
                         value={query}
@@ -377,7 +377,7 @@ export function UsersAdmin({
 
             <div className="overflow-hidden rounded-lg border border-border">
                 <table className="w-full text-sm">
-                    <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">
                                 {t("users.directory.columns.person")}

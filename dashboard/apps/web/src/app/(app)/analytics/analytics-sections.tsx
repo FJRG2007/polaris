@@ -191,11 +191,11 @@ export function RankList({
         <div className={cn("flex min-w-0 flex-col gap-1", className)}>
             <div className="flex items-center gap-3 px-2 text-xs text-muted-foreground">
                 <span className="min-w-0 flex-1 truncate">{t("lists.item")}</span>
-                <span className="w-16 shrink-0 truncate text-right" title={t("lists.visitors")}>
+                <span className="w-16 shrink-0 truncate text-end" title={t("lists.visitors")}>
                     {t("lists.visitors")}
                 </span>
                 <span
-                    className="hidden w-16 shrink-0 truncate text-right sm:inline"
+                    className="hidden w-16 shrink-0 truncate text-end sm:inline"
                     title={dimension === "event" ? t("lists.events") : t("lists.views")}
                 >
                     {dimension === "event" ? t("lists.events") : t("lists.views")}
@@ -211,19 +211,19 @@ export function RankList({
                                 <ContextMenuTrigger asChild>
                                     <div
                                         role="listitem"
-                                        className="absolute left-0 top-0 flex w-full items-center gap-3 text-sm"
+                                        className="absolute start-0 top-0 flex w-full items-center gap-3 text-sm"
                                         style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
                                     >
                                         <span
                                             aria-hidden
-                                            className="absolute inset-y-1 left-0 rounded bg-primary/10"
+                                            className="absolute inset-y-1 start-0 rounded bg-primary/10"
                                             style={{ width: `${top > 0 ? Math.max(2, (row.visitors / top) * 100) : 0}%` }}
                                         />
                                         {onPick ? (
                                             <button
                                                 type="button"
                                                 className={cn(
-                                                    "relative min-w-0 flex-1 truncate pl-2 text-left hover:underline",
+                                                    "relative min-w-0 flex-1 truncate ps-2 text-start hover:underline",
                                                     picked === row.key && "font-medium"
                                                 )}
                                                 aria-pressed={picked === row.key}
@@ -235,21 +235,21 @@ export function RankList({
                                         ) : pick && narrow ? (
                                             <button
                                                 type="button"
-                                                className="relative min-w-0 flex-1 truncate pl-2 text-left hover:underline"
+                                                className="relative min-w-0 flex-1 truncate ps-2 text-start hover:underline"
                                                 title={t("filters.narrowTo", { value: row.key })}
                                                 onClick={() => pick(narrow, row.key)}
                                             >
                                                 {label}
                                             </button>
                                         ) : (
-                                            <span className="relative min-w-0 flex-1 truncate pl-2" title={row.key}>
+                                            <span className="relative min-w-0 flex-1 truncate ps-2" title={row.key}>
                                                 {label}
                                             </span>
                                         )}
-                                        <span className="relative w-16 shrink-0 text-right tabular-nums">
+                                        <span className="relative w-16 shrink-0 text-end tabular-nums">
                                             {grouped(row.visitors)}
                                         </span>
-                                        <span className="relative hidden w-16 shrink-0 pr-2 text-right tabular-nums text-muted-foreground sm:inline">
+                                        <span className="relative hidden w-16 shrink-0 pe-2 text-end tabular-nums text-muted-foreground sm:inline">
                                             {grouped(row.views)}
                                         </span>
                                     </div>
@@ -585,7 +585,7 @@ export function RealtimeSection(props: PanelProps) {
                                         </span>
                                         <button
                                             type="button"
-                                            className="min-w-0 flex-1 truncate text-left hover:underline"
+                                            className="min-w-0 flex-1 truncate text-start hover:underline"
                                             title={entry.kind === "event" ? (entry.name ?? "") : entry.path}
                                             onClick={() =>
                                                 pick?.(entry.kind === "event" ? "event" : "path", entry.kind === "event" ? (entry.name ?? "") : entry.path)
@@ -651,18 +651,18 @@ function TopCard({
                             <li key={row.key} className="relative flex items-center gap-3 py-1.5 text-sm">
                                 <span
                                     aria-hidden
-                                    className="absolute inset-y-0.5 left-0 rounded bg-primary/10"
+                                    className="absolute inset-y-0.5 start-0 rounded bg-primary/10"
                                     style={{ width: `${top > 0 ? Math.max(2, (row.visitors / top) * 100) : 0}%` }}
                                 />
                                 <button
                                     type="button"
-                                    className="relative min-w-0 flex-1 truncate pl-2 text-left hover:underline"
+                                    className="relative min-w-0 flex-1 truncate ps-2 text-start hover:underline"
                                     title={row.key}
                                     onClick={() => (pick && narrow ? pick(narrow, row.key) : undefined)}
                                 >
                                     {rowLabel(dimension, row.key)}
                                 </button>
-                                <span className="relative shrink-0 pr-2 tabular-nums">{grouped(row.visitors)}</span>
+                                <span className="relative shrink-0 pe-2 tabular-nums">{grouped(row.visitors)}</span>
                             </li>
                         ))}
                     </ul>

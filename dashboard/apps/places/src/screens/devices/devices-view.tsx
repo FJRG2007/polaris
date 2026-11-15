@@ -548,7 +548,7 @@ export function DevicesView({
                 {accounts.map((account) => (
                     <span
                         key={account.id}
-                        className="flex items-center gap-1.5 rounded-lg border border-border bg-card py-1 pl-2.5 pr-1"
+                        className="flex items-center gap-1.5 rounded-lg border border-border bg-card py-1 ps-2.5 pe-1"
                     >
                         <IntegrationLogo
                             slug={registry.deviceConnection(account.connection)?.logo ?? ""}
@@ -726,14 +726,14 @@ export function DevicesView({
             {entries.length > 0 && (present.length > 1 || entries.length > 8) && (
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="relative min-w-0 flex-1 sm:max-w-xs">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
+                        <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
                         <Input
                             type="search"
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={t("devicesView.search")}
                             aria-label={t("devicesView.search")}
-                            className="pl-8"
+                            className="ps-8"
                         />
                     </div>
                     {present.length > 1 && (
@@ -990,7 +990,7 @@ const DeviceRow = memo(function DeviceRow({
             <button
                 type="button"
                 onClick={() => onOpen(device)}
-                className="flex min-w-[10rem] flex-1 flex-col items-start gap-0.5 text-left"
+                className="flex min-w-[10rem] flex-1 flex-col items-start gap-0.5 text-start"
             >
                 <span className="flex min-w-0 max-w-full items-center gap-2">
                     <DeviceIcon
@@ -1263,7 +1263,7 @@ function HardwareRow({
             )}
         </>
     );
-    const className = "flex min-w-[10rem] flex-1 flex-col items-start gap-0.5 text-left";
+    const className = "flex min-w-[10rem] flex-1 flex-col items-start gap-0.5 text-start";
     return (
         <RowShell actions={actions}>
             {href ? (

@@ -44,7 +44,7 @@ export function MarkdownContent({ html, className }: { html: string; className?:
         const created: { node: HTMLElement; code: string }[] = [];
         for (const block of root.querySelectorAll<HTMLElement>(".code-block")) {
             const node = document.createElement("span");
-            node.className = "copy-host absolute right-2 top-2 transition-opacity";
+            node.className = "copy-host absolute end-2 top-2 transition-opacity";
             block.append(node);
             created.push({ node, code: block.textContent ?? "" });
         }

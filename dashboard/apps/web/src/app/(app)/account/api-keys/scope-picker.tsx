@@ -114,14 +114,14 @@ export function ScopePicker({
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
                 <span className="relative min-w-[12rem] flex-1">
-                    <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
                         placeholder={t("apiKeys.scopes.filter")}
                         aria-label={t("apiKeys.scopes.filter")}
                         autoComplete="off"
-                        className="pl-8"
+                        className="ps-8"
                     />
                 </span>
                 <span className="text-xs text-muted-foreground">
@@ -187,7 +187,7 @@ export function ScopePicker({
 
                     return (
                         <div key={group.title} className="border-b border-border last:border-b-0">
-                            <div className="flex min-w-0 items-center gap-2 pl-3">
+                            <div className="flex min-w-0 items-center gap-2 ps-3">
                                 <Checkbox
                                     checked={allHeld}
                                     indeterminate={!allHeld && chosen > 0}
@@ -219,7 +219,7 @@ export function ScopePicker({
                                             return next;
                                         })
                                     }
-                                    className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-3 text-left text-sm transition-colors hover:bg-muted/40"
+                                    className="flex min-w-0 flex-1 items-center gap-2 py-2 pe-3 text-start text-sm transition-colors hover:bg-muted/40"
                                 >
                                     <ChevronRight
                                         className={cn(
@@ -253,7 +253,7 @@ export function ScopePicker({
                                 {group.levels ? (
                                     <SegmentedControl<ScopeLevel>
                                         size="sm"
-                                        className="mr-3 shrink-0"
+                                        className="me-3 shrink-0"
                                         aria-label={t("apiKeys.scopes.levelOf", {
                                             group: group.title
                                         })}
@@ -281,7 +281,7 @@ export function ScopePicker({
                             </div>
 
                             {expanded && (
-                                <div className="flex flex-col gap-2 px-3 pb-3 pl-9">
+                                <div className="flex flex-col gap-2 px-3 pb-3 ps-9">
                                     {shown.map((scope) => {
                                         const source = includedBy(scope, selected);
                                         return (

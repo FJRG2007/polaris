@@ -51,7 +51,7 @@ export function ConnectionTable({ rows, noMatch, ...row }: ConnectionTableProps)
     return (
         <div className="min-h-0 overflow-auto overscroll-contain rounded-lg border border-border">
             <table className="w-full min-w-[56rem] text-sm">
-                <thead className="sticky top-0 z-10 bg-surface text-left text-xs text-muted-foreground">
+                <thead className="sticky top-0 z-10 bg-surface text-start text-xs text-muted-foreground">
                     <tr>
                         <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
                             {t("dialog.name")}
@@ -151,7 +151,7 @@ function ConnectionRow({
                             <button
                                 type="button"
                                 onClick={only(() => onOpen(connection))}
-                                className="min-w-0 truncate text-left font-medium hover:underline"
+                                className="min-w-0 truncate text-start font-medium hover:underline"
                                 title={connection.name}
                             >
                                 {connection.name}

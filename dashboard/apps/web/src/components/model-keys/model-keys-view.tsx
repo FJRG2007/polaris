@@ -406,7 +406,7 @@ export function ModelKeysView({
                             arrives at md: that is where the navigation rail appears, so
                             the content area is narrower there than a breakpoint
                             earlier. */}
-                        <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                        <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                             <tr>
                                 <th
                                     className="w-10 px-2 py-2 font-medium"
@@ -674,7 +674,7 @@ function KeyRow({
                 <div className="flex items-center justify-end gap-1">
                     {onToggle ? (
                         <span
-                            className="mr-1 inline-flex"
+                            className="me-1 inline-flex"
                             title={row.enabled ? t("modelKeys.turnOff") : t("modelKeys.turnOn")}
                         >
                             <Switch
@@ -1161,7 +1161,7 @@ function KeyDialog({
                                     href={entry.createUrl}
                                     target="_blank"
                                     rel="noreferrer noopener"
-                                    className="text-muted-foreground hover:text-foreground mr-auto text-xs"
+                                    className="text-muted-foreground hover:text-foreground me-auto text-xs"
                                 >
                                     {t("modelKeys.createAt", { provider: entry.name })}
                                 </a>

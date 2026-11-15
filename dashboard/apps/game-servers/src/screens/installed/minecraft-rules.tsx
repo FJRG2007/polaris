@@ -235,7 +235,7 @@ export function MinecraftRules({
                 <Button
                     size="icon"
                     variant="ghost"
-                    className="ml-auto"
+                    className="ms-auto"
                     aria-label={t("rules.readTheRulesAgain")}
                     title={t("rules.readTheRulesAgain")}
                     disabled={checking}

@@ -686,7 +686,7 @@ export function ContainersView({
                         <div className="mb-2 flex flex-wrap items-center gap-2">
                             <div className="relative min-w-0 flex-1 basis-48">
                                 <Search
-                                    className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                                    className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                                     aria-hidden="true"
                                 />
                                 <Input
@@ -698,7 +698,7 @@ export function ContainersView({
                                     placeholder={t("list.search")}
                                     aria-label={t("list.search")}
                                     maxLength={200}
-                                    className="pl-8"
+                                    className="ps-8"
                                 />
                             </div>
                             {isLocalHost ? (
@@ -754,7 +754,7 @@ export function ContainersView({
 
                         <div className="overflow-x-auto rounded-lg border border-border">
                             <table className="w-full min-w-[44rem] text-sm">
-                                <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                                <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                                     <tr>
                                         <SortHeader
                                             label={t("columns.container")}
@@ -804,7 +804,7 @@ export function ContainersView({
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
-                                                            className="ml-2"
+                                                            className="ms-2"
                                                             onClick={clearFilters}
                                                         >
                                                             {t("list.clear")}
@@ -832,7 +832,7 @@ export function ContainersView({
                                                                         container,
                                                                         "details"
                                                                     )}
-                                                                    className="min-w-0 truncate text-left font-medium hover:underline"
+                                                                    className="min-w-0 truncate text-start font-medium hover:underline"
                                                                     title={container.name}
                                                                 >
                                                                     {container.name}
@@ -886,7 +886,7 @@ export function ContainersView({
                                                                       )
                                                             }
                                                         />
-                                                        <td className="w-12 px-3 py-2 text-right">
+                                                        <td className="w-12 px-3 py-2 text-end">
                                                             <RowActionsMenu
                                                                 title={container.name}
                                                                 label={t("list.menu", {
@@ -1030,7 +1030,7 @@ function SortHeader({
                 type="button"
                 onClick={() => onSort(order)}
                 className={cn(
-                    "flex w-full items-center gap-1 px-3 py-2 text-left transition-colors hover:text-foreground",
+                    "flex w-full items-center gap-1 px-3 py-2 text-start transition-colors hover:text-foreground",
                     active && "text-foreground"
                 )}
             >

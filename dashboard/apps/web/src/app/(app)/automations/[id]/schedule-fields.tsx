@@ -232,7 +232,7 @@ function Times({ value, onChange }: { value: string[]; onChange: (times: string[
                 {value.map((time, index) => (
                     <span
                         key={index}
-                        className="flex items-center gap-0.5 rounded-md border border-border bg-muted/40 py-0.5 pr-0.5 pl-0.5"
+                        className="flex items-center gap-0.5 rounded-md border border-border bg-muted/40 py-0.5 pe-0.5 ps-0.5"
                     >
                         <DateInput
                             mode="time"

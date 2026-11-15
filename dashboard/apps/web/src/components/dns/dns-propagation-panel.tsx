@@ -98,7 +98,7 @@ export function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; reco
                 <Button
                     size="sm"
                     variant="ghost"
-                    className="ml-auto"
+                    className="ms-auto"
                     disabled={busy}
                     onClick={() => void check()}
                 >

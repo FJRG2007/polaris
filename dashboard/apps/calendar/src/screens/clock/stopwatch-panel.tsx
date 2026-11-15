@@ -258,19 +258,19 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
                         <table className="w-full text-[0.8125rem] tabular-nums">
                             <thead>
                                 <tr className="border-b border-border">
-                                    <th className="px-3 py-2 text-left">{headers[0]}</th>
-                                    <th className="px-3 py-2 text-right">{headers[1]}</th>
-                                    <th className="px-3 py-2 text-right">{headers[2]}</th>
+                                    <th className="px-3 py-2 text-start">{headers[0]}</th>
+                                    <th className="px-3 py-2 text-end">{headers[1]}</th>
+                                    <th className="px-3 py-2 text-end">{headers[2]}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {running ? (
                                     <tr className="border-b border-border text-muted-foreground">
                                         <td className="px-3 py-1.5">{laps.length + 1}</td>
-                                        <td className="px-3 py-1.5 text-right">
+                                        <td className="px-3 py-1.5 text-end">
                                             {model.formatClockMs(current, { hundredths: true })}
                                         </td>
-                                        <td className="px-3 py-1.5 text-right">
+                                        <td className="px-3 py-1.5 text-end">
                                             {model.formatClockMs(reading, { hundredths: true })}
                                         </td>
                                     </tr>
@@ -290,7 +290,7 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
                                             <td className="px-3 py-1.5">{index + 1}</td>
                                             <td
                                                 className={cn(
-                                                    "px-3 py-1.5 text-right",
+                                                    "px-3 py-1.5 text-end",
                                                     split === fastest &&
                                                         "font-medium text-success-ink",
                                                     split === slowest && "font-medium text-danger"
@@ -305,7 +305,7 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
                                             >
                                                 {model.formatClockMs(split, { hundredths: true })}
                                             </td>
-                                            <td className="px-3 py-1.5 text-right">
+                                            <td className="px-3 py-1.5 text-end">
                                                 {model.formatClockMs(total, { hundredths: true })}
                                             </td>
                                         </tr>

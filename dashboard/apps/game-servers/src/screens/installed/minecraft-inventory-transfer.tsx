@@ -454,16 +454,16 @@ export function InventoryImportDialog({
                                         })}
                                     </p>
                                 ) : (
-                                    <table className="w-full text-left text-xs">
+                                    <table className="w-full text-start text-xs">
                                         <thead className="text-muted-foreground">
                                             <tr>
-                                                <th className="py-1 pr-2 font-normal">
+                                                <th className="py-1 pe-2 font-normal">
                                                     {t("inventoryTransfer.slot")}
                                                 </th>
-                                                <th className="py-1 pr-2 font-normal">
+                                                <th className="py-1 pe-2 font-normal">
                                                     {t("inventoryTransfer.now")}
                                                 </th>
-                                                <th className="py-1 pr-2 font-normal">
+                                                <th className="py-1 pe-2 font-normal">
                                                     {t("inventoryTransfer.after")}
                                                 </th>
                                                 <th className="py-1 font-normal" />
@@ -475,13 +475,13 @@ export function InventoryImportDialog({
                                                     key={slot.slot}
                                                     className="border-t border-border/60 align-top"
                                                 >
-                                                    <td className="py-1 pr-2 whitespace-nowrap">
+                                                    <td className="py-1 pe-2 whitespace-nowrap">
                                                         {slotLabelIn(t, slot.slot)}
                                                     </td>
-                                                    <td className="py-1 pr-2 break-all">
+                                                    <td className="py-1 pe-2 break-all">
                                                         {stackText(t, slot.before)}
                                                     </td>
-                                                    <td className="py-1 pr-2 break-all">
+                                                    <td className="py-1 pe-2 break-all">
                                                         {stackText(
                                                             t,
                                                             slot.change === "refused"

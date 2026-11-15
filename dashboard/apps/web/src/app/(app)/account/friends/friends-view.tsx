@@ -430,7 +430,7 @@ function AddFriend({
         <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
                 <div className="relative min-w-0 flex-1">
-                    <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={query}
                         onChange={(event) => {
@@ -444,10 +444,10 @@ function AddFriend({
                         }}
                         placeholder={t("friends.searchPlaceholder")}
                         aria-label={t("friends.add")}
-                        className="pl-7"
+                        className="ps-7"
                     />
                     {looking && (
-                        <Loader2 className="absolute right-2 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
+                        <Loader2 className="absolute end-2 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
                     )}
                 </div>
                 <Button
@@ -507,7 +507,7 @@ function AddFriend({
                                     if (await onAsk(() => requestFriendAction(person.id, words)))
                                         sent();
                                 }}
-                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
+                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm transition-colors hover:bg-muted"
                             >
                                 <Avatar person={person} size={20} />
                                 <span className="min-w-0 flex-1 truncate">

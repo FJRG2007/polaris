@@ -61,7 +61,7 @@ export function CloudFirewallSteps({
                     </Button>
                 ) : null}
             </div>
-            <ol className="ml-4 flex list-decimal flex-col gap-2 text-muted-foreground">
+            <ol className="ms-4 flex list-decimal flex-col gap-2 text-muted-foreground">
                 {Array.from({ length: guide.steps }, (_, index) => (
                     <li key={index}>
                         {t.rich(

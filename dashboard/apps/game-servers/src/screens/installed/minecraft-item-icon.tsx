@@ -73,7 +73,7 @@ export function ItemIcon({ id, className }: { id: string; className?: string }) 
                 draggable={false}
                 style={fit}
                 onError={() => setFailed(id)}
-                className="absolute left-0 top-0 max-w-none select-none [image-rendering:pixelated]"
+                className="absolute start-0 top-0 max-w-none select-none [image-rendering:pixelated]"
             />
         </span>
     );

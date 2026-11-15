@@ -217,7 +217,7 @@ function Incident({
                     {t("public.affects", { names: incident.components.join(", ") })}
                 </p>
             ) : null}
-            <ol className="mt-3 space-y-2 border-l border-border pl-3">
+            <ol className="mt-3 space-y-2 border-s border-border ps-3">
                 {incident.updates.map((update) => (
                     <li key={update.at + update.state}>
                         <p className="text-xs">

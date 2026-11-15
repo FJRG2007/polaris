@@ -163,7 +163,7 @@ export function ReportsView({
                                             }}
                                         />
                                     </div>
-                                    <span className="w-8 text-right text-muted-foreground">{slice.count}</span>
+                                    <span className="w-8 text-end text-muted-foreground">{slice.count}</span>
                                 </li>
                             ))}
                             {report.byPriority.length === 0 && (

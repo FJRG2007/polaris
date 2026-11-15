@@ -465,7 +465,7 @@ export function ItemDialog({
                     <DialogDescription>{t("item.description")}</DialogDescription>
                 </DialogHeader>
 
-                <div className="flex max-h-[65vh] flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
+                <div className="flex max-h-[65vh] flex-col gap-3 overflow-y-auto overscroll-contain pe-1">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label className="flex min-w-0 flex-col gap-1 text-sm">
                             {t("item.kind")}
@@ -929,12 +929,12 @@ export function ItemDialog({
                                                 }
                                             })
                                         }
-                                        className="pr-12 font-mono"
+                                        className="pe-12 font-mono"
                                         autoComplete="off"
                                         placeholder="4111 1111 1111 1111"
                                     />
                                     {cardMark ? (
-                                        <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+                                        <span className="pointer-events-none absolute inset-y-0 end-2 flex items-center">
                                             {cardMark}
                                         </span>
                                     ) : null}

@@ -327,7 +327,7 @@ export function EventEditor({
                     aria-describedby={undefined}
                     className="flex max-h-[92vh] w-full max-w-3xl flex-col gap-0 p-0 max-sm:inset-0 max-sm:h-[100dvh] max-sm:max-h-none max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none"
                 >
-                    <div className="flex items-center gap-2 border-b border-border px-5 py-3 pr-14">
+                    <div className="flex items-center gap-2 border-b border-border px-5 py-3 pe-14">
                         <DialogTitle className="min-w-0 flex-1 truncate">{title}</DialogTitle>
                         {detail?.pending ? (
                             <Badge variant="warning" title={t("editor.pendingHint")}>
@@ -422,7 +422,7 @@ export function EventEditor({
                                     />
                                 </div>
                             ) : null}
-                            <div className="ml-auto flex items-center gap-2">
+                            <div className="ms-auto flex items-center gap-2">
                                 <Button
                                     variant="ghost"
                                     onClick={() => void close()}
@@ -792,11 +792,11 @@ function EditForm({
                         <div className="relative">
                             <MapPin
                                 aria-hidden
-                                className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
+                                className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
                             />
                             <Input
                                 id={`${ids}-location`}
-                                className="pl-8"
+                                className="ps-8"
                                 value={form.location}
                                 maxLength={1000}
                                 onChange={(event) => set({ location: event.target.value })}
@@ -1340,13 +1340,13 @@ function ConferenceField({
                 <div className="relative min-w-0 flex-1">
                     <Video
                         aria-hidden
-                        className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
+                        className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
                     />
                     <Input
                         id={id}
                         type="url"
                         inputMode="url"
-                        className="pl-8"
+                        className="ps-8"
                         placeholder="https://"
                         value={value}
                         onChange={(event) => onChange(event.target.value)}

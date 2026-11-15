@@ -365,7 +365,7 @@ export function DashboardsScreen() {
                 {current?.shared ? (
                     <Badge variant="neutral">{t("dashboards.sharedWithYou")}</Badge>
                 ) : null}
-                <span className="mr-auto" />
+                <span className="me-auto" />
                 {manage && current ? (
                     <Button
                         variant="ghost"
@@ -690,7 +690,7 @@ function WidgetCard({
             aria-label={title}
         >
             <div className="flex min-w-0 items-center gap-1">
-                <h2 className="mr-auto min-w-0 truncate text-[0.875rem] font-medium" title={title}>
+                <h2 className="me-auto min-w-0 truncate text-[0.875rem] font-medium" title={title}>
                     {title}
                 </h2>
                 {reading.data?.kind === "groups" && reading.data.capped ? (

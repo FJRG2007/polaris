@@ -133,14 +133,14 @@ export function TimesheetView({
             <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full min-w-[44rem] border-collapse text-sm">
                     <thead>
-                        <tr className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
+                        <tr className="border-b border-border bg-muted/40 text-start text-xs text-muted-foreground">
                             <th className="px-3 py-2 font-medium">{t("timesheet.task")}</th>
                             {weekdayHeadings(sheet.from, locale).map((day, index) => (
                                 <th key={`${day}-${index}`} className="px-2 py-2 text-center font-medium">
                                     {day}
                                 </th>
                             ))}
-                            <th className="px-3 py-2 text-right font-medium">{t("timesheet.total")}</th>
+                            <th className="px-3 py-2 text-end font-medium">{t("timesheet.total")}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -171,7 +171,7 @@ export function TimesheetView({
                                         {seconds > 0 ? core.formatTrackedSeconds(seconds) : "-"}
                                     </td>
                                 ))}
-                                <td className="px-3 py-2 text-right font-medium">
+                                <td className="px-3 py-2 text-end font-medium">
                                     {core.formatTrackedSeconds(entry.total)}
                                 </td>
                             </tr>
@@ -193,7 +193,7 @@ export function TimesheetView({
                                         {seconds > 0 ? core.formatTrackedSeconds(seconds) : "-"}
                                     </td>
                                 ))}
-                                <td className="px-3 py-2 text-right">{core.formatTrackedSeconds(sheet.total)}</td>
+                                <td className="px-3 py-2 text-end">{core.formatTrackedSeconds(sheet.total)}</td>
                             </tr>
                         </tfoot>
                     )}

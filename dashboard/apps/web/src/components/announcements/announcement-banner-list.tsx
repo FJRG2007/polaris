@@ -189,7 +189,7 @@ export function AnnouncementBannerList({
                                     onClick={() => dismiss(banner.id)}
                                     aria-label={t("banner.dismiss")}
                                     title={t("banner.dismiss")}
-                                    className="-my-1.5 -mr-2 inline-flex size-11 items-center justify-center rounded-md opacity-70 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"
+                                    className="-my-1.5 -me-2 inline-flex size-11 items-center justify-center rounded-md opacity-70 hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"
                                 >
                                     <X className="size-4 shrink-0" aria-hidden />
                                 </button>

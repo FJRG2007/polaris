@@ -645,7 +645,7 @@ export function ShareDialog({
                                 {staged.map((one) => (
                                     <span
                                         key={`${one.type}:${one.id}`}
-                                        className="flex min-w-0 max-w-full items-center gap-1 rounded-full bg-muted py-0.5 pl-1 pr-1.5 text-[12px] text-foreground"
+                                        className="flex min-w-0 max-w-full items-center gap-1 rounded-full bg-muted py-0.5 ps-1 pe-1.5 text-[12px] text-foreground"
                                     >
                                         <TargetFace target={one} size={18} />
                                         <span className="min-w-0 truncate" title={one.name}>
@@ -887,11 +887,11 @@ export function ShareDialog({
                                     {total > 5 || filter ? (
                                         <div className="relative">
                                             <Search
-                                                className="pointer-events-none absolute left-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-foreground-subtle"
+                                                className="pointer-events-none absolute start-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-foreground-subtle"
                                                 aria-hidden
                                             />
                                             <Input
-                                                className="pl-8"
+                                                className="ps-8"
                                                 aria-label={t("share.searchAccess")}
                                                 placeholder={t("share.searchAccess")}
                                                 value={filter}
@@ -934,7 +934,7 @@ export function ShareDialog({
                                                             key={grant.id}
                                                             role="listitem"
                                                             data-index={item.index}
-                                                            className="absolute left-0 right-0 flex min-w-0 items-center gap-3 px-1"
+                                                            className="absolute start-0 end-0 flex min-w-0 items-center gap-3 px-1"
                                                             style={{
                                                                 top: item.start,
                                                                 height: ROW_HEIGHT

@@ -733,7 +733,7 @@ export function SignInRefusedNotice({ account }: { account: string | null }) {
     return (
         <Notice error>
             {account ? t("code.signInRefused", { account }) : t("code.signInRefusedUnnamed")}{" "}
-            <Button asChild size="sm" variant="outline" className="ml-1 align-middle">
+            <Button asChild size="sm" variant="outline" className="ms-1 align-middle">
                 <Link href="/account/ai-keys">{t("code.linkAgain")}</Link>
             </Button>
         </Notice>

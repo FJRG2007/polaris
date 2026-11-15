@@ -177,7 +177,7 @@ export function AttachmentSection({
                                         );
                                         onChanged();
                                     }}
-                                    className="absolute right-1 top-1 rounded bg-background/80 p-1 text-muted-foreground transition-opacity md:opacity-0 hover:text-danger md:group-hover:opacity-100"
+                                    className="absolute end-1 top-1 rounded bg-background/80 p-1 text-muted-foreground transition-opacity md:opacity-0 hover:text-danger md:group-hover:opacity-100"
                                 >
                                     <X className="size-3.5" />
                                 </button>
@@ -286,7 +286,7 @@ export function CommitSection({
                                 className="min-w-0 flex-1 truncate text-sm hover:underline"
                                 title={`${commit.repository}@${commit.sha}`}
                             >
-                                <span className="mr-2 font-mono text-[0.6875rem] text-muted-foreground">
+                                <span className="me-2 font-mono text-[0.6875rem] text-muted-foreground">
                                     {commit.shortSha}
                                 </span>
                                 {commit.message || commit.repository}

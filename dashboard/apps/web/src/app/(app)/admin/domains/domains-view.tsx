@@ -283,7 +283,7 @@ function AddressesSkeleton() {
                 <div key={row} className="flex items-center gap-2">
                     <Skeleton className="h-4 w-56 max-w-[60%]" />
                     <Skeleton className="h-3 w-24" />
-                    <Skeleton className="ml-auto h-6 w-6" />
+                    <Skeleton className="ms-auto h-6 w-6" />
                 </div>
             ))}
         </div>
@@ -1047,7 +1047,7 @@ function ExposureGuidance({
         return (
             <GuidanceNote>
                 <b>{t("domains.guidance.wildcardTitle")}</b>
-                <ol className="mt-1 list-decimal space-y-1 pl-4">
+                <ol className="mt-1 list-decimal space-y-1 ps-4">
                     <li>
                         {t("domains.guidance.wildcardRecord")}
                         <DnsRecordTable

@@ -120,7 +120,7 @@ function DownloadArt({
             {/* The list that opens under it. */}
             <div
                 className={cn(
-                    "absolute right-2 top-9 w-[78%] rounded-md border border-border bg-elevated p-2 shadow-popover",
+                    "absolute end-2 top-9 w-[78%] rounded-md border border-border bg-elevated p-2 shadow-popover",
                     safari && "right-auto left-1/2 -translate-x-1/2",
                     firefox && "rounded-sm"
                 )}
@@ -139,7 +139,7 @@ function DownloadArt({
                         <p className="text-[10px] text-muted-foreground">{doneLabel}</p>
                     </div>
                 </div>
-                <Pointer className="bottom-0 right-3" />
+                <Pointer className="bottom-0 end-3" />
             </div>
         </div>
     );
@@ -153,7 +153,7 @@ function ProgressArt({ appName }: { appName: string }) {
                 <span className="size-1.5 rounded-full bg-foreground-subtle/50" />
                 <span className="size-1.5 rounded-full bg-foreground-subtle/50" />
                 <span
-                    className="ml-1 min-w-0 truncate text-[10px] text-muted-foreground"
+                    className="ms-1 min-w-0 truncate text-[10px] text-muted-foreground"
                     title={appName}
                 >
                     {appName}
@@ -180,7 +180,7 @@ function AppTile({ appName }: { appName: string }) {
             <span className="absolute -top-7 left-1/2 max-w-28 -translate-x-1/2 truncate whitespace-nowrap rounded bg-elevated px-1.5 py-0.5 text-[10px] font-medium text-foreground shadow-popover">
                 {appName}
             </span>
-            <Pointer className="-bottom-3 -right-2" />
+            <Pointer className="-bottom-3 -end-2" />
         </span>
     );
 }
@@ -194,7 +194,7 @@ function DockArt({ os, appName }: { os: GuideOs; appName: string }) {
             <div className="absolute inset-3 overflow-hidden rounded-lg border border-border bg-background">
                 <div
                     data-os="linux"
-                    className="absolute inset-y-0 left-0 flex w-10 flex-col items-center justify-center gap-2 bg-surface"
+                    className="absolute inset-y-0 start-0 flex w-10 flex-col items-center justify-center gap-2 bg-surface"
                 >
                     {icons}
                     <AppTile appName={appName} />
@@ -275,7 +275,7 @@ export function InstallGuideDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="w-[calc(100%-2rem)] max-w-3xl">
-                <DialogHeader className="pr-8">
+                <DialogHeader className="pe-8">
                     <DialogTitle>{content.title}</DialogTitle>
                     <DialogDescription>{content.description}</DialogDescription>
                 </DialogHeader>

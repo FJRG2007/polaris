@@ -59,7 +59,7 @@ export function ChannelCard({
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
                 <div className="flex items-center justify-end gap-2">
                     {ready ? (
-                        <span className="mr-auto inline-flex items-center gap-1 text-xs text-success">
+                        <span className="me-auto inline-flex items-center gap-1 text-xs text-success">
                             <CheckCircle2 className="size-3.5" /> {ready}
                         </span>
                     ) : null}

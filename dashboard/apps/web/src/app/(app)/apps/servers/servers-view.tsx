@@ -250,7 +250,7 @@ export function ServersView({
                 {/* Six columns of address, status and auth do not compress into a phone,
                     so the table keeps its width and the wrapper scrolls instead. */}
                 <table className="w-full min-w-[46rem] text-sm">
-                    <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                         <tr>
                             <th className="px-3 py-2 font-medium">{t("list.columns.server")}</th>
                             <th className="px-3 py-2 font-medium">{t("list.columns.address")}</th>
@@ -362,7 +362,7 @@ export function ServersView({
                                                 table already carries six, and a seventh is what makes
                                                 it unreadable on a laptop. */}
                                                     {server.os ? (
-                                                        <span className="ml-1.5 border-l border-border pl-1.5">
+                                                        <span className="ms-1.5 border-s border-border ps-1.5">
                                                             {server.os}
                                                         </span>
                                                     ) : null}
@@ -550,7 +550,7 @@ export function ServersView({
                                                     <SquareTerminal className="size-4" />{" "}
                                                     {t("list.shell")}
                                                     {down ? (
-                                                        <span className="ml-auto pl-3 text-xs">
+                                                        <span className="ms-auto ps-3 text-xs">
                                                             {t("list.notAnswering")}
                                                         </span>
                                                     ) : null}
@@ -561,7 +561,7 @@ export function ServersView({
                                                     <ContextMenuItem disabled>
                                                         <FolderOpen className="size-4" />{" "}
                                                         {t("list.files")}
-                                                        <span className="ml-auto pl-3 text-xs">
+                                                        <span className="ms-auto ps-3 text-xs">
                                                             {t("list.notAnswering")}
                                                         </span>
                                                     </ContextMenuItem>

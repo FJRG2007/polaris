@@ -140,14 +140,14 @@ export function ComparisonEditor({
                         <table className="w-full min-w-[40rem] border-collapse text-[13px]">
                             <thead>
                                 <tr className="border-b border-border bg-surface">
-                                    <th className="sticky left-0 z-10 min-w-48 bg-surface px-3 py-2 text-left font-medium">
+                                    <th className="sticky start-0 z-10 min-w-48 bg-surface px-3 py-2 text-start font-medium">
                                         {t("comparison.criterion")}
                                     </th>
                                     {columns.map((subject) => (
                                         <th
                                             key={subject.id}
                                             className={cn(
-                                                "min-w-40 px-3 py-2 text-left font-medium",
+                                                "min-w-40 px-3 py-2 text-start font-medium",
                                                 // The column that is ours reads
                                                 // differently, because the gap is
                                                 // the point of the exercise.
@@ -179,7 +179,7 @@ export function ComparisonEditor({
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            className="ml-auto"
+                                                            className="ms-auto"
                                                             aria-label={t(
                                                                 "comparison.describeNamed",
                                                                 { name: subject.name }
@@ -236,7 +236,7 @@ export function ComparisonEditor({
                                     <tr key={criterion.id} className="border-b border-border/60">
                                         <th
                                             scope="row"
-                                            className="sticky left-0 z-10 bg-background px-3 py-2 text-left align-top font-normal"
+                                            className="sticky start-0 z-10 bg-background px-3 py-2 text-start align-top font-normal"
                                         >
                                             <span className="block truncate font-medium">
                                                 {criterion.name}
@@ -346,7 +346,7 @@ function CellBox({
                 disabled={!editable}
                 onClick={onOpen}
                 className={cn(
-                    "w-full rounded-md px-2 py-1.5 text-left transition-colors",
+                    "w-full rounded-md px-2 py-1.5 text-start transition-colors",
                     editable && "hover:bg-muted",
                     !editable && "cursor-default"
                 )}

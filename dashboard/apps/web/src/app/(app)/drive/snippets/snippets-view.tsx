@@ -172,12 +172,12 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
     return (
         <div className="flex flex-col gap-3">
             <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder={t("snippets.searchSnippets")}
-                    className="pl-9"
+                    className="ps-9"
                 />
             </div>
 
@@ -368,14 +368,14 @@ function SnippetLogsDialog({
                     </p>
                 ) : (
                     <div className="max-h-80 overflow-auto overscroll-contain">
-                        <table className="w-full text-left text-xs">
+                        <table className="w-full text-start text-xs">
                             <thead className="text-muted-foreground">
                                 <tr>
-                                    <th className="py-1 pr-3 font-medium">{t("snippets.when")}</th>
-                                    <th className="py-1 pr-3 font-medium">
+                                    <th className="py-1 pe-3 font-medium">{t("snippets.when")}</th>
+                                    <th className="py-1 pe-3 font-medium">
                                         {t("snippets.address")}
                                     </th>
-                                    <th className="py-1 pr-3 font-medium">
+                                    <th className="py-1 pe-3 font-medium">
                                         {t("linkVisitor.who")}
                                     </th>
                                     <th className="py-1 font-medium">{t("snippets.what")}</th>
@@ -384,11 +384,11 @@ function SnippetLogsDialog({
                             <tbody>
                                 {logs.map((log) => (
                                     <tr key={log.id} className="border-t border-border">
-                                        <td className="py-1 pr-3 whitespace-nowrap">
+                                        <td className="py-1 pe-3 whitespace-nowrap">
                                             {format.dateTime(log.at)}
                                         </td>
-                                        <td className="py-1 pr-3 font-mono">{log.ip ?? "-"}</td>
-                                        <td className="py-1 pr-3">
+                                        <td className="py-1 pe-3 font-mono">{log.ip ?? "-"}</td>
+                                        <td className="py-1 pe-3">
                                             <LinkVisitorCell visitor={log.visitor} />
                                         </td>
                                         <td className="py-1">

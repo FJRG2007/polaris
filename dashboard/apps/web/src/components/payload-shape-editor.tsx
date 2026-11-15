@@ -56,7 +56,7 @@ function FieldEditor({
         />
     );
     return (
-        <div className={cn("min-w-0 space-y-2", depth > 0 && "border-l border-border pl-2")}>
+        <div className={cn("min-w-0 space-y-2", depth > 0 && "border-s border-border ps-2")}>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {named ? (
                     <Input

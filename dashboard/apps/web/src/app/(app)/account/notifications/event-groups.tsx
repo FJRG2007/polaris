@@ -170,8 +170,8 @@ function AppHoldCard({ app, hold }: { app: core.AppHoldId; hold: HoldControls })
     const hint = t(`appHolds.${app}Hint`);
     return (
         <Card className="overflow-visible">
-            <div className="flex items-center gap-1 pr-2">
-                <div className="flex min-w-0 flex-1 items-center gap-2 py-2.5 pl-9 pr-3">
+            <div className="flex items-center gap-1 pe-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2 py-2.5 ps-9 pe-3">
                     <ProductMark app={app} />
                     <span className="truncate text-sm font-semibold" title={label}>
                         {label}
@@ -213,13 +213,13 @@ export function EventGroup({
 
     return (
         <Card className="overflow-visible">
-            <div className="flex items-center gap-1 pr-2">
+            <div className="flex items-center gap-1 pe-2">
                 <button
                     type="button"
                     onClick={onToggle}
                     aria-expanded={open}
                     aria-controls={panelId}
-                    className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left"
+                    className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-start"
                 >
                     <ChevronRight
                         className={cn(
@@ -556,7 +556,7 @@ function ScheduleDialog({
                         {initial ? (
                             <Button
                                 variant="ghost"
-                                className="mr-auto"
+                                className="me-auto"
                                 onClick={() => onSave(null)}
                             >
                                 {t("holds.removeSchedule")}

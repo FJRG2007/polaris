@@ -465,7 +465,7 @@ export function AppearanceCard({
                         <p className="text-danger text-sm">{error || pictureError}</p>
                     ) : null}
                     {done && !error ? <p className="text-success text-sm">{t("appearance.saved")}</p> : null}
-                    <div className="ml-auto flex items-center gap-2">
+                    <div className="ms-auto flex items-center gap-2">
                         <Button
                             type="button"
                             variant="ghost"

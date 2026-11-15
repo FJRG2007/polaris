@@ -111,7 +111,7 @@ function Actions({
                         type="button"
                         aria-label={words.pageActions}
                         title={words.pageActions}
-                        className="flex w-8 shrink-0 items-center justify-center border-l border-border text-muted-foreground hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                        className="flex w-8 shrink-0 items-center justify-center border-s border-border text-muted-foreground hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     >
                         <ChevronDown className="size-3.5" aria-hidden="true" />
                     </button>

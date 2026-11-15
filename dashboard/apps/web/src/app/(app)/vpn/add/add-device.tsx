@@ -184,7 +184,7 @@ export function AddDeviceSection() {
                             </button>
                         ))}
                     </div>
-                    <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm">
+                    <ol className="flex list-decimal flex-col gap-2 ps-5 text-sm">
                         {Array.from({ length: STEPS[platform] }, (_, index) => (
                             <li key={index}>
                                 {t(`add.${platform}.step${index + 1}` as "add.windows.step1")}

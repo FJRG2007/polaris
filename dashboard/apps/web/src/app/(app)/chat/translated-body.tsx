@@ -157,7 +157,7 @@ export function TranslationNote({
                 </p>
             )}
             {translated?.original !== undefined && typed && (
-                <p className="whitespace-pre-wrap break-words border-l-2 border-border pl-2 text-xs text-muted-foreground">
+                <p className="whitespace-pre-wrap break-words border-s-2 border-border ps-2 text-xs text-muted-foreground">
                     {plainText(translated.original)}
                 </p>
             )}

@@ -26,7 +26,7 @@ export function ActivityDetails({ metadata }: { metadata: string }) {
                 type="button"
                 onClick={() => setOpen((value) => !value)}
                 aria-expanded={open}
-                className="flex w-full items-center gap-1 text-left hover:text-foreground"
+                className="flex w-full items-center gap-1 text-start hover:text-foreground"
             >
                 <ChevronDown className={cn("size-3 shrink-0 transition-transform", open && "rotate-180")} />
                 <span className="truncate font-mono">{metadata}</span>

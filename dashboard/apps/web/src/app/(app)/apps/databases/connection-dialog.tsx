@@ -1064,7 +1064,7 @@ export function ConnectionDialog({
                     {kind === "manual" && (
                         <Button
                             variant="outline"
-                            className="sm:mr-auto"
+                            className="sm:me-auto"
                             onClick={() => void test()}
                             disabled={!complete || testing}
                         >

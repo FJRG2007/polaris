@@ -164,7 +164,7 @@ export function OwnImagesView() {
                                   className="flex items-center gap-3 border-t border-border py-2 first:border-t-0"
                               >
                                   <Skeleton className="h-4 w-56 max-w-full" />
-                                  <Skeleton className="ml-auto h-6 w-20" />
+                                  <Skeleton className="ms-auto h-6 w-20" />
                               </li>
                           ))
                         : images.map((image) => {
@@ -201,7 +201,7 @@ export function OwnImagesView() {
                                           {image.scan.state === "done" && (
                                               <SeverityCounts scan={image.scan} />
                                           )}
-                                          <div className="ml-auto flex shrink-0 items-center gap-1">
+                                          <div className="ms-auto flex shrink-0 items-center gap-1">
                                               <Button
                                                   size="xs"
                                                   variant="ghost"

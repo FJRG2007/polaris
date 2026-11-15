@@ -444,7 +444,7 @@ export function DevicePanel({
             <DialogContent className="flex max-h-[92vh] w-[min(46rem,96vw)] max-w-[min(46rem,96vw)] flex-col gap-0 overflow-hidden p-0">
                 {device && (
                     <>
-                        <header className="flex flex-wrap items-center gap-3 border-b border-border py-3 pl-5 pr-14">
+                        <header className="flex flex-wrap items-center gap-3 border-b border-border py-3 ps-5 pe-14">
                             <DialogTitle className="text-sm font-medium">{device.name}</DialogTitle>
                             <StatePill device={device} />
                             <FilterChip air={device.air} />
@@ -454,7 +454,7 @@ export function DevicePanel({
                                 </span>
                             )}
                             {canManage && (
-                                <div className="ml-auto flex items-center gap-1">
+                                <div className="ms-auto flex items-center gap-1">
                                     {automation && (
                                         <Button
                                             asChild

@@ -156,7 +156,7 @@ export function PinnedBar({
                     setAt((current) => (current + 1) % count);
                 }}
                 title={t("pins.jumpTo")}
-                className="flex min-w-0 flex-1 items-center gap-2 rounded text-left"
+                className="flex min-w-0 flex-1 items-center gap-2 rounded text-start"
             >
                 <Pin className="size-3.5 shrink-0 text-primary" />
                 <span className="flex min-w-0 flex-col">
@@ -364,7 +364,7 @@ export function PinsDialog({
                                             iso={entry.message.createdAt}
                                             className="shrink-0 whitespace-nowrap"
                                         />
-                                        <span className="ml-auto flex shrink-0 items-center gap-1">
+                                        <span className="ms-auto flex shrink-0 items-center gap-1">
                                             <Button
                                                 size="sm"
                                                 variant="ghost"

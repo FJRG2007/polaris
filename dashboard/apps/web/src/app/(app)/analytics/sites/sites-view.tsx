@@ -172,10 +172,10 @@ export function SitesView({ canAdd }: { canAdd: boolean }) {
                     <div className="min-w-0 overflow-x-auto">
                         <table className="w-full min-w-[40rem] table-fixed text-sm">
                             <thead>
-                                <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                                <tr className="border-b border-border text-start text-xs text-muted-foreground">
                                     <th className="w-[34%] px-4 py-2 font-medium">{t("sites.colName")}</th>
                                     <th className="w-[26%] px-3 py-2 font-medium">{t("sites.colAddress")}</th>
-                                    <th className="w-[12%] px-3 py-2 text-right font-medium">{t("sites.colVisitors")}</th>
+                                    <th className="w-[12%] px-3 py-2 text-end font-medium">{t("sites.colVisitors")}</th>
                                     <th className="w-[12%] px-3 py-2 font-medium">{t("sites.colTag")}</th>
                                     <th className="hidden w-[12%] px-3 py-2 font-medium lg:table-cell">{t("sites.colCreated")}</th>
                                     <th className="w-12 px-2 py-2">
@@ -216,7 +216,7 @@ export function SitesView({ canAdd }: { canAdd: boolean }) {
                                                           {address || t("sites.noAddress")}
                                                       </span>
                                                   </td>
-                                                  <td className="px-3 py-2 text-right tabular-nums">{site.visitors}</td>
+                                                  <td className="px-3 py-2 text-end tabular-nums">{site.visitors}</td>
                                                   <td className="px-3 py-2">
                                                       <Badge variant={site.trackerEnabled ? "success" : "neutral"}>
                                                           {site.trackerEnabled ? t("sites.tagOn") : t("sites.tagOff")}
@@ -225,7 +225,7 @@ export function SitesView({ canAdd }: { canAdd: boolean }) {
                                                   <td className="hidden truncate px-3 py-2 text-muted-foreground lg:table-cell">
                                                       {site.createdAt ? <RelativeTime iso={site.createdAt} /> : "-"}
                                                   </td>
-                                                  <td className="px-2 py-2 text-right">
+                                                  <td className="px-2 py-2 text-end">
                                                       <DropdownMenu>
                                                           <DropdownMenuTrigger asChild>
                                                               <Button

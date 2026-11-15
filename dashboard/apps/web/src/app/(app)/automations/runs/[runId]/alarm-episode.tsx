@@ -18,7 +18,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     return (
         <div className="flex min-w-0 items-baseline justify-between gap-3">
             <dt className="shrink-0 text-muted-foreground">{label}</dt>
-            <dd className="min-w-0 truncate text-right tabular-nums">{children}</dd>
+            <dd className="min-w-0 truncate text-end tabular-nums">{children}</dd>
         </div>
     );
 }

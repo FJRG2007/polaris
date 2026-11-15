@@ -221,7 +221,7 @@ function SharePanel({
                         aria-label={t("shareDialog.levelLabel")}
                         className="sm:w-52"
                     />
-                    <Button type="submit" disabled={!target || busy} className="sm:ml-auto">
+                    <Button type="submit" disabled={!target || busy} className="sm:ms-auto">
                         {busy ? <Loader2 className="animate-spin" aria-hidden /> : null}
                         {t("shareDialog.add")}
                     </Button>

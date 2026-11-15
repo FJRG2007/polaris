@@ -66,7 +66,7 @@ function Row({
             onMouseDown={keepFocus ? (event) => event.preventDefault() : undefined}
             onClick={onSelect}
             className={cn(
-                "flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-left transition-colors",
+                "flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-start transition-colors",
                 selected ? "bg-option-hover" : "hover:bg-option-hover/60"
             )}
         >

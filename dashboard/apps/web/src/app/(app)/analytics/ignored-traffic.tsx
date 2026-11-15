@@ -133,8 +133,8 @@ export function IgnoredTraffic({
                 {all.length > 0 ? (
                     <div className="flex flex-col gap-2 sm:flex-row">
                         <div className="relative min-w-0 flex-1">
-                            <Search className="pointer-events-none absolute left-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" aria-hidden />
-                            <Input className="pl-8" value={search} placeholder={t("ignore.search")} aria-label={t("ignore.search")} onChange={(event) => setSearch(event.target.value)} />
+                            <Search className="pointer-events-none absolute start-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                            <Input className="ps-8" value={search} placeholder={t("ignore.search")} aria-label={t("ignore.search")} onChange={(event) => setSearch(event.target.value)} />
                         </div>
                         <Select
                             className="w-full sm:w-40"

@@ -29,7 +29,7 @@ const CENTRED_MOTION =
 
 /** The corner close button every dialog and sheet carries. */
 const CLOSE =
-    "absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground transition-colors duration-fast hover:bg-card-hover hover:text-foreground active:bg-muted";
+    "absolute end-3 top-3 rounded-md p-1.5 text-muted-foreground transition-colors duration-fast hover:bg-card-hover hover:text-foreground active:bg-muted";
 
 export const Dialog = RadixDialog.Root;
 export const DialogTrigger = RadixDialog.Trigger;
@@ -93,7 +93,7 @@ export const SheetContent = forwardRef<
         <RadixDialog.Content
             ref={ref}
             className={cn(
-                "fixed bottom-0 right-0 top-[var(--window-controls-height)] z-50 flex h-[calc(100dvh-var(--window-controls-height))] w-full max-w-full flex-col overflow-hidden border-l border-border-strong bg-elevated shadow-modal outline-none transition-[width,max-width] duration sm:bottom-2 sm:right-2 sm:top-[calc(0.5rem+var(--window-controls-height))] sm:h-[calc(100dvh-1rem-var(--window-controls-height))] sm:max-w-[calc(100vw-1rem)] sm:rounded-xl sm:border",
+                "fixed bottom-0 end-0 top-[var(--window-controls-height)] z-50 flex h-[calc(100dvh-var(--window-controls-height))] w-full max-w-full flex-col overflow-hidden border-s border-border-strong bg-elevated shadow-modal outline-none transition-[width,max-width] duration sm:bottom-2 sm:end-2 sm:top-[calc(0.5rem+var(--window-controls-height))] sm:h-[calc(100dvh-1rem-var(--window-controls-height))] sm:max-w-[calc(100vw-1rem)] sm:rounded-xl sm:border",
                 "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-8 data-[state=closed]:slide-out-to-right-8 data-[state=closed]:duration-fast",
                 className
             )}

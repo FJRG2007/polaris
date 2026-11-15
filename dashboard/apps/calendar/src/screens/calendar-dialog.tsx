@@ -267,7 +267,7 @@ export function CalendarDialog({
     return (
         <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
             <DialogContent className="max-w-lg">
-                <DialogHeader className="pr-8">
+                <DialogHeader className="pe-8">
                     <DialogTitle>{title}</DialogTitle>
                     {calendar && !owner ? (
                         <DialogDescription>

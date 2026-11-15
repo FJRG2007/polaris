@@ -110,7 +110,7 @@ export function AddressChip({
                     {/* Against the address rather than spaced off it: the row
                         sets a gap between everything in the chip, and a comma is
                         punctuation on the preceding word, not another item. */}
-                    {after ? <span className="-ml-1 shrink-0">{after}</span> : null}
+                    {after ? <span className="-ms-1 shrink-0">{after}</span> : null}
                     {/* Under the pointer, and reachable from the keyboard: the
                         chip is in a header somebody tabs through, and a control
                         that only exists on hover is one nobody using a keyboard
@@ -134,7 +134,7 @@ export function AddressChip({
                         // was drawn twice around something nobody can see, which
                         // is the hole that opened up between one address and the
                         // next.
-                        className="-ml-1 shrink-0 self-center rounded p-0.5 text-foreground-subtle opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/address:opacity-100"
+                        className="-ms-1 shrink-0 self-center rounded p-0.5 text-foreground-subtle opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/address:opacity-100"
                     >
                         {copied ? (
                             <Check className="size-3 shrink-0 text-success" aria-hidden />
