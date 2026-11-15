@@ -1,0 +1,16 @@
+listen_port=0
+polaris_udp_sessions=0
+polaris_tcp_connections=0
+polaris_handshakes=0
+polaris_dropped_full=0
+polaris_dropped_malformed=0
+polaris_fragmented_out=0
+polaris_reassembled_in=0
+polaris_dropped_unrouted=0
+polaris_rejected_wire=0
+public_key=0000000000000000000000000000000000000000000000000000000000000000
+last_handshake_time_sec=0
+last_handshake_time_nsec=0
+tx_bytes=0
+rx_bytes=0
+persistent_keepalive_interval=0
