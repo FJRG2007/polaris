@@ -45,10 +45,11 @@ const DIRECT = "Direct";
 export function sessionWhere(filters: readonly core.VisitFilter[]): Prisma.AnalyticsSessionWhereInput {
     const all = filters.map((filter): Prisma.AnalyticsSessionWhereInput => {
         let match: Prisma.AnalyticsSessionWhereInput;
-        if (filter.dimension === "path") match = { events: { some: { kind: "pageview", path: filter.value } } };
-        else if (filter.dimension === "event") match = { events: { some: { kind: "event", name: filter.value } } };
-        else if (filter.dimension === "referrer" && filter.value === DIRECT) match = { referrerSource: null };
-        else match = { [SESSION_COLUMN[filter.dimension]]: filter.value };
+        const test = filter.contains ? { contains: filter.value, mode: "insensitive" as const } : filter.value;
+        if (filter.dimension === "path") match = { events: { some: { kind: "pageview", path: test } } };
+        else if (filter.dimension === "event") match = { events: { some: { kind: "event", name: test } } };
+        else if (filter.dimension === "referrer" && filter.value === DIRECT && !filter.contains) match = { referrerSource: null };
+        else match = { [SESSION_COLUMN[filter.dimension]]: test };
         if (!filter.negate) return match;
         // Not "the column is something else": a visit with no country is not a
         // visit from Spain either, and NOT (x = y) drops every null.
@@ -62,15 +63,18 @@ export function sessionWhere(filters: readonly core.VisitFilter[]): Prisma.Analy
 function sessionSql(filters: readonly core.VisitFilter[]): Prisma.Sql {
     if (filters.length === 0) return Prisma.empty;
     const parts = filters.map((filter) => {
+        const like = `%${likePrefix(filter.value)}`;
         if (filter.dimension === "path" || filter.dimension === "event") {
-            const test =
-                filter.dimension === "path"
-                    ? Prisma.sql`x.kind = 'pageview' AND x.path = ${filter.value}`
-                    : Prisma.sql`x.kind = 'event' AND x.name = ${filter.value}`;
+            const field = Prisma.raw(filter.dimension === "path" ? "x.kind = 'pageview' AND x.path" : "x.kind = 'event' AND x.name");
+            const test = filter.contains ? Prisma.sql`${field} ILIKE ${like}` : Prisma.sql`${field} = ${filter.value}`;
             const exists = Prisma.sql`EXISTS (SELECT 1 FROM "AnalyticsEvent" x WHERE x."sessionId" = s.id AND ${test})`;
             return filter.negate ? Prisma.sql`NOT ${exists}` : exists;
         }
         const column = Prisma.raw(`s."${SESSION_COLUMN[filter.dimension]}"`);
+        if (filter.contains)
+            return filter.negate
+                ? Prisma.sql`(${column} IS NULL OR ${column} NOT ILIKE ${like})`
+                : Prisma.sql`${column} ILIKE ${like}`;
         if (filter.dimension === "referrer" && filter.value === DIRECT)
             return filter.negate ? Prisma.sql`${column} IS NOT NULL` : Prisma.sql`${column} IS NULL`;
         return filter.negate

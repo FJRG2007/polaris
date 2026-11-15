@@ -202,13 +202,14 @@ export function FilterBar({
     const [adding, setAdding] = useState(false);
     const [dimension, setDimension] = useState<core.VisitFilterDimension>("path");
     const [negate, setNegate] = useState(false);
+    const [contains, setContains] = useState(false);
     const [value, setValue] = useState("");
     const [naming, setNaming] = useState(false);
     const [name, setName] = useState("");
     const [failure, setFailure] = useState<string | null>(null);
     const [saving, startSave] = useTransition();
 
-    const candidate = core.visitFilterSchema.safeParse({ dimension, value, negate });
+    const candidate = core.visitFilterSchema.safeParse({ dimension, value, negate, contains });
     const valueProblem = value.trim() && !candidate.success ? t("filters.tooLong") : null;
     const segments = (data?.reports ?? []).filter((report) => report.kind === "segment");
     const canEdit = data ? may(data.level, "edit") : false;
@@ -229,7 +230,7 @@ export function FilterBar({
                             className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border bg-muted/40 py-0.5 ps-2 pe-1 text-xs"
                         >
                             <span className="shrink-0 text-muted-foreground">
-                                {label(filter.dimension)} {filter.negate ? t("filters.isNot") : t("filters.is")}
+                                {label(filter.dimension)} {t(filterVerb(filter))}
                             </span>
                             <span className="min-w-0 truncate font-medium" title={filter.value}>
                                 {filter.value}
@@ -290,14 +291,14 @@ export function FilterBar({
                         onValueChange={(next) => setDimension(next as core.VisitFilterDimension)}
                     />
                     <Select
-                        value={negate ? "not" : "is"}
+                        value={filterVerb({ negate, contains })}
                         aria-label={t("filters.mode")}
-                        className="h-8 sm:w-28"
-                        options={[
-                            { value: "is", label: t("filters.is") },
-                            { value: "not", label: t("filters.isNot") }
-                        ]}
-                        onValueChange={(next) => setNegate(next === "not")}
+                        className="h-8 sm:w-36"
+                        options={FILTER_VERBS.map((verb) => ({ value: verb, label: t(verb) }))}
+                        onValueChange={(next) => {
+                            setNegate(next === "filters.isNot" || next === "filters.notContains");
+                            setContains(next === "filters.contains" || next === "filters.notContains");
+                        }}
                     />
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                         <Input
@@ -362,6 +363,14 @@ export function FilterBar({
 }
 
 // --- one panel's answer -------------------------------------------------------------
+
+/** How a filter compares, as the key of its words. */
+export const FILTER_VERBS = ["filters.is", "filters.isNot", "filters.contains", "filters.notContains"] as const;
+
+export function filterVerb(filter: { negate?: boolean; contains?: boolean }): (typeof FILTER_VERBS)[number] {
+    if (filter.contains) return filter.negate ? "filters.notContains" : "filters.contains";
+    return filter.negate ? "filters.isNot" : "filters.is";
+}
 
 export interface PanelProps {
     data: AnalyticsOverview;

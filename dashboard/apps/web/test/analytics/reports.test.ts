@@ -57,6 +57,26 @@ describe("filters", () => {
         });
     });
 
+    it("match anywhere, ignoring case, when a filter says contains", () => {
+        expect(reports.sessionWhere([{ dimension: "path", value: "blog", negate: false, contains: true }])).toEqual({
+            AND: [{ events: { some: { kind: "pageview", path: { contains: "blog", mode: "insensitive" } } } }]
+        });
+        expect(reports.sessionWhere([{ dimension: "campaign", value: "spring", negate: true, contains: true }])).toEqual({
+            AND: [{ OR: [{ NOT: { campaign: { contains: "spring", mode: "insensitive" } } }, { campaign: null }] }]
+        });
+        // "Direct" is only the no-referrer visits when it is asked for exactly.
+        expect(reports.sessionWhere([{ dimension: "referrer", value: "Direct", negate: false, contains: true }])).toEqual({
+            AND: [{ referrerSource: { contains: "Direct", mode: "insensitive" } }]
+        });
+    });
+
+    it("escape LIKE's own characters in a contains filter", async () => {
+        await reports.eventNames(window([{ dimension: "os", value: "50%_off", negate: false, contains: true }]));
+        const query = db.queries.at(-1)!;
+        expect(query.sql).toContain("ILIKE");
+        expect(query.values).toContain(String.raw`%50\%\_off%`);
+    });
+
     it("read malformed filters off a URL as none", () => {
         expect(core.parseVisitFilters("not json")).toEqual([]);
         expect(core.parseVisitFilters(JSON.stringify([{ dimension: "nope", value: "x" }]))).toEqual([]);

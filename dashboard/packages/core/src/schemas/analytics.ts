@@ -131,7 +131,9 @@ export const visitFilterSchema = z.object({
     dimension: z.enum(VISIT_FILTER_DIMENSIONS),
     value: z.string().trim().min(1).max(240),
     /** Whether the filter keeps the matching visits or every other one. */
-    negate: z.boolean().default(false)
+    negate: z.boolean().default(false),
+    /** Match the value anywhere in the field, ignoring case, instead of exactly. */
+    contains: z.boolean().optional()
 });
 export type VisitFilter = z.infer<typeof visitFilterSchema>;
 

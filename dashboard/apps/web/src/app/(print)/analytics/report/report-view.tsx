@@ -91,7 +91,13 @@ export function ReportView(props: ReportViewProps) {
                                     .map(
                                         (filter) =>
                                             `${t(`filters.dims.${filter.dimension}` as never)} ${t(
-                                                filter.negate ? "filters.isNot" : "filters.is"
+                                                filter.contains
+                                                    ? filter.negate
+                                                        ? "filters.notContains"
+                                                        : "filters.contains"
+                                                    : filter.negate
+                                                      ? "filters.isNot"
+                                                      : "filters.is"
                                             )} ${filter.dimension === "country" ? core.countryName(filter.value) : filter.value}`
                                     )
                                     .join(", ")}

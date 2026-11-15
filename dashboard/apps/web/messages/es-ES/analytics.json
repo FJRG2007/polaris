@@ -130,6 +130,8 @@
         "none": "Todas",
         "is": "es",
         "isNot": "no es",
+        "contains": "contiene",
+        "notContains": "no contiene",
         "remove": "Quitar filtro",
         "add": "Filtrar",
         "clear": "Limpiar",

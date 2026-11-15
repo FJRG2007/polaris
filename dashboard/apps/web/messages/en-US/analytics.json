@@ -130,6 +130,8 @@
         "none": "All visits",
         "is": "is",
         "isNot": "is not",
+        "contains": "contains",
+        "notContains": "does not contain",
         "remove": "Remove filter",
         "add": "Filter",
         "clear": "Clear",
