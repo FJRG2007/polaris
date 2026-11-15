@@ -11,28 +11,44 @@ el índice.
 
 Decidida el 2026-11-13.
 
-### Un núcleo compartido en Rust
+### La app de escritorio sigue en Electron
 
-Una sola biblioteca en Rust, `desktop-tauri/polaris-client`, reúne lo que
-necesita cualquier cliente: el cliente de la API, el inicio de sesión, la caché
-local y la conexión en tiempo real. La usa primero la app de escritorio, y las
-futuras apps móviles nativas usarán el mismo crate. Hoy tiene la dirección del
-servidor, las llamadas con clave de API y las comprobaciones de conexión; el
-resto se sigue en el registro de paridad. Está en su propio workspace de Cargo
-para que ningún trabajo de CI existente la compile.
+Decidido el 2026-11-15; sustituye al plan del 2026-11-13 de pasarla a Tauri 2.
+La beta con Tauri (`desktop-tauri/`, con el núcleo cliente en Rust que llevaba)
+se ha eliminado; nunca llegó a nadie. Queda en el historial de git en
+`909b1a0f41` y los commits siguientes.
 
-### La app de escritorio pasa de Electron a Tauri 2
+Por qué Electron:
 
-La app de escritorio pasa a ser un contenedor de Tauri 2 sobre la misma
-interfaz web que muestra hoy. La versión con Tauri se construye en paralelo a la
-de Electron como una beta que nadie recibe, y se sigue módulo a módulo en el
-[registro de paridad del escritorio](desktop-tauri-parity.md).
+- **El mismo motor en todas partes.** Electron lleva su propio Chromium, así
+  que la app de escritorio se ve y se comporta exactamente como el panel en
+  Chrome, Brave o Edge, en Windows, macOS y Linux. Tauri usa el navegador de
+  cada sistema: WebView2 (Chromium) en Windows, WebKit en macOS y WebKitGTK en
+  Linux. El CSS y las APIs web cambian entre ellos, así que una misma interfaz
+  habría que comprobarla tres veces.
+- **Llamadas y multimedia.** Polaris depende de las llamadas WebRTC, compartir
+  pantalla, los fondos virtuales y la supresión de ruido. Es justo donde más se
+  diferencian los navegadores del sistema, sobre todo WebRTC y la captura de
+  pantalla en WebKitGTK. Con su propio Chromium funcionan en la app igual que
+  en el navegador.
+- **Sin perder funciones ni permisos.** Todo lo que hace hoy la app (bandeja,
+  notificaciones, detección de juegos, el widget de voz, instalar en la TV, el
+  ayudante de la VPN, actualizaciones y firma) ya está hecho y funcionando en
+  Electron. Migrar suponía rehacerlo módulo a módulo sin ningún cambio que el
+  usuario fuera a notar.
+- **Madurez.** Las actualizaciones, la firma y la gestión de fallos en
+  Electron llevan años en uso en apps del tamaño de VS Code, Discord o Slack.
+- **Dos apps de escritorio dividen el esfuerzo.** Mantener una beta al día con
+  la app publicada cuesta cada cambio de escritorio dos veces.
 
-Electron solo se retira cuando se cumple todo esto:
+Lo que cuesta Electron, y se acepta: más memoria y un instalador más grande.
+Medido en el equipo del operador el 2026-11-15 con la 0.1.32: unos 770 MB entre
+todos los procesos de la app, 350 MB de ellos la ventana. El lag de noviembre
+no era Electron: la página acumulaba escuchadores de eventos en cada navegación
+(`PageTiming`, arreglado en `04551960b6`), y con Tauri habría pasado igual.
 
-- Los usuarios no notan ningún cambio.
-- El tiempo de arranque y la memoria no son peores que con Electron, medidos.
-- El CI/CD sigue siendo igual de rápido.
+Rust se queda donde aporta: pequeños ayudantes nativos junto a la app, como ya
+es el de la VPN (`desktop/vpn-helper`), no un segundo contenedor.
 
 ### No hay planes de reescribir la interfaz en GPUI
 
@@ -45,7 +61,7 @@ completa, y no está planificado:
   interfaz actual, así que Polaris mantendría dos interfaces.
 - GPUI no tiene una versión 1.0 estable.
 
-Solo se reconsidera si una pantalla muy usada sigue lenta con Tauri, medida, y
+Solo se reconsidera si una pantalla muy usada sigue lenta en la app de escritorio, medida, y
 entonces solo para esa pantalla.
 
 ## Escala y plataforma de apps
@@ -57,11 +73,13 @@ millones de apps de la comunidad.
 
 ### Velocidad del cliente: un núcleo en Rust en cada cliente (planificado)
 
-El núcleo en Rust de arriba lo comparten todos los clientes: nativo en el
-contenedor de escritorio y en las apps móviles, y compilado a WebAssembly en el
-navegador para el trabajo pesado del cliente - sincronización, caché local e
-índice de búsqueda, criptografía y uso sin conexión. Así la web y los clientes
-nativos ejecutan el mismo código. Nada de esto existe todavía.
+Un núcleo en Rust compartido por todos los clientes - nativo en las apps
+móviles y compilado a WebAssembly en el navegador para el trabajo pesado del
+cliente (sincronización, caché local e índice de búsqueda, criptografía y uso
+sin conexión) - para que la web y los clientes nativos ejecuten el mismo
+código. Nada de esto existe: el primer crate se fue con la beta de Tauri (ver
+arriba), y solo se retoma cuando un cuello de botella medido en el cliente lo
+pida.
 
 ### La interfaz de las apps sigue siendo web y aislada (en parte planificado)
 

@@ -10,27 +10,41 @@ files hold the detail; this page is the index.
 
 Decided on 2026-11-13.
 
-### A shared Rust core
+### The desktop app stays on Electron
 
-One Rust library, `desktop-tauri/polaris-client`, holds what every client
-needs: the API client, sign-in, the local cache and the realtime connection.
-The desktop app uses it first, and future native mobile apps use the same
-crate. Today it has the server address, the API key calls and the reachability
-checks; the rest is tracked in the parity ledger. It sits in its own Cargo
-workspace so that no existing CI job builds it.
+Decided on 2026-11-15, replacing the 2026-11-13 plan to move it to Tauri 2.
+The Tauri beta (`desktop-tauri/`, with the Rust client core it carried) was
+removed; it never reached anybody. It is in the git history at `909b1a0f41`
+and the commits after it.
 
-### The desktop app moves from Electron to Tauri 2
+Why Electron:
 
-The desktop app becomes a Tauri 2 shell over the same web UI it shows today. The
-Tauri build is made side by side with the Electron one as a beta that nobody receives, and
-tracked module by module in the
-[desktop parity ledger](desktop-tauri-parity.md).
+- **The same engine everywhere.** Electron ships its own Chromium, so the
+  desktop app draws and behaves exactly like the dashboard in Chrome, Brave or
+  Edge, on Windows, macOS and Linux. Tauri uses each system's web view: WebView2
+  (Chromium) on Windows, WebKit on macOS and WebKitGTK on Linux. CSS and web
+  APIs differ between them, so one UI would need checking three times.
+- **Calls and media.** Polaris leans on WebRTC calls, screen sharing, virtual
+  backgrounds and noise suppression. Those are where the system web views
+  differ most, WebRTC and screen capture on WebKitGTK above all. With its own
+  Chromium they work in the desktop app wherever they work in the browser.
+- **No feature or permission left behind.** Everything the app does today
+  (tray, notifications, game detection, the voice widget, TV install, the VPN
+  helper, updates and signing) is already built and running on Electron.
+  Moving meant redoing it module by module for no change the user would see.
+- **Maturity.** Updating, signing and crash handling on Electron have years of
+  use behind them in apps the size of VS Code, Discord and Slack.
+- **Two desktop apps halve the effort.** Keeping a beta in step with the
+  shipped app costs every desktop change twice.
 
-Electron is removed only when all of these hold:
+What Electron costs, accepted: more memory and a larger installer. Measured on
+the operator's machine on 2026-11-15 with 0.1.32: about 770 MB across the
+app's processes, 350 MB of it the window. The lag reported in November was not
+Electron: the page piled up event listeners on every navigation (`PageTiming`,
+fixed in `04551960b6`), which would have happened under Tauri too.
 
-- Users notice no change at all.
-- Startup time and memory use are no worse than Electron's, measured.
-- CI/CD stays as fast as it is.
+Rust stays where it earns its place: small native helpers beside the app, as
+the VPN helper (`desktop/vpn-helper`) already is, not a second shell.
 
 ### A native GPUI rewrite is not planned
 
@@ -42,7 +56,7 @@ desktop rewrite) was evaluated for a full native UI and is not planned:
   current UI, so Polaris would maintain two UIs.
 - GPUI has no stable 1.0 release.
 
-Revisit it only if a measured hot screen stays slow under Tauri, and then only
+Revisit it only if a measured hot screen stays slow in the desktop app, and then only
 for that screen.
 
 ## Scale and the app platform
@@ -54,10 +68,12 @@ community apps.
 
 ### Client speed: one Rust core in every client (planned)
 
-The Rust core above is shared by every client: native in the desktop shell and
-in mobile apps, and compiled to WebAssembly in the browser for the heavy client
-work - sync, the local cache and search index, crypto and offline use. The web
-and the native clients then run the same code. None of this exists yet.
+A Rust core shared by every client - native in mobile apps, and compiled to
+WebAssembly in the browser for the heavy client work (sync, the local cache and
+search index, crypto and offline use) - so the web and native clients run the
+same code. None of this exists: the first crate went with the Tauri beta (see
+above), and it is started again only when a measured client bottleneck needs
+it.
 
 ### App UI stays web-based and sandboxed (partly planned)
 

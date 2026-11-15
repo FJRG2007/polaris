@@ -392,9 +392,8 @@ the same dashboard runs fine.
 - **Never listen on a network address.** Binding `0.0.0.0` or joining a
   multicast group is what raises Windows' "allow on private/public networks"
   prompt, again for every binary and install path. TV discovery asks with mDNS
-  QU queries from a port the system picks (`desktop/src/main/tv-mdns.ts`, and
-  `tv_mdns.rs` in the Tauri beta); the only listener left is the VPN helper on
-  loopback.
+  QU queries from a port the system picks (`desktop/src/main/tv-mdns.ts`); the
+  only listener left is the VPN helper on loopback.
 - **A release is the pushed `desktop-v<version>` tag**, after the version bump
   is on main. Without the tag nobody gets the change.
 
