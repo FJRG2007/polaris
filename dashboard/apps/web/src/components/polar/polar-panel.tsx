@@ -99,6 +99,8 @@ import { refusalOf, UPLOAD_ERRORS, uploadFile, type UploadError } from "@/compon
 export { refusalOf };
 import * as polarRuns from "@/components/polar/polar-runs";
 import * as polarCompare from "@/components/polar/polar-compare";
+import * as polarSubagents from "@/components/polar/polar-subagents";
+import * as subagentShared from "@/lib/polar/subagents/shared";
 import * as polarShared from "@/lib/polar/shared";
 import * as polarSlash from "@/lib/polar/slash";
 import * as embedBridge from "@/lib/polar/embed-bridge";
@@ -1015,6 +1017,10 @@ export function PolarChat({
     // A screen holding its own copy of what a tool just changed refetches it.
     useAnnounceWrites(threadId, chat.messages);
     const busy = chat.status === "submitted" || chat.status === "streaming";
+    // The chat's subagents: read again when a turn starts or ends, and while
+    // any of them works (`polar-subagents.tsx`).
+    const subagentState = polarSubagents.useThreadSubagents(threadId, busy ? 1 : 0);
+    const [openSubagent, setOpenSubagent] = useState<string | null>(null);
     const messagesNow = useRef(0);
     messagesNow.current = chat.messages.length;
     const goalState = polarGoal.usePolarGoal(threadId);
@@ -2311,6 +2317,15 @@ export function PolarChat({
             />
             {/* Voice mode takes the composer's place, as in ChatGPT; the
                 composer stays mounted, so a draft is still there after. */}
+            {!inCall ? (
+                <polarSubagents.SubagentBar list={subagentState.list} onOpen={setOpenSubagent} />
+            ) : null}
+            <polarSubagents.SubagentDialog
+                id={openSubagent}
+                onClose={() => setOpenSubagent(null)}
+                onContinue={(text) => void sendSpoken(text)}
+                onChanged={() => void subagentState.reload()}
+            />
             {goalState.goal && !inCall ? (
                 <polarGoal.PolarGoalBar
                     goal={goalState.goal}
@@ -2900,6 +2915,8 @@ export function PolarChat({
                                         }
                                         onRegenerate={regenerateWith}
                                         onAsk={(text) => void sendSpoken(text)}
+                                        subagents={subagentState.list}
+                                        onOpenSubagent={setOpenSubagent}
                                         providers={providers ?? []}
                                         mark={marks[message.id] ?? null}
                                         onMark={(change) => markAnswer(message.id, change)}
@@ -3104,6 +3121,8 @@ function MessageView({
     onSaveCommand,
     onRegenerate,
     onAsk,
+    subagents,
+    onOpenSubagent,
     providers,
     mark,
     onMark,
@@ -3130,6 +3149,9 @@ function MessageView({
     onRegenerate: (options: answerActions.RegenerateOptions) => void;
     /** Sends a line as the next question, for a step offered under an answer. */
     onAsk?: (text: string) => void;
+    /** The chat's subagents as last read, for a background card. */
+    subagents?: readonly subagentShared.SubagentView[] | null;
+    onOpenSubagent?: (id: string) => void;
     providers: ModelSelectorProvider[];
     mark: PolarMark | null;
     onMark: (change: answerActions.MarkChange) => Promise<boolean>;
@@ -3224,8 +3246,12 @@ function MessageView({
     // got wrong is a failed step like any other and folds with them.
     const drawn = (part: UIMessage["parts"][number]) =>
         isVisualPart(part) && (part as unknown as ToolPart).state !== "output-error";
+    // A subagent is a card of its own, never one of the folded steps.
+    const isTask = (part: UIMessage["parts"][number]) =>
+        part.type === `tool-${subagentShared.TASK_TOOL}`;
     const folded = (part: UIMessage["parts"][number]) => {
         if (part.type === "reasoning") return true;
+        if (isTask(part)) return false;
         if (isVisualPart(part)) return !drawn(part);
         const found = toolOf(part);
         return !!found && !found.tool.approval && found.tool.state !== "output-error";
@@ -3349,6 +3375,26 @@ function MessageView({
                                 <MessageResponse>{citeSources(words, sources)}</MessageResponse>
                             )}
                         </MessageContent>
+                    );
+                }
+                if (isTask(part)) {
+                    const tool = part as unknown as ToolPart;
+                    const output =
+                        tool.state === "output-error"
+                            ? subagentShared.erroredTask()
+                            : subagentShared.readTaskOutput(tool.output);
+                    return (
+                        <polarSubagents.SubagentCard
+                            key={index}
+                            output={output}
+                            streaming={streaming}
+                            live={
+                                output?.id
+                                    ? (subagents?.find((entry) => entry.id === output.id) ?? null)
+                                    : null
+                            }
+                            onOpen={(id) => onOpenSubagent?.(id)}
+                        />
                     );
                 }
                 if (drawn(part)) {
