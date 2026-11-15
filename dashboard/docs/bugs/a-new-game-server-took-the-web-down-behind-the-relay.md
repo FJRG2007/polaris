@@ -1,5 +1,13 @@
 # A new game server took the web down behind the relay
 
+> **Superseded.** The design described below has since been replaced. Both
+> relay links now run Polaris' own tunnel daemon (`crates/polaris-tunnel`): the
+> web link carries 80 and 443, and a second WireGuard link nested inside it
+> carries every other port, UDP as UDP. The side link still runs in containers of
+> its own, so adding or removing a game server still never recreates the web
+> link (`relaySpec` in `apps/web/src/lib/backup-access/relay.ts`, pinned by the
+> same test). What follows is the incident and the fix as they were at the time.
+
 ## What happened
 
 On a deployment serving through its own relay, creating a game server made the whole
