@@ -2442,12 +2442,12 @@ export function PolarChat({
                 />
             ) : null}
             {agent?.name ? (
-                <div className="px-3 pb-2">
+                <div className="pb-2">
                     <AgentBar agent={agent} onEnd={() => startNew()} />
                 </div>
             ) : null}
             {temporary && trialSkill ? (
-                <div className="px-3 pb-2">
+                <div className="pb-2">
                     <SkillTrialBar
                         trial={trialSkill}
                         onEnd={() => {
@@ -2459,7 +2459,7 @@ export function PolarChat({
                 </div>
             ) : null}
             {waitingAsk ? (
-                <div className="px-3 pb-2">
+                <div className="pb-2">
                     <PolarAskBar
                         key={waitingAsk.toolCallId}
                         questions={waitingAsk.questions}
