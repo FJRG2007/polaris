@@ -21,14 +21,17 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     cleanFrameAncestors,
     FRAME_ANCESTORS_MAX,
+    FRAME_RULES_MAX,
     instanceDefaultWafPresets,
     polarisDefaultWafPresets,
     WAF_SCOPE_ORDER,
     wafCustomRuleSchema,
+    wafFrameRuleSchema,
     wafRuleInputSchema,
     wafPrincipalGrantSchema,
     type ResolvedWaf,
     type WafCustomRule,
+    type WafFrameRule,
     type WafPrincipalGrant,
     type WafRuleInput,
     type WafScopeType
@@ -108,6 +111,21 @@ function parseCustomRules(json: string): WafCustomRule[] {
     }
 }
 
+/** Conditional framing rules as stored, validated on read for the reason the custom
+ *  rules are: each one's sites end up in a response header. */
+function parseFrameRules(json: string): WafFrameRule[] {
+    try {
+        const parsed: unknown = JSON.parse(json);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.flatMap((entry) => {
+            const rule = wafFrameRuleSchema.safeParse(entry);
+            return rule.success ? [rule.data] : [];
+        });
+    } catch {
+        return [];
+    }
+}
+
 interface RuleRow {
     readonly scopeType: string;
     readonly ipAllowlist: string;
@@ -121,6 +139,7 @@ interface RuleRow {
     readonly emailObfuscation: boolean;
     readonly frameProtection: boolean;
     readonly frameAncestors: string;
+    readonly frameRules: string;
     readonly presets: string;
     readonly rules: string;
 }
@@ -139,6 +158,7 @@ const RULE_SELECT = {
     emailObfuscation: true,
     frameProtection: true,
     frameAncestors: true,
+    frameRules: true,
     presets: true,
     rules: true
 } as const;
@@ -165,6 +185,8 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
     // Who may frame the scope anyway: a union, so a site one scope trusts to embed it
     // stays trusted below it. Meaningless once any scope switches protection off.
     const frameAncestors = new Set<string>();
+    // Conditional framing: concatenated like the custom rules, broadest scope first.
+    const frameRules: WafFrameRule[] = [];
     for (const row of ordered) {
         const allow = parseList(row.ipAllowlist);
         if (allow.length > 0) allowLists.push(allow);
@@ -190,6 +212,7 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
         if (!row.frameProtection) frameProtection = false;
         for (const origin of cleanFrameAncestors(parseList(row.frameAncestors)))
             frameAncestors.add(origin);
+        frameRules.push(...parseFrameRules(row.frameRules));
         // Concatenated, not merged: a rule set is ordered and first-match-wins, so a
         // broader scope's rules have to be offered the request first - otherwise a
         // project could write an `allow` that overrides an instance-wide block.
@@ -207,6 +230,7 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
         emailObfuscation,
         frameProtection,
         frameAncestors: [...frameAncestors].slice(0, FRAME_ANCESTORS_MAX),
+        frameRules: frameRules.slice(0, FRAME_RULES_MAX),
         presets: [...presets],
         rules
     };
@@ -231,6 +255,7 @@ const EMPTY_WAF: ResolvedWaf = {
     emailObfuscation: true,
     frameProtection: true,
     frameAncestors: [],
+    frameRules: [],
     presets: [],
     rules: []
 };
@@ -249,6 +274,7 @@ const DEFAULT_GLOBAL_ROW: RuleRow = {
     emailObfuscation: true,
     frameProtection: true,
     frameAncestors: "[]",
+    frameRules: "[]",
     presets: JSON.stringify(defaultPresets("global")),
     rules: "[]"
 };
@@ -471,6 +497,8 @@ export interface WafRuleView {
     readonly frameProtection: boolean;
     /** Sites this scope alone allows to frame it. */
     readonly frameAncestors: string[];
+    /** This scope's own conditional framing rules. */
+    readonly frameRules: WafFrameRule[];
     /** Managed rule packs enabled on this scope alone - not the union it inherits. */
     readonly presets: string[];
     readonly rules: WafCustomRule[];
@@ -545,6 +573,7 @@ export async function getWafRule(
             emailObfuscation: true,
             frameProtection: true,
             frameAncestors: true,
+            frameRules: true,
             presets: true,
             rules: true
         }
@@ -566,6 +595,7 @@ export async function getWafRule(
             emailObfuscation: true,
             frameProtection: true,
             frameAncestors: [],
+            frameRules: [],
             presets: defaultPresets(scopeType),
             rules: []
         };
@@ -582,6 +612,7 @@ export async function getWafRule(
         emailObfuscation: row.emailObfuscation,
         frameProtection: row.frameProtection,
         frameAncestors: cleanFrameAncestors(parseList(row.frameAncestors)),
+        frameRules: parseFrameRules(row.frameRules),
         presets: parseList(row.presets),
         rules: parseCustomRules(row.rules)
     };
@@ -942,7 +973,8 @@ export async function setWafRule(
         parsed.xssProtection &&
         parsed.emailObfuscation &&
         parsed.frameProtection &&
-        parsed.frameAncestors.length === 0;
+        parsed.frameAncestors.length === 0 &&
+        parsed.frameRules.length === 0;
     // An instance scope keeps its row even when empty: absence there means "never
     // configured" and re-applies the default packs, so deleting it would silently
     // undo an operator who had just switched every one of them off.
@@ -962,6 +994,7 @@ export async function setWafRule(
         emailObfuscation: parsed.emailObfuscation,
         frameProtection: parsed.frameProtection,
         frameAncestors: JSON.stringify(parsed.frameAncestors),
+        frameRules: JSON.stringify(parsed.frameRules),
         presets: JSON.stringify(parsed.presets),
         rules: JSON.stringify(parsed.rules)
     };

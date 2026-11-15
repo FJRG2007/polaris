@@ -20,8 +20,11 @@ import {
     type KeyObject
 } from "node:crypto";
 import {
+    FRAME_RULES_MAX,
     wafCustomRuleSchema,
+    wafFrameRuleSchema,
     type WafCustomRule,
+    type WafFrameRule,
     type WafPrincipalGrant
 } from "./schemas/deploy.js";
 
@@ -87,6 +90,12 @@ export interface GuardRule {
      */
     readonly frameAncestors?: readonly string[];
     /**
+     * Framing decided per request on top of `frameAncestors` (see `decideFraming`).
+     * Only meaningful beside it - with framing protection off there is no list for a
+     * rule to add to or override - so it is carried only when that is.
+     */
+    readonly frameRules?: readonly WafFrameRule[];
+    /**
      * The public keys an edge token for this route may be signed with (Ed25519, raw
      * 32 bytes as base64url), current first. Carried in the rule so the edge holds
      * them with the rest of the route's policy and needs no secret to verify a login:
@@ -139,7 +148,8 @@ export interface GuardRule {
  * login admits, `y` = the principals it refuses, `b` = browser integrity, `s` = SQL
  * injection protection, `x` = XSS protection, `e` = email obfuscation, `c` = the
  * browser challenge, `f` = the origins allowed to frame the route, present only while
- * framing protection is on, `k` = the login's public keys, `o` = the route is the dashboard, `p` = pack ids, `r` = custom
+ * framing protection is on, `fr` = the conditional framing rules, only beside `f` and
+ * only when there are any, `k` = the login's public keys, `o` = the route is the dashboard, `p` = pack ids, `r` = custom
  * rules).
  *
  * The login keys are left out entirely when they say nothing, which is the case on
@@ -165,6 +175,9 @@ export function encodeGuardRule(rule: GuardRule): string {
             ...(rule.challenge === true ? { c: true } : {}),
             ...(rule.frameAncestors !== undefined
                 ? { f: cleanFrameAncestors(rule.frameAncestors) }
+                : {}),
+            ...(rule.frameAncestors !== undefined && (rule.frameRules?.length ?? 0) > 0
+                ? { fr: rule.frameRules!.slice(0, FRAME_RULES_MAX) }
                 : {}),
             ...(rule.requireLogin && (rule.keys?.length ?? 0) > 0 ? { k: rule.keys } : {}),
             ...(rule.requireLogin && validMaxAge(rule.loginMaxAge) ? { m: rule.loginMaxAge } : {}),
@@ -321,6 +334,7 @@ function decodeUncached(header: string): GuardRule {
                 e?: unknown;
                 c?: unknown;
                 f?: unknown;
+                fr?: unknown;
                 k?: unknown;
                 m?: unknown;
                 o?: unknown;
@@ -353,6 +367,9 @@ function decodeUncached(header: string): GuardRule {
                 // Re-validated like the rules: each origin is written into a response
                 // header, so one that does not normalise is dropped, never echoed.
                 frameAncestors: Array.isArray(obj.f) ? cleanFrameAncestors(obj.f) : undefined,
+                ...(Array.isArray(obj.f) && Array.isArray(obj.fr)
+                    ? { frameRules: parseFrameRules(obj.fr) }
+                    : {}),
                 keys: Array.isArray(obj.k)
                     ? obj.k
                           .filter((v): v is string => typeof v === "string" && ED25519_KEY.test(v))
@@ -422,6 +439,18 @@ function parseRules(value: unknown): WafCustomRule[] {
     const rules: WafCustomRule[] = [];
     for (const entry of value) {
         const parsed = wafCustomRuleSchema.safeParse(entry);
+        if (parsed.success) rules.push(parsed.data);
+    }
+    return rules;
+}
+
+/** The framing rules that survive validation, at most FRAME_RULES_MAX. Each one's
+ *  sites end up in a response header, so an entry that does not parse is dropped. */
+function parseFrameRules(value: unknown[]): WafFrameRule[] {
+    const rules: WafFrameRule[] = [];
+    for (const entry of value) {
+        if (rules.length >= FRAME_RULES_MAX) break;
+        const parsed = wafFrameRuleSchema.safeParse(entry);
         if (parsed.success) rules.push(parsed.data);
     }
     return rules;

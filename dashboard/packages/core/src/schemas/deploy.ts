@@ -427,6 +427,61 @@ export const wafCustomRuleSchema = z
 
 export type WafCustomRule = z.infer<typeof wafCustomRuleSchema>;
 
+/** Most conditional framing rules one scope may hold. Carried on every request. */
+export const FRAME_RULES_MAX = 10;
+
+/** What a framing rule does when its conditions hold: add sites, or refuse every frame. */
+export const WAF_FRAME_RULE_ACTIONS = ["allow", "refuse"] as const;
+export type WafFrameRuleAction = (typeof WAF_FRAME_RULE_ACTIONS)[number];
+
+/**
+ * A framing decision that depends on the request.
+ *
+ * A browser only ever accepts a list of sites in `frame-ancestors`, so "this partner may
+ * embed us, but only from their office network" cannot be written in the header itself.
+ * It can be decided per request at the edge, which picks the list it sends: an `allow`
+ * rule adds its sites to the response when its conditions hold, a `refuse` rule sends
+ * `frame-ancestors 'none'` instead. The conditions are the custom rules' own (address,
+ * hostname, path, user agent, groups), judged against the request for the framed page -
+ * never against who is viewing the parent page, which the edge cannot see.
+ *
+ * Kept here rather than in frame-protection.ts: the conditions come from this file, and
+ * frame-protection is imported by it, so the other way round is a module cycle.
+ */
+export const wafFrameRuleSchema = z
+    .object({
+        name: z.string().trim().min(1).max(80),
+        enabled: z.boolean().default(true),
+        action: z.enum(WAF_FRAME_RULE_ACTIONS),
+        /** The sites an `allow` adds. Ignored by `refuse`, and kept rather than cleared
+         *  when the action changes, like a custom rule's `skip`. */
+        ancestors: frameAncestorsSchema.default([]),
+        conditions: z.array(wafConditionSchema).min(1).max(CONDITIONS_MAX)
+    })
+    .superRefine((value, ctx) => {
+        const tests = value.conditions.reduce(
+            (total, entry) => total + wafConditionTests(entry),
+            0
+        );
+        if (tests > WAF_RULE_TESTS_MAX) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["conditions"],
+                message: `At most ${WAF_RULE_TESTS_MAX} conditions in one rule`
+            });
+        }
+        // An allow that names nobody is a rule that does nothing once saved.
+        if (value.action === "allow" && value.ancestors.length === 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["ancestors"],
+                message: "Add at least one site"
+            });
+        }
+    });
+
+export type WafFrameRule = z.infer<typeof wafFrameRuleSchema>;
+
 /** Managed rule packs enabled on a scope, stored as ids (see waf-presets.ts). Not
  *  an enum: an id retired in a later release must still parse, so the reader can
  *  drop it rather than fail the whole rule. */
@@ -504,6 +559,9 @@ export const wafRuleInputSchema = z
         /** Sites allowed to frame the scope anyway, as origins. Union across scopes:
          *  a site one scope trusts to embed it stays trusted below it. */
         frameAncestors: frameAncestorsSchema.default([]),
+        /** Framing decided per request (see `wafFrameRuleSchema`). Concatenated across
+         *  scopes, broadest first, like the custom rules. */
+        frameRules: z.array(wafFrameRuleSchema).max(FRAME_RULES_MAX).default([]),
         presets: wafPresetList.default([]),
         rules: z.array(wafCustomRuleSchema).max(WAF_RULES_MAX).default([])
     })
@@ -596,6 +654,9 @@ export interface ResolvedWaf {
     readonly frameProtection: boolean;
     /** Union of every scope's allowed framing origins. */
     readonly frameAncestors: readonly string[];
+    /** Every scope's conditional framing rules, broadest scope first, at most
+     *  FRAME_RULES_MAX. Applied only while `frameProtection` is on. */
+    readonly frameRules: readonly WafFrameRule[];
     /** Union of every scope's enabled rule packs. Carried to the edge as ids and
      *  expanded there, so a pack of forty user agents costs four bytes on the wire. */
     readonly presets: readonly string[];

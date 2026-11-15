@@ -355,7 +355,35 @@
         "allowedAbove": "También permitidos por un ámbito superior: {sites}",
         "placeholder": "example.com o https://*.example.com",
         "invalid": "Usa una dirección como example.com, https://example.com o *.example.com",
-        "polaris": "Siempre activo en Polaris. Los calendarios publicados se incrustan en cualquier sitio."
+        "polaris": "Siempre activo en Polaris. Los calendarios publicados se incrustan en cualquier sitio.",
+        "rules": {
+            "title": "Reglas condicionales",
+            "hint": "Los navegadores solo aceptan una lista de sitios, así que estas condiciones se comprueban en cada petición. Un sitio se reconoce por su dirección, nunca por quién ve la página que lo rodea.",
+            "count": "{count} de {max}",
+            "create": "Nueva regla",
+            "atMost": "Como máximo {max} reglas",
+            "empty": "Sin reglas condicionales. La lista de arriba vale para todas las peticiones.",
+            "allows": "permite {sites}",
+            "refuses": "rechaza todo marco",
+            "edit": "Editar {name}",
+            "remove": "Eliminar {name}",
+            "kind": "regla",
+            "deleteBody": "Sus peticiones vuelven a usar la lista de arriba.",
+            "newName": "Regla de marcos {number}",
+            "createTitle": "Crear regla de marcos",
+            "editTitle": "Editar regla",
+            "whenHint": "Deben cumplirse todas. Dirección, host, ruta y agente de usuario son los de la petición de esta página.",
+            "actions": {
+                "allow": "Permitir estos sitios",
+                "refuse": "Rechazar todo marco"
+            },
+            "effects": {
+                "allow": "Estos sitios pueden incrustar la página, además de la lista de arriba.",
+                "refuse": "Ningún sitio puede incrustar la página, la permita lo que la permita. Gana a todo permiso."
+            },
+            "sites": "Sitios",
+            "noSites": "Añade al menos un sitio."
+        }
     },
     "missing": {
         "text": "Esta regla no forma parte de esta versión de Polaris.",

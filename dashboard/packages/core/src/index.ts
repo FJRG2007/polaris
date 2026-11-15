@@ -157,6 +157,7 @@ export * from "./schemas/build-settings.js";
 export * from "./schemas/server-templates.js";
 export * from "./edge-config.js";
 export * from "./frame-protection.js";
+export * from "./frame-rules.js";
 export * from "./schemas/database.js";
 export * from "./schemas/data-engines.js";
 export * from "./schemas/database-statements.js";

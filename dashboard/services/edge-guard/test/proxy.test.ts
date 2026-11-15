@@ -396,4 +396,57 @@ describe("framing protection", () => {
 
         expect((await get("/", { obfuscate: false })).headers.get("x-frame-options")).toBeNull();
     });
+    describe("conditional rules", () => {
+        /** Framing on with one rule keyed on the user agent, asked as `agent`. */
+        async function ruled(action: "allow" | "refuse", agent: string) {
+            const response = await fetch(`${proxyUrl}/`, {
+                headers: {
+                    [ORIGIN_HEADER]: signEdgeOrigin(originUrl, SECRET),
+                    "user-agent": agent,
+                    "x-polaris-waf": encodeGuardRule({
+                        deny: [],
+                        requireLogin: false,
+                        frameAncestors: ["https://partner.example"],
+                        frameRules: [
+                            {
+                                name: "kiosk",
+                                enabled: true,
+                                action,
+                                ancestors: ["https://kiosk.example"],
+                                conditions: [
+                                    {
+                                        field: "user_agent",
+                                        operator: "contains",
+                                        values: ["kiosk"]
+                                    }
+                                ]
+                            }
+                        ],
+                        rules: []
+                    })
+                }
+            });
+            return response.headers;
+        }
+
+        it("adds an allow rule's sites only to a request it matches", async () => {
+            respond = () => ({ body: "<p>x</p>" });
+
+            expect((await ruled("allow", "Kiosk/1")).get("content-security-policy")).toBe(
+                "frame-ancestors 'self' https://partner.example https://kiosk.example"
+            );
+            expect((await ruled("allow", "Mozilla/5.0")).get("content-security-policy")).toBe(
+                "frame-ancestors 'self' https://partner.example"
+            );
+        });
+
+        it("refuses every frame on a request a refuse rule matches", async () => {
+            respond = () => ({ body: "<p>x</p>" });
+
+            const headers = await ruled("refuse", "Kiosk/1");
+
+            expect(headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
+            expect(headers.get("x-frame-options")).toBe("DENY");
+        });
+    });
 });

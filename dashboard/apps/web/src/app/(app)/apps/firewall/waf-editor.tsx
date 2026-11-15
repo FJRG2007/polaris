@@ -43,6 +43,7 @@ import { emptyRule, RuleEditor, type RulePosition } from "./rule-editor";
 import { PredefinedRuleList, type PredefinedRuleRow } from "./predefined-list";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DirectAccessNotice } from "./direct-access-notice";
+import { emptyFrameRule, FrameRuleEditor, FrameRuleList } from "./frame-rules";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { localizeManaged } from "./waf-words";
 import {
@@ -51,6 +52,7 @@ import {
     WAF_RULES_MAX,
     wafManagedRule,
     type WafCustomRule,
+    type WafFrameRule,
     type WafManagedRule,
     type WafScopeType
 } from "@polaris/core";
@@ -80,6 +82,7 @@ const BLANK: WafScopeRule = {
     emailObfuscation: true,
     frameProtection: true,
     frameAncestors: [],
+    frameRules: [],
     presets: [],
     rules: []
 };
@@ -89,6 +92,7 @@ const BLANK: WafScopeRule = {
 type View =
     | { readonly kind: "list" }
     | { readonly kind: "custom"; readonly index: number | null; readonly rule: WafCustomRule }
+    | { readonly kind: "frame"; readonly index: number | null; readonly rule: WafFrameRule }
     | { readonly kind: "managed"; readonly id: string }
     | { readonly kind: "addresses" }
     | { readonly kind: "login" };
@@ -259,7 +263,9 @@ export function WafEditor({
         setMatches(undefined);
         void polls.wafRule({ scopeType, scopeId }).then((result) => {
             if (!active) return;
-            const rule = result.rule ?? BLANK;
+            // Filled from BLANK so a field this screen writes is never missing from what
+            // it sends back - a save always carries the whole scope.
+            const rule = { ...BLANK, ...result.rule };
             confirmed.current = rule;
             onScreen.current = rule;
             setSaved(rule);
@@ -374,6 +380,28 @@ export function WafEditor({
                 onCancel={backToList}
                 onSave={(rule, position) => {
                     persist({ rules: placed(saved.rules, rule, view.index, position) });
+                    backToList();
+                }}
+            />
+        );
+    }
+
+    if (view.kind === "frame") {
+        const at = view.index;
+        return (
+            <FrameRuleEditor
+                rule={view.rule}
+                creating={at === null}
+                onCancel={backToList}
+                onSave={(rule) => {
+                    persist({
+                        frameRules:
+                            at === null
+                                ? [...saved.frameRules, rule]
+                                : saved.frameRules.map((entry, index) =>
+                                      index === at ? rule : entry
+                                  )
+                    });
                     backToList();
                 }}
             />
@@ -731,6 +759,17 @@ export function WafEditor({
                 offFromAbove={framingOffAbove}
                 allowedAbove={inherited?.frameAncestors ?? []}
                 onChange={persist}
+                onCreateRule={() =>
+                    setView({
+                        kind: "frame",
+                        index: null,
+                        rule: emptyFrameRule(saved.frameRules.length, t)
+                    })
+                }
+                onEditRule={(index) => {
+                    const rule = saved.frameRules[index];
+                    if (rule) setView({ kind: "frame", index, rule });
+                }}
             />
 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -761,13 +800,17 @@ function FramingSection({
     saved,
     offFromAbove,
     allowedAbove,
-    onChange
+    onChange,
+    onCreateRule,
+    onEditRule
 }: {
     polaris: boolean;
     saved: WafScopeRule;
     offFromAbove: boolean;
     allowedAbove: readonly string[];
     onChange: (patch: Partial<WafScopeRule>) => void;
+    onCreateRule: () => void;
+    onEditRule: (index: number) => void;
 }) {
     const t = useTranslations("firewall");
     const on = polaris || (saved.frameProtection && !offFromAbove);
@@ -828,6 +871,12 @@ function FramingSection({
                                 {t("framing.allowedAbove", { sites: allowedAbove.join(", ") })}
                             </p>
                         ) : null}
+                        <FrameRuleList
+                            rules={saved.frameRules}
+                            onCreate={onCreateRule}
+                            onEdit={onEditRule}
+                            onChange={(frameRules) => onChange({ frameRules })}
+                        />
                     </div>
                 ) : null}
             </div>

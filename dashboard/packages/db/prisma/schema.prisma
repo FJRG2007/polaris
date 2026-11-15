@@ -6128,6 +6128,9 @@ model WafRule {
     frameProtection Boolean @default(true)
     // Origins allowed to frame the scope anyway, as a JSON string array. Unions.
     frameAncestors  String  @default("[]")
+    // Conditional framing rules as a JSON array (conditions -> allow sites | refuse),
+    // decided per request by the edge guard. Concatenated across scopes.
+    frameRules      String  @default("[]")
     // Enabled managed rule packs as a JSON array of ids (see waf-presets.ts). Ids,
     // not their contents: the pack's rules are expanded at the edge, so improving a
     // list ships as a release rather than a migration over everyone's saved rules.

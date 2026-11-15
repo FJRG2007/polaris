@@ -1656,6 +1656,7 @@ async function publishAppRoutes(
             emailObfuscation: true,
             frameProtection: true,
             frameAncestors: [],
+            frameRules: [],
             presets: [],
             rules: []
         };
@@ -1747,6 +1748,7 @@ async function publishAppRoutes(
                         xssProtection: rule.xssProtection,
                         emailObfuscation: rule.emailObfuscation,
                         frameAncestors: frameRuleOf(rule),
+                        frameRules: rule.frameRules,
                         loginKeys
                     },
                     parsePrivateAccess(domain.privateAccess)
@@ -1788,6 +1790,7 @@ async function publishAppRoutes(
                 xssProtection: rule.xssProtection,
                 emailObfuscation: rule.emailObfuscation,
                 frameAncestors: frameRuleOf(rule),
+                frameRules: rule.frameRules,
                 loginKeys
             });
         }

@@ -21,7 +21,7 @@ import { STICKY_COOKIE } from "@polaris/deploy";
 import { writeDynamicFile } from "@/lib/traefik-dynamic";
 import { encodeGuardRule, signEdgeOrigin } from "@polaris/core/waf";
 import { NO_ROUTES_FILE } from "@polaris/core";
-import type { AppEdgeConfig, WafCustomRule, WafPrincipalGrant } from "@polaris/core";
+import type { AppEdgeConfig, WafCustomRule, WafFrameRule, WafPrincipalGrant } from "@polaris/core";
 import {
     declaresFraming,
     fallbackFrameHeaders,
@@ -114,6 +114,10 @@ export interface AppRoute {
      * to set without seeing the app's response (`fallbackFrameHeaders`).
      */
     readonly frameAncestors?: readonly string[];
+    /** Framing decided per request on top of `frameAncestors` (see `decideFraming`).
+     *  Only the guard's proxy can apply it, so it is carried only where the route goes
+     *  through it; the fallback header cannot vary per request. */
+    readonly frameRules?: readonly WafFrameRule[];
     /** The public keys a login token for this route must be signed with (see
      *  `GuardRule.keys`). Only written into a rule that requires a login. */
     readonly loginKeys?: readonly string[];
@@ -395,6 +399,8 @@ function routeMiddlewares(
             // the guard cannot merge for gets the fallback header instead.
             frameAncestors:
                 isProxied && framedByGuard(route, options) ? route.frameAncestors : undefined,
+            frameRules:
+                isProxied && framedByGuard(route, options) ? route.frameRules : undefined,
             presets: route.presets ?? [],
             rules: route.rules ?? []
         });

@@ -106,6 +106,7 @@ export const passthroughWaf = {
     emailObfuscation: false,
     frameProtection: false,
     frameAncestors: [],
+    frameRules: [],
     presets: [],
     rules: []
 };

@@ -54,7 +54,8 @@ import {
     isStaticAssetPath,
     reputationSparesPath,
     signInLiftsBan,
-    type WafIntelIndex
+    type WafIntelIndex,
+    type WafRequestFacts
 } from "@polaris/core";
 import {
     decodeGuardRule,
@@ -184,6 +185,25 @@ function parseUri(uri: string | undefined, proto: string, host: string | undefin
     } catch {
         return null;
     }
+}
+
+/** The facts a rule condition reads, from the forwarded request. Shared by the custom
+ *  rules here and the proxy's framing rules, so both judge the same request. */
+export function requestFacts(req: GuardRequest): WafRequestFacts {
+    const proto = req.forwardedProto || "https";
+    const host = req.forwardedHost;
+    const uri = parseUri(req.forwardedUri, proto, host);
+    return {
+        ip: clientIp(req.forwardedFor),
+        host,
+        path: uri?.pathname ?? req.forwardedUri ?? null,
+        method: req.forwardedMethod,
+        userAgent: req.userAgent,
+        query: uri?.search.replace(/^\?/, "") ?? null,
+        accept: req.accept,
+        acceptLanguage: req.acceptLanguage,
+        acceptEncoding: req.acceptEncoding
+    };
 }
 
 /** The absolute original URL of the request (for the post-login return trip). */
@@ -338,18 +358,7 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
     let skipped: ReadonlySet<string> = EMPTY_SKIP;
     const managed = rule.managedRules ?? [];
     if (rule.rules.length > 0 || managed.length > 0) {
-        const uri = parseUri(req.forwardedUri, proto, host);
-        const facts = {
-            ip: clientIp(req.forwardedFor),
-            host,
-            path: uri?.pathname ?? req.forwardedUri ?? null,
-            method: req.forwardedMethod,
-            userAgent: req.userAgent,
-            query: uri?.search.replace(/^\?/, "") ?? null,
-            accept: req.accept,
-            acceptLanguage: req.acceptLanguage,
-            acceptEncoding: req.acceptEncoding
-        };
+        const facts = requestFacts(req);
 
         const own = evaluateWafRules(rule.rules, facts);
         skipped = own.skipped;

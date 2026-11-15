@@ -307,6 +307,7 @@ describe("wafRuleInputSchema", () => {
             emailObfuscation: true,
             frameProtection: true,
             frameAncestors: [],
+            frameRules: [],
             presets: [],
             rules: []
         });

@@ -56,6 +56,50 @@ describe("with a guard that merges framing", () => {
         // The proxy decides with the app's response in hand; no blind header on top.
         expect(config).not.toContain("X-Frame-Options");
     });
+
+    it("hands the proxy the conditional rules beside the allowed sites", () => {
+        const frameRules = [
+            {
+                name: "office",
+                enabled: true,
+                action: "allow" as const,
+                ancestors: ["https://office.example"],
+                conditions: [{ field: "ip" as const, operator: "equals" as const, values: ["10.0.0.0/8"] }]
+            }
+        ];
+        const config = withSecret(() =>
+            renderDynamicConfig([route({ frameAncestors: [], frameRules })], {
+                proxyAvailable: true,
+                frameAvailable: true
+            })
+        );
+
+        expect(ruleIn(config)?.frameRules).toEqual(frameRules);
+    });
+
+    it("carries no rules when framing protection is off", () => {
+        const config = withSecret(() =>
+            renderDynamicConfig(
+                [
+                    route({
+                        emailObfuscation: true,
+                        frameRules: [
+                            {
+                                name: "x",
+                                enabled: true,
+                                action: "refuse",
+                                ancestors: [],
+                                conditions: [{ field: "path", operator: "equals", values: ["/"] }]
+                            }
+                        ]
+                    })
+                ],
+                { proxyAvailable: true, frameAvailable: true }
+            )
+        );
+
+        expect(ruleIn(config)?.frameRules).toBeUndefined();
+    });
 });
 
 describe("without one", () => {

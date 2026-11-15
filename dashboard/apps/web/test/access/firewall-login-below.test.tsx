@@ -23,6 +23,7 @@ const RULE = {
     emailObfuscation: true,
     frameProtection: true,
     frameAncestors: [],
+    frameRules: [],
     presets: [],
     rules: []
 };

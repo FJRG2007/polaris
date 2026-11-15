@@ -66,7 +66,7 @@ export function emptyRule(count: number, t: Words): WafCustomRule {
 /** Whether any test anywhere in the tree is still waiting for a value. A half-written
  *  condition matches nothing or everything depending on its operator, which is the one
  *  thing that must never reach the edge. A signature check has no value to wait for. */
-function anyEmpty(conditions: readonly WafCondition[]): boolean {
+export function anyEmpty(conditions: readonly WafCondition[]): boolean {
     return conditions.some((condition) => {
         if (core.isWafSignalCondition(condition)) return false;
         return core.isWafConditionGroup(condition)

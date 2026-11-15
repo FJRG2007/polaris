@@ -237,6 +237,7 @@ describe("saving who a rule names", () => {
             emailObfuscation: false,
             frameProtection: false,
             frameAncestors: [],
+            frameRules: [],
             presets: [],
             rules: []
         });

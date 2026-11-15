@@ -38,7 +38,7 @@ import { sendSignInUnavailable } from "./signin-unavailable.js";
 import { connect as netConnect } from "node:net";
 import { sendChallenge } from "./challenge-page.js";
 import { request as httpsRequest } from "node:https";
-import { clientIp, evaluate, type GuardConfig } from "./authz.js";
+import { clientIp, evaluate, requestFacts, type GuardConfig } from "./authz.js";
 import { decodeGuardRule, verifyEdgeOrigin } from "@polaris/core/waf";
 import {
     createServer,
@@ -48,7 +48,8 @@ import {
     type ServerResponse
 } from "node:http";
 import {
-    protectFrameHeaders,
+    decideFraming,
+    frameHeadersFor,
     EMAIL_DECODE_PATH,
     EMAIL_DECODE_SCRIPT,
     obfuscateEmailsInHtml,
@@ -220,22 +221,20 @@ export function createProxyServer(config: () => GuardConfig): Server {
         // route is not a route with weaker rules; it is a route whose response also
         // gets rewritten.
         const wafHeader = header(req, "x-polaris-waf");
-        const decision = evaluate(
-            {
-                wafHeader,
-                forwardedFor: header(req, "x-forwarded-for"),
-                forwardedProto: header(req, "x-forwarded-proto"),
-                forwardedHost: header(req, "x-forwarded-host") ?? header(req, "host"),
-                forwardedUri: url,
-                forwardedMethod: req.method,
-                userAgent: header(req, "user-agent"),
-                accept: header(req, "accept"),
-                acceptLanguage: header(req, "accept-language"),
-                acceptEncoding: header(req, "accept-encoding"),
-                cookie: header(req, "cookie")
-            },
-            cfg
-        );
+        const guardRequest = {
+            wafHeader,
+            forwardedFor: header(req, "x-forwarded-for"),
+            forwardedProto: header(req, "x-forwarded-proto"),
+            forwardedHost: header(req, "x-forwarded-host") ?? header(req, "host"),
+            forwardedUri: url,
+            forwardedMethod: req.method,
+            userAgent: header(req, "user-agent"),
+            accept: header(req, "accept"),
+            acceptLanguage: header(req, "accept-language"),
+            acceptEncoding: header(req, "accept-encoding"),
+            cookie: header(req, "cookie")
+        };
+        const decision = evaluate(guardRequest, cfg);
         if (decision.status === 403) {
             sendBlocked(res, {
                 host: header(req, "x-forwarded-host") ?? header(req, "host"),
@@ -269,10 +268,16 @@ export function createProxyServer(config: () => GuardConfig): Server {
 
         const rule = decodeGuardRule(wafHeader);
         const frame = rule.frameAncestors;
-        const shape: HeaderShape =
+        // Decided once per request, before the upstream answers: the conditions read
+        // the request, so every branch of the response gets the same answer.
+        const framing =
             frame === undefined
+                ? undefined
+                : decideFraming(frame, rule.frameRules ?? [], requestFacts(guardRequest));
+        const shape: HeaderShape =
+            framing === undefined
                 ? (headers) => headers
-                : (headers) => protectFrameHeaders(headers, frame);
+                : (headers) => frameHeadersFor(headers, framing);
         forward(req, res, origin, rule.emailObfuscation === true, shape);
     });
 

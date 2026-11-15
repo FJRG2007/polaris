@@ -355,7 +355,35 @@
         "allowedAbove": "Also allowed by a scope above: {sites}",
         "placeholder": "example.com or https://*.example.com",
         "invalid": "Use a site address like example.com, https://example.com or *.example.com",
-        "polaris": "Always on for Polaris. Published calendars stay embeddable on any site."
+        "polaris": "Always on for Polaris. Published calendars stay embeddable on any site.",
+        "rules": {
+            "title": "Conditional rules",
+            "hint": "Browsers only accept a list of sites, so these conditions are checked on each request for this page. A site is known by its address, never by who views the page around it.",
+            "count": "{count} of {max}",
+            "create": "Add rule",
+            "atMost": "At most {max} rules",
+            "empty": "No conditional rules. The list above applies to every request.",
+            "allows": "allows {sites}",
+            "refuses": "refuses every frame",
+            "edit": "Edit {name}",
+            "remove": "Delete {name}",
+            "kind": "embed rule",
+            "deleteBody": "Requests it matched go back to the list above.",
+            "newName": "Embed rule {number}",
+            "createTitle": "Create embed rule",
+            "editTitle": "Edit embed rule",
+            "whenHint": "Every condition must hold. Address, hostname, path and user agent are those of the request for this page.",
+            "actions": {
+                "allow": "Allow these sites",
+                "refuse": "Refuse every frame"
+            },
+            "effects": {
+                "allow": "The sites below may embed the page, on top of the list above.",
+                "refuse": "No site may embed the page, whatever else allows it. Wins over every allow rule."
+            },
+            "sites": "Sites",
+            "noSites": "Add at least one site."
+        }
     },
     "missing": {
         "text": "This rule is not part of this version of Polaris.",

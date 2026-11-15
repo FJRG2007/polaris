@@ -67,6 +67,7 @@ async function failure(caught: unknown, fallback: FirewallKey): Promise<string> 
 type WafAddressActivity = core.WafAddressActivity;
 type WafAnomaly = core.WafAnomaly;
 type WafCustomRule = core.WafCustomRule;
+type WafFrameRule = core.WafFrameRule;
 type WafJail = core.WafJail;
 type WafPrincipalGrant = core.WafPrincipalGrant;
 type WafPrincipalType = core.WafPrincipalType;
@@ -183,6 +184,7 @@ export interface WafScopeRule {
     emailObfuscation: boolean;
     frameProtection: boolean;
     frameAncestors: string[];
+    frameRules: WafFrameRule[];
     presets: string[];
     rules: WafCustomRule[];
 }
