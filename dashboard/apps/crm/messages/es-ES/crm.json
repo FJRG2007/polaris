@@ -675,7 +675,8 @@
         "waitTimeouts": {
             "stop": "Terminar",
             "continue": "Seguir"
-        }
+        },
+        "notStarted": "Está desactivada o frenada por su límite"
     },
     "favorites": {
         "add": "Añadir a favoritos",
@@ -907,5 +908,12 @@
         "keep": "Conservar este registro. Sus campos vacíos se rellenan con los demás, que van a la papelera.",
         "confirm": "Fusionar",
         "done": "Registros unidos"
+    },
+    "automations": {
+        "appName": "CRM",
+        "new": "Automatizar",
+        "newName": "Automatización de {objects}",
+        "startFailed": "No se pudo crear la automatización",
+        "noAccess": "No tienes acceso a Automatizaciones"
     }
 }

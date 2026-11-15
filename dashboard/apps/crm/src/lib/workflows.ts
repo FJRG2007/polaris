@@ -46,6 +46,8 @@ interface StoredWorkflow {
     readonly lastRunAt: Date | null;
     readonly lastError: string | null;
     readonly nextRunAt?: Date | null;
+    /** The central automation it moved to: set, this engine starts nothing new for it. */
+    readonly movedToId?: string | null;
 }
 
 /** What a run knows about why it started. */
@@ -704,9 +706,46 @@ async function runAction(
     }
 }
 
+/** A CRM check as a step of a central automation: whether the run's record matches. */
+export function centralMatches(
+    runner: CrmActor,
+    context: RunContext,
+    filter: model.WorkflowFilter
+): Promise<boolean> {
+    return recordMatches(runner, context, filter);
+}
+
+/**
+ * A CRM action as a step of a central automation, done as the runner with the
+ * same code a workflow's run used. The changes it makes set nothing else off.
+ */
+export async function centralAction(
+    runner: CrmActor,
+    automation: { readonly id: string; readonly name: string },
+    action: model.WorkflowAction,
+    context: RunContext
+): Promise<void> {
+    const trigger = JSON.stringify({ kind: context.event?.kind ?? "manual" });
+    const stand: StoredWorkflow = {
+        id: automation.id,
+        orgId: runner.shelf.orgId,
+        userId: runner.shelf.userId,
+        object: context.object,
+        name: automation.name,
+        trigger,
+        actions: "[]",
+        enabled: true,
+        runAsId: runner.user.id,
+        runCount: 0,
+        lastRunAt: null,
+        lastError: null
+    };
+    await withinWorkflow(() => runAction(runner, stand, action, context));
+}
+
 /** What a failure says on the workflow: a refusal as it was worded, anything
  *  else as a sentence that names nothing internal. */
-async function failureText(caught: unknown): Promise<string> {
+export async function failureText(caught: unknown): Promise<string> {
     if (caught instanceof CrmRefusal) return caught.message.slice(0, ERROR_MAX);
     console.error("crm: a workflow failed", caught);
     return (await crmT())("errors.generic");
@@ -1016,9 +1055,11 @@ export async function listManualWorkflows(
         orderBy: { name: "asc" },
         take: model.MAX_WORKFLOWS
     })) as StoredWorkflow[];
-    return rows
-        .filter((row) => model.readTrigger(row.trigger)?.kind === "manual")
+    const own = rows
+        .filter((row) => !row.movedToId && model.readTrigger(row.trigger)?.kind === "manual")
         .map((row) => ({ id: row.id, name: row.name }));
+    const central = await (await import("./automation-central")).manualAutomations(actor, object);
+    return [...own, ...central].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -1037,11 +1078,16 @@ export async function runManualWorkflow(
     const row = (await prisma.crmWorkflow.findFirst({
         where: { id: workflowId, ...shelfWhere(actor.shelf), object, enabled: true }
     })) as StoredWorkflow | null;
-    if (!row || model.readTrigger(row.trigger)?.kind !== "manual") {
-        throw new CrmRefusal(t("workflows.gone"));
-    }
     const record = await records.getRecord(actor, object, recordId);
     if (!record || record.deletedAt) throw new CrmRefusal(t("errors.notFound"));
+    if (!row || row.movedToId || model.readTrigger(row.trigger)?.kind !== "manual") {
+        // An automation's id: it runs there, and its run says how it went.
+        const started = await (
+            await import("./automation-central")
+        ).runManualAutomation(actor, object, recordId, workflowId);
+        if (started === null) throw new CrmRefusal(t("workflows.gone"));
+        return { error: started ? null : t("workflows.notStarted") };
+    }
     return { error: await runWorkflow(row, { object, recordId, event: null }) };
 }
 
@@ -1064,10 +1110,14 @@ export async function onRecordEvents(
         where: { ...shelfWhere(actor.shelf), object, enabled: true },
         take: model.MAX_WORKFLOWS
     })) as StoredWorkflow[];
+    await (await import("./automation-central"))
+        .fireRecordEvents(actor, object, events, inRun)
+        .catch((caught: unknown) => console.error("crm: automations were not set off", caught));
     if (rows.length === 0) return;
     if (!inRun) {
         const fields = fieldsOf(object, await loadFields(actor.shelf, object));
-        for (const row of rows) {
+        // A workflow that moved runs as its automation, set off from there.
+        for (const row of rows.filter((one) => !one.movedToId)) {
             const trigger = model.readTrigger(row.trigger);
             if (!trigger) continue;
             for (const event of events) {
@@ -1093,7 +1143,7 @@ const SCHEDULE_BATCH = 50;
  */
 export async function runDueSchedules(now: Date = new Date()): Promise<number> {
     const rows = (await prisma.crmWorkflow.findMany({
-        where: { enabled: true, nextRunAt: { lte: now } },
+        where: { enabled: true, movedToId: null, nextRunAt: { lte: now } },
         orderBy: { nextRunAt: "asc" },
         take: SCHEDULE_BATCH
     })) as (StoredWorkflow & { nextRunAt: Date })[];
@@ -1109,7 +1159,13 @@ export async function runDueSchedules(now: Date = new Date()): Promise<number> {
         await runWorkflow(row, { object: row.object as CrmObject, recordId: null, event: null });
         ran += 1;
     }
-    return ran + (await resumeWaitingRuns(now));
+    const central = await (await import("./automation-central"))
+        .fireDueSchedules(now)
+        .catch((caught: unknown) => {
+            console.error("crm: scheduled automations were not set off", caught);
+            return 0;
+        });
+    return ran + central + (await resumeWaitingRuns(now));
 }
 
 /** What an outside call to a webhook address came to. */
@@ -1133,6 +1189,12 @@ export async function runHook(secret: string, text: string): Promise<HookAnswer>
         } catch {
             return "badBody";
         }
+    }
+    if (row.movedToId) {
+        const started = await (
+            await import("./automation-central")
+        ).fireHook(row.movedToId, row.object as CrmObject, body);
+        return started ? { error: null } : "unknown";
     }
     return {
         error: await runWorkflow(row, {

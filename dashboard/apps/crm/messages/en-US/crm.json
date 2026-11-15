@@ -675,7 +675,8 @@
         "waitTimeouts": {
             "stop": "End the run",
             "continue": "Go on anyway"
-        }
+        },
+        "notStarted": "It is switched off or held back by its limit"
     },
     "favorites": {
         "add": "Add to favorites",
@@ -907,5 +908,12 @@
         "keep": "Keep this record. Its empty fields are filled from the others, which go to the trash.",
         "confirm": "Merge",
         "done": "Records merged"
+    },
+    "automations": {
+        "appName": "CRM",
+        "new": "New automation",
+        "newName": "New {objects} automation",
+        "startFailed": "The automation could not be started",
+        "noAccess": "You do not have access to Automations"
     }
 }

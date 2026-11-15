@@ -15126,6 +15126,10 @@ model CrmWorkflow {
     // Whoever saved it last: it runs as them. No FK - it outlives them, and
     // stops running then.
     runAsId     String?   @db.Uuid
+    // The central automation it moved to. Set, this engine starts no new run
+    // for it and only finishes the ones already waiting; cleared, it is the
+    // workflow's again. No FK: the automation may be removed alone.
+    movedToId   String?   @db.Uuid
     createdAt   DateTime  @default(now())
     updatedAt   DateTime  @updatedAt
 

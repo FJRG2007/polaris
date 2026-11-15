@@ -106,9 +106,15 @@ vi.mock("@polaris/db", () => {
     client.$transaction = async (run: (tx: unknown) => unknown) => run(client);
     return { prisma: client, Prisma: { Decimal: class {} } };
 });
+const automations = vi.hoisted(() => ({
+    appTriggers: vi.fn(async (): Promise<Record<string, unknown>[]> => []),
+    fireAppTrigger: vi.fn(async () => true),
+    wakeAppWaits: vi.fn(async () => undefined)
+}));
 vi.mock("@polaris/app-host", () => ({
     host: {
         crmHost,
+        automations,
         i18nRequest: { getClient: async () => "browser", getLocale: async () => "en-US" },
         rateLimitService: { rateLimit: async () => ({ ok: limits.ok }) },
         requestContext: { clientIp: async () => "203.0.113.9" },
@@ -986,7 +992,11 @@ describe("on a schedule", () => {
         expect(await workflows.runDueSchedules(new Date("2026-10-13T09:00:30Z"))).toBe(1);
         expect(db.crmWorkflow.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { enabled: true, nextRunAt: { lte: new Date("2026-10-13T09:00:30Z") } }
+                where: {
+                    enabled: true,
+                    movedToId: null,
+                    nextRunAt: { lte: new Date("2026-10-13T09:00:30Z") }
+                }
             })
         );
         expect(db.crmWorkflow.updateMany).toHaveBeenCalledWith({
